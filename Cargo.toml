@@ -1,4 +1,8 @@
 [package]
 name = "ion"
 version = "0.1.0"
-authors = ["Michael Gattozzi <mgattozzi@gmail.com>"]
+authors = [
+  "Redox Developers <info@redox-os.org>"
+  "Michael Gattozzi <mgattozzi@gmail.com>",
+  "Łukasz Niemier <lukasz@niemier.pl>"
+]
