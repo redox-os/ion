@@ -2,7 +2,7 @@
 name = "ion"
 version = "0.1.0"
 authors = [
-  "Redox Developers <info@redox-os.org>"
+  "Redox Developers <info@redox-os.org>",
   "Michael Gattozzi <mgattozzi@gmail.com>",
   "Łukasz Niemier <lukasz@niemier.pl>"
 ]
