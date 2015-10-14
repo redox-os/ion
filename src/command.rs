@@ -7,15 +7,12 @@ pub struct InstructionOut {
 
 pub fn run(input_command: Vec<&str>) -> Option<InstructionOut> {
     let args = input_command.as_slice();
-    let length = args.len();
     let output: Option<Output>;
-    if length ==0 {
-        output = Command::new("").output().ok();
-    } else if length ==  1 {
-        output = Command::new(&args[0]).output().ok();
-    } else {
-        output = Command::new(&args[0]).args(&args[1..]).output().ok();
-    };
+    match args.len() {
+        0 => output = Command::new("").output().ok(),
+        1 => output = Command::new(&args[0]).output().ok(),
+        _ => output = Command::new(&args[0]).args(&args[1..]).output().ok(),
+    }
     if output.is_some() {
         let output = output.unwrap();
         Some(InstructionOut {
