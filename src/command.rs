@@ -5,8 +5,7 @@ pub struct InstructionOut {
     pub stderr: String,
 }
 
-pub fn run(input_command: Vec<&str>) -> Option<InstructionOut> {
-    let args = input_command.as_slice();
+pub fn run(args: &[&str]) -> Option<InstructionOut> {
     let output: Option<Output>;
     match args.len() {
         0 => output = Command::new("").output().ok(),
