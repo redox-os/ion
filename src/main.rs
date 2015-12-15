@@ -621,7 +621,7 @@ pub fn set_var(variables: &mut Vec<Variable>, name: &str, value: &str) {
     }
 }
 
-#[no_mangle] pub fn main() {
+fn real_main() {
     let commands = Command::vec();
     let mut variables: Vec<Variable> = vec![];
     let mut modes: Vec<Mode> = vec![];
@@ -670,4 +670,15 @@ pub fn set_var(variables: &mut Vec<Variable>, name: &str, value: &str) {
             break;
         }
     }
+}
+
+#[cfg(target_os = "redox")]
+#[no_mangle]
+pub fn main(){
+    real_main();
+}
+
+#[cfg(not(target_os = "redox"))]
+fn main(){
+    real_main();
 }
