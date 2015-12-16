@@ -2,11 +2,12 @@
 name = "ion-shell"
 description = "The Ion Shell"
 repository = "https://github.com/redox-os/ion"
-version = "0.0.3"
+version = "0.0.4"
 license-file = "LICENSE"
 readme = "README.md"
 authors = [
   "Jeremy Soller <jackpot51@gmail.com>",
   "Michael Gattozzi <mgattozzi@gmail.com>",
-  "Łukasz Niemier <lukasz@niemier.pl>"
+  "Łukasz Niemier <lukasz@niemier.pl>",
+  "Skyler Berg <skylertheberg@gmail.com>"
 ]
