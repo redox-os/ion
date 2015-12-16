@@ -3,24 +3,16 @@ use std::string::String;
 use std::vec::Vec;
 use std::boxed::Box;
 use std::fs::{self, File};
-use std::io::{stdout, stdin, Read, Write};
+use std::io::{stdout, Read, Write};
 use std::env;
 use std::process;
 use std::thread;
 
 use self::to_num::ToNum;
+use self::input_editor::readln;
 
 pub mod to_num;
-
-macro_rules! readln {
-    () => ({
-        let mut buffer = String::new();
-        match stdin().read_line(&mut buffer) {
-            Ok(_) => Some(buffer),
-            Err(_) => None
-        }
-    });
-}
+pub mod input_editor;
 
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the functionnality associated to this one, with zero, one or several argument(s).
@@ -262,7 +254,7 @@ impl Command {
                         let arg = arg_original.trim();
                         print!("{}=", arg);
                         stdout().flush();
-                        if let Some(value_original) = readln!() {
+                        if let Some(value_original) = readln() {
                             let value = value_original.trim();
                             set_var(variables, arg, value);
                         }
@@ -599,7 +591,7 @@ fn real_main() {
         print!("ion:{}# ", cwd);
         stdout().flush();
 
-        if let Some(command_original) = readln!() {
+        if let Some(command_original) = readln() {
             let command = command_original.trim();
             if command == "exit" {
                 break;
