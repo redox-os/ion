@@ -1,12 +1,19 @@
-pub fn tokenize(input: &str) -> Vec<String> {
-    let mut result: Vec<String> = vec![];
+#[derive(PartialEq)]
+#[derive(Debug)]
+pub enum Token {
+    Word(String),
+    End,
+}
+
+pub fn tokenize(input: &str) -> Vec<Token> {
+    let mut result: Vec<Token> = vec![];
     for raw_word in input.split(' ') {
         let word = raw_word.trim();
         if word.starts_with("#") {
             break;
         }
         if !word.is_empty() {
-            result.push(word.to_string());
+            result.push(Token::Word(word.to_string()));
         }
     }
     result
@@ -19,40 +26,37 @@ mod tests {
 
     #[test]
     fn tokenize_empty_string() {
-        let expected: Vec<String> = vec![];
-        assert_eq!(tokenize(""), expected);
+        assert!(tokenize("").is_empty());
     }
 
     #[test]
     fn tokenize_single_word() {
-        let expected: Vec<String> = vec!["word".to_string()];
-        assert_eq!(tokenize("word"), expected);
+        let expected: Vec<Token> = vec![Token::Word("word".to_string())];
+        assert_eq!(expected, tokenize("word"));
     }
 
     #[test]
     fn tokenize_whitespace() {
-        let expected: Vec<String> = vec![];
-        assert_eq!(tokenize(" \t   "), expected);
+        assert!(tokenize(" \t   ").is_empty());
     }
 
     #[test]
     fn tokenize_multiple_words() {
-        let expected: Vec<String> = vec![
-            "one".to_string(),
-            "two".to_string(),
-            "three".to_string()];
-        assert_eq!(tokenize("one two three"), expected);
+        let expected: Vec<Token> = vec![
+            Token::Word("one".to_string()),
+            Token::Word("two".to_string()),
+            Token::Word("three".to_string())];
+        assert_eq!(expected, tokenize("one two three"));
     }
 
     #[test]
     fn tokenize_comment() {
-        let expected: Vec<String> = vec![];
-        assert_eq!(tokenize("# some text"), expected);
+        assert!(tokenize("# some text").is_empty());
     }
 
     #[test]
     fn tokenize_end_of_line_comment() {
-        let expected: Vec<String> = vec!["word".to_string()];
-        assert_eq!(tokenize("word # more stuff"), expected);
+        let expected: Vec<Token> = vec![Token::Word("word".to_string())];
+        assert_eq!(expected, tokenize("word # more stuff"));
     }
 }

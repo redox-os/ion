@@ -10,7 +10,7 @@ use std::thread;
 
 use self::to_num::ToNum;
 use self::input_editor::readln;
-use self::tokenizer::tokenize;
+use self::tokenizer::{Token, tokenize};
 
 pub mod to_num;
 pub mod input_editor;
@@ -401,25 +401,28 @@ fn on_command(command_string: &str,
         return;
     }
 
-    let mut tokens: Vec<String> = tokenize(command_string);
+    let mut tokens: Vec<Token> = tokenize(command_string);
 
     // replace variables
     // TODO This copies all tokens and is inefficient
-    let mut args: Vec<_> = tokens.iter().map(|arg| {
-        if arg.starts_with('$') {
-            let mut result = String::new();
-            let name = arg[1..arg.len()].to_string();
-            for variable in variables.iter() {
-                if variable.name == name {
-                    result = variable.value.clone();
-                    break;
+    let mut args: Vec<String> = vec![];
+    for token in tokens.drain(..) {
+        if let Token::Word(arg) = token {
+            if arg.starts_with('$') {
+                let mut result = String::new();
+                let name = arg[1..arg.len()].to_string();
+                for variable in variables.iter() {
+                    if variable.name == name {
+                        result = variable.value.clone();
+                        break;
+                    }
                 }
+                args.push(result);
+            } else {
+                args.push(arg.clone());
             }
-            result
-        } else {
-            arg.clone()
         }
-    }).collect();
+    }
 
     // Execute commands
     if let Some(cmd) = args.get(0) {
