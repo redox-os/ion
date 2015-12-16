@@ -10,9 +10,11 @@ use std::thread;
 
 use self::to_num::ToNum;
 use self::input_editor::readln;
+use self::tokenizer::tokenize;
 
 pub mod to_num;
 pub mod input_editor;
+pub mod tokenizer;
 
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the functionnality associated to this one, with zero, one or several argument(s).
@@ -391,11 +393,6 @@ fn on_command(command_string: &str,
               commands: &Vec<Command>,
               variables: &mut Vec<Variable>,
               modes: &mut Vec<Mode>) {
-    // Comment
-    if command_string.starts_with('#') {
-        return;
-    }
-
     // Show variables
     if command_string == "$" {
         for variable in variables.iter() {
@@ -404,23 +401,25 @@ fn on_command(command_string: &str,
         return;
     }
 
-    // Explode into arguments, replace variables
-    let mut args: Vec<String> = vec![];
-    for arg in command_string.split(' ') {
-        if !arg.is_empty() {
-            if arg.starts_with('$') {
-                let name = arg[1..arg.len()].to_string();
-                for variable in variables.iter() {
-                    if variable.name == name {
-                        args.push(variable.value.clone());
-                        break;
-                    }
+    let mut tokens: Vec<String> = tokenize(command_string);
+
+    // replace variables
+    // TODO This copies all tokens and is inefficient
+    let mut args: Vec<_> = tokens.iter().map(|arg| {
+        if arg.starts_with('$') {
+            let mut result = String::new();
+            let name = arg[1..arg.len()].to_string();
+            for variable in variables.iter() {
+                if variable.name == name {
+                    result = variable.value.clone();
+                    break;
                 }
-            } else {
-                args.push(arg.to_string());
             }
+            result
+        } else {
+            arg.clone()
         }
-    }
+    }).collect();
 
     // Execute commands
     if let Some(cmd) = args.get(0) {
