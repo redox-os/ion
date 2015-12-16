@@ -169,14 +169,29 @@ impl Command {
             main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
                 let path = args.get(1).map_or(".".to_string(), |arg| arg.clone());
 
+                let mut entries = Vec::new();
                 match fs::read_dir(&path) {
                     Ok(dir) => {
                         for entry_result in dir {
                             match entry_result {
                                 Ok(entry) => {
-                                    match entry.path().to_str() {
-                                        Some(path_str) => println!("{}", path_str),
-                                        None => println!("?")
+                                    let directory = match entry.file_type() {
+                                        Ok(file_type) => file_type.is_dir(),
+                                        Err(err) => {
+                                            println!("Failed to read file type: {}", err);
+                                            false
+                                        }
+                                    };
+
+                                    match entry.file_name().to_str() {
+                                        Some(path_str) => {
+                                            if directory {
+                                                entries.push(path_str.to_string() + "/")
+                                            } else {
+                                                entries.push(path_str.to_string())
+                                            }
+                                        },
+                                        None => println!("Failed to convert path to string")
                                     }
                                 },
                                 Err(err) => println!("Failed to read entry: {}", err)
@@ -184,6 +199,12 @@ impl Command {
                         }
                     },
                     Err(err) => println!("Failed to open directory: {}: {}", path, err)
+                }
+
+                entries.sort();
+
+                for entry in entries {
+                    println!("{}", entry);
                 }
             }),
         });
@@ -252,11 +273,24 @@ impl Command {
 
         commands.push(Command {
             name: "rm",
-            help: "To remove a file, in the current directory\n    rm <my_file>",
+            help: "Remove a file\n    rm <file>",
             main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
                 match args.get(1) {
-                    Some(file_name) => if fs::remove_file(file_name).is_err() {
-                        println!("Failed to remove: {}", file_name);
+                    Some(path) => if fs::remove_file(path).is_err() {
+                        println!("Failed to remove: {}", path);
+                    },
+                    None => println!("No name provided"),
+                }
+            }),
+        });
+
+        commands.push(Command {
+            name: "rmdir",
+            help: "Remove a directory\n    rmdir <directory>",
+            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+                match args.get(1) {
+                    Some(path) => if fs::remove_dir(path).is_err() {
+                        println!("Failed to remove: {}", path);
                     },
                     None => println!("No name provided"),
                 }
@@ -303,41 +337,6 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
-            name: "send",
-            help: "To send data, via an URL\n    send <url> <data>",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
-                if args.len() < 3 {
-                    println!("Error: incorrect arguments");
-                    println!("Usage: send <url> <data>");
-                    return;
-                }
-
-                let path = args.get(1).map_or(String::new(), |arg| arg.clone());
-
-                match File::open(&path) {
-                    Ok(mut file) => {
-                        let string: String = args.iter()
-                                                 .skip(2)
-                                                 .fold(String::new(), |s, arg| s + " " + arg) +
-                                             "\r\n\r\n";
-
-                        match file.write(string.trim_left().as_bytes()) {
-                            Ok(size) => println!("Wrote {} bytes", size),
-                            Err(err) => println!("Failed to write: {}", err),
-                        }
-
-                        let mut string = String::new();
-                        match file.read_to_string(&mut string) {
-                            Ok(_) => println!("{}", string),
-                            Err(err) => println!("Failed to read: {}", err),
-                        }
-                    },
-                    Err(err) => println!("Failed to open: {}", err)
-                }
-            }),
-        });
-
         // Simple command to create a file, in the current directory
         // The file has got the name given as the first argument of the command
         // If the command have no arguments, the command don't create the file
@@ -354,57 +353,6 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
-            name: "url_hex",
-            help: "",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
-                let path = args.get(1).map_or(String::new(), |arg| arg.clone());
-
-                match File::open(&path) {
-                    Ok(mut file) => {
-                        let mut vec: Vec<u8> = vec![];
-                        match file.read_to_end(&mut vec) {
-                            Ok(_) => {
-                                let mut line = "HEX:".to_string();
-                                for byte in vec.iter() {
-                                    line = line + " " + &format!("{:X}", *byte);
-                                }
-                                println!("{}", line);
-                            }
-                            Err(err) => println!("Failed to read: {}", err)
-                        }
-                    }
-                    Err(err) => println!("Failed to open: {}", err)
-                }
-            }),
-        });
-
-        commands.push(Command {
-            name: "wget",
-            help: "To make some requests at a given host, using TCP protocol\n    wget <host> \
-                   <request>",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
-                if let Some(host) = args.get(1) {
-                    if let Some(req) = args.get(2) {
-                        if let Ok(mut con) = File::open(&("tcp://".to_string() + host)) {
-                            con.write(("GET ".to_string() + req + " HTTP/1.1").as_bytes());
-
-                            let mut res = vec![];
-                            con.read_to_end(&mut res);
-
-                            if let Ok(mut file) = File::open(&req) {
-                                file.write(&res);
-                            }
-                        }
-                    } else {
-                        println!("No request given");
-                    }
-                } else {
-                    println!("No url given");
-                }
-            }),
-        });
-
         // TODO: Someone should implement FromIterator for HashMap before
         //       changing the type back to HashMap
         let command_helper: BTreeMap<String, String> = commands
@@ -413,8 +361,8 @@ impl Command {
             .collect();
 
         commands.push(Command {
-            name: "man",
-            help: "Display a little helper for a given command\n    man ls",
+            name: "help",
+            help: "Display a little helper for a given command\n    help ls",
             main: Box::new(move |args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
                 if let Some(command) = args.get(1) {
                     if command_helper.contains_key(command) {
@@ -426,18 +374,10 @@ impl Command {
                         println!("Command helper not found [run 'help']...");
                     }
                 } else {
-                    println!("Please to specify a command!");
+                    for (command, _help) in command_helper.iter() {
+                        println!("{}", command);
+                    }
                 }
-            }),
-        });
-
-        let command_list = commands.iter().fold(String::new(), |l, c| l + " " + c.name);
-
-        commands.push(Command {
-            name: "help",
-            help: "Print available commands",
-            main: Box::new(move |_: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
-                println!("Commands:{}", command_list);
             }),
         });
 
@@ -656,7 +596,7 @@ fn real_main() {
             Err(_) => "?".to_string()
         };
 
-        print!("user@redox:{}# ", cwd);
+        print!("ion:{}# ", cwd);
         stdout().flush();
 
         if let Some(command_original) = readln!() {
