@@ -553,6 +553,27 @@ pub fn set_var(variables: &mut Vec<Variable>, name: &str, value: &str) {
     }
 }
 
+fn print_prompt(modes: &Vec<Mode>) {
+        for mode in modes.iter().rev() {
+            if mode.value {
+                print!("+ ");
+            } else {
+                print!("- ");
+            }
+        }
+
+        let cwd = match env::current_dir() {
+            Ok(path) => match path.to_str() {
+                Some(path_str) => path_str.to_string(),
+                None => "?".to_string()
+            },
+            Err(_) => "?".to_string()
+        };
+
+        print!("ion:{}# ", cwd);
+        stdout().flush();
+}
+
 fn real_main() {
     let commands = Command::vec();
     let mut variables: Vec<Variable> = vec![];
@@ -572,24 +593,8 @@ fn real_main() {
     }
 
     loop {
-        for mode in modes.iter().rev() {
-            if mode.value {
-                print!("+ ");
-            } else {
-                print!("- ");
-            }
-        }
 
-        let cwd = match env::current_dir() {
-            Ok(path) => match path.to_str() {
-                Some(path_str) => path_str.to_string(),
-                None => "?".to_string()
-            },
-            Err(_) => "?".to_string()
-        };
-
-        print!("ion:{}# ", cwd);
-        stdout().flush();
+        print_prompt(&modes);
 
         if let Some(command_original) = readln() {
             let command = command_original.trim();
