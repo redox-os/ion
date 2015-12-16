@@ -5,18 +5,89 @@ pub enum Token {
     End,
 }
 
-pub fn tokenize(input: &str) -> Vec<Token> {
-    let mut result: Vec<Token> = vec![];
-    for raw_word in input.split(' ') {
-        let word = raw_word.trim();
-        if word.starts_with("#") {
-            break;
+enum TokenizerState {
+    Default,
+    DoubleQuoted,
+    SingleQuoted,
+    Commented,
+}
+
+fn process_character_double_quoted(tokens: &mut Vec<Token>,
+                                   current_token: &mut String,
+                                   chr: char) -> TokenizerState {
+    match chr {
+        '"' => TokenizerState::Default,
+        _ => {
+            current_token.push(chr);
+            TokenizerState::DoubleQuoted
+        },
+    }
+}
+
+fn process_character_single_quoted(tokens: &mut Vec<Token>,
+                                   current_token: &mut String,
+                                   chr: char) -> TokenizerState {
+    match chr {
+        '\'' => TokenizerState::Default,
+        _ => {
+            current_token.push(chr);
+            TokenizerState::SingleQuoted
+        },
+    }
+}
+
+fn process_character_default(tokens: &mut Vec<Token>,
+                             current_token: &mut String,
+                             chr: char) -> TokenizerState {
+    let mut next_state = TokenizerState::Default;
+    match chr {
+        ' ' | '\t' => {
+            if !current_token.is_empty() {
+                tokens.push(Token::Word(current_token.clone()));
+                current_token.clear();
+            }
+        },
+        '#' => {
+            next_state = TokenizerState::Commented;
+        },
+        '\n' | '\r' | ';' => {
+            if !current_token.is_empty() {
+                tokens.push(Token::Word(current_token.clone()));
+                current_token.clear();
+            }
+            tokens.push(Token::End);
         }
-        if !word.is_empty() {
-            result.push(Token::Word(word.to_string()));
+        '"' => {
+            next_state = TokenizerState::DoubleQuoted;
+        },
+        '\'' => {
+            next_state = TokenizerState::SingleQuoted;
+        },
+        _ => {
+            current_token.push(chr);
+        },
+    }
+    next_state
+}
+
+pub fn tokenize(input: &str) -> Vec<Token> {
+    let mut state = TokenizerState::Default;
+    let mut tokens: Vec<Token> = vec![];
+    let mut current_token: String = String::new();
+    for chr in input.chars() {
+        state = match state {
+            TokenizerState::DoubleQuoted => 
+                process_character_double_quoted(&mut tokens, &mut current_token, chr),
+            TokenizerState::SingleQuoted => 
+                process_character_single_quoted(&mut tokens, &mut current_token, chr),
+            TokenizerState::Commented => TokenizerState::Commented,
+            _ => process_character_default(&mut tokens, &mut current_token, chr),
         }
     }
-    result
+    if !current_token.is_empty() {
+        tokens.push(Token::Word(current_token.clone()));
+    }
+    tokens
 }
 
 #[cfg(test)]
@@ -31,7 +102,7 @@ mod tests {
 
     #[test]
     fn tokenize_single_word() {
-        let expected: Vec<Token> = vec![Token::Word("word".to_string())];
+        let expected = vec![Token::Word("word".to_string())];
         assert_eq!(expected, tokenize("word"));
     }
 
@@ -42,7 +113,7 @@ mod tests {
 
     #[test]
     fn tokenize_multiple_words() {
-        let expected: Vec<Token> = vec![
+        let expected = vec![
             Token::Word("one".to_string()),
             Token::Word("two".to_string()),
             Token::Word("three".to_string())];
@@ -56,7 +127,38 @@ mod tests {
 
     #[test]
     fn tokenize_end_of_line_comment() {
-        let expected: Vec<Token> = vec![Token::Word("word".to_string())];
+        let expected = vec![Token::Word("word".to_string())];
         assert_eq!(expected, tokenize("word # more stuff"));
+    }
+
+    #[test]
+    fn tokenize_newline_produces_end_token() {
+        let expected = vec![
+            Token::Word("word".to_string()),
+            Token::End];
+        assert_eq!(expected, tokenize("word\n"));
+    }
+
+    #[test]
+    fn double_quotes_escape_space() {
+        let expected = vec![Token::Word("escaped space".to_string())];
+        assert_eq!(expected, tokenize("\"escaped space\""));
+    }
+
+    #[test]
+    fn mixed_quoted_and_unquoted() {
+        let expected = vec![
+            Token::Word("one".to_string()),
+            Token::Word("two# three".to_string()),
+            Token::Word("four".to_string())];
+        assert_eq!(expected, tokenize("one \"two# three\" four"));
+    }
+
+    #[test]
+    fn mixed_double_and_single_quotes() {
+        let expected = vec![
+            Token::Word("''".to_string()),
+            Token::Word("\"\"".to_string())];
+        assert_eq!(expected, tokenize("\"''\" '\"\"'"));
     }
 }
