@@ -1,4 +1,6 @@
 language: rust
+rust:
+  - nightly
 sudo: false
 notifications:
   email: false
