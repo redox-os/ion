@@ -12,7 +12,7 @@ enum TokenizerState {
     Commented,
 }
 
-fn process_character_double_quoted(tokens: &mut Vec<Token>,
+fn process_character_double_quoted(_: &mut Vec<Token>,
                                    current_token: &mut String,
                                    chr: char) -> TokenizerState {
     match chr {
@@ -24,7 +24,7 @@ fn process_character_double_quoted(tokens: &mut Vec<Token>,
     }
 }
 
-fn process_character_single_quoted(tokens: &mut Vec<Token>,
+fn process_character_single_quoted(_: &mut Vec<Token>,
                                    current_token: &mut String,
                                    chr: char) -> TokenizerState {
     match chr {
@@ -87,6 +87,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
     if !current_token.is_empty() {
         tokens.push(Token::Word(current_token.clone()));
     }
+    tokens.push(Token::End);
     tokens
 }
 
@@ -97,18 +98,22 @@ mod tests {
 
     #[test]
     fn tokenize_empty_string() {
-        assert!(tokenize("").is_empty());
+        let expected = vec![Token::End];
+        assert_eq!(expected, tokenize(""));
     }
 
     #[test]
     fn tokenize_single_word() {
-        let expected = vec![Token::Word("word".to_string())];
+        let expected = vec![
+            Token::Word("word".to_string()),
+            Token::End];
         assert_eq!(expected, tokenize("word"));
     }
 
     #[test]
     fn tokenize_whitespace() {
-        assert!(tokenize(" \t   ").is_empty());
+        let expected = vec![Token::End];
+        assert_eq!(expected, tokenize(" \t   "));
     }
 
     #[test]
@@ -116,18 +121,22 @@ mod tests {
         let expected = vec![
             Token::Word("one".to_string()),
             Token::Word("two".to_string()),
-            Token::Word("three".to_string())];
+            Token::Word("three".to_string()),
+            Token::End];
         assert_eq!(expected, tokenize("one two three"));
     }
 
     #[test]
     fn tokenize_comment() {
-        assert!(tokenize("# some text").is_empty());
+        let expected = vec![Token::End];
+        assert_eq!(expected, tokenize("# some text"));
     }
 
     #[test]
     fn tokenize_end_of_line_comment() {
-        let expected = vec![Token::Word("word".to_string())];
+        let expected = vec![
+            Token::Word("word".to_string()),
+            Token::End];
         assert_eq!(expected, tokenize("word # more stuff"));
     }
 
@@ -136,12 +145,14 @@ mod tests {
         let expected = vec![
             Token::Word("word".to_string()),
             Token::End];
-        assert_eq!(expected, tokenize("word\n"));
+        assert_eq!(expected, tokenize("word"));
     }
 
     #[test]
     fn double_quotes_escape_space() {
-        let expected = vec![Token::Word("escaped space".to_string())];
+        let expected = vec![
+            Token::Word("escaped space".to_string()),
+            Token::End];
         assert_eq!(expected, tokenize("\"escaped space\""));
     }
 
@@ -150,7 +161,8 @@ mod tests {
         let expected = vec![
             Token::Word("one".to_string()),
             Token::Word("two# three".to_string()),
-            Token::Word("four".to_string())];
+            Token::Word("four".to_string()),
+            Token::End];
         assert_eq!(expected, tokenize("one \"two# three\" four"));
     }
 
@@ -158,7 +170,8 @@ mod tests {
     fn mixed_double_and_single_quotes() {
         let expected = vec![
             Token::Word("''".to_string()),
-            Token::Word("\"\"".to_string())];
+            Token::Word("\"\"".to_string()),
+            Token::End];
         assert_eq!(expected, tokenize("\"''\" '\"\"'"));
     }
 }
