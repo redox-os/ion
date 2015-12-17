@@ -11,10 +11,14 @@ use std::thread;
 use self::to_num::ToNum;
 use self::input_editor::readln;
 use self::tokenizer::{Token, tokenize};
+use self::expansion::expand_tokens;
+use self::parser::{parse, Job};
 
 pub mod to_num;
 pub mod input_editor;
 pub mod tokenizer;
+pub mod parser;
+pub mod expansion;
 
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the functionnality associated to this one, with zero, one or several argument(s).
@@ -394,34 +398,17 @@ fn on_command(command_string: &str,
         return;
     }
 
-    let mut tokens: Vec<Token> = tokenize(command_string);
-
-    // replace variables
-    // TODO This copies all tokens and is inefficient
-    let mut args: Vec<String> = vec![];
-    for token in tokens.drain(..) {
-        if let Token::Word(arg) = token {
-            if arg.starts_with('$') {
-                let mut result = String::new();
-                let name = arg[1..arg.len()].to_string();
-                if let Some(value) = variables.get(&name) {
-                    result = value.clone();
-                }
-                args.push(result);
-            } else {
-                args.push(arg.clone());
-            }
-        }
-    }
+    let mut tokens: Vec<Token> = expand_tokens(&mut tokenize(command_string), variables);
+    let mut jobs: Vec<Job> = parse(&mut tokens);
 
     // Execute commands
-    if let Some(cmd) = args.get(0) {
-        if cmd == "if" {
+    for job in jobs.iter() {
+        if job.command == "if" {
             let mut value = false;
 
-            if let Some(left) = args.get(1) {
-                if let Some(cmp) = args.get(2) {
-                    if let Some(right) = args.get(3) {
+            if let Some(left) = job.args.get(0) {
+                if let Some(cmp) = job.args.get(1) {
+                    if let Some(right) = job.args.get(2) {
                         if cmp == "==" {
                             value = *left == *right;
                         } else if cmp == "!=" {
@@ -448,10 +435,10 @@ fn on_command(command_string: &str,
             }
 
             modes.insert(0, Mode { value: value });
-            return;
+            continue;
         }
 
-        if cmd == "else" {
+        if job.command == "else" {
             let mut syntax_error = false;
             match modes.get_mut(0) {
                 Some(mode) => mode.value = !mode.value,
@@ -460,10 +447,10 @@ fn on_command(command_string: &str,
             if syntax_error {
                 println!("Syntax error: else found with no previous if");
             }
-            return;
+            continue;
         }
 
-        if cmd == "fi" {
+        if job.command == "fi" {
             let mut syntax_error = false;
             if !modes.is_empty() {
                 modes.remove(0);
@@ -473,36 +460,43 @@ fn on_command(command_string: &str,
             if syntax_error {
                 println!("Syntax error: fi found with no previous if");
             }
-            return;
+            continue;
         }
 
+        let mut skipped: bool = false;
         for mode in modes.iter() {
             if !mode.value {
-                return;
+                skipped = true;
+                break
             }
+        }
+        if skipped {
+            continue;
         }
 
         // Set variables
-        if let Some(i) = cmd.find('=') {
-            let name = cmd[0..i].trim();
-            let mut value = cmd[i + 1..cmd.len()].trim().to_string();
+        if let Some(i) = job.command.find('=') {
+            let name = job.command[0..i].trim();
+            let mut value = job.command[i + 1..job.command.len()].trim().to_string();
 
-            for i in 1..args.len() {
-                if let Some(arg) = args.get(i) {
+            for i in 0..job.args.len() {
+                if let Some(arg) = job.args.get(i) {
                     value = value + " " + &arg;
                 }
             }
 
             set_var(variables, name, &value);
-            return;
+            continue;
         }
 
         // Commands
-        if let Some(command) = commands.get(cmd) {
+        if let Some(command) = commands.get(&job.command) {
+            let mut args = job.args.clone();
+            args.insert(0, job.command.clone());
             (*command.main)(&args, variables, modes);
         }
         else {
-            println!("Unknown command: '{}'", cmd);
+            println!("Unknown command: '{}'", job.command);
         }
     }
 }
@@ -551,10 +545,7 @@ fn real_main() {
         if let Ok(mut file) = File::open(arg) {
             file.read_to_string(&mut command_list);
         }
-
-        for command in command_list.split('\n') {
-            on_command(&command, &commands, &mut variables, &mut modes);
-        }
+        on_command(&command_list, &commands, &mut variables, &mut modes);
 
         return;
     }
