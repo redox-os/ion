@@ -36,6 +36,18 @@ fn process_character_single_quoted(_: &mut Vec<Token>,
     }
 }
 
+fn process_character_comment(tokens: &mut Vec<Token>,
+                             current_token: &mut String,
+                             chr: char) -> TokenizerState {
+    match chr {
+        '\n' | '\r' => {
+            tokens.push(Token::End);
+            TokenizerState::Default
+        },
+        _ => TokenizerState::Commented
+    }
+}
+
 fn process_character_default(tokens: &mut Vec<Token>,
                              current_token: &mut String,
                              chr: char) -> TokenizerState {
@@ -76,11 +88,12 @@ pub fn tokenize(input: &str) -> Vec<Token> {
     let mut current_token: String = String::new();
     for chr in input.chars() {
         state = match state {
-            TokenizerState::DoubleQuoted => 
+            TokenizerState::DoubleQuoted =>
                 process_character_double_quoted(&mut tokens, &mut current_token, chr),
-            TokenizerState::SingleQuoted => 
+            TokenizerState::SingleQuoted =>
                 process_character_single_quoted(&mut tokens, &mut current_token, chr),
-            TokenizerState::Commented => TokenizerState::Commented,
+            TokenizerState::Commented =>
+                process_character_comment(&mut tokens, &mut current_token, chr),
             _ => process_character_default(&mut tokens, &mut current_token, chr),
         }
     }
@@ -173,5 +186,15 @@ mod tests {
             Token::Word("\"\"".to_string()),
             Token::End];
         assert_eq!(expected, tokenize("\"''\" '\"\"'"));
+    }
+
+    #[test]
+    fn comment_before_newline() {
+        let expected = vec![
+            Token::Word("ls".to_string()),
+            Token::End,
+            Token::Word("help".to_string()),
+            Token::End];
+        assert_eq!(expected, tokenize("ls # look in dir\nhelp"));
     }
 }
