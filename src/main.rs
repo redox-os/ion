@@ -3,24 +3,18 @@ use std::string::String;
 use std::vec::Vec;
 use std::boxed::Box;
 use std::fs::{self, File};
-use std::io::{stdout, stdin, Read, Write};
+use std::io::{stdout, Read, Write};
 use std::env;
 use std::process;
 use std::thread;
 
 use self::to_num::ToNum;
+use self::input_editor::readln;
+use self::tokenizer::{Token, tokenize};
 
 pub mod to_num;
-
-macro_rules! readln {
-    () => ({
-        let mut buffer = String::new();
-        match stdin().read_line(&mut buffer) {
-            Ok(_) => Some(buffer),
-            Err(_) => None
-        }
-    });
-}
+pub mod input_editor;
+pub mod tokenizer;
 
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the functionnality associated to this one, with zero, one or several argument(s).
@@ -262,7 +256,7 @@ impl Command {
                         let arg = arg_original.trim();
                         print!("{}=", arg);
                         stdout().flush();
-                        if let Some(value_original) = readln!() {
+                        if let Some(value_original) = readln() {
                             let value = value_original.trim();
                             set_var(variables, arg, value);
                         }
@@ -399,11 +393,6 @@ fn on_command(command_string: &str,
               commands: &Vec<Command>,
               variables: &mut Vec<Variable>,
               modes: &mut Vec<Mode>) {
-    // Comment
-    if command_string.starts_with('#') {
-        return;
-    }
-
     // Show variables
     if command_string == "$" {
         for variable in variables.iter() {
@@ -412,20 +401,25 @@ fn on_command(command_string: &str,
         return;
     }
 
-    // Explode into arguments, replace variables
+    let mut tokens: Vec<Token> = tokenize(command_string);
+
+    // replace variables
+    // TODO This copies all tokens and is inefficient
     let mut args: Vec<String> = vec![];
-    for arg in command_string.split(' ') {
-        if !arg.is_empty() {
+    for token in tokens.drain(..) {
+        if let Token::Word(arg) = token {
             if arg.starts_with('$') {
+                let mut result = String::new();
                 let name = arg[1..arg.len()].to_string();
                 for variable in variables.iter() {
                     if variable.name == name {
-                        args.push(variable.value.clone());
+                        result = variable.value.clone();
                         break;
                     }
                 }
+                args.push(result);
             } else {
-                args.push(arg.to_string());
+                args.push(arg.clone());
             }
         }
     }
@@ -561,6 +555,27 @@ pub fn set_var(variables: &mut Vec<Variable>, name: &str, value: &str) {
     }
 }
 
+fn print_prompt(modes: &Vec<Mode>) {
+        for mode in modes.iter().rev() {
+            if mode.value {
+                print!("+ ");
+            } else {
+                print!("- ");
+            }
+        }
+
+        let cwd = match env::current_dir() {
+            Ok(path) => match path.to_str() {
+                Some(path_str) => path_str.to_string(),
+                None => "?".to_string()
+            },
+            Err(_) => "?".to_string()
+        };
+
+        print!("ion:{}# ", cwd);
+        stdout().flush();
+}
+
 fn real_main() {
     let commands = Command::vec();
     let mut variables: Vec<Variable> = vec![];
@@ -580,26 +595,10 @@ fn real_main() {
     }
 
     loop {
-        for mode in modes.iter().rev() {
-            if mode.value {
-                print!("+ ");
-            } else {
-                print!("- ");
-            }
-        }
 
-        let cwd = match env::current_dir() {
-            Ok(path) => match path.to_str() {
-                Some(path_str) => path_str.to_string(),
-                None => "?".to_string()
-            },
-            Err(_) => "?".to_string()
-        };
+        print_prompt(&modes);
 
-        print!("ion:{}# ", cwd);
-        stdout().flush();
-
-        if let Some(command_original) = readln!() {
+        if let Some(command_original) = readln() {
             let command = command_original.trim();
             if command == "exit" {
                 break;
