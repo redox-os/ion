@@ -3,4 +3,5 @@ rust:
   - nightly
 sudo: false
 notifications:
+  slack: redox-os:t5jWurX9sFfgurPznqdECoKN
   email: false
