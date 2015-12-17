@@ -35,12 +35,11 @@ pub struct Command {
 }
 
 impl Command {
-    /// Return the vector of the commands
-    // TODO: Use a more efficient collection instead
-    pub fn vec() -> Vec<Self> {
-        let mut commands: Vec<Self> = Vec::new();
+    /// Return the map from command names to commands
+    pub fn map() -> BTreeMap<String, Self> {
+        let mut commands: BTreeMap<String, Self> = BTreeMap::new();
 
-        commands.push(Command {
+        commands.insert("cat".to_string(), Command {
             name: "cat",
             help: "To display a file in the output\n    cat <your_file>",
             main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -59,7 +58,7 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("cd".to_string(), Command {
             name: "cd",
             help: "To change the current directory\n    cd <your_destination>",
             main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -74,7 +73,7 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("echo".to_string(), Command {
             name: "echo",
             help: "To display some text in the output\n    echo Hello world!",
             main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -85,13 +84,13 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("else".to_string(), Command {
             name: "else",
             help: "",
             main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {}),
         });
 
-        commands.push(Command {
+        commands.insert("exec".to_string(), Command {
             name: "exec",
             help: "To execute a binary in the output\n    exec <my_binary>",
             main: Box::new(|args: &Vec<String>, variables: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -122,19 +121,19 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("exit".to_string(), Command {
             name: "exit",
             help: "To exit the curent session",
             main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {}),
         });
 
-        commands.push(Command {
+        commands.insert("fi".to_string(), Command {
             name: "fi",
             help: "",
             main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {}),
         });
 
-        commands.push(Command {
+        commands.insert("free".to_string(), Command {
             name: "free",
             help: "Show memory information\n    free",
             main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -151,13 +150,13 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("if".to_string(), Command {
             name: "if",
             help: "",
             main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {}),
         });
 
-        commands.push(Command {
+        commands.insert("ls".to_string(), Command {
             name: "ls",
             help: "To list the content of the current directory\n    ls",
             main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -203,7 +202,7 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("mkdir".to_string(), Command {
             name: "mkdir",
             help: "To create a directory in the current directory\n    mkdir <my_new_directory>",
             main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -216,7 +215,7 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("ps".to_string(), Command {
             name: "ps",
             help: "Show process list\n    ps",
             main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -233,7 +232,7 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("pwd".to_string(), Command {
             name: "pwd",
             help: "To output the path of the current directory\n    pwd",
             main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -247,7 +246,7 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("read".to_string(), Command {
             name: "read",
             help: "To read some variables\n    read <my_variable>",
             main: Box::new(|args: &Vec<String>, variables: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -265,7 +264,7 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("rm".to_string(), Command {
             name: "rm",
             help: "Remove a file\n    rm <file>",
             main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -278,7 +277,7 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("rmdir".to_string(), Command {
             name: "rmdir",
             help: "Remove a directory\n    rmdir <directory>",
             main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -291,7 +290,7 @@ impl Command {
             }),
         });
 
-        commands.push(Command {
+        commands.insert("run".to_string(), Command {
             name: "run",
             help: "Run a script\n    run <script>",
             main: Box::new(|args: &Vec<String>, variables: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -322,7 +321,7 @@ impl Command {
             })
         });
 
-        commands.push(Command {
+        commands.insert("sleep".to_string(), Command {
             name: "sleep",
             help: "Make a sleep in the current session\n    sleep <number_of_seconds>",
             main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -334,7 +333,7 @@ impl Command {
         // Simple command to create a file, in the current directory
         // The file has got the name given as the first argument of the command
         // If the command have no arguments, the command don't create the file
-        commands.push(Command {
+        commands.insert("touch".to_string(), Command {
             name: "touch",
             help: "To create a file, in the current directory\n    touch <my_file>",
             main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -351,10 +350,10 @@ impl Command {
         //       changing the type back to HashMap
         let command_helper: BTreeMap<String, String> = commands
             .iter()
-            .map(|c| (c.name.to_string(), c.help.to_string()))
+            .map(|(k, v)| (k.to_string(), v.help.to_string()))
             .collect();
 
-        commands.push(Command {
+        commands.insert("help".to_string(), Command {
             name: "help",
             help: "Display a little helper for a given command\n    help ls",
             main: Box::new(move |args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
@@ -384,7 +383,7 @@ pub struct Mode {
 }
 
 fn on_command(command_string: &str,
-              commands: &Vec<Command>,
+              commands: &BTreeMap<String, Command>,
               variables: &mut BTreeMap<String, String>,
               modes: &mut Vec<Mode>) {
     // Show variables
@@ -499,14 +498,12 @@ fn on_command(command_string: &str,
         }
 
         // Commands
-        for command in commands.iter() {
-            if &command.name == cmd {
-                (*command.main)(&args, variables, modes);
-                return;
-            }
+        if let Some(command) = commands.get(cmd) {
+            (*command.main)(&args, variables, modes);
         }
-
-        println!("Unknown command: '{}'", cmd);
+        else {
+            println!("Unknown command: '{}'", cmd);
+        }
     }
 }
 
@@ -545,7 +542,7 @@ fn print_prompt(modes: &Vec<Mode>) {
 }
 
 fn real_main() {
-    let commands = Command::vec();
+    let commands = Command::map();
     let mut variables: BTreeMap<String, String> = BTreeMap::new();
     let mut modes: Vec<Mode> = vec![];
 
