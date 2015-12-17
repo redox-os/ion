@@ -31,7 +31,7 @@ pub mod tokenizer;
 pub struct Command {
     pub name: &'static str,
     pub help: &'static str,
-    pub main: Box<Fn(&Vec<String>, &mut Vec<Variable>, &mut Vec<Mode>)>,
+    pub main: Box<Fn(&Vec<String>, &mut BTreeMap<String, String>, &mut Vec<Mode>)>,
 }
 
 impl Command {
@@ -43,7 +43,7 @@ impl Command {
         commands.push(Command {
             name: "cat",
             help: "To display a file in the output\n    cat <your_file>",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 let path = args.get(1).map_or(String::new(), |arg| arg.clone());
 
                 match File::open(&path) {
@@ -62,7 +62,7 @@ impl Command {
         commands.push(Command {
             name: "cd",
             help: "To change the current directory\n    cd <your_destination>",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 match args.get(1) {
                     Some(path) => {
                         if let Err(err) = env::set_current_dir(&path) {
@@ -77,7 +77,7 @@ impl Command {
         commands.push(Command {
             name: "echo",
             help: "To display some text in the output\n    echo Hello world!",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 let echo = args.iter()
                                .skip(1)
                                .fold(String::new(), |string, arg| string + " " + arg);
@@ -88,13 +88,13 @@ impl Command {
         commands.push(Command {
             name: "else",
             help: "",
-            main: Box::new(|_: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {}),
+            main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {}),
         });
 
         commands.push(Command {
             name: "exec",
             help: "To execute a binary in the output\n    exec <my_binary>",
-            main: Box::new(|args: &Vec<String>, variables: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, variables: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 if let Some(path) = args.get(1) {
                     let mut command = process::Command::new(path);
                     for i in 2 .. args.len() {
@@ -125,19 +125,19 @@ impl Command {
         commands.push(Command {
             name: "exit",
             help: "To exit the curent session",
-            main: Box::new(|_: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {}),
+            main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {}),
         });
 
         commands.push(Command {
             name: "fi",
             help: "",
-            main: Box::new(|_: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {}),
+            main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {}),
         });
 
         commands.push(Command {
             name: "free",
             help: "Show memory information\n    free",
-            main: Box::new(|_: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 match File::open("memory:") {
                     Ok(mut file) => {
                         let mut string = String::new();
@@ -154,13 +154,13 @@ impl Command {
         commands.push(Command {
             name: "if",
             help: "",
-            main: Box::new(|_: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {}),
+            main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {}),
         });
 
         commands.push(Command {
             name: "ls",
             help: "To list the content of the current directory\n    ls",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 let path = args.get(1).map_or(".".to_string(), |arg| arg.clone());
 
                 let mut entries = Vec::new();
@@ -206,7 +206,7 @@ impl Command {
         commands.push(Command {
             name: "mkdir",
             help: "To create a directory in the current directory\n    mkdir <my_new_directory>",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 match args.get(1) {
                     Some(dir_name) => if let Err(err) = fs::create_dir(dir_name) {
                         println!("Failed to create: {}: {}", dir_name, err);
@@ -219,7 +219,7 @@ impl Command {
         commands.push(Command {
             name: "ps",
             help: "Show process list\n    ps",
-            main: Box::new(|_: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 match File::open("context:") {
                     Ok(mut file) => {
                         let mut string = String::new();
@@ -236,7 +236,7 @@ impl Command {
         commands.push(Command {
             name: "pwd",
             help: "To output the path of the current directory\n    pwd",
-            main: Box::new(|_: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 match env::current_dir() {
                     Ok(path) => match path.to_str() {
                         Some(path_str) => println!("{}", path_str),
@@ -250,7 +250,7 @@ impl Command {
         commands.push(Command {
             name: "read",
             help: "To read some variables\n    read <my_variable>",
-            main: Box::new(|args: &Vec<String>, variables: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, variables: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 for i in 1..args.len() {
                     if let Some(arg_original) = args.get(i) {
                         let arg = arg_original.trim();
@@ -268,7 +268,7 @@ impl Command {
         commands.push(Command {
             name: "rm",
             help: "Remove a file\n    rm <file>",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 match args.get(1) {
                     Some(path) => if fs::remove_file(path).is_err() {
                         println!("Failed to remove: {}", path);
@@ -281,7 +281,7 @@ impl Command {
         commands.push(Command {
             name: "rmdir",
             help: "Remove a directory\n    rmdir <directory>",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 match args.get(1) {
                     Some(path) => if fs::remove_dir(path).is_err() {
                         println!("Failed to remove: {}", path);
@@ -294,7 +294,7 @@ impl Command {
         commands.push(Command {
             name: "run",
             help: "Run a script\n    run <script>",
-            main: Box::new(|args: &Vec<String>, variables: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, variables: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 let path = "/apps/shell/main.bin";
 
                 let mut command = process::Command::new(path);
@@ -325,7 +325,7 @@ impl Command {
         commands.push(Command {
             name: "sleep",
             help: "Make a sleep in the current session\n    sleep <number_of_seconds>",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 let secs = args.get(1).map_or(0, |arg| arg.to_num());
                 thread::sleep_ms(secs as u32 * 1000);
             }),
@@ -337,7 +337,7 @@ impl Command {
         commands.push(Command {
             name: "touch",
             help: "To create a file, in the current directory\n    touch <my_file>",
-            main: Box::new(|args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(|args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 match args.get(1) {
                     Some(file_name) => if let Err(err) = File::create(file_name) {
                         println!("Failed to create: {}: {}", file_name, err);
@@ -357,7 +357,7 @@ impl Command {
         commands.push(Command {
             name: "help",
             help: "Display a little helper for a given command\n    help ls",
-            main: Box::new(move |args: &Vec<String>, _: &mut Vec<Variable>, _: &mut Vec<Mode>| {
+            main: Box::new(move |args: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
                 if let Some(command) = args.get(1) {
                     if command_helper.contains_key(command) {
                         match command_helper.get(command) {
@@ -379,24 +379,18 @@ impl Command {
     }
 }
 
-/// A (env) variable
-pub struct Variable {
-    pub name: String,
-    pub value: String,
-}
-
 pub struct Mode {
     value: bool,
 }
 
 fn on_command(command_string: &str,
               commands: &Vec<Command>,
-              variables: &mut Vec<Variable>,
+              variables: &mut BTreeMap<String, String>,
               modes: &mut Vec<Mode>) {
     // Show variables
     if command_string == "$" {
-        for variable in variables.iter() {
-            println!("{}={}", variable.name, variable.value);
+        for (key, value) in variables.iter() {
+            println!("{}={}", key, value);
         }
         return;
     }
@@ -411,11 +405,8 @@ fn on_command(command_string: &str,
             if arg.starts_with('$') {
                 let mut result = String::new();
                 let name = arg[1..arg.len()].to_string();
-                for variable in variables.iter() {
-                    if variable.name == name {
-                        result = variable.value.clone();
-                        break;
-                    }
+                if let Some(value) = variables.get(&name) {
+                    result = value.clone();
                 }
                 args.push(result);
             } else {
@@ -520,38 +511,15 @@ fn on_command(command_string: &str,
 }
 
 
-pub fn set_var(variables: &mut Vec<Variable>, name: &str, value: &str) {
+pub fn set_var(variables: &mut BTreeMap<String, String>, name: &str, value: &str) {
     if name.is_empty() {
         return;
     }
 
     if value.is_empty() {
-        let mut remove = -1;
-        for i in 0..variables.len() {
-            match variables.get(i) {
-                Some(variable) => if variable.name == name {
-                    remove = i as isize;
-                    break;
-                },
-                None => break,
-            }
-        }
-
-        if remove >= 0 {
-            variables.remove(remove as usize);
-        }
+        variables.remove(&name.to_string());
     } else {
-        for variable in variables.iter_mut() {
-            if variable.name == name {
-                variable.value = value.to_string();
-                return;
-            }
-        }
-
-        variables.push(Variable {
-            name: name.to_string(),
-            value: value.to_string(),
-        });
+        variables.insert(name.to_string(), value.to_string());
     }
 }
 
@@ -578,7 +546,7 @@ fn print_prompt(modes: &Vec<Mode>) {
 
 fn real_main() {
     let commands = Command::vec();
-    let mut variables: Vec<Variable> = vec![];
+    let mut variables: BTreeMap<String, String> = BTreeMap::new();
     let mut modes: Vec<Mode> = vec![];
 
     for arg in env::args().skip(1) {
