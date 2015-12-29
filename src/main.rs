@@ -219,6 +219,17 @@ impl Command {
             }),
         });
 
+        commands.insert("poweroff".to_string(), Command {
+            name: "poweroff",
+            help: "poweroff utility has the machine remove power, if possible\n\tpoweroff",
+            main: Box::new(|_: &Vec<String>, _: &mut BTreeMap<String, String>, _: &mut Vec<Mode>| {
+                match File::create("acpi:off") {
+                    Err(err) => println!("Failed to remove power (error: {})", err),
+                    Ok(_) => println!("I see dead people"),
+                }
+            }),
+        });
+
         commands.insert("ps".to_string(), Command {
             name: "ps",
             help: "Show process list\n    ps",
