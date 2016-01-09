@@ -28,7 +28,7 @@ pub fn parse(tokens: &mut Vec<Token>) -> Vec<Job> {
                 } else {
                     job.args.push(word);
                 }
-            },
+            }
             Token::End => {
                 if !job.command.is_empty() {
                     jobs.push(job.clone());
@@ -55,29 +55,24 @@ mod tests {
 
     #[test]
     fn parse_command_no_args() {
-        let mut tokens: Vec<Token> = vec![
-            Token::Word("ls".to_string()),
-            Token::End];
-        let expected = vec![
-            Job {
-                command: "ls".to_string(),
-                args: vec![],
-            }];
+        let mut tokens: Vec<Token> = vec![Token::Word("ls".to_string()), Token::End];
+        let expected = vec![Job {
+                                command: "ls".to_string(),
+                                args: vec![],
+                            }];
         assert_eq!(expected, parse(&mut tokens));
     }
 
     #[test]
     fn parse_command_with_args() {
-        let mut tokens: Vec<Token> = vec![
-            Token::Word("ls".to_string()),
-            Token::Word("-a".to_string()),
-            Token::Word("-l".to_string()),
-            Token::End];
-        let expected = vec![
-            Job {
-                command: "ls".to_string(),
-                args: vec!["-a".to_string(), "-l".to_string()],
-            }];
+        let mut tokens: Vec<Token> = vec![Token::Word("ls".to_string()),
+                                          Token::Word("-a".to_string()),
+                                          Token::Word("-l".to_string()),
+                                          Token::End];
+        let expected = vec![Job {
+                                command: "ls".to_string(),
+                                args: vec!["-a".to_string(), "-l".to_string()],
+                            }];
         assert_eq!(expected, parse(&mut tokens));
     }
 
@@ -92,15 +87,14 @@ mod tests {
             Token::Word("hello world".to_string()),
             Token::End,
         ];
-        let expected = vec![
-            Job {
-                command: "ls".to_string(),
-                args: vec!["-a".to_string(), "-l".to_string()],
-            },
-            Job {
-                command: "echo".to_string(),
-                args: vec!["hello world".to_string()],
-            }];
+        let expected = vec![Job {
+                                command: "ls".to_string(),
+                                args: vec!["-a".to_string(), "-l".to_string()],
+                            },
+                            Job {
+                                command: "echo".to_string(),
+                                args: vec!["hello world".to_string()],
+                            }];
         assert_eq!(expected, parse(&mut tokens));
     }
 }
