@@ -8,6 +8,7 @@ before_script:
   - cargo fmt
   - cd ../
 script:
+  - cargo clean
   - cargo build --release
   - diff --brief -r . formatted/
 notifications:
