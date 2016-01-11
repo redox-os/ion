@@ -3,7 +3,7 @@ rust:
   - nightly
 sudo: false
 before_script:
-  - cp -r . formatted/
+  - cp * formatted/
   - cd formatted/
   - cargo fmt
   - cd ../
