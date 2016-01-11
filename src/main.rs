@@ -102,15 +102,6 @@ impl Command {
                             }),
                         });
 
-        commands.insert("else".to_string(),
-                        Command {
-                            name: "else",
-                            help: "",
-                            main: Box::new(|_: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {}),
-                        });
-
         commands.insert("exec".to_string(),
                         Command {
                             name: "exec",
@@ -160,15 +151,6 @@ impl Command {
                                             _: &mut Vec<Mode>| {}),
                         });
 
-        commands.insert("fi".to_string(),
-                        Command {
-                            name: "fi",
-                            help: "",
-                            main: Box::new(|_: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {}),
-                        });
-
         commands.insert("free".to_string(),
                         Command {
                             name: "free",
@@ -187,15 +169,6 @@ impl Command {
                                     Err(err) => println!("Failed to open file: memory: {}", err),
                                 }
                             }),
-                        });
-
-        commands.insert("if".to_string(),
-                        Command {
-                            name: "if",
-                            help: "",
-                            main: Box::new(|_: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {}),
                         });
 
         commands.insert("ls".to_string(),
