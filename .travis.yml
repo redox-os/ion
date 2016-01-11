@@ -2,6 +2,14 @@ language: rust
 rust:
   - nightly
 sudo: false
+before_script:
+  - cp . formatted/
+  - cd formatted/
+  - cargo fmt
+  - cd ../
+script:
+  - cargo build --release
+  - diff --brief -r . formatted/
 notifications:
   slack: redox-os:t5jWurX9sFfgurPznqdECoKN
   email: false
