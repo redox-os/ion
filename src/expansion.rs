@@ -10,14 +10,13 @@ pub fn expand_tokens(tokens: &mut Vec<Token>, variables: &BTreeMap<String, Strin
                     let key = word[1..word.len()].to_string();
                     if let Some(value) = variables.get(&key) {
                         Token::Word(value.clone())
-                    }
-                    else {
+                    } else {
                         Token::Word(String::new())
                     }
                 } else {
                     Token::Word(word)
                 }
-            },
+            }
             _ => token,
         });
     }
