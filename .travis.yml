@@ -5,7 +5,7 @@ sudo: false
 before_script:
   - TARGETDIR="formatted/"
   - mkdir $TARGETDIR
-  - for file in *
+  - for file in "find . -type f"
   - do test "$file" != "$TARGETDIR" && cp "$file" "$TARGETDIR/"
   - done
   - cd formatted/
