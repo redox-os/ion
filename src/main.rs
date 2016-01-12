@@ -546,7 +546,7 @@ fn print_prompt(modes: &Vec<Mode>) {
         stdout().flush();
 }
 
-fn real_main() {
+fn main() {
     let commands = Command::map();
     let mut variables: BTreeMap<String, String> = BTreeMap::new();
     let mut modes: Vec<Mode> = vec![];
@@ -576,15 +576,4 @@ fn real_main() {
             break;
         }
     }
-}
-
-#[cfg(target_os = "redox")]
-#[no_mangle]
-pub fn main(){
-    real_main();
-}
-
-#[cfg(not(target_os = "redox"))]
-fn main(){
-    real_main();
 }
