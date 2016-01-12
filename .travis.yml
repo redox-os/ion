@@ -3,7 +3,11 @@ rust:
   - nightly
 sudo: false
 before_script:
-  - cp * formatted/
+  - TARGETDIR="formatted/"
+  - mkdir $TARGETDIR
+  - for file in *
+  - do test "$file" != "$TARGETDIR" && cp "$file" "$TARGETDIR/"
+  - done
   - cd formatted/
   - cargo fmt
   - cd ../
