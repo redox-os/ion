@@ -21,7 +21,8 @@ pub mod parser;
 pub mod expansion;
 
 /// Structure which represents a Terminal's command.
-/// This command structure contains a name, and the code which run the functionnality associated to this one, with zero, one or several argument(s).
+/// This command structure contains a name, and the code which run the
+/// functionnality associated to this one, with zero, one or several argument(s).
 /// # Example
 /// ```
 /// let my_command = Command {
@@ -99,46 +100,6 @@ impl Command {
                                                .fold(String::new(),
                                                      |string, arg| string + " " + arg);
                                 println!("{}", echo.trim());
-                            }),
-                        });
-
-        commands.insert("exec".to_string(),
-                        Command {
-                            name: "exec",
-                            help: "To execute a binary in the output\n    exec <my_binary>",
-                            main: Box::new(|args: &Vec<String>,
-                                            variables: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
-                                if let Some(path) = args.get(1) {
-                                    let mut command = process::Command::new(path);
-                                    for i in 2..args.len() {
-                                        if let Some(arg) = args.get(i) {
-                                            command.arg(arg);
-                                        }
-                                    }
-
-                                    match command.spawn() {
-                                        Ok(mut child) => {
-                                            match child.wait() {
-                                                Ok(status) => {
-                                                    if let Some(code) = status.code() {
-                                                        set_var(variables,
-                                                                "?",
-                                                                &format!("{}", code));
-                                                    } else {
-                                                        println!("{}: No child exit code", path);
-                                                    }
-                                                }
-                                                Err(err) => {
-                                                    println!("{}: Failed to wait: {}", path, err)
-                                                }
-                                            }
-                                        }
-                                        Err(err) => {
-                                            println!("{}: Failed to execute: {}", path, err)
-                                        }
-                                    }
-                                }
                             }),
                         });
 
@@ -579,12 +540,12 @@ fn on_command(command_string: &str,
         }
 
         // Commands
+        let mut args = job.args.clone();
+        args.insert(0, job.command.clone());
         if let Some(command) = commands.get(&job.command) {
-            let mut args = job.args.clone();
-            args.insert(0, job.command.clone());
             (*command.main)(&args, variables, modes);
         } else {
-            println!("Unknown command: '{}'", job.command);
+            run_external_commmand(args, variables);
         }
     }
 }
@@ -623,6 +584,39 @@ fn print_prompt(modes: &Vec<Mode>) {
 
     print!("ion:{}# ", cwd);
     stdout().flush();
+}
+
+fn run_external_commmand(args: Vec<String>,
+                         variables: &mut BTreeMap<String, String>) {
+    if let Some(path) = args.get(0) {
+        let mut command = process::Command::new(path);
+        for i in 1..args.len() {
+            if let Some(arg) = args.get(i) {
+                command.arg(arg);
+            }
+        }
+        match command.spawn() {
+            Ok(mut child) => {
+                match child.wait() {
+                    Ok(status) => {
+                        if let Some(code) = status.code() {
+                            set_var(variables,
+                                    "?",
+                                    &format!("{}", code));
+                        } else {
+                            println!("{}: No child exit code", path);
+                        }
+                    }
+                    Err(err) => {
+                        println!("{}: Failed to wait: {}", path, err)
+                    }
+                }
+            }
+            Err(err) => {
+                println!("{}: Failed to execute: {}", path, err)
+            }
+        }
+    }
 }
 
 fn main() {
