@@ -316,7 +316,9 @@ impl Command {
                                     if let Some(arg_original) = args.get(i) {
                                         let arg = arg_original.trim();
                                         print!("{}=", arg);
-                                        stdout().flush();
+                                        if let Err(message) = stdout().flush() {
+                                            println!("{}: Failed to flush stdout", message);
+                                        }
                                         if let Some(value_original) = readln() {
                                             let value = value_original.trim();
                                             set_var(variables, arg, value);
@@ -488,7 +490,7 @@ fn on_command(command_string: &str,
     }
 
     let mut tokens: Vec<Token> = expand_tokens(&mut tokenize(command_string), variables);
-    let mut jobs: Vec<Job> = parse(&mut tokens);
+    let jobs: Vec<Job> = parse(&mut tokens);
 
     // Execute commands
     for job in jobs.iter() {
@@ -622,7 +624,9 @@ fn print_prompt(modes: &Vec<Mode>) {
     };
 
     print!("ion:{}# ", cwd);
-    stdout().flush();
+    if let Err(message) = stdout().flush() {
+        println!("{}: failed to flush prompt to stdout", message);
+    }
 }
 
 fn main() {
@@ -632,8 +636,10 @@ fn main() {
 
     for arg in env::args().skip(1) {
         let mut command_list = String::new();
-        if let Ok(mut file) = File::open(arg) {
-            file.read_to_string(&mut command_list);
+        if let Ok(mut file) = File::open(&arg) {
+            if let Err(message) = file.read_to_string(&mut command_list) {
+                println!("{}: Failed to read {}", message, arg);
+            }
         }
         on_command(&command_list, &commands, &mut variables, &mut modes);
 
