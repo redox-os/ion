@@ -426,8 +426,7 @@ fn print_prompt(modes: &Vec<Mode>) {
     }
 }
 
-fn run_external_commmand(args: Vec<String>,
-                         variables: &mut BTreeMap<String, String>) {
+fn run_external_commmand(args: Vec<String>, variables: &mut BTreeMap<String, String>) {
     if let Some(path) = args.get(0) {
         let mut command = process::Command::new(path);
         for i in 1..args.len() {
@@ -440,21 +439,15 @@ fn run_external_commmand(args: Vec<String>,
                 match child.wait() {
                     Ok(status) => {
                         if let Some(code) = status.code() {
-                            set_var(variables,
-                                    "?",
-                                    &format!("{}", code));
+                            set_var(variables, "?", &format!("{}", code));
                         } else {
                             println!("{}: No child exit code", path);
                         }
                     }
-                    Err(err) => {
-                        println!("{}: Failed to wait: {}", path, err)
-                    }
+                    Err(err) => println!("{}: Failed to wait: {}", path, err),
                 }
             }
-            Err(err) => {
-                println!("{}: Failed to execute: {}", path, err)
-            }
+            Err(err) => println!("{}: Failed to execute: {}", path, err),
         }
     }
 }

@@ -19,9 +19,7 @@ pub fn cat(args: &Vec<String>) {
             let mut string = String::new();
             match file.read_to_string(&mut string) {
                 Ok(_) => println!("{}", string),
-                Err(err) => {
-                    println!("Failed to read: {}: {}", path, err)
-                }
+                Err(err) => println!("Failed to read: {}: {}", path, err),
             }
         }
         Err(err) => println!("Failed to open file: {}: {}", path, err),
@@ -32,9 +30,7 @@ pub fn cd(args: &Vec<String>) {
     match args.get(1) {
         Some(path) => {
             if let Err(err) = env::set_current_dir(&path) {
-                println!("Failed to set current dir to {}: {}",
-                         path,
-                         err);
+                println!("Failed to set current dir to {}: {}", path, err);
             }
         }
         None => println!("No path given"),
@@ -43,9 +39,8 @@ pub fn cd(args: &Vec<String>) {
 
 pub fn echo(args: &Vec<String>) {
     let echo = args.iter()
-        .skip(1)
-        .fold(String::new(),
-        |string, arg| string + " " + arg);
+                   .skip(1)
+                   .fold(String::new(), |string, arg| string + " " + arg);
     println!("{}", echo.trim());
 }
 
@@ -87,20 +82,14 @@ pub fn ls(args: &Vec<String>) {
                                     entries.push(path_str.to_string())
                                 }
                             }
-                            None => {
-                                println!("Failed to convert path to string")
-                            }
+                            None => println!("Failed to convert path to string"),
                         }
                     }
-                    Err(err) => {
-                        println!("Failed to read entry: {}", err)
-                    }
+                    Err(err) => println!("Failed to read entry: {}", err),
                 }
             }
         }
-        Err(err) => {
-            println!("Failed to open directory: {}: {}", path, err)
-        }
+        Err(err) => println!("Failed to open directory: {}: {}", path, err),
     }
 
     entries.sort();
@@ -134,9 +123,7 @@ pub fn ps() {
             let mut string = String::new();
             match file.read_to_string(&mut string) {
                 Ok(_) => println!("{}", string),
-                Err(err) => {
-                    println!("Failed to read: context: {}", err)
-                }
+                Err(err) => println!("Failed to read: context: {}", err),
             }
         }
         Err(err) => println!("Failed to open file: context: {}", err),
@@ -213,9 +200,7 @@ pub fn run(args: &Vec<String>, variables: &mut BTreeMap<String, String>) {
                         println!("{}: No child exit code", path);
                     }
                 }
-                Err(err) => {
-                    println!("{}: Failed to wait: {}", path, err)
-                }
+                Err(err) => println!("{}: Failed to wait: {}", path, err),
             }
         }
         Err(err) => println!("{}: Failed to execute: {}", path, err),
