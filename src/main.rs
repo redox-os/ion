@@ -39,6 +39,234 @@ pub struct Command {
     pub main: Box<Fn(&Vec<String>, &mut BTreeMap<String, String>, &mut Vec<Mode>)>,
 }
 
+/// This struct will contain all of the data structures related to this
+/// instance of the shell.
+pub struct Shell<'a> {
+    pub variables: &'a mut BTreeMap<String, String>,
+    pub mode: &'a mut Vec<Mode>,
+}
+
+pub fn builtin_cat(args: &Vec<String>) {
+    let path = args.get(1).map_or(String::new(), |arg| arg.clone());
+
+    match File::open(&path) {
+        Ok(mut file) => {
+            let mut string = String::new();
+            match file.read_to_string(&mut string) {
+                Ok(_) => println!("{}", string),
+                Err(err) => {
+                    println!("Failed to read: {}: {}", path, err)
+                }
+            }
+        }
+        Err(err) => println!("Failed to open file: {}: {}", path, err),
+    }
+}
+
+pub fn builtin_cd(args: &Vec<String>) {
+    match args.get(1) {
+        Some(path) => {
+            if let Err(err) = env::set_current_dir(&path) {
+                println!("Failed to set current dir to {}: {}",
+                         path,
+                         err);
+            }
+        }
+        None => println!("No path given"),
+    }
+}
+
+pub fn builtin_echo(args: &Vec<String>) {
+    let echo = args.iter()
+        .skip(1)
+        .fold(String::new(),
+        |string, arg| string + " " + arg);
+    println!("{}", echo.trim());
+}
+
+pub fn buiiltin_free() {
+    match File::open("memory:") {
+        Ok(mut file) => {
+            let mut string = String::new();
+            match file.read_to_string(&mut string) {
+                Ok(_) => println!("{}", string),
+                Err(err) => println!("Failed to read: memory: {}", err),
+            }
+        }
+        Err(err) => println!("Failed to open file: memory: {}", err),
+    }
+}
+
+pub fn builtin_ls(args: &Vec<String>) {
+    let path = args.get(1).map_or(".".to_string(), |arg| arg.clone());
+
+    let mut entries = Vec::new();
+    match fs::read_dir(&path) {
+        Ok(dir) => {
+            for entry_result in dir {
+                match entry_result {
+                    Ok(entry) => {
+                        let directory = match entry.file_type() {
+                            Ok(file_type) => file_type.is_dir(),
+                            Err(err) => {
+                                println!("Failed to read file type: {}", err);
+                                false
+                            }
+                        };
+
+                        match entry.file_name().to_str() {
+                            Some(path_str) => {
+                                if directory {
+                                    entries.push(path_str.to_string() + "/")
+                                } else {
+                                    entries.push(path_str.to_string())
+                                }
+                            }
+                            None => {
+                                println!("Failed to convert path to string")
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        println!("Failed to read entry: {}", err)
+                    }
+                }
+            }
+        }
+        Err(err) => {
+            println!("Failed to open directory: {}: {}", path, err)
+        }
+    }
+
+    entries.sort();
+
+    for entry in entries {
+        println!("{}", entry);
+    }
+}
+
+pub fn builtin_mkdir(args: &Vec<String>) {
+    match args.get(1) {
+        Some(dir_name) => {
+            if let Err(err) = fs::create_dir(dir_name) {
+                println!("Failed to create: {}: {}", dir_name, err);
+            }
+        }
+        None => println!("No name provided"),
+    }
+}
+
+pub fn builtin_poweroff() {
+    match File::create("acpi:off") {
+        Err(err) => println!("Failed to remove power (error: {})", err),
+        Ok(_) => println!("I see dead people"),
+    }
+}
+
+pub fn builtin_ps() {
+    match File::open("context:") {
+        Ok(mut file) => {
+            let mut string = String::new();
+            match file.read_to_string(&mut string) {
+                Ok(_) => println!("{}", string),
+                Err(err) => {
+                    println!("Failed to read: context: {}", err)
+                }
+            }
+        }
+        Err(err) => println!("Failed to open file: context: {}", err),
+    }
+}
+
+pub fn builtin_pwd() {
+    match env::current_dir() {
+        Ok(path) => {
+            match path.to_str() {
+                Some(path_str) => println!("{}", path_str),
+                None => println!("?"),
+            }
+        }
+        Err(err) => println!("Failed to get current dir: {}", err),
+    }
+}
+
+pub fn builtin_read(args: &Vec<String>, variables: &mut BTreeMap<String, String>) {
+    for i in 1..args.len() {
+        if let Some(arg_original) = args.get(i) {
+            let arg = arg_original.trim();
+            print!("{}=", arg);
+            if let Err(message) = stdout().flush() {
+                println!("{}: Failed to flush stdout", message);
+            }
+            if let Some(value_original) = readln() {
+                let value = value_original.trim();
+                set_var(variables, arg, value);
+            }
+        }
+    }
+}
+
+pub fn builtin_rm(args: &Vec<String>) {
+    match args.get(1) {
+        Some(path) => {
+            if fs::remove_file(path).is_err() {
+                println!("Failed to remove: {}", path);
+            }
+        }
+        None => println!("No name provided"),
+    }
+}
+
+pub fn builtin_rmdir(args: &Vec<String>) {
+    match args.get(1) {
+        Some(path) => {
+            if fs::remove_dir(path).is_err() {
+                println!("Failed to remove: {}", path);
+            }
+        }
+        None => println!("No name provided"),
+    }
+}
+
+pub fn builtin_run(args: &Vec<String>, variables: &mut BTreeMap<String, String>) {
+    let path = "/apps/shell/main.bin";
+
+    let mut command = process::Command::new(path);
+    for i in 1..args.len() {
+        if let Some(arg) = args.get(i) {
+            command.arg(arg);
+        }
+    }
+
+    match command.spawn() {
+        Ok(mut child) => {
+            match child.wait() {
+                Ok(status) => {
+                    if let Some(code) = status.code() {
+                        set_var(variables, "?", &format!("{}", code));
+                    } else {
+                        println!("{}: No child exit code", path);
+                    }
+                }
+                Err(err) => {
+                    println!("{}: Failed to wait: {}", path, err)
+                }
+            }
+        }
+        Err(err) => println!("{}: Failed to execute: {}", path, err),
+    }
+}
+
+pub fn builtin_sleep(args: &Vec<String>) {
+    let secs = args.get(1).map_or(0, |arg| arg.to_num());
+    thread::sleep_ms(secs as u32 * 1000);
+}
+
+pub fn builtin_touch(args: &Vec<String>) {
+    let secs = args.get(1).map_or(0, |arg| arg.to_num());
+    thread::sleep_ms(secs as u32 * 1000);
+}
+
 impl Command {
     /// Return the map from command names to commands
     pub fn map() -> BTreeMap<String, Self> {
@@ -51,20 +279,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                let path = args.get(1).map_or(String::new(), |arg| arg.clone());
-
-                                match File::open(&path) {
-                                    Ok(mut file) => {
-                                        let mut string = String::new();
-                                        match file.read_to_string(&mut string) {
-                                            Ok(_) => println!("{}", string),
-                                            Err(err) => {
-                                                println!("Failed to read: {}: {}", path, err)
-                                            }
-                                        }
-                                    }
-                                    Err(err) => println!("Failed to open file: {}: {}", path, err),
-                                }
+                                builtin_cat(args);
                             }),
                         });
 
@@ -75,16 +290,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                match args.get(1) {
-                                    Some(path) => {
-                                        if let Err(err) = env::set_current_dir(&path) {
-                                            println!("Failed to set current dir to {}: {}",
-                                                     path,
-                                                     err);
-                                        }
-                                    }
-                                    None => println!("No path given"),
-                                }
+                                builtin_cd(args);
                             }),
                         });
 
@@ -95,11 +301,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                let echo = args.iter()
-                                               .skip(1)
-                                               .fold(String::new(),
-                                                     |string, arg| string + " " + arg);
-                                println!("{}", echo.trim());
+                                builtin_echo(args);
                             }),
                         });
 
@@ -119,16 +321,7 @@ impl Command {
                             main: Box::new(|_: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                match File::open("memory:") {
-                                    Ok(mut file) => {
-                                        let mut string = String::new();
-                                        match file.read_to_string(&mut string) {
-                                            Ok(_) => println!("{}", string),
-                                            Err(err) => println!("Failed to read: memory: {}", err),
-                                        }
-                                    }
-                                    Err(err) => println!("Failed to open file: memory: {}", err),
-                                }
+                                buiiltin_free();
                             }),
                         });
 
@@ -139,55 +332,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                let path = args.get(1).map_or(".".to_string(), |arg| arg.clone());
-
-                                let mut entries = Vec::new();
-                                match fs::read_dir(&path) {
-                                    Ok(dir) => {
-                                        for entry_result in dir {
-                                            match entry_result {
-                                                Ok(entry) => {
-                                                    let directory = match entry.file_type() {
-                                                        Ok(file_type) => file_type.is_dir(),
-                                                        Err(err) => {
-                                                            println!("Failed to read file type: \
-                                                                      {}",
-                                                                     err);
-                                                            false
-                                                        }
-                                                    };
-
-                                                    match entry.file_name().to_str() {
-                                                        Some(path_str) => {
-                                                            if directory {
-                                                                entries.push(path_str.to_string() +
-                                                                             "/")
-                                                            } else {
-                                                                entries.push(path_str.to_string())
-                                                            }
-                                                        }
-                                                        None => {
-                                                            println!("Failed to convert path to \
-                                                                      string")
-                                                        }
-                                                    }
-                                                }
-                                                Err(err) => {
-                                                    println!("Failed to read entry: {}", err)
-                                                }
-                                            }
-                                        }
-                                    }
-                                    Err(err) => {
-                                        println!("Failed to open directory: {}: {}", path, err)
-                                    }
-                                }
-
-                                entries.sort();
-
-                                for entry in entries {
-                                    println!("{}", entry);
-                                }
+                                builtin_ls(args);
                             }),
                         });
 
@@ -199,14 +344,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                match args.get(1) {
-                                    Some(dir_name) => {
-                                        if let Err(err) = fs::create_dir(dir_name) {
-                                            println!("Failed to create: {}: {}", dir_name, err);
-                                        }
-                                    }
-                                    None => println!("No name provided"),
-                                }
+                                builtin_mkdir(args);
                             }),
                         });
 
@@ -218,10 +356,7 @@ impl Command {
                             main: Box::new(|_: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                match File::create("acpi:off") {
-                                    Err(err) => println!("Failed to remove power (error: {})", err),
-                                    Ok(_) => println!("I see dead people"),
-                                }
+                                builtin_poweroff();
                             }),
                         });
 
@@ -232,18 +367,7 @@ impl Command {
                             main: Box::new(|_: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                match File::open("context:") {
-                                    Ok(mut file) => {
-                                        let mut string = String::new();
-                                        match file.read_to_string(&mut string) {
-                                            Ok(_) => println!("{}", string),
-                                            Err(err) => {
-                                                println!("Failed to read: context: {}", err)
-                                            }
-                                        }
-                                    }
-                                    Err(err) => println!("Failed to open file: context: {}", err),
-                                }
+                                builtin_ps();
                             }),
                         });
 
@@ -254,15 +378,7 @@ impl Command {
                             main: Box::new(|_: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                match env::current_dir() {
-                                    Ok(path) => {
-                                        match path.to_str() {
-                                            Some(path_str) => println!("{}", path_str),
-                                            None => println!("?"),
-                                        }
-                                    }
-                                    Err(err) => println!("Failed to get current dir: {}", err),
-                                }
+                                builtin_pwd();
                             }),
                         });
 
@@ -273,19 +389,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             variables: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                for i in 1..args.len() {
-                                    if let Some(arg_original) = args.get(i) {
-                                        let arg = arg_original.trim();
-                                        print!("{}=", arg);
-                                        if let Err(message) = stdout().flush() {
-                                            println!("{}: Failed to flush stdout", message);
-                                        }
-                                        if let Some(value_original) = readln() {
-                                            let value = value_original.trim();
-                                            set_var(variables, arg, value);
-                                        }
-                                    }
-                                }
+                                builtin_read(args, variables);
                             }),
                         });
 
@@ -296,14 +400,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                match args.get(1) {
-                                    Some(path) => {
-                                        if fs::remove_file(path).is_err() {
-                                            println!("Failed to remove: {}", path);
-                                        }
-                                    }
-                                    None => println!("No name provided"),
-                                }
+                                builtin_rm(args);
                             }),
                         });
 
@@ -314,14 +411,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                match args.get(1) {
-                                    Some(path) => {
-                                        if fs::remove_dir(path).is_err() {
-                                            println!("Failed to remove: {}", path);
-                                        }
-                                    }
-                                    None => println!("No name provided"),
-                                }
+                                builtin_rmdir(args);
                             }),
                         });
 
@@ -332,32 +422,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             variables: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                let path = "/apps/shell/main.bin";
-
-                                let mut command = process::Command::new(path);
-                                for i in 1..args.len() {
-                                    if let Some(arg) = args.get(i) {
-                                        command.arg(arg);
-                                    }
-                                }
-
-                                match command.spawn() {
-                                    Ok(mut child) => {
-                                        match child.wait() {
-                                            Ok(status) => {
-                                                if let Some(code) = status.code() {
-                                                    set_var(variables, "?", &format!("{}", code));
-                                                } else {
-                                                    println!("{}: No child exit code", path);
-                                                }
-                                            }
-                                            Err(err) => {
-                                                println!("{}: Failed to wait: {}", path, err)
-                                            }
-                                        }
-                                    }
-                                    Err(err) => println!("{}: Failed to execute: {}", path, err),
-                                }
+                                builtin_run(args, variables);
                             }),
                         });
 
@@ -369,8 +434,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                let secs = args.get(1).map_or(0, |arg| arg.to_num());
-                                thread::sleep_ms(secs as u32 * 1000);
+                                builtin_sleep(args);
                             }),
                         });
 
@@ -384,14 +448,7 @@ impl Command {
                             main: Box::new(|args: &Vec<String>,
                                             _: &mut BTreeMap<String, String>,
                                             _: &mut Vec<Mode>| {
-                                match args.get(1) {
-                                    Some(file_name) => {
-                                        if let Err(err) = File::create(file_name) {
-                                            println!("Failed to create: {}: {}", file_name, err);
-                                        }
-                                    }
-                                    None => println!("No name provided"),
-                                }
+                                builtin_touch(args);
                             }),
                         });
 
