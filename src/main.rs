@@ -41,9 +41,9 @@ pub struct Command {
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
-pub struct Shell<'a> {
-    pub variables: &'a mut BTreeMap<String, String>,
-    pub modes: &'a mut Vec<Mode>,
+pub struct Shell {
+    pub variables: BTreeMap<String, String>,
+    pub modes: Vec<Mode>,
 }
 
 impl Command {
@@ -146,7 +146,7 @@ impl Command {
                             name: "read",
                             help: "To read some variables\n    read <my_variable>",
                             main: Box::new(|args: &[String], shell: &mut Shell| {
-                                builtin::read(args, shell.variables);
+                                builtin::read(args, &mut shell.variables);
                             }),
                         });
 
@@ -173,7 +173,7 @@ impl Command {
                             name: "run",
                             help: "Run a script\n    run <script>",
                             main: Box::new(|args: &[String], shell: &mut Shell| {
-                                builtin::run(args, shell.variables);
+                                builtin::run(args, &mut shell.variables);
                             }),
                         });
 
@@ -249,7 +249,7 @@ fn on_command(command_string: &str, commands: &BTreeMap<String, Command>, shell:
         return;
     }
 
-    let mut tokens: Vec<Token> = expand_tokens(&mut tokenize(command_string), shell.variables);
+    let mut tokens: Vec<Token> = expand_tokens(&mut tokenize(command_string), &mut shell.variables);
     let jobs: Vec<Job> = parse(&mut tokens);
 
     // Execute commands
@@ -336,7 +336,7 @@ fn on_command(command_string: &str, commands: &BTreeMap<String, Command>, shell:
                 }
             }
 
-            set_var(shell.variables, name, &value);
+            set_var(&mut shell.variables, name, &value);
             continue;
         }
 
@@ -346,7 +346,7 @@ fn on_command(command_string: &str, commands: &BTreeMap<String, Command>, shell:
         if let Some(command) = commands.get(&job.command) {
             (*command.main)(&args, shell);
         } else {
-            run_external_commmand(args, shell.variables);
+            run_external_commmand(args, &mut shell.variables);
         }
     }
 }
@@ -418,8 +418,8 @@ fn run_external_commmand(args: Vec<String>, variables: &mut BTreeMap<String, Str
 fn main() {
     let commands = Command::map();
     let mut shell = Shell {
-        variables: &mut BTreeMap::new(),
-        modes: &mut vec![],
+        variables: BTreeMap::new(),
+        modes: vec![],
     };
 
     for arg in env::args().skip(1) {
