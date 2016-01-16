@@ -36,14 +36,14 @@ pub mod expansion;
 pub struct Command {
     pub name: &'static str,
     pub help: &'static str,
-    pub main: Box<Fn(&Vec<String>, &mut BTreeMap<String, String>, &mut Vec<Mode>)>,
+    pub main: Box<Fn(&Vec<String>, &mut Shell)>,
 }
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell<'a> {
     pub variables: &'a mut BTreeMap<String, String>,
-    pub mode: &'a mut Vec<Mode>,
+    pub modes: &'a mut Vec<Mode>,
 }
 
 impl Command {
@@ -55,9 +55,7 @@ impl Command {
                         Command {
                             name: "cat",
                             help: "To display a file in the output\n    cat <your_file>",
-                            main: Box::new(|args: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|args: &Vec<String>, _: &mut Shell| {
                                 builtin::cat(args);
                             }),
                         });
@@ -66,9 +64,7 @@ impl Command {
                         Command {
                             name: "cd",
                             help: "To change the current directory\n    cd <your_destination>",
-                            main: Box::new(|args: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|args: &Vec<String>, _: &mut Shell| {
                                 builtin::cd(args);
                             }),
                         });
@@ -77,9 +73,7 @@ impl Command {
                         Command {
                             name: "echo",
                             help: "To display some text in the output\n    echo Hello world!",
-                            main: Box::new(|args: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|args: &Vec<String>, _: &mut Shell| {
                                 builtin::echo(args);
                             }),
                         });
@@ -88,18 +82,14 @@ impl Command {
                         Command {
                             name: "exit",
                             help: "To exit the curent session",
-                            main: Box::new(|_: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {}),
+                            main: Box::new(|_: &Vec<String>, _: &mut Shell| {}),
                         });
 
         commands.insert("free".to_string(),
                         Command {
                             name: "free",
                             help: "Show memory information\n    free",
-                            main: Box::new(|_: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|_: &Vec<String>, _: &mut Shell| {
                                 builtin::free();
                             }),
                         });
@@ -108,9 +98,7 @@ impl Command {
                         Command {
                             name: "ls",
                             help: "To list the content of the current directory\n    ls",
-                            main: Box::new(|args: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|args: &Vec<String>, _: &mut Shell| {
                                 builtin::ls(args);
                             }),
                         });
@@ -120,9 +108,7 @@ impl Command {
                             name: "mkdir",
                             help: "To create a directory in the current directory\n    mkdir \
                                    <my_new_directory>",
-                            main: Box::new(|args: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|args: &Vec<String>, _: &mut Shell| {
                                 builtin::mkdir(args);
                             }),
                         });
@@ -132,9 +118,7 @@ impl Command {
                             name: "poweroff",
                             help: "poweroff utility has the machine remove power, if \
                                    possible\n\tpoweroff",
-                            main: Box::new(|_: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|_: &Vec<String>, _: &mut Shell| {
                                 builtin::poweroff();
                             }),
                         });
@@ -143,9 +127,7 @@ impl Command {
                         Command {
                             name: "ps",
                             help: "Show process list\n    ps",
-                            main: Box::new(|_: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|_: &Vec<String>, _: &mut Shell| {
                                 builtin::ps();
                             }),
                         });
@@ -154,9 +136,7 @@ impl Command {
                         Command {
                             name: "pwd",
                             help: "To output the path of the current directory\n    pwd",
-                            main: Box::new(|_: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|_: &Vec<String>, _: &mut Shell| {
                                 builtin::pwd();
                             }),
                         });
@@ -165,10 +145,8 @@ impl Command {
                         Command {
                             name: "read",
                             help: "To read some variables\n    read <my_variable>",
-                            main: Box::new(|args: &Vec<String>,
-                                            variables: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
-                                builtin::read(args, variables);
+                            main: Box::new(|args: &Vec<String>, shell: &mut Shell| {
+                                builtin::read(args, shell.variables);
                             }),
                         });
 
@@ -176,9 +154,7 @@ impl Command {
                         Command {
                             name: "rm",
                             help: "Remove a file\n    rm <file>",
-                            main: Box::new(|args: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|args: &Vec<String>, _: &mut Shell| {
                                 builtin::rm(args);
                             }),
                         });
@@ -187,9 +163,7 @@ impl Command {
                         Command {
                             name: "rmdir",
                             help: "Remove a directory\n    rmdir <directory>",
-                            main: Box::new(|args: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|args: &Vec<String>, _: &mut Shell| {
                                 builtin::rmdir(args);
                             }),
                         });
@@ -198,10 +172,8 @@ impl Command {
                         Command {
                             name: "run",
                             help: "Run a script\n    run <script>",
-                            main: Box::new(|args: &Vec<String>,
-                                            variables: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
-                                builtin::run(args, variables);
+                            main: Box::new(|args: &Vec<String>, shell: &mut Shell| {
+                                builtin::run(args, shell.variables);
                             }),
                         });
 
@@ -210,9 +182,7 @@ impl Command {
                             name: "sleep",
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
-                            main: Box::new(|args: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|args: &Vec<String>, _: &mut Shell| {
                                 builtin::sleep(args);
                             }),
                         });
@@ -224,9 +194,7 @@ impl Command {
                         Command {
                             name: "touch",
                             help: "To create a file, in the current directory\n    touch <my_file>",
-                            main: Box::new(|args: &Vec<String>,
-                                            _: &mut BTreeMap<String, String>,
-                                            _: &mut Vec<Mode>| {
+                            main: Box::new(|args: &Vec<String>, _: &mut Shell| {
                                 builtin::touch(args);
                             }),
                         });
@@ -244,9 +212,7 @@ impl Command {
                         Command {
                             name: "help",
                             help: "Display a little helper for a given command\n    help ls",
-                            main: Box::new(move |args: &Vec<String>,
-                                                 _: &mut BTreeMap<String, String>,
-                                                 _: &mut Vec<Mode>| {
+                            main: Box::new(move |args: &Vec<String>, _: &mut Shell| {
                                 if let Some(command) = args.get(1) {
                                     if command_helper.contains_key(command) {
                                         match command_helper.get(command) {
@@ -274,19 +240,16 @@ pub struct Mode {
     value: bool,
 }
 
-fn on_command(command_string: &str,
-              commands: &BTreeMap<String, Command>,
-              variables: &mut BTreeMap<String, String>,
-              modes: &mut Vec<Mode>) {
+fn on_command(command_string: &str, commands: &BTreeMap<String, Command>, shell: &mut Shell) {
     // Show variables
     if command_string == "$" {
-        for (key, value) in variables.iter() {
+        for (key, value) in shell.variables.iter() {
             println!("{}={}", key, value);
         }
         return;
     }
 
-    let mut tokens: Vec<Token> = expand_tokens(&mut tokenize(command_string), variables);
+    let mut tokens: Vec<Token> = expand_tokens(&mut tokenize(command_string), shell.variables);
     let jobs: Vec<Job> = parse(&mut tokens);
 
     // Execute commands
@@ -322,13 +285,13 @@ fn on_command(command_string: &str,
                 println!("No left hand side");
             }
 
-            modes.insert(0, Mode { value: value });
+            shell.modes.insert(0, Mode { value: value });
             continue;
         }
 
         if job.command == "else" {
             let mut syntax_error = false;
-            match modes.get_mut(0) {
+            match shell.modes.get_mut(0) {
                 Some(mode) => mode.value = !mode.value,
                 None => syntax_error = true,
             }
@@ -340,8 +303,8 @@ fn on_command(command_string: &str,
 
         if job.command == "fi" {
             let mut syntax_error = false;
-            if !modes.is_empty() {
-                modes.remove(0);
+            if !shell.modes.is_empty() {
+                shell.modes.remove(0);
             } else {
                 syntax_error = true;
             }
@@ -352,7 +315,7 @@ fn on_command(command_string: &str,
         }
 
         let mut skipped: bool = false;
-        for mode in modes.iter() {
+        for mode in shell.modes.iter() {
             if !mode.value {
                 skipped = true;
                 break;
@@ -373,7 +336,7 @@ fn on_command(command_string: &str,
                 }
             }
 
-            set_var(variables, name, &value);
+            set_var(shell.variables, name, &value);
             continue;
         }
 
@@ -381,9 +344,9 @@ fn on_command(command_string: &str,
         let mut args = job.args.clone();
         args.insert(0, job.command.clone());
         if let Some(command) = commands.get(&job.command) {
-            (*command.main)(&args, variables, modes);
+            (*command.main)(&args, shell);
         } else {
-            run_external_commmand(args, variables);
+            run_external_commmand(args, shell.variables);
         }
     }
 }
@@ -454,8 +417,10 @@ fn run_external_commmand(args: Vec<String>, variables: &mut BTreeMap<String, Str
 
 fn main() {
     let commands = Command::map();
-    let mut variables: BTreeMap<String, String> = BTreeMap::new();
-    let mut modes: Vec<Mode> = vec![];
+    let mut shell = Shell {
+        variables: &mut BTreeMap::new(),
+        modes: &mut vec![],
+    };
 
     for arg in env::args().skip(1) {
         let mut command_list = String::new();
@@ -464,21 +429,21 @@ fn main() {
                 println!("{}: Failed to read {}", message, arg);
             }
         }
-        on_command(&command_list, &commands, &mut variables, &mut modes);
+        on_command(&command_list, &commands, &mut shell);
 
         return;
     }
 
     loop {
 
-        print_prompt(&modes);
+        print_prompt(&shell.modes);
 
         if let Some(command_original) = readln() {
             let command = command_original.trim();
             if command == "exit" {
                 break;
             } else if !command.is_empty() {
-                on_command(&command, &commands, &mut variables, &mut modes);
+                on_command(&command, &commands, &mut shell);
             }
         } else {
             break;
