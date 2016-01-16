@@ -1,3 +1,5 @@
+#![feature(box_syntax)]
+
 use std::collections::BTreeMap;
 use std::string::String;
 use std::vec::Vec;
@@ -55,52 +57,52 @@ impl Command {
                         Command {
                             name: "cat",
                             help: "To display a file in the output\n    cat <your_file>",
-                            main: Box::new(|args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| {
                                 builtin::cat(args);
-                            }),
+                            },
                         });
 
         commands.insert("cd".to_string(),
                         Command {
                             name: "cd",
                             help: "To change the current directory\n    cd <your_destination>",
-                            main: Box::new(|args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| {
                                 builtin::cd(args);
-                            }),
+                            },
                         });
 
         commands.insert("echo".to_string(),
                         Command {
                             name: "echo",
                             help: "To display some text in the output\n    echo Hello world!",
-                            main: Box::new(|args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| {
                                 builtin::echo(args);
-                            }),
+                            },
                         });
 
         commands.insert("exit".to_string(),
                         Command {
                             name: "exit",
                             help: "To exit the curent session",
-                            main: Box::new(|_: &[String], _: &mut Shell| {}),
+                            main: box |_: &[String], _: &mut Shell| {},
                         });
 
         commands.insert("free".to_string(),
                         Command {
                             name: "free",
                             help: "Show memory information\n    free",
-                            main: Box::new(|_: &[String], _: &mut Shell| {
+                            main: box |_: &[String], _: &mut Shell| {
                                 builtin::free();
-                            }),
+                            },
                         });
 
         commands.insert("ls".to_string(),
                         Command {
                             name: "ls",
                             help: "To list the content of the current directory\n    ls",
-                            main: Box::new(|args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| {
                                 builtin::ls(args);
-                            }),
+                            },
                         });
 
         commands.insert("mkdir".to_string(),
@@ -108,9 +110,9 @@ impl Command {
                             name: "mkdir",
                             help: "To create a directory in the current directory\n    mkdir \
                                    <my_new_directory>",
-                            main: Box::new(|args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| {
                                 builtin::mkdir(args);
-                            }),
+                            },
                         });
 
         commands.insert("poweroff".to_string(),
@@ -118,63 +120,63 @@ impl Command {
                             name: "poweroff",
                             help: "poweroff utility has the machine remove power, if \
                                    possible\n\tpoweroff",
-                            main: Box::new(|_: &[String], _: &mut Shell| {
+                            main: box |_: &[String], _: &mut Shell| {
                                 builtin::poweroff();
-                            }),
+                            },
                         });
 
         commands.insert("ps".to_string(),
                         Command {
                             name: "ps",
                             help: "Show process list\n    ps",
-                            main: Box::new(|_: &[String], _: &mut Shell| {
+                            main: box |_: &[String], _: &mut Shell| {
                                 builtin::ps();
-                            }),
+                            },
                         });
 
         commands.insert("pwd".to_string(),
                         Command {
                             name: "pwd",
                             help: "To output the path of the current directory\n    pwd",
-                            main: Box::new(|_: &[String], _: &mut Shell| {
+                            main: box |_: &[String], _: &mut Shell| {
                                 builtin::pwd();
-                            }),
+                            },
                         });
 
         commands.insert("read".to_string(),
                         Command {
                             name: "read",
                             help: "To read some variables\n    read <my_variable>",
-                            main: Box::new(|args: &[String], shell: &mut Shell| {
+                            main: box |args: &[String], shell: &mut Shell| {
                                 builtin::read(args, &mut shell.variables);
-                            }),
+                            },
                         });
 
         commands.insert("rm".to_string(),
                         Command {
                             name: "rm",
                             help: "Remove a file\n    rm <file>",
-                            main: Box::new(|args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| {
                                 builtin::rm(args);
-                            }),
+                            },
                         });
 
         commands.insert("rmdir".to_string(),
                         Command {
                             name: "rmdir",
                             help: "Remove a directory\n    rmdir <directory>",
-                            main: Box::new(|args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| {
                                 builtin::rmdir(args);
-                            }),
+                            },
                         });
 
         commands.insert("run".to_string(),
                         Command {
                             name: "run",
                             help: "Run a script\n    run <script>",
-                            main: Box::new(|args: &[String], shell: &mut Shell| {
+                            main: box |args: &[String], shell: &mut Shell| {
                                 builtin::run(args, &mut shell.variables);
-                            }),
+                            },
                         });
 
         commands.insert("sleep".to_string(),
@@ -182,9 +184,9 @@ impl Command {
                             name: "sleep",
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
-                            main: Box::new(|args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| {
                                 builtin::sleep(args);
-                            }),
+                            },
                         });
 
         // Simple command to create a file, in the current directory
@@ -194,9 +196,9 @@ impl Command {
                         Command {
                             name: "touch",
                             help: "To create a file, in the current directory\n    touch <my_file>",
-                            main: Box::new(|args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| {
                                 builtin::touch(args);
-                            }),
+                            },
                         });
 
         // TODO: Someone should implement FromIterator for HashMap before
@@ -212,7 +214,7 @@ impl Command {
                         Command {
                             name: "help",
                             help: "Display a little helper for a given command\n    help ls",
-                            main: Box::new(move |args: &[String], _: &mut Shell| {
+                            main: box move |args: &[String], _: &mut Shell| {
                                 if let Some(command) = args.get(1) {
                                     if command_helper.contains_key(command) {
                                         match command_helper.get(command) {
@@ -229,7 +231,7 @@ impl Command {
                                         println!("{}", command);
                                     }
                                 }
-                            }),
+                            },
                         });
 
         commands
