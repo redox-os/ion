@@ -11,7 +11,7 @@ use super::to_num::ToNum;
 use super::set_var;
 use super::input_editor::readln;
 
-pub fn cat(args: &Vec<String>) {
+pub fn cat(args: &[String]) {
     let path = args.get(1).map_or(String::new(), |arg| arg.clone());
 
     match File::open(&path) {
@@ -26,7 +26,7 @@ pub fn cat(args: &Vec<String>) {
     }
 }
 
-pub fn cd(args: &Vec<String>) {
+pub fn cd(args: &[String]) {
     match args.get(1) {
         Some(path) => {
             if let Err(err) = env::set_current_dir(&path) {
@@ -37,7 +37,7 @@ pub fn cd(args: &Vec<String>) {
     }
 }
 
-pub fn echo(args: &Vec<String>) {
+pub fn echo(args: &[String]) {
     let echo = args.iter()
                    .skip(1)
                    .fold(String::new(), |string, arg| string + " " + arg);
@@ -57,7 +57,7 @@ pub fn free() {
     }
 }
 
-pub fn ls(args: &Vec<String>) {
+pub fn ls(args: &[String]) {
     let path = args.get(1).map_or(".".to_string(), |arg| arg.clone());
 
     let mut entries = Vec::new();
@@ -99,7 +99,7 @@ pub fn ls(args: &Vec<String>) {
     }
 }
 
-pub fn mkdir(args: &Vec<String>) {
+pub fn mkdir(args: &[String]) {
     match args.get(1) {
         Some(dir_name) => {
             if let Err(err) = fs::create_dir(dir_name) {
@@ -142,7 +142,7 @@ pub fn pwd() {
     }
 }
 
-pub fn read(args: &Vec<String>, variables: &mut BTreeMap<String, String>) {
+pub fn read(args: &[String], variables: &mut BTreeMap<String, String>) {
     for i in 1..args.len() {
         if let Some(arg_original) = args.get(i) {
             let arg = arg_original.trim();
@@ -158,7 +158,7 @@ pub fn read(args: &Vec<String>, variables: &mut BTreeMap<String, String>) {
     }
 }
 
-pub fn rm(args: &Vec<String>) {
+pub fn rm(args: &[String]) {
     match args.get(1) {
         Some(path) => {
             if fs::remove_file(path).is_err() {
@@ -169,7 +169,7 @@ pub fn rm(args: &Vec<String>) {
     }
 }
 
-pub fn rmdir(args: &Vec<String>) {
+pub fn rmdir(args: &[String]) {
     match args.get(1) {
         Some(path) => {
             if fs::remove_dir(path).is_err() {
@@ -180,7 +180,7 @@ pub fn rmdir(args: &Vec<String>) {
     }
 }
 
-pub fn run(args: &Vec<String>, variables: &mut BTreeMap<String, String>) {
+pub fn run(args: &[String], variables: &mut BTreeMap<String, String>) {
     let path = "/apps/shell/main.bin";
 
     let mut command = process::Command::new(path);
@@ -207,12 +207,12 @@ pub fn run(args: &Vec<String>, variables: &mut BTreeMap<String, String>) {
     }
 }
 
-pub fn sleep(args: &Vec<String>) {
+pub fn sleep(args: &[String]) {
     let secs = args.get(1).map_or(0, |arg| arg.to_num());
     thread::sleep_ms(secs as u32 * 1000);
 }
 
-pub fn touch(args: &Vec<String>) {
+pub fn touch(args: &[String]) {
     match args.get(1) {
         Some(file_name) => {
             if let Err(err) = File::create(file_name) {
