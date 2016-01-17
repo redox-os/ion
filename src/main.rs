@@ -1,9 +1,6 @@
 #![feature(box_syntax)]
 
 use std::collections::BTreeMap;
-use std::string::String;
-use std::vec::Vec;
-use std::boxed::Box;
 use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::env;
