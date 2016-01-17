@@ -1,6 +1,6 @@
 #![feature(box_syntax)]
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::env;
@@ -41,14 +41,14 @@ pub struct Command {
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell {
-    pub variables: BTreeMap<String, String>,
+    pub variables: HashMap<String, String>,
     pub modes: Vec<Mode>,
 }
 
 impl Command {
     /// Return the map from command names to commands
-    pub fn map() -> BTreeMap<String, Self> {
-        let mut commands: BTreeMap<String, Self> = BTreeMap::new();
+    pub fn map() -> HashMap<String, Self> {
+        let mut commands: HashMap<String, Self> = HashMap::new();
 
         commands.insert("cat".to_string(),
                         Command {
@@ -186,21 +186,9 @@ impl Command {
                             },
                         });
 
-        // Simple command to create a file, in the current directory
-        // The file has got the name given as the first argument of the command
-        // If the command have no arguments, the command don't create the file
-        commands.insert("touch".to_string(),
-                        Command {
-                            name: "touch",
-                            help: "To create a file, in the current directory\n    touch <my_file>",
-                            main: box |args: &[String], _: &mut Shell| {
-                                builtin::touch(args);
-                            },
-                        });
-
         // TODO: Someone should implement FromIterator for HashMap before
         //       changing the type back to HashMap
-        let command_helper: BTreeMap<String, String> = commands.iter()
+        let command_helper: HashMap<String, String> = commands.iter()
                                                                .map(|(k, v)| {
                                                                    (k.to_string(),
                                                                     v.help.to_string())
@@ -239,10 +227,12 @@ pub struct Mode {
     value: bool,
 }
 
-fn on_command(command_string: &str, commands: &BTreeMap<String, Command>, shell: &mut Shell) {
+fn on_command(command_string: &str, commands: &HashMap<String, Command>, shell: &mut Shell) {
     // Show variables
     if command_string == "$" {
-        for (key, value) in shell.variables.iter() {
+        let mut pairs: Vec<_> = shell.variables.iter().collect();
+        pairs.sort();
+        for (key, value) in pairs {
             println!("{}={}", key, value);
         }
         return;
@@ -351,7 +341,7 @@ fn on_command(command_string: &str, commands: &BTreeMap<String, Command>, shell:
 }
 
 
-pub fn set_var(variables: &mut BTreeMap<String, String>, name: &str, value: &str) {
+pub fn set_var(variables: &mut HashMap<String, String>, name: &str, value: &str) {
     if name.is_empty() {
         return;
     }
@@ -388,7 +378,7 @@ fn print_prompt(modes: &Vec<Mode>) {
     }
 }
 
-fn run_external_commmand(args: Vec<String>, variables: &mut BTreeMap<String, String>) {
+fn run_external_commmand(args: Vec<String>, variables: &mut HashMap<String, String>) {
     if let Some(path) = args.get(0) {
         let mut command = process::Command::new(path);
         for i in 1..args.len() {
@@ -417,7 +407,7 @@ fn run_external_commmand(args: Vec<String>, variables: &mut BTreeMap<String, Str
 fn main() {
     let commands = Command::map();
     let mut shell = Shell {
-        variables: BTreeMap::new(),
+        variables: HashMap::new(),
         modes: vec![],
     };
 

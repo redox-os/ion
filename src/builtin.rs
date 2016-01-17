@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{stdout, Read, Write};
 use std::env;
@@ -36,9 +36,7 @@ pub fn cd(args: &[String]) {
 }
 
 pub fn echo(args: &[String]) {
-    let echo = args.iter()
-                   .skip(1)
-                   .fold(String::new(), |string, arg| string + " " + arg);
+    let echo = args.join(" ");
     println!("{}", echo.trim());
 }
 
@@ -109,9 +107,8 @@ pub fn mkdir(args: &[String]) {
 }
 
 pub fn poweroff() {
-    match File::create("acpi:off") {
-        Err(err) => println!("Failed to remove power (error: {})", err),
-        Ok(_) => println!("I see dead people"),
+    if let Err(err) = File::create("acpi:off") {
+        println!("Failed to remove power (error: {})", err);
     }
 }
 
@@ -140,12 +137,13 @@ pub fn pwd() {
     }
 }
 
-pub fn read(args: &[String], variables: &mut BTreeMap<String, String>) {
+pub fn read(args: &[String], variables: &mut HashMap<String, String>) {
+    let mut out = stdout();
     for i in 1..args.len() {
         if let Some(arg_original) = args.get(i) {
             let arg = arg_original.trim();
             print!("{}=", arg);
-            if let Err(message) = stdout().flush() {
+            if let Err(message) = out.flush() {
                 println!("{}: Failed to flush stdout", message);
             }
             if let Some(value_original) = readln() {
@@ -178,7 +176,7 @@ pub fn rmdir(args: &[String]) {
     }
 }
 
-pub fn run(args: &[String], variables: &mut BTreeMap<String, String>) {
+pub fn run(args: &[String], variables: &mut HashMap<String, String>) {
     let path = "/apps/shell/main.bin";
 
     let mut command = process::Command::new(path);
@@ -208,15 +206,4 @@ pub fn run(args: &[String], variables: &mut BTreeMap<String, String>) {
 pub fn sleep(args: &[String]) {
     let secs = args.get(1).map_or(0, |arg| arg.to_num());
     thread::sleep_ms(secs as u32 * 1000);
-}
-
-pub fn touch(args: &[String]) {
-    match args.get(1) {
-        Some(file_name) => {
-            if let Err(err) = File::create(file_name) {
-                println!("Failed to create: {}: {}", file_name, err);
-            }
-        }
-        None => println!("No name provided"),
-    }
 }
