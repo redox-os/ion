@@ -1,4 +1,5 @@
 #![feature(box_syntax)]
+#![feature(convert)]
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -47,10 +48,10 @@ pub struct Shell {
 
 impl Command {
     /// Return the map from command names to commands
-    pub fn map() -> HashMap<String, Self> {
-        let mut commands: HashMap<String, Self> = HashMap::new();
+    pub fn map() -> HashMap<&'static str, Self> {
+        let mut commands: HashMap<&str, Self> = HashMap::new();
 
-        commands.insert("cat".to_string(),
+        commands.insert("cat",
                         Command {
                             name: "cat",
                             help: "To display a file in the output\n    cat <your_file>",
@@ -59,7 +60,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("cd".to_string(),
+        commands.insert("cd",
                         Command {
                             name: "cd",
                             help: "To change the current directory\n    cd <your_destination>",
@@ -68,7 +69,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("echo".to_string(),
+        commands.insert("echo",
                         Command {
                             name: "echo",
                             help: "To display some text in the output\n    echo Hello world!",
@@ -77,14 +78,14 @@ impl Command {
                             },
                         });
 
-        commands.insert("exit".to_string(),
+        commands.insert("exit",
                         Command {
                             name: "exit",
                             help: "To exit the curent session",
                             main: box |_: &[String], _: &mut Shell| {},
                         });
 
-        commands.insert("free".to_string(),
+        commands.insert("free",
                         Command {
                             name: "free",
                             help: "Show memory information\n    free",
@@ -93,7 +94,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("ls".to_string(),
+        commands.insert("ls",
                         Command {
                             name: "ls",
                             help: "To list the content of the current directory\n    ls",
@@ -102,7 +103,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("mkdir".to_string(),
+        commands.insert("mkdir",
                         Command {
                             name: "mkdir",
                             help: "To create a directory in the current directory\n    mkdir \
@@ -112,7 +113,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("poweroff".to_string(),
+        commands.insert("poweroff",
                         Command {
                             name: "poweroff",
                             help: "poweroff utility has the machine remove power, if \
@@ -122,7 +123,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("ps".to_string(),
+        commands.insert("ps",
                         Command {
                             name: "ps",
                             help: "Show process list\n    ps",
@@ -131,7 +132,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("pwd".to_string(),
+        commands.insert("pwd",
                         Command {
                             name: "pwd",
                             help: "To output the path of the current directory\n    pwd",
@@ -140,7 +141,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("read".to_string(),
+        commands.insert("read",
                         Command {
                             name: "read",
                             help: "To read some variables\n    read <my_variable>",
@@ -149,7 +150,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("rm".to_string(),
+        commands.insert("rm",
                         Command {
                             name: "rm",
                             help: "Remove a file\n    rm <file>",
@@ -158,7 +159,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("rmdir".to_string(),
+        commands.insert("rmdir",
                         Command {
                             name: "rmdir",
                             help: "Remove a directory\n    rmdir <directory>",
@@ -167,7 +168,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("run".to_string(),
+        commands.insert("run",
                         Command {
                             name: "run",
                             help: "Run a script\n    run <script>",
@@ -176,7 +177,7 @@ impl Command {
                             },
                         });
 
-        commands.insert("sleep".to_string(),
+        commands.insert("sleep",
                         Command {
                             name: "sleep",
                             help: "Make a sleep in the current session\n    sleep \
@@ -195,7 +196,7 @@ impl Command {
                                                                })
                                                                .collect();
 
-        commands.insert("help".to_string(),
+        commands.insert("help",
                         Command {
                             name: "help",
                             help: "Display a little helper for a given command\n    help ls",
@@ -227,7 +228,7 @@ pub struct Mode {
     value: bool,
 }
 
-fn on_command(command_string: &str, commands: &HashMap<String, Command>, shell: &mut Shell) {
+fn on_command(command_string: &str, commands: &HashMap<&str, Command>, shell: &mut Shell) {
     // Show variables
     if command_string == "$" {
         let mut pairs: Vec<_> = shell.variables.iter().collect();
@@ -332,7 +333,7 @@ fn on_command(command_string: &str, commands: &HashMap<String, Command>, shell: 
         // Commands
         let mut args = job.args.clone();
         args.insert(0, job.command.clone());
-        if let Some(command) = commands.get(&job.command) {
+        if let Some(command) = commands.get(&job.command.as_str()) {
             (*command.main)(&args, shell);
         } else {
             run_external_commmand(args, &mut shell.variables);
