@@ -23,3 +23,50 @@
 - `fi` will end the comparison block
 
 ## Proposed Syntax
+
+A LR(k) grammar. Something like this (pseudocode):
+```
+statement:
+    LET IDENT SET expr
+    | IF expr DELSTART statement* DELEND
+expr:
+    # comparations
+    expr EQ expr = eq
+    | expr NEQ expr = not_eq
+    | expr LT expr = less_than
+    | expr GT expr = greater_than
+    | expr LEQ expr = less_than_or_eq
+    | expr GEQ expr = greater_than_or_eq
+    # operators
+    | expr PLUS expr = add
+    | expr MINUS expr = sub
+    | expr MUL expr = mul
+    | expr DIV expr = div
+    # control
+    | IF expr DELSTART expr DELEND ELSE DELSTART expr DELEND = if_else
+    # misc
+    | statement* SEMICOLON expr = block
+    # const
+    | STR(a) = str
+    | NUM(a) = num
+    ...
+```
+
+example:
+
+```
+let home = "~";
+
+if home == pwd {
+    echo "home sweet home"
+}
+
+// let's define a new cmd
+
+fn my_cmd a b {
+    echo a + b;
+}
+
+mycmd 2 4 // 6
+```
+
