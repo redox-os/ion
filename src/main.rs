@@ -9,9 +9,9 @@ use std::process;
 
 use self::to_num::ToNum;
 use self::input_editor::readln;
-use self::tokenizer::{Token, tokenize};
+use self::tokenizer::tokenize;
 use self::expansion::expand_tokens;
-use self::parser::{parse, Job};
+use self::parser::parse;
 
 pub mod builtin;
 pub mod to_num;
@@ -190,11 +190,11 @@ impl Command {
         // TODO: Someone should implement FromIterator for HashMap before
         //       changing the type back to HashMap
         let command_helper: HashMap<String, String> = commands.iter()
-                                                               .map(|(k, v)| {
-                                                                   (k.to_string(),
-                                                                    v.help.to_string())
-                                                               })
-                                                               .collect();
+                                                              .map(|(k, v)| {
+                                                                  (k.to_string(),
+                                                                   v.help.to_string())
+                                                              })
+                                                              .collect();
 
         commands.insert("help",
                         Command {
@@ -239,8 +239,8 @@ fn on_command(command_string: &str, commands: &HashMap<&str, Command>, shell: &m
         return;
     }
 
-    let mut tokens: Vec<Token> = expand_tokens(&mut tokenize(command_string), &mut shell.variables);
-    let jobs: Vec<Job> = parse(&mut tokens);
+    let mut tokens = expand_tokens(&mut tokenize(command_string), &mut shell.variables);
+    let jobs = parse(&mut tokens);
 
     // Execute commands
     for job in jobs.iter() {
@@ -280,25 +280,18 @@ fn on_command(command_string: &str, commands: &HashMap<&str, Command>, shell: &m
         }
 
         if job.command == "else" {
-            let mut syntax_error = false;
-            match shell.modes.get_mut(0) {
-                Some(mode) => mode.value = !mode.value,
-                None => syntax_error = true,
-            }
-            if syntax_error {
+            if let Some(mode) = shell.modes.get_mut(0) {
+                mode.value = !mode.value;
+            } else {
                 println!("Syntax error: else found with no previous if");
             }
             continue;
         }
 
         if job.command == "fi" {
-            let mut syntax_error = false;
             if !shell.modes.is_empty() {
                 shell.modes.remove(0);
             } else {
-                syntax_error = true;
-            }
-            if syntax_error {
                 println!("Syntax error: fi found with no previous if");
             }
             continue;
@@ -392,7 +385,7 @@ fn run_external_commmand(args: Vec<String>, variables: &mut HashMap<String, Stri
                 match child.wait() {
                     Ok(status) => {
                         if let Some(code) = status.code() {
-                            set_var(variables, "?", &format!("{}", code));
+                            set_var(variables, "?", &code.to_string());
                         } else {
                             println!("{}: No child exit code", path);
                         }
