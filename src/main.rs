@@ -31,7 +31,6 @@ pub struct Shell {
 }
 
 impl Shell {
-
     /// Panics if DirectoryStack construction fails
     pub fn new() -> Shell {
         Shell {

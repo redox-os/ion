@@ -1,11 +1,8 @@
 use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::{stdout, Read, Write};
+use std::io::{stdout, Write};
 use std::env;
 use std::process;
-use std::thread;
 
-use super::to_num::ToNum;
 use super::set_var;
 use super::input_editor::readln;
 
