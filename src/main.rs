@@ -22,10 +22,12 @@ pub mod tokenizer;
 pub mod parser;
 pub mod expansion;
 
+pub type Variables = BTreeMap<String, String>;
+
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell {
-    pub variables: BTreeMap<String, String>,
+    pub variables: Variables,
     pub modes: Vec<Mode>,
     pub directory_stack: DirectoryStack,
 }
@@ -275,7 +277,7 @@ fn on_command(command_string: &str, commands: &HashMap<&str, Command>, shell: &m
 }
 
 
-pub fn set_var(variables: &mut BTreeMap<String, String>, name: &str, value: &str) {
+pub fn set_var(variables: &mut Variables, name: &str, value: &str) {
     if name.is_empty() {
         return;
     }
@@ -312,7 +314,7 @@ fn print_prompt(modes: &Vec<Mode>) {
     }
 }
 
-fn run_external_commmand(args: Vec<String>, variables: &mut BTreeMap<String, String>) {
+fn run_external_commmand(args: Vec<String>, variables: &mut Variables) {
     if let Some(path) = args.get(0) {
         let mut command = process::Command::new(path);
         for i in 1..args.len() {
