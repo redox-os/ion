@@ -8,17 +8,39 @@ use std::env;
 use std::process;
 
 use self::to_num::ToNum;
+use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
 use self::tokenizer::tokenize;
 use self::expansion::expand_tokens;
 use self::parser::parse;
 
 pub mod builtin;
+pub mod directory_stack;
 pub mod to_num;
 pub mod input_editor;
 pub mod tokenizer;
 pub mod parser;
 pub mod expansion;
+
+/// This struct will contain all of the data structures related to this
+/// instance of the shell.
+pub struct Shell {
+    pub variables: HashMap<String, String>,
+    pub modes: Vec<Mode>,
+    pub directory_stack: DirectoryStack,
+}
+
+impl Shell {
+
+    /// Panics if DirectoryStack construction fails
+    pub fn new() -> Shell {
+        Shell {
+            variables: HashMap::new(),
+            modes: vec![],
+            directory_stack: DirectoryStack::new().expect(""),
+        }
+    }
+}
 
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the
@@ -37,13 +59,6 @@ pub struct Command {
     pub name: &'static str,
     pub help: &'static str,
     pub main: Box<Fn(&[String], &mut Shell)>,
-}
-
-/// This struct will contain all of the data structures related to this
-/// instance of the shell.
-pub struct Shell {
-    pub variables: HashMap<String, String>,
-    pub modes: Vec<Mode>,
 }
 
 impl Command {
@@ -182,8 +197,38 @@ impl Command {
                             name: "sleep",
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
-                            main: box |args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], shell: &mut Shell| {
                                 builtin::sleep(args);
+                            },
+                        });
+
+        commands.insert("pushd",
+                        Command {
+                            name: "pushd",
+                            help: "Make a sleep in the current session\n    sleep \
+                                   <number_of_seconds>",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.directory_stack.pushd(args);
+                            },
+                        });
+
+        commands.insert("popd",
+                        Command {
+                            name: "popd",
+                            help: "Make a sleep in the current session\n    sleep \
+                                   <number_of_seconds>",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.directory_stack.popd(args);
+                            },
+                        });
+
+        commands.insert("dirs",
+                        Command {
+                            name: "dirs",
+                            help: "Make a sleep in the current session\n    sleep \
+                                   <number_of_seconds>",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.directory_stack.dirs(args);
                             },
                         });
 
@@ -400,10 +445,7 @@ fn run_external_commmand(args: Vec<String>, variables: &mut HashMap<String, Stri
 
 fn main() {
     let commands = Command::map();
-    let mut shell = Shell {
-        variables: HashMap::new(),
-        modes: vec![],
-    };
+    let mut shell = Shell::new();
 
     for arg in env::args().skip(1) {
         let mut command_list = String::new();
