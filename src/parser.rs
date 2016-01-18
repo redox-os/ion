@@ -1,25 +1,17 @@
 use super::tokenizer::Token;
 
-#[derive(Debug)]
-#[derive(PartialEq)]
-#[derive(Clone)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Job {
     pub command: String,
     pub args: Vec<String>,
 }
 
-impl Job {
-    pub fn new() -> Job {
-        Job {
-            command: String::new(),
-            args: vec![],
-        }
-    }
-}
+//impl Job {
+//}
 
 pub fn parse(tokens: &mut Vec<Token>) -> Vec<Job> {
     let mut jobs: Vec<Job> = vec![];
-    let mut job = Job::new();
+    let mut job = Job::default();
     for token in tokens.drain(..) {
         match token {
             Token::Word(word) => {
@@ -31,8 +23,8 @@ pub fn parse(tokens: &mut Vec<Token>) -> Vec<Job> {
             }
             Token::End => {
                 if !job.command.is_empty() {
-                    jobs.push(job.clone());
-                    job = Job::new();
+                    jobs.push(job);
+                    job = Job::default();
                 }
             }
         }
