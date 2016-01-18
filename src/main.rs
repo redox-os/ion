@@ -66,15 +66,6 @@ impl Command {
     pub fn map() -> HashMap<&'static str, Self> {
         let mut commands: HashMap<&str, Self> = HashMap::new();
 
-        commands.insert("cat",
-                        Command {
-                            name: "cat",
-                            help: "To display a file in the output\n    cat <your_file>",
-                            main: box |args: &[String], _: &mut Shell| {
-                                builtin::cat(args);
-                            },
-                        });
-
         commands.insert("cd",
                         Command {
                             name: "cd",
@@ -84,76 +75,11 @@ impl Command {
                             },
                         });
 
-        commands.insert("echo",
-                        Command {
-                            name: "echo",
-                            help: "To display some text in the output\n    echo Hello world!",
-                            main: box |args: &[String], _: &mut Shell| {
-                                builtin::echo(args);
-                            },
-                        });
-
         commands.insert("exit",
                         Command {
                             name: "exit",
                             help: "To exit the curent session",
                             main: box |_: &[String], _: &mut Shell| {},
-                        });
-
-        commands.insert("free",
-                        Command {
-                            name: "free",
-                            help: "Show memory information\n    free",
-                            main: box |_: &[String], _: &mut Shell| {
-                                builtin::free();
-                            },
-                        });
-
-        commands.insert("ls",
-                        Command {
-                            name: "ls",
-                            help: "To list the content of the current directory\n    ls",
-                            main: box |args: &[String], _: &mut Shell| {
-                                builtin::ls(args);
-                            },
-                        });
-
-        commands.insert("mkdir",
-                        Command {
-                            name: "mkdir",
-                            help: "To create a directory in the current directory\n    mkdir \
-                                   <my_new_directory>",
-                            main: box |args: &[String], _: &mut Shell| {
-                                builtin::mkdir(args);
-                            },
-                        });
-
-        commands.insert("poweroff",
-                        Command {
-                            name: "poweroff",
-                            help: "poweroff utility has the machine remove power, if \
-                                   possible\n\tpoweroff",
-                            main: box |_: &[String], _: &mut Shell| {
-                                builtin::poweroff();
-                            },
-                        });
-
-        commands.insert("ps",
-                        Command {
-                            name: "ps",
-                            help: "Show process list\n    ps",
-                            main: box |_: &[String], _: &mut Shell| {
-                                builtin::ps();
-                            },
-                        });
-
-        commands.insert("pwd",
-                        Command {
-                            name: "pwd",
-                            help: "To output the path of the current directory\n    pwd",
-                            main: box |_: &[String], _: &mut Shell| {
-                                builtin::pwd();
-                            },
                         });
 
         commands.insert("read",
@@ -165,40 +91,12 @@ impl Command {
                             },
                         });
 
-        commands.insert("rm",
-                        Command {
-                            name: "rm",
-                            help: "Remove a file\n    rm <file>",
-                            main: box |args: &[String], _: &mut Shell| {
-                                builtin::rm(args);
-                            },
-                        });
-
-        commands.insert("rmdir",
-                        Command {
-                            name: "rmdir",
-                            help: "Remove a directory\n    rmdir <directory>",
-                            main: box |args: &[String], _: &mut Shell| {
-                                builtin::rmdir(args);
-                            },
-                        });
-
         commands.insert("run",
                         Command {
                             name: "run",
                             help: "Run a script\n    run <script>",
                             main: box |args: &[String], shell: &mut Shell| {
                                 builtin::run(args, &mut shell.variables);
-                            },
-                        });
-
-        commands.insert("sleep",
-                        Command {
-                            name: "sleep",
-                            help: "Make a sleep in the current session\n    sleep \
-                                   <number_of_seconds>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                builtin::sleep(args);
                             },
                         });
 
