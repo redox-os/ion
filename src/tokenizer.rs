@@ -38,10 +38,7 @@ fn process_character_single_quoted(_: &mut Vec<Token>,
     }
 }
 
-fn process_character_comment(tokens: &mut Vec<Token>,
-                             current_token: &mut String,
-                             chr: char)
-                             -> TokenizerState {
+fn process_character_comment(tokens: &mut Vec<Token>, _: &mut String, chr: char) -> TokenizerState {
     match chr {
         '\n' | '\r' => {
             tokens.push(Token::End);
