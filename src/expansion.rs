@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use super::tokenizer::Token;
 
-pub fn expand_tokens(tokens: &mut Vec<Token>, variables: &HashMap<String, String>) -> Vec<Token> {
+pub fn expand_tokens(tokens: &mut Vec<Token>, variables: &BTreeMap<String, String>) -> Vec<Token> {
     let mut expanded_tokens: Vec<Token> = vec![];
     for token in tokens.drain(..) {
         expanded_tokens.push(match token {

@@ -1,7 +1,7 @@
 #![feature(box_syntax)]
 #![feature(convert)]
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::env;
@@ -25,16 +25,16 @@ pub mod expansion;
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell {
-    pub variables: HashMap<String, String>,
+    pub variables: BTreeMap<String, String>,
     pub modes: Vec<Mode>,
     pub directory_stack: DirectoryStack,
 }
 
 impl Shell {
     /// Panics if DirectoryStack construction fails
-    pub fn new() -> Shell {
+    pub fn new() -> Self {
         Shell {
-            variables: HashMap::new(),
+            variables: BTreeMap::new(),
             modes: vec![],
             directory_stack: DirectoryStack::new().expect(""),
         }
@@ -173,9 +173,7 @@ pub struct Mode {
 fn on_command(command_string: &str, commands: &HashMap<&str, Command>, shell: &mut Shell) {
     // Show variables
     if command_string == "$" {
-        let mut pairs: Vec<_> = shell.variables.iter().collect();
-        pairs.sort();
-        for (key, value) in pairs {
+        for (key, value) in shell.variables.iter() {
             println!("{}={}", key, value);
         }
         return;
@@ -277,7 +275,7 @@ fn on_command(command_string: &str, commands: &HashMap<&str, Command>, shell: &m
 }
 
 
-pub fn set_var(variables: &mut HashMap<String, String>, name: &str, value: &str) {
+pub fn set_var(variables: &mut BTreeMap<String, String>, name: &str, value: &str) {
     if name.is_empty() {
         return;
     }
@@ -314,7 +312,7 @@ fn print_prompt(modes: &Vec<Mode>) {
     }
 }
 
-fn run_external_commmand(args: Vec<String>, variables: &mut HashMap<String, String>) {
+fn run_external_commmand(args: Vec<String>, variables: &mut BTreeMap<String, String>) {
     if let Some(path) = args.get(0) {
         let mut command = process::Command::new(path);
         for i in 1..args.len() {

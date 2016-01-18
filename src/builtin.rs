@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::{stdout, Write};
 use std::env;
 use std::process;
@@ -17,7 +17,7 @@ pub fn cd(args: &[String]) {
     }
 }
 
-pub fn read(args: &[String], variables: &mut HashMap<String, String>) {
+pub fn read(args: &[String], variables: &mut BTreeMap<String, String>) {
     let mut out = stdout();
     for i in 1..args.len() {
         if let Some(arg_original) = args.get(i) {
@@ -34,7 +34,7 @@ pub fn read(args: &[String], variables: &mut HashMap<String, String>) {
     }
 }
 
-pub fn run(args: &[String], variables: &mut HashMap<String, String>) {
+pub fn run(args: &[String], variables: &mut BTreeMap<String, String>) {
     let path = "/apps/shell/main.bin";
 
     let mut command = process::Command::new(path);
