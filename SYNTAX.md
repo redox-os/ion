@@ -10,7 +10,7 @@
 - `help builtin` will display the syntax and description of `builtin`
 
 ### Variables
-- `variable=some value` will set a variable to `some value`, if a `some value` is blank the variable will be deleted
+- `variable=some value` will set a variable to `some value`, if `some value` is blank the variable will be deleted
 - `$variable` will be placed inline as a single argument, so `touch $variable` would try to create a file `some value`
 - `$` will list all variables
 
