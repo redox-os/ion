@@ -53,10 +53,7 @@ impl DirectoryStack {
     }
 
     fn print_dirs(&self) {
-        // TODO don't print an extra space at the end, do some joining logic instead.
-        for dir in self.dirs.iter().rev() {
-            print!("{} ", dir.display());
-        }
-        println!("");
+        let dir = self.dirs.iter().rev().fold(String::new(), |acc, dir| acc + " " + dir.to_str().unwrap_or("No directory found"));
+        println!("{}", dir.trim_left());
     }
 }

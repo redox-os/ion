@@ -1,5 +1,4 @@
 #![feature(box_syntax)]
-#![feature(convert)]
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
