@@ -1,4 +1,6 @@
 #![feature(box_syntax)]
+#![feature(plugin)]
+#![plugin(peg_syntax_ext)]
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
@@ -20,6 +22,7 @@ pub mod input_editor;
 pub mod tokenizer;
 pub mod parser;
 pub mod expansion;
+pub mod peg;
 
 pub type Variables = BTreeMap<String, String>;
 

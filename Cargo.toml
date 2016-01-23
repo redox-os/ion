@@ -11,3 +11,6 @@ authors = [
   "Łukasz Niemier <lukasz@niemier.pl>",
   "Skyler Berg <skylertheberg@gmail.com>"
 ]
+
+[dependencies]
+peg = "0.3.0"
