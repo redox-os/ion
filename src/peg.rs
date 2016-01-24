@@ -27,6 +27,7 @@ use super::Job;
 job_list -> Vec<Job>
     = jobs:job ++ job_ending { jobs }
     / blank_line ** job_ending { vec![] }
+    / .* { vec![] }
 
 job -> Job
     = res:_job whitespace? comment? { res }
