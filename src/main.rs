@@ -288,24 +288,13 @@ pub fn set_var(variables: &mut Variables, name: &str, value: &str) {
     }
 }
 
-fn print_prompt(modes: &Vec<Mode>) {
-    for mode in modes.iter().rev() {
-        if mode.value {
-            print!("+ ");
-        } else {
-            print!("- ");
-        }
-    }
+fn print_prompt(modes: &[Mode]) {
+    let mode = modes.iter().rev().fold(String::new(), |acc, mode| {
+        acc + if mode.value { "+ " } else { "- " }
+    });
+    print!("{}", mode.trim_right());
 
-    let cwd = match env::current_dir() {
-        Ok(path) => {
-            match path.to_str() {
-                Some(path_str) => path_str.to_string(),
-                None => "?".to_string(),
-            }
-        }
-        Err(_) => "?".to_string(),
-    };
+    let cwd = env::current_dir().ok().map_or("?".to_string(), |ref p| p.to_str().unwrap_or("?").to_string());
 
     print!("ion:{}# ", cwd);
     if let Err(message) = stdout().flush() {
