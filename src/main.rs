@@ -180,7 +180,8 @@ fn on_command(command_string: &str, commands: &HashMap<&str, Command>, shell: &m
         return;
     }
 
-    let jobs = expand_variables(parse(command_string), &shell.variables);
+    let mut jobs = parse(command_string);
+    expand_variables(&mut jobs, &shell.variables);
 
     // Execute commands
     for job in jobs.iter() {
