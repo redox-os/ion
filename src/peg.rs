@@ -25,7 +25,7 @@ use super::Job;
 
 #[pub]
 job_list -> Vec<Job>
-    = (unused* newline)* jobs:job ++ (job_ending+ unused*) (newline unused*)* { jobs }
+    = (unused* newline)* jobs:job ++ ((job_ending+ unused*)+) (newline unused*)* { jobs }
     / (unused*) ** newline { vec![] }
 
 job -> Job
@@ -152,11 +152,11 @@ mod tests {
         assert_eq!(0, jobs[0].args.len());
     }
 
-    //#[test]
-    //fn comments_in_multiline_script() {
-    //    let jobs = job_list("echo\n# a comment;\necho#asfasdf").unwrap();
-    //    assert_eq!(2, jobs.len());
-    //}
+    #[test]
+    fn comments_in_multiline_script() {
+        let jobs = job_list("echo\n# a comment;\necho#asfasdf").unwrap();
+        assert_eq!(2, jobs.len());
+    }
 
     #[test]
     fn multiple_newlines() {
