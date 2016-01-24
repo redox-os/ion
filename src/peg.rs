@@ -15,18 +15,24 @@ impl Job {
     }
 }
 
+pub fn parse(code: &str) -> Vec<Job> {
+    job_list(code).unwrap()  // TODO don't unwrap, handle parse error
+}
+
 peg! grammar(r#"
 use super::Job;
 
+
 #[pub]
-job_list  -> Vec<Job>
-    = whitespace { vec![] }
-    / comment { vec![] }
-    / jobs:job ** job_ending { jobs }
+job_list -> Vec<Job>
+    = jobs:job ++ job_ending { jobs }
+    / blank_line ** job_ending { vec![] }
 
 job -> Job
-    = command:word whitespace args:word ** whitespace whitespace? comment? { Job::new(command, args) }
-    / command:word whitespace? comment? { Job::new(command, vec![]) }
+    = res:_job whitespace? comment? { res }
+    
+_job -> Job
+    = args:word ++ whitespace { let mut args = args.clone(); Job::new(args.remove(0), args) }
 
 word -> String
     = double_quoted_word
@@ -45,6 +51,10 @@ single_quoted_word -> String
 _single_quoted_word -> String
     = [^']+ { match_str.to_string() }
 
+blank_line -> ()
+    = whitespace comment? { () }
+    / comment
+
 comment -> ()
     = [#] [^\r\n]*
 
@@ -52,8 +62,9 @@ whitespace -> ()
     = [ \t]+
 
 job_ending -> ()
-    = newline
-    / [;]
+    = [;]
+    / newline ** (blank_line*)
+    / newline
 
 newline -> ()
     = [\r\n]
@@ -147,10 +158,26 @@ mod tests {
     //    assert_eq!(2, jobs.len());
     //}
 
-    //#[test]
-    //fn multiple_newlines() {
-    //    let jobs = job_list("echo\n\ncat").unwrap();
-    //}
+    #[test]
+    fn multiple_newlines() {
+        let jobs = job_list("echo\n\ncat").unwrap();
+        assert_eq!(2, jobs.len());
+    }
+
+    #[test]
+    fn leading_whitespace() {
+        let jobs = job_list("    \techo").unwrap();
+        assert_eq!(1, jobs.len());
+        assert_eq!("echo", jobs[0].command);
+    }
+
+    #[test]
+    fn indentation_on_multiple_lines() {
+        let jobs = job_list("echo\n  cat").unwrap();
+        assert_eq!(2, jobs.len());
+        assert_eq!("echo", jobs[0].command);
+        assert_eq!("cat", jobs[1].command);
+    }
 
     #[test]
     fn single_quoting() {
