@@ -20,20 +20,43 @@ use super::Job;
 
 #[pub]
 job_list  -> Vec<Job>
-    = job ** job_ending
+    = whitespace { vec![] }
+    / comment { vec![] }
+    / jobs:job ** job_ending { jobs }
 
 job -> Job
-    = command:word whitespace args:word ** whitespace whitespace? { Job::new(command, args) }
-    / command:word { Job::new(command, vec![]) }
+    = command:word whitespace args:word ** whitespace whitespace? comment? { Job::new(command, args) }
+    / command:word whitespace? comment? { Job::new(command, vec![]) }
 
 word -> String
-    = [^ \t\r\n;]+ { match_str.to_string() }
+    = double_quoted_word
+    / single_quoted_word
+    / [^ \t\r\n#;]+ { match_str.to_string() }
+
+double_quoted_word -> String
+    = ["] word:_double_quoted_word ["] { word }
+
+_double_quoted_word -> String
+    = [^"]+ { match_str.to_string() }
+
+single_quoted_word -> String
+    = ['] word:_single_quoted_word ['] { word }
+
+_single_quoted_word -> String
+    = [^']+ { match_str.to_string() }
+
+comment -> ()
+    = [#] [^\r\n]*
 
 whitespace -> ()
     = [ \t]+
 
 job_ending -> ()
-    = [;\r\n]
+    = newline
+    / [;]
+
+newline -> ()
+    = [\r\n]
 "#);
 
 
@@ -92,10 +115,55 @@ mod tests {
         assert_eq!("-al", jobs[0].args[0]);
     }
 
-    // fn double_quoting()
-    // fn single_quoting()
-    // fn single_quoting_with_inner_double_quotes()
-    // fn double_quoting_with_inner_single_quotes()
-    // fn escape_character()
-    // fn quoting_with_escape_character()
+    #[test]
+    fn double_quoting() {
+        let jobs = job_list("echo \"Hello World\"").unwrap();
+        assert_eq!(1, jobs[0].args.len());
+        assert_eq!("Hello World", jobs[0].args[0]);
+    }
+
+    #[test]
+    fn all_whitespace() {
+        let jobs = job_list("  \t ").unwrap();
+        assert_eq!(0, jobs.len());
+    }
+
+    #[test]
+    fn lone_comment() {
+        let jobs = job_list("# ; \t as!!+dfa").unwrap();
+        assert_eq!(0, jobs.len());
+    }
+
+    #[test]
+    fn command_followed_by_comment() {
+        let jobs = job_list("cat # ; \t as!!+dfa").unwrap();
+        assert_eq!(1, jobs.len());
+        assert_eq!(0, jobs[0].args.len());
+    }
+
+    //#[test]
+    //fn comments_in_multiline_script() {
+    //    let jobs = job_list("echo\n# a comment;\necho#asfasdf").unwrap();
+    //    assert_eq!(2, jobs.len());
+    //}
+
+    //#[test]
+    //fn multiple_newlines() {
+    //    let jobs = job_list("echo\n\ncat").unwrap();
+    //}
+
+    #[test]
+    fn single_quoting() {
+        let jobs = job_list("echo '#!!;\"\\'").unwrap();
+        assert_eq!("#!!;\"\\", jobs[0].args[0]);
+    }
+
+    #[test]
+    fn mixed_quoted_and_unquoted() {
+        let jobs = job_list("echo '#!!;\"\\' and \t some \"more' 'stuff\"").unwrap();
+        assert_eq!("#!!;\"\\", jobs[0].args[0]);
+        assert_eq!("and", jobs[0].args[1]);
+        assert_eq!("some", jobs[0].args[2]);
+        assert_eq!("more' 'stuff", jobs[0].args[3]);
+    }
 }
