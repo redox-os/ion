@@ -25,12 +25,11 @@ use super::Job;
 
 #[pub]
 job_list -> Vec<Job>
-    = jobs:job ++ job_ending { jobs }
-    / blank_line ** job_ending { vec![] }
-    / .* { vec![] }
+    = (unused* newline)* jobs:job ++ (job_ending+ unused*) (newline unused*)* { jobs }
+    / (unused*) ** newline { vec![] }
 
 job -> Job
-    = res:_job whitespace? comment? { res }
+    = whitespace? res:_job whitespace? comment? { res }
     
 _job -> Job
     = args:word ++ whitespace { let mut args = args.clone(); Job::new(args.remove(0), args) }
@@ -52,9 +51,9 @@ single_quoted_word -> String
 _single_quoted_word -> String
     = [^']+ { match_str.to_string() }
 
-blank_line -> ()
+unused -> ()
     = whitespace comment? { () }
-    / comment
+    / comment { () }
 
 comment -> ()
     = [#] [^\r\n]*
@@ -64,7 +63,7 @@ whitespace -> ()
 
 job_ending -> ()
     = [;]
-    / newline ** (blank_line*)
+    / newline
     / newline
 
 newline -> ()
@@ -194,4 +193,67 @@ mod tests {
         assert_eq!("some", jobs[0].args[2]);
         assert_eq!("more' 'stuff", jobs[0].args[3]);
     }
+
+    #[test]
+    fn several_blank_lines() {
+        let jobs = parse("\n\n\n");
+        assert_eq!(0, jobs.len());
+    }
+
+    #[test]
+    fn full_script() {
+        let jobs = job_list(
+r#"if a == a
+  echo true a == a
+
+  if b != b
+    echo true b != b
+  else
+    echo false b != b
+
+    if 3 > 2
+      echo true 3 > 2
+    else
+      echo false 3 > 2
+    fi
+  fi
+else
+  echo false a == a
+fi
+"#).unwrap();  // Make sure it parses
+    }
+
+    #[test]
+    fn leading_and_trailing_junk() {
+        let jobs = job_list(
+r#"
+
+# comment
+   # comment
+  
+
+    if a == a   
+  echo true a == a  # Line ending commment
+
+  if b != b
+    echo true b != b
+  else
+    echo false b != b
+
+    if 3 > 2
+      echo true 3 > 2
+    else
+      echo false 3 > 2
+    fi
+  fi
+else
+  echo false a == a
+      fi     
+
+# comment
+
+"#).unwrap();  // Make sure it parses
+    }
+
+
 }
