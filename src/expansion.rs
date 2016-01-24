@@ -4,9 +4,10 @@ use super::Variables;
 pub fn expand_variables(mut jobs: Vec<Job>, variables: &Variables) -> Vec<Job> {
     for mut job in &mut jobs {
         job.command = expand_string(job.command.as_str(), variables);
-        job.args = job.args.iter().map(|original: &String| {
-            expand_string(original.as_str(), variables)
-        }).collect();
+        job.args = job.args
+                      .iter()
+                      .map(|original: &String| expand_string(original.as_str(), variables))
+                      .collect();
     }
     jobs
 }

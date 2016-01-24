@@ -53,7 +53,9 @@ impl DirectoryStack {
     }
 
     fn print_dirs(&self) {
-        let dir = self.dirs.iter().rev().fold(String::new(), |acc, dir| acc + " " + dir.to_str().unwrap_or("No directory found"));
+        let dir = self.dirs.iter().rev().fold(String::new(), |acc, dir| {
+            acc + " " + dir.to_str().unwrap_or("No directory found")
+        });
         println!("{}", dir.trim_left());
     }
 }

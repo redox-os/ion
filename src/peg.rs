@@ -30,7 +30,7 @@ job_list -> Vec<Job>
 
 job -> Job
     = whitespace? res:_job whitespace? comment? { res }
-    
+
 _job -> Job
     = args:word ++ whitespace { let mut args = args.clone(); Job::new(args.remove(0), args) }
 
@@ -202,8 +202,7 @@ mod tests {
 
     #[test]
     fn full_script() {
-        let jobs = job_list(
-r#"if a == a
+        job_list(r#"if a == a
   echo true a == a
 
   if b != b
@@ -220,13 +219,13 @@ r#"if a == a
 else
   echo false a == a
 fi
-"#).unwrap();  // Make sure it parses
+"#)
+            .unwrap();  // Make sure it parses
     }
 
     #[test]
     fn leading_and_trailing_junk() {
-        let jobs = job_list(
-r#"
+        job_list(r#"
 
 # comment
    # comment
@@ -252,7 +251,8 @@ else
 
 # comment
 
-"#).unwrap();  // Make sure it parses
+"#)
+            .unwrap();  // Make sure it parses
     }
 
 
