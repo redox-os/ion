@@ -289,10 +289,10 @@ pub fn set_var(variables: &mut Variables, name: &str, value: &str) {
 }
 
 fn print_prompt(modes: &[Mode]) {
-    let mode = modes.iter().rev().fold(String::new(), |acc, mode| {
+    let prompt_prefix = modes.iter().rev().fold(String::new(), |acc, mode| {
         acc + if mode.value { "+ " } else { "- " }
     });
-    print!("{}", mode.trim_right());
+    print!("{}", prompt_prefix);
 
     let cwd = env::current_dir().ok().map_or("?".to_string(), |ref p| p.to_str().unwrap_or("?").to_string());
 
