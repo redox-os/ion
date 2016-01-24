@@ -12,12 +12,14 @@ use self::to_num::ToNum;
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
 use self::peg::parse;
+use self::expansion::expand_variables;
 
 pub mod builtin;
 pub mod directory_stack;
 pub mod to_num;
 pub mod input_editor;
 pub mod peg;
+pub mod expansion;
 
 pub type Variables = BTreeMap<String, String>;
 
@@ -178,8 +180,7 @@ fn on_command(command_string: &str, commands: &HashMap<&str, Command>, shell: &m
         return;
     }
 
-    //let mut tokens = expand_tokens(&mut tokenize(command_string), &mut shell.variables);
-    let jobs = parse(command_string);
+    let jobs = expand_variables(parse(command_string), &shell.variables);
 
     // Execute commands
     for job in jobs.iter() {
