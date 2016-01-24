@@ -1,4 +1,6 @@
 #![feature(box_syntax)]
+#![feature(plugin)]
+#![plugin(peg_syntax_ext)]
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
@@ -9,16 +11,14 @@ use std::process;
 use self::to_num::ToNum;
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
-use self::tokenizer::tokenize;
-use self::expansion::expand_tokens;
-use self::parser::parse;
+use self::peg::parse;
+use self::expansion::expand_variables;
 
 pub mod builtin;
 pub mod directory_stack;
 pub mod to_num;
 pub mod input_editor;
-pub mod tokenizer;
-pub mod parser;
+pub mod peg;
 pub mod expansion;
 
 pub type Variables = BTreeMap<String, String>;
@@ -180,8 +180,7 @@ fn on_command(command_string: &str, commands: &HashMap<&str, Command>, shell: &m
         return;
     }
 
-    let mut tokens = expand_tokens(&mut tokenize(command_string), &mut shell.variables);
-    let jobs = parse(&mut tokens);
+    let jobs = expand_variables(parse(command_string), &shell.variables);
 
     // Execute commands
     for job in jobs.iter() {

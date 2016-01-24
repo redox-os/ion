@@ -1,24 +1,26 @@
-use super::tokenizer::Token;
+use super::peg::Job;
 use super::Variables;
 
-pub fn expand_tokens(tokens: &mut Vec<Token>, variables: &Variables) -> Vec<Token> {
-    let mut expanded_tokens: Vec<Token> = vec![];
-    for token in tokens.drain(..) {
-        expanded_tokens.push(match token {
-            Token::Word(word) => {
-                if word.starts_with('$') {
-                    let key = word[1..word.len()].to_string();
-                    if let Some(value) = variables.get(&key) {
-                        Token::Word(value.clone())
-                    } else {
-                        Token::Word(String::new())
-                    }
-                } else {
-                    Token::Word(word)
-                }
-            }
-            _ => token,
-        });
+pub fn expand_variables(mut jobs: Vec<Job>, variables: &Variables) -> Vec<Job> {
+    for mut job in &mut jobs {
+        job.command = expand_string(job.command.as_str(), variables);
+        job.args = job.args
+                      .iter()
+                      .map(|original: &String| expand_string(original.as_str(), variables))
+                      .collect();
     }
-    expanded_tokens
+    jobs
+}
+
+#[inline]
+fn expand_string(original: &str, variables: &Variables) -> String {
+    if original.starts_with("$") {
+        if let Some(value) = variables.get(&original[1..original.len()]) {
+            value.clone()
+        } else {
+            String::new()
+        }
+    } else {
+        original.to_string()
+    }
 }
