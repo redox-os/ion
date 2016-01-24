@@ -16,7 +16,7 @@ impl Job {
 }
 
 pub fn parse(code: &str) -> Vec<Job> {
-    job_list(code).unwrap()  // TODO don't unwrap, handle parse error
+    job_list(code).unwrap_or(vec![])
 }
 
 peg! grammar(r#"
