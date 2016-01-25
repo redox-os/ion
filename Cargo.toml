@@ -6,10 +6,10 @@ version = "0.0.4"
 license-file = "LICENSE"
 readme = "README.md"
 authors = [
+  "Skyler Berg <skylertheberg@gmail.com>",
   "Jeremy Soller <jackpot51@gmail.com>",
   "Michael Gattozzi <mgattozzi@gmail.com>",
   "Łukasz Niemier <lukasz@niemier.pl>",
-  "Skyler Berg <skylertheberg@gmail.com>"
 ]
 
 [dependencies]
