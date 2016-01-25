@@ -50,7 +50,7 @@ impl Shell {
 /// let my_command = Command {
 ///     name: "my_command",
 ///     help: "Describe what my_command does followed by a newline showing usage",
-///     main: box|args: &[String]| {
+///     main: box|args: &[String], &mut Shell| {
 ///         println!("Say 'hello' to my command! :-D");
 ///     }
 /// }
@@ -72,6 +72,16 @@ impl Command {
                             help: "To change the current directory\n    cd <your_destination>",
                             main: box |args: &[String], _: &mut Shell| {
                                 builtin::cd(args);
+                            },
+                        });
+
+        commands.insert("dirs",
+                        Command {
+                            name: "dirs",
+                            help: "Make a sleep in the current session\n    sleep \
+                                   <number_of_seconds>",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.directory_stack.dirs(args);
                             },
                         });
 
@@ -120,18 +130,6 @@ impl Command {
                             },
                         });
 
-        commands.insert("dirs",
-                        Command {
-                            name: "dirs",
-                            help: "Make a sleep in the current session\n    sleep \
-                                   <number_of_seconds>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.directory_stack.dirs(args);
-                            },
-                        });
-
-        // TODO: Someone should implement FromIterator for HashMap before
-        //       changing the type back to HashMap
         let command_helper: HashMap<String, String> = commands.iter()
                                                               .map(|(k, v)| {
                                                                   (k.to_string(),
@@ -290,11 +288,17 @@ pub fn set_var(variables: &mut Variables, name: &str, value: &str) {
 
 fn print_prompt(modes: &[Mode]) {
     let prompt_prefix = modes.iter().rev().fold(String::new(), |acc, mode| {
-        acc + if mode.value { "+ " } else { "- " }
+        acc +
+        if mode.value {
+            "+ "
+        } else {
+            "- "
+        }
     });
     print!("{}", prompt_prefix);
 
-    let cwd = env::current_dir().ok().map_or("?".to_string(), |ref p| p.to_str().unwrap_or("?").to_string());
+    let cwd = env::current_dir().ok().map_or("?".to_string(),
+                                             |ref p| p.to_str().unwrap_or("?").to_string());
 
     print!("ion:{}# ", cwd);
     if let Err(message) = stdout().flush() {
@@ -340,7 +344,6 @@ fn main() {
             }
         }
         on_command(&command_list, &commands, &mut shell);
-
         return;
     }
 
