@@ -2,7 +2,7 @@
 #![feature(plugin)]
 #![plugin(peg_syntax_ext)]
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::env;
@@ -29,6 +29,7 @@ pub struct Shell {
     pub variables: Variables,
     pub modes: Vec<Mode>,
     pub directory_stack: DirectoryStack,
+    pub history: VecDeque<String>,
 }
 
 impl Shell {
@@ -38,6 +39,7 @@ impl Shell {
             variables: BTreeMap::new(),
             modes: vec![],
             directory_stack: DirectoryStack::new().expect(""),
+            history: VecDeque::new(),
         }
     }
 }
@@ -130,6 +132,17 @@ impl Command {
                             },
                         });
 
+        commands.insert("history",
+                        Command {
+                            name: "history",
+                            help: "Display all commands previously executed",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                for command in shell.history.clone() {
+                                    println!("{}", command);
+                                }
+                            },
+                        });
+
         let command_helper: HashMap<String, String> = commands.iter()
                                                               .map(|(k, v)| {
                                                                   (k.to_string(),
@@ -170,6 +183,12 @@ pub struct Mode {
 }
 
 fn on_command(command_string: &str, commands: &HashMap<&str, Command>, shell: &mut Shell) {
+    let max_history: usize = 1000; // TODO temporary, make this configurable
+    if shell.history.len() > max_history {
+        shell.history.pop_front();
+    }
+    shell.history.push_back(command_string.to_string());
+
     // Show variables
     if command_string == "$" {
         for (key, value) in shell.variables.iter() {
