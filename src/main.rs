@@ -77,100 +77,93 @@ impl Shell {
             for (key, value) in self.variables.iter() {
                 println!("{}={}", key, value);
             }
-            return;
-        }
+        } else {
+            let mut jobs = parse(command_string);
+            self.expand_variables(&mut jobs);
 
-        let mut jobs = parse(command_string);
-        self.expand_variables(&mut jobs);
+            // Execute commands
+            for job in jobs.iter() {
+                if job.command == "if" {
+                    let mut value = false;
 
-        // Execute commands
-        for job in jobs.iter() {
-            if job.command == "if" {
-                let mut value = false;
-
-                if let Some(left) = job.args.get(0) {
-                    if let Some(cmp) = job.args.get(1) {
-                        if let Some(right) = job.args.get(2) {
-                            if cmp == "==" {
-                                value = *left == *right;
-                            } else if cmp == "!=" {
-                                value = *left != *right;
-                            } else if cmp == ">" {
-                                value = left.to_num_signed() > right.to_num_signed();
-                            } else if cmp == ">=" {
-                                value = left.to_num_signed() >= right.to_num_signed();
-                            } else if cmp == "<" {
-                                value = left.to_num_signed() < right.to_num_signed();
-                            } else if cmp == "<=" {
-                                value = left.to_num_signed() <= right.to_num_signed();
+                    if let Some(left) = job.args.get(0) {
+                        if let Some(cmp) = job.args.get(1) {
+                            if let Some(right) = job.args.get(2) {
+                                if cmp == "==" {
+                                    value = *left == *right;
+                                } else if cmp == "!=" {
+                                    value = *left != *right;
+                                } else if cmp == ">" {
+                                    value = left.to_num_signed() > right.to_num_signed();
+                                } else if cmp == ">=" {
+                                    value = left.to_num_signed() >= right.to_num_signed();
+                                } else if cmp == "<" {
+                                    value = left.to_num_signed() < right.to_num_signed();
+                                } else if cmp == "<=" {
+                                    value = left.to_num_signed() <= right.to_num_signed();
+                                } else {
+                                    println!("Unknown comparison: {}", cmp);
+                                }
                             } else {
-                                println!("Unknown comparison: {}", cmp);
+                                println!("No right hand side");
                             }
                         } else {
-                            println!("No right hand side");
+                            println!("No comparison operator");
                         }
                     } else {
-                        println!("No comparison operator");
+                        println!("No left hand side");
                     }
-                } else {
-                    println!("No left hand side");
+
+                    self.modes.insert(0, Mode { value: value });
+                    continue;
                 }
 
-                self.modes.insert(0, Mode { value: value });
-                continue;
-            }
-
-            if job.command == "else" {
-                if let Some(mode) = self.modes.get_mut(0) {
-                    mode.value = !mode.value;
-                } else {
-                    println!("Syntax error: else found with no previous if");
-                }
-                continue;
-            }
-
-            if job.command == "fi" {
-                if !self.modes.is_empty() {
-                    self.modes.remove(0);
-                } else {
-                    println!("Syntax error: fi found with no previous if");
-                }
-                continue;
-            }
-
-            let mut skipped: bool = false;
-            for mode in self.modes.iter() {
-                if !mode.value {
-                    skipped = true;
-                    break;
-                }
-            }
-            if skipped {
-                continue;
-            }
-
-            // Set variables
-            if let Some(i) = job.command.find('=') {
-                let name = job.command[0..i].trim();
-                let mut value = job.command[i + 1..job.command.len()].trim().to_string();
-
-                for i in 0..job.args.len() {
-                    if let Some(arg) = job.args.get(i) {
-                        value = value + " " + &arg;
+                if job.command == "else" {
+                    if let Some(mode) = self.modes.get_mut(0) {
+                        mode.value = !mode.value;
+                    } else {
+                        println!("Syntax error: else found with no previous if");
                     }
+                    continue;
                 }
 
-                self.set_var(name, &value);
-                continue;
-            }
+                if job.command == "fi" {
+                    if !self.modes.is_empty() {
+                        self.modes.remove(0);
+                    } else {
+                        println!("Syntax error: fi found with no previous if");
+                    }
+                    continue;
+                }
 
-            // Commands
-            let mut args = job.args.clone();
-            args.insert(0, job.command.clone());
-            if let Some(command) = commands.get(&job.command.as_str()) {
-                (*command.main)(&args, self);
-            } else {
-                self.run_external_commmand(args);
+                let skipped = self.modes.iter().any(|mode| !mode.value);
+                if skipped {
+                    continue;
+                }
+
+                // Set variables
+                if let Some(i) = job.command.find('=') {
+                    let name = job.command[..i].trim();
+                    let mut value = job.command[i + 1..job.command.len()].trim().to_string();
+
+                    for i in 0..job.args.len() {
+                        if let Some(arg) = job.args.get(i) {
+                            value = value + " " + &arg;
+                        }
+                    }
+
+                    self.set_var(name, &value);
+                    continue;
+                }
+
+                // Commands
+                let mut args = job.args.clone();
+                args.insert(0, job.command.clone());
+                if let Some(command) = commands.get(&job.command.as_str()) {
+                    (*command.main)(&args, self);
+                } else {
+                    self.run_external_commmand(args);
+                }
             }
         }
     }
@@ -202,14 +195,12 @@ impl Shell {
     }
 
     pub fn set_var(&mut self, name: &str, value: &str) {
-        if name.is_empty() {
-            return;
-        }
-
-        if value.is_empty() {
-            self.variables.remove(&name.to_string());
-        } else {
-            self.variables.insert(name.to_string(), value.to_string());
+        if !name.is_empty() {
+            if value.is_empty() {
+                self.variables.remove(&name.to_string());
+            } else {
+                self.variables.insert(name.to_string(), value.to_string());
+            }
         }
     }
 }
