@@ -2,7 +2,7 @@ use std::io::{stdout, Write};
 use std::env;
 use std::process;
 
-use super::{Shell, Variables};
+use super::Shell;
 use super::input_editor::readln;
 
 pub fn cd(args: &[String]) {

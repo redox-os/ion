@@ -12,7 +12,7 @@ use self::to_num::ToNum;
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
 use self::peg::parse;
-use self::expansion::expand_variables;
+use self::expansion::Expand;
 
 pub mod builtin;
 pub mod directory_stack;
@@ -21,12 +21,14 @@ pub mod input_editor;
 pub mod peg;
 pub mod expansion;
 
-pub type Variables = BTreeMap<String, String>;
+pub struct Mode {
+    value: bool,
+}
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell {
-    variables: Variables,
+    variables: BTreeMap<String, String>,
     modes: Vec<Mode>,
     directory_stack: DirectoryStack,
     history: VecDeque<String>,
@@ -79,7 +81,7 @@ impl Shell {
         }
 
         let mut jobs = parse(command_string);
-        expand_variables(&mut jobs, &self.variables);
+        self.expand_variables(&mut jobs);
 
         // Execute commands
         for job in jobs.iter() {
@@ -345,11 +347,6 @@ impl Command {
         commands
     }
 }
-
-pub struct Mode {
-    value: bool,
-}
-
 
 fn main() {
     let commands = Command::map();
