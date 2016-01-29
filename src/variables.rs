@@ -16,15 +16,13 @@ impl Variables {
     pub fn read(&mut self, args: &[String]) {
         let mut out = stdout();
         for i in 1..args.len() {
-            if let Some(arg_original) = args.get(i) {
-                let arg = arg_original.trim();
-                print!("{}=", arg);
+            if let Some(arg) = args.get(i) {
+                print!("{}=", arg.trim());
                 if let Err(message) = out.flush() {
                     println!("{}: Failed to flush stdout", message);
                 }
-                if let Some(value_original) = readln() {
-                    let value = value_original.trim();
-                    self.set_var(arg, value);
+                if let Some(value) = readln() {
+                    self.set_var(arg, value.trim());
                 }
             }
         }
