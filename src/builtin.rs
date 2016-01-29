@@ -2,7 +2,7 @@ use std::io::{stdout, Write};
 use std::env;
 use std::process;
 
-use super::{set_var, Variables};
+use super::Shell;
 use super::input_editor::readln;
 
 pub fn cd(args: &[String]) {
@@ -16,7 +16,7 @@ pub fn cd(args: &[String]) {
     }
 }
 
-pub fn read(args: &[String], variables: &mut Variables) {
+pub fn read(args: &[String], shell: &mut Shell) {
     let mut out = stdout();
     for i in 1..args.len() {
         if let Some(arg_original) = args.get(i) {
@@ -27,13 +27,13 @@ pub fn read(args: &[String], variables: &mut Variables) {
             }
             if let Some(value_original) = readln() {
                 let value = value_original.trim();
-                set_var(variables, arg, value);
+                shell.set_var(arg, value);
             }
         }
     }
 }
 
-pub fn run(args: &[String], variables: &mut Variables) {
+pub fn run(args: &[String], shell: &mut Shell) {
     let path = "/apps/shell/main.bin";
 
     let mut command = process::Command::new(path);
@@ -48,7 +48,7 @@ pub fn run(args: &[String], variables: &mut Variables) {
             match child.wait() {
                 Ok(status) => {
                     if let Some(code) = status.code() {
-                        set_var(variables, "?", &format!("{}", code));
+                        shell.set_var("?", &format!("{}", code));
                     } else {
                         println!("{}: No child exit code", path);
                     }

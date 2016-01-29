@@ -1,25 +1,32 @@
 use super::peg::Job;
-use super::Variables;
+use super::Shell;
 
-pub fn expand_variables(jobs: &mut [Job], variables: &Variables) {
-    for mut job in &mut jobs[..] {
-        job.command = expand_string(&job.command, variables).to_string();
-        job.args = job.args
-                      .iter()
-                      .map(|original: &String| expand_string(&original, variables).to_string())
-                      .collect();
-    }
+pub trait Expand {
+    fn expand_variables(&self, jobs: &mut [Job]);
+    fn expand_string<'a>(&'a self, original: &'a str) -> &'a str;
 }
 
-#[inline]
-fn expand_string<'a>(original: &'a str, variables: &'a Variables) -> &'a str {
-    if original.starts_with("$") {
-        if let Some(value) = variables.get(&original[1..]) {
-            &value
-        } else {
-            ""
+impl Expand for Shell {
+    fn expand_variables(&self, jobs: &mut [Job]) {
+        for mut job in &mut jobs[..] {
+            job.command = self.expand_string(&job.command).to_string();
+            job.args = job.args
+                .iter()
+                .map(|original: &String| self.expand_string(&original).to_string())
+                .collect();
         }
-    } else {
-        original
+    }
+
+    #[inline]
+    fn expand_string<'a>(&'a self, original: &'a str) -> &'a str {
+        if original.starts_with("$") {
+            if let Some(value) = self.variables.get(&original[1..]) {
+                &value
+            } else {
+                ""
+            }
+        } else {
+            original
+        }
     }
 }
