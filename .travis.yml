@@ -2,6 +2,14 @@ language: rust
 rust:
   - nightly
 sudo: false
+before_script:
+  - cargo install rustfmt --root . --debug
+  - cp -r src formatted
+  - ./bin/rustfmt --write-mode=overwrite formatted/*
+script:
+  - cargo build --verbose
+  - cargo test --verbose
+  - diff --brief -r src formatted/
 notifications:
   slack: redox-os:t5jWurX9sFfgurPznqdECoKN
   email: false

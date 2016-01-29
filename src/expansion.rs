@@ -11,9 +11,9 @@ impl Expand for Shell {
         for mut job in &mut jobs[..] {
             job.command = self.expand_string(&job.command).to_string();
             job.args = job.args
-                .iter()
-                .map(|original: &String| self.expand_string(&original).to_string())
-                .collect();
+                          .iter()
+                          .map(|original: &String| self.expand_string(&original).to_string())
+                          .collect();
         }
     }
 
