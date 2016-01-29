@@ -34,10 +34,10 @@ impl Variables {
         match (args.get(1), args.get(2)) {
             (Some(key), Some(value)) => {
                 self.variables.insert(key.clone(), value.clone());
-            },
+            }
             (Some(key), None) => {
                 self.variables.remove(key);
-            },
+            }
             _ => {
                 for (key, value) in self.variables.iter() {
                     println!("{}={}", key, value);
