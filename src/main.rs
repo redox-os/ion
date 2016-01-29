@@ -2,7 +2,7 @@
 #![feature(plugin)]
 #![plugin(peg_syntax_ext)]
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::env;
@@ -12,14 +12,14 @@ use self::to_num::ToNum;
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
 use self::peg::parse;
-use self::expansion::Expand;
+use self::variables::Variables;
 
 pub mod builtin;
 pub mod directory_stack;
 pub mod to_num;
 pub mod input_editor;
 pub mod peg;
-pub mod expansion;
+pub mod variables;
 
 pub struct Mode {
     value: bool,
@@ -28,7 +28,7 @@ pub struct Mode {
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell {
-    variables: BTreeMap<String, String>,
+    variables: Variables,
     modes: Vec<Mode>,
     directory_stack: DirectoryStack,
     history: VecDeque<String>,
@@ -38,7 +38,7 @@ impl Shell {
     /// Panics if DirectoryStack construction fails
     pub fn new() -> Self {
         Shell {
-            variables: BTreeMap::new(),
+            variables: Variables::new(),
             modes: vec![],
             directory_stack: DirectoryStack::new().expect(""),
             history: VecDeque::new(),
@@ -72,98 +72,91 @@ impl Shell {
         }
         self.history.push_back(command_string.to_string());
 
-        // Show variables
-        if command_string == "$" {
-            for (key, value) in self.variables.iter() {
-                println!("{}={}", key, value);
-            }
-        } else {
-            let mut jobs = parse(command_string);
-            self.expand_variables(&mut jobs);
+        let mut jobs = parse(command_string);
+        self.variables.expand_variables(&mut jobs);
 
-            // Execute commands
-            for job in jobs.iter() {
-                if job.command == "if" {
-                    let mut value = false;
+        // Execute commands
+        for job in jobs.iter() {
+            if job.command == "if" {
+                let mut value = false;
 
-                    if let Some(left) = job.args.get(0) {
-                        if let Some(cmp) = job.args.get(1) {
-                            if let Some(right) = job.args.get(2) {
-                                if cmp == "==" {
-                                    value = *left == *right;
-                                } else if cmp == "!=" {
-                                    value = *left != *right;
-                                } else if cmp == ">" {
-                                    value = left.to_num_signed() > right.to_num_signed();
-                                } else if cmp == ">=" {
-                                    value = left.to_num_signed() >= right.to_num_signed();
-                                } else if cmp == "<" {
-                                    value = left.to_num_signed() < right.to_num_signed();
-                                } else if cmp == "<=" {
-                                    value = left.to_num_signed() <= right.to_num_signed();
-                                } else {
-                                    println!("Unknown comparison: {}", cmp);
-                                }
+                if let Some(left) = job.args.get(0) {
+                    if let Some(cmp) = job.args.get(1) {
+                        if let Some(right) = job.args.get(2) {
+                            if cmp == "==" {
+                                value = *left == *right;
+                            } else if cmp == "!=" {
+                                value = *left != *right;
+                            } else if cmp == ">" {
+                                value = left.to_num_signed() > right.to_num_signed();
+                            } else if cmp == ">=" {
+                                value = left.to_num_signed() >= right.to_num_signed();
+                            } else if cmp == "<" {
+                                value = left.to_num_signed() < right.to_num_signed();
+                            } else if cmp == "<=" {
+                                value = left.to_num_signed() <= right.to_num_signed();
                             } else {
-                                println!("No right hand side");
+                                println!("Unknown comparison: {}", cmp);
                             }
                         } else {
-                            println!("No comparison operator");
+                            println!("No right hand side");
                         }
                     } else {
-                        println!("No left hand side");
+                        println!("No comparison operator");
                     }
-
-                    self.modes.insert(0, Mode { value: value });
-                    continue;
-                }
-
-                if job.command == "else" {
-                    if let Some(mode) = self.modes.get_mut(0) {
-                        mode.value = !mode.value;
-                    } else {
-                        println!("Syntax error: else found with no previous if");
-                    }
-                    continue;
-                }
-
-                if job.command == "fi" {
-                    if !self.modes.is_empty() {
-                        self.modes.remove(0);
-                    } else {
-                        println!("Syntax error: fi found with no previous if");
-                    }
-                    continue;
-                }
-
-                let skipped = self.modes.iter().any(|mode| !mode.value);
-                if skipped {
-                    continue;
-                }
-
-                // Set variables
-                if let Some(i) = job.command.find('=') {
-                    let name = job.command[..i].trim();
-                    let mut value = job.command[i + 1..job.command.len()].trim().to_string();
-
-                    for i in 0..job.args.len() {
-                        if let Some(arg) = job.args.get(i) {
-                            value = value + " " + &arg;
-                        }
-                    }
-
-                    self.set_var(name, &value);
-                    continue;
-                }
-
-                // Commands
-                let mut args = job.args.clone();
-                args.insert(0, job.command.clone());
-                if let Some(command) = commands.get(&job.command.as_str()) {
-                    (*command.main)(&args, self);
                 } else {
-                    self.run_external_commmand(args);
+                    println!("No left hand side");
                 }
+
+                self.modes.insert(0, Mode { value: value });
+                continue;
+            }
+
+            if job.command == "else" {
+                if let Some(mode) = self.modes.get_mut(0) {
+                    mode.value = !mode.value;
+                } else {
+                    println!("Syntax error: else found with no previous if");
+                }
+                continue;
+            }
+
+            if job.command == "fi" {
+                if !self.modes.is_empty() {
+                    self.modes.remove(0);
+                } else {
+                    println!("Syntax error: fi found with no previous if");
+                }
+                continue;
+            }
+
+            let skipped = self.modes.iter().any(|mode| !mode.value);
+            if skipped {
+                continue;
+            }
+
+            // Set variables
+            if let Some(i) = job.command.find('=') {
+                let name = job.command[..i].trim();
+                let mut value = job.command[i + 1..job.command.len()].trim().to_string();
+
+                for i in 0..job.args.len() {
+                    if let Some(arg) = job.args.get(i) {
+                        value = value + " " + &arg;
+                    }
+                }
+
+                self.variables.set_var(name, &value);
+                continue;
+            }
+
+            // Commands
+            let mut args = job.args.clone();
+            args.insert(0, job.command.clone());
+            if let Some(command) = commands.get(&job.command.as_str()) {
+                (*command.main)(&args, self);
+            } else {
+                self.run_external_commmand(args);
             }
         }
     }
@@ -181,7 +174,7 @@ impl Shell {
                     match child.wait() {
                         Ok(status) => {
                             if let Some(code) = status.code() {
-                                self.set_var("?", &code.to_string());
+                                self.variables.set_var("?", &code.to_string());
                             } else {
                                 println!("{}: No child exit code", path);
                             }
@@ -190,16 +183,6 @@ impl Shell {
                     }
                 }
                 Err(err) => println!("{}: Failed to execute: {}", path, err),
-            }
-        }
-    }
-
-    pub fn set_var(&mut self, name: &str, value: &str) {
-        if !name.is_empty() {
-            if value.is_empty() {
-                self.variables.remove(&name.to_string());
-            } else {
-                self.variables.insert(name.to_string(), value.to_string());
             }
         }
     }
@@ -255,12 +238,21 @@ impl Command {
                             main: box |_: &[String], _: &mut Shell| {},
                         });
 
+        commands.insert("let",
+                        Command {
+                            name: "let",
+                            help: "View, set or unset variables",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.variables.let_(args);
+                            },
+                        });
+
         commands.insert("read",
                         Command {
                             name: "read",
                             help: "To read some variables\n    read <my_variable>",
                             main: box |args: &[String], shell: &mut Shell| {
-                                builtin::read(args, shell);
+                                shell.variables.read(args);
                             },
                         });
 
