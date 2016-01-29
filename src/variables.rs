@@ -31,12 +31,19 @@ impl Variables {
     }
 
     pub fn let_(&mut self, args: &[String]) {
-        if args.len() <= 1 {
-            for (key, value) in self.variables.iter() {
-                println!("{}={}", key, value);
+        match (args.get(1), args.get(2)) {
+            (Some(key), Some(value)) => {
+                self.variables.insert(key.clone(), value.clone());
+            }
+            (Some(key), None) => {
+                self.variables.remove(key);
+            }
+            _ => {
+                for (key, value) in self.variables.iter() {
+                    println!("{}={}", key, value);
+                }
             }
         }
-        // TODO use let to set variables if they are provided as arguments
     }
 
     pub fn set_var(&mut self, name: &str, value: &str) {

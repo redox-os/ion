@@ -135,21 +135,6 @@ impl Shell {
                 continue;
             }
 
-            // Set variables
-            if let Some(i) = job.command.find('=') {
-                let name = job.command[..i].trim();
-                let mut value = job.command[i + 1..job.command.len()].trim().to_string();
-
-                for i in 0..job.args.len() {
-                    if let Some(arg) = job.args.get(i) {
-                        value = value + " " + &arg;
-                    }
-                }
-
-                self.variables.set_var(name, &value);
-                continue;
-            }
-
             // Commands
             let mut args = job.args.clone();
             args.insert(0, job.command.clone());
