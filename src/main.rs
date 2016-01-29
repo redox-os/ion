@@ -220,7 +220,10 @@ impl Command {
                         Command {
                             name: "exit",
                             help: "To exit the curent session",
-                            main: box |_: &[String], _: &mut Shell| {},
+                            main: box |_: &[String], _: &mut Shell| {
+                                process::exit(0);
+                                // TODO exit with argument 1 as parameter
+                            },
                         });
 
         commands.insert("let",
