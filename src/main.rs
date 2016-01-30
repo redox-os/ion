@@ -3,7 +3,7 @@
 #![feature(plugin)]
 #![plugin(peg_syntax_ext)]
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::env;
@@ -14,6 +14,7 @@ use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
 use self::peg::parse;
 use self::variables::Variables;
+use self::history::History;
 
 pub mod builtin;
 pub mod directory_stack;
@@ -21,6 +22,7 @@ pub mod to_num;
 pub mod input_editor;
 pub mod peg;
 pub mod variables;
+pub mod history;
 
 pub struct Mode {
     value: bool,
@@ -32,7 +34,7 @@ pub struct Shell {
     variables: Variables,
     modes: Vec<Mode>,
     directory_stack: DirectoryStack,
-    history: VecDeque<String>,
+    history: History,
 }
 
 impl Shell {
@@ -42,7 +44,7 @@ impl Shell {
             variables: Variables::new(),
             modes: vec![],
             directory_stack: DirectoryStack::new().expect(""),
-            history: VecDeque::new(),
+            history: History::new(),
         }
     }
 
@@ -67,11 +69,7 @@ impl Shell {
     }
 
     fn on_command(&mut self, command_string: &str, commands: &HashMap<&str, Command>) {
-        let max_history: usize = 1000; // TODO temporary, make this configurable
-        if self.history.len() > max_history {
-            self.history.pop_front();
-        }
-        self.history.push_back(command_string.to_string());
+        self.history.add(command_string.to_string());
 
         let mut jobs = parse(command_string);
         self.variables.expand_variables(&mut jobs);
@@ -278,10 +276,8 @@ impl Command {
                         Command {
                             name: "history",
                             help: "Display all commands previously executed",
-                            main: box |_: &[String], shell: &mut Shell| {
-                                for command in shell.history.clone() {
-                                    println!("{}", command);
-                                }
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.history.history(args);
                             },
                         });
 
