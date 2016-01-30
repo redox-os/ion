@@ -27,7 +27,7 @@ impl Variables {
     }
 
     pub fn let_(&mut self, args: &[String]) {
-        match (args.get(1), args.get(2)) {
+        match (args.get(0), args.get(1)) {
             (Some(key), Some(value)) => {
                 self.variables.insert(key.clone(), value.clone());
             }
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn let_and_expand_a_variable() {
         let mut variables = Variables::new();
-        variables.let_(&["let".to_string(), "FOO".to_string(), "BAR".to_string()]);
+        variables.let_(&["FOO".to_string(), "BAR".to_string()]);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("BAR", expanded);
     }
@@ -106,8 +106,8 @@ mod tests {
     #[test]
     fn remove_a_variable_with_let() {
         let mut variables = Variables::new();
-        variables.let_(&["let".to_string(), "FOO".to_string(), "BAR".to_string()]);
-        variables.let_(&["let".to_string(), "FOO".to_string()]);
+        variables.let_(&["FOO".to_string(), "BAR".to_string()]);
+        variables.let_(&["FOO".to_string()]);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("", expanded);
     }

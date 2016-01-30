@@ -231,7 +231,7 @@ impl Command {
                             name: "let",
                             help: "View, set or unset variables",
                             main: box |args: &[String], shell: &mut Shell| {
-                                shell.variables.let_(args);
+                                shell.variables.let_(&args[1..3]);
                             },
                         });
 
