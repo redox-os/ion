@@ -75,3 +75,40 @@ impl Variables {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn undefined_variable_expands_to_empty_string() {
+        let variables = Variables::new();
+        let expanded = variables.expand_string("$FOO");
+        assert_eq!("", expanded);
+    }
+
+    #[test]
+    fn let_and_expand_a_variable() {
+        let mut variables = Variables::new();
+        variables.let_(&["let".to_string(), "FOO".to_string(), "BAR".to_string()]);
+        let expanded = variables.expand_string("$FOO");
+        assert_eq!("BAR", expanded);
+    }
+
+    #[test]
+    fn set_var_and_expand_a_variable() {
+        let mut variables = Variables::new();
+        variables.set_var("FOO", "BAR");
+        let expanded = variables.expand_string("$FOO");
+        assert_eq!("BAR", expanded);
+    }
+
+    #[test]
+    fn remove_a_variable_with_let() {
+        let mut variables = Variables::new();
+        variables.let_(&["let".to_string(), "FOO".to_string(), "BAR".to_string()]);
+        variables.let_(&["let".to_string(), "FOO".to_string()]);
+        let expanded = variables.expand_string("$FOO");
+        assert_eq!("", expanded);
+    }
+}
