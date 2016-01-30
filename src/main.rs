@@ -274,7 +274,7 @@ impl Command {
                         Command {
                             name: "history",
                             help: "Display all commands previously executed",
-                            main: box |args: &[String], shell: &mut Shell| {
+                            main: box |_: &[String], shell: &mut Shell| {
                                 for command in shell.history.clone() {
                                     println!("{}", command);
                                 }
@@ -335,12 +335,12 @@ fn main() {
 
         shell.print_prompt();
 
-        if let Some(command_original) = readln() {
-            let command = command_original.trim();
+        if let Some(command) = readln() {
+            let command = command.trim();
             if command == "exit" {
                 break;
             } else if !command.is_empty() {
-                shell.on_command(&command, &commands);
+                shell.on_command(command, &commands);
             }
         } else {
             break;
