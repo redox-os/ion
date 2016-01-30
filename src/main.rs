@@ -335,14 +335,11 @@ fn main() {
     }
 
     loop {
-
         shell.print_prompt();
 
         if let Some(command) = readln() {
             let command = command.trim();
-            if command == "exit" {
-                break;
-            } else if !command.is_empty() {
+            if !command.is_empty() {
                 shell.on_command(command, &commands);
             }
         } else {
