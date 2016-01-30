@@ -18,10 +18,8 @@ pub fn run(args: &[String], shell: &mut Shell) {
     let path = "/apps/shell/main.bin";
 
     let mut command = process::Command::new(path);
-    for i in 1..args.len() {
-        if let Some(arg) = args.get(i) {
-            command.arg(arg);
-        }
+    for arg in args.iter().skip(1) {
+        command.arg(arg);
     }
 
     match command.spawn() {
