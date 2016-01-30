@@ -1,18 +1,6 @@
-use std::env;
 use std::process;
 
 use super::Shell;
-
-pub fn cd(args: &[String]) {
-    match args.get(1) {
-        Some(path) => {
-            if let Err(err) = env::set_current_dir(&path) {
-                println!("Failed to set current dir to {}: {}", path, err);
-            }
-        }
-        None => println!("No path given"),
-    }
-}
 
 pub fn run(args: &[String], shell: &mut Shell) {
     let path = "/apps/shell/main.bin";

@@ -201,8 +201,8 @@ impl Command {
                         Command {
                             name: "cd",
                             help: "To change the current directory\n    cd <your_destination>",
-                            main: box |args: &[String], _: &mut Shell| {
-                                builtin::cd(args);
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.directory_stack.cd(args);
                             },
                         });
 
