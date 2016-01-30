@@ -27,7 +27,7 @@ pub fn run(args: &[String], shell: &mut Shell) {
             match child.wait() {
                 Ok(status) => {
                     if let Some(code) = status.code() {
-                        shell.variables.set_var("?", &format!("{}", code));
+                        shell.variables.let_(&["?".to_string(), format!("{}", code)]);
                     } else {
                         println!("{}: No child exit code", path);
                     }

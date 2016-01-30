@@ -42,16 +42,6 @@ impl Variables {
         }
     }
 
-    pub fn set_var(&mut self, name: &str, value: &str) {
-        if !name.is_empty() {
-            if value.is_empty() {
-                self.variables.remove(&name.to_string());
-            } else {
-                self.variables.insert(name.to_string(), value.to_string());
-            }
-        }
-    }
-
     pub fn expand_variables(&self, jobs: &mut [Job]) {
         for mut job in &mut jobs[..] {
             job.command = self.expand_string(&job.command).to_string();
@@ -72,6 +62,16 @@ impl Variables {
             }
         } else {
             original
+        }
+    }
+
+    fn set_var(&mut self, name: &str, value: &str) {
+        if !name.is_empty() {
+            if value.is_empty() {
+                self.variables.remove(&name.to_string());
+            } else {
+                self.variables.insert(name.to_string(), value.to_string());
+            }
         }
     }
 }

@@ -159,7 +159,7 @@ impl Shell {
                     match child.wait() {
                         Ok(status) => {
                             if let Some(code) = status.code() {
-                                self.variables.set_var("?", &code.to_string());
+                                self.variables.let_(&["?".to_string(), code.to_string()]);
                             } else {
                                 println!("{}: No child exit code", path);
                             }
