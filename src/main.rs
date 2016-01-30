@@ -1,3 +1,4 @@
+#![feature(deque_extras)]
 #![feature(box_syntax)]
 #![feature(plugin)]
 #![plugin(peg_syntax_ext)]

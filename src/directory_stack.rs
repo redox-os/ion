@@ -1,14 +1,21 @@
+use std::collections::VecDeque;
 use std::env::{set_current_dir, current_dir};
 use std::path::PathBuf;
 
 pub struct DirectoryStack {
-    dirs: Vec<PathBuf>, // The top is always the current directory
+    dirs: VecDeque<PathBuf>, // The top is always the current directory
+    max_size: usize,
 }
 
 impl DirectoryStack {
     pub fn new() -> Result<DirectoryStack, &'static str> {
+        let mut dirs: VecDeque<PathBuf> = VecDeque::new();
         if let Ok(curr_dir) = current_dir() {
-            Ok(DirectoryStack { dirs: vec![curr_dir] })
+            dirs.push_front(curr_dir);
+            Ok(DirectoryStack {
+                dirs: dirs,
+                max_size: 1000, // TODO don't hardcode this size, make it configurable
+            })
         } else {
             Err("Failed to get current directory when building directory stack")
         }
@@ -25,7 +32,7 @@ impl DirectoryStack {
                 return;
             }
         }
-        self.dirs.pop();
+        self.dirs.pop_back();
         self.print_dirs();
     }
 
@@ -45,7 +52,7 @@ impl DirectoryStack {
         if let Some(dir) = args.get(1) {
             match (set_current_dir(dir), current_dir()) {
                 (Ok(()), Ok(cur_dir)) => {
-                    self.dirs.push(cur_dir);
+                    self.push_dir(cur_dir);
                 }
                 (Err(err), _) => {
                     println!("Failed to set current dir to {}: {}", dir, err);
@@ -59,12 +66,17 @@ impl DirectoryStack {
         }
     }
 
+    fn push_dir(&mut self, path: PathBuf) {
+        self.dirs.push_front(path);
+        self.dirs.truncate(self.max_size);
+    }
+
     pub fn dirs(&self, _: &[String]) {
         self.print_dirs()
     }
 
     fn print_dirs(&self) {
-        let dir = self.dirs.iter().rev().fold(String::new(), |acc, dir| {
+        let dir = self.dirs.iter().fold(String::new(), |acc, dir| {
             acc + " " + dir.to_str().unwrap_or("No directory found")
         });
         println!("{}", dir.trim_left());
