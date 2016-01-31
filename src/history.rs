@@ -18,7 +18,7 @@ impl History {
         self.history.push_front(command);
     }
 
-    pub fn history(&self, _: &[String]) {
+    pub fn history<'a, I: IntoIterator<Item = &'a str>>(&self, _: I) {
         for command in self.history.iter().rev() {
             println!("{}", command);
         }

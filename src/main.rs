@@ -201,6 +201,7 @@ impl Command {
                             name: "cd",
                             help: "To change the current directory\n    cd <your_destination>",
                             main: box |args: &[String], shell: &mut Shell| {
+                                let args = args.iter().map(|s|s.as_str());
                                 shell.directory_stack.cd(args);
                             },
                         });
@@ -211,6 +212,7 @@ impl Command {
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
                             main: box |args: &[String], shell: &mut Shell| {
+                                let args = args.iter().map(|s|s.as_str());
                                 shell.directory_stack.dirs(args);
                             },
                         });
@@ -230,7 +232,8 @@ impl Command {
                             name: "let",
                             help: "View, set or unset variables",
                             main: box |args: &[String], shell: &mut Shell| {
-                                shell.variables.let_(&args[1..3]);
+                                let args = args.iter().map(|s|s.as_str());
+                                shell.variables.let_(args);
                             },
                         });
 
@@ -239,6 +242,7 @@ impl Command {
                             name: "read",
                             help: "To read some variables\n    read <my_variable>",
                             main: box |args: &[String], shell: &mut Shell| {
+                                let args = args.iter().map(|s|s.as_str());
                                 shell.variables.read(args);
                             },
                         });
@@ -248,6 +252,7 @@ impl Command {
                             name: "run",
                             help: "Run a script\n    run <script>",
                             main: box |args: &[String], shell: &mut Shell| {
+                                let args = args.iter().map(|s|s.as_str());
                                 builtin::run(args, shell);
                             },
                         });
@@ -258,6 +263,7 @@ impl Command {
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
                             main: box |args: &[String], shell: &mut Shell| {
+                                let args = args.iter().map(|s|s.as_str());
                                 shell.directory_stack.pushd(args);
                             },
                         });
@@ -268,6 +274,7 @@ impl Command {
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
                             main: box |args: &[String], shell: &mut Shell| {
+                                let args = args.iter().map(|s|s.as_str());
                                 shell.directory_stack.popd(args);
                             },
                         });
@@ -277,6 +284,7 @@ impl Command {
                             name: "history",
                             help: "Display all commands previously executed",
                             main: box |args: &[String], shell: &mut Shell| {
+                                let args = args.iter().map(|s|s.as_str());
                                 shell.history.history(args);
                             },
                         });

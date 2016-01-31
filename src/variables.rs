@@ -13,9 +13,9 @@ impl Variables {
         Variables { variables: BTreeMap::new() }
     }
 
-    pub fn read(&mut self, args: &[String]) {
+    pub fn read<'a, I: IntoIterator<Item=&'a str>>(&mut self, args: I) {
         let mut out = stdout();
-        for arg in args.iter().skip(1) {
+        for arg in args.into_iter().skip(1) {
             print!("{}=", arg.trim());
             if let Err(message) = out.flush() {
                 println!("{}: Failed to flush stdout", message);
@@ -26,10 +26,11 @@ impl Variables {
         }
     }
 
-    pub fn let_(&mut self, args: &[String]) {
-        match (args.get(0), args.get(1)) {
+    pub fn let_<'a, I: IntoIterator<Item=&'a str>>(&mut self, args: I) {
+        let mut args = args.into_iter();
+        match (args.next(), args.next()) {
             (Some(key), Some(value)) => {
-                self.variables.insert(key.clone(), value.clone());
+                self.variables.insert(key.to_string(), value.to_string());
             }
             (Some(key), None) => {
                 self.variables.remove(key);
@@ -90,7 +91,7 @@ mod tests {
     #[test]
     fn let_and_expand_a_variable() {
         let mut variables = Variables::new();
-        variables.let_(&["FOO".to_string(), "BAR".to_string()]);
+        variables.let_(vec!["FOO", "BAR"]);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("BAR", expanded);
     }
@@ -106,8 +107,8 @@ mod tests {
     #[test]
     fn remove_a_variable_with_let() {
         let mut variables = Variables::new();
-        variables.let_(&["FOO".to_string(), "BAR".to_string()]);
-        variables.let_(&["FOO".to_string()]);
+        variables.let_(vec!["FOO", "BAR"]);
+        variables.let_(vec!["FOO"]);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("", expanded);
     }
