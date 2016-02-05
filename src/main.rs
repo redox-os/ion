@@ -72,7 +72,7 @@ impl Shell {
         self.history.add(command_string.to_string());
 
         let mut jobs = parse(command_string);
-        self.variables.expand_variables(&mut jobs);
+        //self.variables.expand_variables(&mut jobs);
 
         // Execute commands
         for job in jobs.iter() {
@@ -82,17 +82,17 @@ impl Shell {
                 if let Some(left) = job.args.get(0) {
                     if let Some(cmp) = job.args.get(1) {
                         if let Some(right) = job.args.get(2) {
-                            if cmp == "==" {
+                            if *cmp == "==" {
                                 value = *left == *right;
-                            } else if cmp == "!=" {
+                            } else if *cmp == "!=" {
                                 value = *left != *right;
-                            } else if cmp == ">" {
+                            } else if *cmp == ">" {
                                 value = left.to_num_signed() > right.to_num_signed();
-                            } else if cmp == ">=" {
+                            } else if *cmp == ">=" {
                                 value = left.to_num_signed() >= right.to_num_signed();
-                            } else if cmp == "<" {
+                            } else if *cmp == "<" {
                                 value = left.to_num_signed() < right.to_num_signed();
-                            } else if cmp == "<=" {
+                            } else if *cmp == "<=" {
                                 value = left.to_num_signed() <= right.to_num_signed();
                             } else {
                                 println!("Unknown comparison: {}", cmp);
@@ -137,8 +137,8 @@ impl Shell {
             // Commands
             let mut args = job.args.clone();
             args.insert(0, job.command.clone());
-            if let Some(command) = commands.get(&job.command.as_str()) {
-                (*command.main)(&args, self);
+            if let Some(command) = commands.get(job.command) {
+                (*command.main)(args.as_slice(), self);
             } else {
                 self.run_external_commmand(args);
             }
@@ -188,7 +188,7 @@ impl Shell {
 pub struct Command {
     pub name: &'static str,
     pub help: &'static str,
-    pub main: Box<Fn(&[String], &mut Shell)>,
+    pub main: Box<Fn(&[&str], &mut Shell)>,
 }
 
 impl Command {
@@ -200,8 +200,7 @@ impl Command {
                         Command {
                             name: "cd",
                             help: "To change the current directory\n    cd <your_destination>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                let args = args.iter().map(|s|s.as_str());
+                            main: box |args: &[&str], shell: &mut Shell| {
                                 shell.directory_stack.cd(args);
                             },
                         });
@@ -211,8 +210,7 @@ impl Command {
                             name: "dirs",
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                let args = args.iter().map(|s|s.as_str());
+                            main: box |args: &[&str], shell: &mut Shell| {
                                 shell.directory_stack.dirs(args);
                             },
                         });
@@ -221,7 +219,7 @@ impl Command {
                         Command {
                             name: "exit",
                             help: "To exit the curent session",
-                            main: box |_: &[String], _: &mut Shell| {
+                            main: box |_: &[&str], _: &mut Shell| {
                                 process::exit(0);
                                 // TODO exit with argument 1 as parameter
                             },
@@ -231,8 +229,7 @@ impl Command {
                         Command {
                             name: "let",
                             help: "View, set or unset variables",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                let args = args.iter().map(|s|s.as_str());
+                            main: box |args: &[&str], shell: &mut Shell| {
                                 shell.variables.let_(args);
                             },
                         });
@@ -241,8 +238,7 @@ impl Command {
                         Command {
                             name: "read",
                             help: "To read some variables\n    read <my_variable>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                let args = args.iter().map(|s|s.as_str());
+                            main: box |args: &[&str], shell: &mut Shell| {
                                 shell.variables.read(args);
                             },
                         });
@@ -251,8 +247,7 @@ impl Command {
                         Command {
                             name: "run",
                             help: "Run a script\n    run <script>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                let args = args.iter().map(|s|s.as_str());
+                            main: box |args: &[&str], shell: &mut Shell| {
                                 builtin::run(args, shell);
                             },
                         });
@@ -262,8 +257,7 @@ impl Command {
                             name: "pushd",
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                let args = args.iter().map(|s|s.as_str());
+                            main: box |args: &[&str], shell: &mut Shell| {
                                 shell.directory_stack.pushd(args);
                             },
                         });
@@ -273,8 +267,7 @@ impl Command {
                             name: "popd",
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                let args = args.iter().map(|s|s.as_str());
+                            main: box |args: &[&str], shell: &mut Shell| {
                                 shell.directory_stack.popd(args);
                             },
                         });
@@ -283,16 +276,14 @@ impl Command {
                         Command {
                             name: "history",
                             help: "Display all commands previously executed",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                let args = args.iter().map(|s|s.as_str());
-                                shell.history.history(args);
+                            main: box |args: &[&str], shell: &mut Shell| {
+                                shell.history.history(args.iter().map(|s|*s));
                             },
                         });
 
-        let command_helper: HashMap<String, String> = commands.iter()
+        let command_helper: HashMap<&'static str, &'static str> = commands.iter()
                                                               .map(|(k, v)| {
-                                                                  (k.to_string(),
-                                                                   v.help.to_string())
+                                                                  (*k, v.help)
                                                               })
                                                               .collect();
 
@@ -300,7 +291,7 @@ impl Command {
                         Command {
                             name: "help",
                             help: "Display a little helper for a given command\n    help ls",
-                            main: box move |args: &[String], _: &mut Shell| {
+                            main: box move |args: &[&str], _: &mut Shell| {
                                 if let Some(command) = args.get(1) {
                                     if command_helper.contains_key(command) {
                                         match command_helper.get(command) {

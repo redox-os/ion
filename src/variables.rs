@@ -53,6 +53,7 @@ impl Variables {
         }
     }
 
+    /*
     pub fn expand_variables(&self, jobs: &mut [Job]) {
         for mut job in &mut jobs[..] {
             job.command = self.expand_string(&job.command).to_string();
@@ -62,6 +63,7 @@ impl Variables {
                           .collect();
         }
     }
+    */
 
     #[inline]
     fn expand_string<'a>(&'a self, original: &'a str) -> &'a str {

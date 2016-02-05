@@ -1,6 +1,78 @@
 use self::grammar::job_list;
 
 #[derive(Debug, PartialEq)]
+pub struct Job<'a> {
+    pub command: &'a str,
+    pub args: Vec<&'a str>,
+}
+
+impl<'a> Job<'a> {
+    fn new(command: &'a str, args: Vec<&'a str>) -> Self {
+        Job {
+            command: command,
+            args: args,
+        }
+    }
+}
+
+pub fn parse<'a>(code: &'a str) -> Vec<Job<'a>> {
+    job_list(code).unwrap_or(vec![])
+}
+
+peg! grammar(r#"
+use super::Job;
+
+
+#[pub]
+job_list -> Vec<Job<'input>>
+    = (unused* newline)* jobs:job ++ ((job_ending+ unused*)+) (newline unused*)* { jobs }
+    / (unused*) ** newline { vec![] }
+
+job -> Job<'input>
+    = whitespace? res:_job whitespace? comment? { res }
+
+_job -> Job<'input>
+    = args:word ++ whitespace { Job::new(args.remove(0), args) }
+
+word -> &'input str
+    = double_quoted_word
+    / single_quoted_word
+    / [^ \t\r\n#;]+ { match_str }
+
+double_quoted_word -> &'input str
+    = ["] word:_double_quoted_word ["] { word }
+
+_double_quoted_word -> &'input str
+    = [^"]+ { match_str }
+
+single_quoted_word -> &'input str
+    = ['] word:_single_quoted_word ['] { word }
+
+_single_quoted_word -> &'input str
+    = [^']+ { match_str }
+
+unused -> ()
+    = whitespace comment? { () }
+    / comment { () }
+
+comment -> ()
+    = [#] [^\r\n]*
+
+whitespace -> ()
+    = [ \t]+
+
+job_ending -> ()
+    = [;]
+    / newline
+    / newline
+
+newline -> ()
+    = [\r\n]
+"#);
+
+
+/*
+#[derive(Debug, PartialEq)]
 pub struct Job {
     pub command: String,
     pub args: Vec<String>,
@@ -69,6 +141,7 @@ job_ending -> ()
 newline -> ()
     = [\r\n]
 "#);
+*/
 
 
 #[cfg(test)]
