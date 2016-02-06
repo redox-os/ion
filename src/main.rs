@@ -135,17 +135,15 @@ impl Shell {
             }
 
             // Commands
-            let mut args = job.args.clone();
-            args.insert(0, job.command.clone());
             if let Some(command) = commands.get(job.command) {
-                (*command.main)(args.as_slice(), self);
+                (*command.main)(job.args.as_slice(), self);
             } else {
-                self.run_external_commmand(args);
+                self.run_external_commmand(&job.args);
             }
         }
     }
 
-    fn run_external_commmand<'a>(&'a mut self, args: Vec<&'a str>) {
+    fn run_external_commmand<'a>(&'a mut self, args: &Vec<&'a str>) {
         if let Some(path) = args.get(0) {
             let mut command = process::Command::new(path);
             for i in 1..args.len() {
