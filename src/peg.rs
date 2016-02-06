@@ -1,13 +1,15 @@
 use self::grammar::job_list;
 
 #[derive(Debug, PartialEq)]
-pub struct Job<'a> {
-    pub command: &'a str,
-    pub args: Vec<&'a str>,
+pub struct Job {
+    pub command: String,
+    pub args: Vec<String>,
 }
 
-impl<'a> Job<'a> {
-    fn new(command: &'a str, args: Vec<&'a str>) -> Self {
+impl Job {
+    fn new(args: Vec<&str>) -> Self {
+        let command = args[0].to_string();
+        let args = args.iter().map(|arg| arg.to_string()).collect();
         Job {
             command: command,
             args: args,
@@ -15,7 +17,7 @@ impl<'a> Job<'a> {
     }
 }
 
-pub fn parse<'a>(code: &'a str) -> Vec<Job<'a>> {
+pub fn parse(code: &str) -> Vec<Job> {
     job_list(code).unwrap_or(vec![])
 }
 
@@ -24,15 +26,15 @@ use super::Job;
 
 
 #[pub]
-job_list -> Vec<Job<'input>>
+job_list -> Vec<Job>
     = (unused* newline)* jobs:job ++ ((job_ending+ unused*)+) (newline unused*)* { jobs }
     / (unused*) ** newline { vec![] }
 
-job -> Job<'input>
+job -> Job
     = whitespace? res:_job whitespace? comment? { res }
 
-_job -> Job<'input>
-    = args:word ++ whitespace { Job::new(args[0], args) }
+_job -> Job
+    = args:word ++ whitespace { Job::new(args) }
 
 word -> &'input str
     = double_quoted_word
