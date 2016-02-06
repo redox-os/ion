@@ -21,7 +21,7 @@ impl DirectoryStack {
         }
     }
 
-    pub fn popd<'a, I: IntoIterator<Item = &'a str>>(&mut self, _: I) {
+    pub fn popd<I: IntoIterator>(&mut self, _: I) where I::Item: AsRef<str> {
         if self.dirs.len() < 2 {
             println!("Directory stack is empty");
             return;
@@ -36,26 +36,26 @@ impl DirectoryStack {
         self.print_dirs();
     }
 
-    pub fn pushd<'a, I: IntoIterator<Item = &'a str>>(&mut self, args: I) {
+    pub fn pushd<I: IntoIterator>(&mut self, args: I) where I::Item: AsRef<str> {
         self.change_and_push_dir(args);
         self.print_dirs();
     }
 
-    pub fn cd<'a, I: IntoIterator<Item = &'a str>>(&mut self, args: I) {
+    pub fn cd<I: IntoIterator>(&mut self, args: I) where I::Item: AsRef<str> {
         self.change_and_push_dir(args);
     }
 
     // TODO the signature for this function doesn't make a lot of sense I did
     // it this way to for ease of use where it is used, however, it should take
     // just one dir instead of args once we add features like `cd -`.
-    pub fn change_and_push_dir<'a, I: IntoIterator<Item = &'a str>>(&mut self, args: I) {
+    pub fn change_and_push_dir<I: IntoIterator>(&mut self, args: I) where I::Item: AsRef<str> {
         if let Some(dir) = args.into_iter().skip(1).next() {
-            match (set_current_dir(dir), current_dir()) {
+            match (set_current_dir(dir.as_ref()), current_dir()) {
                 (Ok(()), Ok(cur_dir)) => {
                     self.push_dir(cur_dir);
                 }
                 (Err(err), _) => {
-                    println!("Failed to set current dir to {}: {}", dir, err);
+                    println!("Failed to set current dir to {}: {}", dir.as_ref(), err);
                     return;
                 }
                 (_, _) => (),
@@ -71,7 +71,7 @@ impl DirectoryStack {
         self.dirs.truncate(self.max_size);
     }
 
-    pub fn dirs<'a, I: IntoIterator<Item = &'a str>>(&self, _: I) {
+    pub fn dirs<I: IntoIterator>(&self, _: I) where I::Item: AsRef<str> {
         self.print_dirs()
     }
 

@@ -145,7 +145,7 @@ impl Shell {
         }
     }
 
-    fn run_external_commmand(&mut self, args: Vec<String>) {
+    fn run_external_commmand<'a>(&'a mut self, args: Vec<&'a str>) {
         if let Some(path) = args.get(0) {
             let mut command = process::Command::new(path);
             for i in 1..args.len() {

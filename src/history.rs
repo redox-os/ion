@@ -18,7 +18,7 @@ impl History {
         self.history.push_front(command);
     }
 
-    pub fn history<'a, I: IntoIterator<Item = &'a str>>(&self, _: I) {
+    pub fn history<I: IntoIterator>(&self, _: I) where I::Item: AsRef<str> {
         for command in self.history.iter().rev() {
             println!("{}", command);
         }
