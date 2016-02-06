@@ -2,12 +2,14 @@ use std::process;
 
 use super::Shell;
 
-pub fn run(args: &[String], shell: &mut Shell) {
+pub fn run<I: IntoIterator>(args: I, shell: &mut Shell)
+    where I::Item: AsRef<str>
+{
     let path = "/apps/shell/main.bin";
 
     let mut command = process::Command::new(path);
-    for arg in args.iter().skip(1) {
-        command.arg(arg);
+    for arg in args.into_iter().skip(1) {
+        command.arg(arg.as_ref());
     }
 
     match command.spawn() {

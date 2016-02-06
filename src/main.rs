@@ -79,20 +79,20 @@ impl Shell {
             if job.command == "if" {
                 let mut value = false;
 
-                if let Some(left) = job.args.get(0) {
-                    if let Some(cmp) = job.args.get(1) {
-                        if let Some(right) = job.args.get(2) {
-                            if cmp == "==" {
+                if let Some(left) = job.args.get(1) {
+                    if let Some(cmp) = job.args.get(2) {
+                        if let Some(right) = job.args.get(3) {
+                            if *cmp == "==" {
                                 value = *left == *right;
-                            } else if cmp == "!=" {
+                            } else if *cmp == "!=" {
                                 value = *left != *right;
-                            } else if cmp == ">" {
+                            } else if *cmp == ">" {
                                 value = left.to_num_signed() > right.to_num_signed();
-                            } else if cmp == ">=" {
+                            } else if *cmp == ">=" {
                                 value = left.to_num_signed() >= right.to_num_signed();
-                            } else if cmp == "<" {
+                            } else if *cmp == "<" {
                                 value = left.to_num_signed() < right.to_num_signed();
-                            } else if cmp == "<=" {
+                            } else if *cmp == "<=" {
                                 value = left.to_num_signed() <= right.to_num_signed();
                             } else {
                                 println!("Unknown comparison: {}", cmp);
@@ -135,17 +135,15 @@ impl Shell {
             }
 
             // Commands
-            let mut args = job.args.clone();
-            args.insert(0, job.command.clone());
-            if let Some(command) = commands.get(&job.command.as_str()) {
-                (*command.main)(&args, self);
+            if let Some(command) = commands.get(job.command.as_str()) {
+                (*command.main)(job.args.as_slice(), self);
             } else {
-                self.run_external_commmand(args);
+                self.run_external_commmand(&job.args);
             }
         }
     }
 
-    fn run_external_commmand(&mut self, args: Vec<String>) {
+    fn run_external_commmand(&mut self, args: &Vec<String>) {
         if let Some(path) = args.get(0) {
             let mut command = process::Command::new(path);
             for i in 1..args.len() {
@@ -230,7 +228,7 @@ impl Command {
                             name: "let",
                             help: "View, set or unset variables",
                             main: box |args: &[String], shell: &mut Shell| {
-                                shell.variables.let_(&args[1..3]);
+                                shell.variables.let_(args);
                             },
                         });
 
@@ -281,12 +279,11 @@ impl Command {
                             },
                         });
 
-        let command_helper: HashMap<String, String> = commands.iter()
-                                                              .map(|(k, v)| {
-                                                                  (k.to_string(),
-                                                                   v.help.to_string())
-                                                              })
-                                                              .collect();
+        let command_helper: HashMap<&'static str, &'static str> = commands.iter()
+                                                                          .map(|(k, v)| {
+                                                                              (*k, v.help)
+                                                                          })
+                                                                          .collect();
 
         commands.insert("help",
                         Command {
@@ -294,8 +291,8 @@ impl Command {
                             help: "Display a little helper for a given command\n    help ls",
                             main: box move |args: &[String], _: &mut Shell| {
                                 if let Some(command) = args.get(1) {
-                                    if command_helper.contains_key(command) {
-                                        match command_helper.get(command) {
+                                    if command_helper.contains_key(command.as_str()) {
+                                        match command_helper.get(command.as_str()) {
                                             Some(help) => println!("{}", help),
                                             None => {
                                                 println!("Command helper not found [run 'help']...")

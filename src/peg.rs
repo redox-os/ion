@@ -7,7 +7,9 @@ pub struct Job {
 }
 
 impl Job {
-    fn new(command: String, args: Vec<String>) -> Job {
+    fn new(args: Vec<&str>) -> Self {
+        let command = args[0].to_string();
+        let args = args.iter().map(|arg| arg.to_string()).collect();
         Job {
             command: command,
             args: args,
@@ -32,24 +34,24 @@ job -> Job
     = whitespace? res:_job whitespace? comment? { res }
 
 _job -> Job
-    = args:word ++ whitespace { let mut args = args.clone(); Job::new(args.remove(0), args) }
+    = args:word ++ whitespace { Job::new(args) }
 
-word -> String
+word -> &'input str
     = double_quoted_word
     / single_quoted_word
-    / [^ \t\r\n#;]+ { match_str.to_string() }
+    / [^ \t\r\n#;]+ { match_str }
 
-double_quoted_word -> String
+double_quoted_word -> &'input str
     = ["] word:_double_quoted_word ["] { word }
 
-_double_quoted_word -> String
-    = [^"]+ { match_str.to_string() }
+_double_quoted_word -> &'input str
+    = [^"]+ { match_str }
 
-single_quoted_word -> String
+single_quoted_word -> &'input str
     = ['] word:_single_quoted_word ['] { word }
 
-_single_quoted_word -> String
-    = [^']+ { match_str.to_string() }
+_single_quoted_word -> &'input str
+    = [^']+ { match_str }
 
 unused -> ()
     = whitespace comment? { () }
@@ -71,6 +73,78 @@ newline -> ()
 "#);
 
 
+// #[derive(Debug, PartialEq)]
+// pub struct Job {
+// pub command: String,
+// pub args: Vec<String>,
+// }
+//
+// impl Job {
+// fn new(command: String, args: Vec<String>) -> Job {
+// Job {
+// command: command,
+// args: args,
+// }
+// }
+// }
+//
+// pub fn parse(code: &str) -> Vec<Job> {
+// job_list(code).unwrap_or(vec![])
+// }
+//
+// peg! grammar(r#"
+// use super::Job;
+//
+//
+// #[pub]
+// job_list -> Vec<Job>
+// = (unused* newline)* jobs:job ++ ((job_ending+ unused*)+) (newline unused*)* { jobs }
+// / (unused*) ** newline { vec![] }
+//
+// job -> Job
+// = whitespace? res:_job whitespace? comment? { res }
+//
+// _job -> Job
+// = args:word ++ whitespace { let mut args = args.clone(); Job::new(args.remove(0), args) }
+//
+// word -> String
+// = double_quoted_word
+// / single_quoted_word
+// / [^ \t\r\n#;]+ { match_str.to_string() }
+//
+// double_quoted_word -> String
+// = ["] word:_double_quoted_word ["] { word }
+//
+// _double_quoted_word -> String
+// = [^"]+ { match_str.to_string() }
+//
+// single_quoted_word -> String
+// = ['] word:_single_quoted_word ['] { word }
+//
+// _single_quoted_word -> String
+// = [^']+ { match_str.to_string() }
+//
+// unused -> ()
+// = whitespace comment? { () }
+// / comment { () }
+//
+// comment -> ()
+// = [#] [^\r\n]*
+//
+// whitespace -> ()
+// = [ \t]+
+//
+// job_ending -> ()
+// = [;]
+// / newline
+// / newline
+//
+// newline -> ()
+// = [\r\n]
+// "#);
+//
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,7 +155,7 @@ mod tests {
         let jobs = job_list("cat").unwrap();
         assert_eq!(1, jobs.len());
         assert_eq!("cat", jobs[0].command);
-        assert_eq!(0, jobs[0].args.len());
+        assert_eq!(1, jobs[0].args.len());
     }
 
     #[test]
@@ -89,8 +163,8 @@ mod tests {
         let jobs = job_list("ls -al dir").unwrap();
         assert_eq!(1, jobs.len());
         assert_eq!("ls", jobs[0].command);
-        assert_eq!("-al", jobs[0].args[0]);
-        assert_eq!("dir", jobs[0].args[1]);
+        assert_eq!("-al", jobs[0].args[1]);
+        assert_eq!("dir", jobs[0].args[2]);
     }
 
     #[test]
@@ -98,9 +172,9 @@ mod tests {
         let jobs = job_list("ls -al;cat tmp.txt").unwrap();
         assert_eq!(2, jobs.len());
         assert_eq!("ls", jobs[0].command);
-        assert_eq!("-al", jobs[0].args[0]);
+        assert_eq!("-al", jobs[0].args[1]);
         assert_eq!("cat", jobs[1].command);
-        assert_eq!("tmp.txt", jobs[1].args[0]);
+        assert_eq!("tmp.txt", jobs[1].args[1]);
     }
 
     #[test]
@@ -114,8 +188,8 @@ mod tests {
         let jobs = job_list("ls \t -al\t\tdir").unwrap();
         assert_eq!(1, jobs.len());
         assert_eq!("ls", jobs[0].command);
-        assert_eq!("-al", jobs[0].args[0]);
-        assert_eq!("dir", jobs[0].args[1]);
+        assert_eq!("-al", jobs[0].args[1]);
+        assert_eq!("dir", jobs[0].args[2]);
     }
 
     #[test]
@@ -123,14 +197,14 @@ mod tests {
         let jobs = job_list("ls -al\t ").unwrap();
         assert_eq!(1, jobs.len());
         assert_eq!("ls", jobs[0].command);
-        assert_eq!("-al", jobs[0].args[0]);
+        assert_eq!("-al", jobs[0].args[1]);
     }
 
     #[test]
     fn double_quoting() {
         let jobs = job_list("echo \"Hello World\"").unwrap();
-        assert_eq!(1, jobs[0].args.len());
-        assert_eq!("Hello World", jobs[0].args[0]);
+        assert_eq!(2, jobs[0].args.len());
+        assert_eq!("Hello World", jobs[0].args[1]);
     }
 
     #[test]
@@ -149,7 +223,7 @@ mod tests {
     fn command_followed_by_comment() {
         let jobs = job_list("cat # ; \t as!!+dfa").unwrap();
         assert_eq!(1, jobs.len());
-        assert_eq!(0, jobs[0].args.len());
+        assert_eq!(1, jobs[0].args.len());
     }
 
     #[test]
@@ -182,16 +256,16 @@ mod tests {
     #[test]
     fn single_quoting() {
         let jobs = job_list("echo '#!!;\"\\'").unwrap();
-        assert_eq!("#!!;\"\\", jobs[0].args[0]);
+        assert_eq!("#!!;\"\\", jobs[0].args[1]);
     }
 
     #[test]
     fn mixed_quoted_and_unquoted() {
         let jobs = job_list("echo '#!!;\"\\' and \t some \"more' 'stuff\"").unwrap();
-        assert_eq!("#!!;\"\\", jobs[0].args[0]);
-        assert_eq!("and", jobs[0].args[1]);
-        assert_eq!("some", jobs[0].args[2]);
-        assert_eq!("more' 'stuff", jobs[0].args[3]);
+        assert_eq!("#!!;\"\\", jobs[0].args[1]);
+        assert_eq!("and", jobs[0].args[2]);
+        assert_eq!("some", jobs[0].args[3]);
+        assert_eq!("more' 'stuff", jobs[0].args[4]);
     }
 
     #[test]
