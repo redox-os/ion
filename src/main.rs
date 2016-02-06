@@ -280,10 +280,10 @@ impl Command {
                         });
 
         let command_helper: HashMap<&'static str, &'static str> = commands.iter()
-                                                              .map(|(k, v)| {
-                                                                  (*k, v.help)
-                                                              })
-                                                              .collect();
+                                                                          .map(|(k, v)| {
+                                                                              (*k, v.help)
+                                                                          })
+                                                                          .collect();
 
         commands.insert("help",
                         Command {

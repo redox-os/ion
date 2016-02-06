@@ -2,7 +2,9 @@ use std::process;
 
 use super::Shell;
 
-pub fn run<I: IntoIterator>(args: I, shell: &mut Shell) where I::Item: AsRef<str> {
+pub fn run<I: IntoIterator>(args: I, shell: &mut Shell)
+    where I::Item: AsRef<str>
+{
     let path = "/apps/shell/main.bin";
 
     let mut command = process::Command::new(path);

@@ -13,7 +13,9 @@ impl Variables {
         Variables { variables: BTreeMap::new() }
     }
 
-    pub fn read<I: IntoIterator>(&mut self, args: I) where I::Item: AsRef<str> {
+    pub fn read<I: IntoIterator>(&mut self, args: I)
+        where I::Item: AsRef<str>
+    {
         let mut out = stdout();
         for arg in args.into_iter().skip(1) {
             print!("{}=", arg.as_ref().trim());
@@ -26,7 +28,9 @@ impl Variables {
         }
     }
 
-    pub fn let_<I: IntoIterator>(&mut self, args: I) where I::Item: AsRef<str> {
+    pub fn let_<I: IntoIterator>(&mut self, args: I)
+        where I::Item: AsRef<str>
+    {
         let mut args = args.into_iter();
         match (args.next(), args.next()) {
             (Some(key), Some(value)) => {

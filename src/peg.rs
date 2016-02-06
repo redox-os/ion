@@ -73,77 +73,76 @@ newline -> ()
 "#);
 
 
-/*
-#[derive(Debug, PartialEq)]
-pub struct Job {
-    pub command: String,
-    pub args: Vec<String>,
-}
-
-impl Job {
-    fn new(command: String, args: Vec<String>) -> Job {
-        Job {
-            command: command,
-            args: args,
-        }
-    }
-}
-
-pub fn parse(code: &str) -> Vec<Job> {
-    job_list(code).unwrap_or(vec![])
-}
-
-peg! grammar(r#"
-use super::Job;
-
-
-#[pub]
-job_list -> Vec<Job>
-    = (unused* newline)* jobs:job ++ ((job_ending+ unused*)+) (newline unused*)* { jobs }
-    / (unused*) ** newline { vec![] }
-
-job -> Job
-    = whitespace? res:_job whitespace? comment? { res }
-
-_job -> Job
-    = args:word ++ whitespace { let mut args = args.clone(); Job::new(args.remove(0), args) }
-
-word -> String
-    = double_quoted_word
-    / single_quoted_word
-    / [^ \t\r\n#;]+ { match_str.to_string() }
-
-double_quoted_word -> String
-    = ["] word:_double_quoted_word ["] { word }
-
-_double_quoted_word -> String
-    = [^"]+ { match_str.to_string() }
-
-single_quoted_word -> String
-    = ['] word:_single_quoted_word ['] { word }
-
-_single_quoted_word -> String
-    = [^']+ { match_str.to_string() }
-
-unused -> ()
-    = whitespace comment? { () }
-    / comment { () }
-
-comment -> ()
-    = [#] [^\r\n]*
-
-whitespace -> ()
-    = [ \t]+
-
-job_ending -> ()
-    = [;]
-    / newline
-    / newline
-
-newline -> ()
-    = [\r\n]
-"#);
-*/
+// #[derive(Debug, PartialEq)]
+// pub struct Job {
+// pub command: String,
+// pub args: Vec<String>,
+// }
+//
+// impl Job {
+// fn new(command: String, args: Vec<String>) -> Job {
+// Job {
+// command: command,
+// args: args,
+// }
+// }
+// }
+//
+// pub fn parse(code: &str) -> Vec<Job> {
+// job_list(code).unwrap_or(vec![])
+// }
+//
+// peg! grammar(r#"
+// use super::Job;
+//
+//
+// #[pub]
+// job_list -> Vec<Job>
+// = (unused* newline)* jobs:job ++ ((job_ending+ unused*)+) (newline unused*)* { jobs }
+// / (unused*) ** newline { vec![] }
+//
+// job -> Job
+// = whitespace? res:_job whitespace? comment? { res }
+//
+// _job -> Job
+// = args:word ++ whitespace { let mut args = args.clone(); Job::new(args.remove(0), args) }
+//
+// word -> String
+// = double_quoted_word
+// / single_quoted_word
+// / [^ \t\r\n#;]+ { match_str.to_string() }
+//
+// double_quoted_word -> String
+// = ["] word:_double_quoted_word ["] { word }
+//
+// _double_quoted_word -> String
+// = [^"]+ { match_str.to_string() }
+//
+// single_quoted_word -> String
+// = ['] word:_single_quoted_word ['] { word }
+//
+// _single_quoted_word -> String
+// = [^']+ { match_str.to_string() }
+//
+// unused -> ()
+// = whitespace comment? { () }
+// / comment { () }
+//
+// comment -> ()
+// = [#] [^\r\n]*
+//
+// whitespace -> ()
+// = [ \t]+
+//
+// job_ending -> ()
+// = [;]
+// / newline
+// / newline
+//
+// newline -> ()
+// = [\r\n]
+// "#);
+//
 
 
 #[cfg(test)]
