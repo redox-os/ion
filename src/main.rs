@@ -11,7 +11,7 @@ use std::process;
 
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
-use self::peg::{parse,Job};
+use self::peg::{parse, Job};
 use self::variables::Variables;
 use self::history::History;
 use self::flow_control::{FlowControl, is_flow_control_command, Statement};
@@ -92,7 +92,11 @@ impl Shell {
                 // TODO move this logic into "end" command
                 if job.command == "end" {
                     self.flow_control.collecting_block = false;
-                    let block_jobs: Vec<Job> = self.flow_control.current_block.jobs.drain(..).collect();
+                    let block_jobs: Vec<Job> = self.flow_control
+                                                   .current_block
+                                                   .jobs
+                                                   .drain(..)
+                                                   .collect();
                     let mut variable = String::new();
                     let mut values: Vec<String> = vec![];
                     if let Statement::For(ref var, ref vals) = self.flow_control.current_statement {
@@ -106,13 +110,10 @@ impl Shell {
                         }
                     }
                     self.flow_control.current_statement = Statement::Default;
-                }
-                else {
+                } else {
                     self.flow_control.current_block.jobs.push(job);
                 }
-            }
-
-            else {
+            } else {
                 if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
                     continue;
                 }

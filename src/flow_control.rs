@@ -22,8 +22,7 @@ pub struct FlowControl {
     pub modes: Vec<Mode>,
     pub collecting_block: bool,
     pub current_block: CodeBlock,
-    pub current_statement: Statement,
-    //pub prompt: &'static str,  // Custom prompt while collecting code block
+    pub current_statement: Statement, /* pub prompt: &'static str,  // Custom prompt while collecting code block */
 }
 
 impl FlowControl {
@@ -106,16 +105,14 @@ impl FlowControl {
                     println!("For loops must have 'in' as the second argument");
                     return;
                 }
-            }
-            else {
+            } else {
                 println!("For loops must have 'in' as the second argument");
                 return;
             }
             let values: Vec<String> = args.map(|value| value.as_ref().to_string()).collect();
             self.current_statement = Statement::For(variable, values);
             self.collecting_block = true;
-        }
-        else {
+        } else {
             println!("For loops must have a variable name as the first argument");
             return;
         }
