@@ -15,6 +15,14 @@ impl Job {
             args: args,
         }
     }
+
+    pub fn from_vec_string(args: Vec<String>) -> Self {
+        let command = args[0].clone();
+        Job {
+            command: command,
+            args: args,
+        }
+    }
 }
 
 pub fn parse(code: &str) -> Vec<Job> {

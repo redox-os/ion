@@ -11,10 +11,10 @@ use std::process;
 
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
-use self::peg::parse;
+use self::peg::{parse, Job};
 use self::variables::Variables;
 use self::history::History;
-use self::flow_control::{FlowControl, is_flow_control_command};
+use self::flow_control::{FlowControl, is_flow_control_command, Statement};
 
 pub mod builtin;
 pub mod directory_stack;
@@ -47,6 +47,19 @@ impl Shell {
     }
 
     pub fn print_prompt(&self) {
+        self.print_prompt_prefix();
+        match self.flow_control.current_statement {
+            Statement::For(_, _) => self.print_for_prompt(),
+            Statement::Default => self.print_default_prompt(),
+        }
+        if let Err(message) = stdout().flush() {
+            println!("{}: failed to flush prompt to stdout", message);
+        }
+
+    }
+
+    // TODO eventually this thing should be gone
+    fn print_prompt_prefix(&self) {
         let prompt_prefix = self.flow_control.modes.iter().rev().fold(String::new(), |acc, mode| {
             acc +
             if mode.value {
@@ -56,36 +69,68 @@ impl Shell {
             }
         });
         print!("{}", prompt_prefix);
+    }
 
+    fn print_for_prompt(&self) {
+        print!("for> ");
+    }
+
+    fn print_default_prompt(&self) {
         let cwd = env::current_dir().ok().map_or("?".to_string(),
                                                  |ref p| p.to_str().unwrap_or("?").to_string());
-
         print!("ion:{}# ", cwd);
-        if let Err(message) = stdout().flush() {
-            println!("{}: failed to flush prompt to stdout", message);
-        }
     }
 
     fn on_command(&mut self, command_string: &str, commands: &HashMap<&str, Command>) {
         self.history.add(command_string.to_string());
 
         let mut jobs = parse(command_string);
-        self.variables.expand_variables(&mut jobs);
 
         // Execute commands
-        for job in jobs.iter() {
-            if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
-                continue;
-            }
-
-            // Commands
-            if let Some(command) = commands.get(job.command.as_str()) {
-                (*command.main)(job.args.as_slice(), self);
+        for job in jobs.drain(..) {
+            if self.flow_control.collecting_block {
+                // TODO move this logic into "end" command
+                if job.command == "end" {
+                    self.flow_control.collecting_block = false;
+                    let block_jobs: Vec<Job> = self.flow_control
+                                                   .current_block
+                                                   .jobs
+                                                   .drain(..)
+                                                   .collect();
+                    let mut variable = String::new();
+                    let mut values: Vec<String> = vec![];
+                    if let Statement::For(ref var, ref vals) = self.flow_control.current_statement {
+                        variable = var.clone();
+                        values = vals.clone();
+                    }
+                    for value in values {
+                        self.variables.set_var(&variable, &value);
+                        for job in block_jobs.iter() {
+                            self.run_job(job, commands);
+                        }
+                    }
+                    self.flow_control.current_statement = Statement::Default;
+                } else {
+                    self.flow_control.current_block.jobs.push(job);
+                }
             } else {
-                self.run_external_commmand(&job.args);
+                if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
+                    continue;
+                }
+                self.run_job(&job, commands);
             }
         }
     }
+
+    fn run_job(&mut self, job: &Job, commands: &HashMap<&str, Command>) {
+        let job = self.variables.expand_job(job);
+        if let Some(command) = commands.get(job.command.as_str()) {
+            (*command.main)(job.args.as_slice(), self);
+        } else {
+            self.run_external_commmand(&job.args);
+        }
+    }
+
 
     fn run_external_commmand(&mut self, args: &Vec<String>) {
         if let Some(path) = args.get(0) {
@@ -247,6 +292,15 @@ impl Command {
                             help: "end a code block",
                             main: box |args: &[String], shell: &mut Shell| {
                                 shell.flow_control.end(args);
+                            },
+                        });
+
+        commands.insert("for",
+                        Command {
+                            name: "for",
+                            help: "Loop over something",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.flow_control.for_(args);
                             },
                         });
 
