@@ -206,9 +206,14 @@ impl Command {
                         Command {
                             name: "exit",
                             help: "To exit the curent session",
-                            main: box |_: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| {
+                                if let Some(status) = args.get(1) {
+                                    if let Ok(status) = status.parse::<i32>() {
+                                        process::exit(status);
+                                    }
+                                }
+                                // TODO should use exit status of previously run command, not 0
                                 process::exit(0);
-                                // TODO exit with argument 1 as parameter
                             },
                         });
 
