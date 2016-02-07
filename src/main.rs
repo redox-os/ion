@@ -16,7 +16,6 @@ use self::variables::Variables;
 use self::history::History;
 use self::flow_control::{FlowControl, is_flow_control_command, Statement};
 
-pub mod builtin;
 pub mod directory_stack;
 pub mod to_num;
 pub mod input_editor;
@@ -227,15 +226,6 @@ impl Command {
                             help: "To read some variables\n    read <my_variable>",
                             main: box |args: &[String], shell: &mut Shell| {
                                 shell.variables.read(args);
-                            },
-                        });
-
-        commands.insert("run",
-                        Command {
-                            name: "run",
-                            help: "Run a script\n    run <script>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                builtin::run(args, shell);
                             },
                         });
 
