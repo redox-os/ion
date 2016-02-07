@@ -57,15 +57,12 @@ impl Variables {
         }
     }
 
-    pub fn expand_variables(&self, jobs: &mut [Job]) {
+    pub fn expand_job(&self, job: &Job) -> Job {
         // TODO don't copy everything
-        for mut job in &mut jobs[..] {
-            job.command = self.expand_string(&job.command).to_string();
-            job.args = job.args
-                          .iter()
-                          .map(|original: &String| self.expand_string(&original).to_string())
-                          .collect();
-        }
+        Job::from_vec_string(job.args
+                                .iter()
+                                .map(|original: &String| self.expand_string(&original).to_string())
+                                .collect())
     }
 
     #[inline]

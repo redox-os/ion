@@ -14,7 +14,7 @@ use self::input_editor::readln;
 use self::peg::{parse,Job};
 use self::variables::Variables;
 use self::history::History;
-use self::flow_control::{FlowControl, is_flow_control_command};
+use self::flow_control::{FlowControl, is_flow_control_command, Statement};
 
 pub mod builtin;
 pub mod directory_stack;
@@ -70,7 +70,6 @@ impl Shell {
         self.history.add(command_string.to_string());
 
         let mut jobs = parse(command_string);
-        self.variables.expand_variables(&mut jobs);
 
         // Execute commands
         for job in jobs.drain(..) {
@@ -78,14 +77,24 @@ impl Shell {
                 if job.command == "end" {
                     self.flow_control.collecting_block = false;
                     let block_jobs: Vec<Job> = self.flow_control.current_block.jobs.drain(..).collect();
-                    for job in block_jobs {
-                        self.run_job(&job, commands);
+                    let mut variable = String::new();
+                    let mut values: Vec<String> = vec![];
+                    if let Statement::For(ref var, ref vals) = self.flow_control.current_statement {
+                        variable = var.clone();
+                        values = vals.clone();
+                    }
+                    for value in values {
+                        self.variables.set_var(&variable, &value);
+                        for job in block_jobs.iter() {
+                            self.run_job(job, commands);
+                        }
                     }
                 }
                 else {
                     self.flow_control.current_block.jobs.push(job);
                 }
             }
+
             else {
                 if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
                     continue;
@@ -96,6 +105,7 @@ impl Shell {
     }
 
     fn run_job(&mut self, job: &Job, commands: &HashMap<&str, Command>) {
+        let job = self.variables.expand_job(job);
         if let Some(command) = commands.get(job.command.as_str()) {
             (*command.main)(job.args.as_slice(), self);
         } else {

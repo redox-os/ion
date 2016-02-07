@@ -6,7 +6,8 @@ pub fn is_flow_control_command(command: &str) -> bool {
 }
 
 pub enum Statement {
-    Job(Job),
+    For(String, Vec<String>),
+    Default,
 }
 
 pub struct CodeBlock {
@@ -21,6 +22,7 @@ pub struct FlowControl {
     pub modes: Vec<Mode>,
     pub collecting_block: bool,
     pub current_block: CodeBlock,
+    pub current_statement: Statement,
     //pub prompt: &'static str,  // Custom prompt while collecting code block
 }
 
@@ -30,6 +32,7 @@ impl FlowControl {
             modes: vec![],
             collecting_block: false,
             current_block: CodeBlock { jobs: vec![] },
+            current_statement: Statement::Default,
         }
     }
 
@@ -93,9 +96,28 @@ impl FlowControl {
         }
     }
 
-    pub fn for_<I: IntoIterator>(&mut self, _: I)
+    pub fn for_<I: IntoIterator>(&mut self, args: I)
         where I::Item: AsRef<str>
     {
-        self.collecting_block = true;
+        let mut args = args.into_iter();
+        if let Some(variable) = args.nth(1).map(|var| var.as_ref().to_string()) {
+            if let Some(in_) = args.nth(0) {
+                if in_.as_ref() != "in" {
+                    println!("For loops must have 'in' as the second argument");
+                    return;
+                }
+            }
+            else {
+                println!("For loops must have 'in' as the second argument");
+                return;
+            }
+            let values: Vec<String> = args.map(|value| value.as_ref().to_string()).collect();
+            self.current_statement = Statement::For(variable, values);
+            self.collecting_block = true;
+        }
+        else {
+            println!("For loops must have a variable name as the first argument");
+            return;
+        }
     }
 }
