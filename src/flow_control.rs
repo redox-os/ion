@@ -44,24 +44,26 @@ impl FlowControl {
     {
         let mut args = args.into_iter(); // TODO why does the compiler want this to be mutable?
         let mut value = false;
-        // TODO cleanup as_ref calls
         if let Some(left) = args.nth(1) {
+            let left = left.as_ref();
             if let Some(cmp) = args.nth(0) {
+                let cmp = cmp.as_ref();
                 if let Some(right) = args.nth(0) {
-                    if cmp.as_ref() == "==" {
-                        value = left.as_ref() == right.as_ref();
-                    } else if cmp.as_ref() == "!=" {
-                        value = left.as_ref() != right.as_ref();
-                    } else if cmp.as_ref() == ">" {
-                        value = left.as_ref().to_num_signed() > right.as_ref().to_num_signed();
-                    } else if cmp.as_ref() == ">=" {
-                        value = left.as_ref().to_num_signed() >= right.as_ref().to_num_signed();
-                    } else if cmp.as_ref() == "<" {
-                        value = left.as_ref().to_num_signed() < right.as_ref().to_num_signed();
-                    } else if cmp.as_ref() == "<=" {
-                        value = left.as_ref().to_num_signed() <= right.as_ref().to_num_signed();
+                    let right = right.as_ref();
+                    if cmp == "==" {
+                        value = left == right;
+                    } else if cmp == "!=" {
+                        value = left != right;
+                    } else if cmp == ">" {
+                        value = left.to_num_signed() > right.to_num_signed();
+                    } else if cmp == ">=" {
+                        value = left.to_num_signed() >= right.to_num_signed();
+                    } else if cmp == "<" {
+                        value = left.to_num_signed() < right.to_num_signed();
+                    } else if cmp == "<=" {
+                        value = left.to_num_signed() <= right.to_num_signed();
                     } else {
-                        println!("Unknown comparison: {}", cmp.as_ref());
+                        println!("Unknown comparison: {}", cmp);
                     }
                 } else {
                     println!("No right hand side");
