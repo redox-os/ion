@@ -11,7 +11,7 @@ use std::process;
 
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
-use self::peg::parse;
+use self::peg::{parse,Job};
 use self::variables::Variables;
 use self::history::History;
 use self::flow_control::{FlowControl, is_flow_control_command};
@@ -73,19 +73,36 @@ impl Shell {
         self.variables.expand_variables(&mut jobs);
 
         // Execute commands
-        for job in jobs.iter() {
-            if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
-                continue;
+        for job in jobs.drain(..) {
+            if self.flow_control.collecting_block {
+                if job.command == "end" {
+                    self.flow_control.collecting_block = false;
+                    let block_jobs: Vec<Job> = self.flow_control.current_block.jobs.drain(..).collect();
+                    for job in block_jobs {
+                        self.run_job(&job, commands);
+                    }
+                }
+                else {
+                    self.flow_control.current_block.jobs.push(job);
+                }
             }
-
-            // Commands
-            if let Some(command) = commands.get(job.command.as_str()) {
-                (*command.main)(job.args.as_slice(), self);
-            } else {
-                self.run_external_commmand(&job.args);
+            else {
+                if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
+                    continue;
+                }
+                self.run_job(&job, commands);
             }
         }
     }
+
+    fn run_job(&mut self, job: &Job, commands: &HashMap<&str, Command>) {
+        if let Some(command) = commands.get(job.command.as_str()) {
+            (*command.main)(job.args.as_slice(), self);
+        } else {
+            self.run_external_commmand(&job.args);
+        }
+    }
+
 
     fn run_external_commmand(&mut self, args: &Vec<String>) {
         if let Some(path) = args.get(0) {
@@ -247,6 +264,15 @@ impl Command {
                             help: "end a code block",
                             main: box |args: &[String], shell: &mut Shell| {
                                 shell.flow_control.end(args);
+                            },
+                        });
+
+        commands.insert("for",
+                        Command {
+                            name: "for",
+                            help: "Loop over something",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.flow_control.for_(args);
                             },
                         });
 
