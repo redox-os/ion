@@ -19,7 +19,7 @@
  - `left` and `right` are single arguments, they may be a variable like `$variable` or a value like `2` or `"some value"`
  - The available comparisons are `==`, `!=`, `>`, `>=`, `<`, and `<=`
 - `else` will invert the comparison block
-- `fi` will end the comparison block
+- `end` will end the comparison block
 
 ## Proposed Syntax
 

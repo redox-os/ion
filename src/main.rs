@@ -9,12 +9,12 @@ use std::io::{stdout, Read, Write};
 use std::env;
 use std::process;
 
-use self::to_num::ToNum;
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
 use self::peg::parse;
 use self::variables::Variables;
 use self::history::History;
+use self::flow_control::{FlowControl, is_flow_control_command};
 
 pub mod builtin;
 pub mod directory_stack;
@@ -23,16 +23,14 @@ pub mod input_editor;
 pub mod peg;
 pub mod variables;
 pub mod history;
+pub mod flow_control;
 
-pub struct Mode {
-    value: bool,
-}
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell {
     variables: Variables,
-    modes: Vec<Mode>,
+    flow_control: FlowControl,
     directory_stack: DirectoryStack,
     history: History,
 }
@@ -42,14 +40,14 @@ impl Shell {
     pub fn new() -> Self {
         Shell {
             variables: Variables::new(),
-            modes: vec![],
+            flow_control: FlowControl::new(),
             directory_stack: DirectoryStack::new().expect(""),
             history: History::new(),
         }
     }
 
     pub fn print_prompt(&self) {
-        let prompt_prefix = self.modes.iter().rev().fold(String::new(), |acc, mode| {
+        let prompt_prefix = self.flow_control.modes.iter().rev().fold(String::new(), |acc, mode| {
             acc +
             if mode.value {
                 "+ "
@@ -76,61 +74,7 @@ impl Shell {
 
         // Execute commands
         for job in jobs.iter() {
-            if job.command == "if" {
-                let mut value = false;
-
-                if let Some(left) = job.args.get(1) {
-                    if let Some(cmp) = job.args.get(2) {
-                        if let Some(right) = job.args.get(3) {
-                            if *cmp == "==" {
-                                value = *left == *right;
-                            } else if *cmp == "!=" {
-                                value = *left != *right;
-                            } else if *cmp == ">" {
-                                value = left.to_num_signed() > right.to_num_signed();
-                            } else if *cmp == ">=" {
-                                value = left.to_num_signed() >= right.to_num_signed();
-                            } else if *cmp == "<" {
-                                value = left.to_num_signed() < right.to_num_signed();
-                            } else if *cmp == "<=" {
-                                value = left.to_num_signed() <= right.to_num_signed();
-                            } else {
-                                println!("Unknown comparison: {}", cmp);
-                            }
-                        } else {
-                            println!("No right hand side");
-                        }
-                    } else {
-                        println!("No comparison operator");
-                    }
-                } else {
-                    println!("No left hand side");
-                }
-
-                self.modes.insert(0, Mode { value: value });
-                continue;
-            }
-
-            if job.command == "else" {
-                if let Some(mode) = self.modes.get_mut(0) {
-                    mode.value = !mode.value;
-                } else {
-                    println!("Syntax error: else found with no previous if");
-                }
-                continue;
-            }
-
-            if job.command == "fi" {
-                if !self.modes.is_empty() {
-                    self.modes.remove(0);
-                } else {
-                    println!("Syntax error: fi found with no previous if");
-                }
-                continue;
-            }
-
-            let skipped = self.modes.iter().any(|mode| !mode.value);
-            if skipped {
+            if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
                 continue;
             }
 
@@ -276,6 +220,33 @@ impl Command {
                             help: "Display all commands previously executed",
                             main: box |args: &[String], shell: &mut Shell| {
                                 shell.history.history(args);
+                            },
+                        });
+
+        commands.insert("if",
+                        Command {
+                            name: "if",
+                            help: "Conditionally execute code",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.flow_control.if_(args);
+                            },
+                        });
+
+        commands.insert("else",
+                        Command {
+                            name: "else",
+                            help: "Execute code if a previous condition was false",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.flow_control.else_(args);
+                            },
+                        });
+
+        commands.insert("end",
+                        Command {
+                            name: "end",
+                            help: "end a code block",
+                            main: box |args: &[String], shell: &mut Shell| {
+                                shell.flow_control.end(args);
                             },
                         });
 
