@@ -47,6 +47,19 @@ impl Shell {
     }
 
     pub fn print_prompt(&self) {
+        self.print_prompt_prefix();
+        match self.flow_control.current_statement {
+            Statement::For(_, _) => self.print_for_prompt(),
+            Statement::Default => self.print_default_prompt(),
+        }
+        if let Err(message) = stdout().flush() {
+            println!("{}: failed to flush prompt to stdout", message);
+        }
+
+    }
+
+    // TODO eventually this thing should be gone
+    fn print_prompt_prefix(&self) {
         let prompt_prefix = self.flow_control.modes.iter().rev().fold(String::new(), |acc, mode| {
             acc +
             if mode.value {
@@ -56,14 +69,16 @@ impl Shell {
             }
         });
         print!("{}", prompt_prefix);
+    }
 
+    fn print_for_prompt(&self) {
+        print!("for> ");
+    }
+
+    fn print_default_prompt(&self) {
         let cwd = env::current_dir().ok().map_or("?".to_string(),
                                                  |ref p| p.to_str().unwrap_or("?").to_string());
-
         print!("ion:{}# ", cwd);
-        if let Err(message) = stdout().flush() {
-            println!("{}: failed to flush prompt to stdout", message);
-        }
     }
 
     fn on_command(&mut self, command_string: &str, commands: &HashMap<&str, Command>) {
@@ -74,6 +89,7 @@ impl Shell {
         // Execute commands
         for job in jobs.drain(..) {
             if self.flow_control.collecting_block {
+                // TODO move this logic into "end" command
                 if job.command == "end" {
                     self.flow_control.collecting_block = false;
                     let block_jobs: Vec<Job> = self.flow_control.current_block.jobs.drain(..).collect();
@@ -89,6 +105,7 @@ impl Shell {
                             self.run_job(job, commands);
                         }
                     }
+                    self.flow_control.current_statement = Statement::Default;
                 }
                 else {
                     self.flow_control.current_block.jobs.push(job);
