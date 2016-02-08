@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::env::{set_current_dir, current_dir};
+use std::env::{set_current_dir, current_dir, home_dir};
 use std::path::PathBuf;
 use super::status::{SUCCESS, FAILURE};
 
@@ -43,40 +43,49 @@ impl DirectoryStack {
     pub fn pushd<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
-        self.change_and_push_dir(args);
-        self.print_dirs();
-        SUCCESS  // TODO determine success from result of change_and_push_dir
-                 // I am not doing this at the moment because it will just create
-                 // a nasty merge conflict
+        if let Some(dir) = args.into_iter().nth(1) {
+            let result = self.change_and_push_dir(dir.as_ref());
+            self.print_dirs();
+            result
+        } else {
+            println!("No directory provided");
+            FAILURE
+        }
     }
 
     pub fn cd<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
-        self.change_and_push_dir(args);
-        SUCCESS  // TODO determine success from result of change_and_push_dir
+        if let Some(dir) = args.into_iter().nth(1) {
+            let dir = dir.as_ref();
+            self.change_and_push_dir(dir)
+        } else {
+            if let Some(home) = home_dir() {
+                if let Some(home) = home.to_str() {
+                    self.change_and_push_dir(home)
+                } else {
+                    println!("Failed to convert home directory to str");
+                    FAILURE
+                }
+            } else {
+                println!("Failed to get home directory");
+                FAILURE
+            }
+        }
     }
 
-    // TODO the signature for this function doesn't make a lot of sense I did
-    // it this way to for ease of use where it is used, however, it should take
-    // just one dir instead of args once we add features like `cd -`.
-    pub fn change_and_push_dir<I: IntoIterator>(&mut self, args: I)
-        where I::Item: AsRef<str>
+    pub fn change_and_push_dir(&mut self, dir: &str) -> i32
     {
-        if let Some(dir) = args.into_iter().skip(1).next() {
-            match (set_current_dir(dir.as_ref()), current_dir()) {
-                (Ok(()), Ok(cur_dir)) => {
-                    self.push_dir(cur_dir);
-                }
-                (Err(err), _) => {
-                    println!("Failed to set current dir to {}: {}", dir.as_ref(), err);
-                    return;
-                }
-                (_, _) => (),
+        match (set_current_dir(dir), current_dir()) {
+            (Ok(()), Ok(cur_dir)) => {
+                self.push_dir(cur_dir);
+                SUCCESS
             }
-        } else {
-            println!("No directory provided");
-            return;
+            (Err(err), _) => {
+                println!("Failed to set current dir to {}: {}", dir, err);
+                FAILURE
+            }
+            (_, _) => FAILURE // This should not happen
         }
     }
 
