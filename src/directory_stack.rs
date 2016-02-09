@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::env::{set_current_dir, current_dir};
 use std::path::PathBuf;
+use super::status::{SUCCESS, FAILURE};
 
 pub struct DirectoryStack {
     dirs: VecDeque<PathBuf>, // The top is always the current directory
@@ -21,34 +22,39 @@ impl DirectoryStack {
         }
     }
 
-    pub fn popd<I: IntoIterator>(&mut self, _: I)
+    pub fn popd<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
         if self.dirs.len() < 2 {
             println!("Directory stack is empty");
-            return;
+            return FAILURE;
         }
         if let Some(dir) = self.dirs.get(self.dirs.len() - 2) {
             if let Err(err) = set_current_dir(dir) {
                 println!("{}: Failed to switch to directory {}", err, dir.display());
-                return;
+                return FAILURE;
             }
         }
         self.dirs.pop_back();
         self.print_dirs();
+        SUCCESS
     }
 
-    pub fn pushd<I: IntoIterator>(&mut self, args: I)
+    pub fn pushd<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
         self.change_and_push_dir(args);
         self.print_dirs();
+        SUCCESS  // TODO determine success from result of change_and_push_dir
+                 // I am not doing this at the moment because it will just create
+                 // a nasty merge conflict
     }
 
-    pub fn cd<I: IntoIterator>(&mut self, args: I)
+    pub fn cd<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
         self.change_and_push_dir(args);
+        SUCCESS  // TODO determine success from result of change_and_push_dir
     }
 
     // TODO the signature for this function doesn't make a lot of sense I did
@@ -79,10 +85,11 @@ impl DirectoryStack {
         self.dirs.truncate(self.max_size);
     }
 
-    pub fn dirs<I: IntoIterator>(&self, _: I)
+    pub fn dirs<I: IntoIterator>(&self, _: I) -> i32
         where I::Item: AsRef<str>
     {
-        self.print_dirs()
+        self.print_dirs();
+        SUCCESS
     }
 
     fn print_dirs(&self) {
