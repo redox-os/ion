@@ -1,5 +1,6 @@
 use super::to_num::ToNum;
 use super::peg::Job;
+use super::status::{SUCCESS, FAILURE};
 
 pub fn is_flow_control_command(command: &str) -> bool {
     command == "end" || command == "if" || command == "else"
@@ -39,11 +40,11 @@ impl FlowControl {
         self.modes.iter().any(|mode| !mode.value)
     }
 
-    pub fn if_<I: IntoIterator>(&mut self, args: I)
+    pub fn if_<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
         let mut args = args.into_iter(); // TODO why does the compiler want this to be mutable?
-        let mut value = false;
+        let value;
         if let Some(left) = args.nth(1) {
             let left = left.as_ref();
             if let Some(cmp) = args.nth(0) {
@@ -64,40 +65,49 @@ impl FlowControl {
                         value = left.to_num_signed() <= right.to_num_signed();
                     } else {
                         println!("Unknown comparison: {}", cmp);
+                        return FAILURE;
                     }
                 } else {
                     println!("No right hand side");
+                    return FAILURE;
                 }
             } else {
                 println!("No comparison operator");
+                return FAILURE;
             }
         } else {
             println!("No left hand side");
+            return FAILURE;
         }
         self.modes.insert(0, Mode { value: value });
+        SUCCESS
     }
 
-    pub fn else_<I: IntoIterator>(&mut self, _: I)
+    pub fn else_<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
         if let Some(mode) = self.modes.get_mut(0) {
             mode.value = !mode.value;
+            SUCCESS
         } else {
             println!("Syntax error: else found with no previous if");
+            FAILURE
         }
     }
 
-    pub fn end<I: IntoIterator>(&mut self, _: I)
+    pub fn end<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
         if !self.modes.is_empty() {
             self.modes.remove(0);
+            SUCCESS
         } else {
             println!("Syntax error: fi found with no previous if");
+            FAILURE
         }
     }
 
-    pub fn for_<I: IntoIterator>(&mut self, args: I)
+    pub fn for_<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
         let mut args = args.into_iter();
@@ -105,18 +115,19 @@ impl FlowControl {
             if let Some(in_) = args.nth(0) {
                 if in_.as_ref() != "in" {
                     println!("For loops must have 'in' as the second argument");
-                    return;
+                    return FAILURE;
                 }
             } else {
                 println!("For loops must have 'in' as the second argument");
-                return;
+                return FAILURE;
             }
             let values: Vec<String> = args.map(|value| value.as_ref().to_string()).collect();
             self.current_statement = Statement::For(variable, values);
             self.collecting_block = true;
         } else {
             println!("For loops must have a variable name as the first argument");
-            return;
+            return FAILURE;
         }
+        SUCCESS
     }
 }

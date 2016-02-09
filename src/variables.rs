@@ -3,6 +3,7 @@ use std::io::{stdout, Write};
 
 use super::peg::Job;
 use super::input_editor::readln;
+use super::status::{SUCCESS, FAILURE};
 
 pub struct Variables {
     variables: BTreeMap<String, String>,
@@ -13,7 +14,7 @@ impl Variables {
         Variables { variables: BTreeMap::new() }
     }
 
-    pub fn read<I: IntoIterator>(&mut self, args: I)
+    pub fn read<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
         let mut out = stdout();
@@ -21,14 +22,16 @@ impl Variables {
             print!("{}=", arg.as_ref().trim());
             if let Err(message) = out.flush() {
                 println!("{}: Failed to flush stdout", message);
+                return FAILURE;
             }
             if let Some(value) = readln() {
                 self.set_var(arg.as_ref(), value.trim());
             }
         }
+        SUCCESS
     }
 
-    pub fn let_<I: IntoIterator>(&mut self, args: I)
+    pub fn let_<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
         let mut args = args.into_iter();
@@ -45,6 +48,7 @@ impl Variables {
                 }
             }
         }
+        SUCCESS
     }
 
     pub fn set_var(&mut self, name: &str, value: &str) {

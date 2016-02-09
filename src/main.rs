@@ -15,6 +15,7 @@ use self::peg::{parse, Job};
 use self::variables::Variables;
 use self::history::History;
 use self::flow_control::{FlowControl, is_flow_control_command, Statement};
+use self::status::{SUCCESS, NO_SUCH_COMMAND, TERMINATED};
 
 pub mod directory_stack;
 pub mod to_num;
@@ -23,6 +24,7 @@ pub mod peg;
 pub mod variables;
 pub mod history;
 pub mod flow_control;
+pub mod status;
 
 
 /// This struct will contain all of the data structures related to this
@@ -123,15 +125,18 @@ impl Shell {
 
     fn run_job(&mut self, job: &Job, commands: &HashMap<&str, Command>) {
         let job = self.variables.expand_job(job);
-        if let Some(command) = commands.get(job.command.as_str()) {
-            (*command.main)(job.args.as_slice(), self);
+        let exit_status = if let Some(command) = commands.get(job.command.as_str()) {
+            Some((*command.main)(job.args.as_slice(), self))
         } else {
-            self.run_external_commmand(&job.args);
+            self.run_external_commmand(&job.args)
+        };
+        if let Some(code) = exit_status {
+            self.variables.set_var("?", &code.to_string());
         }
     }
 
-
-    fn run_external_commmand(&mut self, args: &Vec<String>) {
+    /// Returns an exit code if a command was run
+    fn run_external_commmand(&mut self, args: &Vec<String>) -> Option<i32> {
         if let Some(path) = args.get(0) {
             let mut command = process::Command::new(path);
             for i in 1..args.len() {
@@ -144,16 +149,25 @@ impl Shell {
                     match child.wait() {
                         Ok(status) => {
                             if let Some(code) = status.code() {
-                                self.variables.set_var("?", &code.to_string());
+                                Some(code)
                             } else {
-                                println!("{}: No child exit code", path);
+                                println!("{}: child ended by signal", path);
+                                Some(TERMINATED)
                             }
                         }
-                        Err(err) => println!("{}: Failed to wait: {}", path, err),
+                        Err(err) => {
+                            println!("{}: Failed to wait: {}", path, err);
+                            Some(100) // TODO what should we return here?
+                        }
                     }
                 }
-                Err(err) => println!("{}: Failed to execute: {}", path, err),
+                Err(err) => {
+                    println!("{}: Failed to execute: {}", path, err);
+                    Some(NO_SUCH_COMMAND)
+                }
             }
+        } else {
+            None
         }
     }
 }
@@ -166,7 +180,7 @@ impl Shell {
 /// let my_command = Command {
 ///     name: "my_command",
 ///     help: "Describe what my_command does followed by a newline showing usage",
-///     main: box|args: &[String], &mut Shell| {
+///     main: box|args: &[String], &mut Shell| -> i32 {
 ///         println!("Say 'hello' to my command! :-D");
 ///     }
 /// }
@@ -174,7 +188,7 @@ impl Shell {
 pub struct Command {
     pub name: &'static str,
     pub help: &'static str,
-    pub main: Box<Fn(&[String], &mut Shell)>,
+    pub main: Box<Fn(&[String], &mut Shell) -> i32>,
 }
 
 impl Command {
@@ -186,8 +200,8 @@ impl Command {
                         Command {
                             name: "cd",
                             help: "To change the current directory\n    cd <your_destination>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.directory_stack.cd(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.directory_stack.cd(args)
                             },
                         });
 
@@ -196,8 +210,8 @@ impl Command {
                             name: "dirs",
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.directory_stack.dirs(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.directory_stack.dirs(args)
                             },
                         });
 
@@ -205,7 +219,7 @@ impl Command {
                         Command {
                             name: "exit",
                             help: "To exit the curent session",
-                            main: box |args: &[String], _: &mut Shell| {
+                            main: box |args: &[String], _: &mut Shell| -> i32 {
                                 if let Some(status) = args.get(1) {
                                     if let Ok(status) = status.parse::<i32>() {
                                         process::exit(status);
@@ -220,8 +234,8 @@ impl Command {
                         Command {
                             name: "let",
                             help: "View, set or unset variables",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.variables.let_(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.let_(args)
                             },
                         });
 
@@ -229,8 +243,8 @@ impl Command {
                         Command {
                             name: "read",
                             help: "To read some variables\n    read <my_variable>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.variables.read(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.read(args)
                             },
                         });
 
@@ -239,8 +253,8 @@ impl Command {
                             name: "pushd",
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.directory_stack.pushd(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.directory_stack.pushd(args)
                             },
                         });
 
@@ -249,8 +263,8 @@ impl Command {
                             name: "popd",
                             help: "Make a sleep in the current session\n    sleep \
                                    <number_of_seconds>",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.directory_stack.popd(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.directory_stack.popd(args)
                             },
                         });
 
@@ -258,8 +272,8 @@ impl Command {
                         Command {
                             name: "history",
                             help: "Display all commands previously executed",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.history.history(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.history.history(args)
                             },
                         });
 
@@ -267,8 +281,8 @@ impl Command {
                         Command {
                             name: "if",
                             help: "Conditionally execute code",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.flow_control.if_(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.flow_control.if_(args)
                             },
                         });
 
@@ -276,8 +290,8 @@ impl Command {
                         Command {
                             name: "else",
                             help: "Execute code if a previous condition was false",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.flow_control.else_(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.flow_control.else_(args)
                             },
                         });
 
@@ -285,8 +299,8 @@ impl Command {
                         Command {
                             name: "end",
                             help: "end a code block",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.flow_control.end(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.flow_control.end(args)
                             },
                         });
 
@@ -294,8 +308,8 @@ impl Command {
                         Command {
                             name: "for",
                             help: "Loop over something",
-                            main: box |args: &[String], shell: &mut Shell| {
-                                shell.flow_control.for_(args);
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.flow_control.for_(args)
                             },
                         });
 
@@ -309,7 +323,7 @@ impl Command {
                         Command {
                             name: "help",
                             help: "Display a little helper for a given command\n    help ls",
-                            main: box move |args: &[String], _: &mut Shell| {
+                            main: box move |args: &[String], _: &mut Shell| -> i32 {
                                 if let Some(command) = args.get(1) {
                                     if command_helper.contains_key(command.as_str()) {
                                         match command_helper.get(command.as_str()) {
@@ -326,6 +340,7 @@ impl Command {
                                         println!("{}", command);
                                     }
                                 }
+                                SUCCESS
                             },
                         });
 
