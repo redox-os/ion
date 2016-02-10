@@ -11,5 +11,4 @@ script:
   - cargo test --verbose
   - diff --brief -r src formatted/
 notifications:
-  slack: redox-os:t5jWurX9sFfgurPznqdECoKN
   email: false
