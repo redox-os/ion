@@ -199,7 +199,7 @@ impl Command {
         commands.insert("cd",
                         Command {
                             name: "cd",
-                            help: "To change the current directory\n    cd <your_destination>",
+                            help: "Change the current directory\n    cd <path>",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.directory_stack.cd(args)
                             },
@@ -208,8 +208,7 @@ impl Command {
         commands.insert("dirs",
                         Command {
                             name: "dirs",
-                            help: "Make a sleep in the current session\n    sleep \
-                                   <number_of_seconds>",
+                            help: "Display the current directory stack",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.directory_stack.dirs(args)
                             },
@@ -242,7 +241,7 @@ impl Command {
         commands.insert("read",
                         Command {
                             name: "read",
-                            help: "To read some variables\n    read <my_variable>",
+                            help: "Read some variables\n    read <variable>",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.variables.read(args)
                             },
@@ -251,8 +250,7 @@ impl Command {
         commands.insert("pushd",
                         Command {
                             name: "pushd",
-                            help: "Make a sleep in the current session\n    sleep \
-                                   <number_of_seconds>",
+                            help: "Push a directory to the stack",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.directory_stack.pushd(args)
                             },
@@ -261,8 +259,7 @@ impl Command {
         commands.insert("popd",
                         Command {
                             name: "popd",
-                            help: "Make a sleep in the current session\n    sleep \
-                                   <number_of_seconds>",
+                            help: "Pop a directory from the stack",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.directory_stack.popd(args)
                             },
@@ -271,7 +268,7 @@ impl Command {
         commands.insert("history",
                         Command {
                             name: "history",
-                            help: "Display all commands previously executed",
+                            help: "Display a log of all commands previously executed",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.history.history(args)
                             },
@@ -298,7 +295,7 @@ impl Command {
         commands.insert("end",
                         Command {
                             name: "end",
-                            help: "end a code block",
+                            help: "End a code block",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.flow_control.end(args)
                             },
@@ -307,7 +304,7 @@ impl Command {
         commands.insert("for",
                         Command {
                             name: "for",
-                            help: "Loop over something",
+                            help: "Iterate through a list",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.flow_control.for_(args)
                             },
@@ -322,7 +319,8 @@ impl Command {
         commands.insert("help",
                         Command {
                             name: "help",
-                            help: "Display a little helper for a given command\n    help ls",
+                            help: "Display helpful information about a given command, or list \
+                                   commands if none specified\n    help <command>",
                             main: box move |args: &[String], _: &mut Shell| -> i32 {
                                 if let Some(command) = args.get(1) {
                                     if command_helper.contains_key(command.as_str()) {
