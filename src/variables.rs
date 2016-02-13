@@ -66,7 +66,7 @@ impl Variables {
         Job::from_vec_string(job.args
                                 .iter()
                                 .map(|original: &String| self.expand_string(&original).to_string())
-                                .collect())
+                                .collect(), job.background)
     }
 
     #[inline]

@@ -10,6 +10,7 @@ use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::env;
 use std::process;
+use std::thread;
 
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
@@ -131,7 +132,7 @@ impl Shell {
         let exit_status = if let Some(command) = commands.get(job.command.as_str()) {
             Some((*command.main)(job.args.as_slice(), self))
         } else {
-            self.run_external_commmand(&job.args)
+            self.run_external_commmand(job)
         };
         if let Some(code) = exit_status {
             self.variables.set_var("?", &code.to_string());
@@ -139,38 +140,53 @@ impl Shell {
     }
 
     /// Returns an exit code if a command was run
-    fn run_external_commmand(&mut self, args: &Vec<String>) -> Option<i32> {
-        if let Some(path) = args.get(0) {
-            let mut command = process::Command::new(path);
-            for i in 1..args.len() {
-                if let Some(arg) = args.get(i) {
-                    command.arg(arg);
+    fn run_external_commmand(&mut self, job: Job) -> Option<i32> {
+        if job.background {
+            thread::spawn(move || {
+                let mut command = Shell::build_command(&job);
+                command.stdin(process::Stdio::null());
+                if let Ok(mut child) = command.spawn() {
+                    Shell::wait_and_get_status(&mut child, &job.command);
                 }
-            }
+            });
+            None
+        } else {
+            let mut command = Shell::build_command(&job);
             match command.spawn() {
-                Ok(mut child) => {
-                    match child.wait() {
-                        Ok(status) => {
-                            if let Some(code) = status.code() {
-                                Some(code)
-                            } else {
-                                println!("{}: child ended by signal", path);
-                                Some(TERMINATED)
-                            }
-                        }
-                        Err(err) => {
-                            println!("{}: Failed to wait: {}", path, err);
-                            Some(100) // TODO what should we return here?
-                        }
-                    }
-                }
+                Ok(mut child) => Some(Shell::wait_and_get_status(&mut child, &job.command)),
                 Err(err) => {
-                    println!("{}: Failed to execute: {}", path, err);
+                    println!("{}: Failed to execute: {}", job.command, err);
                     Some(NO_SUCH_COMMAND)
                 }
             }
-        } else {
-            None
+        }
+    }
+
+    fn build_command(job: &Job) -> process::Command {
+        let mut command = process::Command::new(&job.command);
+        for i in 1..job.args.len() {
+            if let Some(arg) = job.args.get(i) {
+                command.arg(arg);
+            }
+        }
+        command
+    }
+
+    // TODO don't pass in command and do printing outside this function
+    fn wait_and_get_status(child: &mut process::Child, command: &str) -> i32 {
+        match child.wait() {
+            Ok(status) => {
+                if let Some(code) = status.code() {
+                    code
+                } else {
+                    println!("{}: child ended by signal", command);
+                    TERMINATED
+                }
+            }
+            Err(err) => {
+                println!("{}: Failed to wait: {}", command, err);
+                100 // TODO what should we return here?
+            }
         }
     }
 }
