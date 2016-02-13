@@ -141,21 +141,17 @@ impl Shell {
 
     /// Returns an exit code if a command was run
     fn run_external_commmand(&mut self, job: &Job) -> Option<i32> {
-        let mut command = process::Command::new(&job.command);
-        for i in 1..job.args.len() {
-            if let Some(arg) = job.args.get(i) {
-                command.arg(arg);
-            }
-        }
         if job.background {
-            command.stdin(process::Stdio::null());
             thread::spawn(move || {
+                let command = Shell::build_command(&job);
+                command.stdin(process::Stdio::null());
                 if let Ok(mut child) = command.spawn() {
                     Shell::wait_and_get_status(&mut child, &job.command);
                 }
             });
             None
         } else {
+            let command = Shell::build_command(&job);
             match command.spawn() {
                 Ok(mut child) => Some(Shell::wait_and_get_status(&mut child, &job.command)),
                 Err(err) => {
@@ -164,6 +160,16 @@ impl Shell {
                 }
             }
         }
+    }
+
+    fn build_command(job: &Job) -> process::Command {
+        let mut command = process::Command::new(&job.command);
+        for i in 1..job.args.len() {
+            if let Some(arg) = job.args.get(i) {
+                command.arg(arg);
+            }
+        }
+        command
     }
 
     // TODO don't pass in command and do printing outside this function
