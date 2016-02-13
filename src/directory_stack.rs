@@ -84,6 +84,7 @@ impl DirectoryStack {
     fn switch_to_previous_directory(&mut self) -> i32 {
         if let Some(prev) = self.get_previous_dir()
                                 .map(|path| path.to_string_lossy().to_string()) {
+            self.dirs.remove(1);
             println!("{}", prev);
             self.change_and_push_dir(&prev)
         } else {
