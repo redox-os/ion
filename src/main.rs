@@ -13,8 +13,7 @@ use std::process;
 
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
-use self::peg::parse;
-use self::job::Job;
+use self::peg::{parse, Job};
 use self::variables::Variables;
 use self::history::History;
 use self::flow_control::{FlowControl, is_flow_control_command, Statement};
@@ -28,7 +27,6 @@ pub mod variables;
 pub mod history;
 pub mod flow_control;
 pub mod status;
-pub mod job;
 
 
 /// This struct will contain all of the data structures related to this

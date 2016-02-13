@@ -1,5 +1,5 @@
 use super::to_num::ToNum;
-use super::job::Job;
+use super::peg::Job;
 use super::status::{SUCCESS, FAILURE};
 
 pub fn is_flow_control_command(command: &str) -> bool {
