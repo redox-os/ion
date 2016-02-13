@@ -37,7 +37,7 @@ impl Job {
                     pushed_glob = true;
                     new_args.push(path.to_string_lossy().into_owned());
                 }
-            } 
+            }
             if !pushed_glob {
                 new_args.push(arg);
             }

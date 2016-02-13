@@ -111,7 +111,7 @@ impl DirectoryStack {
                 println!("Failed to set current dir to {}: {}", dir, err);
                 FAILURE
             }
-            (_, _) => FAILURE // This should not happen
+            (_, _) => FAILURE, // This should not happen
         }
     }
 
