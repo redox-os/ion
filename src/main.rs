@@ -3,6 +3,8 @@
 #![feature(plugin)]
 #![plugin(peg_syntax_ext)]
 
+extern crate glob;
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{stdout, Read, Write};
@@ -126,7 +128,8 @@ impl Shell {
     }
 
     fn run_job(&mut self, job: &Job, commands: &HashMap<&str, Command>) {
-        let job = self.variables.expand_job(job);
+        let mut job = self.variables.expand_job(job);
+        job.expand_globs();
         let exit_status = if let Some(command) = commands.get(job.command.as_str()) {
             Some((*command.main)(job.args.as_slice(), self))
         } else {
