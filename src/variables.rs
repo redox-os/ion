@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::io::{stdout, Write};
 
-use super::peg::Job;
+use super::job::Job;
 use super::input_editor::readln;
 use super::status::{SUCCESS, FAILURE};
 

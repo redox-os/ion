@@ -1,36 +1,12 @@
+use super::job::Job;
 use self::grammar::job_list;
-
-#[derive(Debug, PartialEq)]
-pub struct Job {
-    pub command: String,
-    pub args: Vec<String>,
-}
-
-impl Job {
-    fn new(args: Vec<&str>) -> Self {
-        let command = args[0].to_string();
-        let args = args.iter().map(|arg| arg.to_string()).collect();
-        Job {
-            command: command,
-            args: args,
-        }
-    }
-
-    pub fn from_vec_string(args: Vec<String>) -> Self {
-        let command = args[0].clone();
-        Job {
-            command: command,
-            args: args,
-        }
-    }
-}
 
 pub fn parse(code: &str) -> Vec<Job> {
     job_list(code).unwrap_or(vec![])
 }
 
 peg! grammar(r#"
-use super::Job;
+use super::super::job::Job;
 
 
 #[pub]
