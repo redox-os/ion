@@ -63,7 +63,11 @@ job -> Job
     = whitespace? res:_job whitespace? comment? { res }
 
 _job -> Job
-    = args:word ++ whitespace background:[&]? { Job::new(args, background.is_some()) }
+    = args:word ++ whitespace background:background_token? { Job::new(args, background.is_some()) }
+
+background_token -> ()
+    = [&]
+    / whitespace [&]
 
 word -> &'input str
     = double_quoted_word
@@ -256,7 +260,7 @@ mod tests {
 
     #[test]
     fn background_job_with_space() {
-        let jobs = job_list("echo hello world&").unwrap();
+        let jobs = job_list("echo hello world &").unwrap();
         assert_eq!(true, jobs[0].background);
     }
 

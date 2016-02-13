@@ -132,7 +132,7 @@ impl Shell {
         let exit_status = if let Some(command) = commands.get(job.command.as_str()) {
             Some((*command.main)(job.args.as_slice(), self))
         } else {
-            self.run_external_commmand(&job)
+            self.run_external_commmand(job)
         };
         if let Some(code) = exit_status {
             self.variables.set_var("?", &code.to_string());
@@ -140,10 +140,10 @@ impl Shell {
     }
 
     /// Returns an exit code if a command was run
-    fn run_external_commmand(&mut self, job: &Job) -> Option<i32> {
+    fn run_external_commmand(&mut self, job: Job) -> Option<i32> {
         if job.background {
             thread::spawn(move || {
-                let command = Shell::build_command(&job);
+                let mut command = Shell::build_command(&job);
                 command.stdin(process::Stdio::null());
                 if let Ok(mut child) = command.spawn() {
                     Shell::wait_and_get_status(&mut child, &job.command);
@@ -151,7 +151,7 @@ impl Shell {
             });
             None
         } else {
-            let command = Shell::build_command(&job);
+            let mut command = Shell::build_command(&job);
             match command.spawn() {
                 Ok(mut child) => Some(Shell::wait_and_get_status(&mut child, &job.command)),
                 Err(err) => {
