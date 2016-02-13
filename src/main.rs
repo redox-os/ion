@@ -10,6 +10,7 @@ use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::env;
 use std::process;
+use std::thread;
 
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
@@ -148,19 +149,19 @@ impl Shell {
         }
         if job.background {
             command.stdin(process::Stdio::null());
-        }
-        match command.spawn() {
-            Ok(mut child) => {
-                if job.background {
-                    None
-                } else {
-                    Some(Shell::wait_and_get_status(&mut child, &job.command))
+            thread::spawn(move || {
+                if let Ok(mut child) = command.spawn() {
+                    Shell::wait_and_get_status(&mut child, &job.command);
                 }
-
-            }
-            Err(err) => {
-                println!("{}: Failed to execute: {}", job.command, err);
-                Some(NO_SUCH_COMMAND)
+            });
+            None
+        } else {
+            match command.spawn() {
+                Ok(mut child) => Some(Shell::wait_and_get_status(&mut child, &job.command)),
+                Err(err) => {
+                    println!("{}: Failed to execute: {}", job.command, err);
+                    Some(NO_SUCH_COMMAND)
+                }
             }
         }
     }
@@ -182,7 +183,6 @@ impl Shell {
             }
         }
     }
-
 }
 
 /// Structure which represents a Terminal's command.
