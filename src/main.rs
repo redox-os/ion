@@ -154,8 +154,8 @@ impl Shell {
             let mut command = Shell::build_command(&job);
             match command.spawn() {
                 Ok(mut child) => Some(Shell::wait_and_get_status(&mut child, &job.command)),
-                Err(err) => {
-                    println!("{}: Failed to execute: {}", job.command, err);
+                Err(_) => {
+                    println!("ion: command not found: {}", job.command);
                     Some(NO_SUCH_COMMAND)
                 }
             }
