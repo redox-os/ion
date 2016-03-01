@@ -100,7 +100,7 @@ mod tests {
     #[test]
     fn let_and_expand_a_variable() {
         let mut variables = Variables::new();
-        variables.let_(vec!["FOO", "BAR"]);
+        variables.let_(vec!["let", "FOO", "=", "BAR"]);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("BAR", expanded);
     }
@@ -116,8 +116,8 @@ mod tests {
     #[test]
     fn remove_a_variable_with_let() {
         let mut variables = Variables::new();
-        variables.let_(vec!["FOO", "BAR"]);
-        variables.let_(vec!["FOO"]);
+        variables.let_(vec!["let", "FOO", "=", "BAR"]);
+        variables.let_(vec!["let", "FOO"]);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("", expanded);
     }
