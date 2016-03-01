@@ -7,12 +7,13 @@
 
 ### Builtins
 - `help` will list all builtins
-- `help builtin` will display the syntax and description of `builtin`
+- `help builtin` will display the syntax and description of the `builtin` command
 
 ### Variables
-- `variable=some value` will set a variable to `some value`, if `some value` is blank the variable will be deleted
+- `let variable=value` will set a variable to `value`
 - `$variable` will be placed inline as a single argument, so `touch $variable` would try to create a file `some value`
-- `$` will list all variables
+- `let variable` will delete the variable called `variable`
+- `let` will list all variables
 
 ### Conditionals
 - `if left comparison right` will begin a comparison block
