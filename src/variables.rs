@@ -34,14 +34,16 @@ impl Variables {
     pub fn let_<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
-        let mut args = args.into_iter();
-        match (args.next(), args.next()) {
+        let args = args.into_iter();
+        let string: String = args.skip(1).fold(String::new(), |string, x| string + x.as_ref());
+        let mut split = string.split('=');
+        match (split.next().and_then(|x| if x == "" { None } else { Some(x) }), split.next()) {
             (Some(key), Some(value)) => {
-                self.variables.insert(key.as_ref().to_string(), value.as_ref().to_string());
-            }
+                self.variables.insert(key.to_string(), value.to_string());
+            },
             (Some(key), None) => {
-                self.variables.remove(key.as_ref());
-            }
+                self.variables.remove(key);
+            },
             _ => {
                 for (key, value) in self.variables.iter() {
                     println!("{}={}", key, value);
@@ -98,7 +100,7 @@ mod tests {
     #[test]
     fn let_and_expand_a_variable() {
         let mut variables = Variables::new();
-        variables.let_(vec!["FOO", "BAR"]);
+        variables.let_(vec!["let", "FOO", "=", "BAR"]);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("BAR", expanded);
     }
@@ -114,8 +116,8 @@ mod tests {
     #[test]
     fn remove_a_variable_with_let() {
         let mut variables = Variables::new();
-        variables.let_(vec!["FOO", "BAR"]);
-        variables.let_(vec!["FOO"]);
+        variables.let_(vec!["let", "FOO", "=", "BAR"]);
+        variables.let_(vec!["let", "FOO"]);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("", expanded);
     }
