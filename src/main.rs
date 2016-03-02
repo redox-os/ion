@@ -151,13 +151,11 @@ impl Shell {
             });
             None
         } else {
-            let mut command = Shell::build_command(&job);
-            match command.spawn() {
-                Ok(mut child) => Some(Shell::wait_and_get_status(&mut child, &job.command)),
-                Err(_) => {
-                    println!("ion: command not found: {}", job.command);
-                    Some(NO_SUCH_COMMAND)
-                }
+            if let Ok(mut child) = Shell::build_command(&job).spawn() {
+                Some(Shell::wait_and_get_status(&mut child, &job.command))
+            } else {
+                println!("ion: command not found: {}", job.command);
+                Some(NO_SUCH_COMMAND)
             }
         }
     }
