@@ -24,7 +24,7 @@
 
 ## Proposed Syntax
 
-A LR(k) grammar. Something like this (pseudocode):
+A LR(k) grammar. This is a rough brainstorm and is somewhat out of sync with the exampels:
 ```
 statement:
     LET IDENT SET expr
@@ -52,20 +52,20 @@ expr:
     ...
 ```
 
-example:
+Examples:
 
 ```
 let home = "~";
 
-if home == pwd {
+if home == pwd
     echo "home sweet home"
-}
+end
 
 // let's define a new cmd
 
-fn my_cmd a b {
-    echo a + b;
-}
+fn my_cmd a b
+    echo a + b
+end
 
 mycmd 2 4 // 6
 ```
