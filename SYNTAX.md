@@ -24,7 +24,7 @@
 
 ## Proposed Syntax
 
-A LR(k) grammar. This is a rough brainstorm and is somewhat out of sync with the exampels:
+A LR(k) grammar. This is a rough brainstorm and is somewhat out of sync with the examples:
 ```
 statement:
     LET IDENT SET expr
