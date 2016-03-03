@@ -19,6 +19,7 @@ use self::variables::Variables;
 use self::history::History;
 use self::flow_control::{FlowControl, is_flow_control_command, Statement};
 use self::status::{SUCCESS, NO_SUCH_COMMAND, TERMINATED};
+use self::function::Function;
 
 pub mod directory_stack;
 pub mod to_num;
@@ -28,6 +29,7 @@ pub mod variables;
 pub mod history;
 pub mod flow_control;
 pub mod status;
+pub mod function;
 
 
 /// This struct will contain all of the data structures related to this
@@ -37,6 +39,7 @@ pub struct Shell {
     flow_control: FlowControl,
     directory_stack: DirectoryStack,
     history: History,
+    functions: HashMap<String, Function>
 }
 
 impl Shell {
@@ -47,6 +50,7 @@ impl Shell {
             flow_control: FlowControl::new(),
             directory_stack: DirectoryStack::new().expect(""),
             history: History::new(),
+            functions: HashMap::new()
         }
     }
 
@@ -54,7 +58,8 @@ impl Shell {
         self.print_prompt_prefix();
         match self.flow_control.current_statement {
             Statement::For(_, _) => self.print_for_prompt(),
-            Statement::Default => self.print_default_prompt(),
+            Statement::Function => self.print_function_prompt(),
+            _ => self.print_default_prompt(),
         }
         if let Err(message) = stdout().flush() {
             println!("{}: failed to flush prompt to stdout", message);
@@ -79,6 +84,10 @@ impl Shell {
         print!("for> ");
     }
 
+    fn print_function_prompt(&self) {
+        print!("fn> ");
+    }
+
     fn print_default_prompt(&self) {
         let cwd = env::current_dir().ok().map_or("?".to_string(),
                                                  |ref p| p.to_str().unwrap_or("?").to_string());
@@ -101,17 +110,21 @@ impl Shell {
                                                    .jobs
                                                    .drain(..)
                                                    .collect();
-                    let mut variable = String::new();
-                    let mut values: Vec<String> = vec![];
-                    if let Statement::For(ref var, ref vals) = self.flow_control.current_statement {
-                        variable = var.clone();
-                        values = vals.clone();
-                    }
-                    for value in values {
-                        self.variables.set_var(&variable, &value);
-                        for job in block_jobs.iter() {
-                            self.run_job(job, commands);
-                        }
+                    match self.flow_control.current_statement.clone() {
+                        Statement::For(ref var, ref vals) => {
+                            let variable = var.clone();
+                            let values = vals.clone();
+                            for value in values {
+                                self.variables.set_var(&variable, &value);
+                                for job in block_jobs.iter() {
+                                    self.run_job(job, commands);
+                                }
+                            }
+                        },
+                        Statement::Function(ref name) => {
+                            self.functions.insert(name.clone(), Function { name: name.clone(), jobs: block_jobs.clone() });
+                        },
+                        _ => {}
                     }
                     self.flow_control.current_statement = Statement::Default;
                 } else {
@@ -126,11 +139,18 @@ impl Shell {
         }
     }
 
-    fn run_job(&mut self, job: &Job, commands: &HashMap<&str, Command>) {
+    fn run_job(&mut self, job: &Job, commands: &HashMap<&str, Command>) -> Option<i32> {
         let mut job = self.variables.expand_job(job);
         job.expand_globs();
         let exit_status = if let Some(command) = commands.get(job.command.as_str()) {
             Some((*command.main)(job.args.as_slice(), self))
+        } else if self.functions.get(job.command.as_str()).is_some() { // Not really idiomatic but I don't know how to clone the value without borrowing self
+            let function = self.functions.get(job.command.as_str()).unwrap().clone();
+            let mut return_value = None;
+            for function_job in function.jobs.iter() {
+                return_value = self.run_job(&function_job, commands)
+            }
+            return_value
         } else {
             self.run_external_commmand(job)
         };
@@ -138,6 +158,7 @@ impl Shell {
             self.variables.set_var("?", &code.to_string());
             self.history.previous_status = code;
         }
+        exit_status
     }
 
     /// Returns an exit code if a command was run
@@ -379,6 +400,16 @@ impl Command {
                             help: "Evaluate the file following the command or re-initialize the init file",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.source_command(args)
+
+                            },
+                        });
+
+        commands.insert("fn",
+                        Command {
+                            name: "fn",
+                            help: "Create a function",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.flow_control.fn_(args)
                             },
                         });
 

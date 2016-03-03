@@ -6,9 +6,12 @@ pub fn is_flow_control_command(command: &str) -> bool {
     command == "end" || command == "if" || command == "else"
 }
 
+#[derive(Clone)]
 pub enum Statement {
     For(String, Vec<String>),
-    Default,
+    Function(String),
+    If,
+    Default
 }
 
 pub struct CodeBlock {
@@ -80,6 +83,7 @@ impl FlowControl {
             return FAILURE;
         }
         self.modes.insert(0, Mode { value: value });
+        self.current_statement = Statement::If;
         SUCCESS
     }
 
@@ -102,7 +106,7 @@ impl FlowControl {
             self.modes.remove(0);
             SUCCESS
         } else {
-            println!("Syntax error: fi found with no previous if");
+            println!("Syntax error: end found outside of a block");
             FAILURE
         }
     }
@@ -126,6 +130,20 @@ impl FlowControl {
             self.collecting_block = true;
         } else {
             println!("For loops must have a variable name as the first argument");
+            return FAILURE;
+        }
+        SUCCESS
+    }
+
+    pub fn fn_<I: IntoIterator>(&mut self, args: I) -> i32
+        where I::Item: AsRef<str>
+    {
+        let mut args = args.into_iter();
+        if let Some(name) = args.nth(1) {
+            self.collecting_block = true;
+            self.current_statement = Statement::Function(name.as_ref().to_string());
+        } else {
+            println!("Functions must have the function name as the first argument");
             return FAILURE;
         }
         SUCCESS

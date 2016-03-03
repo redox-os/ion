@@ -1,7 +1,7 @@
 use self::grammar::job_list;
 use glob::glob;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Job {
     pub command: String,
     pub args: Vec<String>,
