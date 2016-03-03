@@ -136,6 +136,7 @@ impl Shell {
         };
         if let Some(code) = exit_status {
             self.variables.set_var("?", &code.to_string());
+            self.history.previous_status = code;
         }
     }
 
@@ -281,14 +282,13 @@ impl Command {
                         Command {
                             name: "exit",
                             help: "To exit the curent session",
-                            main: box |args: &[String], _: &mut Shell| -> i32 {
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 if let Some(status) = args.get(1) {
                                     if let Ok(status) = status.parse::<i32>() {
                                         process::exit(status);
                                     }
                                 }
-                                // TODO should use exit status of previously run command, not 0
-                                process::exit(0);
+                                process::exit(shell.history.previous_status);
                             },
                         });
 
@@ -442,4 +442,7 @@ fn main() {
         }
         shell.print_prompt()
     }
+
+    // Exit with the previous command's exit status.
+    process::exit(shell.history.previous_status);
 }

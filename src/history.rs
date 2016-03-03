@@ -2,15 +2,17 @@ use std::collections::VecDeque;
 use super::status::SUCCESS;
 
 pub struct History {
-    history: VecDeque<String>,
-    max_size: usize,
+    history:             VecDeque<String>,
+    max_size:            usize,
+    pub previous_status: i32,
 }
 
 impl History {
     pub fn new() -> History {
         History {
-            history: VecDeque::new(),
-            max_size: 1000, // TODO don't hardcode this size, make it configurable
+            history:         VecDeque::new(),
+            max_size:        1000, // TODO don't hardcode this size, make it configurable
+            previous_status: SUCCESS,
         }
     }
 
