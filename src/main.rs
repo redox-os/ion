@@ -431,7 +431,9 @@ fn main() {
             }
         }
         shell.on_command(&command_list, &commands);
-        return;
+        
+        // Exit with the previous command's exit status.
+        process::exit(shell.history.previous_status);
     }
 
     shell.print_prompt();
