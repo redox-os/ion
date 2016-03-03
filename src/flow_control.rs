@@ -10,8 +10,8 @@ pub fn is_flow_control_command(command: &str) -> bool {
 pub enum Statement {
     For(String, Vec<String>),
     Function(String),
-    If,
-    Default
+    If(bool),
+    Default,
 }
 
 pub struct CodeBlock {
@@ -23,24 +23,25 @@ pub struct Mode {
 }
 
 pub struct FlowControl {
-    pub modes: Vec<Mode>,
     pub collecting_block: bool,
     pub current_block: CodeBlock,
-    pub current_statement: Statement, /* pub prompt: &'static str,  // Custom prompt while collecting code block */
+    pub statements: Vec<Statement>,
 }
 
 impl FlowControl {
     pub fn new() -> FlowControl {
         FlowControl {
-            modes: vec![],
             collecting_block: false,
             current_block: CodeBlock { jobs: vec![] },
-            current_statement: Statement::Default,
+            statements: vec![Statement::Default],
         }
     }
 
     pub fn skipping(&self) -> bool {
-        self.modes.iter().any(|mode| !mode.value)
+        self.statements.iter().any(|stat| match *stat {
+            Statement::If(value) => !value,
+            _ => false
+        })
     }
 
     pub fn if_<I: IntoIterator>(&mut self, args: I) -> i32
@@ -82,16 +83,15 @@ impl FlowControl {
             println!("No left hand side");
             return FAILURE;
         }
-        self.modes.insert(0, Mode { value: value });
-        self.current_statement = Statement::If;
+        self.statements.push(Statement::If(value));
         SUCCESS
     }
 
     pub fn else_<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
-        if let Some(mode) = self.modes.get_mut(0) {
-            mode.value = !mode.value;
+        if let Some(&mut Statement::If(ref mut value)) = self.statements.last_mut() {
+            *value = !*value;
             SUCCESS
         } else {
             println!("Syntax error: else found with no previous if");
@@ -102,8 +102,8 @@ impl FlowControl {
     pub fn end<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
-        if !self.modes.is_empty() {
-            self.modes.remove(0);
+        if self.statements.len() > 1{
+            self.statements.pop();
             SUCCESS
         } else {
             println!("Syntax error: end found outside of a block");
@@ -126,7 +126,7 @@ impl FlowControl {
                 return FAILURE;
             }
             let values: Vec<String> = args.map(|value| value.as_ref().to_string()).collect();
-            self.current_statement = Statement::For(variable, values);
+            self.statements.push(Statement::For(variable, values));
             self.collecting_block = true;
         } else {
             println!("For loops must have a variable name as the first argument");
@@ -141,7 +141,7 @@ impl FlowControl {
         let mut args = args.into_iter();
         if let Some(name) = args.nth(1) {
             self.collecting_block = true;
-            self.current_statement = Statement::Function(name.as_ref().to_string());
+            self.statements.push(Statement::Function(name.as_ref().to_string()));
         } else {
             println!("Functions must have the function name as the first argument");
             return FAILURE;

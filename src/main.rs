@@ -56,9 +56,9 @@ impl Shell {
 
     pub fn print_prompt(&self) {
         self.print_prompt_prefix();
-        match self.flow_control.current_statement {
-            Statement::For(_, _) => self.print_for_prompt(),
-            Statement::Function => self.print_function_prompt(),
+        match self.flow_control.statements.last() {
+            Some(&Statement::For(_, _)) => self.print_for_prompt(),
+            Some(&Statement::Function) => self.print_function_prompt(),
             _ => self.print_default_prompt(),
         }
         if let Err(message) = stdout().flush() {
@@ -69,12 +69,16 @@ impl Shell {
 
     // TODO eventually this thing should be gone
     fn print_prompt_prefix(&self) {
-        let prompt_prefix = self.flow_control.modes.iter().rev().fold(String::new(), |acc, mode| {
+        let prompt_prefix = self.flow_control.statements.iter().fold(String::new(), |acc, statement| {
             acc +
-            if mode.value {
-                "+ "
+            if let &Statement::If(value) = statement {
+                if value {
+                    "+ "
+                } else {
+                    "- "
+                }
             } else {
-                "- "
+                ""
             }
         });
         print!("{}", prompt_prefix);
@@ -110,7 +114,7 @@ impl Shell {
                                                    .jobs
                                                    .drain(..)
                                                    .collect();
-                    match self.flow_control.current_statement.clone() {
+                    match self.flow_control.statements.last().unwrap().clone() {
                         Statement::For(ref var, ref vals) => {
                             let variable = var.clone();
                             let values = vals.clone();
@@ -126,7 +130,7 @@ impl Shell {
                         },
                         _ => {}
                     }
-                    self.flow_control.current_statement = Statement::Default;
+                    self.run_job(&job, commands);
                 } else {
                     self.flow_control.current_block.jobs.push(job);
                 }
