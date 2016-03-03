@@ -442,4 +442,7 @@ fn main() {
         }
         shell.print_prompt()
     }
+
+    // Exit with the previous command's exit status.
+    process::exit(shell.history.previous_status);
 }
