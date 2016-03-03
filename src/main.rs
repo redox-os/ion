@@ -189,6 +189,52 @@ impl Shell {
             }
         }
     }
+
+    /// Evaluates the source init file in the user's home directory. If the file does not exist,
+    /// the file will be created.
+    fn evaluate_init_file(&mut self, commands: &HashMap<&'static str, Command>) {
+        let mut source_file = std::env::home_dir().unwrap(); // Obtain home directory
+        source_file.push(".ionrc");                          // Location of ion init file
+
+        if let Ok(mut file) = File::open(source_file.clone()) {
+            let mut command_list = String::new();
+            if let Err(message) = file.read_to_string(&mut command_list) {
+                println!("{}: Failed to read {:?}", message, source_file.clone());
+            } else {
+                self.on_command(&command_list, commands);
+            }
+        } else {
+            if let Err(message) = File::create(source_file) {
+                println!("{}", message);
+            }
+        }
+    }
+
+    /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
+    fn source_command(&mut self, arguments: &[String]) -> i32 {
+        let commands = Command::map();
+        match arguments.iter().skip(1).next() {
+            Some(argument) => {
+                if let Ok(mut file) = File::open(&argument) {
+                    let mut command_list = String::new();
+                    if let Err(message) = file.read_to_string(&mut command_list) {
+                        println!("{}: Failed to read {}", message, argument);
+                        return status::FAILURE;
+                    } else {
+                        self.on_command(&command_list, &commands);
+                        return status::SUCCESS;
+                    }
+                } else {
+                    println!("Failed to open {}", argument);
+                    return status::FAILURE;
+                }
+            },
+            None => {
+                self.evaluate_init_file(&commands);
+                return status::SUCCESS;
+            },
+        }
+    }
 }
 
 /// Structure which represents a Terminal's command.
@@ -329,6 +375,15 @@ impl Command {
                             },
                         });
 
+        commands.insert("source",
+                        Command {
+                            name: "source",
+                            help: "Evaluate the file following the command or re-initialize the init file",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.source_command(args)
+                            },
+                        });
+
         let command_helper: HashMap<&'static str, &'static str> = commands.iter()
                                                                           .map(|(k, v)| {
                                                                               (*k, v.help)
@@ -368,6 +423,7 @@ impl Command {
 fn main() {
     let commands = Command::map();
     let mut shell = Shell::new();
+    shell.evaluate_init_file(&commands);
 
     for arg in env::args().skip(1) {
         let mut command_list = String::new();
@@ -380,16 +436,12 @@ fn main() {
         return;
     }
 
-    loop {
-        shell.print_prompt();
-
-        if let Some(command) = readln() {
-            let command = command.trim();
-            if !command.is_empty() {
-                shell.on_command(command, &commands);
-            }
-        } else {
-            break;
+    shell.print_prompt();
+    while let Some(command) = readln() {
+        let command = command.trim();
+        if !command.is_empty() {
+            shell.on_command(command, &commands);
         }
+        shell.print_prompt()
     }
 }
