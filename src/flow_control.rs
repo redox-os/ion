@@ -1,6 +1,7 @@
 use super::to_num::ToNum;
 use super::peg::Job;
 use super::status::{SUCCESS, FAILURE};
+use std::default::Default;
 
 pub fn is_flow_control_command(command: &str) -> bool {
     command == "end" || command == "if" || command == "else"
@@ -14,8 +15,23 @@ pub enum Statement {
     Default,
 }
 
+#[derive(Clone)]
 pub struct CodeBlock {
     pub jobs: Vec<Job>,
+    pub statement: Statement,
+    pub collecting: bool,
+}
+
+impl CodeBlock {
+    pub fn new(statement: Statement, collecting: bool) -> CodeBlock {
+        CodeBlock { jobs: vec![], statement: statement, collecting: collecting }
+    }
+}
+
+impl Default for CodeBlock {
+    fn default() -> CodeBlock {
+        CodeBlock::new(Statement::Default, false)
+    }
 }
 
 pub struct Mode {
@@ -23,22 +39,20 @@ pub struct Mode {
 }
 
 pub struct FlowControl {
-    pub collecting_block: bool,
-    pub current_block: CodeBlock,
-    pub statements: Vec<Statement>,
+    pub blocks: Vec<CodeBlock>,
 }
 
 impl FlowControl {
     pub fn new() -> FlowControl {
         FlowControl {
-            collecting_block: false,
-            current_block: CodeBlock { jobs: vec![] },
-            statements: vec![Statement::Default],
+            blocks: vec! [CodeBlock::new(Statement::Default, false)],
+            // current_block: CodeBlock { jobs: vec![] },
+            // statements: vec![Statement::Default],
         }
     }
 
     pub fn skipping(&self) -> bool {
-        self.statements.iter().any(|stat| match *stat {
+        self.blocks.iter().any(|block| match block.statement {
             Statement::If(value) => !value,
             _ => false
         })
@@ -83,14 +97,14 @@ impl FlowControl {
             println!("No left hand side");
             return FAILURE;
         }
-        self.statements.push(Statement::If(value));
+        self.blocks.push(CodeBlock::new(Statement::If(value), false));
         SUCCESS
     }
 
     pub fn else_<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
-        if let Some(&mut Statement::If(ref mut value)) = self.statements.last_mut() {
+        if let Statement::If(ref mut value) = self.blocks.last_mut().unwrap_or(&mut CodeBlock::default()).statement {
             *value = !*value;
             SUCCESS
         } else {
@@ -102,8 +116,8 @@ impl FlowControl {
     pub fn end<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
-        if self.statements.len() > 1{
-            self.statements.pop();
+        if self.blocks.len() > 1{
+            self.blocks.pop();
             SUCCESS
         } else {
             println!("Syntax error: end found outside of a block");
@@ -126,8 +140,7 @@ impl FlowControl {
                 return FAILURE;
             }
             let values: Vec<String> = args.map(|value| value.as_ref().to_string()).collect();
-            self.statements.push(Statement::For(variable, values));
-            self.collecting_block = true;
+            self.blocks.push(CodeBlock::new(Statement::For(variable, values), true));
         } else {
             println!("For loops must have a variable name as the first argument");
             return FAILURE;
@@ -140,8 +153,7 @@ impl FlowControl {
     {
         let mut args = args.into_iter();
         if let Some(name) = args.nth(1) {
-            self.collecting_block = true;
-            self.statements.push(Statement::Function(name.as_ref().to_string()));
+            self.blocks.push(CodeBlock::new(Statement::Function(name.as_ref().to_string()), true));
         } else {
             println!("Functions must have the function name as the first argument");
             return FAILURE;

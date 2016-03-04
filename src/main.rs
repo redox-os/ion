@@ -17,7 +17,7 @@ use self::input_editor::readln;
 use self::peg::{parse, Job};
 use self::variables::Variables;
 use self::history::History;
-use self::flow_control::{FlowControl, is_flow_control_command, Statement};
+use self::flow_control::{FlowControl, is_flow_control_command, Statement, CodeBlock};
 use self::status::{SUCCESS, NO_SUCH_COMMAND, TERMINATED};
 use self::function::Function;
 
@@ -56,9 +56,9 @@ impl Shell {
 
     pub fn print_prompt(&self) {
         self.print_prompt_prefix();
-        match self.flow_control.statements.last() {
-            Some(&Statement::For(_, _)) => self.print_for_prompt(),
-            Some(&Statement::Function) => self.print_function_prompt(),
+        match self.flow_control.blocks.last().unwrap_or(&CodeBlock::default()).statement {
+            Statement::For => self.print_for_prompt(),
+            Statement::Function => self.print_function_prompt(),
             _ => self.print_default_prompt(),
         }
         if let Err(message) = stdout().flush() {
@@ -69,9 +69,9 @@ impl Shell {
 
     // TODO eventually this thing should be gone
     fn print_prompt_prefix(&self) {
-        let prompt_prefix = self.flow_control.statements.iter().fold(String::new(), |acc, statement| {
+        let prompt_prefix = self.flow_control.blocks.iter().fold(String::new(), |acc, block| {
             acc +
-            if let &Statement::If(value) = statement {
+            if let Statement::If(value) = block.statement {
                 if value {
                     "+ "
                 } else {
@@ -105,16 +105,17 @@ impl Shell {
 
         // Execute commands
         for job in jobs.drain(..) {
-            if self.flow_control.collecting_block {
+            if self.flow_control.blocks.last().unwrap_or(&CodeBlock::default()).collecting {
                 // TODO move this logic into "end" command
                 if job.command == "end" {
-                    self.flow_control.collecting_block = false;
                     let block_jobs: Vec<Job> = self.flow_control
-                                                   .current_block
+                                                   .blocks
+                                                   .last_mut()
+                                                   .expect("The block stack should not be empty")
                                                    .jobs
                                                    .drain(..)
                                                    .collect();
-                    match self.flow_control.statements.last().unwrap().clone() {
+                    match self.flow_control.blocks.last().cloned().unwrap_or_default().statement {
                         Statement::For(ref var, ref vals) => {
                             let variable = var.clone();
                             let values = vals.clone();
@@ -132,7 +133,11 @@ impl Shell {
                     }
                     self.run_job(&job, commands);
                 } else {
-                    self.flow_control.current_block.jobs.push(job);
+                    if is_flow_control_command(&job.command) {
+                        self.run_job(&job, commands);
+                    } else {
+                        self.flow_control.blocks.last_mut().unwrap_or(&mut CodeBlock::default()).jobs.push(job);
+                    }
                 }
             } else {
                 if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
