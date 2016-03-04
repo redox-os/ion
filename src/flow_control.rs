@@ -16,15 +16,21 @@ pub enum Statement {
 }
 
 #[derive(Clone)]
+pub enum Expression {
+    Job(Job),
+    Block(CodeBlock)
+}
+
+#[derive(Clone)]
 pub struct CodeBlock {
-    pub jobs: Vec<Job>,
+    pub expressions: Vec<Expression>,
     pub statement: Statement,
     pub collecting: bool,
 }
 
 impl CodeBlock {
     pub fn new(statement: Statement, collecting: bool) -> CodeBlock {
-        CodeBlock { jobs: vec![], statement: statement, collecting: collecting }
+        CodeBlock { expressions: vec![], statement: statement, collecting: collecting }
     }
 }
 

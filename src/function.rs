@@ -1,7 +1,7 @@
-use super::peg::Job;
+use super::flow_control::Expression;
 
 #[derive(Clone)]
 pub struct Function {
     pub name: String,
-    pub jobs: Vec<Job>,
+    pub expressions: Vec<Expression>,
 }
