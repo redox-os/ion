@@ -454,17 +454,29 @@ fn main() {
     let mut shell = Shell::new();
     shell.evaluate_init_file(&commands);
 
+    let mut dash_c = false;
     for arg in env::args().skip(1) {
-        let mut command_list = String::new();
-        if let Ok(mut file) = File::open(&arg) {
-            if let Err(message) = file.read_to_string(&mut command_list) {
-                println!("{}: Failed to read {}", message, arg);
+        if arg == "-c" {
+            dash_c = true;
+        } else {
+            if dash_c {
+                shell.on_command(&arg, &commands);
+            } else {
+                match File::open(&arg) {
+                    Ok(mut file) => {
+                        let mut command_list = String::new();
+                        match file.read_to_string(&mut command_list) {
+                            Ok(_) => shell.on_command(&command_list, &commands),
+                            Err(err) => println!("ion: failed to read {}: {}", arg, err)
+                        }
+                    },
+                    Err(err) => println!("ion: failed to open {}: {}", arg, err)
+                }
             }
+            
+            // Exit with the previous command's exit status.
+            process::exit(shell.history.previous_status);
         }
-        shell.on_command(&command_list, &commands);
-        
-        // Exit with the previous command's exit status.
-        process::exit(shell.history.previous_status);
     }
 
     shell.print_prompt();
