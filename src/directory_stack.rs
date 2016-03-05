@@ -1,11 +1,11 @@
 use std::collections::VecDeque;
 use std::env::{set_current_dir, current_dir, home_dir};
 use std::path::PathBuf;
+use variables::Variables;
 use super::status::{SUCCESS, FAILURE};
 
 pub struct DirectoryStack {
     dirs: VecDeque<PathBuf>, // The top is always the current directory
-    max_size: usize,
 }
 
 impl DirectoryStack {
@@ -15,10 +15,19 @@ impl DirectoryStack {
             dirs.push_front(curr_dir);
             Ok(DirectoryStack {
                 dirs: dirs,
-                max_size: 1000, // TODO don't hardcode this size, make it configurable
             })
         } else {
             Err("Failed to get current directory when building directory stack")
+        }
+    }
+
+    /// This function will take a map of variables as input and attempt to parse the value of the
+    /// directory stack size variable. If it succeeds, it will return the value of that variable,
+    /// else it will return a default value of 1000.
+    fn get_size(variables: &Variables) -> usize {
+        match variables.expand_string("$DIRECTORY_STACK_SIZE").parse::<usize>() {
+            Ok(size) => size,
+            _        => 1000,
         }
     }
 
@@ -39,11 +48,11 @@ impl DirectoryStack {
         SUCCESS
     }
 
-    pub fn pushd<I: IntoIterator>(&mut self, args: I) -> i32
+    pub fn pushd<I: IntoIterator>(&mut self, args: I, variables: &Variables) -> i32
         where I::Item: AsRef<str>
     {
         if let Some(dir) = args.into_iter().nth(1) {
-            let result = self.change_and_push_dir(dir.as_ref());
+            let result = self.change_and_push_dir(dir.as_ref(), variables);
             self.print_dirs();
             result
         } else {
@@ -52,25 +61,25 @@ impl DirectoryStack {
         }
     }
 
-    pub fn cd<I: IntoIterator>(&mut self, args: I) -> i32
+    pub fn cd<I: IntoIterator>(&mut self, args: I, variables: &Variables) -> i32
         where I::Item: AsRef<str>
     {
         if let Some(dir) = args.into_iter().nth(1) {
             let dir = dir.as_ref();
             if dir == "-" {
-                self.switch_to_previous_directory()
+                self.switch_to_previous_directory(variables)
             } else {
-                self.change_and_push_dir(dir)
+                self.change_and_push_dir(dir, variables)
             }
         } else {
-            self.switch_to_home_directory()
+            self.switch_to_home_directory(variables)
         }
     }
 
-    fn switch_to_home_directory(&mut self) -> i32 {
+    fn switch_to_home_directory(&mut self, variables: &Variables) -> i32 {
         if let Some(home) = home_dir() {
             if let Some(home) = home.to_str() {
-                self.change_and_push_dir(home)
+                self.change_and_push_dir(home, variables)
             } else {
                 println!("Failed to convert home directory to str");
                 FAILURE
@@ -81,12 +90,12 @@ impl DirectoryStack {
         }
     }
 
-    fn switch_to_previous_directory(&mut self) -> i32 {
+    fn switch_to_previous_directory(&mut self, variables: &Variables) -> i32 {
         if let Some(prev) = self.get_previous_dir()
                                 .map(|path| path.to_string_lossy().to_string()) {
             self.dirs.remove(1);
             println!("{}", prev);
-            self.change_and_push_dir(&prev)
+            self.change_and_push_dir(&prev, variables)
         } else {
             println!("No previous directory to switch to");
             FAILURE
@@ -101,10 +110,10 @@ impl DirectoryStack {
         }
     }
 
-    pub fn change_and_push_dir(&mut self, dir: &str) -> i32 {
+    pub fn change_and_push_dir(&mut self, dir: &str, variables: &Variables) -> i32 {
         match (set_current_dir(dir), current_dir()) {
             (Ok(()), Ok(cur_dir)) => {
-                self.push_dir(cur_dir);
+                self.push_dir(cur_dir, variables);
                 SUCCESS
             }
             (Err(err), _) => {
@@ -115,9 +124,10 @@ impl DirectoryStack {
         }
     }
 
-    fn push_dir(&mut self, path: PathBuf) {
+    fn push_dir(&mut self, path: PathBuf, variables: &Variables) {
         self.dirs.push_front(path);
-        self.dirs.truncate(self.max_size);
+
+        self.dirs.truncate(DirectoryStack::get_size(variables));
     }
 
     pub fn dirs<I: IntoIterator>(&self, _: I) -> i32
