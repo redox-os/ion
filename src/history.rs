@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::fs::OpenOptions;
-use std::io::{Write};
+use std::io::Write;
 use variables::Variables;
 use super::status::SUCCESS;
 

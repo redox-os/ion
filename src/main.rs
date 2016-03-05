@@ -21,7 +21,6 @@ use self::flow_control::{FlowControl, is_flow_control_command, Statement};
 use self::status::{SUCCESS, NO_SUCH_COMMAND, TERMINATED};
 use self::function::Function;
 
-
 pub mod directory_stack;
 pub mod to_num;
 pub mod input_editor;
