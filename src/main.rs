@@ -58,7 +58,7 @@ impl Shell {
         self.print_prompt_prefix();
         match self.flow_control.current_statement {
             Statement::For(_, _) => self.print_for_prompt(),
-            Statement::Function => self.print_function_prompt(),
+            Statement::Function(_) => self.print_function_prompt(),
             _ => self.print_default_prompt(),
         }
         if let Err(message) = stdout().flush() {
