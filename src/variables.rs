@@ -73,12 +73,11 @@ impl Variables {
     }
 
     #[inline]
-    fn expand_string<'a>(&'a self, original: &'a str) -> &'a str {
+    pub fn expand_string<'a>(&'a self, original: &'a str) -> &'a str {
         if original.starts_with("$") {
-            if let Some(value) = self.variables.get(&original[1..]) {
-                &value
-            } else {
-                ""
+            match self.variables.get(&original[1..]) {
+                Some(value) => &value,
+                None        => ""
             }
         } else {
             original
