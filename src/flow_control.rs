@@ -52,8 +52,6 @@ impl FlowControl {
     pub fn new() -> FlowControl {
         FlowControl {
             blocks: vec! [CodeBlock::new(Statement::Default, false)],
-            // current_block: CodeBlock { jobs: vec![] },
-            // statements: vec![Statement::Default],
         }
     }
 

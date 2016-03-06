@@ -31,7 +31,6 @@ pub mod flow_control;
 pub mod status;
 pub mod function;
 
-
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell {
@@ -45,20 +44,77 @@ pub struct Shell {
 impl Shell {
     /// Panics if DirectoryStack construction fails
     pub fn new() -> Self {
-        Shell {
+        let mut new_shell = Shell {
             variables: Variables::new(),
             flow_control: FlowControl::new(),
             directory_stack: DirectoryStack::new().expect(""),
             history: History::new(),
             functions: HashMap::new()
+        };
+        new_shell.initialize_default_variables();
+        new_shell.evaluate_init_file();
+        return new_shell;
+    }
+
+    /// This function will initialize the default variables used by the shell. This function will
+    /// be called before evaluating the init
+    fn initialize_default_variables(&mut self) {
+        self.variables.set_var("DIRECTORY_STACK_SIZE", "1000");
+        self.variables.set_var("HISTORY_SIZE", "1000");
+        self.variables.set_var("HISTORY_FILE_ENABLED", "1");
+
+        {   // Initialize the HISTORY_FILE variable
+            let mut history_path = std::env::home_dir().unwrap();
+            history_path.push(".ion_history");
+            self.variables.set_var("HISTORY_FILE", history_path.to_str().unwrap());
+        }
+
+        {   // Initialize the CWD (Current Working Directory) variable
+            match std::env::current_dir() {
+                Ok(path) => self.variables.set_var("CWD", path.to_str().unwrap()),
+                Err(_)   => self.variables.set_var("CWD", "?")
+            }
+        }
+    }
+
+    /// This functional will update variables that need to be kept consistent with each iteration
+    /// of the prompt. In example, the CWD variable needs to be updated to reflect changes to the
+    /// the current working directory.
+    fn update_variables(&mut self) {
+        {   // Update the CWD (Current Working Directory) variable
+            match std::env::current_dir() {
+                Ok(path) => self.variables.set_var("CWD", path.to_str().unwrap()),
+                Err(_)   => self.variables.set_var("CWD", "?")
+            }
+        }
+    }
+
+    /// Evaluates the source init file in the user's home directory. If the file does not exist,
+    /// the file will be created.
+    fn evaluate_init_file(&mut self) {
+        let commands = &Command::map();
+        let mut source_file = std::env::home_dir().unwrap(); // Obtain home directory
+        source_file.push(".ionrc");                          // Location of ion init file
+
+        if let Ok(mut file) = File::open(source_file.clone()) {
+            let mut command_list = String::new();
+            if let Err(message) = file.read_to_string(&mut command_list) {
+                println!("{}: Failed to read {:?}", message, source_file.clone());
+            } else {
+                self.on_command(&command_list, commands);
+            }
+        } else {
+            if let Err(message) = File::create(source_file) {
+                println!("{}", message);
+            }
         }
     }
 
     pub fn print_prompt(&self) {
         self.print_prompt_prefix();
-        match self.flow_control.blocks.last().unwrap_or(&CodeBlock::default()).statement {
-            Statement::For => self.print_for_prompt(),
-            Statement::Function => self.print_function_prompt(),
+        match self.flow_control.current_statement {
+            Statement::For(_, _) => self.print_for_prompt(),
+            Statement::Function(_) => self.print_function_prompt(),
             _ => self.print_default_prompt(),
         }
         if let Err(message) = stdout().flush() {
@@ -93,13 +149,11 @@ impl Shell {
     }
 
     fn print_default_prompt(&self) {
-        let cwd = env::current_dir().ok().map_or("?".to_string(),
-                                                 |ref p| p.to_str().unwrap_or("?").to_string());
-        print!("ion:{}# ", cwd);
+        print!("ion:{}# ", self.variables.expand_string("$CWD"));
     }
 
     fn on_command(&mut self, command_string: &str, commands: &HashMap<&str, Command>) {
-        self.history.add(command_string.to_string());
+        self.history.add(command_string.to_string(), &self.variables);
 
         let mut jobs = parse(command_string);
 
@@ -239,26 +293,6 @@ impl Shell {
         }
     }
 
-    /// Evaluates the source init file in the user's home directory. If the file does not exist,
-    /// the file will be created.
-    fn evaluate_init_file(&mut self, commands: &HashMap<&'static str, Command>) {
-        let mut source_file = std::env::home_dir().unwrap(); // Obtain home directory
-        source_file.push(".ionrc");                          // Location of ion init file
-
-        if let Ok(mut file) = File::open(source_file.clone()) {
-            let mut command_list = String::new();
-            if let Err(message) = file.read_to_string(&mut command_list) {
-                println!("{}: Failed to read {:?}", message, source_file.clone());
-            } else {
-                self.on_command(&command_list, commands);
-            }
-        } else {
-            if let Err(message) = File::create(source_file) {
-                println!("{}", message);
-            }
-        }
-    }
-
     /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
     fn source_command(&mut self, arguments: &[String]) -> i32 {
         let commands = Command::map();
@@ -279,7 +313,7 @@ impl Shell {
                 }
             },
             None => {
-                self.evaluate_init_file(&commands);
+                self.evaluate_init_file();
                 return status::SUCCESS;
             },
         }
@@ -315,7 +349,7 @@ impl Command {
                             name: "cd",
                             help: "Change the current directory\n    cd <path>",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.directory_stack.cd(args)
+                                shell.directory_stack.cd(args, &shell.variables)
                             },
                         });
 
@@ -365,7 +399,7 @@ impl Command {
                             name: "pushd",
                             help: "Push a directory to the stack",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.directory_stack.pushd(args)
+                                shell.directory_stack.pushd(args, &shell.variables)
                             },
                         });
 
@@ -481,19 +515,30 @@ impl Command {
 fn main() {
     let commands = Command::map();
     let mut shell = Shell::new();
-    shell.evaluate_init_file(&commands);
 
+    let mut dash_c = false;
     for arg in env::args().skip(1) {
-        let mut command_list = String::new();
-        if let Ok(mut file) = File::open(&arg) {
-            if let Err(message) = file.read_to_string(&mut command_list) {
-                println!("{}: Failed to read {}", message, arg);
+        if arg == "-c" {
+            dash_c = true;
+        } else {
+            if dash_c {
+                shell.on_command(&arg, &commands);
+            } else {
+                match File::open(&arg) {
+                    Ok(mut file) => {
+                        let mut command_list = String::new();
+                        match file.read_to_string(&mut command_list) {
+                            Ok(_) => shell.on_command(&command_list, &commands),
+                            Err(err) => println!("ion: failed to read {}: {}", arg, err)
+                        }
+                    },
+                    Err(err) => println!("ion: failed to open {}: {}", arg, err)
+                }
             }
+
+            // Exit with the previous command's exit status.
+            process::exit(shell.history.previous_status);
         }
-        shell.on_command(&command_list, &commands);
-        
-        // Exit with the previous command's exit status.
-        process::exit(shell.history.previous_status);
     }
 
     shell.print_prompt();
@@ -502,7 +547,8 @@ fn main() {
         if !command.is_empty() {
             shell.on_command(command, &commands);
         }
-        shell.print_prompt()
+        shell.update_variables();
+        shell.print_prompt();
     }
 
     // Exit with the previous command's exit status.
