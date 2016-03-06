@@ -112,7 +112,7 @@ impl Shell {
 
     pub fn print_prompt(&self) {
         self.print_prompt_prefix();
-        match self.flow_control.current_statement {
+        match self.flow_control.blocks.last().expect("The block stack should not be empty").statement {
             Statement::For(_, _) => self.print_for_prompt(),
             Statement::Function(_) => self.print_function_prompt(),
             _ => self.print_default_prompt(),
@@ -183,13 +183,6 @@ impl Shell {
                         Statement::Function(ref name) => {
                             self.functions.insert(name.clone(), Function { name: name.clone(), expressions: block_expressions.clone() });
                         },
-                        /* Statement::If(ref value) => {
-                            if *value {
-                                for expression in block_expressions.iter() {
-                                    self.evaluate_expression(expression, commands);
-                                }
-                            }
-                        } */
                         _ => {}
                     }
                     self.run_job(&job, commands);
