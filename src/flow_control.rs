@@ -108,7 +108,7 @@ impl FlowControl {
     pub fn else_<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
-        if let Statement::If(ref mut value) = self.blocks.last_mut().unwrap_or(&mut CodeBlock::default()).statement {
+        if let Statement::If(ref mut value) = self.blocks.last_mut().expect("The block stack should not be empty").statement {
             *value = !*value;
             SUCCESS
         } else {

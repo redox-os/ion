@@ -17,7 +17,7 @@ use self::input_editor::readln;
 use self::peg::{parse, Job};
 use self::variables::Variables;
 use self::history::History;
-use self::flow_control::{FlowControl, is_flow_control_command, Statement, CodeBlock, Expression};
+use self::flow_control::{FlowControl, is_flow_control_command, Statement, Expression};
 use self::status::{SUCCESS, NO_SUCH_COMMAND, TERMINATED};
 use self::function::Function;
 
@@ -159,7 +159,7 @@ impl Shell {
 
         // Execute commands
         for job in jobs.drain(..) {
-            if self.flow_control.blocks.last().unwrap_or(&CodeBlock::default()).collecting {
+            if self.flow_control.blocks.last().expect("The block stack should not be empty").collecting {
                 // TODO move this logic into "end" command
                 if job.command == "end" {
                     let block_expressions: Vec<Expression> = self.flow_control
@@ -169,7 +169,7 @@ impl Shell {
                                                                  .expressions
                                                                  .drain(..)
                                                                  .collect();
-                    match self.flow_control.blocks.last().cloned().unwrap_or_default().statement {
+                    match self.flow_control.blocks.last().cloned().expect("The block stack should not be empty").statement {
                         Statement::For(ref var, ref vals) => {
                             let variable = var.clone();
                             let values = vals.clone();
@@ -190,7 +190,7 @@ impl Shell {
                     if is_flow_control_command(&job.command) {
                         self.run_job(&job, commands);
                     } else {
-                        self.flow_control.blocks.last_mut().unwrap_or(&mut CodeBlock::default()).expressions.push(Expression::Job(job));
+                        self.flow_control.blocks.last_mut().expect("The block stack should not be empty").expressions.push(Expression::Job(job));
                     }
                 }
             } else {
