@@ -17,7 +17,7 @@ use self::input_editor::readln;
 use self::peg::{parse, Job};
 use self::variables::Variables;
 use self::history::History;
-use self::flow_control::{FlowControl, is_flow_control_command, Statement};
+use self::flow_control::{FlowControl, is_flow_control_command, Statement, Expression};
 use self::status::{SUCCESS, NO_SUCH_COMMAND, TERMINATED};
 use self::function::Function;
 
@@ -112,7 +112,7 @@ impl Shell {
 
     pub fn print_prompt(&self) {
         self.print_prompt_prefix();
-        match self.flow_control.current_statement {
+        match self.flow_control.blocks.last().expect("The block stack should not be empty").statement {
             Statement::For(_, _) => self.print_for_prompt(),
             Statement::Function(_) => self.print_function_prompt(),
             _ => self.print_default_prompt(),
@@ -125,12 +125,16 @@ impl Shell {
 
     // TODO eventually this thing should be gone
     fn print_prompt_prefix(&self) {
-        let prompt_prefix = self.flow_control.modes.iter().rev().fold(String::new(), |acc, mode| {
+        let prompt_prefix = self.flow_control.blocks.iter().fold(String::new(), |acc, block| {
             acc +
-            if mode.value {
-                "+ "
+            if let Statement::If(value) = block.statement {
+                if value {
+                    "+ "
+                } else {
+                    "- "
+                }
             } else {
-                "- "
+                ""
             }
         });
         print!("{}", prompt_prefix);
@@ -155,34 +159,39 @@ impl Shell {
 
         // Execute commands
         for job in jobs.drain(..) {
-            if self.flow_control.collecting_block {
+            if self.flow_control.blocks.last().expect("The block stack should not be empty").collecting {
                 // TODO move this logic into "end" command
                 if job.command == "end" {
-                    self.flow_control.collecting_block = false;
-                    let block_jobs: Vec<Job> = self.flow_control
-                                                   .current_block
-                                                   .jobs
-                                                   .drain(..)
-                                                   .collect();
-                    match self.flow_control.current_statement.clone() {
+                    let block_expressions: Vec<Expression> = self.flow_control
+                                                                 .blocks
+                                                                 .last_mut()
+                                                                 .expect("The block stack should not be empty")
+                                                                 .expressions
+                                                                 .drain(..)
+                                                                 .collect();
+                    match self.flow_control.blocks.last().cloned().expect("The block stack should not be empty").statement {
                         Statement::For(ref var, ref vals) => {
                             let variable = var.clone();
                             let values = vals.clone();
                             for value in values {
                                 self.variables.set_var(&variable, &value);
-                                for job in block_jobs.iter() {
-                                    self.run_job(job, commands);
+                                for expression in block_expressions.iter() {
+                                    self.evaluate_expression(expression, commands);
                                 }
                             }
                         },
                         Statement::Function(ref name) => {
-                            self.functions.insert(name.clone(), Function { name: name.clone(), jobs: block_jobs.clone() });
+                            self.functions.insert(name.clone(), Function { name: name.clone(), expressions: block_expressions.clone() });
                         },
                         _ => {}
                     }
-                    self.flow_control.current_statement = Statement::Default;
+                    self.run_job(&job, commands);
                 } else {
-                    self.flow_control.current_block.jobs.push(job);
+                    if is_flow_control_command(&job.command) {
+                        self.run_job(&job, commands);
+                    } else {
+                        self.flow_control.blocks.last_mut().expect("The block stack should not be empty").expressions.push(Expression::Job(job));
+                    }
                 }
             } else {
                 if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
@@ -201,8 +210,8 @@ impl Shell {
         } else if self.functions.get(job.command.as_str()).is_some() { // Not really idiomatic but I don't know how to clone the value without borrowing self
             let function = self.functions.get(job.command.as_str()).unwrap().clone();
             let mut return_value = None;
-            for function_job in function.jobs.iter() {
-                return_value = self.run_job(&function_job, commands)
+            for function_expression in function.expressions.iter() {
+                return_value = self.evaluate_expression(function_expression, commands);
             }
             return_value
         } else {
@@ -213,6 +222,19 @@ impl Shell {
             self.history.previous_status = code;
         }
         exit_status
+    }
+
+    fn evaluate_expression(&mut self, expression: &Expression, commands: &HashMap<&str, Command>) -> Option<i32> {
+        match expression {
+            &Expression::Job(ref job) => self.run_job(job, commands),
+            &Expression::Block(ref code_block) => {
+                let mut return_status: Option<i32> = None;
+                for block_expression in code_block.expressions.iter() {
+                    return_status = self.evaluate_expression(block_expression, commands);
+                }
+                return_status
+            }
+        }
     }
 
     /// Returns an exit code if a command was run

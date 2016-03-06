@@ -1,6 +1,7 @@
 use super::to_num::ToNum;
 use super::peg::Job;
 use super::status::{SUCCESS, FAILURE};
+use std::default::Default;
 
 pub fn is_flow_control_command(command: &str) -> bool {
     command == "end" || command == "if" || command == "else"
@@ -10,12 +11,33 @@ pub fn is_flow_control_command(command: &str) -> bool {
 pub enum Statement {
     For(String, Vec<String>),
     Function(String),
-    If,
-    Default
+    If(bool),
+    Default,
 }
 
+#[derive(Clone)]
+pub enum Expression {
+    Job(Job),
+    Block(CodeBlock)
+}
+
+#[derive(Clone)]
 pub struct CodeBlock {
-    pub jobs: Vec<Job>,
+    pub expressions: Vec<Expression>,
+    pub statement: Statement,
+    pub collecting: bool,
+}
+
+impl CodeBlock {
+    pub fn new(statement: Statement, collecting: bool) -> CodeBlock {
+        CodeBlock { expressions: vec![], statement: statement, collecting: collecting }
+    }
+}
+
+impl Default for CodeBlock {
+    fn default() -> CodeBlock {
+        CodeBlock::new(Statement::Default, false)
+    }
 }
 
 pub struct Mode {
@@ -23,24 +45,21 @@ pub struct Mode {
 }
 
 pub struct FlowControl {
-    pub modes: Vec<Mode>,
-    pub collecting_block: bool,
-    pub current_block: CodeBlock,
-    pub current_statement: Statement, /* pub prompt: &'static str,  // Custom prompt while collecting code block */
+    pub blocks: Vec<CodeBlock>,
 }
 
 impl FlowControl {
     pub fn new() -> FlowControl {
         FlowControl {
-            modes: vec![],
-            collecting_block: false,
-            current_block: CodeBlock { jobs: vec![] },
-            current_statement: Statement::Default,
+            blocks: vec! [CodeBlock::new(Statement::Default, false)],
         }
     }
 
     pub fn skipping(&self) -> bool {
-        self.modes.iter().any(|mode| !mode.value)
+        self.blocks.iter().any(|block| match block.statement {
+            Statement::If(value) => !value,
+            _ => false
+        })
     }
 
     pub fn if_<I: IntoIterator>(&mut self, args: I) -> i32
@@ -82,16 +101,15 @@ impl FlowControl {
             println!("No left hand side");
             return FAILURE;
         }
-        self.modes.insert(0, Mode { value: value });
-        self.current_statement = Statement::If;
+        self.blocks.push(CodeBlock::new(Statement::If(value), false));
         SUCCESS
     }
 
     pub fn else_<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
-        if let Some(mode) = self.modes.get_mut(0) {
-            mode.value = !mode.value;
+        if let Statement::If(ref mut value) = self.blocks.last_mut().expect("The block stack should not be empty").statement {
+            *value = !*value;
             SUCCESS
         } else {
             println!("Syntax error: else found with no previous if");
@@ -102,8 +120,8 @@ impl FlowControl {
     pub fn end<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
-        if !self.modes.is_empty() {
-            self.modes.remove(0);
+        if self.blocks.len() > 1{
+            self.blocks.pop();
             SUCCESS
         } else {
             println!("Syntax error: end found outside of a block");
@@ -126,8 +144,7 @@ impl FlowControl {
                 return FAILURE;
             }
             let values: Vec<String> = args.map(|value| value.as_ref().to_string()).collect();
-            self.current_statement = Statement::For(variable, values);
-            self.collecting_block = true;
+            self.blocks.push(CodeBlock::new(Statement::For(variable, values), true));
         } else {
             println!("For loops must have a variable name as the first argument");
             return FAILURE;
@@ -140,8 +157,7 @@ impl FlowControl {
     {
         let mut args = args.into_iter();
         if let Some(name) = args.nth(1) {
-            self.collecting_block = true;
-            self.current_statement = Statement::Function(name.as_ref().to_string());
+            self.blocks.push(CodeBlock::new(Statement::Function(name.as_ref().to_string()), true));
         } else {
             println!("Functions must have the function name as the first argument");
             return FAILURE;
