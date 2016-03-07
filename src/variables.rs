@@ -39,6 +39,9 @@ impl Variables {
         let mut split = string.split('=');
         match (split.next().and_then(|x| if x == "" { None } else { Some(x) }), split.next()) {
             (Some(key), Some(value)) => {
+                if !Variables::is_valid_variable_name(&key) {
+                    return FAILURE;
+                }
                 self.variables.insert(key.to_string(), value.to_string());
             },
             (Some(key), None) => {
@@ -87,6 +90,10 @@ impl Variables {
         c.is_alphanumeric() || c == '_' || c == '?'
     }
 
+    pub fn is_valid_variable_name(name: &str) -> bool {
+        name.chars().all(Variables::is_valid_variable_character)
+    }
+
     #[inline]
     pub fn expand_string<'a>(&'a self, original: &'a str) -> String {
         let mut new = original.to_owned();
@@ -128,6 +135,7 @@ impl Variables {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use status::FAILURE;
 
     #[test]
     fn undefined_variable_expands_to_empty_string() {
@@ -179,8 +187,15 @@ mod tests {
 
     #[test]
     fn escape_with_backslash() {
-        let mut variables = Variables::new();
+        let variables = Variables::new();
         let expanded = variables.expand_string("\\$FOO");
         assert_eq!("\\$FOO", &expanded);
+    }
+
+    #[test]
+    fn let_checks_variable_name() {
+        let mut variables = Variables::new();
+        let return_status = variables.let_(vec!["let", ",;!:", "=", "FOO"]);
+        assert_eq!(FAILURE, return_status);
     }
 }
