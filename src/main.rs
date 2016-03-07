@@ -196,14 +196,13 @@ impl Shell {
     }
 
     fn run_pipeline(&mut self, pipeline: &Pipeline, commands: &HashMap<&str, Command>) -> Option<i32> {
-        let job = pipeline.jobs[0].clone(); // TODO stop doing this once builtins work in pipelines.
         let mut pipeline = self.variables.expand_pipeline(pipeline);
         pipeline.expand_globs();
-        let exit_status = if let Some(command) = commands.get(job.command.as_str()) {
-            Some((*command.main)(job.args.as_slice(), self))
-        } else if self.functions.get(job.command.as_str()).is_some() { 
+        let exit_status = if let Some(command) = commands.get(pipeline.jobs[0].command.as_str()) {
+            Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
+        } else if self.functions.get(pipeline.jobs[0].command.as_str()).is_some() { 
             // Not really idiomatic but I don't know how to clone the value without borrowing self
-            let function = self.functions.get(job.command.as_str()).unwrap().clone();
+            let function = self.functions.get(pipeline.jobs[0].command.as_str()).unwrap().clone();
             let mut return_value = None;
             for function_pipeline in function.pipelines.iter() {
                 return_value = self.run_pipeline(function_pipeline, commands)
@@ -214,7 +213,7 @@ impl Shell {
             Some(pipe(&mut piped_commands))
         }
         else {
-            self.run_external_commmand(job)
+            self.run_external_commmand(&pipeline.jobs[0])
         };
         if let Some(code) = exit_status {
             self.variables.set_var("?", &code.to_string());
@@ -224,8 +223,9 @@ impl Shell {
     }
 
     /// Returns an exit code if a command was run
-    fn run_external_commmand(&mut self, job: Job) -> Option<i32> {
+    fn run_external_commmand(&mut self, job: &Job) -> Option<i32> {
         if job.background {
+            let job = job.clone(); // TODO this clone can probably be avoided
             thread::spawn(move || {
                 let mut command = Shell::build_command(&job);
                 command.stdin(process::Stdio::null());
@@ -235,7 +235,7 @@ impl Shell {
             });
             None
         } else {
-            if let Ok(mut child) = Shell::build_command(&job).spawn() {
+            if let Ok(mut child) = Shell::build_command(job).spawn() {
                 Some(Shell::wait_and_get_status(&mut child, &job.command))
             } else {
                 println!("ion: command not found: {}", job.command);
