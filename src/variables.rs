@@ -77,30 +77,49 @@ impl Variables {
                              job.background)
     }
 
+    fn replace_substring(string: &mut String, start: usize, end: usize, replacement: &str) {
+        let string_start = string.chars().take(start).collect::<String>();
+        let string_end = string.chars().skip(end+1).collect::<String>();
+        *string = string_start + replacement + &string_end;
+    }
+
+    pub fn is_valid_variable_character(c: char) -> bool {
+        c.is_alphanumeric() || c == '_' || c == '?'
+    }
+
     #[inline]
     pub fn expand_string<'a>(&'a self, original: &'a str) -> String {
         let mut new = original.to_owned();
-        for (i, _) in original.match_indices("$") {
+        let mut replacements: Vec<(usize, usize, String)> = vec![];
+        for (n, _) in original.match_indices("$") {
+            if n > 0 {
+                if let Some(c) = original.chars().nth(n-1) {
+                    if c == '\\' {
+                        continue;
+                    }
+                }
+            }
             let mut var_name = "".to_owned();
-            for (i, c) in original.char_indices().skip(i+1) { // skip the dollar sign
-                let mut replace_string = false;
-                if c.is_alphanumeric() || c == '_' {
+            for (i, c) in original.char_indices().skip(n+1) { // skip the dollar sign
+                if Variables::is_valid_variable_character(c) {
                     var_name.push(c);
                     if i == original.len() - 1 {
-                        replace_string = true;
+                        replacements.push((n, i, var_name.clone()));
+                        break;
                     }
                 } else {
-                    replace_string = true;
-                }
-                if replace_string {
-                    let value: &str = match self.variables.get(&var_name) {
-                        Some(v) => &v,
-                        None => ""
-                    };
-                    new = new.replace(&format!("${}", var_name), value);
+                    replacements.push((n, i-1, var_name.clone()));
                     break;
                 }
-            } 
+            }
+        }
+
+        for &(start, end, ref var_name) in replacements.iter().rev() {
+            let value: &str = match self.variables.get(var_name) {
+                Some(v) => &v,
+                None => ""
+            };
+            Variables::replace_substring(&mut new, start, end, value);
         }
         new.clone()
     }
@@ -149,5 +168,19 @@ mod tests {
         variables.let_(vec!["let", "X", "=", "Y"]);
         let expanded = variables.expand_string("variables: $FOO $X");
         assert_eq!("variables: BAR Y", &expanded);
+    }
+
+    #[test]
+    fn replace_substring() {
+        let mut string = "variable: $FOO".to_owned();
+        Variables::replace_substring(&mut string, 10, 13, "BAR");
+        assert_eq!("variable: BAR", string);
+    }
+
+    #[test]
+    fn escape_with_backslash() {
+        let mut variables = Variables::new();
+        let expanded = variables.expand_string("\\$FOO");
+        assert_eq!("\\$FOO", &expanded);
     }
 }
