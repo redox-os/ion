@@ -97,7 +97,7 @@ impl Variables {
             }
             let mut var_name = "".to_owned();
             for (i, c) in original.char_indices().skip(n+1) { // skip the dollar sign
-                if c.is_alphanumeric() || c == '_' {
+                if !c.is_whitespace() {
                     var_name.push(c);
                     if i == original.len() - 1 {
                         replacements.push((n, i, var_name.clone()));
