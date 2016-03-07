@@ -64,6 +64,7 @@ impl Shell {
         self.variables.set_var("DIRECTORY_STACK_SIZE", "1000");
         self.variables.set_var("HISTORY_SIZE", "1000");
         self.variables.set_var("HISTORY_FILE_ENABLED", "1");
+        self.variables.set_var("PROMPT", "ion:$CWD# ");
 
         {   // Initialize the HISTORY_FILE variable
             let mut history_path = std::env::home_dir().unwrap();
@@ -147,7 +148,7 @@ impl Shell {
     }
 
     fn print_default_prompt(&self) {
-        print!("ion:{}# ", self.variables.expand_string("$CWD"));
+        print!("{}", self.variables.expand_string(&self.variables.expand_string("$PROMPT")));
     }
 
     fn on_command(&mut self, command_string: &str, commands: &HashMap<&str, Command>) {
