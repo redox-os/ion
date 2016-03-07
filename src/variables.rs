@@ -83,6 +83,10 @@ impl Variables {
         *string = string_start + replacement + &string_end;
     }
 
+    pub fn is_valid_variable_character(c: char) -> bool {
+        c.is_alphanumeric() || c == '_' || c == '?'
+    }
+
     #[inline]
     pub fn expand_string<'a>(&'a self, original: &'a str) -> String {
         let mut new = original.to_owned();
@@ -97,7 +101,7 @@ impl Variables {
             }
             let mut var_name = "".to_owned();
             for (i, c) in original.char_indices().skip(n+1) { // skip the dollar sign
-                if !c.is_whitespace() {
+                if Variables::is_valid_variable_character(c) {
                     var_name.push(c);
                     if i == original.len() - 1 {
                         replacements.push((n, i, var_name.clone()));
