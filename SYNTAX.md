@@ -22,6 +22,9 @@
 - `else` will invert the comparison block
 - `end` will end the comparison block
 
+### Piping
+- `echo foo | cat | xargs touch` will pipe the output from one process to another.
+
 ## Proposed Syntax
 
 A LR(k) grammar. This is a rough brainstorm and is somewhat out of sync with the examples:
