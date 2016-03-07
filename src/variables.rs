@@ -78,15 +78,31 @@ impl Variables {
     }
 
     #[inline]
-    pub fn expand_string<'a>(&'a self, original: &'a str) -> &'a str {
-        if original.starts_with("$") {
-            match self.variables.get(&original[1..]) {
-                Some(value) => &value,
-                None        => ""
-            }
-        } else {
-            original
+    pub fn expand_string<'a>(&'a self, original: &'a str) -> String {
+        let mut new = original.to_owned();
+        for (i, _) in original.match_indices("$") {
+            let mut var_name = "".to_owned();
+            for (i, c) in original.char_indices().skip(i+1) { // skip the dollar sign
+                let mut replace_string = false;
+                if c.is_alphanumeric() || c == '_' {
+                    var_name.push(c);
+                    if i == original.len() - 1 {
+                        replace_string = true;
+                    }
+                } else {
+                    replace_string = true;
+                }
+                if replace_string {
+                    let value: &str = match self.variables.get(&var_name) {
+                        Some(v) => &v,
+                        None => ""
+                    };
+                    new = new.replace(&format!("${}", var_name), value);
+                    break;
+                }
+            } 
         }
+        new.clone()
     }
 }
 
@@ -98,7 +114,7 @@ mod tests {
     fn undefined_variable_expands_to_empty_string() {
         let variables = Variables::new();
         let expanded = variables.expand_string("$FOO");
-        assert_eq!("", expanded);
+        assert_eq!("", &expanded);
     }
 
     #[test]
@@ -106,7 +122,7 @@ mod tests {
         let mut variables = Variables::new();
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
         let expanded = variables.expand_string("$FOO");
-        assert_eq!("BAR", expanded);
+        assert_eq!("BAR", &expanded);
     }
 
     #[test]
@@ -114,7 +130,7 @@ mod tests {
         let mut variables = Variables::new();
         variables.set_var("FOO", "BAR");
         let expanded = variables.expand_string("$FOO");
-        assert_eq!("BAR", expanded);
+        assert_eq!("BAR", &expanded);
     }
 
     #[test]
@@ -123,6 +139,15 @@ mod tests {
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
         variables.let_(vec!["let", "FOO"]);
         let expanded = variables.expand_string("$FOO");
-        assert_eq!("", expanded);
+        assert_eq!("", &expanded);
+    }
+
+    #[test]
+    fn expand_several_variables() {
+        let mut variables = Variables::new();
+        variables.let_(vec!["let", "FOO", "=", "BAR"]);
+        variables.let_(vec!["let", "X", "=", "Y"]);
+        let expanded = variables.expand_string("variables: $FOO $X");
+        assert_eq!("variables: BAR Y", &expanded);
     }
 }

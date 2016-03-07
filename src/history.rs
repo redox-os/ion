@@ -24,7 +24,7 @@ impl History {
         // TODO: Prevent evaluated files from writing to the log.
         if variables.expand_string("$HISTORY_FILE_ENABLED") == "1" {
             let history_file = variables.expand_string("$HISTORY_FILE");
-            History::write_to_disk(history_file, &command);
+            History::write_to_disk(&history_file, &command);
         }
 
         self.history.truncate(History::get_size(variables) - 1); // Make room for new item
