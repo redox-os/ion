@@ -157,10 +157,9 @@ impl Shell {
 
         // Execute commands
         for pipeline in pipelines.drain(..) {
-            let job = pipeline.jobs[0].clone();
             if self.flow_control.collecting_block {
                 // TODO move this logic into "end" command
-                if job.command == "end" {
+                if pipeline.jobs[0].command == "end" {
                     self.flow_control.collecting_block = false;
                     let block_jobs: Vec<Pipeline> = self.flow_control
                                                    .current_block
@@ -188,7 +187,7 @@ impl Shell {
                     self.flow_control.current_block.pipelines.push(pipeline);
                 }
             } else {
-                if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
+                if self.flow_control.skipping() && !is_flow_control_command(&pipeline.jobs[0].command) {
                     continue;
                 }
                 self.run_pipeline(&pipeline, commands);
@@ -197,7 +196,7 @@ impl Shell {
     }
 
     fn run_pipeline(&mut self, pipeline: &Pipeline, commands: &HashMap<&str, Command>) -> Option<i32> {
-        let job = pipeline.jobs[0].clone();
+        let job = pipeline.jobs[0].clone(); // TODO stop doing this once builtins work in pipelines.
         let mut pipeline = self.variables.expand_pipeline(pipeline);
         pipeline.expand_globs();
         let exit_status = if let Some(command) = commands.get(job.command.as_str()) {

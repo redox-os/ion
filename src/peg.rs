@@ -82,7 +82,7 @@ pipelines -> Vec<Pipeline>
     / (unused*) ** newline { vec![] }
 
 pipeline -> Pipeline
-    = whitespace? res:job ++ pipeline_sep comment? { Pipeline::new(res) }
+    = whitespace? res:job ++ pipeline_sep whitespace? comment? { Pipeline::new(res) }
 
 job -> Job
     = args:word ++ whitespace background:background_token? { Job::new(args, background.is_some()) }
@@ -131,79 +131,6 @@ newline -> ()
 "#);
 
 
-// #[derive(Debug, PartialEq)]
-// pub struct Job {
-// pub command: String,
-// pub args: Vec<String>,
-// }
-//
-// impl Job {
-// fn new(command: String, args: Vec<String>) -> Job {
-// Job {
-// command: command,
-// args: args,
-// }
-// }
-// }
-//
-// pub fn parse(code: &str) -> Vec<Job> {
-// job_list(code).unwrap_or(vec![])
-// }
-//
-// peg! grammar(r#"
-// use super::Job;
-//
-//
-// #[pub]
-// job_list -> Vec<Job>
-// = (unused* newline)* jobs:job ++ ((job_ending+ unused*)+) (newline unused*)* { jobs }
-// / (unused*) ** newline { vec![] }
-//
-// job -> Job
-// = whitespace? res:_job whitespace? comment? { res }
-//
-// _job -> Job
-// = args:word ++ whitespace { let mut args = args.clone(); Job::new(args.remove(0), args) }
-//
-// word -> String
-// = double_quoted_word
-// / single_quoted_word
-// / [^ \t\r\n#;]+ { match_str.to_string() }
-//
-// double_quoted_word -> String
-// = ["] word:_double_quoted_word ["] { word }
-//
-// _double_quoted_word -> String
-// = [^"]+ { match_str.to_string() }
-//
-// single_quoted_word -> String
-// = ['] word:_single_quoted_word ['] { word }
-//
-// _single_quoted_word -> String
-// = [^']+ { match_str.to_string() }
-//
-// unused -> ()
-// = whitespace comment? { () }
-// / comment { () }
-//
-// comment -> ()
-// = [#] [^\r\n]*
-//
-// whitespace -> ()
-// = [ \t]+
-//
-// job_ending -> ()
-// = [;]
-// / newline
-// / newline
-//
-// newline -> ()
-// = [\r\n]
-// "#);
-//
-
-
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,7 +138,7 @@ mod tests {
 
     #[test]
     fn single_job_no_args() {
-        let jobs = job_list("cat").unwrap();
+        let jobs = parse("cat").remove(0).jobs;
         assert_eq!(1, jobs.len());
         assert_eq!("cat", jobs[0].command);
         assert_eq!(1, jobs[0].args.len());
@@ -219,7 +146,7 @@ mod tests {
 
     #[test]
     fn single_job_with_args() {
-        let jobs = job_list("ls -al dir").unwrap();
+        let jobs = parse("ls -al dir").remove(0).jobs;
         assert_eq!(1, jobs.len());
         assert_eq!("ls", jobs[0].command);
         assert_eq!("-al", jobs[0].args[1]);
@@ -228,23 +155,23 @@ mod tests {
 
     #[test]
     fn multiple_jobs_with_args() {
-        let jobs = job_list("ls -al;cat tmp.txt").unwrap();
-        assert_eq!(2, jobs.len());
-        assert_eq!("ls", jobs[0].command);
-        assert_eq!("-al", jobs[0].args[1]);
-        assert_eq!("cat", jobs[1].command);
-        assert_eq!("tmp.txt", jobs[1].args[1]);
+        let pipelines = parse("ls -al;cat tmp.txt");
+        assert_eq!(2, pipelines.len());
+        assert_eq!("ls", pipelines[0].jobs[0].command);
+        assert_eq!("-al", pipelines[0].jobs[0].args[1]);
+        assert_eq!("cat", pipelines[1].jobs[0].command);
+        assert_eq!("tmp.txt", pipelines[1].jobs[0].args[1]);
     }
 
     #[test]
     fn parse_empty_string() {
-        let jobs = job_list("").unwrap();
-        assert_eq!(0, jobs.len());
+        let pipelines = parse("");
+        assert_eq!(0, pipelines.len());
     }
 
     #[test]
     fn multiple_white_space_between_words() {
-        let jobs = job_list("ls \t -al\t\tdir").unwrap();
+        let jobs = parse("ls \t -al\t\tdir").remove(0).jobs;
         assert_eq!(1, jobs.len());
         assert_eq!("ls", jobs[0].command);
         assert_eq!("-al", jobs[0].args[1]);
@@ -253,92 +180,92 @@ mod tests {
 
     #[test]
     fn trailing_whitespace() {
-        let jobs = job_list("ls -al\t ").unwrap();
-        assert_eq!(1, jobs.len());
-        assert_eq!("ls", jobs[0].command);
-        assert_eq!("-al", jobs[0].args[1]);
+        let pipelines = parse("ls -al\t ");
+        assert_eq!(1, pipelines.len());
+        assert_eq!("ls", pipelines[0].jobs[0].command);
+        assert_eq!("-al", pipelines[0].jobs[0].args[1]);
     }
 
     #[test]
     fn double_quoting() {
-        let jobs = job_list("echo \"Hello World\"").unwrap();
+        let jobs = parse("echo \"Hello World\"").remove(0).jobs;
         assert_eq!(2, jobs[0].args.len());
         assert_eq!("Hello World", jobs[0].args[1]);
     }
 
     #[test]
     fn all_whitespace() {
-        let jobs = job_list("  \t ").unwrap();
-        assert_eq!(0, jobs.len());
+        let pipelines = parse("  \t ");
+        assert_eq!(0, pipelines.len());
     }
 
     #[test]
     fn not_background_job() {
-        let jobs = job_list("echo hello world").unwrap();
+        let jobs = parse("echo hello world").remove(0).jobs;
         assert_eq!(false, jobs[0].background);
     }
 
     #[test]
     fn background_job() {
-        let jobs = job_list("echo hello world&").unwrap();
+        let jobs = parse("echo hello world&").remove(0).jobs;
         assert_eq!(true, jobs[0].background);
     }
 
     #[test]
     fn background_job_with_space() {
-        let jobs = job_list("echo hello world &").unwrap();
+        let jobs = parse("echo hello world &").remove(0).jobs;
         assert_eq!(true, jobs[0].background);
     }
 
     #[test]
     fn lone_comment() {
-        let jobs = job_list("# ; \t as!!+dfa").unwrap();
-        assert_eq!(0, jobs.len());
+        let pipelines = parse("# ; \t as!!+dfa");
+        assert_eq!(0, pipelines.len());
     }
 
     #[test]
     fn command_followed_by_comment() {
-        let jobs = job_list("cat # ; \t as!!+dfa").unwrap();
-        assert_eq!(1, jobs.len());
-        assert_eq!(1, jobs[0].args.len());
+        let pipelines = parse("cat # ; \t as!!+dfa");
+        assert_eq!(1, pipelines.len());
+        assert_eq!(1, pipelines[0].jobs[0].args.len());
     }
 
     #[test]
     fn comments_in_multiline_script() {
-        let jobs = job_list("echo\n# a comment;\necho#asfasdf").unwrap();
-        assert_eq!(2, jobs.len());
+        let pipelines = parse("echo\n# a comment;\necho#asfasdf");
+        assert_eq!(2, pipelines.len());
     }
 
     #[test]
     fn multiple_newlines() {
-        let jobs = job_list("echo\n\ncat").unwrap();
-        assert_eq!(2, jobs.len());
+        let pipelines = parse("echo\n\ncat");
+        assert_eq!(2, pipelines.len());
     }
 
     #[test]
     fn leading_whitespace() {
-        let jobs = job_list("    \techo").unwrap();
+        let jobs = parse("    \techo").remove(0).jobs;
         assert_eq!(1, jobs.len());
         assert_eq!("echo", jobs[0].command);
     }
 
     #[test]
     fn indentation_on_multiple_lines() {
-        let jobs = job_list("echo\n  cat").unwrap();
-        assert_eq!(2, jobs.len());
-        assert_eq!("echo", jobs[0].command);
-        assert_eq!("cat", jobs[1].command);
+        let pipelines = parse("echo\n  cat");
+        assert_eq!(2, pipelines.len());
+        assert_eq!("echo", pipelines[0].jobs[0].command);
+        assert_eq!("cat", pipelines[1].jobs[0].command);
     }
 
     #[test]
     fn single_quoting() {
-        let jobs = job_list("echo '#!!;\"\\'").unwrap();
+        let jobs = parse("echo '#!!;\"\\'").remove(0).jobs;
         assert_eq!("#!!;\"\\", jobs[0].args[1]);
     }
 
     #[test]
     fn mixed_quoted_and_unquoted() {
-        let jobs = job_list("echo '#!!;\"\\' and \t some \"more' 'stuff\"").unwrap();
+        let jobs = parse("echo '#!!;\"\\' and \t some \"more' 'stuff\"").remove(0).jobs;
         assert_eq!("#!!;\"\\", jobs[0].args[1]);
         assert_eq!("and", jobs[0].args[2]);
         assert_eq!("some", jobs[0].args[3]);
@@ -347,13 +274,13 @@ mod tests {
 
     #[test]
     fn several_blank_lines() {
-        let jobs = parse("\n\n\n");
-        assert_eq!(0, jobs.len());
+        let pipelines = parse("\n\n\n");
+        assert_eq!(0, pipelines.len());
     }
 
     #[test]
     fn full_script() {
-        job_list(r#"if a == a
+        pipelines(r#"if a == a
   echo true a == a
 
   if b != b
@@ -376,7 +303,7 @@ fi
 
     #[test]
     fn leading_and_trailing_junk() {
-        job_list(r#"
+        pipelines(r#"
 
 # comment
    # comment
@@ -402,10 +329,6 @@ else
 
 # comment
 
-"#)
-            .unwrap();  // Make sure it parses
+"#).unwrap();  // Make sure it parses
     }
-
-
 }
-*/
