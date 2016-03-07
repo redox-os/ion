@@ -1,5 +1,5 @@
 use super::to_num::ToNum;
-use super::peg::Job;
+use super::peg::Pipeline;
 use super::status::{SUCCESS, FAILURE};
 
 pub fn is_flow_control_command(command: &str) -> bool {
@@ -15,7 +15,7 @@ pub enum Statement {
 }
 
 pub struct CodeBlock {
-    pub jobs: Vec<Job>,
+    pub pipelines: Vec<Pipeline>,
 }
 
 pub struct Mode {
@@ -34,7 +34,7 @@ impl FlowControl {
         FlowControl {
             modes: vec![],
             collecting_block: false,
-            current_block: CodeBlock { jobs: vec![] },
+            current_block: CodeBlock { pipelines: vec![] },
             current_statement: Statement::Default,
         }
     }

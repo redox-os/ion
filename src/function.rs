@@ -1,7 +1,7 @@
-use super::peg::Job;
+use super::peg::Pipeline;
 
 #[derive(Clone)]
 pub struct Function {
     pub name: String,
-    pub jobs: Vec<Job>,
+    pub pipelines: Vec<Pipeline>,
 }

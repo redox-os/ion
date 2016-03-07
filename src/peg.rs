@@ -12,6 +12,14 @@ impl Pipeline {
             jobs: jobs,
         }
     }
+
+    pub fn expand_globs(&mut self) {
+        let jobs = self.jobs.drain(..).map(|mut job| {
+            job.expand_globs();
+            job
+        }).collect();
+        self.jobs = jobs;
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

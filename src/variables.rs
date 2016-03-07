@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::io::{stdout, Write};
 
-use super::peg::Job;
+use super::peg::{Pipeline, Job};
 use super::input_editor::readln;
 use super::status::{SUCCESS, FAILURE};
 
@@ -61,6 +61,11 @@ impl Variables {
                 self.variables.insert(name.to_string(), value.to_string());
             }
         }
+    }
+
+    pub fn expand_pipeline(&self, pipeline: &Pipeline) -> Pipeline {
+        // TODO don't copy everything
+        Pipeline::new(pipeline.jobs.iter().map(|job| {self.expand_job(job)}).collect())
     }
 
     pub fn expand_job(&self, job: &Job) -> Job {

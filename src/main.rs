@@ -162,9 +162,9 @@ impl Shell {
                 // TODO move this logic into "end" command
                 if job.command == "end" {
                     self.flow_control.collecting_block = false;
-                    let block_jobs: Vec<Job> = self.flow_control
+                    let block_jobs: Vec<Pipeline> = self.flow_control
                                                    .current_block
-                                                   .jobs
+                                                   .pipelines
                                                    .drain(..)
                                                    .collect();
                     match self.flow_control.current_statement.clone() {
@@ -173,46 +173,49 @@ impl Shell {
                             let values = vals.clone();
                             for value in values {
                                 self.variables.set_var(&variable, &value);
-                                for job in block_jobs.iter() {
-                                    self.run_job(job, &pipeline, commands);
+                                for pipeline in block_jobs.iter() {
+                                    self.run_pipeline(&pipeline, commands);
                                 }
                             }
                         },
                         Statement::Function(ref name) => {
-                            self.functions.insert(name.clone(), Function { name: name.clone(), jobs: block_jobs.clone() });
+                            self.functions.insert(name.clone(), Function { name: name.clone(), pipelines: block_jobs.clone() });
                         },
                         _ => {}
                     }
                     self.flow_control.current_statement = Statement::Default;
                 } else {
-                    self.flow_control.current_block.jobs.push(job);
+                    self.flow_control.current_block.pipelines.push(pipeline);
                 }
             } else {
                 if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
                     continue;
                 }
-                self.run_job(&job, &pipeline, commands);
+                self.run_pipeline(&pipeline, commands);
             }
         }
     }
 
-    fn run_job(&mut self, job: &Job, pipeline: &Pipeline, commands: &HashMap<&str, Command>) -> Option<i32> {
-        let mut job = self.variables.expand_job(job);
-        job.expand_globs();
+    fn run_pipeline(&mut self, pipeline: &Pipeline, commands: &HashMap<&str, Command>) -> Option<i32> {
+        let job = pipeline.jobs[0].clone();
+        let mut pipeline = self.variables.expand_pipeline(pipeline);
+        pipeline.expand_globs();
         let exit_status = if let Some(command) = commands.get(job.command.as_str()) {
             Some((*command.main)(job.args.as_slice(), self))
-        } else if self.functions.get(job.command.as_str()).is_some() { // Not really idiomatic but I don't know how to clone the value without borrowing self
+        } else if self.functions.get(job.command.as_str()).is_some() { 
+            // Not really idiomatic but I don't know how to clone the value without borrowing self
             let function = self.functions.get(job.command.as_str()).unwrap().clone();
             let mut return_value = None;
-            for function_job in function.jobs.iter() {
-                return_value = self.run_job(&function_job, pipeline, commands)
+            for function_pipeline in function.pipelines.iter() {
+                return_value = self.run_pipeline(function_pipeline, commands)
             }
             return_value
-        } else {
-            //self.run_external_commmand(job)
+        } else if pipeline.jobs.len() > 1 { // TODO Piping should not be a special case in the future
             let mut piped_commands: Vec<process::Command> = pipeline.jobs.iter().map(|job| { Shell::build_command(job) }).collect();
-            pipe(&mut piped_commands);
-            Some(0)  // TODO fix this shit
+            Some(pipe(&mut piped_commands))
+        }
+        else {
+            self.run_external_commmand(job)
         };
         if let Some(code) = exit_status {
             self.variables.set_var("?", &code.to_string());
