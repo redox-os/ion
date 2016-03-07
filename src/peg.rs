@@ -1,5 +1,18 @@
-use self::grammar::job_list;
+use self::grammar::pipelines;
 use glob::glob;
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Pipeline {
+    pub jobs: Vec<Job>,
+}
+
+impl Pipeline {
+    pub fn new(jobs: Vec<Job>) -> Self {
+        Pipeline {
+            jobs: jobs,
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Job {
@@ -46,24 +59,28 @@ impl Job {
     }
 }
 
-pub fn parse(code: &str) -> Vec<Job> {
-    job_list(code).unwrap_or(vec![])
+pub fn parse(code: &str) -> Vec<Pipeline> {
+    pipelines(code).unwrap_or(vec![])
 }
 
 peg! grammar(r#"
+use super::Pipeline;
 use super::Job;
 
 
 #[pub]
-job_list -> Vec<Job>
-    = (unused* newline)* jobs:job ++ ((job_ending+ unused*)+) (newline unused*)* { jobs }
+pipelines -> Vec<Pipeline>
+    = (unused* newline)* pipelines:pipeline ++ ((job_ending+ unused*)+) (newline unused*)* { pipelines }
     / (unused*) ** newline { vec![] }
 
-job -> Job
-    = whitespace? res:_job whitespace? comment? { res }
+pipeline -> Pipeline
+    = whitespace? res:job ++ pipeline_sep comment? { Pipeline::new(res) }
 
-_job -> Job
+job -> Job
     = args:word ++ whitespace background:background_token? { Job::new(args, background.is_some()) }
+
+pipeline_sep -> ()
+    = (whitespace? [|] whitespace?) { }
 
 background_token -> ()
     = [&]
@@ -72,7 +89,7 @@ background_token -> ()
 word -> &'input str
     = double_quoted_word
     / single_quoted_word
-    / [^ \t\r\n#;&]+ { match_str }
+    / [^ \t\r\n#;&|]+ { match_str }
 
 double_quoted_word -> &'input str
     = ["] word:_double_quoted_word ["] { word }
@@ -178,6 +195,7 @@ newline -> ()
 //
 
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -382,3 +400,4 @@ else
 
 
 }
+*/

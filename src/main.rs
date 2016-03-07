@@ -14,13 +14,15 @@ use std::thread;
 
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
-use self::peg::{parse, Job};
+use self::peg::{parse, Job, Pipeline};
 use self::variables::Variables;
 use self::history::History;
 use self::flow_control::{FlowControl, is_flow_control_command, Statement};
 use self::status::{SUCCESS, NO_SUCH_COMMAND, TERMINATED};
 use self::function::Function;
+use self::pipe::pipe;
 
+pub mod pipe;
 pub mod directory_stack;
 pub mod to_num;
 pub mod input_editor;
@@ -151,10 +153,11 @@ impl Shell {
     fn on_command(&mut self, command_string: &str, commands: &HashMap<&str, Command>) {
         self.history.add(command_string.to_string(), &self.variables);
 
-        let mut jobs = parse(command_string);
+        let mut pipelines = parse(command_string);
 
         // Execute commands
-        for job in jobs.drain(..) {
+        for pipeline in pipelines.drain(..) {
+            let job = pipeline.jobs[0].clone();
             if self.flow_control.collecting_block {
                 // TODO move this logic into "end" command
                 if job.command == "end" {
@@ -171,7 +174,7 @@ impl Shell {
                             for value in values {
                                 self.variables.set_var(&variable, &value);
                                 for job in block_jobs.iter() {
-                                    self.run_job(job, commands);
+                                    self.run_job(job, &pipeline, commands);
                                 }
                             }
                         },
@@ -188,12 +191,12 @@ impl Shell {
                 if self.flow_control.skipping() && !is_flow_control_command(&job.command) {
                     continue;
                 }
-                self.run_job(&job, commands);
+                self.run_job(&job, &pipeline, commands);
             }
         }
     }
 
-    fn run_job(&mut self, job: &Job, commands: &HashMap<&str, Command>) -> Option<i32> {
+    fn run_job(&mut self, job: &Job, pipeline: &Pipeline, commands: &HashMap<&str, Command>) -> Option<i32> {
         let mut job = self.variables.expand_job(job);
         job.expand_globs();
         let exit_status = if let Some(command) = commands.get(job.command.as_str()) {
@@ -202,11 +205,14 @@ impl Shell {
             let function = self.functions.get(job.command.as_str()).unwrap().clone();
             let mut return_value = None;
             for function_job in function.jobs.iter() {
-                return_value = self.run_job(&function_job, commands)
+                return_value = self.run_job(&function_job, pipeline, commands)
             }
             return_value
         } else {
-            self.run_external_commmand(job)
+            //self.run_external_commmand(job)
+            let mut piped_commands: Vec<process::Command> = pipeline.jobs.iter().map(|job| { Shell::build_command(job) }).collect();
+            pipe(&mut piped_commands);
+            Some(0)  // TODO fix this shit
         };
         if let Some(code) = exit_status {
             self.variables.set_var("?", &code.to_string());
