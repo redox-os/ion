@@ -1,7 +1,27 @@
 use std::process::{Stdio, Command, Child};
-use std::os::unix::io::{FromRawFd, AsRawFd};
+use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
+use std::fs::File;
 
 use super::status::{TERMINATED, NO_SUCH_COMMAND};
+use super::Shell;
+use super::peg::Pipeline;
+
+pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
+    let mut piped_commands: Vec<Command> = pipeline.jobs.iter().map(|job| { Shell::build_command(job) }).collect();
+    if let (Some(stdin_file), Some(command)) = (pipeline.stdin_file, piped_commands.first_mut()) {
+        if let Ok(file) = File::open(stdin_file) {
+            unsafe { command.stdin(Stdio::from_raw_fd(file.into_raw_fd())); }
+        }
+    }
+    if let Some(stdout_file) = pipeline.stdout_file {
+        if let Some(mut command) = piped_commands.last_mut() {
+            if let Ok(file) = File::create(stdout_file) {
+                unsafe { command.stdout(Stdio::from_raw_fd(file.into_raw_fd())); }
+            }
+        }
+    }
+    pipe(&mut piped_commands)
+}
 
 /// This function will panic if called with an empty slice
 pub fn pipe(commands: &mut [Command]) -> i32 {
