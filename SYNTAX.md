@@ -25,6 +25,11 @@
 ### Piping
 - `echo foo | cat | xargs touch` will pipe the output from one process to another.
 
+### Redirection
+- `echo foo > bar` will write "foo" to a file named "bar".
+- `cat < foo` will write the contents of a file named "foo" to the console.
+- `cat < foo > bar` will write the contents of a file named "foo" to a file named "bar".
+
 ## Proposed Syntax
 
 A LR(k) grammar. This is a rough brainstorm and is somewhat out of sync with the examples:
