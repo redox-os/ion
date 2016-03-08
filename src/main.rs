@@ -10,7 +10,6 @@ use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::env;
 use std::process;
-use std::thread;
 
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
@@ -18,9 +17,9 @@ use self::peg::{parse, Job, Pipeline};
 use self::variables::Variables;
 use self::history::History;
 use self::flow_control::{FlowControl, is_flow_control_command, Statement};
-use self::status::{SUCCESS, NO_SUCH_COMMAND, TERMINATED};
+use self::status::SUCCESS;
 use self::function::Function;
-use self::pipe::pipe;
+use self::pipe::execute_pipeline;
 
 pub mod pipe;
 pub mod directory_stack;
@@ -209,12 +208,8 @@ impl Shell {
                 return_value = self.run_pipeline(function_pipeline, commands)
             }
             return_value
-        } else if pipeline.jobs.len() > 1 { // TODO Piping should not be a special case in the future
-            let mut piped_commands: Vec<process::Command> = pipeline.jobs.iter().map(|job| { Shell::build_command(job) }).collect();
-            Some(pipe(&mut piped_commands))
-        }
-        else {
-            self.run_external_commmand(&pipeline.jobs[0])
+        } else {
+            Some(execute_pipeline(pipeline))
         };
         if let Some(code) = exit_status {
             self.variables.set_var("?", &code.to_string());
@@ -223,29 +218,7 @@ impl Shell {
         exit_status
     }
 
-    /// Returns an exit code if a command was run
-    fn run_external_commmand(&mut self, job: &Job) -> Option<i32> {
-        if job.background {
-            let job = job.clone(); // TODO this clone can probably be avoided
-            thread::spawn(move || {
-                let mut command = Shell::build_command(&job);
-                command.stdin(process::Stdio::null());
-                if let Ok(mut child) = command.spawn() {
-                    Shell::wait_and_get_status(&mut child, &job.command);
-                }
-            });
-            None
-        } else {
-            if let Ok(mut child) = Shell::build_command(job).spawn() {
-                Some(Shell::wait_and_get_status(&mut child, &job.command))
-            } else {
-                println!("ion: command not found: {}", job.command);
-                Some(NO_SUCH_COMMAND)
-            }
-        }
-    }
-
-    fn build_command(job: &Job) -> process::Command {
+    pub fn build_command(job: &Job) -> process::Command {
         let mut command = process::Command::new(&job.command);
         for i in 1..job.args.len() {
             if let Some(arg) = job.args.get(i) {
@@ -253,24 +226,6 @@ impl Shell {
             }
         }
         command
-    }
-
-    // TODO don't pass in command and do printing outside this function
-    fn wait_and_get_status(child: &mut process::Child, command: &str) -> i32 {
-        match child.wait() {
-            Ok(status) => {
-                if let Some(code) = status.code() {
-                    code
-                } else {
-                    println!("{}: child ended by signal", command);
-                    TERMINATED
-                }
-            }
-            Err(err) => {
-                println!("{}: Failed to wait: {}", command, err);
-                100 // TODO what should we return here?
-            }
-        }
     }
 
     /// Evaluates the given file and returns 'SUCCESS' if it succeeds.

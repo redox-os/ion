@@ -68,7 +68,11 @@ impl Variables {
 
     pub fn expand_pipeline(&self, pipeline: &Pipeline) -> Pipeline {
         // TODO don't copy everything
-        Pipeline::new(pipeline.jobs.iter().map(|job| {self.expand_job(job)}).collect())
+        // TODO ugh, I made it worse
+        Pipeline::new(
+            pipeline.jobs.iter().map(|job| {self.expand_job(job)}).collect(),
+            pipeline.stdin_file.clone(),
+            pipeline.stdout_file.clone())
     }
 
     pub fn expand_job(&self, job: &Job) -> Job {

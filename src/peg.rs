@@ -4,12 +4,17 @@ use glob::glob;
 #[derive(Debug, PartialEq, Clone)]
 pub struct Pipeline {
     pub jobs: Vec<Job>,
+    pub stdout_file: Option<String>,
+    pub stdin_file: Option<String>,
 }
 
 impl Pipeline {
-    pub fn new(jobs: Vec<Job>) -> Self {
+
+    pub fn new(jobs: Vec<Job>, stdin: Option<String>, stdout: Option<String>) -> Self {
         Pipeline {
             jobs: jobs,
+            stdin_file: stdin,
+            stdout_file: stdout,
         }
     }
 
@@ -82,10 +87,21 @@ pipelines -> Vec<Pipeline>
     / (unused*) ** newline { vec![] }
 
 pipeline -> Pipeline
-    = whitespace? res:job ++ pipeline_sep whitespace? comment? { Pipeline::new(res) }
+    = whitespace? res:job ++ pipeline_sep whitespace? redir:redirection whitespace? comment? { Pipeline::new(res, redir.0, redir.1) }
 
 job -> Job
     = args:word ++ whitespace background:background_token? { Job::new(args, background.is_some()) }
+
+redirection -> (Option<String>, Option<String>)
+    = stdin:redirect_stdin whitespace? stdout:redirect_stdout? { (Some(stdin), stdout) }
+    / stdout:redirect_stdout whitespace? stdin:redirect_stdin? { (stdin, Some(stdout)) }
+    / { (None, None) }
+
+redirect_stdin -> String
+    = [<] whitespace? file:word { file.to_string() }
+
+redirect_stdout -> String
+    = [>] whitespace? file:word { file.to_string() }
 
 pipeline_sep -> ()
     = (whitespace? [|] whitespace?) { }
@@ -97,7 +113,7 @@ background_token -> ()
 word -> &'input str
     = double_quoted_word
     / single_quoted_word
-    / [^ \t\r\n#;&|]+ { match_str }
+    / [^ \t\r\n#;&|<>]+ { match_str }
 
 double_quoted_word -> &'input str
     = ["] word:_double_quoted_word ["] { word }
@@ -276,6 +292,22 @@ mod tests {
     fn several_blank_lines() {
         let pipelines = parse("\n\n\n");
         assert_eq!(0, pipelines.len());
+    }
+
+    #[test]
+    fn pipelines_with_redirection() {
+        let pipelines = parse("cat | echo hello | cat < stuff > other");
+        assert_eq!(3, pipelines[0].jobs.len());
+        assert_eq!(Some("stuff".to_string()), pipelines[0].stdin_file);
+        assert_eq!(Some("other".to_string()), pipelines[0].stdout_file);
+    }
+
+    #[test]
+    fn pipelines_with_redirection_reverse_order() {
+        let pipelines = parse("cat | echo hello | cat > stuff < other");
+        assert_eq!(3, pipelines[0].jobs.len());
+        assert_eq!(Some("other".to_string()), pipelines[0].stdin_file);
+        assert_eq!(Some("stuff".to_string()), pipelines[0].stdout_file);
     }
 
     #[test]
