@@ -410,6 +410,24 @@ impl Command {
                             },
                         });
 
+        commands.insert("true",
+                        Command {
+                            name: "true",
+                            help: "Do nothing, successfully",
+                            main: box |_: &[String], _: &mut Shell| -> i32 {
+                                status::SUCCESS
+                            },
+                        });
+
+        commands.insert("false",
+                        Command {
+                            name: "false",
+                            help: "Do nothing, unsuccessfully",
+                            main: box |_: &[String], _: &mut Shell| -> i32 {
+                                status::FAILURE
+                            },
+                        });
+
         commands.insert("fn",
                         Command {
                             name: "fn",
