@@ -48,7 +48,11 @@ impl History {
                     (file_length, commands_stored)
                 };
 
-                // Truncate the history file if the limit has been reached
+                // If the max history file size has been reached, truncate the file so that only
+                // N amount of commands are listed. To truncate the file, the seek point will be
+                // discovered by counting the number of bytes until N newlines have been found and
+                // then the file will be seeked to that point, copying all data after and rewriting
+                // the file with the first N lines removed.
                 if commands_stored >= max_size {
                     let seek_point = {
                         let commands_to_delete = commands_stored - max_size + 1;
@@ -62,7 +66,7 @@ impl History {
                         }
                         bytes as u64
                     };
-                    
+
                     if let Err(message) = file.seek(SeekFrom::Start(seek_point)) {
                         println!("ion: unable to seek in history file: {}", message);
                     }
@@ -79,6 +83,11 @@ impl History {
                     if let Err(message) = io::copy(&mut buffer.as_slice(), &mut file) {
                         println!("ion: unable to write to history file: {}", message);
                     }
+                }
+
+                // Seek to end for appending
+                if let Err(message) = file.seek(SeekFrom::End(0)) {
+                    println!("ion: unable to seek in history file: {}", message);
                 }
 
                 // Write the command to the history file.
