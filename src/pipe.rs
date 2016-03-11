@@ -9,14 +9,16 @@ use super::peg::Pipeline;
 pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
     let mut piped_commands: Vec<Command> = pipeline.jobs.iter().map(|job| { Shell::build_command(job) }).collect();
     if let (Some(stdin_file), Some(command)) = (pipeline.stdin_file, piped_commands.first_mut()) {
-        if let Ok(file) = File::open(stdin_file) {
-            unsafe { command.stdin(Stdio::from_raw_fd(file.into_raw_fd())); }
+        match File::open(&stdin_file) {
+            Ok(file) => unsafe { command.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
+            Err(err) => println!("ion: failed to pipe stdin into {}: {}", stdin_file, err)
         }
     }
     if let Some(stdout_file) = pipeline.stdout_file {
         if let Some(mut command) = piped_commands.last_mut() {
-            if let Ok(file) = File::create(stdout_file) {
-                unsafe { command.stdout(Stdio::from_raw_fd(file.into_raw_fd())); }
+            match File::create(&stdout_file) {
+                Ok(file) => unsafe { command.stdout(Stdio::from_raw_fd(file.into_raw_fd())); },
+                Err(err) => println!("ion: failed to pipe stdout into {}: {}", stdout_file, err)
             }
         }
     }
