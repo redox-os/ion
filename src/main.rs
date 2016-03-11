@@ -63,18 +63,26 @@ impl Shell {
         self.variables.set_var("DIRECTORY_STACK_SIZE", "1000");
         self.variables.set_var("HISTORY_SIZE", "1000");
         self.variables.set_var("HISTORY_FILE_ENABLED", "1");
+        self.variables.set_var("HISTORY_FILE_SIZE", "1000");
         self.variables.set_var("PROMPT", "ion:$CWD# ");
 
         {   // Initialize the HISTORY_FILE variable
             let mut history_path = std::env::home_dir().unwrap();
             history_path.push(".ion_history");
-            self.variables.set_var("HISTORY_FILE", history_path.to_str().unwrap());
+            self.variables.set_var("HISTORY_FILE", history_path.to_str().unwrap_or("?"));
         }
 
         {   // Initialize the CWD (Current Working Directory) variable
             match std::env::current_dir() {
-                Ok(path) => self.variables.set_var("CWD", path.to_str().unwrap()),
+                Ok(path) => self.variables.set_var("CWD", path.to_str().unwrap_or("?")),
                 Err(_)   => self.variables.set_var("CWD", "?")
+            }
+        }
+
+        {   // Initialize the HOME variable
+            match std::env::home_dir() {
+                Some(path) => self.variables.set_var("HOME", path.to_str().unwrap_or("?")),
+                None       => self.variables.set_var("HOME", "?")
             }
         }
     }
@@ -200,7 +208,7 @@ impl Shell {
         pipeline.expand_globs();
         let exit_status = if let Some(command) = commands.get(pipeline.jobs[0].command.as_str()) {
             Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
-        } else if self.functions.get(pipeline.jobs[0].command.as_str()).is_some() { 
+        } else if self.functions.get(pipeline.jobs[0].command.as_str()).is_some() {
             // Not really idiomatic but I don't know how to clone the value without borrowing self
             let function = self.functions.get(pipeline.jobs[0].command.as_str()).unwrap().clone();
             let mut return_value = None;
