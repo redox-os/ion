@@ -64,7 +64,7 @@ impl Shell {
         self.variables.set_var("HISTORY_SIZE", "1000");
         self.variables.set_var("HISTORY_FILE_ENABLED", "1");
         self.variables.set_var("HISTORY_FILE_SIZE", "1000");
-        self.variables.set_var("PROMPT", "ion:$CWD# ");
+        self.variables.set_var("PROMPT", "ion:$PWD# ");
 
         {   // Initialize the HISTORY_FILE variable
             let mut history_path = std::env::home_dir().unwrap();
@@ -72,10 +72,10 @@ impl Shell {
             self.variables.set_var("HISTORY_FILE", history_path.to_str().unwrap_or("?"));
         }
 
-        {   // Initialize the CWD (Current Working Directory) variable
+        {   // Initialize the PWD (Present Working Directory) variable
             match std::env::current_dir() {
-                Ok(path) => self.variables.set_var("CWD", path.to_str().unwrap_or("?")),
-                Err(_)   => self.variables.set_var("CWD", "?")
+                Ok(path) => self.variables.set_var("PWD", path.to_str().unwrap_or("?")),
+                Err(_)   => self.variables.set_var("PWD", "?")
             }
         }
 
@@ -88,13 +88,13 @@ impl Shell {
     }
 
     /// This functional will update variables that need to be kept consistent with each iteration
-    /// of the prompt. In example, the CWD variable needs to be updated to reflect changes to the
+    /// of the prompt. In example, the PWD variable needs to be updated to reflect changes to the
     /// the current working directory.
     fn update_variables(&mut self) {
-        {   // Update the CWD (Current Working Directory) variable
+        {   // Update the PWD (Present Working Directory) variable
             match std::env::current_dir() {
-                Ok(path) => self.variables.set_var("CWD", path.to_str().unwrap()),
-                Err(_)   => self.variables.set_var("CWD", "?")
+                Ok(path) => self.variables.set_var("PWD", path.to_str().unwrap()),
+                Err(_)   => self.variables.set_var("PWD", "?")
             }
         }
     }
