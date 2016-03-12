@@ -167,7 +167,7 @@ impl Shell {
         for pipeline in pipelines.drain(..) {
             if self.flow_control.collecting_block {
                 // TODO move this logic into "end" command
-                if pipeline.jobs[0].command_name == "end" {
+                if pipeline.jobs[0].command == "end" {
                     self.flow_control.collecting_block = false;
                     let block_jobs: Vec<Pipeline> = self.flow_control
                                                    .current_block
@@ -195,7 +195,7 @@ impl Shell {
                     self.flow_control.current_block.pipelines.push(pipeline);
                 }
             } else {
-                if self.flow_control.skipping() && !is_flow_control_command(&pipeline.jobs[0].command_name) {
+                if self.flow_control.skipping() && !is_flow_control_command(&pipeline.jobs[0].command) {
                     continue;
                 }
                 self.run_pipeline(&pipeline, commands);
@@ -206,9 +206,9 @@ impl Shell {
     fn run_pipeline(&mut self, pipeline: &Pipeline, commands: &HashMap<&str, Command>) -> Option<i32> {
         let mut pipeline = self.variables.expand_pipeline(pipeline);
         pipeline.expand_globs();
-        let exit_status = if let Some(command) = commands.get(pipeline.jobs[0].command_name.as_str()) {
+        let exit_status = if let Some(command) = commands.get(pipeline.jobs[0].command.as_str()) {
             Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
-        } else if let Some(function) = self.functions.get(pipeline.jobs[0].command_name.as_str()).cloned() {
+        } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
             if pipeline.jobs[0].args.len() - 1 != function.args.len() {
                 println!("This function takes {} arguments, but you provided {}", function.args.len(), pipeline.jobs[0].args.len()-1);
                 Some(NO_SUCH_COMMAND) // not sure if this is the right error code

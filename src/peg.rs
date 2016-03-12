@@ -31,7 +31,7 @@ impl Pipeline {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Job {
-    pub command_name: String,
+    pub command: String,
     pub args: Vec<String>,
     pub background: bool,
 }
@@ -41,7 +41,7 @@ impl Job {
     pub fn new(args: Vec<String>, background: bool) -> Self {
         let command = args[0].clone();
         Job {
-            command_name: command,
+            command: command,
             args: args,
             background: background,
         }
@@ -65,7 +65,7 @@ impl Job {
     }
 
     pub fn build_command(&self) -> Command {
-        let mut command = Command::new(&self.command_name);
+        let mut command = Command::new(&self.command);
         for i in 1..self.args.len() {
             if let Some(arg) = self.args.get(i) {
                 command.arg(arg);
