@@ -85,11 +85,11 @@ impl Variables {
 
     pub fn expand_job(&self, job: &Job) -> Job {
         // TODO don't copy everything
-        Job::from_vec_string(job.args
-                                .iter()
-                                .map(|original: &String| self.expand_string(&original).to_string())
-                                .collect(),
-                             job.background)
+        Job::new(job.args
+                    .iter()
+                    .map(|original: &String| self.expand_string(&original))
+                    .collect(),
+                 job.background)
     }
 
     fn replace_substring(string: &mut String, start: usize, end: usize, replacement: &str) {
@@ -106,7 +106,6 @@ impl Variables {
         name.chars().all(Variables::is_valid_variable_character)
     }
 
-    #[inline]
     pub fn expand_string<'a>(&'a self, original: &'a str) -> String {
         let mut new = original.to_owned();
         let mut replacements: Vec<(usize, usize, String)> = vec![];

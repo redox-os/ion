@@ -31,26 +31,17 @@ impl Pipeline {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Job {
-    pub command: String,
+    pub command_name: String,
     pub args: Vec<String>,
     pub background: bool,
 }
 
 impl Job {
-    pub fn new(args: Vec<&str>, background: bool) -> Self {
-        let command = args[0].to_string();
-        let args = args.iter().map(|arg| arg.to_string()).collect();
-        Job {
-            command: command,
-            args: args,
-            background: background,
-        }
-    }
 
-    pub fn from_vec_string(args: Vec<String>, background: bool) -> Self {
+    pub fn new(args: Vec<String>, background: bool) -> Self {
         let command = args[0].clone();
         Job {
-            command: command,
+            command_name: command,
             args: args,
             background: background,
         }
@@ -74,7 +65,7 @@ impl Job {
     }
 
     pub fn build_command(&self) -> Command {
-        let mut command = Command::new(&self.command);
+        let mut command = Command::new(&self.command_name);
         for i in 1..self.args.len() {
             if let Some(arg) = self.args.get(i) {
                 command.arg(arg);
@@ -102,7 +93,9 @@ pipeline -> Pipeline
     = whitespace? res:job ++ pipeline_sep whitespace? redir:redirection whitespace? comment? { Pipeline::new(res, redir.0, redir.1) }
 
 job -> Job
-    = args:word ++ whitespace background:background_token? { Job::new(args, background.is_some()) }
+    = args:word ++ whitespace background:background_token? { 
+        Job::new(args.iter().map(|arg|arg.to_string()).collect(), background.is_some())
+    }
 
 redirection -> (Option<String>, Option<String>)
     = stdin:redirect_stdin whitespace? stdout:redirect_stdout? { (Some(stdin), stdout) }
