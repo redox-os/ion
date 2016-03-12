@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use self::grammar::pipelines;
 use glob::glob;
 
@@ -69,6 +71,16 @@ impl Job {
             }
         }
         self.args = new_args;
+    }
+
+    pub fn build_command(&self) -> Command {
+        let mut command = Command::new(&self.command);
+        for i in 1..self.args.len() {
+            if let Some(arg) = self.args.get(i) {
+                command.arg(arg);
+            }
+        }
+        command
     }
 }
 

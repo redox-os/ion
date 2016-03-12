@@ -3,11 +3,13 @@ use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
 use std::fs::File;
 
 use super::status::{TERMINATED, NO_SUCH_COMMAND};
-use super::Shell;
 use super::peg::Pipeline;
 
 pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
-    let mut piped_commands: Vec<Command> = pipeline.jobs.iter().map(|job| { Shell::build_command(job) }).collect();
+    let mut piped_commands: Vec<Command> = pipeline.jobs
+                                                   .iter()
+                                                   .map(|job| { job.build_command() })
+                                                   .collect();
     if let (Some(stdin_file), Some(command)) = (pipeline.stdin_file, piped_commands.first_mut()) {
         match File::open(&stdin_file) {
             Ok(file) => unsafe { command.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
