@@ -66,6 +66,14 @@ impl Variables {
         }
     }
 
+    pub fn get_var(&self, name: &str) -> Option<&String> {
+        self.variables.get(name)
+    }
+
+    pub fn unset_var(&mut self, name: &str) -> Option<String> {
+        self.variables.remove(name)
+    }
+
     pub fn expand_pipeline(&self, pipeline: &Pipeline) -> Pipeline {
         // TODO don't copy everything
         // TODO ugh, I made it worse

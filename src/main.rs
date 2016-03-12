@@ -17,7 +17,7 @@ use self::peg::{parse, Job, Pipeline};
 use self::variables::Variables;
 use self::history::History;
 use self::flow_control::{FlowControl, is_flow_control_command, Statement};
-use self::status::SUCCESS;
+use self::status::{SUCCESS, NO_SUCH_COMMAND};
 use self::function::Function;
 use self::pipe::execute_pipeline;
 
@@ -124,7 +124,7 @@ impl Shell {
         self.print_prompt_prefix();
         match self.flow_control.current_statement {
             Statement::For(_, _) => self.print_for_prompt(),
-            Statement::Function(_) => self.print_function_prompt(),
+            Statement::Function(_, _) => self.print_function_prompt(),
             _ => self.print_default_prompt(),
         }
         if let Err(message) = stdout().flush() {
@@ -185,8 +185,8 @@ impl Shell {
                                 }
                             }
                         },
-                        Statement::Function(ref name) => {
-                            self.functions.insert(name.clone(), Function { name: name.clone(), pipelines: block_jobs.clone() });
+                        Statement::Function(ref name, ref args) => {
+                            self.functions.insert(name.clone(), Function { name: name.clone(), pipelines: block_jobs.clone(), args: args.clone() });
                         },
                         _ => {}
                     }
@@ -208,14 +208,30 @@ impl Shell {
         pipeline.expand_globs();
         let exit_status = if let Some(command) = commands.get(pipeline.jobs[0].command.as_str()) {
             Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
-        } else if self.functions.get(pipeline.jobs[0].command.as_str()).is_some() {
-            // Not really idiomatic but I don't know how to clone the value without borrowing self
-            let function = self.functions.get(pipeline.jobs[0].command.as_str()).unwrap().clone();
-            let mut return_value = None;
-            for function_pipeline in function.pipelines.iter() {
-                return_value = self.run_pipeline(function_pipeline, commands)
+        } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
+            if pipeline.jobs[0].args.len() - 1 != function.args.len() {
+                println!("This function takes {} arguments, but you provided {}", function.args.len(), pipeline.jobs[0].args.len()-1);
+                Some(NO_SUCH_COMMAND) // not sure if this is the right error code
+            } else {
+                let mut variables_backup: HashMap<&str, Option<String>> = HashMap::new();
+                for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
+                    variables_backup.insert(name, self.variables.get_var(name).cloned());
+                    self.variables.set_var(name, value);
+                }
+                let mut return_value = None;
+                for function_pipeline in function.pipelines.iter() {
+                    return_value = self.run_pipeline(function_pipeline, commands)
+                }
+                for (name, value_option) in variables_backup.iter() {
+                    match *value_option {
+                        Some(ref value) => self.variables.set_var(name, value),
+                        None => {
+                            self.variables.unset_var(name);
+                        }
+                    }
+                }
+                return_value
             }
-            return_value
         } else {
             Some(execute_pipeline(pipeline))
         };

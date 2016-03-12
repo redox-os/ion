@@ -22,6 +22,30 @@
 - `else` will invert the comparison block
 - `end` will end the comparison block
 
+### Functions
+Use the `fn` keyword to define functions:
+```
+fn function
+  echo "Hello, Ion!"
+end
+```
+And use the function name to call it:
+```
+ion:# function
+Hello, Ion!
+```
+You can also create function with arguments:
+```
+fn print_two_strings first second
+  echo $first $second
+end
+```
+To call the function you can use the function name followed by the arguments:
+```
+ion:# print_two_strings "Foo" "Bar"
+Foo Bar
+```
+
 ### Piping
 - `echo foo | cat | xargs touch` will pipe the output from one process to another.
 
