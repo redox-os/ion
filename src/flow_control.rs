@@ -9,7 +9,7 @@ pub fn is_flow_control_command(command: &str) -> bool {
 #[derive(Clone)]
 pub enum Statement {
     For(String, Vec<String>),
-    Function(String),
+    Function(String, Vec<String>),
     If,
     Default
 }
@@ -141,7 +141,8 @@ impl FlowControl {
         let mut args = args.into_iter();
         if let Some(name) = args.nth(1) {
             self.collecting_block = true;
-            self.current_statement = Statement::Function(name.as_ref().to_string());
+            let values: Vec<String> = args.map(|value| value.as_ref().to_string()).collect();
+            self.current_statement = Statement::Function(name.as_ref().to_string(), values);
         } else {
             println!("Functions must have the function name as the first argument");
             return FAILURE;

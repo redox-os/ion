@@ -4,4 +4,5 @@ use super::peg::Pipeline;
 pub struct Function {
     pub name: String,
     pub pipelines: Vec<Pipeline>,
+    pub args: Vec<String>
 }
