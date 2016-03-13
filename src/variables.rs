@@ -1,9 +1,12 @@
 use std::collections::BTreeMap;
 use std::io::{stdout, Write};
+use std::env;
 
 use super::peg::{Pipeline, Job};
 use super::input_editor::readln;
 use super::status::{SUCCESS, FAILURE};
+
+use regex::Regex;
 
 pub struct Variables {
     variables: BTreeMap<String, String>,
@@ -74,6 +77,7 @@ impl Variables {
         self.variables.remove(name)
     }
 
+
     pub fn expand_pipeline(&self, pipeline: &Pipeline) -> Pipeline {
         // TODO don't copy everything
         // TODO ugh, I made it worse
@@ -106,8 +110,38 @@ impl Variables {
         name.chars().all(Variables::is_valid_variable_character)
     }
 
+    pub fn tilde_expansion(&self, word: String) -> String {
+        let re = Regex::new("^~(.*?)((/|$).*)").unwrap();
+        if let Some(cap) = re.captures_iter(&word).next() {
+            if let (Some(tilde_prefix), Some(remainder)) = (cap.at(1), cap.at(2)) {
+                match tilde_prefix {
+                    "" => {
+                        if let Some(home) = env::home_dir() {
+                            return home.to_string_lossy().to_string() + remainder;
+                        }
+                    },
+                    "+" => {
+                        if let Some(pwd) = self.get_var("PWD") {
+                            return pwd.to_string() + remainder;
+                        } else if let Ok(pwd) = env::current_dir() {
+                            return pwd.to_string_lossy().to_string() + remainder;
+                        }
+                    },
+                    "-" => {
+                        if let Some(oldpwd) = self.get_var("OLDPWD") {
+                            return oldpwd.to_string() + remainder;
+                        }
+                    },
+                    _ => (),
+                }
+            }
+        }
+        word
+    }
+
     pub fn expand_string<'a>(&'a self, original: &'a str) -> String {
         let mut new = original.to_owned();
+        new = self.tilde_expansion(new);
         let mut replacements: Vec<(usize, usize, String)> = vec![];
         for (n, _) in original.match_indices("$") {
             if n > 0 {
