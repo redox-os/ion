@@ -51,10 +51,12 @@ impl Job {
         let mut new_args: Vec<String> = vec![];
         for arg in self.args.drain(..) {
             let mut pushed_glob = false;
-            if let Ok(expanded) = glob(&arg) {
-                for path in expanded.filter_map(Result::ok) {
-                    pushed_glob = true;
-                    new_args.push(path.to_string_lossy().into_owned());
+            if arg.contains(|chr| chr == '?' || chr == '*' || chr == '[') {
+                if let Ok(expanded) = glob(&arg) {
+                    for path in expanded.filter_map(Result::ok) {
+                        pushed_glob = true;
+                        new_args.push(path.to_string_lossy().into_owned());
+                    }
                 }
             }
             if !pushed_glob {
