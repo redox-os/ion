@@ -13,7 +13,7 @@ use std::process;
 
 use self::directory_stack::DirectoryStack;
 use self::input_editor::readln;
-use self::peg::{parse, Job, Pipeline};
+use self::peg::{parse, Pipeline};
 use self::variables::Variables;
 use self::history::History;
 use self::flow_control::{FlowControl, is_flow_control_command, Statement};
@@ -240,16 +240,6 @@ impl Shell {
             self.history.previous_status = code;
         }
         exit_status
-    }
-
-    pub fn build_command(job: &Job) -> process::Command {
-        let mut command = process::Command::new(&job.command);
-        for i in 1..job.args.len() {
-            if let Some(arg) = job.args.get(i) {
-                command.arg(arg);
-            }
-        }
-        command
     }
 
     /// Evaluates the given file and returns 'SUCCESS' if it succeeds.

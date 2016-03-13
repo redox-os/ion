@@ -3,22 +3,24 @@ use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
 use std::fs::File;
 
 use super::status::{TERMINATED, NO_SUCH_COMMAND};
-use super::Shell;
 use super::peg::Pipeline;
 
 pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
-    let mut piped_commands: Vec<Command> = pipeline.jobs.iter().map(|job| { Shell::build_command(job) }).collect();
+    let mut piped_commands: Vec<Command> = pipeline.jobs
+                                                   .iter()
+                                                   .map(|job| { job.build_command() })
+                                                   .collect();
     if let (Some(stdin_file), Some(command)) = (pipeline.stdin_file, piped_commands.first_mut()) {
         match File::open(&stdin_file) {
             Ok(file) => unsafe { command.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
-            Err(err) => println!("ion: failed to pipe stdin into {}: {}", stdin_file, err)
+            Err(err) => println!("ion: failed to redirect stdin into {}: {}", stdin_file, err)
         }
     }
     if let Some(stdout_file) = pipeline.stdout_file {
         if let Some(mut command) = piped_commands.last_mut() {
             match File::create(&stdout_file) {
                 Ok(file) => unsafe { command.stdout(Stdio::from_raw_fd(file.into_raw_fd())); },
-                Err(err) => println!("ion: failed to pipe stdout into {}: {}", stdout_file, err)
+                Err(err) => println!("ion: failed to redirect stdout into {}: {}", stdout_file, err)
             }
         }
     }
@@ -39,10 +41,15 @@ pub fn pipe(commands: &mut [Command]) -> i32 {
                     unsafe { command.stdin(Stdio::from_raw_fd(stdout.as_raw_fd())); }
                 }
             } else {
+                // The previous command failed to spawn
                 command.stdin(Stdio::null());
             }
         }
-        children.push(command.spawn().ok());
+        let child = command.spawn().ok();
+        if child.is_none() {
+            println!("ion: command not found: {}", get_command_name(&command));
+        }
+        children.push(child);
     }
     wait(&mut children)
 }
@@ -61,7 +68,7 @@ fn wait(children: &mut Vec<Option<Child>>) -> i32 {
                 if let Some(code) = status.code() {
                     code
                 } else {
-                    println!("child ended by signal");
+                    println!("Child ended by signal");
                     TERMINATED
                 }
             }
@@ -73,4 +80,8 @@ fn wait(children: &mut Vec<Option<Child>>) -> i32 {
     } else {
         NO_SUCH_COMMAND
     }
+}
+
+fn get_command_name(command: &Command) -> String {
+    format!("{:?}", command).split('"').nth(1).unwrap_or("").to_string()
 }
