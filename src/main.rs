@@ -73,18 +73,16 @@ impl Shell {
             self.variables.set_var("HISTORY_FILE", history_path.to_str().unwrap_or("?"));
         }
 
-        {   // Initialize the PWD (Present Working Directory) variable
-            match std::env::current_dir() {
-                Ok(path) => self.variables.set_var("PWD", path.to_str().unwrap_or("?")),
-                Err(_)   => self.variables.set_var("PWD", "?")
-            }
+        // Initialize the PWD (Present Working Directory) variable
+        match std::env::current_dir() {
+            Ok(path) => self.variables.set_var("PWD", path.to_str().unwrap_or("?")),
+            Err(_)   => self.variables.set_var("PWD", "?")
         }
 
-        {   // Initialize the HOME variable
-            match std::env::home_dir() {
-                Some(path) => self.variables.set_var("HOME", path.to_str().unwrap_or("?")),
-                None       => self.variables.set_var("HOME", "?")
-            }
+        // Initialize the HOME variable
+        match std::env::home_dir() {
+            Some(path) => self.variables.set_var("HOME", path.to_str().unwrap_or("?")),
+            None       => self.variables.set_var("HOME", "?")
         }
     }
 
@@ -92,12 +90,21 @@ impl Shell {
     /// of the prompt. In example, the PWD variable needs to be updated to reflect changes to the
     /// the current working directory.
     fn update_variables(&mut self) {
-        {   // Update the PWD (Present Working Directory) variable
-            match std::env::current_dir() {
-                Ok(path) => self.variables.set_var("PWD", path.to_str().unwrap()),
-                Err(_)   => self.variables.set_var("PWD", "?")
-            }
+        // Update the PWD (Present Working Directory) variable if the current working directory has
+        // been updated.
+        match std::env::current_dir() {
+            Ok(path) => {
+                let pwd = self.variables.expand_string("$PWD");
+                let pwd = pwd.as_str();
+                let current_dir = path.to_str().unwrap_or("?");
+                if pwd != current_dir {
+                    self.variables.set_var("OLDPWD", pwd);
+                    self.variables.set_var("PWD", current_dir);
+                }
+            },
+            Err(_)   => self.variables.set_var("PWD", "?")
         }
+
     }
 
     /// Evaluates the source init file in the user's home directory. If the file does not exist,
