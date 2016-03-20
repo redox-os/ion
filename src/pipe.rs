@@ -1,6 +1,6 @@
 use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 
 use super::status::{TERMINATED, NO_SUCH_COMMAND};
 use super::peg::Pipeline;
@@ -10,17 +10,21 @@ pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
                                                    .iter()
                                                    .map(|job| { job.build_command() })
                                                    .collect();
-    if let (Some(stdin_file), Some(command)) = (pipeline.stdin_file, piped_commands.first_mut()) {
-        match File::open(&stdin_file) {
+    if let (Some(stdin), Some(command)) = (pipeline.stdin, piped_commands.first_mut()) {
+        match File::open(&stdin.file) {
             Ok(file) => unsafe { command.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
-            Err(err) => println!("ion: failed to redirect stdin into {}: {}", stdin_file, err)
+            Err(err) => println!("ion: failed to redirect stdin into {}: {}", stdin.file, err)
         }
     }
-    if let Some(stdout_file) = pipeline.stdout_file {
+    if let Some(stdout) = pipeline.stdout {
         if let Some(mut command) = piped_commands.last_mut() {
-            match File::create(&stdout_file) {
-                Ok(file) => unsafe { command.stdout(Stdio::from_raw_fd(file.into_raw_fd())); },
-                Err(err) => println!("ion: failed to redirect stdout into {}: {}", stdout_file, err)
+            let file = match stdout.append {
+                true => OpenOptions::new().write(true).append(true).open(&stdout.file),
+                false => File::create(&stdout.file)
+            };
+            match file {
+                Ok(f) => unsafe { command.stdout(Stdio::from_raw_fd(f.into_raw_fd())); },
+                Err(err) => println!("ion: failed to redirect stdout into {}: {}", stdout.file, err)
             }
         }
     }

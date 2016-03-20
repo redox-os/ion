@@ -4,19 +4,25 @@ use self::grammar::pipelines;
 use glob::glob;
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Redirection {
+    pub file: String,
+    pub append: bool
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct Pipeline {
     pub jobs: Vec<Job>,
-    pub stdout_file: Option<String>,
-    pub stdin_file: Option<String>,
+    pub stdout: Option<Redirection>,
+    pub stdin: Option<Redirection>,
 }
 
 impl Pipeline {
 
-    pub fn new(jobs: Vec<Job>, stdin: Option<String>, stdout: Option<String>) -> Self {
+    pub fn new(jobs: Vec<Job>, stdin: Option<Redirection>, stdout: Option<Redirection>) -> Self {
         Pipeline {
             jobs: jobs,
-            stdin_file: stdin,
-            stdout_file: stdout,
+            stdin: stdin,
+            stdout: stdout,
         }
     }
 
@@ -84,6 +90,7 @@ pub fn parse(code: &str) -> Vec<Pipeline> {
 peg! grammar(r#"
 use super::Pipeline;
 use super::Job;
+use super::Redirection;
 
 
 #[pub]
@@ -99,16 +106,17 @@ job -> Job
         Job::new(args.iter().map(|arg|arg.to_string()).collect(), background.is_some())
     }
 
-redirection -> (Option<String>, Option<String>)
+redirection -> (Option<Redirection>, Option<Redirection>)
     = stdin:redirect_stdin whitespace? stdout:redirect_stdout? { (Some(stdin), stdout) }
     / stdout:redirect_stdout whitespace? stdin:redirect_stdin? { (stdin, Some(stdout)) }
     / { (None, None) }
 
-redirect_stdin -> String
-    = [<] whitespace? file:word { file.to_string() }
+redirect_stdin -> Redirection
+    = [<] whitespace? file:word { Redirection { file: file.to_string(), append: false } }
 
-redirect_stdout -> String
-    = [>] whitespace? file:word { file.to_string() }
+redirect_stdout -> Redirection
+    = [>]{2} whitespace? file:word { Redirection { file: file.to_string(), append: true } }
+    / [>] whitespace? file:word { Redirection { file: file.to_string(), append: false } }
 
 pipeline_sep -> ()
     = (whitespace? [|] whitespace?) { }
@@ -305,16 +313,26 @@ mod tests {
     fn pipelines_with_redirection() {
         let pipelines = parse("cat | echo hello | cat < stuff > other");
         assert_eq!(3, pipelines[0].jobs.len());
-        assert_eq!(Some("stuff".to_string()), pipelines[0].stdin_file);
-        assert_eq!(Some("other".to_string()), pipelines[0].stdout_file);
+        assert_eq!("stuff", &pipelines[0].clone().stdin.unwrap().file);
+        assert_eq!("other", &pipelines[0].clone().stdout.unwrap().file);
+        assert!(!pipelines[0].clone().stdout.unwrap().append);
+    }
+
+    #[test]
+    fn pipeline_with_redirection_append() {
+        let pipelines = parse("cat | echo hello | cat < stuff >> other");
+        assert_eq!(3, pipelines[0].jobs.len());
+        assert_eq!("stuff", &pipelines[0].clone().stdin.unwrap().file);
+        assert_eq!("other", &pipelines[0].clone().stdout.unwrap().file);
+        assert!(pipelines[0].clone().stdout.unwrap().append);
     }
 
     #[test]
     fn pipelines_with_redirection_reverse_order() {
         let pipelines = parse("cat | echo hello | cat > stuff < other");
         assert_eq!(3, pipelines[0].jobs.len());
-        assert_eq!(Some("other".to_string()), pipelines[0].stdin_file);
-        assert_eq!(Some("stuff".to_string()), pipelines[0].stdout_file);
+        assert_eq!("other", &pipelines[0].clone().stdin.unwrap().file);
+        assert_eq!("stuff", &pipelines[0].clone().stdout.unwrap().file);
     }
 
     #[test]
