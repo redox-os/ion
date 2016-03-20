@@ -451,6 +451,15 @@ impl Command {
                             },
                         });
 
+        commands.insert("unlet",
+                        Command {
+                            name: "unlet",
+                            help: "Delete a variable",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.unlet(args)
+                            },
+                        });
+
         let command_helper: HashMap<&'static str, &'static str> = commands.iter()
                                                                           .map(|(k, v)| {
                                                                               (*k, v.help)

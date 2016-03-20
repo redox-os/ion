@@ -43,17 +43,36 @@ impl Variables {
         match (split.next().and_then(|x| if x == "" { None } else { Some(x) }), split.next()) {
             (Some(key), Some(value)) => {
                 if !Variables::is_valid_variable_name(&key) {
+                    println!("Invalid variable name");
                     return FAILURE;
                 }
                 self.variables.insert(key.to_string(), value.to_string());
             },
-            (Some(key), None) => {
-                self.variables.remove(key);
+            (Some(_), None) => {
+                println!("Please provide a value for the variable");
+                return FAILURE;
             },
             _ => {
                 for (key, value) in self.variables.iter() {
                     println!("{}={}", key, value);
                 }
+            }
+        }
+        SUCCESS
+    }
+
+    pub fn unlet<I: IntoIterator>(&mut self, args: I) -> i32
+        where I::Item: AsRef<str>
+    {
+        let args = args.into_iter().collect::<Vec<I::Item>>();
+        if args.len() <= 1 {
+            println!("You must specify a variable name");
+            return FAILURE;
+        }
+        for variable in args.iter().skip(1) {
+            if let None = self.unset_var(variable.as_ref()) {
+                println!("Undefined variable: {}", variable.as_ref());
+                return FAILURE;
             }
         }
         SUCCESS
@@ -180,7 +199,7 @@ impl Variables {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use status::FAILURE;
+    use status::{FAILURE, SUCCESS};
 
     #[test]
     fn undefined_variable_expands_to_empty_string() {
@@ -206,12 +225,10 @@ mod tests {
     }
 
     #[test]
-    fn remove_a_variable_with_let() {
+    fn let_fails_if_no_value() {
         let mut variables = Variables::new();
-        variables.let_(vec!["let", "FOO", "=", "BAR"]);
-        variables.let_(vec!["let", "FOO"]);
-        let expanded = variables.expand_string("$FOO");
-        assert_eq!("", &expanded);
+        let return_status = variables.let_(vec!["let", "FOO"]);
+        assert_eq!(FAILURE, return_status);
     }
 
     #[test]
@@ -241,6 +258,30 @@ mod tests {
     fn let_checks_variable_name() {
         let mut variables = Variables::new();
         let return_status = variables.let_(vec!["let", ",;!:", "=", "FOO"]);
+        assert_eq!(FAILURE, return_status);
+    }
+
+    #[test]
+    fn unlet_deletes_variable() {
+        let mut variables = Variables::new();
+        variables.set_var("FOO", "BAR");
+        let return_status = variables.unlet(vec!["unlet", "FOO"]);
+        assert_eq!(SUCCESS, return_status);
+        let expanded = variables.expand_string("$FOO");
+        assert_eq!("", expanded);
+    }
+
+    #[test]
+    fn unlet_fails_with_no_arguments() {
+        let mut variables = Variables::new();
+        let return_status = variables.unlet(vec!["unlet"]);
+        assert_eq!(FAILURE, return_status);
+    }
+
+    #[test]
+    fn unlet_fails_with_undefined_variable() {
+        let mut variables = Variables::new();
+        let return_status = variables.unlet(vec!["unlet", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
 }
