@@ -456,7 +456,7 @@ impl Command {
                             name: "drop",
                             help: "Delete a variable",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.drop(args)
+                                shell.variables.drop_(args)
                             },
                         });
 
