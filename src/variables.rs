@@ -61,7 +61,7 @@ impl Variables {
         SUCCESS
     }
 
-    pub fn drop_<I: IntoIterator>(&mut self, args: I) -> i32
+    pub fn drop_variable<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
         let args = args.into_iter().collect::<Vec<I::Item>>();
@@ -265,7 +265,7 @@ mod tests {
     fn drop_deletes_variable() {
         let mut variables = Variables::new();
         variables.set_var("FOO", "BAR");
-        let return_status = variables.drop_(vec!["drop", "FOO"]);
+        let return_status = variables.drop_variable(vec!["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("", expanded);
@@ -274,14 +274,14 @@ mod tests {
     #[test]
     fn drop_fails_with_no_arguments() {
         let mut variables = Variables::new();
-        let return_status = variables.drop_(vec!["drop"]);
+        let return_status = variables.drop_variable(vec!["drop"]);
         assert_eq!(FAILURE, return_status);
     }
 
     #[test]
     fn drop_fails_with_undefined_variable() {
         let mut variables = Variables::new();
-        let return_status = variables.drop_(vec!["drop", "FOO"]);
+        let return_status = variables.drop_variable(vec!["drop", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
 }
