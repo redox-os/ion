@@ -451,12 +451,12 @@ impl Command {
                             },
                         });
 
-        commands.insert("unlet",
+        commands.insert("drop",
                         Command {
-                            name: "unlet",
+                            name: "drop",
                             help: "Delete a variable",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.unlet(args)
+                                shell.variables.drop_variable(args)
                             },
                         });
 
