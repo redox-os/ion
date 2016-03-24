@@ -84,7 +84,13 @@ impl Job {
 }
 
 pub fn parse(code: &str) -> Vec<Pipeline> {
-    pipelines(code).unwrap_or(vec![])
+    match pipelines(code) {
+		Ok(code_ok) => code_ok,
+		Err(err) => {
+			println!("ion: Syntax {}",err);
+			vec![]
+		}
+	}
 }
 
 peg! grammar(r#"
