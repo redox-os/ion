@@ -12,11 +12,13 @@ pub struct Variables {
     variables: BTreeMap<String, String>,
 }
 
-impl Variables {
-    pub fn new() -> Variables {
+impl Default for Variables {
+    fn default() -> Variables {
         Variables { variables: BTreeMap::new() }
     }
+}
 
+impl Variables {
     pub fn read<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
@@ -53,7 +55,7 @@ impl Variables {
                 return FAILURE;
             },
             _ => {
-                for (key, value) in self.variables.iter() {
+                for (key, value) in &self.variables {
                     println!("{}={}", key, value);
                 }
             }
@@ -162,7 +164,7 @@ impl Variables {
         let mut new = original.to_owned();
         new = self.tilde_expansion(new);
         let mut replacements: Vec<(usize, usize, String)> = vec![];
-        for (n, _) in original.match_indices("$") {
+        for (n, _) in original.match_indices('$') {
             if n > 0 {
                 if let Some(c) = original.chars().nth(n-1) {
                     if c == '\\' {

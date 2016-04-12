@@ -29,8 +29,8 @@ pub struct FlowControl {
     pub current_statement: Statement, /* pub prompt: &'static str,  // Custom prompt while collecting code block */
 }
 
-impl FlowControl {
-    pub fn new() -> FlowControl {
+impl Default for FlowControl {
+    fn default() -> FlowControl {
         FlowControl {
             modes: vec![],
             collecting_block: false,
@@ -38,7 +38,9 @@ impl FlowControl {
             current_statement: Statement::Default,
         }
     }
+}
 
+impl FlowControl {
     pub fn skipping(&self) -> bool {
         self.modes.iter().any(|mode| !mode.value)
     }
@@ -102,12 +104,12 @@ impl FlowControl {
     pub fn end<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
-        if !self.modes.is_empty() {
-            self.modes.remove(0);
-            SUCCESS
-        } else {
+        if self.modes.is_empty() {
             println!("Syntax error: end found outside of a block");
             FAILURE
+        } else {
+            self.modes.remove(0);
+            SUCCESS
         }
     }
 
