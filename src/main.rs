@@ -67,8 +67,7 @@ impl Shell {
         self.variables.set_var("HISTORY_FILE_SIZE", "1000");
         self.variables.set_var("PROMPT", "ion:$PWD# ");
 
-        {   // Initialize the HISTORY_FILE variable
-            let mut history_path = std::env::home_dir().unwrap();
+        if let Some(mut history_path) = std::env::home_dir() {   // Initialize the HISTORY_FILE variable
             history_path.push(".ion_history");
             self.variables.set_var("HISTORY_FILE", history_path.to_str().unwrap_or("?"));
         }
@@ -111,20 +110,26 @@ impl Shell {
     /// the file will be created.
     fn evaluate_init_file(&mut self) {
         let commands = &Command::map();
-        let mut source_file = std::env::home_dir().unwrap(); // Obtain home directory
-        source_file.push(".ionrc");                          // Location of ion init file
 
-        if let Ok(mut file) = File::open(source_file.clone()) {
-            let mut command_list = String::new();
-            if let Err(message) = file.read_to_string(&mut command_list) {
-                println!("{}: Failed to read {:?}", message, source_file.clone());
+        // Obtain home directory
+        if let Some(mut source_file) = std::env::home_dir() {
+            // Location of ion init file
+            source_file.push(".ionrc");
+
+            if let Ok(mut file) = File::open(source_file.clone()) {
+                let mut command_list = String::new();
+                if let Err(message) = file.read_to_string(&mut command_list) {
+                    println!("{}: Failed to read {:?}", message, source_file.clone());
+                } else {
+                    self.on_command(&command_list, commands);
+                }
             } else {
-                self.on_command(&command_list, commands);
+                if let Err(message) = File::create(source_file) {
+                    println!("{}", message);
+                }
             }
         } else {
-            if let Err(message) = File::create(source_file) {
-                println!("{}", message);
-            }
+            println!("ion: could not get home directory");
         }
     }
 
