@@ -9,14 +9,16 @@ pub struct History {
     pub previous_status: i32,
 }
 
-impl History {
-    pub fn new() -> History {
+impl Default for History {
+    fn default() -> History {
         History {
             history:         VecDeque::with_capacity(1000),
             previous_status: SUCCESS,
         }
     }
+}
 
+impl History {
     /// Add a command to the history buffer and remove the oldest commands when the max history
     /// size has been met.
     pub fn add(&mut self, command: String, variables: &Variables) {

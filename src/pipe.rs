@@ -18,9 +18,10 @@ pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
     }
     if let Some(stdout) = pipeline.stdout {
         if let Some(mut command) = piped_commands.last_mut() {
-            let file = match stdout.append {
-                true => OpenOptions::new().write(true).append(true).open(&stdout.file),
-                false => File::create(&stdout.file)
+            let file = if stdout.append {
+                OpenOptions::new().write(true).append(true).open(&stdout.file)
+            } else {
+                File::create(&stdout.file)
             };
             match file {
                 Ok(f) => unsafe { command.stdout(Stdio::from_raw_fd(f.into_raw_fd())); },
@@ -63,7 +64,7 @@ fn wait(children: &mut Vec<Option<Child>>) -> i32 {
     let end = children.len() - 1;
     for child in children.drain(..end) {
         if let Some(mut child) = child {
-            child.wait();
+            let _ = child.wait();
         }
     }
     if let Some(mut child) = children.pop().unwrap() {

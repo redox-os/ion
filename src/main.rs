@@ -43,19 +43,62 @@ pub struct Shell {
     functions: HashMap<String, Function>
 }
 
-impl Shell {
+impl Default for Shell {
     /// Panics if DirectoryStack construction fails
-    pub fn new() -> Self {
+    fn default() -> Shell {
         let mut new_shell = Shell {
-            variables: Variables::new(),
-            flow_control: FlowControl::new(),
+            variables: Variables::default(),
+            flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new().expect(""),
-            history: History::new(),
+            history: History::default(),
             functions: HashMap::new()
         };
         new_shell.initialize_default_variables();
         new_shell.evaluate_init_file();
-        return new_shell;
+        new_shell
+    }
+}
+
+impl Shell {
+    fn execute(&mut self) {
+        let commands = Command::map();
+        let mut dash_c = false;
+        for arg in env::args().skip(1) {
+            if arg == "-c" {
+                dash_c = true;
+            } else {
+                if dash_c {
+                    self.on_command(&arg, &commands);
+                } else {
+                    match File::open(&arg) {
+                        Ok(mut file) => {
+                            let mut command_list = String::new();
+                            match file.read_to_string(&mut command_list) {
+                                Ok(_) => self.on_command(&command_list, &commands),
+                                Err(err) => println!("ion: failed to read {}: {}", arg, err)
+                            }
+                        },
+                        Err(err) => println!("ion: failed to open {}: {}", arg, err)
+                    }
+                }
+
+                // Exit with the previous command's exit status.
+                process::exit(self.history.previous_status);
+            }
+        }
+
+        self.print_prompt();
+        while let Some(command) = readln() {
+            let command = command.trim();
+            if !command.is_empty() {
+                self.on_command(command, &commands);
+            }
+            self.update_variables();
+            self.print_prompt();
+        }
+
+        // Exit with the previous command's exit status.
+        process::exit(self.history.previous_status);
     }
 
     /// This function will initialize the default variables used by the shell. This function will
@@ -193,7 +236,7 @@ impl Shell {
                             let values = vals.clone();
                             for value in values {
                                 self.variables.set_var(&variable, &value);
-                                for pipeline in block_jobs.iter() {
+                                for pipeline in &block_jobs {
                                     self.run_pipeline(&pipeline, commands);
                                 }
                             }
@@ -222,28 +265,26 @@ impl Shell {
         let exit_status = if let Some(command) = commands.get(pipeline.jobs[0].command.as_str()) {
             Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
         } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
-            if pipeline.jobs[0].args.len() - 1 != function.args.len() {
-                println!("This function takes {} arguments, but you provided {}", function.args.len(), pipeline.jobs[0].args.len()-1);
-                Some(NO_SUCH_COMMAND) // not sure if this is the right error code
-            } else {
+            if pipeline.jobs[0].args.len() - 1 == function.args.len() {
                 let mut variables_backup: HashMap<&str, Option<String>> = HashMap::new();
                 for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
                     variables_backup.insert(name, self.variables.get_var(name).cloned());
                     self.variables.set_var(name, value);
                 }
                 let mut return_value = None;
-                for function_pipeline in function.pipelines.iter() {
+                for function_pipeline in &function.pipelines {
                     return_value = self.run_pipeline(function_pipeline, commands)
                 }
-                for (name, value_option) in variables_backup.iter() {
+                for (name, value_option) in &variables_backup {
                     match *value_option {
                         Some(ref value) => self.variables.set_var(name, value),
-                        None => {
-                            self.variables.unset_var(name);
-                        }
+                        None => {self.variables.unset_var(name);},
                     }
                 }
                 return_value
+            } else {
+                println!("This function takes {} arguments, but you provided {}", function.args.len(), pipeline.jobs[0].args.len()-1);
+                Some(NO_SUCH_COMMAND) // not sure if this is the right error code
             }
         } else {
             Some(execute_pipeline(pipeline))
@@ -264,19 +305,19 @@ impl Shell {
                     let mut command_list = String::new();
                     if let Err(message) = file.read_to_string(&mut command_list) {
                         println!("{}: Failed to read {}", message, argument);
-                        return status::FAILURE;
+                        status::FAILURE
                     } else {
                         self.on_command(&command_list, &commands);
-                        return status::SUCCESS;
+                        status::SUCCESS
                     }
                 } else {
                     println!("Failed to open {}", argument);
-                    return status::FAILURE;
+                    status::FAILURE
                 }
             },
             None => {
                 self.evaluate_init_file();
-                return status::SUCCESS;
+                status::SUCCESS
             },
         }
     }
@@ -489,7 +530,7 @@ impl Command {
                                         println!("Command helper not found [run 'help']...");
                                     }
                                 } else {
-                                    for (command, _help) in command_helper.iter() {
+                                    for command in command_helper.keys() {
                                         println!("{}", command);
                                     }
                                 }
@@ -502,44 +543,5 @@ impl Command {
 }
 
 fn main() {
-    let commands = Command::map();
-    let mut shell = Shell::new();
-
-    let mut dash_c = false;
-    for arg in env::args().skip(1) {
-        if arg == "-c" {
-            dash_c = true;
-        } else {
-            if dash_c {
-                shell.on_command(&arg, &commands);
-            } else {
-                match File::open(&arg) {
-                    Ok(mut file) => {
-                        let mut command_list = String::new();
-                        match file.read_to_string(&mut command_list) {
-                            Ok(_) => shell.on_command(&command_list, &commands),
-                            Err(err) => println!("ion: failed to read {}: {}", arg, err)
-                        }
-                    },
-                    Err(err) => println!("ion: failed to open {}: {}", arg, err)
-                }
-            }
-
-            // Exit with the previous command's exit status.
-            process::exit(shell.history.previous_status);
-        }
-    }
-
-    shell.print_prompt();
-    while let Some(command) = readln() {
-        let command = command.trim();
-        if !command.is_empty() {
-            shell.on_command(command, &commands);
-        }
-        shell.update_variables();
-        shell.print_prompt();
-    }
-
-    // Exit with the previous command's exit status.
-    process::exit(shell.history.previous_status);
+    Shell::default().execute();
 }
