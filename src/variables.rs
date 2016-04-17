@@ -237,14 +237,14 @@ mod tests {
 
     #[test]
     fn undefined_variable_expands_to_empty_string() {
-        let variables = Variables::new();
+        let variables = Variables::default();
         let expanded = variables.expand_string("$FOO");
         assert_eq!("", &expanded);
     }
 
     #[test]
     fn let_and_expand_a_variable() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("BAR", &expanded);
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn set_var_and_expand_a_variable() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
         let expanded = variables.expand_string("$FOO");
         assert_eq!("BAR", &expanded);
@@ -260,14 +260,14 @@ mod tests {
 
     #[test]
     fn let_fails_if_no_value() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         let return_status = variables.let_(vec!["let", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
 
     #[test]
     fn expand_several_variables() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
         variables.let_(vec!["let", "X", "=", "Y"]);
         let expanded = variables.expand_string("variables: $FOO $X");
@@ -283,21 +283,21 @@ mod tests {
 
     #[test]
     fn escape_with_backslash() {
-        let variables = Variables::new();
+        let variables = Variables::default();
         let expanded = variables.expand_string("\\$FOO");
         assert_eq!("\\$FOO", &expanded);
     }
 
     #[test]
     fn let_checks_variable_name() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         let return_status = variables.let_(vec!["let", ",;!:", "=", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
 
     #[test]
     fn drop_deletes_variable() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
         let return_status = variables.drop_variable(vec!["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
@@ -307,14 +307,14 @@ mod tests {
 
     #[test]
     fn drop_fails_with_no_arguments() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         let return_status = variables.drop_variable(vec!["drop"]);
         assert_eq!(FAILURE, return_status);
     }
 
     #[test]
     fn drop_fails_with_undefined_variable() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         let return_status = variables.drop_variable(vec!["drop", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
