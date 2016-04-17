@@ -117,14 +117,14 @@ impl Shell {
 
         // Initialize the PWD (Present Working Directory) variable
         match std::env::current_dir() {
-            Ok(path) => self.variables.set_var("PWD", path.to_str().unwrap_or("?")),
-            Err(_)   => self.variables.set_var("PWD", "?")
+            Ok(path) => env::set_var("PWD", path.to_str().unwrap_or("?")),
+            Err(_)   => env::set_var("PWD", "?")
         }
 
         // Initialize the HOME variable
         match std::env::home_dir() {
-            Some(path) => self.variables.set_var("HOME", path.to_str().unwrap_or("?")),
-            None       => self.variables.set_var("HOME", "?")
+            Some(path) => env::set_var("HOME", path.to_str().unwrap_or("?")),
+            None       => env::set_var("HOME", "?")
         }
     }
 
@@ -140,11 +140,11 @@ impl Shell {
                 let pwd = pwd.as_str();
                 let current_dir = path.to_str().unwrap_or("?");
                 if pwd != current_dir {
-                    self.variables.set_var("OLDPWD", pwd);
-                    self.variables.set_var("PWD", current_dir);
+                    env::set_var("OLDPWD", pwd);
+                    env::set_var("PWD", current_dir);
                 }
             },
-            Err(_)   => self.variables.set_var("PWD", "?")
+            Err(_) => env::set_var("PWD", "?")
         }
 
     }
@@ -268,7 +268,7 @@ impl Shell {
             if pipeline.jobs[0].args.len() - 1 == function.args.len() {
                 let mut variables_backup: HashMap<&str, Option<String>> = HashMap::new();
                 for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
-                    variables_backup.insert(name, self.variables.get_var(name).cloned());
+                    variables_backup.insert(name, self.variables.get_var(name));
                     self.variables.set_var(name, value);
                 }
                 let mut return_value = None;
@@ -504,6 +504,15 @@ impl Command {
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.variables.drop_variable(args)
                             },
+                        });
+
+        commands.insert("export",
+                        Command {
+                            name: "export",
+                            help: "Set an environment variable",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.export_variable(args)
+                            }
                         });
 
         let command_helper: HashMap<&'static str, &'static str> = commands.iter()

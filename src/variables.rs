@@ -39,10 +39,7 @@ impl Variables {
     pub fn let_<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
-        let args = args.into_iter();
-        let string: String = args.skip(1).fold(String::new(), |string, x| string + x.as_ref());
-        let mut split = string.split('=');
-        match (split.next().and_then(|x| if x == "" { None } else { Some(x) }), split.next()) {
+        match Variables::parse_assignment(args) {
             (Some(key), Some(value)) => {
                 if !Variables::is_valid_variable_name(&key) {
                     println!("Invalid variable name");
@@ -90,14 +87,49 @@ impl Variables {
         }
     }
 
-    pub fn get_var(&self, name: &str) -> Option<&String> {
-        self.variables.get(name)
+    pub fn get_var(&self, name: &str) -> Option<String> {
+        self.variables.get(name).cloned().or(env::var(name).ok())
     }
 
     pub fn unset_var(&mut self, name: &str) -> Option<String> {
         self.variables.remove(name)
     }
 
+    fn parse_assignment<I: IntoIterator>(args: I) -> (Option<String>, Option<String>)
+        where I::Item: AsRef<str>
+    {
+        let args = args.into_iter();
+        let string: String = args.skip(1).fold(String::new(), |string, x| string + x.as_ref());
+        let mut split = string.split('=');
+        (split.next().and_then(|x| if x == "" { None } else { Some(x.to_owned()) }), split.next().and_then(|x| Some(x.to_owned())))
+    }
+
+    pub fn export_variable<I: IntoIterator>(&mut self, args: I) -> i32
+        where I::Item: AsRef<str>
+    {
+        match Variables::parse_assignment(args) {
+            (Some(key), Some(value)) => {
+                if !Variables::is_valid_variable_name(&key) {
+                    println!("Invalid variable name");
+                    return FAILURE;
+                }
+                env::set_var(key, value);
+            },
+            (Some(key), None) => {
+                if let Some(local_value) = self.get_var(&key) {
+                    env::set_var(key, local_value);
+                } else {
+                    println!("Unknown variable: {}", &key);
+                    return FAILURE;
+                }
+            },
+            _ => {
+                println!("Usage: export KEY=VALUE");
+                return FAILURE;
+            }
+        }
+        SUCCESS
+    }
 
     pub fn expand_pipeline(&self, pipeline: &Pipeline) -> Pipeline {
         // TODO don't copy everything
@@ -188,11 +220,11 @@ impl Variables {
         }
 
         for &(start, end, ref var_name) in replacements.iter().rev() {
-            let value: &str = match self.variables.get(var_name) {
-                Some(v) => &v,
-                None => ""
-            };
-            Variables::replace_substring(&mut new, start, end, value);
+            if let Some(value) = self.get_var(var_name) {
+                Variables::replace_substring(&mut new, start, end, &value);
+            } else {
+                Variables::replace_substring(&mut new, start, end, "");
+            }
         }
         new.clone()
     }
@@ -205,14 +237,14 @@ mod tests {
 
     #[test]
     fn undefined_variable_expands_to_empty_string() {
-        let variables = Variables::new();
+        let variables = Variables::default();
         let expanded = variables.expand_string("$FOO");
         assert_eq!("", &expanded);
     }
 
     #[test]
     fn let_and_expand_a_variable() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
         let expanded = variables.expand_string("$FOO");
         assert_eq!("BAR", &expanded);
@@ -220,7 +252,7 @@ mod tests {
 
     #[test]
     fn set_var_and_expand_a_variable() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
         let expanded = variables.expand_string("$FOO");
         assert_eq!("BAR", &expanded);
@@ -228,14 +260,14 @@ mod tests {
 
     #[test]
     fn let_fails_if_no_value() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         let return_status = variables.let_(vec!["let", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
 
     #[test]
     fn expand_several_variables() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
         variables.let_(vec!["let", "X", "=", "Y"]);
         let expanded = variables.expand_string("variables: $FOO $X");
@@ -251,21 +283,21 @@ mod tests {
 
     #[test]
     fn escape_with_backslash() {
-        let variables = Variables::new();
+        let variables = Variables::default();
         let expanded = variables.expand_string("\\$FOO");
         assert_eq!("\\$FOO", &expanded);
     }
 
     #[test]
     fn let_checks_variable_name() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         let return_status = variables.let_(vec!["let", ",;!:", "=", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
 
     #[test]
     fn drop_deletes_variable() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
         let return_status = variables.drop_variable(vec!["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
@@ -275,14 +307,14 @@ mod tests {
 
     #[test]
     fn drop_fails_with_no_arguments() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         let return_status = variables.drop_variable(vec!["drop"]);
         assert_eq!(FAILURE, return_status);
     }
 
     #[test]
     fn drop_fails_with_undefined_variable() {
-        let mut variables = Variables::new();
+        let mut variables = Variables::default();
         let return_status = variables.drop_variable(vec!["drop", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
