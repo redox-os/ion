@@ -13,6 +13,6 @@ authors = [
 ]
 
 [dependencies]
-peg = { git = "https://github.com/crazymykl/rust-peg.git", branch = "libsyntax-changes-again" }
+peg = "*"
 glob = "*"
 regex = "0.1"
