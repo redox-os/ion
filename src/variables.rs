@@ -5,6 +5,7 @@ use std::env;
 use super::peg::{Pipeline, Job};
 use super::input_editor::readln;
 use super::status::{SUCCESS, FAILURE};
+use super::directory_stack::DirectoryStack;
 
 pub struct Variables {
     variables: BTreeMap<String, String>,
@@ -89,6 +90,10 @@ impl Variables {
         self.variables.get(name).cloned().or(env::var(name).ok())
     }
 
+    pub fn get_var_or_empty(&self, name: &str) -> String {
+        self.get_var(name).unwrap_or(String::new())
+    }
+
     pub fn unset_var(&mut self, name: &str) -> Option<String> {
         self.variables.remove(name)
     }
@@ -129,21 +134,20 @@ impl Variables {
         SUCCESS
     }
 
-    pub fn expand_pipeline(&self, pipeline: &Pipeline) -> Pipeline {
+    pub fn expand_pipeline(&self, pipeline: &Pipeline, dir_stack: &DirectoryStack) -> Pipeline {
         // TODO don't copy everything
         // TODO ugh, I made it worse
-        Pipeline::new(
-            pipeline.jobs.iter().map(|job| {self.expand_job(job)}).collect(),
-            pipeline.stdin.clone(),
-            pipeline.stdout.clone())
+        Pipeline::new(pipeline.jobs.iter().map(|job| self.expand_job(job, dir_stack)).collect(),
+                      pipeline.stdin.clone(),
+                      pipeline.stdout.clone())
     }
 
-    pub fn expand_job(&self, job: &Job) -> Job {
+    pub fn expand_job(&self, job: &Job, dir_stack: &DirectoryStack) -> Job {
         // TODO don't copy everything
         Job::new(job.args
-                    .iter()
-                    .map(|original: &String| self.expand_string(&original))
-                    .collect(),
+                     .iter()
+                     .map(|original: &String| self.expand_string(&original, dir_stack))
+                     .collect(),
                  job.background)
     }
 
@@ -161,7 +165,7 @@ impl Variables {
         name.chars().all(Variables::is_valid_variable_character)
     }
 
-    pub fn tilde_expansion(&self, word: String) -> String {
+    pub fn tilde_expansion(&self, word: String, dir_stack: &DirectoryStack) -> String {
         // If the word doesn't start with ~, just return it to avoid allocating an iterator
         if word.starts_with("~") {
             let mut chars = word.char_indices();
@@ -201,16 +205,42 @@ impl Variables {
                         return oldpwd.to_string() + remainder;
                     }
                 }
-                _ => (),
+                _ => {
+                    let neg;
+                    let tilde_num;
+
+                    if tilde_prefix.starts_with("+") {
+                        tilde_num = &tilde_prefix[1..];
+                        neg = false;
+                    } else if tilde_prefix.starts_with("-") {
+                        tilde_num = &tilde_prefix[1..];
+                        neg = true;
+                    } else {
+                        tilde_num = tilde_prefix;
+                        neg = false;
+                    }
+
+                    if let Ok(num) = tilde_num.parse::<usize>() {
+                        let res = if neg {
+                            dir_stack.dir_from_top(num)
+                        } else {
+                            dir_stack.dir_from_bottom(num)
+                        };
+
+                        if let Some(path) = res {
+                            return path.to_str().unwrap().to_string();
+                        }
+                    }
+                }
             }
         }
 
         word
     }
 
-    pub fn expand_string<'a>(&'a self, original: &'a str) -> String {
+    pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> String {
         let mut new = original.to_owned();
-        new = self.tilde_expansion(new);
+        new = self.tilde_expansion(new, dir_stack);
         let mut replacements: Vec<(usize, usize, String)> = vec![];
         for (n, _) in original.match_indices('$') {
             if n > 0 {
@@ -250,11 +280,16 @@ impl Variables {
 mod tests {
     use super::*;
     use status::{FAILURE, SUCCESS};
+    use directory_stack::DirectoryStack;
+
+    fn new_dir_stack() -> DirectoryStack {
+        DirectoryStack::new().unwrap()
+    }
 
     #[test]
     fn undefined_variable_expands_to_empty_string() {
         let variables = Variables::default();
-        let expanded = variables.expand_string("$FOO");
+        let expanded = variables.expand_string("$FOO", &new_dir_stack());
         assert_eq!("", &expanded);
     }
 
@@ -262,7 +297,7 @@ mod tests {
     fn let_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
-        let expanded = variables.expand_string("$FOO");
+        let expanded = variables.expand_string("$FOO", &new_dir_stack());
         assert_eq!("BAR", &expanded);
     }
 
@@ -270,7 +305,7 @@ mod tests {
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
-        let expanded = variables.expand_string("$FOO");
+        let expanded = variables.expand_string("$FOO", &new_dir_stack());
         assert_eq!("BAR", &expanded);
     }
 
@@ -286,7 +321,7 @@ mod tests {
         let mut variables = Variables::default();
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
         variables.let_(vec!["let", "X", "=", "Y"]);
-        let expanded = variables.expand_string("variables: $FOO $X");
+        let expanded = variables.expand_string("variables: $FOO $X", &new_dir_stack());
         assert_eq!("variables: BAR Y", &expanded);
     }
 
@@ -300,7 +335,7 @@ mod tests {
     #[test]
     fn escape_with_backslash() {
         let variables = Variables::default();
-        let expanded = variables.expand_string("\\$FOO");
+        let expanded = variables.expand_string("\\$FOO", &new_dir_stack());
         assert_eq!("\\$FOO", &expanded);
     }
 
@@ -317,7 +352,7 @@ mod tests {
         variables.set_var("FOO", "BAR");
         let return_status = variables.drop_variable(vec!["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = variables.expand_string("$FOO");
+        let expanded = variables.expand_string("$FOO", &new_dir_stack());
         assert_eq!("", expanded);
     }
 

@@ -135,15 +135,15 @@ impl Shell {
         // been updated.
         match std::env::current_dir() {
             Ok(path) => {
-                let pwd = self.variables.expand_string("$PWD");
+                let pwd = self.variables.get_var_or_empty("PWD");
                 let pwd = pwd.as_str();
                 let current_dir = path.to_str().unwrap_or("?");
                 if pwd != current_dir {
                     env::set_var("OLDPWD", pwd);
                     env::set_var("PWD", current_dir);
                 }
-            },
-            Err(_) => env::set_var("PWD", "?")
+            }
+            Err(_) => env::set_var("PWD", "?"),
         }
 
     }
@@ -210,7 +210,9 @@ impl Shell {
     }
 
     fn print_default_prompt(&self) {
-        print!("{}", self.variables.expand_string(&self.variables.expand_string("$PROMPT")));
+        print!("{}",
+               self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"),
+                                            &self.directory_stack));
     }
 
     fn on_command(&mut self, command_string: &str, commands: &HashMap<&str, Command>) {
@@ -258,8 +260,11 @@ impl Shell {
         }
     }
 
-    fn run_pipeline(&mut self, pipeline: &Pipeline, commands: &HashMap<&str, Command>) -> Option<i32> {
-        let mut pipeline = self.variables.expand_pipeline(pipeline);
+    fn run_pipeline(&mut self,
+                    pipeline: &Pipeline,
+                    commands: &HashMap<&str, Command>)
+                    -> Option<i32> {
+        let mut pipeline = self.variables.expand_pipeline(pipeline, &self.directory_stack);
         pipeline.expand_globs();
         let exit_status = if let Some(command) = commands.get(pipeline.jobs[0].command.as_str()) {
             Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
