@@ -107,7 +107,7 @@ impl Shell {
         self.variables.set_var("HISTORY_SIZE", "1000");
         self.variables.set_var("HISTORY_FILE_ENABLED", "1");
         self.variables.set_var("HISTORY_FILE_SIZE", "1000");
-        self.variables.set_var("PROMPT", "ion:$PWD# ");
+        self.variables.set_var("PROMPT", "\x1B[0m\x1B[1;38;5;85mion\x1B[37m:\x1B[38;5;75m$PWD\x1B[37m#\x1B[0m ");
 
         if let Some(mut history_path) = std::env::home_dir() {   // Initialize the HISTORY_FILE variable
             history_path.push(".ion_history");
