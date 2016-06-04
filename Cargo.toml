@@ -2,7 +2,7 @@
 name = "ion-shell"
 description = "The Ion Shell"
 repository = "https://github.com/redox-os/ion"
-version = "0.1.2"
+version = "0.1.3"
 license-file = "LICENSE"
 readme = "README.md"
 authors = [
@@ -13,5 +13,5 @@ authors = [
 ]
 
 [dependencies]
-peg = "*"
-glob = "*"
+peg = "0.3"
+glob = "0.2"
