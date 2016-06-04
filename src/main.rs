@@ -4,7 +4,6 @@
 #![plugin(peg_syntax_ext)]
 
 extern crate glob;
-extern crate regex;
 
 use std::collections::HashMap;
 use std::fs::File;

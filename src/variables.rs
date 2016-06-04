@@ -6,8 +6,6 @@ use super::peg::{Pipeline, Job};
 use super::input_editor::readln;
 use super::status::{SUCCESS, FAILURE};
 
-use regex::Regex;
-
 pub struct Variables {
     variables: BTreeMap<String, String>,
 }
@@ -164,31 +162,49 @@ impl Variables {
     }
 
     pub fn tilde_expansion(&self, word: String) -> String {
-        let re = Regex::new("^~(.*?)((/|$).*)").unwrap();
-        if let Some(cap) = re.captures_iter(&word).next() {
-            if let (Some(tilde_prefix), Some(remainder)) = (cap.at(1), cap.at(2)) {
-                match tilde_prefix {
-                    "" => {
-                        if let Some(home) = env::home_dir() {
-                            return home.to_string_lossy().to_string() + remainder;
-                        }
-                    },
-                    "+" => {
-                        if let Some(pwd) = self.get_var("PWD") {
-                            return pwd.to_string() + remainder;
-                        } else if let Ok(pwd) = env::current_dir() {
-                            return pwd.to_string_lossy().to_string() + remainder;
-                        }
-                    },
-                    "-" => {
-                        if let Some(oldpwd) = self.get_var("OLDPWD") {
-                            return oldpwd.to_string() + remainder;
-                        }
-                    },
-                    _ => (),
+        // If the word doesn't start with ~, just return it to avoid allocating an iterator
+        if word.starts_with("~") {
+            let mut chars = word.char_indices();
+
+            let tilde_prefix;
+            let remainder;
+
+            loop {
+                if let Some((ind, c)) = chars.next() {
+                    if c == '/' || c == '$' {
+                        tilde_prefix = &word[1..ind];
+                        remainder = &word[ind..];
+                        break;
+                    }
+                } else {
+                    tilde_prefix = &word[1..];
+                    remainder = "";
+                    break;
                 }
             }
+
+            match tilde_prefix {
+                "" => {
+                    if let Some(home) = env::home_dir() {
+                        return home.to_string_lossy().to_string() + remainder;
+                    }
+                }
+                "+" => {
+                    if let Some(pwd) = self.get_var("PWD") {
+                        return pwd.to_string() + remainder;
+                    } else if let Ok(pwd) = env::current_dir() {
+                        return pwd.to_string_lossy().to_string() + remainder;
+                    }
+                }
+                "-" => {
+                    if let Some(oldpwd) = self.get_var("OLDPWD") {
+                        return oldpwd.to_string() + remainder;
+                    }
+                }
+                _ => (),
+            }
         }
+
         word
     }
 
