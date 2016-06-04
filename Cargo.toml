@@ -15,4 +15,3 @@ authors = [
 [dependencies]
 peg = "*"
 glob = "*"
-regex = "0.1"
