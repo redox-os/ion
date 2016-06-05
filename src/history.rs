@@ -24,8 +24,8 @@ impl History {
     pub fn add(&mut self, command: String, variables: &Variables) {
         // Write this command to the history file if writing to the file is enabled.
         // TODO: Prevent evaluated files from writing to the log.
-        if variables.expand_string("$HISTORY_FILE_ENABLED") == "1" && command.trim() != "" {
-            let history_file = variables.expand_string("$HISTORY_FILE");
+        if variables.get_var_or_empty("HISTORY_FILE_ENABLED") == "1" && command.trim() != "" {
+            let history_file = variables.get_var_or_empty("HISTORY_FILE");
             History::write_to_disk(&history_file, History::get_file_size(variables), &command);
         }
 
@@ -119,9 +119,9 @@ impl History {
     /// will return a default value of 1000.
     #[inline]
     fn get_size(variables: &Variables) -> usize {
-        match variables.expand_string("$HISTORY_SIZE").parse::<usize>() {
+        match variables.get_var_or_empty("HISTORY_SIZE").parse::<usize>() {
             Ok(size) => size,
-            _        => 1000,
+            _ => 1000,
         }
     }
 
@@ -130,9 +130,9 @@ impl History {
     /// it will return a default value of 1000.
     #[inline]
     fn get_file_size(variables: &Variables) -> usize {
-        match variables.expand_string("$HISTORY_FILE_SIZE").parse::<usize>() {
-            Ok(size)  => size,
-            Err(_)    => 1000,
+        match variables.get_var_or_empty("HISTORY_FILE_SIZE").parse::<usize>() {
+            Ok(size) => size,
+            Err(_) => 1000,
         }
     }
 }

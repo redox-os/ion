@@ -25,9 +25,9 @@ impl DirectoryStack {
     /// directory stack size variable. If it succeeds, it will return the value of that variable,
     /// else it will return a default value of 1000.
     fn get_size(variables: &Variables) -> usize {
-        match variables.expand_string("$DIRECTORY_STACK_SIZE").parse::<usize>() {
+        match variables.get_var_or_empty("DIRECTORY_STACK_SIZE").parse::<usize>() {
             Ok(size) => size,
-            _        => 1000,
+            _ => 1000,
         }
     }
 
@@ -135,6 +135,14 @@ impl DirectoryStack {
     {
         self.print_dirs();
         SUCCESS
+    }
+
+    pub fn dir_from_top(&self, num: usize) -> Option<&PathBuf> {
+        self.dirs.get(num)
+    }
+
+    pub fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> {
+        self.dirs.iter().rev().nth(num)
     }
 
     fn print_dirs(&self) {
