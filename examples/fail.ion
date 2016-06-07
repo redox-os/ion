@@ -1,0 +1,5 @@
+if 3 == 2
+    echo pass
+else
+    echo fail
+end
