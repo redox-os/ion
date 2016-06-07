@@ -105,7 +105,7 @@ impl Shell {
     fn initialize_default_variables(&mut self) {
         self.variables.set_var("DIRECTORY_STACK_SIZE", "1000");
         self.variables.set_var("HISTORY_SIZE", "1000");
-        self.variables.set_var("HISTORY_FILE_ENABLED", "1");
+        self.variables.set_var("HISTORY_FILE_ENABLED", "0");
         self.variables.set_var("HISTORY_FILE_SIZE", "1000");
         self.variables.set_var("PROMPT", "\x1B[0m\x1B[1;38;5;85mion\x1B[37m:\x1B[38;5;75m$PWD\x1B[37m#\x1B[0m ");
 
