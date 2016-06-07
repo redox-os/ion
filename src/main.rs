@@ -148,8 +148,7 @@ impl Shell {
 
     }
 
-    /// Evaluates the source init file in the user's home directory. If the file does not exist,
-    /// the file will be created.
+    /// Evaluates the source init file in the user's home directory.
     fn evaluate_init_file(&mut self) {
         let commands = &Command::map();
 
@@ -164,10 +163,6 @@ impl Shell {
                     println!("{}: Failed to read {:?}", message, source_file.clone());
                 } else {
                     self.on_command(&command_list, commands);
-                }
-            } else {
-                if let Err(message) = File::create(source_file) {
-                    println!("{}", message);
                 }
             }
         } else {
