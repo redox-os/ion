@@ -1,6 +1,8 @@
 use std::process::Command;
 
 use self::grammar::pipelines;
+use self::grammar::if_;
+
 use glob::glob;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -14,6 +16,31 @@ pub struct Pipeline {
     pub jobs: Vec<Job>,
     pub stdout: Option<Redirection>,
     pub stdin: Option<Redirection>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ShellUpdate {
+    FlowControl(IfStatement),
+    Pipelines(Vec<Pipeline>)
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IfStatement {
+    pub left: String,
+    pub comparitor: Comparitor,
+    pub right: String
+    //pub if_block: Pipeline,
+    //pub else_block: Pipeline
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Comparitor {
+    Equal,
+    NotEqual,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual
 }
 
 impl Pipeline {
@@ -97,7 +124,26 @@ peg! grammar(r#"
 use super::Pipeline;
 use super::Job;
 use super::Redirection;
+use super::IfStatement;
+use super::ShellUpdate;
+use super::Comparitor::*;
+use super::Comparitor;
 
+
+#[pub]
+if_ -> ShellUpdate
+    = "if " l:_not_comparitor whitespace c:comparitor whitespace r:_not_comparitor { ShellUpdate::FlowControl(IfStatement{ left: l, comparitor: c, right: r}) }
+
+comparitor -> Comparitor
+    = "==" { Equal }
+    / "!=" { NotEqual }
+    / "<"  { LessThan }
+    / "<=" { LessThanOrEqual }
+    / ">"  { GreaterThan }
+    / ">=" { GreaterThanOrEqual }
+
+_not_comparitor -> String
+    = !comparitor [^ ]+ { match_str.to_string() }
 
 #[pub]
 pipelines -> Vec<Pipeline>
@@ -108,7 +154,7 @@ pipeline -> Pipeline
     = whitespace? res:job ++ pipeline_sep whitespace? redir:redirection whitespace? comment? { Pipeline::new(res, redir.0, redir.1) }
 
 job -> Job
-    = args:word ++ whitespace background:background_token? { 
+    = args:word ++ whitespace background:background_token? {
         Job::new(args.iter().map(|arg|arg.to_string()).collect(), background.is_some())
     }
 
@@ -370,9 +416,9 @@ fi
 
 # comment
    # comment
-  
 
-    if a == a   
+
+    if a == a
   echo true a == a  # Line ending commment
 
   if b != b
@@ -388,10 +434,18 @@ fi
   fi
 else
   echo false a == a
-      fi     
+      fi
 
 # comment
 
 "#).unwrap();  // Make sure it parses
+    }
+    #[test]
+    fn parsing_ifs() {
+        let parsed_if = if_("if 1 == 2").unwrap();
+        let correct_parse = ShellUpdate::FlowControl(IfStatement{left: "1".to_string(),
+                                        comparitor: Comparitor::Equal,
+                                        right: "2".to_string()});
+        assert_eq!(correct_parse, parsed_if);
     }
 }
