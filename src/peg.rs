@@ -28,6 +28,10 @@ pub enum ShellUpdate {
         name: String,
         args: Vec<String>
     },
+    ForStatement{
+        variable: String,
+        values: Vec<String>
+    },
     ElseStatement,
     EndStatement,
     Pipelines(Vec<Pipeline>)
@@ -146,11 +150,16 @@ fn_ -> ShellUpdate
 
 _name -> String
       = [A-z]+ { match_str.to_string() }
+
 _args -> Vec<String>
       = _arg ** " "
 
 _arg -> String
      = [A-z]+ { match_str.to_string() }
+
+#[pub]
+for_ -> ShellUpdate
+    = whitespace* "for " n:_name " in " args:_args whitespace* { ShellUpdate::ForStatement{variable: n.to_string(), values: args} }
 
 comparitor -> Comparitor
     = "==" { Comparitor::Equal }
@@ -537,6 +546,22 @@ else
 
         // Leading spaces after final value
         let parsed_if = fn_("         fn bob a b").unwrap();
+        assert_eq!(correct_parse, parsed_if);
+    }
+
+    #[test]
+    fn parsing_fors() {
+        // Default case where spaced normally
+        let parsed_if = for_("for i in a b").unwrap();
+        let correct_parse = ShellUpdate::ForStatement{variable: "i".to_string(), values: vec!("a".to_string(), "b".to_string())};
+        assert_eq!(correct_parse, parsed_if);
+
+        // Trailing spaces after final value
+        let parsed_if = for_("for i in a b        ").unwrap();
+        assert_eq!(correct_parse, parsed_if);
+
+        // Leading spaces after final value
+        let parsed_if = for_("         for i in a b").unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 }
