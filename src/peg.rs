@@ -1,7 +1,6 @@
 use std::process::Command;
 
 use self::grammar::pipelines;
-use self::grammar::if_;
 
 use glob::glob;
 
@@ -20,17 +19,18 @@ pub struct Pipeline {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ShellUpdate {
-    FlowControl(IfStatement),
+    IfStatement {
+        left: String,
+        comparitor: Comparitor,
+        right: String
+    },
+    FunctionStatement{
+        name: String,
+        args: Vec<String>
+    },
+    ElseStatement,
+    EndStatement,
     Pipelines(Vec<Pipeline>)
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct IfStatement {
-    pub left: String,
-    pub comparitor: Comparitor,
-    pub right: String
-    //pub if_block: Pipeline,
-    //pub else_block: Pipeline
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -124,23 +124,41 @@ peg! grammar(r#"
 use super::Pipeline;
 use super::Job;
 use super::Redirection;
-use super::IfStatement;
 use super::ShellUpdate;
-use super::Comparitor::*;
 use super::Comparitor;
 
 
 #[pub]
 if_ -> ShellUpdate
-    = "if " l:_not_comparitor whitespace c:comparitor whitespace r:_not_comparitor { ShellUpdate::FlowControl(IfStatement{ left: l, comparitor: c, right: r}) }
+    = "if " l:_not_comparitor whitespace c:comparitor whitespace r:_not_comparitor whitespace* { ShellUpdate::IfStatement{ left: l, comparitor: c, right: r} }
+
+#[pub]
+else_ -> ShellUpdate
+    = whitespace* "else" whitespace*  { ShellUpdate::ElseStatement }
+
+#[pub]
+end_ -> ShellUpdate
+    = whitespace* "end" whitespace* { ShellUpdate::EndStatement }
+
+#[pub]
+fn_ -> ShellUpdate
+    = whitespace* "fn " n:_name whitespace* args:_args whitespace* { ShellUpdate::FunctionStatement{name: n.to_string(), args: args} }
+
+_name -> String
+      = [A-z]+ { match_str.to_string() }
+_args -> Vec<String>
+      = _arg ** " "
+
+_arg -> String
+     = [A-z]+ { match_str.to_string() }
 
 comparitor -> Comparitor
-    = "==" { Equal }
-    / "!=" { NotEqual }
-    / "<"  { LessThan }
-    / "<=" { LessThanOrEqual }
-    / ">"  { GreaterThan }
-    / ">=" { GreaterThanOrEqual }
+    = "==" { Comparitor::Equal }
+    / "!=" { Comparitor::NotEqual }
+    / "<"  { Comparitor::LessThan }
+    / "<=" { Comparitor::LessThanOrEqual }
+    / ">"  { Comparitor::GreaterThan }
+    / ">=" { Comparitor::GreaterThanOrEqual }
 
 _not_comparitor -> String
     = !comparitor [^ ]+ { match_str.to_string() }
@@ -442,10 +460,83 @@ else
     }
     #[test]
     fn parsing_ifs() {
+        // Default case where spaced normally
         let parsed_if = if_("if 1 == 2").unwrap();
-        let correct_parse = ShellUpdate::FlowControl(IfStatement{left: "1".to_string(),
+        let correct_parse = ShellUpdate::IfStatement{left: "1".to_string(),
                                         comparitor: Comparitor::Equal,
-                                        right: "2".to_string()});
+                                        right: "2".to_string()};
+        assert_eq!(correct_parse, parsed_if);
+
+        // Trailing spaces after final value
+        let parsed_if = if_("if 1 == 2         ").unwrap();
+        let correct_parse = ShellUpdate::IfStatement{left: "1".to_string(),
+                                        comparitor: Comparitor::Equal,
+                                        right: "2".to_string()};
+        assert_eq!(correct_parse, parsed_if);
+    }
+
+    #[test]
+    fn parsing_elses() {
+        // Default case where spaced normally
+        let parsed_if = else_("else").unwrap();
+        let correct_parse = ShellUpdate::ElseStatement;
+        assert_eq!(correct_parse, parsed_if);
+
+        // Trailing spaces after final value
+        let parsed_if = else_("else         ").unwrap();
+        let correct_parse = ShellUpdate::ElseStatement;
+        assert_eq!(correct_parse, parsed_if);
+
+        // Leading spaces after final value
+        let parsed_if = else_("         else").unwrap();
+        let correct_parse = ShellUpdate::ElseStatement;
+        assert_eq!(correct_parse, parsed_if);
+    }
+
+    #[test]
+    fn parsing_ends() {
+        // Default case where spaced normally
+        let parsed_if = end_("end").unwrap();
+        let correct_parse = ShellUpdate::EndStatement;
+        assert_eq!(correct_parse, parsed_if);
+
+        // Trailing spaces after final value
+        let parsed_if = end_("end         ").unwrap();
+        let correct_parse = ShellUpdate::EndStatement;
+        assert_eq!(correct_parse, parsed_if);
+
+        // Leading spaces after final value
+        let parsed_if = end_("         end").unwrap();
+        let correct_parse = ShellUpdate::EndStatement;
+        assert_eq!(correct_parse, parsed_if);
+    }
+
+    #[test]
+    fn parsing_functions() {
+        // Default case where spaced normally
+        let parsed_if = fn_("fn bob").unwrap();
+        let correct_parse = ShellUpdate::FunctionStatement{name: "bob".to_string(), args: vec!()};
+        assert_eq!(correct_parse, parsed_if);
+
+        // Trailing spaces after final value
+        let parsed_if = fn_("fn bob        ").unwrap();
+        assert_eq!(correct_parse, parsed_if);
+
+        // Leading spaces after final value
+        let parsed_if = fn_("         fn bob").unwrap();
+        assert_eq!(correct_parse, parsed_if);
+
+        // Default case where spaced normally
+        let parsed_if = fn_("fn bob a b").unwrap();
+        let correct_parse = ShellUpdate::FunctionStatement{name: "bob".to_string(), args: vec!("a".to_string(), "b".to_string())};
+        assert_eq!(correct_parse, parsed_if);
+
+        // Trailing spaces after final value
+        let parsed_if = fn_("fn bob a b       ").unwrap();
+        assert_eq!(correct_parse, parsed_if);
+
+        // Leading spaces after final value
+        let parsed_if = fn_("         fn bob a b").unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 }
