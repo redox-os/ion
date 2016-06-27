@@ -1,0 +1,121 @@
+use peg::Pipeline;
+use peg::Job;
+use peg::Redirection;
+use flow_control::Statement;
+use flow_control::Comparitor;
+
+#[pub]
+parse_ -> Statement
+      = if_
+      / else_
+      / for_
+      / fn_
+      / end_
+      / pipelines
+
+#[pub]
+if_ -> Statement
+    = "if " l:_not_comparitor whitespace c:comparitor whitespace r:_not_comparitor whitespace* { Statement::If{ left: l, comparitor: c, right: r} }
+
+#[pub]
+else_ -> Statement
+    = whitespace* "else" whitespace*  { Statement::Else}
+
+#[pub]
+end_ -> Statement
+    = whitespace* "end" whitespace* { Statement ::End}
+
+#[pub]
+fn_ -> Statement
+    = whitespace* "fn " n:_name whitespace* args:_args whitespace* { Statement::Function{name: n.to_string(), args: args} }
+
+_name -> String
+      = [A-z]+ { match_str.to_string() }
+
+_args -> Vec<String>
+      = _arg ** " "
+
+_arg -> String
+     = [A-z]+ { match_str.to_string() }
+
+#[pub]
+for_ -> Statement
+    = whitespace* "for " n:_name " in " args:_args whitespace* { Statement::For{variable: n.to_string(), values: args} }
+
+comparitor -> Comparitor
+    = "==" { Comparitor::Equal }
+    / "!=" { Comparitor::NotEqual }
+    / "<=" { Comparitor::LessThanOrEqual }
+    / ">=" { Comparitor::GreaterThanOrEqual }
+    / "<"  { Comparitor::LessThan }
+    / ">"  { Comparitor::GreaterThan }
+
+_not_comparitor -> String
+    = !comparitor [^ ]+ { match_str.to_string() }
+
+#[pub]
+pipelines -> Statement
+    = (unused* newline)* pipelines:pipeline ++ ((job_ending+ unused*)+) (newline unused*)* { Statement::Pipelines(pipelines) }
+    / (unused*) ** newline { Statement::Pipelines(vec![]) }
+
+pipeline -> Pipeline
+    = whitespace? res:job ++ pipeline_sep whitespace? redir:redirection whitespace? comment? { Pipeline::new(res, redir.0, redir.1) }
+
+job -> Job
+    = args:word ++ whitespace background:background_token? {
+        Job::new(args.iter().map(|arg|arg.to_string()).collect(), background.is_some())
+    }
+
+redirection -> (Option<Redirection>, Option<Redirection>)
+    = stdin:redirect_stdin whitespace? stdout:redirect_stdout? { (Some(stdin), stdout) }
+    / stdout:redirect_stdout whitespace? stdin:redirect_stdin? { (stdin, Some(stdout)) }
+    / { (None, None) }
+
+redirect_stdin -> Redirection
+    = [<] whitespace? file:word { Redirection { file: file.to_string(), append: false } }
+
+redirect_stdout -> Redirection
+    = [>]{2} whitespace? file:word { Redirection { file: file.to_string(), append: true } }
+    / [>] whitespace? file:word { Redirection { file: file.to_string(), append: false } }
+
+pipeline_sep -> ()
+    = (whitespace? [|] whitespace?) { }
+
+background_token -> ()
+    = [&]
+    / whitespace [&]
+
+word -> &'input str
+    = double_quoted_word
+    / single_quoted_word
+    / [^ \t\r\n#;&|<>]+ { match_str }
+
+double_quoted_word -> &'input str
+    = ["] word:_double_quoted_word ["] { word }
+
+_double_quoted_word -> &'input str
+    = [^"]+ { match_str }
+
+single_quoted_word -> &'input str
+    = ['] word:_single_quoted_word ['] { word }
+
+_single_quoted_word -> &'input str
+    = [^']+ { match_str }
+
+unused -> ()
+    = whitespace comment? { () }
+    / comment { () }
+
+comment -> ()
+    = [#] [^\r\n]*
+
+whitespace -> ()
+    = [ \t]+
+
+job_ending -> ()
+    = [;]
+    / newline
+    / newline
+
+newline -> ()
+    = [\r\n]

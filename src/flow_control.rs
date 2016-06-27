@@ -6,12 +6,63 @@ pub fn is_flow_control_command(command: &str) -> bool {
     command == "end" || command == "if" || command == "else"
 }
 
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
-    For(String, Vec<String>),
-    Function(String, Vec<String>),
-    If,
+    If {
+        left: String,
+        comparitor: Comparitor,
+        right: String
+    },
+    Function{
+        name: String,
+        args: Vec<String>
+    },
+    For{
+        variable: String,
+        values: Vec<String>
+    },
+    Else,
+    End,
+    Pipelines(Vec<Pipeline>),
     Default
+}
+
+impl Statement {
+    fn begins_collection(self) -> bool {
+        match self {
+            Statement::If{left, comparitor, right} => true,
+            Statement::Else                        => true,
+            Statement::For{variable, values}       => true,
+            Statement::Function{name, args}        => true,
+            Statement::End                         => false,
+            Statement::Pipelines(p)                => false,
+            Statement::Default                     => false
+
+        }
+    }
+
+    fn ends_collection(self) -> bool {
+        match self {
+            Statement::If{left, comparitor, right} => false,
+            Statement::Else                        => true,
+            Statement::For{variable, values}       => false,
+            Statement::Function{name, args}        => false,
+            Statement::End                         => true,
+            Statement::Pipelines(p)                => false,
+            Statement::Default                     => false
+
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Comparitor {
+    Equal,
+    NotEqual,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual
 }
 
 pub struct CodeBlock {
@@ -56,6 +107,7 @@ impl FlowControl {
                 let cmp = cmp.as_ref();
                 if let Some(right) = args.nth(0) {
                     let right = right.as_ref();
+                    self.current_statement = Statement::If{left: left.to_string(), comparitor: Comparitor::Equal, right: right.to_string()};
                     if cmp == "==" {
                         value = left == right;
                     } else if cmp == "!=" {
@@ -85,7 +137,6 @@ impl FlowControl {
             return FAILURE;
         }
         self.modes.insert(0, Mode { value: value });
-        self.current_statement = Statement::If;
         SUCCESS
     }
 
@@ -128,7 +179,7 @@ impl FlowControl {
                 return FAILURE;
             }
             let values: Vec<String> = args.map(|value| value.as_ref().to_string()).collect();
-            self.current_statement = Statement::For(variable, values);
+            self.current_statement = Statement::For{variable: variable, values: values};
             self.collecting_block = true;
         } else {
             println!("For loops must have a variable name as the first argument");
@@ -144,7 +195,7 @@ impl FlowControl {
         if let Some(name) = args.nth(1) {
             self.collecting_block = true;
             let values: Vec<String> = args.map(|value| value.as_ref().to_string()).collect();
-            self.current_statement = Statement::Function(name.as_ref().to_string(), values);
+            self.current_statement = Statement::Function{name: name.as_ref().to_string(), args: values};
         } else {
             println!("Functions must have the function name as the first argument");
             return FAILURE;

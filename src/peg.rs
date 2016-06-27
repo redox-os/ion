@@ -1,8 +1,11 @@
+use super::flow_control::Statement;
+
 use std::process::Command;
 
-use self::grammar::pipelines;
+use self::grammar::parse_;
 
 use glob::glob;
+
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Redirection {
@@ -15,36 +18,6 @@ pub struct Pipeline {
     pub jobs: Vec<Job>,
     pub stdout: Option<Redirection>,
     pub stdin: Option<Redirection>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum ShellUpdate {
-    IfStatement {
-        left: String,
-        comparitor: Comparitor,
-        right: String
-    },
-    FunctionStatement{
-        name: String,
-        args: Vec<String>
-    },
-    ForStatement{
-        variable: String,
-        values: Vec<String>
-    },
-    ElseStatement,
-    EndStatement,
-    Pipelines(Vec<Pipeline>)
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Comparitor {
-    Equal,
-    NotEqual,
-    GreaterThan,
-    LessThan,
-    GreaterThanOrEqual,
-    LessThanOrEqual
 }
 
 impl Pipeline {
@@ -114,304 +87,279 @@ impl Job {
     }
 }
 
-pub fn parse(code: &str) -> Vec<Pipeline> {
-    match pipelines(code) {
+//pub fn parse(code: &str) -> Vec<Pipeline> {
+    //match pipelines(code) {
+		//Ok(code_ok) => code_ok,
+		//Err(err) => {
+			//println!("ion: Syntax {}",err);
+			//vec![]
+		//}
+	//}
+//}
+pub fn parse(code: &str) -> Statement {
+    match parse_(code) {
 		Ok(code_ok) => code_ok,
 		Err(err) => {
 			println!("ion: Syntax {}",err);
-			vec![]
+			Statement::Pipelines(vec![])
 		}
 	}
 }
 
-peg! grammar(r#"
-use super::Pipeline;
-use super::Job;
-use super::Redirection;
-use super::ShellUpdate;
-use super::Comparitor;
-
-
-#[pub]
-if_ -> ShellUpdate
-    = "if " l:_not_comparitor whitespace c:comparitor whitespace r:_not_comparitor whitespace* { ShellUpdate::IfStatement{ left: l, comparitor: c, right: r} }
-
-#[pub]
-else_ -> ShellUpdate
-    = whitespace* "else" whitespace*  { ShellUpdate::ElseStatement }
-
-#[pub]
-end_ -> ShellUpdate
-    = whitespace* "end" whitespace* { ShellUpdate::EndStatement }
-
-#[pub]
-fn_ -> ShellUpdate
-    = whitespace* "fn " n:_name whitespace* args:_args whitespace* { ShellUpdate::FunctionStatement{name: n.to_string(), args: args} }
-
-_name -> String
-      = [A-z]+ { match_str.to_string() }
-
-_args -> Vec<String>
-      = _arg ** " "
-
-_arg -> String
-     = [A-z]+ { match_str.to_string() }
-
-#[pub]
-for_ -> ShellUpdate
-    = whitespace* "for " n:_name " in " args:_args whitespace* { ShellUpdate::ForStatement{variable: n.to_string(), values: args} }
-
-comparitor -> Comparitor
-    = "==" { Comparitor::Equal }
-    / "!=" { Comparitor::NotEqual }
-    / "<"  { Comparitor::LessThan }
-    / "<=" { Comparitor::LessThanOrEqual }
-    / ">"  { Comparitor::GreaterThan }
-    / ">=" { Comparitor::GreaterThanOrEqual }
-
-_not_comparitor -> String
-    = !comparitor [^ ]+ { match_str.to_string() }
-
-#[pub]
-pipelines -> Vec<Pipeline>
-    = (unused* newline)* pipelines:pipeline ++ ((job_ending+ unused*)+) (newline unused*)* { pipelines }
-    / (unused*) ** newline { vec![] }
-
-pipeline -> Pipeline
-    = whitespace? res:job ++ pipeline_sep whitespace? redir:redirection whitespace? comment? { Pipeline::new(res, redir.0, redir.1) }
-
-job -> Job
-    = args:word ++ whitespace background:background_token? {
-        Job::new(args.iter().map(|arg|arg.to_string()).collect(), background.is_some())
-    }
-
-redirection -> (Option<Redirection>, Option<Redirection>)
-    = stdin:redirect_stdin whitespace? stdout:redirect_stdout? { (Some(stdin), stdout) }
-    / stdout:redirect_stdout whitespace? stdin:redirect_stdin? { (stdin, Some(stdout)) }
-    / { (None, None) }
-
-redirect_stdin -> Redirection
-    = [<] whitespace? file:word { Redirection { file: file.to_string(), append: false } }
-
-redirect_stdout -> Redirection
-    = [>]{2} whitespace? file:word { Redirection { file: file.to_string(), append: true } }
-    / [>] whitespace? file:word { Redirection { file: file.to_string(), append: false } }
-
-pipeline_sep -> ()
-    = (whitespace? [|] whitespace?) { }
-
-background_token -> ()
-    = [&]
-    / whitespace [&]
-
-word -> &'input str
-    = double_quoted_word
-    / single_quoted_word
-    / [^ \t\r\n#;&|<>]+ { match_str }
-
-double_quoted_word -> &'input str
-    = ["] word:_double_quoted_word ["] { word }
-
-_double_quoted_word -> &'input str
-    = [^"]+ { match_str }
-
-single_quoted_word -> &'input str
-    = ['] word:_single_quoted_word ['] { word }
-
-_single_quoted_word -> &'input str
-    = [^']+ { match_str }
-
-unused -> ()
-    = whitespace comment? { () }
-    / comment { () }
-
-comment -> ()
-    = [#] [^\r\n]*
-
-whitespace -> ()
-    = [ \t]+
-
-job_ending -> ()
-    = [;]
-    / newline
-    / newline
-
-newline -> ()
-    = [\r\n]
-"#);
+peg_file! grammar("grammar.rustpeg");
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use super::grammar::*;
+    use flow_control::{Statement, Comparitor};
 
     #[test]
     fn single_job_no_args() {
-        let jobs = parse("cat").remove(0).jobs;
-        assert_eq!(1, jobs.len());
-        assert_eq!("cat", jobs[0].command);
-        assert_eq!(1, jobs[0].args.len());
+        if let Statement::Pipelines(mut pipelines) = parse("cat") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(1, jobs.len());
+            assert_eq!("cat", jobs[0].command);
+            assert_eq!(1, jobs[0].args.len());
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn single_job_with_args() {
-        let jobs = parse("ls -al dir").remove(0).jobs;
-        assert_eq!(1, jobs.len());
-        assert_eq!("ls", jobs[0].command);
-        assert_eq!("-al", jobs[0].args[1]);
-        assert_eq!("dir", jobs[0].args[2]);
+        if let Statement::Pipelines(mut pipelines) = parse("ls -al dir") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(1, jobs.len());
+            assert_eq!("ls", jobs[0].command);
+            assert_eq!("-al", jobs[0].args[1]);
+            assert_eq!("dir", jobs[0].args[2]);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn multiple_jobs_with_args() {
-        let pipelines = parse("ls -al;cat tmp.txt");
-        assert_eq!(2, pipelines.len());
-        assert_eq!("ls", pipelines[0].jobs[0].command);
-        assert_eq!("-al", pipelines[0].jobs[0].args[1]);
-        assert_eq!("cat", pipelines[1].jobs[0].command);
-        assert_eq!("tmp.txt", pipelines[1].jobs[0].args[1]);
+        if let Statement::Pipelines(mut pipelines) = parse("ls -al;cat tmp.txt") {
+            assert_eq!(2, pipelines.len());
+            assert_eq!("ls", pipelines[0].jobs[0].command);
+            assert_eq!("-al", pipelines[0].jobs[0].args[1]);
+            assert_eq!("cat", pipelines[1].jobs[0].command);
+            assert_eq!("tmp.txt", pipelines[1].jobs[0].args[1]);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn parse_empty_string() {
-        let pipelines = parse("");
-        assert_eq!(0, pipelines.len());
+        if let Statement::Pipelines(mut pipelines) = parse("") {
+            assert_eq!(0, pipelines.len());
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn multiple_white_space_between_words() {
-        let jobs = parse("ls \t -al\t\tdir").remove(0).jobs;
-        assert_eq!(1, jobs.len());
-        assert_eq!("ls", jobs[0].command);
-        assert_eq!("-al", jobs[0].args[1]);
-        assert_eq!("dir", jobs[0].args[2]);
+        if let Statement::Pipelines(mut pipelines) = parse("ls \t -al\t\tdir") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(1, jobs.len());
+            assert_eq!("ls", jobs[0].command);
+            assert_eq!("-al", jobs[0].args[1]);
+            assert_eq!("dir", jobs[0].args[2]);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn trailing_whitespace() {
-        let pipelines = parse("ls -al\t ");
-        assert_eq!(1, pipelines.len());
-        assert_eq!("ls", pipelines[0].jobs[0].command);
-        assert_eq!("-al", pipelines[0].jobs[0].args[1]);
+        if let Statement::Pipelines(mut pipelines) = parse("ls -al\t ") {
+            assert_eq!(1, pipelines.len());
+            assert_eq!("ls", pipelines[0].jobs[0].command);
+            assert_eq!("-al", pipelines[0].jobs[0].args[1]);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn double_quoting() {
-        let jobs = parse("echo \"Hello World\"").remove(0).jobs;
-        assert_eq!(2, jobs[0].args.len());
-        assert_eq!("Hello World", jobs[0].args[1]);
+        if let Statement::Pipelines(mut pipelines) = parse("echo \"Hello World\"") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(2, jobs[0].args.len());
+            assert_eq!("Hello World", jobs[0].args[1]);
+        } else {
+            assert!(false)
+        }
     }
 
     #[test]
     fn all_whitespace() {
-        let pipelines = parse("  \t ");
-        assert_eq!(0, pipelines.len());
+        if let Statement::Pipelines(mut pipelines) = parse("  \t ") {
+            assert_eq!(0, pipelines.len());
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn not_background_job() {
-        let jobs = parse("echo hello world").remove(0).jobs;
-        assert_eq!(false, jobs[0].background);
+        if let Statement::Pipelines(mut pipelines) = parse("echo hello world") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(false, jobs[0].background);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn background_job() {
-        let jobs = parse("echo hello world&").remove(0).jobs;
-        assert_eq!(true, jobs[0].background);
+        if let Statement::Pipelines(mut pipelines) = parse("echo hello world&") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(true, jobs[0].background);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn background_job_with_space() {
-        let jobs = parse("echo hello world &").remove(0).jobs;
-        assert_eq!(true, jobs[0].background);
+        if let Statement::Pipelines(mut pipelines) = parse("echo hello world &") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(true, jobs[0].background);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn lone_comment() {
-        let pipelines = parse("# ; \t as!!+dfa");
-        assert_eq!(0, pipelines.len());
+        if let Statement::Pipelines(mut pipelines) = parse("# ; \t as!!+dfa") {
+            assert_eq!(0, pipelines.len());
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn command_followed_by_comment() {
-        let pipelines = parse("cat # ; \t as!!+dfa");
-        assert_eq!(1, pipelines.len());
-        assert_eq!(1, pipelines[0].jobs[0].args.len());
+        if let Statement::Pipelines(mut pipelines) = parse("cat # ; \t as!!+dfa") {
+            assert_eq!(1, pipelines.len());
+            assert_eq!(1, pipelines[0].jobs[0].args.len());
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn comments_in_multiline_script() {
-        let pipelines = parse("echo\n# a comment;\necho#asfasdf");
-        assert_eq!(2, pipelines.len());
+        if let Statement::Pipelines(mut pipelines) = parse("echo\n# a comment;\necho#asfasdf") {
+            assert_eq!(2, pipelines.len());
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn multiple_newlines() {
-        let pipelines = parse("echo\n\ncat");
-        assert_eq!(2, pipelines.len());
+        if let Statement::Pipelines(mut pipelines) = parse("echo\n\ncat") {
+            assert_eq!(2, pipelines.len());
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn leading_whitespace() {
-        let jobs = parse("    \techo").remove(0).jobs;
-        assert_eq!(1, jobs.len());
-        assert_eq!("echo", jobs[0].command);
+        if let Statement::Pipelines(mut pipelines) = parse("    \techo") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(1, jobs.len());
+            assert_eq!("echo", jobs[0].command);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn indentation_on_multiple_lines() {
-        let pipelines = parse("echo\n  cat");
-        assert_eq!(2, pipelines.len());
-        assert_eq!("echo", pipelines[0].jobs[0].command);
-        assert_eq!("cat", pipelines[1].jobs[0].command);
+        if let Statement::Pipelines(mut pipelines) = parse("echo\n  cat") {
+            assert_eq!(2, pipelines.len());
+            assert_eq!("echo", pipelines[0].jobs[0].command);
+            assert_eq!("cat", pipelines[1].jobs[0].command);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn single_quoting() {
-        let jobs = parse("echo '#!!;\"\\'").remove(0).jobs;
-        assert_eq!("#!!;\"\\", jobs[0].args[1]);
+        if let Statement::Pipelines(mut pipelines) = parse("echo '#!!;\"\\'") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!("#!!;\"\\", jobs[0].args[1]);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn mixed_quoted_and_unquoted() {
-        let jobs = parse("echo '#!!;\"\\' and \t some \"more' 'stuff\"").remove(0).jobs;
-        assert_eq!("#!!;\"\\", jobs[0].args[1]);
-        assert_eq!("and", jobs[0].args[2]);
-        assert_eq!("some", jobs[0].args[3]);
-        assert_eq!("more' 'stuff", jobs[0].args[4]);
+        if let Statement::Pipelines(mut pipelines) = parse("echo '#!!;\"\\' and \t some \"more' 'stuff\"") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!("#!!;\"\\", jobs[0].args[1]);
+            assert_eq!("and", jobs[0].args[2]);
+            assert_eq!("some", jobs[0].args[3]);
+            assert_eq!("more' 'stuff", jobs[0].args[4]);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn several_blank_lines() {
-        let pipelines = parse("\n\n\n");
-        assert_eq!(0, pipelines.len());
+        if let Statement::Pipelines(mut pipelines) = parse("\n\n\n") {
+            assert_eq!(0, pipelines.len());
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn pipelines_with_redirection() {
-        let pipelines = parse("cat | echo hello | cat < stuff > other");
-        assert_eq!(3, pipelines[0].jobs.len());
-        assert_eq!("stuff", &pipelines[0].clone().stdin.unwrap().file);
-        assert_eq!("other", &pipelines[0].clone().stdout.unwrap().file);
-        assert!(!pipelines[0].clone().stdout.unwrap().append);
+        if let Statement::Pipelines(mut pipelines) = parse("cat | echo hello | cat < stuff > other") {
+            assert_eq!(3, pipelines[0].jobs.len());
+            assert_eq!("stuff", &pipelines[0].clone().stdin.unwrap().file);
+            assert_eq!("other", &pipelines[0].clone().stdout.unwrap().file);
+            assert!(!pipelines[0].clone().stdout.unwrap().append);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn pipeline_with_redirection_append() {
-        let pipelines = parse("cat | echo hello | cat < stuff >> other");
+        if let Statement::Pipelines(mut pipelines) = parse("cat | echo hello | cat < stuff >> other") {
         assert_eq!(3, pipelines[0].jobs.len());
         assert_eq!("stuff", &pipelines[0].clone().stdin.unwrap().file);
         assert_eq!("other", &pipelines[0].clone().stdout.unwrap().file);
         assert!(pipelines[0].clone().stdout.unwrap().append);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
     fn pipelines_with_redirection_reverse_order() {
-        let pipelines = parse("cat | echo hello | cat > stuff < other");
-        assert_eq!(3, pipelines[0].jobs.len());
-        assert_eq!("other", &pipelines[0].clone().stdin.unwrap().file);
-        assert_eq!("stuff", &pipelines[0].clone().stdout.unwrap().file);
+        if let Statement::Pipelines(mut pipelines) = parse("cat | echo hello | cat > stuff < other") {
+            assert_eq!(3, pipelines[0].jobs.len());
+            assert_eq!("other", &pipelines[0].clone().stdin.unwrap().file);
+            assert_eq!("stuff", &pipelines[0].clone().stdout.unwrap().file);
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
@@ -471,15 +419,22 @@ else
     fn parsing_ifs() {
         // Default case where spaced normally
         let parsed_if = if_("if 1 == 2").unwrap();
-        let correct_parse = ShellUpdate::IfStatement{left: "1".to_string(),
+        let correct_parse = Statement::If{left: "1".to_string(),
                                         comparitor: Comparitor::Equal,
                                         right: "2".to_string()};
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
         let parsed_if = if_("if 1 == 2         ").unwrap();
-        let correct_parse = ShellUpdate::IfStatement{left: "1".to_string(),
+        let correct_parse = Statement::If{left: "1".to_string(),
                                         comparitor: Comparitor::Equal,
+                                        right: "2".to_string()};
+        assert_eq!(correct_parse, parsed_if);
+
+        // Default case where spaced normally
+        let parsed_if = if_("if 1 <= 2").unwrap();
+        let correct_parse = Statement::If{left: "1".to_string(),
+                                        comparitor: Comparitor::LessThanOrEqual,
                                         right: "2".to_string()};
         assert_eq!(correct_parse, parsed_if);
     }
@@ -488,17 +443,17 @@ else
     fn parsing_elses() {
         // Default case where spaced normally
         let parsed_if = else_("else").unwrap();
-        let correct_parse = ShellUpdate::ElseStatement;
+        let correct_parse = Statement::Else;
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
         let parsed_if = else_("else         ").unwrap();
-        let correct_parse = ShellUpdate::ElseStatement;
+        let correct_parse = Statement::Else;
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
         let parsed_if = else_("         else").unwrap();
-        let correct_parse = ShellUpdate::ElseStatement;
+        let correct_parse = Statement::Else;
         assert_eq!(correct_parse, parsed_if);
     }
 
@@ -506,17 +461,17 @@ else
     fn parsing_ends() {
         // Default case where spaced normally
         let parsed_if = end_("end").unwrap();
-        let correct_parse = ShellUpdate::EndStatement;
+        let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
         let parsed_if = end_("end         ").unwrap();
-        let correct_parse = ShellUpdate::EndStatement;
+        let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
         let parsed_if = end_("         end").unwrap();
-        let correct_parse = ShellUpdate::EndStatement;
+        let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
     }
 
@@ -524,7 +479,7 @@ else
     fn parsing_functions() {
         // Default case where spaced normally
         let parsed_if = fn_("fn bob").unwrap();
-        let correct_parse = ShellUpdate::FunctionStatement{name: "bob".to_string(), args: vec!()};
+        let correct_parse = Statement::Function{name: "bob".to_string(), args: vec!()};
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
@@ -537,7 +492,7 @@ else
 
         // Default case where spaced normally
         let parsed_if = fn_("fn bob a b").unwrap();
-        let correct_parse = ShellUpdate::FunctionStatement{name: "bob".to_string(), args: vec!("a".to_string(), "b".to_string())};
+        let correct_parse = Statement::Function{name: "bob".to_string(), args: vec!("a".to_string(), "b".to_string())};
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
@@ -553,7 +508,7 @@ else
     fn parsing_fors() {
         // Default case where spaced normally
         let parsed_if = for_("for i in a b").unwrap();
-        let correct_parse = ShellUpdate::ForStatement{variable: "i".to_string(), values: vec!("a".to_string(), "b".to_string())};
+        let correct_parse = Statement::For{variable: "i".to_string(), values: vec!("a".to_string(), "b".to_string())};
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
