@@ -72,7 +72,11 @@ impl Shell {
                         Ok(mut file) => {
                             let mut command_list = String::new();
                             match file.read_to_string(&mut command_list) {
-                                Ok(_) => self.on_command(&command_list),
+                                Ok(_) => {
+                                    for command in command_list.split("\n") {
+                                        self.on_command(&command)
+                                    }
+                                },
                                 Err(err) => println!("ion: failed to read {}: {}", arg, err)
                             }
                         },
@@ -212,11 +216,12 @@ impl Shell {
         self.history.add(command_string.to_string(), &self.variables);
 
         let update = parse(command_string);
+        self.flow_control.current_statement = update.clone();
 
         match update {
             Statement::End => self.handle_end(),
             Statement::If{left, right, comparitor} => self.handle_if(left, comparitor, right),
-            //Statement::Else => handle_else,
+            Statement::Else => self.handle_else(),
             //Statement::For{variable: v, values: vs} => handle_for,
             //Statement::Function{name: name, args: args} => handle_func,
             Statement::Pipelines(pipelines) => self.handle_pipelines(pipelines),
@@ -237,6 +242,13 @@ impl Shell {
 
         self.flow_control.collecting_block = true;
         self.flow_control.modes.insert(0, flow_control::Mode{value: value})
+    }
+
+    fn handle_else(&mut self) {
+        self.flow_control.collecting_block = true;
+        if let Some(&flow_control::Mode{value: false}) = self.flow_control.modes.get(0) {
+            self.flow_control.current_block.pipelines.clear()
+        }
     }
 
     fn handle_end(&mut self){
@@ -260,13 +272,26 @@ impl Shell {
             //Statement::Function{ref name, ref args} => {
                 //self.functions.insert(name.clone(), Function { name: name.clone(), pipelines: block_jobs.clone(), args: args.clone() });
             //},
-            _ => {
+            Statement::If{..} => {
                 if let Some(&flow_control::Mode{value: true}) = self.flow_control.modes.get(0) {
                 for pipeline in &block_jobs {
                     self.run_pipeline(&pipeline);
                 }
                 }
                 self.flow_control.modes.clear();
+            },
+            Statement::Else => {
+                if let Some(&flow_control::Mode{value: false}) = self.flow_control.modes.get(0) {
+                for pipeline in &block_jobs {
+                    self.run_pipeline(&pipeline);
+                }
+                }
+                self.flow_control.modes.clear();
+            },
+            _ => {
+                for pipeline in &block_jobs {
+                    self.run_pipeline(&pipeline);
+                }
             }
         }
         self.flow_control.current_statement = Statement::Default;
