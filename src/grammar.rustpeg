@@ -36,7 +36,7 @@ _args -> Vec<String>
       = _arg ** " "
 
 _arg -> String
-     = [A-z]+ { match_str.to_string() }
+     = [A-z0-9]+ { match_str.to_string() }
 
 #[pub]
 for_ -> Statement

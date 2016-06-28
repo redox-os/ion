@@ -16,7 +16,7 @@ use self::input_editor::readln;
 use self::peg::{parse, Pipeline};
 use self::variables::Variables;
 use self::history::History;
-use self::flow_control::{FlowControl, is_flow_control_command, Statement, Comparitor};
+use self::flow_control::{FlowControl, Statement, Comparitor};
 use self::status::{SUCCESS, NO_SUCH_COMMAND};
 use self::function::Function;
 use self::pipe::execute_pipeline;
@@ -216,13 +216,16 @@ impl Shell {
         self.history.add(command_string.to_string(), &self.variables);
 
         let update = parse(command_string);
-        self.flow_control.current_statement = update.clone();
+        if update.clone().is_flow_control() {
+            self.flow_control.current_statement = update.clone();
+            self.flow_control.collecting_block = true;
+        }
 
         match update {
             Statement::End => self.handle_end(),
             Statement::If{left, right, comparitor} => self.handle_if(left, comparitor, right),
             Statement::Else => self.handle_else(),
-            //Statement::For{variable: v, values: vs} => handle_for,
+            Statement::For{..} => self.handle_for(),
             //Statement::Function{name: name, args: args} => handle_func,
             Statement::Pipelines(pipelines) => self.handle_pipelines(pipelines),
             _ => {}
@@ -251,6 +254,10 @@ impl Shell {
         }
     }
 
+    fn handle_for(&mut self){
+        self.flow_control.collecting_block = true;
+    }
+
     fn handle_end(&mut self){
         self.flow_control.collecting_block = false;
         let block_jobs: Vec<Pipeline> = self.flow_control
@@ -259,19 +266,19 @@ impl Shell {
             .drain(..)
             .collect();
         match self.flow_control.current_statement.clone() {
-            //Statement::For{variable: ref var, values: ref vals} => {
-                //let variable = var.clone();
-                //let values = vals.clone();
-                //for value in values {
-                    //self.variables.set_var(&variable, &value);
-                    //for pipeline in &block_jobs {
-                        //self.run_pipeline(&pipeline);
-                    //}
-                //}
-            //},
-            //Statement::Function{ref name, ref args} => {
-                //self.functions.insert(name.clone(), Function { name: name.clone(), pipelines: block_jobs.clone(), args: args.clone() });
-            //},
+            Statement::For{variable: ref var, values: ref vals} => {
+                let variable = var.clone();
+                let values = vals.clone();
+                for value in values {
+                    self.variables.set_var(&variable, &value);
+                    for pipeline in &block_jobs {
+                        self.run_pipeline(&pipeline);
+                    }
+                }
+            },
+            Statement::Function{ref name, ref args} => {
+                self.functions.insert(name.clone(), Function { name: name.clone(), pipelines: block_jobs.clone(), args: args.clone() });
+            },
             Statement::If{..} => {
                 if let Some(&flow_control::Mode{value: true}) = self.flow_control.modes.get(0) {
                 for pipeline in &block_jobs {

@@ -28,28 +28,16 @@ pub enum Statement {
 }
 
 impl Statement {
-    fn begins_collection(self) -> bool {
-        match self {
-            Statement::If{left, comparitor, right} => true,
-            Statement::Else                        => true,
-            Statement::For{variable, values}       => true,
-            Statement::Function{name, args}        => true,
-            Statement::End                         => false,
-            Statement::Pipelines(p)                => false,
-            Statement::Default                     => false
 
-        }
-    }
-
-    fn ends_collection(self) -> bool {
+    pub fn is_flow_control(self) -> bool {
         match self {
-            Statement::If{left, comparitor, right} => false,
-            Statement::Else                        => true,
-            Statement::For{variable, values}       => false,
-            Statement::Function{name, args}        => false,
-            Statement::End                         => true,
-            Statement::Pipelines(p)                => false,
-            Statement::Default                     => false
+            Statement::If{..}                => true,
+            Statement::Else                  => true,
+            Statement::For{variable, values} => true,
+            Statement::Function{..}          => true,
+            Statement::End                   => false,
+            Statement::Pipelines(..)         => false,
+            Statement::Default               => false
 
         }
     }
