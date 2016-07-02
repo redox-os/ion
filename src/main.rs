@@ -244,12 +244,12 @@ impl Shell {
         };
 
         self.flow_control.collecting_block = true;
-        self.flow_control.modes.insert(0, flow_control::Mode{value: value})
+        self.flow_control.modes.push(flow_control::Mode{value: value})
     }
 
     fn handle_else(&mut self) {
         self.flow_control.collecting_block = true;
-        if let Some(&flow_control::Mode{value: false}) = self.flow_control.modes.get(0) {
+        if let Some(&flow_control::Mode{value: false}) = self.flow_control.modes.last() {
             self.flow_control.current_block.pipelines.clear()
         }
     }
@@ -280,20 +280,20 @@ impl Shell {
                 self.functions.insert(name.clone(), Function { name: name.clone(), pipelines: block_jobs.clone(), args: args.clone() });
             },
             Statement::If{..} => {
-                if let Some(&flow_control::Mode{value: true}) = self.flow_control.modes.get(0) {
+                if let Some(&flow_control::Mode{value: true}) = self.flow_control.modes.last() {
                 for pipeline in &block_jobs {
                     self.run_pipeline(&pipeline);
                 }
                 }
-                self.flow_control.modes.clear();
+                self.flow_control.modes.pop();
             },
             Statement::Else => {
-                if let Some(&flow_control::Mode{value: false}) = self.flow_control.modes.get(0) {
+                if let Some(&flow_control::Mode{value: false}) = self.flow_control.modes.last() {
                 for pipeline in &block_jobs {
                     self.run_pipeline(&pipeline);
                 }
                 }
-                self.flow_control.modes.clear();
+                self.flow_control.modes.pop();
             },
             _ => {
                 for pipeline in &block_jobs {
