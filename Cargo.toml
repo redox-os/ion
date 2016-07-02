@@ -13,5 +13,6 @@ authors = [
 ]
 
 [dependencies]
-peg = "0.3"
 glob = "0.2"
+liner = { git="https://github.com/jackpot51/liner.git", branch="patch-1" }
+peg = "0.3"

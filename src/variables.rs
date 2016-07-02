@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
-use std::io::{stdout, Write};
 use std::env;
 
+use liner::Context;
+
 use super::peg::{Pipeline, Job};
-use super::input_editor::readln;
 use super::status::{SUCCESS, FAILURE};
 use super::directory_stack::DirectoryStack;
 
@@ -21,15 +21,11 @@ impl Variables {
     pub fn read<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
-        let mut out = stdout();
+        let mut con = Context::new();
         for arg in args.into_iter().skip(1) {
-            print!("{}=", arg.as_ref().trim());
-            if let Err(message) = out.flush() {
-                println!("{}: Failed to flush stdout", message);
-                return FAILURE;
-            }
-            if let Some(value) = readln() {
-                self.set_var(arg.as_ref(), value.trim());
+            match con.read_line(format!("{}=", arg.as_ref().trim()), &mut |_| {}) {
+                Ok(buffer) => self.set_var(arg.as_ref(), buffer.trim()),
+                Err(_) => return FAILURE,
             }
         }
         SUCCESS

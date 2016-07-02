@@ -4,15 +4,17 @@
 #![plugin(peg_syntax_ext)]
 
 extern crate glob;
+extern crate liner;
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{stdout, Read, Write};
+use std::io::Read;
 use std::env;
 use std::process;
 
+use liner::Context;
+
 use self::directory_stack::DirectoryStack;
-use self::input_editor::readln;
 use self::peg::{parse, Pipeline};
 use self::variables::Variables;
 use self::history::History;
@@ -24,7 +26,6 @@ use self::pipe::execute_pipeline;
 pub mod pipe;
 pub mod directory_stack;
 pub mod to_num;
-pub mod input_editor;
 pub mod peg;
 pub mod variables;
 pub mod history;
@@ -35,6 +36,7 @@ pub mod function;
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell {
+    context: Context,
     variables: Variables,
     flow_control: FlowControl,
     directory_stack: DirectoryStack,
@@ -46,6 +48,7 @@ impl Default for Shell {
     /// Panics if DirectoryStack construction fails
     fn default() -> Shell {
         let mut new_shell = Shell {
+            context: Context::new(),
             variables: Variables::default(),
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new().expect(""),
@@ -59,6 +62,21 @@ impl Default for Shell {
 }
 
 impl Shell {
+    fn readln(&mut self) -> Option<String> {
+        let prompt = self.prompt();
+        match self.context.read_line(prompt, &mut |_| {}) {
+            Ok(buffer) => {
+                let buffer_clone = buffer.clone();
+                self.context.history.push(buffer.into());
+                while self.context.history.len() > 1024 {
+                    self.context.history.remove(0);
+                }
+                Some(buffer_clone)
+            }
+            Err(_) => None,
+        }
+    }
+
     fn execute(&mut self) {
         let commands = Command::map();
         let mut dash_c = false;
@@ -86,14 +104,12 @@ impl Shell {
             }
         }
 
-        self.print_prompt();
-        while let Some(command) = readln() {
+        while let Some(command) = self.readln() {
             let command = command.trim();
             if !command.is_empty() {
                 self.on_command(command, &commands);
             }
             self.update_variables();
-            self.print_prompt();
         }
 
         // Exit with the previous command's exit status.
@@ -170,44 +186,29 @@ impl Shell {
         }
     }
 
-    pub fn print_prompt(&self) {
-        self.print_prompt_prefix();
-        match self.flow_control.current_statement {
-            Statement::For(_, _) => self.print_for_prompt(),
-            Statement::Function(_, _) => self.print_function_prompt(),
-            _ => self.print_default_prompt(),
-        }
-        if let Err(message) = stdout().flush() {
-            println!("{}: failed to flush prompt to stdout", message);
-        }
-
-    }
-
-    // TODO eventually this thing should be gone
-    fn print_prompt_prefix(&self) {
-        let prompt_prefix = self.flow_control.modes.iter().rev().fold(String::new(), |acc, mode| {
+    pub fn prompt(&self) -> String {
+        let mut prompt = self.flow_control.modes.iter().rev().fold(String::new(), |acc, mode| {
             acc +
             if mode.value {
                 "+ "
             } else {
                 "- "
             }
-        });
-        print!("{}", prompt_prefix);
-    }
+        }).to_string();
 
-    fn print_for_prompt(&self) {
-        print!("for> ");
-    }
+        match self.flow_control.current_statement {
+            Statement::For(_, _) => {
+                prompt.push_str("for> ");
+            },
+            Statement::Function(_, _) => {
+                prompt.push_str("fn> ");
+            },
+            _ => {
+                prompt.push_str(&format!("{}", self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"), &self.directory_stack)));
+            }
+        }
 
-    fn print_function_prompt(&self) {
-        print!("fn> ");
-    }
-
-    fn print_default_prompt(&self) {
-        print!("{}",
-               self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"),
-                                            &self.directory_stack));
+        prompt
     }
 
     fn on_command(&mut self, command_string: &str, commands: &HashMap<&str, Command>) {
