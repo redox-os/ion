@@ -244,16 +244,10 @@ impl Shell {
             Comparitor::NotEqual           => { left != right },
         };
 
-        //println!("{:?}", self.flow_control.current_statement.clone());
-        //println!("{:?}", value);
         self.flow_control.modes.push(flow_control::Mode{value: value})
     }
 
     fn handle_else(&mut self) {
-        //if let Some(&flow_control::Mode{value: true}) = self.flow_control.modes.last() {
-            //self.flow_control.collecting_block = true;
-            //self.flow_control.current_block.pipelines.clear()
-        //}
     }
 
     fn handle_for(&mut self){
@@ -329,12 +323,10 @@ impl Shell {
     fn handle_pipelines(&mut self, mut pipelines: Vec<Pipeline>) {
         for pipeline in pipelines.drain(..) {
             if self.flow_control.collecting_block {
-                let mode = self.flow_control.modes.last().unwrap().value;
-                //println!("{:?}", mode);
-                //println!("{:?}", self.flow_control.current_statement.clone());
-                //println!("{:?}", pipeline);
+                let mode = self.flow_control.modes.last().unwrap_or(&flow_control::Mode{value: false}).value;
                 match (mode, self.flow_control.current_statement.clone()) {
-                    (true, Statement::If{..}) | (false, Statement::Else) => self.flow_control.current_block.pipelines.push(pipeline),
+                    (true, Statement::If{..}) | (false, Statement::Else) |
+                    (_, Statement::For{..}) |(_, Statement::Function{..}) => self.flow_control.current_block.pipelines.push(pipeline),
                     _ => {}
                 }
             } else {
