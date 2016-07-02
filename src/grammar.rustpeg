@@ -15,7 +15,7 @@ parse_ -> Statement
 
 #[pub]
 if_ -> Statement
-    = "if " l:_not_comparitor whitespace c:comparitor whitespace r:_not_comparitor whitespace* { Statement::If{ left: l, comparitor: c, right: r} }
+    = whitespace* "if " l:_not_comparitor whitespace c:comparitor whitespace r:_not_comparitor whitespace* { Statement::If{ left: l, comparitor: c, right: r} }
 
 #[pub]
 else_ -> Statement

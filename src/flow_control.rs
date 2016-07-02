@@ -31,13 +31,13 @@ impl Statement {
 
     pub fn is_flow_control(self) -> bool {
         match self {
-            Statement::If{..}                => true,
-            Statement::Else                  => true,
-            Statement::For{variable, values} => true,
-            Statement::Function{..}          => true,
-            Statement::End                   => false,
-            Statement::Pipelines(..)         => false,
-            Statement::Default               => false
+            Statement::If{..}        => true,
+            Statement::Else          => true,
+            Statement::For{..}       => true,
+            Statement::Function{..}  => true,
+            Statement::End           => false,
+            Statement::Pipelines(..) => false,
+            Statement::Default       => false
 
         }
     }
