@@ -66,12 +66,16 @@ impl Shell {
         let prompt = self.prompt();
         match self.context.read_line(prompt, &mut |_| {}) {
             Ok(buffer) => {
-                let buffer_clone = buffer.clone();
-                self.context.history.push(buffer.into());
-                while self.context.history.len() > 1024 {
-                    self.context.history.remove(0);
+                if buffer.trim().is_empty() {
+                    Some(buffer)
+                } else {
+                    let buffer_clone = buffer.clone();
+                    self.context.history.push(buffer.into());
+                    while self.context.history.len() > 1024 {
+                        self.context.history.remove(0);
+                    }
+                    Some(buffer_clone)
                 }
-                Some(buffer_clone)
             }
             Err(_) => None,
         }
