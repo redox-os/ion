@@ -6,6 +6,8 @@ NC='\033[0m' # No Color
 TAGFAIL=$RED'[FAIL]'$NC
 TAGPASS=$GREEN'[PASS]'$NC
 
+EXAMPLES_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 EXIT_VAL=0
 
 function check_return_value {
@@ -20,13 +22,13 @@ function check_return_value {
     EXPECTED_OUTPUT_FILE=$(echo $1 | sed 's/\.ion/\.out/')
 
     # Run script and redirect stdout into tmp file
-    cargo run $1 1> examples/tmp.out 2> /dev/null
+    cargo run $1 1> $EXAMPLES_DIR/tmp.out 2> /dev/null
     # Compare real and expected output
-    cmp --silent examples/tmp.out $EXPECTED_OUTPUT_FILE
+    cmp --silent $EXAMPLES_DIR/tmp.out $EXPECTED_OUTPUT_FILE
     local RET=$?
 
     # Clean up the mess
-    rm -f examples/tmp.out
+    rm -f $EXAMPLES_DIR/tmp.out
 
     # Write result
     if [[ $RET -ne 0 ]]; then
@@ -39,7 +41,7 @@ function check_return_value {
 }
 
 # Iterate over every Ion script in examples directory
-for i in examples/*.ion; do
+for i in $EXAMPLES_DIR/*.ion; do
     check_return_value $i;
     if [[ $? -ne 0 ]]; then
         EXIT_VAL=1;
