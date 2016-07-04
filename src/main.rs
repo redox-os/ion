@@ -73,8 +73,8 @@ impl Shell {
                             let mut command_list = String::new();
                             match file.read_to_string(&mut command_list) {
                                 Ok(_) => {
-                                    for command in command_list.split("\n") {
-                                        self.on_command(&command)
+                                    for command in command_list.split('\n') {
+                                        self.on_command(command)
                                     }
                                 },
                                 Err(err) => println!("ion: failed to read {}: {}", arg, err)
@@ -213,23 +213,19 @@ impl Shell {
     }
 
     fn on_command(&mut self, command_string: &str) {
-        //println!("{:?}", command_string);
         self.history.add(command_string.to_string(), &self.variables);
 
         let update = parse(command_string);
-        if update.clone().is_flow_control() {
+        if update.is_flow_control() {
             self.flow_control.current_statement = update.clone();
             self.flow_control.collecting_block = true;
         }
 
         match update {
-            Statement::End => self.handle_end(),
+            Statement::End                         => self.handle_end(),
             Statement::If{left, right, comparitor} => self.handle_if(left, comparitor, right),
-            Statement::Else => self.handle_else(),
-            Statement::For{..} => self.handle_for(),
-            //Statement::Function{name: name, args: args} => handle_func,
-            Statement::Pipelines(pipelines) => self.handle_pipelines(pipelines),
-            _ => {}
+            Statement::Pipelines(pipelines)        => self.handle_pipelines(pipelines),
+            _                                      => {}
         }
 
     }
@@ -247,12 +243,6 @@ impl Shell {
         self.flow_control.modes.push(flow_control::Mode{value: value})
     }
 
-    fn handle_else(&mut self) {
-    }
-
-    fn handle_for(&mut self){
-        self.flow_control.collecting_block = true;
-    }
 
     fn handle_end(&mut self){
         self.flow_control.collecting_block = false;
@@ -268,7 +258,7 @@ impl Shell {
                 for value in values {
                     self.variables.set_var(&variable, &value);
                     for pipeline in &block_jobs {
-                        self.run_pipeline(&pipeline);
+                        self.run_pipeline(pipeline);
                         }
                     }
             },
@@ -282,27 +272,27 @@ impl Shell {
             },
             Statement::If{..} => {
                 self.flow_control.modes.pop();
-                if self.flow_control.modes.len() == 0 {
+                if self.flow_control.modes.is_empty() {
                     let block_jobs: Vec<Pipeline> = self.flow_control
                         .current_block
                         .pipelines
                         .drain(..)
                         .collect();
                     for pipeline in &block_jobs {
-                        self.run_pipeline(&pipeline);
+                        self.run_pipeline(pipeline);
                     }
                 }
             },
             Statement::Else => {
                 self.flow_control.modes.pop();
-                if self.flow_control.modes.len() == 0 {
+                if self.flow_control.modes.is_empty() {
                     let block_jobs: Vec<Pipeline> = self.flow_control
                         .current_block
                         .pipelines
                         .drain(..)
                         .collect();
                     for pipeline in &block_jobs {
-                        self.run_pipeline(&pipeline);
+                        self.run_pipeline(pipeline);
                     }
                 }
             },
@@ -313,7 +303,7 @@ impl Shell {
                         .drain(..)
                         .collect();
                 for pipeline in &block_jobs {
-                    self.run_pipeline(&pipeline);
+                    self.run_pipeline(pipeline);
                 }
             }
         }
@@ -504,41 +494,6 @@ impl Command {
                             },
                         });
 
-        //commands.insert("if",
-                        //Command {
-                            //name: "if",
-                            //help: "Conditionally execute code",
-                            //main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                //shell.flow_control.if_(args)
-                            //},
-                        //});
-
-        //commands.insert("else",
-                        //Command {
-                            //name: "else",
-                            //help: "Execute code if a previous condition was false",
-                            //main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                //shell.flow_control.else_(args)
-                            //},
-                        //});
-
-        //commands.insert("end",
-                        //Command {
-                            //name: "end",
-                            //help: "End a code block",
-                            //main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                //shell.flow_control.end(args)
-                            //},
-                        //});
-
-        //commands.insert("for",
-                        //Command {
-                            //name: "for",
-                            //help: "Iterate through a list",
-                            //main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                //shell.flow_control.for_(args)
-                            //},
-                        //});
 
         commands.insert("source",
                         Command {
@@ -568,14 +523,6 @@ impl Command {
                             },
                         });
 
-        //commands.insert("fn",
-                        //Command {
-                            //name: "fn",
-                            //help: "Create a function",
-                            //main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                //shell.flow_control.fn_(args)
-                            //},
-                        //});
 
         commands.insert("drop",
                         Command {

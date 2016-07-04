@@ -87,15 +87,6 @@ impl Job {
     }
 }
 
-//pub fn parse(code: &str) -> Vec<Pipeline> {
-    //match pipelines(code) {
-		//Ok(code_ok) => code_ok,
-		//Err(err) => {
-			//println!("ion: Syntax {}",err);
-			//vec![]
-		//}
-	//}
-//}
 pub fn parse(code: &str) -> Statement {
     match parse_(code) {
 		Ok(code_ok) => code_ok,
