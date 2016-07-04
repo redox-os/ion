@@ -1,0 +1,3 @@
+echo Hello world  # End of line comments are ignored
+
+#echo Goodbye world
