@@ -69,6 +69,7 @@ impl History {
                         bytes as u64
                     };
 
+
                     if let Err(message) = file.seek(SeekFrom::Start(seek_point)) {
                         println!("ion: unable to seek in history file: {}", message);
                     }
@@ -119,10 +120,7 @@ impl History {
     /// will return a default value of 1000.
     #[inline]
     fn get_size(variables: &Variables) -> usize {
-        match variables.get_var_or_empty("HISTORY_SIZE").parse::<usize>() {
-            Ok(size) => size,
-            _ => 1000,
-        }
+        variables.get_var_or_empty("HISTORY_SIZE").parse::<usize>().unwrap_or(1000)
     }
 
     /// This function will take a map of variables as input and attempt to parse the value of the
@@ -130,9 +128,6 @@ impl History {
     /// it will return a default value of 1000.
     #[inline]
     fn get_file_size(variables: &Variables) -> usize {
-        match variables.get_var_or_empty("HISTORY_FILE_SIZE").parse::<usize>() {
-            Ok(size) => size,
-            Err(_) => 1000,
-        }
+        variables.get_var_or_empty("HISTORY_FILE_SIZE").parse::<usize>().unwrap_or(1000)
     }
 }

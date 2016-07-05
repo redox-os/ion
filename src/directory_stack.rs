@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::env::{set_current_dir, current_dir, home_dir};
 use std::path::PathBuf;
@@ -9,97 +10,84 @@ pub struct DirectoryStack {
 }
 
 impl DirectoryStack {
+    /// Attempts to create a new `DirectoryStack` containing the current working directory.
     pub fn new() -> Result<DirectoryStack, &'static str> {
-        let mut dirs: VecDeque<PathBuf> = VecDeque::new();
-        if let Ok(curr_dir) = current_dir() {
-            dirs.push_front(curr_dir);
-            Ok(DirectoryStack {
-                dirs: dirs,
+        current_dir()
+            .map_err(|_| "ion: failed to get current directory when building directory stack")
+            .map(|curr_dir| {
+                let mut dirs: VecDeque<PathBuf> = VecDeque::new();
+                dirs.push_front(curr_dir);
+                DirectoryStack { dirs: dirs }
             })
-        } else {
-            Err("Failed to get current directory when building directory stack")
-        }
     }
 
     /// This function will take a map of variables as input and attempt to parse the value of the
     /// directory stack size variable. If it succeeds, it will return the value of that variable,
     /// else it will return a default value of 1000.
     fn get_size(variables: &Variables) -> usize {
-        match variables.get_var_or_empty("DIRECTORY_STACK_SIZE").parse::<usize>() {
-            Ok(size) => size,
-            _ => 1000,
-        }
+        variables.get_var_or_empty("DIRECTORY_STACK_SIZE").parse::<usize>().unwrap_or(1000)
     }
 
+    /// Attempts to set the current directory to the directory stack's previous directory,
+    /// and then removes the front directory from the stack.
     pub fn popd<I: IntoIterator>(&mut self, _: I) -> i32
         where I::Item: AsRef<str>
     {
-        if let Some(dir) = self.get_previous_dir() {
-            if let Err(err) = set_current_dir(dir) {
-                println!("{}: Failed to switch to directory {}", err, dir.display());
-                return FAILURE;
-            }
-        } else {
-            println!("Directory stack is empty");
-            return FAILURE;
-        }
-        self.dirs.pop_front();
-        self.print_dirs();
-        SUCCESS
+        self.get_previous_dir().cloned()
+            .map_or(Err(Cow::Borrowed("ion: directory stack is empty")), |dir| {
+                set_current_dir(&dir)
+                    .map_err(|err| { Cow::Owned(format!("ion: {}: Failed to switch to directory {}", err, dir.display())) })
+                    .map(|_| { self.dirs.pop_front(); self.print_dirs(); SUCCESS })
+            })
+            .unwrap_or_else(|err| { println!("{}", err); FAILURE })
+
     }
 
     pub fn pushd<I: IntoIterator>(&mut self, args: I, variables: &Variables) -> i32
         where I::Item: AsRef<str>
     {
-        if let Some(dir) = args.into_iter().nth(1) {
-            let result = self.change_and_push_dir(dir.as_ref(), variables);
-            self.print_dirs();
-            result
-        } else {
-            println!("No directory provided");
-            FAILURE
-        }
+        args.into_iter().nth(1)
+            .map_or_else(|| { println!("ion: no directory provided"); FAILURE }, |dir| {
+                let result = self.change_and_push_dir(dir.as_ref(), variables);
+                self.print_dirs();
+                result
+            })
     }
 
     pub fn cd<I: IntoIterator>(&mut self, args: I, variables: &Variables) -> i32
         where I::Item: AsRef<str>
     {
-        if let Some(dir) = args.into_iter().nth(1) {
-            let dir = dir.as_ref();
-            if dir == "-" {
-                self.switch_to_previous_directory(variables)
-            } else {
-                self.change_and_push_dir(dir, variables)
-            }
-        } else {
-            self.switch_to_home_directory(variables)
-        }
+            args.into_iter().nth(1)
+                .map_or(self.switch_to_home_directory(variables), |dir| {
+                    let dir = dir.as_ref();
+                    if dir == "-" {
+                        self.switch_to_previous_directory(variables)
+                    } else {
+                        self.change_and_push_dir(dir, variables)
+                    }
+                })
     }
 
     fn switch_to_home_directory(&mut self, variables: &Variables) -> i32 {
-        if let Some(home) = home_dir() {
-            if let Some(home) = home.to_str() {
-                self.change_and_push_dir(home, variables)
-            } else {
-                println!("Failed to convert home directory to str");
-                FAILURE
-            }
-        } else {
-            println!("Failed to get home directory");
-            FAILURE
-        }
+        home_dir()
+            .map_or(Err("ion: failed to get home directory"), |home| {
+                home.to_str().map_or(Err("ion: failed to convert home directory to str"), |home| {
+                    Ok(self.change_and_push_dir(home, variables))
+                })
+            })
+            .unwrap_or_else(|message| { println!("{}", message); FAILURE })
     }
 
     fn switch_to_previous_directory(&mut self, variables: &Variables) -> i32 {
-        if let Some(prev) = self.get_previous_dir()
-                                .map(|path| path.to_string_lossy().to_string()) {
-            self.dirs.remove(1);
-            println!("{}", prev);
-            self.change_and_push_dir(&prev, variables)
-        } else {
-            println!("No previous directory to switch to");
-            FAILURE
-        }
+        let (message, status) = self.get_previous_dir().cloned()
+            .map_or_else(|| (Cow::Borrowed("ion: no previous directory to switch to"), FAILURE), |prev| {
+                self.dirs.remove(1);
+                let prev = prev.to_string_lossy().to_string();
+                let status = self.change_and_push_dir(&prev, variables);
+                (Cow::Owned(prev), status)
+            });
+        println!("{}", message);
+        status
     }
 
     fn get_previous_dir(&self) -> Option<&PathBuf> {
@@ -117,7 +105,7 @@ impl DirectoryStack {
                 SUCCESS
             }
             (Err(err), _) => {
-                println!("Failed to set current dir to {}: {}", dir, err);
+                println!("ion: failed to set current dir to {}: {}", dir, err);
                 FAILURE
             }
             (_, _) => FAILURE, // This should not happen
@@ -147,7 +135,7 @@ impl DirectoryStack {
 
     fn print_dirs(&self) {
         let dir = self.dirs.iter().fold(String::new(), |acc, dir| {
-            acc + " " + dir.to_str().unwrap_or("No directory found")
+            acc + " " + dir.to_str().unwrap_or("ion: no directory found")
         });
         println!("{}", dir.trim_left());
     }
