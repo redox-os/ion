@@ -10,9 +10,10 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::env;
+use std::mem;
 use std::process;
 
-use liner::Context;
+use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter};
 
 use self::directory_stack::DirectoryStack;
 use self::peg::{parse, Pipeline};
@@ -64,7 +65,37 @@ impl Default for Shell {
 impl Shell {
     fn readln(&mut self) -> Option<String> {
         let prompt = self.prompt();
-        match self.context.read_line(prompt, &mut |_| {}) {
+        match self.context.read_line(prompt, &mut |Event {editor, kind}| {
+            match kind {
+                EventKind::BeforeComplete => {
+                    let (_, pos) = editor.get_words_and_cursor_position();
+
+                    let filename = match pos {
+                        CursorPosition::InWord(i) => i > 0,
+                        CursorPosition::InSpace(Some(_), _) => true,
+                        CursorPosition::InSpace(None, _) => false,
+                        CursorPosition::OnWordLeftEdge(i) => i >= 1,
+                        CursorPosition::OnWordRightEdge(i) => i >= 1,
+                    };
+
+                    if filename {
+                        let pathbuf = env::current_dir().unwrap();
+                        let url = pathbuf.to_str().unwrap();
+                        //HACK FOR LINER LOOKUP ON REDOX
+                        let reference = match url.find(':') {
+                            Some(i) => &url[i + 1..],
+                            None => url
+                        };
+                        let completer = FilenameCompleter::new(Some(reference));
+                        mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                    } else {
+                        let completer = FilenameCompleter::new(Some("/bin/"));
+                        mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                    }
+                },
+                _ => ()
+            }
+        }) {
             Ok(buffer) => {
                 if buffer.trim().is_empty() {
                     Some(buffer)
