@@ -8,7 +8,7 @@ extern crate glob;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{stdout, Read, Write};
-use std::env;
+use std::env::{self, current_dir, home_dir};
 use std::process;
 
 use self::directory_stack::DirectoryStack;
@@ -70,11 +70,11 @@ impl Shell {
                 } else {
                     match File::open(&arg) {
                         Ok(mut file) => {
-                            let mut command_list = String::new();
+                            let mut command_list = String::with_capacity(file.metadata().ok().map_or(0, |x| x.len() as usize));
                             match file.read_to_string(&mut command_list) {
                                 Ok(_) => {
                                     for command in command_list.split('\n') {
-                                        self.on_command(command)
+                                        self.on_command(command);
                                     }
                                 },
                                 Err(err) => println!("ion: failed to read {}: {}", arg, err)
@@ -112,22 +112,17 @@ impl Shell {
         self.variables.set_var("HISTORY_FILE_SIZE", "1000");
         self.variables.set_var("PROMPT", "\x1B[0m\x1B[1;38;5;85mion\x1B[37m:\x1B[38;5;75m$PWD\x1B[37m#\x1B[0m ");
 
-        if let Some(mut history_path) = std::env::home_dir() {   // Initialize the HISTORY_FILE variable
+        // Initialize the HISTORY_FILE variable
+        home_dir().map(|mut history_path| {
             history_path.push(".ion_history");
             self.variables.set_var("HISTORY_FILE", history_path.to_str().unwrap_or("?"));
-        }
+        });
 
         // Initialize the PWD (Present Working Directory) variable
-        match std::env::current_dir() {
-            Ok(path) => env::set_var("PWD", path.to_str().unwrap_or("?")),
-            Err(_)   => env::set_var("PWD", "?")
-        }
+        current_dir().ok().map_or_else(|| env::set_var("PWD", "?"), |path| env::set_var("PWD", path.to_str().unwrap_or("?")));
 
         // Initialize the HOME variable
-        match std::env::home_dir() {
-            Some(path) => env::set_var("HOME", path.to_str().unwrap_or("?")),
-            None       => env::set_var("HOME", "?")
-        }
+        home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| env::set_var("HOME", path.to_str().unwrap_or("?")));
     }
 
     /// This functional will update variables that need to be kept consistent with each iteration
@@ -136,40 +131,32 @@ impl Shell {
     fn update_variables(&mut self) {
         // Update the PWD (Present Working Directory) variable if the current working directory has
         // been updated.
-        match std::env::current_dir() {
-            Ok(path) => {
-                let pwd = self.variables.get_var_or_empty("PWD");
-                let pwd = pwd.as_str();
-                let current_dir = path.to_str().unwrap_or("?");
-                if pwd != current_dir {
-                    env::set_var("OLDPWD", pwd);
-                    env::set_var("PWD", current_dir);
-                }
+        env::current_dir().ok().map_or_else(|| env::set_var("PWD", "?"), |path| {
+            let pwd = self.variables.get_var_or_empty("PWD");
+            let pwd = pwd.as_str();
+            let current_dir = path.to_str().unwrap_or("?");
+            if pwd != current_dir {
+                env::set_var("OLDPWD", pwd);
+                env::set_var("PWD", current_dir);
             }
-            Err(_) => env::set_var("PWD", "?"),
-        }
-
+        })
     }
 
     /// Evaluates the source init file in the user's home directory.
     fn evaluate_init_file(&mut self) {
 
         // Obtain home directory
-        if let Some(mut source_file) = std::env::home_dir() {
-            // Location of ion init file
+        home_dir().map_or_else(|| println!("ion: could not get home directory"), |mut source_file| {
             source_file.push(".ionrc");
-
-            if let Ok(mut file) = File::open(source_file.clone()) {
-                let mut command_list = String::new();
+            if let Ok(mut file) = File::open(&source_file) {
+                let mut command_list = String::with_capacity(file.metadata().ok().map_or(0, |x| x.len() as usize));
                 if let Err(message) = file.read_to_string(&mut command_list) {
-                    println!("{}: Failed to read {:?}", message, source_file.clone());
+                    println!("{}: Failed to read {:?}", message, source_file)
                 } else {
-                    self.on_command(&command_list);
+                    self.on_command(&command_list)
                 }
             }
-        } else {
-            println!("ion: could not get home directory");
-        }
+        });
     }
 
     pub fn print_prompt(&self) {
@@ -372,7 +359,7 @@ impl Shell {
         match arguments.iter().skip(1).next() {
             Some(argument) => {
                 if let Ok(mut file) = File::open(&argument) {
-                    let mut command_list = String::new();
+                    let mut command_list = String::with_capacity(file.metadata().ok().map_or(0, |x| x.len() as usize));
                     if let Err(message) = file.read_to_string(&mut command_list) {
                         println!("{}: Failed to read {}", message, argument);
                         status::FAILURE
@@ -440,12 +427,8 @@ impl Command {
                             name: "exit",
                             help: "To exit the curent session",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                if let Some(status) = args.get(1) {
-                                    if let Ok(status) = status.parse::<i32>() {
-                                        process::exit(status);
-                                    }
-                                }
-                                process::exit(shell.history.previous_status);
+                                process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
+                                    .unwrap_or(shell.history.previous_status))
                             },
                         });
 
