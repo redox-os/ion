@@ -40,15 +40,35 @@ impl Pipeline {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum Word {
+    Bare(String),
+    SingleQuoted(String),
+    DoubleQuoted(String)
+}
+
+impl ::std::ops::Deref for Word {
+    type Target = String;
+    fn deref<'a>(&'a self) -> &'a String {
+        //let &Word(ref v) = self;
+        //v
+        match *self {
+            Word::Bare(ref v)         => v,
+            Word::SingleQuoted(ref v) => v,
+            Word::DoubleQuoted(ref v) => v
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct Job {
-    pub command: String,
-    pub args: Vec<String>,
+    pub command: Word,
+    pub args: Vec<Word>,
     pub background: bool,
 }
 
 impl Job {
 
-    pub fn new(args: Vec<String>, background: bool) -> Self {
+    pub fn new(args: Vec<Word>, background: bool) -> Self {
         let command = args[0].clone();
         Job {
             command: command,
@@ -58,14 +78,15 @@ impl Job {
     }
 
     pub fn expand_globs(&mut self) {
-        let mut new_args: Vec<String> = vec![];
+        let mut new_args: Vec<Word> = vec![];
         for arg in self.args.drain(..) {
             let mut pushed_glob = false;
             if arg.contains(|chr| chr == '?' || chr == '*' || chr == '[') {
                 if let Ok(expanded) = glob(&arg) {
                     for path in expanded.filter_map(Result::ok) {
                         pushed_glob = true;
-                        new_args.push(path.to_string_lossy().into_owned());
+                        // Assume Word::Bare for expanded globs
+                        new_args.push(Word::Bare(path.to_string_lossy().into_owned()));
                     }
                 }
             }
@@ -77,10 +98,10 @@ impl Job {
     }
 
     pub fn build_command(&self) -> Command {
-        let mut command = Command::new(&self.command);
+        let mut command = Command::new(&self.command.to_string());
         for i in 1..self.args.len() {
             if let Some(arg) = self.args.get(i) {
-                command.arg(arg);
+                command.arg(arg.to_string());
             }
         }
         command

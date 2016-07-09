@@ -17,7 +17,7 @@ use std::process;
 use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter};
 
 use self::directory_stack::DirectoryStack;
-use self::peg::{parse, Pipeline};
+use self::peg::{parse, Pipeline, Word};
 use self::variables::Variables;
 use self::flow_control::{FlowControl, Statement, Comparitor};
 use self::status::{SUCCESS, NO_SUCH_COMMAND};
@@ -223,7 +223,7 @@ impl Shell {
                 prompt.push_str("fn> ");
             },
             _ => {
-                prompt.push_str(&format!("{}", self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"), &self.directory_stack)));
+                prompt.push_str(&format!("{}", self.variables.expand_string(&peg::Word::Bare(self.variables.get_var_or_empty("PROMPT")), &self.directory_stack)));
             }
         }
 
@@ -372,7 +372,10 @@ impl Shell {
         // Branch if -> input == shell command i.e. echo
         // Run the 'main' of the command and set exit_status
         let exit_status = if let Some(command) = Command::map().get(pipeline.jobs[0].command.as_str()) {
-            Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
+            let job_args = pipeline.jobs[0].args.clone();
+            let b : Vec<String> = job_args.iter().map(|v| v.to_string()).collect();
+            let args : &[String] = b.as_slice();
+            Some((*command.main)(args, self))
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
             if pipeline.jobs[0].args.len() - 1 == function.args.len() {
