@@ -200,7 +200,7 @@ impl Shell {
         home_dir().map_or_else(|| println!("ion: could not get home directory"), |mut source_file| {
             source_file.push(".ionrc");
             if let Ok(mut file) = File::open(&source_file) {
-                let mut command_list = String::with_capacity(file.metadata().ok().map_or(0, |x| x.len() as usize));
+                let mut command_list = String::new();
                 if let Err(message) = file.read_to_string(&mut command_list) {
                     println!("{}: Failed to read {:?}", message, source_file)
                 } else {
@@ -395,7 +395,7 @@ impl Shell {
         match arguments.iter().skip(1).next() {
             Some(argument) => {
                 if let Ok(mut file) = File::open(&argument) {
-                    let mut command_list = String::with_capacity(file.metadata().ok().map_or(0, |x| x.len() as usize));
+                    let mut command_list = String::new();
                     if let Err(message) = file.read_to_string(&mut command_list) {
                         println!("{}: Failed to read {}", message, argument);
                         status::FAILURE
