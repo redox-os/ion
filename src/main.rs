@@ -123,7 +123,7 @@ impl Shell {
                 } else {
                     match File::open(&arg) {
                         Ok(mut file) => {
-                            let mut command_list = String::with_capacity(file.metadata().ok().map_or(0, |x| x.len() as usize));
+                            let mut command_list = String::new();
                             match file.read_to_string(&mut command_list) {
                                 Ok(_) => {
                                     for command in command_list.split('\n') {
