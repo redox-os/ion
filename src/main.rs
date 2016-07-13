@@ -9,7 +9,7 @@ extern crate liner;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
-use std::env;
+use std::env::{self, current_dir, home_dir};
 use std::mem;
 use std::process;
 
@@ -19,7 +19,7 @@ use self::directory_stack::DirectoryStack;
 use self::peg::{parse, Pipeline};
 use self::variables::Variables;
 use self::history::History;
-use self::flow_control::{FlowControl, is_flow_control_command, Statement};
+use self::flow_control::{FlowControl, Comparitor, Statement};
 use self::status::{SUCCESS, NO_SUCH_COMMAND};
 use self::function::Function;
 use self::pipe::execute_pipeline;
@@ -42,7 +42,7 @@ pub struct Shell {
     flow_control: FlowControl,
     directory_stack: DirectoryStack,
     history: History,
-    functions: HashMap<String, Function>
+    functions: HashMap<String, Function>,
 }
 
 impl Default for Shell {
@@ -54,7 +54,7 @@ impl Default for Shell {
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new().expect(""),
             history: History::default(),
-            functions: HashMap::new()
+            functions: HashMap::new(),
         };
         new_shell.initialize_default_variables();
         new_shell.evaluate_init_file();
@@ -113,20 +113,19 @@ impl Shell {
     }
 
     fn execute(&mut self) {
-        let commands = Command::map();
         let mut dash_c = false;
         for arg in env::args().skip(1) {
             if arg == "-c" {
                 dash_c = true;
             } else {
                 if dash_c {
-                    self.on_command(&arg, &commands);
+                    self.on_command(&arg);
                 } else {
                     match File::open(&arg) {
                         Ok(mut file) => {
                             let mut command_list = String::new();
                             match file.read_to_string(&mut command_list) {
-                                Ok(_) => self.on_command(&command_list, &commands),
+                                Ok(_) => self.on_command(&command_list),
                                 Err(err) => println!("ion: failed to read {}: {}", arg, err)
                             }
                         },
@@ -142,7 +141,7 @@ impl Shell {
         while let Some(command) = self.readln() {
             let command = command.trim();
             if !command.is_empty() {
-                self.on_command(command, &commands);
+                self.on_command(command);
             }
             self.update_variables();
         }
@@ -160,22 +159,17 @@ impl Shell {
         self.variables.set_var("HISTORY_FILE_SIZE", "1000");
         self.variables.set_var("PROMPT", "\x1B[0m\x1B[1;38;5;85mion\x1B[37m:\x1B[38;5;75m$PWD\x1B[37m#\x1B[0m ");
 
-        if let Some(mut history_path) = std::env::home_dir() {   // Initialize the HISTORY_FILE variable
+        // Initialize the HISTORY_FILE variable
+        home_dir().map(|mut history_path| {
             history_path.push(".ion_history");
             self.variables.set_var("HISTORY_FILE", history_path.to_str().unwrap_or("?"));
-        }
+        });
 
         // Initialize the PWD (Present Working Directory) variable
-        match std::env::current_dir() {
-            Ok(path) => env::set_var("PWD", path.to_str().unwrap_or("?")),
-            Err(_)   => env::set_var("PWD", "?")
-        }
+        current_dir().ok().map_or_else(|| env::set_var("PWD", "?"), |path| env::set_var("PWD", path.to_str().unwrap_or("?")));
 
         // Initialize the HOME variable
-        match std::env::home_dir() {
-            Some(path) => env::set_var("HOME", path.to_str().unwrap_or("?")),
-            None       => env::set_var("HOME", "?")
-        }
+        home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| env::set_var("HOME", path.to_str().unwrap_or("?")));
     }
 
     /// This functional will update variables that need to be kept consistent with each iteration
@@ -184,41 +178,31 @@ impl Shell {
     fn update_variables(&mut self) {
         // Update the PWD (Present Working Directory) variable if the current working directory has
         // been updated.
-        match std::env::current_dir() {
-            Ok(path) => {
-                let pwd = self.variables.get_var_or_empty("PWD");
-                let pwd = pwd.as_str();
-                let current_dir = path.to_str().unwrap_or("?");
-                if pwd != current_dir {
-                    env::set_var("OLDPWD", pwd);
-                    env::set_var("PWD", current_dir);
-                }
+        env::current_dir().ok().map_or_else(|| env::set_var("PWD", "?"), |path| {
+            let pwd = self.variables.get_var_or_empty("PWD");
+            let pwd = pwd.as_str();
+            let current_dir = path.to_str().unwrap_or("?");
+            if pwd != current_dir {
+                env::set_var("OLDPWD", pwd);
+                env::set_var("PWD", current_dir);
             }
-            Err(_) => env::set_var("PWD", "?"),
-        }
-
+        })
     }
 
     /// Evaluates the source init file in the user's home directory.
     fn evaluate_init_file(&mut self) {
-        let commands = &Command::map();
-
         // Obtain home directory
-        if let Some(mut source_file) = std::env::home_dir() {
-            // Location of ion init file
+        home_dir().map_or_else(|| println!("ion: could not get home directory"), |mut source_file| {
             source_file.push(".ionrc");
-
-            if let Ok(mut file) = File::open(source_file.clone()) {
-                let mut command_list = String::new();
+            if let Ok(mut file) = File::open(&source_file) {
+                let mut command_list = String::with_capacity(file.metadata().ok().map_or(0, |x| x.len() as usize));
                 if let Err(message) = file.read_to_string(&mut command_list) {
-                    println!("{}: Failed to read {:?}", message, source_file.clone());
+                    println!("{}: Failed to read {:?}", message, source_file)
                 } else {
-                    self.on_command(&command_list, commands);
+                    self.on_command(&command_list)
                 }
             }
-        } else {
-            println!("ion: could not get home directory");
-        }
+        });
     }
 
     pub fn prompt(&self) -> String {
@@ -232,10 +216,10 @@ impl Shell {
         }).to_string();
 
         match self.flow_control.current_statement {
-            Statement::For(_, _) => {
+            Statement::For { .. } => {
                 prompt.push_str("for> ");
             },
-            Statement::Function(_, _) => {
+            Statement::Function { .. } => {
                 prompt.push_str("fn> ");
             },
             _ => {
@@ -246,59 +230,127 @@ impl Shell {
         prompt
     }
 
-    fn on_command(&mut self, command_string: &str, commands: &HashMap<&str, Command>) {
+    fn on_command(&mut self, command_string: &str) {
         self.history.add(command_string.to_string(), &self.variables);
 
-        let mut pipelines = parse(command_string);
+        let update = parse(command_string);
+        if update.is_flow_control() {
+            self.flow_control.current_statement = update.clone();
+            self.flow_control.collecting_block = true;
+        }
 
-        // Execute commands
+        match update {
+            Statement::End                         => self.handle_end(),
+            Statement::If{left, right, comparitor} => self.handle_if(left, comparitor, right),
+            Statement::Pipelines(pipelines)        => self.handle_pipelines(pipelines),
+            _                                      => {}
+        }
+
+    }
+
+    fn handle_if(&mut self, left: String, comparitor: Comparitor, right: String) {
+        let value = match comparitor {
+            Comparitor::GreaterThan        => { left >  right },
+            Comparitor::GreaterThanOrEqual => { left >= right },
+            Comparitor::LessThan           => { left <  right },
+            Comparitor::LessThanOrEqual    => { left <= right },
+            Comparitor::Equal              => { left == right },
+            Comparitor::NotEqual           => { left != right },
+        };
+
+        self.flow_control.modes.push(flow_control::Mode{value: value})
+    }
+
+
+    fn handle_end(&mut self){
+        self.flow_control.collecting_block = false;
+        match self.flow_control.current_statement.clone() {
+            Statement::For{variable: ref var, values: ref vals} => {
+                    let block_jobs: Vec<Pipeline> = self.flow_control
+                        .current_block
+                        .pipelines
+                        .drain(..)
+                        .collect();
+                let variable = var.clone();
+                let values = vals.clone();
+                for value in values {
+                    self.variables.set_var(&variable, &value);
+                    for pipeline in &block_jobs {
+                        self.run_pipeline(pipeline);
+                        }
+                    }
+            },
+            Statement::Function{ref name, ref args} => {
+                    let block_jobs: Vec<Pipeline> = self.flow_control
+                        .current_block
+                        .pipelines
+                        .drain(..)
+                        .collect();
+                self.functions.insert(name.clone(), Function { name: name.clone(), pipelines: block_jobs.clone(), args: args.clone() });
+            },
+            Statement::If{..} => {
+                self.flow_control.modes.pop();
+                if self.flow_control.modes.is_empty() {
+                    let block_jobs: Vec<Pipeline> = self.flow_control
+                        .current_block
+                        .pipelines
+                        .drain(..)
+                        .collect();
+                    for pipeline in &block_jobs {
+                        self.run_pipeline(pipeline);
+                    }
+                }
+            },
+            Statement::Else => {
+                self.flow_control.modes.pop();
+                if self.flow_control.modes.is_empty() {
+                    let block_jobs: Vec<Pipeline> = self.flow_control
+                        .current_block
+                        .pipelines
+                        .drain(..)
+                        .collect();
+                    for pipeline in &block_jobs {
+                        self.run_pipeline(pipeline);
+                    }
+                }
+            },
+            _ => {
+                    let block_jobs: Vec<Pipeline> = self.flow_control
+                        .current_block
+                        .pipelines
+                        .drain(..)
+                        .collect();
+                for pipeline in &block_jobs {
+                    self.run_pipeline(pipeline);
+                }
+            }
+        }
+        self.flow_control.current_statement = Statement::Default;
+    }
+
+    fn handle_pipelines(&mut self, mut pipelines: Vec<Pipeline>) {
         for pipeline in pipelines.drain(..) {
             if self.flow_control.collecting_block {
-                // TODO move this logic into "end" command
-                if pipeline.jobs[0].command == "end" {
-                    self.flow_control.collecting_block = false;
-                    let block_jobs: Vec<Pipeline> = self.flow_control
-                                                   .current_block
-                                                   .pipelines
-                                                   .drain(..)
-                                                   .collect();
-                    match self.flow_control.current_statement.clone() {
-                        Statement::For(ref var, ref vals) => {
-                            let variable = var.clone();
-                            let values = vals.clone();
-                            for value in values {
-                                self.variables.set_var(&variable, &value);
-                                for pipeline in &block_jobs {
-                                    self.run_pipeline(&pipeline, commands);
-                                }
-                            }
-                        },
-                        Statement::Function(ref name, ref args) => {
-                            self.functions.insert(name.clone(), Function { name: name.clone(), pipelines: block_jobs.clone(), args: args.clone() });
-                        },
-                        _ => {}
-                    }
-                    self.flow_control.current_statement = Statement::Default;
-                } else {
-                    self.flow_control.current_block.pipelines.push(pipeline);
+                let mode = self.flow_control.modes.last().unwrap_or(&flow_control::Mode{value: false}).value;
+                match (mode, self.flow_control.current_statement.clone()) {
+                    (true, Statement::If{..}) | (false, Statement::Else) |
+                    (_, Statement::For{..}) |(_, Statement::Function{..}) => self.flow_control.current_block.pipelines.push(pipeline),
+                    _ => {}
                 }
             } else {
-                if self.flow_control.skipping() && !is_flow_control_command(&pipeline.jobs[0].command) {
-                    continue;
-                }
-                self.run_pipeline(&pipeline, commands);
+                self.run_pipeline(&pipeline);
             }
         }
     }
 
-    fn run_pipeline(&mut self,
-                    pipeline: &Pipeline,
-                    commands: &HashMap<&str, Command>)
-                    -> Option<i32> {
+    fn run_pipeline(&mut self, pipeline: &Pipeline) -> Option<i32> {
         let mut pipeline = self.variables.expand_pipeline(pipeline, &self.directory_stack);
         pipeline.expand_globs();
-        let exit_status = if let Some(command) = commands.get(pipeline.jobs[0].command.as_str()) {
+        // Branch if -> input == shell command i.e. echo
+        // Run the 'main' of the command and set exit_status
+        let exit_status = if let Some(command) = Command::map().get(pipeline.jobs[0].command.as_str()) {
             Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
+        // Branch else if -> input == shell function and set the exit_status
         } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
             if pipeline.jobs[0].args.len() - 1 == function.args.len() {
                 let mut variables_backup: HashMap<&str, Option<String>> = HashMap::new();
@@ -308,7 +360,7 @@ impl Shell {
                 }
                 let mut return_value = None;
                 for function_pipeline in &function.pipelines {
-                    return_value = self.run_pipeline(function_pipeline, commands)
+                    return_value = self.run_pipeline(function_pipeline)
                 }
                 for (name, value_option) in &variables_backup {
                     match *value_option {
@@ -321,9 +373,11 @@ impl Shell {
                 println!("This function takes {} arguments, but you provided {}", function.args.len(), pipeline.jobs[0].args.len()-1);
                 Some(NO_SUCH_COMMAND) // not sure if this is the right error code
             }
+        // If not a shell command or a shell function execute the pipeline and set the exit_status
         } else {
             Some(execute_pipeline(pipeline))
         };
+        // Retrieve the exit_status and set the $? variable and history.previous_status
         if let Some(code) = exit_status {
             self.variables.set_var("?", &code.to_string());
             self.history.previous_status = code;
@@ -333,16 +387,15 @@ impl Shell {
 
     /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
     fn source_command(&mut self, arguments: &[String]) -> i32 {
-        let commands = Command::map();
         match arguments.iter().skip(1).next() {
             Some(argument) => {
                 if let Ok(mut file) = File::open(&argument) {
-                    let mut command_list = String::new();
+                    let mut command_list = String::with_capacity(file.metadata().ok().map_or(0, |x| x.len() as usize));
                     if let Err(message) = file.read_to_string(&mut command_list) {
                         println!("{}: Failed to read {}", message, argument);
                         status::FAILURE
                     } else {
-                        self.on_command(&command_list, &commands);
+                        self.on_command(&command_list);
                         status::SUCCESS
                     }
                 } else {
@@ -405,12 +458,8 @@ impl Command {
                             name: "exit",
                             help: "To exit the curent session",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                if let Some(status) = args.get(1) {
-                                    if let Ok(status) = status.parse::<i32>() {
-                                        process::exit(status);
-                                    }
-                                }
-                                process::exit(shell.history.previous_status);
+                                process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
+                                    .unwrap_or(shell.history.previous_status))
                             },
                         });
 
@@ -459,41 +508,6 @@ impl Command {
                             },
                         });
 
-        commands.insert("if",
-                        Command {
-                            name: "if",
-                            help: "Conditionally execute code",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.flow_control.if_(args)
-                            },
-                        });
-
-        commands.insert("else",
-                        Command {
-                            name: "else",
-                            help: "Execute code if a previous condition was false",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.flow_control.else_(args)
-                            },
-                        });
-
-        commands.insert("end",
-                        Command {
-                            name: "end",
-                            help: "End a code block",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.flow_control.end(args)
-                            },
-                        });
-
-        commands.insert("for",
-                        Command {
-                            name: "for",
-                            help: "Iterate through a list",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.flow_control.for_(args)
-                            },
-                        });
 
         commands.insert("source",
                         Command {
@@ -523,14 +537,6 @@ impl Command {
                             },
                         });
 
-        commands.insert("fn",
-                        Command {
-                            name: "fn",
-                            help: "Create a function",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.flow_control.fn_(args)
-                            },
-                        });
 
         commands.insert("drop",
                         Command {

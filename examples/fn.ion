@@ -1,0 +1,7 @@
+fn test a b c
+  echo $a
+  echo $b
+  echo $c
+end
+
+test hello world goodbye

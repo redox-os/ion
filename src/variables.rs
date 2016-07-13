@@ -87,7 +87,7 @@ impl Variables {
     }
 
     pub fn get_var_or_empty(&self, name: &str) -> String {
-        self.get_var(name).unwrap_or(String::new())
+        self.get_var(name).unwrap_or_default()
     }
 
     pub fn unset_var(&mut self, name: &str) -> Option<String> {
@@ -142,7 +142,7 @@ impl Variables {
         // TODO don't copy everything
         Job::new(job.args
                      .iter()
-                     .map(|original: &String| self.expand_string(&original, dir_stack))
+                     .map(|original: &String| self.expand_string(original, dir_stack))
                      .collect(),
                  job.background)
     }
@@ -163,7 +163,7 @@ impl Variables {
 
     pub fn tilde_expansion(&self, word: String, dir_stack: &DirectoryStack) -> String {
         // If the word doesn't start with ~, just return it to avoid allocating an iterator
-        if word.starts_with("~") {
+        if word.starts_with('~') {
             let mut chars = word.char_indices();
 
             let tilde_prefix;
@@ -205,10 +205,10 @@ impl Variables {
                     let neg;
                     let tilde_num;
 
-                    if tilde_prefix.starts_with("+") {
+                    if tilde_prefix.starts_with('+') {
                         tilde_num = &tilde_prefix[1..];
                         neg = false;
-                    } else if tilde_prefix.starts_with("-") {
+                    } else if tilde_prefix.starts_with('-') {
                         tilde_num = &tilde_prefix[1..];
                         neg = true;
                     } else {
