@@ -19,7 +19,7 @@ use self::directory_stack::DirectoryStack;
 use self::peg::{parse, Pipeline};
 use self::variables::Variables;
 use self::history::History;
-use self::flow_control::{FlowControl, Comparitor, Statement};
+use self::flow_control::{FlowControl, Statement, Comparitor};
 use self::status::{SUCCESS, NO_SUCH_COMMAND};
 use self::function::Function;
 use self::pipe::execute_pipeline;
@@ -123,9 +123,13 @@ impl Shell {
                 } else {
                     match File::open(&arg) {
                         Ok(mut file) => {
-                            let mut command_list = String::new();
+                            let mut command_list = String::with_capacity(file.metadata().ok().map_or(0, |x| x.len() as usize));
                             match file.read_to_string(&mut command_list) {
-                                Ok(_) => self.on_command(&command_list),
+                                Ok(_) => {
+                                    for command in command_list.split('\n') {
+                                        self.on_command(command);
+                                    }
+                                },
                                 Err(err) => println!("ion: failed to read {}: {}", arg, err)
                             }
                         },
@@ -191,6 +195,7 @@ impl Shell {
 
     /// Evaluates the source init file in the user's home directory.
     fn evaluate_init_file(&mut self) {
+        
         // Obtain home directory
         home_dir().map_or_else(|| println!("ion: could not get home directory"), |mut source_file| {
             source_file.push(".ionrc");
