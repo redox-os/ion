@@ -4,19 +4,22 @@
 #![plugin(peg_syntax_ext)]
 
 extern crate glob;
+extern crate liner;
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{stdout, Read, Write};
+use std::io::Read;
 use std::env::{self, current_dir, home_dir};
+use std::mem;
 use std::process;
 
+use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter};
+
 use self::directory_stack::DirectoryStack;
-use self::input_editor::readln;
 use self::peg::{parse, Pipeline};
 use self::variables::Variables;
 use self::history::History;
-use self::flow_control::{FlowControl, Statement, Comparitor};
+use self::flow_control::{FlowControl, Comparitor, Statement};
 use self::status::{SUCCESS, NO_SUCH_COMMAND};
 use self::function::Function;
 use self::pipe::execute_pipeline;
@@ -24,7 +27,6 @@ use self::pipe::execute_pipeline;
 pub mod pipe;
 pub mod directory_stack;
 pub mod to_num;
-pub mod input_editor;
 pub mod peg;
 pub mod variables;
 pub mod history;
@@ -35,6 +37,7 @@ pub mod function;
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell {
+    context: Context,
     variables: Variables,
     flow_control: FlowControl,
     directory_stack: DirectoryStack,
@@ -46,6 +49,7 @@ impl Default for Shell {
     /// Panics if DirectoryStack construction fails
     fn default() -> Shell {
         let mut new_shell = Shell {
+            context: Context::new(),
             variables: Variables::default(),
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new().expect(""),
@@ -59,6 +63,55 @@ impl Default for Shell {
 }
 
 impl Shell {
+    fn readln(&mut self) -> Option<String> {
+        let prompt = self.prompt();
+        match self.context.read_line(prompt, &mut |Event {editor, kind}| {
+            match kind {
+                EventKind::BeforeComplete => {
+                    let (_, pos) = editor.get_words_and_cursor_position();
+
+                    let filename = match pos {
+                        CursorPosition::InWord(i) => i > 0,
+                        CursorPosition::InSpace(Some(_), _) => true,
+                        CursorPosition::InSpace(None, _) => false,
+                        CursorPosition::OnWordLeftEdge(i) => i >= 1,
+                        CursorPosition::OnWordRightEdge(i) => i >= 1,
+                    };
+
+                    if filename {
+                        let pathbuf = env::current_dir().unwrap();
+                        let url = pathbuf.to_str().unwrap();
+                        //HACK FOR LINER LOOKUP ON REDOX
+                        let reference = match url.find(':') {
+                            Some(i) => &url[i + 1..],
+                            None => url
+                        };
+                        let completer = FilenameCompleter::new(Some(reference));
+                        mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                    } else {
+                        let completer = FilenameCompleter::new(Some("/bin/"));
+                        mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                    }
+                },
+                _ => ()
+            }
+        }) {
+            Ok(buffer) => {
+                if buffer.trim().is_empty() {
+                    Some(buffer)
+                } else {
+                    let buffer_clone = buffer.clone();
+                    self.context.history.push(buffer.into());
+                    while self.context.history.len() > 1024 {
+                        self.context.history.remove(0);
+                    }
+                    Some(buffer_clone)
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
     fn execute(&mut self) {
         let mut dash_c = false;
         for arg in env::args().skip(1) {
@@ -70,13 +123,9 @@ impl Shell {
                 } else {
                     match File::open(&arg) {
                         Ok(mut file) => {
-                            let mut command_list = String::with_capacity(file.metadata().ok().map_or(0, |x| x.len() as usize));
+                            let mut command_list = String::new();
                             match file.read_to_string(&mut command_list) {
-                                Ok(_) => {
-                                    for command in command_list.split('\n') {
-                                        self.on_command(command);
-                                    }
-                                },
+                                Ok(_) => self.on_command(&command_list),
                                 Err(err) => println!("ion: failed to read {}: {}", arg, err)
                             }
                         },
@@ -89,14 +138,12 @@ impl Shell {
             }
         }
 
-        self.print_prompt();
-        while let Some(command) = readln() {
+        while let Some(command) = self.readln() {
             let command = command.trim();
             if !command.is_empty() {
                 self.on_command(command);
             }
             self.update_variables();
-            self.print_prompt();
         }
 
         // Exit with the previous command's exit status.
@@ -144,7 +191,6 @@ impl Shell {
 
     /// Evaluates the source init file in the user's home directory.
     fn evaluate_init_file(&mut self) {
-
         // Obtain home directory
         home_dir().map_or_else(|| println!("ion: could not get home directory"), |mut source_file| {
             source_file.push(".ionrc");
@@ -159,44 +205,29 @@ impl Shell {
         });
     }
 
-    pub fn print_prompt(&self) {
-        self.print_prompt_prefix();
-        match self.flow_control.current_statement {
-            Statement::For{..} => self.print_for_prompt(),
-            Statement::Function{..} => self.print_function_prompt(),
-            _ => self.print_default_prompt(),
-        }
-        if let Err(message) = stdout().flush() {
-            println!("{}: failed to flush prompt to stdout", message);
-        }
-
-    }
-
-    // TODO eventually this thing should be gone
-    fn print_prompt_prefix(&self) {
-        let prompt_prefix = self.flow_control.modes.iter().rev().fold(String::new(), |acc, mode| {
+    pub fn prompt(&self) -> String {
+        let mut prompt = self.flow_control.modes.iter().rev().fold(String::new(), |acc, mode| {
             acc +
             if mode.value {
                 "+ "
             } else {
                 "- "
             }
-        });
-        print!("{}", prompt_prefix);
-    }
+        }).to_string();
 
-    fn print_for_prompt(&self) {
-        print!("for> ");
-    }
+        match self.flow_control.current_statement {
+            Statement::For { .. } => {
+                prompt.push_str("for> ");
+            },
+            Statement::Function { .. } => {
+                prompt.push_str("fn> ");
+            },
+            _ => {
+                prompt.push_str(&format!("{}", self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"), &self.directory_stack)));
+            }
+        }
 
-    fn print_function_prompt(&self) {
-        print!("fn> ");
-    }
-
-    fn print_default_prompt(&self) {
-        print!("{}",
-               self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"),
-                                            &self.directory_stack));
+        prompt
     }
 
     fn on_command(&mut self, command_string: &str) {
