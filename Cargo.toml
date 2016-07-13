@@ -13,5 +13,6 @@ authors = [
 ]
 
 [dependencies]
-peg = "0.3"
 glob = "0.2"
+liner = { git="https://github.com/movingtomars/liner.git", rev="88362e06536147799f1887a3d3dc753b753ac625" }
+peg = "0.3"
