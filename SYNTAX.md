@@ -12,7 +12,7 @@
 ### Variables
 - `let variable=value` will set a variable to `value`
 - `$variable` will be placed inline as a single argument, so `touch $variable` would try to create a file `some value`
-- `let variable` will delete the variable called `variable`
+- `drop variable` will delete the variable called `variable`
 - `let` will list all variables
 
 ### Conditionals
