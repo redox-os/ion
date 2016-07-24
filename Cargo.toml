@@ -14,5 +14,5 @@ authors = [
 
 [dependencies]
 glob = "0.2"
-liner = { git="https://github.com/jackpot51/liner.git" }
+liner = { git="https://github.com/jackpot51/liner.git", branch="termion-1.0" }
 peg = "0.3"
