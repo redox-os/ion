@@ -57,15 +57,17 @@ impl DirectoryStack {
     pub fn cd<I: IntoIterator>(&mut self, args: I, variables: &Variables) -> i32
         where I::Item: AsRef<str>
     {
-            args.into_iter().nth(1)
-                .map_or(self.switch_to_home_directory(variables), |dir| {
+            match args.into_iter().nth(1) {
+                Some(dir) => {
                     let dir = dir.as_ref();
                     if dir == "-" {
                         self.switch_to_previous_directory(variables)
                     } else {
                         self.change_and_push_dir(dir, variables)
                     }
-                })
+                }
+                None => self.switch_to_home_directory(variables)
+            }
     }
 
     fn switch_to_home_directory(&mut self, variables: &Variables) -> i32 {
