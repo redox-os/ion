@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![feature(deque_extras)]
 #![feature(box_syntax)]
 #![feature(plugin)]
@@ -101,10 +102,7 @@ impl Shell {
                     Some(buffer)
                 } else {
                     let buffer_clone = buffer.clone();
-                    self.context.history.push(buffer.into());
-                    while self.context.history.len() > 1024 {
-                        self.context.history.remove(0);
-                    }
+                    let _ = self.context.history.push(buffer.into());
                     Some(buffer_clone)
                 }
             }
@@ -144,7 +142,7 @@ impl Shell {
 
         while let Some(command) = self.readln() {
             let command = command.trim();
-            if !command.is_empty() {
+            if ! command.is_empty() {
                 self.on_command(command);
             }
             self.update_variables();
@@ -195,7 +193,7 @@ impl Shell {
 
     /// Evaluates the source init file in the user's home directory.
     fn evaluate_init_file(&mut self) {
-        
+
         // Obtain home directory
         home_dir().map_or_else(|| println!("ion: could not get home directory"), |mut source_file| {
             source_file.push(".ionrc");
