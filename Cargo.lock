@@ -20,7 +20,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "liner"
 version = "0.1.0"
-source = "git+https://github.com/jackpot51/liner.git#b0517a0aa79d354a0dac6261aa79373a0e0f4e4c"
+source = "git+https://github.com/jackpot51/liner.git#2a08ab91b42ff2e5359121b2c3738fdc677d9f7a"
 dependencies = [
  "termion 0.1.0 (git+https://github.com/jackpot51/termion.git)",
  "unicode-width 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
