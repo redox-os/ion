@@ -19,7 +19,6 @@ use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter};
 use self::directory_stack::DirectoryStack;
 use self::peg::{parse, Pipeline};
 use self::variables::Variables;
-use self::history::History;
 use self::flow_control::{FlowControl, Statement, Comparitor};
 use self::status::{SUCCESS, NO_SUCH_COMMAND};
 use self::function::Function;
@@ -30,7 +29,6 @@ pub mod directory_stack;
 pub mod to_num;
 pub mod peg;
 pub mod variables;
-pub mod history;
 pub mod flow_control;
 pub mod status;
 pub mod function;
@@ -42,8 +40,8 @@ pub struct Shell {
     variables: Variables,
     flow_control: FlowControl,
     directory_stack: DirectoryStack,
-    history: History,
     functions: HashMap<String, Function>,
+    previous_status: i32,
 }
 
 impl Default for Shell {
@@ -54,8 +52,8 @@ impl Default for Shell {
             variables: Variables::default(),
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new().expect(""),
-            history: History::default(),
             functions: HashMap::new(),
+            previous_status: 0,
         };
         new_shell.initialize_default_variables();
         new_shell.evaluate_init_file();
@@ -66,7 +64,9 @@ impl Default for Shell {
 impl Shell {
     fn readln(&mut self) -> Option<String> {
         let prompt = self.prompt();
-        match self.context.read_line(prompt, &mut |Event {editor, kind}| {
+
+        let line = self.context.read_line(prompt,
+                                          &mut |Event { editor, kind }| {
             match kind {
                 EventKind::BeforeComplete => {
                     let (_, pos) = editor.get_words_and_cursor_position();
@@ -93,20 +93,17 @@ impl Shell {
                         let completer = FilenameCompleter::new(Some("/bin/"));
                         mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                     }
-                },
-                _ => ()
-            }
-        }) {
-            Ok(buffer) => {
-                if buffer.trim().is_empty() {
-                    Some(buffer)
-                } else {
-                    let buffer_clone = buffer.clone();
-                    let _ = self.context.history.push(buffer.into());
-                    Some(buffer_clone)
                 }
+                _ => (),
             }
-            Err(_) => None,
+        });
+
+        match line {
+            Ok(line) => Some(line),
+            Err(err) => {
+                println!("ion: {}", err);
+                None
+            }
         }
     }
 
@@ -136,7 +133,7 @@ impl Shell {
                 }
 
                 // Exit with the previous command's exit status.
-                process::exit(self.history.previous_status);
+                process::exit(self.previous_status);
             }
         }
 
@@ -149,7 +146,7 @@ impl Shell {
         }
 
         // Exit with the previous command's exit status.
-        process::exit(self.history.previous_status);
+        process::exit(self.previous_status);
     }
 
     /// This function will initialize the default variables used by the shell. This function will
@@ -234,7 +231,30 @@ impl Shell {
     }
 
     fn on_command(&mut self, command_string: &str) {
-        self.history.add(command_string.to_string(), &self.variables);
+        if !command_string.trim().is_empty() {
+            if self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") == "1" {
+                let file_name = self.variables.get_var_or_empty("HISTORY_FILE");
+                self.context.history.set_file_name(Some(file_name));
+
+                let max_file_size = self.variables
+                    .get_var_or_empty("HISTORY_FILE_SIZE")
+                    .parse()
+                    .unwrap_or(1000);
+                let max_size = self.variables
+                    .get_var_or_empty("HISTORY_SIZE")
+                    .parse()
+                    .unwrap_or(1000);
+
+                self.context.history.set_max_file_size(max_file_size);
+                self.context.history.set_max_size(max_size);
+            } else {
+                self.context.history.set_file_name(None);
+            }
+
+            if let Err(err) = self.context.history.push(command_string.into()) {
+                println!("ion: {}", err);
+            }
+        }
 
         let update = parse(command_string);
         if update.is_flow_control() {
@@ -383,7 +403,7 @@ impl Shell {
         // Retrieve the exit_status and set the $? variable and history.previous_status
         if let Some(code) = exit_status {
             self.variables.set_var("?", &code.to_string());
-            self.history.previous_status = code;
+            self.previous_status = code;
         }
         exit_status
     }
@@ -411,6 +431,13 @@ impl Shell {
                 status::SUCCESS
             },
         }
+    }
+
+    fn print_history(&self, _arguments: &[String]) -> i32 {
+        for command in &self.context.history.buffers {
+            println!("{}", command);
+        }
+        SUCCESS
     }
 }
 
@@ -462,7 +489,7 @@ impl Command {
                             help: "To exit the curent session",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
-                                    .unwrap_or(shell.history.previous_status))
+                                    .unwrap_or(shell.previous_status))
                             },
                         });
 
@@ -507,7 +534,7 @@ impl Command {
                             name: "history",
                             help: "Display a log of all commands previously executed",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.history.history(args)
+                                shell.print_history(args)
                             },
                         });
 
