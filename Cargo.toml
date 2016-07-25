@@ -14,5 +14,5 @@ authors = [
 
 [dependencies]
 glob = "0.2"
-liner = "0.1"
+liner = "0.1.1"
 peg = "0.3"
