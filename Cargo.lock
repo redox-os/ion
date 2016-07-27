@@ -3,7 +3,7 @@ name = "ion-shell"
 version = "0.1.4"
 dependencies = [
  "glob 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "liner 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "liner 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "peg 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -19,7 +19,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "liner"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "termion 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
