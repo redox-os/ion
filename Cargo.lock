@@ -5,7 +5,6 @@ dependencies = [
  "glob 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "liner 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "peg 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "termion 1.0.4 (git+https://github.com/ticki/termion.git)",
 ]
 
 [[package]]
@@ -44,9 +43,7 @@ dependencies = [
 name = "termion"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "libc 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
-]
+replace = "termion 1.0.4 (git+https://github.com/ticki/termion.git)"
 
 [[package]]
 name = "unicode-width"

@@ -17,5 +17,5 @@ glob = "0.2"
 liner = "0.1"
 peg = "0.3"
 
-[dependencies.termion]
-git = "https://github.com/ticki/termion.git"
+[replace]
+"termion:1.0.4" = { git = "https://github.com/ticki/termion.git" }
