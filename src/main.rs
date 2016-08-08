@@ -223,7 +223,7 @@ impl Shell {
                 prompt.push_str("fn> ");
             },
             _ => {
-                prompt.push_str(&format!("{}", self.variables.expand_string(&peg::Word::Bare(self.variables.get_var_or_empty("PROMPT")), &self.directory_stack)));
+                prompt.push_str(&format!("{}", self.variables.expand_string(&Word::Bare(self.variables.get_var_or_empty("PROMPT")), &self.directory_stack)));
             }
         }
 

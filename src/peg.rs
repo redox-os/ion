@@ -39,7 +39,7 @@ impl Pipeline {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Word {
     Bare(String),
     SingleQuoted(String),
@@ -49,13 +49,23 @@ pub enum Word {
 impl ::std::ops::Deref for Word {
     type Target = String;
     fn deref<'a>(&'a self) -> &'a String {
-        //let &Word(ref v) = self;
-        //v
         match *self {
             Word::Bare(ref v)         => v,
             Word::SingleQuoted(ref v) => v,
             Word::DoubleQuoted(ref v) => v
         }
+    }
+}
+
+impl ::std::cmp::PartialEq<Word> for Word {
+    fn eq(&self, other: &Word) -> bool {
+        self == other
+    }
+}
+
+impl ::std::cmp::PartialEq<Word> for str {
+    fn eq(&self, other: &Word) -> bool {
+        self == other.as_str()
     }
 }
 
@@ -132,7 +142,7 @@ mod tests {
         if let Statement::Pipelines(mut pipelines) = parse("cat") {
             let jobs = pipelines.remove(0).jobs;
             assert_eq!(1, jobs.len());
-            assert_eq!("cat", jobs[0].command);
+            assert_eq!("cat", &jobs[0].command);
             assert_eq!(1, jobs[0].args.len());
         } else {
             assert!(false);
@@ -144,9 +154,9 @@ mod tests {
         if let Statement::Pipelines(mut pipelines) = parse("ls -al dir") {
             let jobs = pipelines.remove(0).jobs;
             assert_eq!(1, jobs.len());
-            assert_eq!("ls", jobs[0].command);
-            assert_eq!("-al", jobs[0].args[1]);
-            assert_eq!("dir", jobs[0].args[2]);
+            assert_eq!("ls", &jobs[0].command);
+            assert_eq!("-al", &jobs[0].args[1]);
+            assert_eq!("dir", &jobs[0].args[2]);
         } else {
             assert!(false);
         }
@@ -156,10 +166,10 @@ mod tests {
     fn multiple_jobs_with_args() {
         if let Statement::Pipelines(pipelines) = parse("ls -al;cat tmp.txt") {
             assert_eq!(2, pipelines.len());
-            assert_eq!("ls", pipelines[0].jobs[0].command);
-            assert_eq!("-al", pipelines[0].jobs[0].args[1]);
-            assert_eq!("cat", pipelines[1].jobs[0].command);
-            assert_eq!("tmp.txt", pipelines[1].jobs[0].args[1]);
+            assert_eq!("ls", &pipelines[0].jobs[0].command);
+            assert_eq!("-al", &pipelines[0].jobs[0].args[1]);
+            assert_eq!("cat", &pipelines[1].jobs[0].command);
+            assert_eq!("tmp.txt", &pipelines[1].jobs[0].args[1]);
         } else {
             assert!(false);
         }
@@ -179,9 +189,9 @@ mod tests {
         if let Statement::Pipelines(mut pipelines) = parse("ls \t -al\t\tdir") {
             let jobs = pipelines.remove(0).jobs;
             assert_eq!(1, jobs.len());
-            assert_eq!("ls", jobs[0].command);
-            assert_eq!("-al", jobs[0].args[1]);
-            assert_eq!("dir", jobs[0].args[2]);
+            assert_eq!("ls", &jobs[0].command);
+            assert_eq!("-al", &jobs[0].args[1]);
+            assert_eq!("dir", &jobs[0].args[2]);
         } else {
             assert!(false);
         }
@@ -191,8 +201,8 @@ mod tests {
     fn trailing_whitespace() {
         if let Statement::Pipelines(pipelines) = parse("ls -al\t ") {
             assert_eq!(1, pipelines.len());
-            assert_eq!("ls", pipelines[0].jobs[0].command);
-            assert_eq!("-al", pipelines[0].jobs[0].args[1]);
+            assert_eq!("ls", &pipelines[0].jobs[0].command);
+            assert_eq!("-al", &pipelines[0].jobs[0].args[1]);
         } else {
             assert!(false);
         }
@@ -203,7 +213,7 @@ mod tests {
         if let Statement::Pipelines(mut pipelines) = parse("echo \"Hello World\"") {
             let jobs = pipelines.remove(0).jobs;
             assert_eq!(2, jobs[0].args.len());
-            assert_eq!("Hello World", jobs[0].args[1]);
+            assert_eq!("Hello World", &jobs[0].args[1]);
         } else {
             assert!(false)
         }
@@ -290,7 +300,7 @@ mod tests {
         if let Statement::Pipelines(mut pipelines) = parse("    \techo") {
             let jobs = pipelines.remove(0).jobs;
             assert_eq!(1, jobs.len());
-            assert_eq!("echo", jobs[0].command);
+            assert_eq!("echo", &jobs[0].command);
         } else {
             assert!(false);
         }
@@ -300,8 +310,8 @@ mod tests {
     fn indentation_on_multiple_lines() {
         if let Statement::Pipelines(pipelines) = parse("echo\n  cat") {
             assert_eq!(2, pipelines.len());
-            assert_eq!("echo", pipelines[0].jobs[0].command);
-            assert_eq!("cat", pipelines[1].jobs[0].command);
+            assert_eq!("echo", &pipelines[0].jobs[0].command);
+            assert_eq!("cat", &pipelines[1].jobs[0].command);
         } else {
             assert!(false);
         }
@@ -311,7 +321,7 @@ mod tests {
     fn single_quoting() {
         if let Statement::Pipelines(mut pipelines) = parse("echo '#!!;\"\\'") {
             let jobs = pipelines.remove(0).jobs;
-            assert_eq!("#!!;\"\\", jobs[0].args[1]);
+            assert_eq!("#!!;\"\\", &jobs[0].args[1]);
         } else {
             assert!(false);
         }
@@ -321,10 +331,10 @@ mod tests {
     fn mixed_quoted_and_unquoted() {
         if let Statement::Pipelines(mut pipelines) = parse("echo '#!!;\"\\' and \t some \"more' 'stuff\"") {
             let jobs = pipelines.remove(0).jobs;
-            assert_eq!("#!!;\"\\", jobs[0].args[1]);
-            assert_eq!("and", jobs[0].args[2]);
-            assert_eq!("some", jobs[0].args[3]);
-            assert_eq!("more' 'stuff", jobs[0].args[4]);
+            assert_eq!("#!!;\"\\", &jobs[0].args[1]);
+            assert_eq!("and", &jobs[0].args[2]);
+            assert_eq!("some", &jobs[0].args[3]);
+            assert_eq!("more' 'stuff", &jobs[0].args[4]);
         } else {
             assert!(false);
         }
