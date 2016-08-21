@@ -1,3 +1,4 @@
 hello world
 hello world
 hello $test
+ion: failed to set current dir to ~: No such file or directory (os error 2)
