@@ -1,0 +1,9 @@
+export test=world
+
+echo hello $test
+echo "hello $test"
+echo 'hello $test'
+
+cd '~'
+cd "~"
+cd ~

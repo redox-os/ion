@@ -1,6 +1,7 @@
 use peg::Pipeline;
 use peg::Job;
 use peg::Redirection;
+use peg::Word;
 use flow_control::Statement;
 use flow_control::Comparitor;
 
@@ -63,7 +64,7 @@ pipeline -> Pipeline
 
 job -> Job
     = args:word ++ whitespace background:background_token? {
-        Job::new(args.iter().map(|arg|arg.to_string()).collect(), background.is_some())
+        Job::new(args.iter().map(|v| v.clone()).collect(), background.is_some())
     }
 
 redirection -> (Option<Redirection>, Option<Redirection>)
@@ -85,19 +86,19 @@ background_token -> ()
     = [&]
     / whitespace [&]
 
-word -> &'input str
+word -> Word
     = double_quoted_word
     / single_quoted_word
-    / [^ \t\r\n#;&|<>]+ { match_str }
+    / [^ \t\r\n#;&|<>]+ { Word::Bare(match_str.to_string()) }
 
-double_quoted_word -> &'input str
-    = ["] word:_double_quoted_word ["] { word }
+double_quoted_word -> Word
+    = ["] word:_double_quoted_word ["] { Word::DoubleQuoted(word.to_string()) }
 
 _double_quoted_word -> &'input str
     = [^"]+ { match_str }
 
-single_quoted_word -> &'input str
-    = ['] word:_single_quoted_word ['] { word }
+single_quoted_word -> Word
+    = ['] word:_single_quoted_word ['] { Word::SingleQuoted(word.to_string()) }
 
 _single_quoted_word -> &'input str
     = [^']+ { match_str }

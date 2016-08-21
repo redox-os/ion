@@ -6,6 +6,7 @@ use liner::Context;
 use super::peg::{Pipeline, Job};
 use super::status::{SUCCESS, FAILURE};
 use super::directory_stack::DirectoryStack;
+use super::peg::Word;
 
 pub struct Variables {
     variables: BTreeMap<String, String>,
@@ -142,7 +143,7 @@ impl Variables {
         // TODO don't copy everything
         Job::new(job.args
                      .iter()
-                     .map(|original: &String| self.expand_string(original, dir_stack))
+                     .map(|original: &Word| Word::Bare(self.expand_string(&original, dir_stack).clone()))
                      .collect(),
                  job.background)
     }
@@ -234,11 +235,15 @@ impl Variables {
         word
     }
 
-    pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> String {
-        let mut new = original.to_owned();
-        new = self.tilde_expansion(new, dir_stack);
+    pub fn expand_string<'a>(&'a self, original: &'a Word, dir_stack: &DirectoryStack) -> String {
+        let mut new = original.to_string();
+        if let &Word::SingleQuoted(_) = original {
+            return new.to_string()
+        }
+        new = self.tilde_expansion(new.to_string(), dir_stack);
         let mut replacements: Vec<(usize, usize, String)> = vec![];
         for (n, _) in original.match_indices('$') {
+            // Skip this dollar sign if it is escaped by a backslash
             if n > 0 {
                 if let Some(c) = original.chars().nth(n-1) {
                     if c == '\\' {
@@ -247,6 +252,7 @@ impl Variables {
                 }
             }
             let mut var_name = "".to_owned();
+            // Why not compare against the known variables?
             for (i, c) in original.char_indices().skip(n+1) { // skip the dollar sign
                 if Variables::is_valid_variable_character(c) {
                     var_name.push(c);
@@ -277,6 +283,7 @@ mod tests {
     use super::*;
     use status::{FAILURE, SUCCESS};
     use directory_stack::DirectoryStack;
+    use peg::Word;
 
     fn new_dir_stack() -> DirectoryStack {
         DirectoryStack::new().unwrap()
@@ -285,7 +292,7 @@ mod tests {
     #[test]
     fn undefined_variable_expands_to_empty_string() {
         let variables = Variables::default();
-        let expanded = variables.expand_string("$FOO", &new_dir_stack());
+        let expanded = variables.expand_string(&Word::Bare("$FOO".to_string()), &new_dir_stack());
         assert_eq!("", &expanded);
     }
 
@@ -293,7 +300,7 @@ mod tests {
     fn let_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
-        let expanded = variables.expand_string("$FOO", &new_dir_stack());
+        let expanded = variables.expand_string(&Word::Bare("$FOO".to_string()), &new_dir_stack());
         assert_eq!("BAR", &expanded);
     }
 
@@ -301,7 +308,7 @@ mod tests {
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
-        let expanded = variables.expand_string("$FOO", &new_dir_stack());
+        let expanded = variables.expand_string(&Word::Bare("$FOO".to_string()), &new_dir_stack());
         assert_eq!("BAR", &expanded);
     }
 
@@ -317,7 +324,7 @@ mod tests {
         let mut variables = Variables::default();
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
         variables.let_(vec!["let", "X", "=", "Y"]);
-        let expanded = variables.expand_string("variables: $FOO $X", &new_dir_stack());
+        let expanded = variables.expand_string(&Word::Bare("variables: $FOO $X".to_string()), &new_dir_stack());
         assert_eq!("variables: BAR Y", &expanded);
     }
 
@@ -331,7 +338,7 @@ mod tests {
     #[test]
     fn escape_with_backslash() {
         let variables = Variables::default();
-        let expanded = variables.expand_string("\\$FOO", &new_dir_stack());
+        let expanded = variables.expand_string(&Word::Bare("\\$FOO".to_string()), &new_dir_stack());
         assert_eq!("\\$FOO", &expanded);
     }
 
@@ -348,7 +355,7 @@ mod tests {
         variables.set_var("FOO", "BAR");
         let return_status = variables.drop_variable(vec!["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = variables.expand_string("$FOO", &new_dir_stack());
+        let expanded = variables.expand_string(&Word::Bare("$FOO".to_string()), &new_dir_stack());
         assert_eq!("", expanded);
     }
 
