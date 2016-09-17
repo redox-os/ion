@@ -324,24 +324,33 @@ impl Shell {
         }
     }
 
+    /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if it
+    /// is set otherwise to a default value (1000).
+    ///
+    /// If the HISTORY_FILE_ENABLED shell variable is set to 1, then HISTORY_FILE_SIZE is synced
+    /// with the shell context as well. Otherwise, the history file name is set to None in the
+    /// shell context.
+    ///
+    /// This is called in on_command so that the history length and history file state will be
+    /// updated correctly after a command is entered that alters them and just before loading the
+    /// history file so that it will be loaded correctly.
     fn set_context_history_from_vars(&mut self) {
-        let max_history_file_size = self.variables
-            .get_var_or_empty("HISTORY_FILE_SIZE")
-            .parse()
-            .unwrap_or(1000);
         let max_history_size = self.variables
             .get_var_or_empty("HISTORY_SIZE")
             .parse()
             .unwrap_or(1000);
 
-        self.context.history.set_max_file_size(max_history_file_size);
         self.context.history.set_max_size(max_history_size);
 
         let file_name = self.variables.get_var_or_empty("HISTORY_FILE");
         self.context.history.set_file_name(Some(file_name));
 
         if self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") == "1" {
-
+            let max_history_file_size = self.variables
+                .get_var_or_empty("HISTORY_FILE_SIZE")
+                .parse()
+                .unwrap_or(1000);
+            self.context.history.set_max_file_size(max_history_file_size);
         } else {
             self.context.history.set_file_name(None);
         }
