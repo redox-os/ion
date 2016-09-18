@@ -197,7 +197,7 @@ impl Shell {
                 prompt.push_str("fn> ");
             },
             _ => {
-                prompt.push_str(&format!("{}", self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"), &self.directory_stack)));
+                prompt.push_str(&self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"), &self.directory_stack));
             }
         }
 
@@ -396,15 +396,15 @@ impl Shell {
 
         if let Some(elapsed_time) = command_start_time.elapsed().ok() {
             let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
-                                  elapsed_time.as_secs(), elapsed_time.subsec_nanos()).into();
+                                  elapsed_time.as_secs(), elapsed_time.subsec_nanos());
 
             // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the pipline
             // just executed to the the file and context histories. At the moment, this means
             // record how long it took.
-            if "1".to_string() == self.variables.get_var_or_empty("RECORD_SUMMARY") {
-                if let Err(err) = self.context.history.push(summary) {
+            if "1" == self.variables.get_var_or_empty("RECORD_SUMMARY") {
+                self.context.history.push(summary.into()).unwrap_or_else(|err| {
                     println!("ion: {}", err);
-                }
+                });
             }
         }
 
@@ -640,7 +640,7 @@ fn main() {
     if "1" == shell.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {
         match shell.context.history.load_history() {
             Ok(()) => {
-                ();
+                // pass
             }
             Err(ref err) if err.kind() == ErrorKind::NotFound => {
                 let history_filename = shell.variables.get_var_or_empty("HISTORY_FILE");
