@@ -397,8 +397,14 @@ impl Shell {
         if let Some(elapsed_time) = command_start_time.elapsed().ok() {
             let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
                                   elapsed_time.as_secs(), elapsed_time.subsec_nanos()).into();
-            if let Err(err) = self.context.history.push(summary) {
-                println!("ion: {}", err);
+
+            // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the pipline
+            // just executed to the the file and context histories. At the moment, this means
+            // record how long it took.
+            if "1".to_string() == self.variables.get_var_or_empty("RECORD_SUMMARY") {
+                if let Err(err) = self.context.history.push(summary) {
+                    println!("ion: {}", err);
+                }
             }
         }
 
