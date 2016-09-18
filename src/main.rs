@@ -342,10 +342,10 @@ impl Shell {
 
         self.context.history.set_max_size(max_history_size);
 
-        let file_name = self.variables.get_var_or_empty("HISTORY_FILE");
-        self.context.history.set_file_name(Some(file_name));
-
         if self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") == "1" {
+            let file_name = self.variables.get_var("HISTORY_FILE");
+            self.context.history.set_file_name(file_name);
+
             let max_history_file_size = self.variables
                 .get_var_or_empty("HISTORY_FILE_SIZE")
                 .parse()
@@ -636,16 +636,20 @@ fn main() {
     // Clear the history just added by the init file being evaluated.
     shell.context.history.buffers.clear();
     shell.set_context_history_from_vars();
-    match shell.context.history.load_history() {
-        Ok(()) => {
-            ();
-        }
-        Err(ref err) if err.kind() == ErrorKind::NotFound => {
-            let history_filename = shell.variables.get_var_or_empty("HISTORY_FILE");
-            println!("ion: failed to find history file {}: {}", history_filename, err);
-        },
-        Err(err) => {
-            println!("ion: {}", err);
+
+    if "1" == shell.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {
+        match shell.context.history.load_history() {
+            Ok(()) => {
+                ();
+            }
+            Err(ref err) if err.kind() == ErrorKind::NotFound => {
+                let history_filename = shell.variables.get_var_or_empty("HISTORY_FILE");
+                println!("ion: failed to find history file {}: {}", history_filename, err);
+            },
+            Err(err) => {
+                println!("failed here!");
+                println!("ion: {}", err);
+            }
         }
     }
     shell.execute();
