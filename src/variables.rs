@@ -147,12 +147,6 @@ impl Variables {
                  job.background)
     }
 
-    fn replace_substring(string: &mut String, start: usize, end: usize, replacement: &str) {
-        let string_start = string.chars().take(start).collect::<String>();
-        let string_end = string.chars().skip(end+1).collect::<String>();
-        *string = string_start + replacement + &string_end;
-    }
-
     pub fn is_valid_variable_character(c: char) -> bool {
         c.is_alphanumeric() || c == '_' || c == '?'
     }
@@ -234,41 +228,109 @@ impl Variables {
         word
     }
 
-    pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> String {
-        let mut new = original.to_owned();
-        new = self.tilde_expansion(new, dir_stack);
-        let mut replacements: Vec<(usize, usize, String)> = vec![];
-        for (n, _) in original.match_indices('$') {
-            if n > 0 {
-                if let Some(c) = original.chars().nth(n-1) {
-                    if c == '\\' {
-                        continue;
-                    }
-                }
-            }
-            let mut var_name = "".to_owned();
-            for (i, c) in original.char_indices().skip(n+1) { // skip the dollar sign
-                if Variables::is_valid_variable_character(c) {
-                    var_name.push(c);
-                    if i == original.len() - 1 {
-                        replacements.push((n, i, var_name.clone()));
-                        break;
-                    }
-                } else {
-                    replacements.push((n, i-1, var_name.clone()));
-                    break;
-                }
+    fn brace_expand(&self, input: String) -> String {
+        let mut ignore_next = false;
+        let mut brace_found = false;
+        let mut infix_is_variable = false;
+        let char_iter = input.clone();
+        let mut char_iter = char_iter.chars();
+
+        // Prefix Phase
+        let mut prefix = String::new();
+        while let Some(character) = char_iter.next() {
+            match character {
+                '$'  if !ignore_next => { infix_is_variable = true; break },
+                '{'  if !ignore_next => { brace_found = true; break },
+                '\\' if !ignore_next => ignore_next = true,
+                '\\'                 => { prefix.push(character); ignore_next = false; },
+                _ if ignore_next     => { prefix.push(character); ignore_next = false; },
+                _                    => prefix.push(character),
             }
         }
 
-        for &(start, end, ref var_name) in replacements.iter().rev() {
-            if let Some(value) = self.get_var(var_name) {
-                Variables::replace_substring(&mut new, start, end, &value);
+        // Infix Phase
+        let mut infixes = Vec::new();
+        if infix_is_variable {
+            let mut variable = String::new();
+            if let Some(character) = char_iter.next() {
+                if character == '{' {
+                    while let Some(character) = char_iter.next() {
+                        if character == '}' { break }
+                        variable.push(character);
+                    }
+                } else {
+                    variable.push(character);
+                    while let Some(character) = char_iter.next() {
+                        variable.push(character);
+                    }
+                }
+            }
+
+            if let Some(value) = self.get_var(&variable) {
+                infixes.push(value);
             } else {
-                Variables::replace_substring(&mut new, start, end, "");
+                infixes.push(String::default());
+            }
+        } else if !brace_found {
+            return input;
+        } else {
+            brace_found = false;
+            ignore_next = false;
+            let mut current = String::new();
+            while let Some(character) = char_iter.next() {
+                match character {
+                    '}'  if !ignore_next => {
+                        infixes.push(current.clone());
+                        current.clear();
+                        brace_found = true;
+                        break
+                    },
+                    '\\' if !ignore_next => ignore_next = true,
+                    '\\'                 => { current.push(character); ignore_next = false; },
+                    ',' if !ignore_next  => { infixes.push(current.clone()); current.clear(); },
+                    _ if ignore_next     => { current.push(character); ignore_next = false; },
+                    _                    => current.push(character),
+                }
+            }
+
+            if !brace_found { return input; }
+        }
+
+
+        // Suffix Phase
+        ignore_next = false;
+        let mut suffix = String::new();
+        for character in char_iter {
+            match character {
+                '\\' if !ignore_next => ignore_next = true,
+                _    if !ignore_next => suffix.push(character),
+                _                    => { suffix.push(character); ignore_next = false; },
             }
         }
-        new.clone()
+
+        // Combine
+        infixes.iter().map(|infix| prefix.clone() + infix + &suffix).collect::<Vec<String>>().join(" ")
+    }
+
+    pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> String {
+        let mut output = String::new();
+        let mut current = String::new();
+        for character in original.chars() {
+            match character {
+                ' ' if current.is_empty() => output.push(' '),
+                ' ' => {
+                    output.push_str(&self.brace_expand(self.tilde_expansion(current.clone(), dir_stack)));
+                    output.push(' ');
+                    current.clear();
+                },
+                _ => current.push(character)
+            }
+        }
+
+        if !current.is_empty() {
+            output.push_str(&self.brace_expand(self.tilde_expansion(current, dir_stack)));
+        }
+        output
     }
 }
 
@@ -322,10 +384,31 @@ mod tests {
     }
 
     #[test]
-    fn replace_substring() {
-        let mut string = "variable: $FOO".to_owned();
-        Variables::replace_substring(&mut string, 10, 13, "BAR");
-        assert_eq!("variable: BAR", string);
+    fn expand_long_braces() {
+        let variables = Variables::default();
+        let line = "The pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
+        let expected = "The prodigal programmer processed prototype procedures proficiently proving prospective projections";
+        let expanded = variables.expand_string(line, &new_dir_stack());
+        assert_eq!(expected, &expanded);
+    }
+
+    #[test]
+    fn expand_several_braces() {
+        let variables = Variables::default();
+        let line = "The {barb,veget}arian eat{ers,ing} appl{esauce,ied} am{ple,ounts} of eff{ort,ectively}";
+        let expected = "The barbarian vegetarian eaters eating applesauce applied ample amounts of effort effectively";
+        let expanded = variables.expand_string(line, &new_dir_stack());
+        assert_eq!(expected, &expanded);
+    }
+
+    #[test]
+    fn expand_variable_braces() {
+        let mut variables = Variables::default();
+        variables.let_(vec!["let", "FOO", "=", "BAR"]);
+        let expanded = variables.expand_string("FOO$FOO", &new_dir_stack());
+        assert_eq!("FOOBAR", &expanded);
+        let expanded = variables.expand_string(" FOO${FOO} ", &new_dir_stack());
+        assert_eq!(" FOOBAR ", &expanded);
     }
 
     #[test]

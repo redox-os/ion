@@ -156,7 +156,7 @@ impl Shell {
         self.variables.set_var("HISTORY_SIZE", "1000");
         self.variables.set_var("HISTORY_FILE_ENABLED", "0");
         self.variables.set_var("HISTORY_FILE_SIZE", "1000");
-        self.variables.set_var("PROMPT", "\x1B[0m\x1B[1;38;5;85mion\x1B[37m:\x1B[38;5;75m$PWD\x1B[37m#\x1B[0m ");
+        self.variables.set_var("PROMPT", "\x1B[0m\x1B[1;38;5;85mion\x1B[37m:\x1B[38;5;75m${PWD}\x1B[37m#\x1B[0m ");
 
         // Initialize the HISTORY_FILE variable
         home_dir().map(|mut history_path| {
@@ -223,7 +223,7 @@ impl Shell {
                 prompt.push_str("fn> ");
             },
             _ => {
-                prompt.push_str(&format!("{}", self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"), &self.directory_stack)));
+                prompt.push_str(&self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"), &self.directory_stack));
             }
         }
 
