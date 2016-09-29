@@ -259,6 +259,7 @@ impl Variables {
             // Infix Phase
             let mut infixes = Vec::new();
             if infix_is_variable {
+                let mut colon_found = false;
                 let mut variable = String::new();
                 if let Some(character) = char_iter.next() {
                     if character == '{' {
@@ -270,15 +271,21 @@ impl Variables {
                     } else {
                         variable.push(character);
                         while let Some(character) = char_iter.next() {
-                            variable.push(character);
+                            if character == ':' {
+                                variable_expansion_found = true;
+                                colon_found = true;
+                                break
+                            } else {
+                                variable.push(character);
+                            }
                         }
                     }
                 }
 
-                if let Some(value) = self.get_var(&variable) {
-                    infixes.push(value);
+                if colon_found {
+                    infixes.push(self.get_var(&variable).map_or(String::from(":"), |value| value + ":"));
                 } else {
-                    infixes.push(String::default());
+                    infixes.push(self.get_var(&variable).map_or(String::default(), |value| value));
                 }
             } else if !brace_found {
                 return input;
@@ -422,6 +429,15 @@ mod tests {
         assert_eq!("FOOBAR", &expanded);
         let expanded = variables.expand_string(" FOO${FOO} ", &new_dir_stack());
         assert_eq!(" FOOBAR ", &expanded);
+    }
+
+    #[test]
+    fn expand_variables_with_colons() {
+        let mut variables = Variables::default();
+        variables.let_(vec!["let", "FOO", "=", "FOO"]);
+        variables.let_(vec!["let", "BAR", "=", "BAR"]);
+        let expanded = variables.expand_string("$FOO:$BAR", &new_dir_stack());
+        assert_eq!("FOO:BAR", &expanded);
     }
 
     #[test]
