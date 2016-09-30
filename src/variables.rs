@@ -231,85 +231,105 @@ impl Variables {
     fn brace_expand(&self, input: String) -> String {
         let mut ignore_next = false;
         let mut brace_found = false;
+        let mut variable_expansion_found;
         let mut infix_is_variable = false;
-        let char_iter = input.clone();
-        let mut char_iter = char_iter.chars();
+        let mut output = input.clone();
 
-        // Prefix Phase
-        let mut prefix = String::new();
-        while let Some(character) = char_iter.next() {
-            match character {
-                '$'  if !ignore_next => { infix_is_variable = true; break },
-                '{'  if !ignore_next => { brace_found = true; break },
-                '\\' if !ignore_next => ignore_next = true,
-                '\\'                 => { prefix.push(character); ignore_next = false; },
-                _ if ignore_next     => { prefix.push(character); ignore_next = false; },
-                _                    => prefix.push(character),
-            }
-        }
+        loop {
+            variable_expansion_found = false;
+            let temp = output.clone();
+            let mut char_iter = temp.chars();
 
-        // Infix Phase
-        let mut infixes = Vec::new();
-        if infix_is_variable {
-            let mut variable = String::new();
-            if let Some(character) = char_iter.next() {
-                if character == '{' {
-                    while let Some(character) = char_iter.next() {
-                        if character == '}' { break }
-                        variable.push(character);
-                    }
-                } else {
-                    variable.push(character);
-                    while let Some(character) = char_iter.next() {
-                        variable.push(character);
-                    }
-                }
-            }
-
-            if let Some(value) = self.get_var(&variable) {
-                infixes.push(value);
-            } else {
-                infixes.push(String::default());
-            }
-        } else if !brace_found {
-            return input;
-        } else {
-            brace_found = false;
-            ignore_next = false;
-            let mut current = String::new();
+            // Prefix Phase
+            let mut prefix = String::new();
             while let Some(character) = char_iter.next() {
                 match character {
-                    '}'  if !ignore_next => {
-                        infixes.push(current.clone());
-                        current.clear();
+                    '$'  if !ignore_next => { infix_is_variable = true; break },
+                    '{'  if !ignore_next => {
                         brace_found = true;
                         break
                     },
                     '\\' if !ignore_next => ignore_next = true,
-                    '\\'                 => { current.push(character); ignore_next = false; },
-                    ',' if !ignore_next  => { infixes.push(current.clone()); current.clear(); },
-                    _ if ignore_next     => { current.push(character); ignore_next = false; },
-                    _                    => current.push(character),
+                    '\\'                 => { prefix.push(character); ignore_next = false; },
+                    _ if ignore_next     => { prefix.push(character); ignore_next = false; },
+                    _                    => prefix.push(character),
                 }
             }
 
-            if !brace_found { return input; }
-        }
+            // Infix Phase
+            let mut infixes = Vec::new();
+            if infix_is_variable {
+                let mut colon_found = false;
+                let mut variable = String::new();
+                if let Some(character) = char_iter.next() {
+                    if character == '{' {
+                        variable_expansion_found = true;
+                        while let Some(character) = char_iter.next() {
+                            if character == '}' { break }
+                            variable.push(character);
+                        }
+                    } else {
+                        variable.push(character);
+                        while let Some(character) = char_iter.next() {
+                            if character == ':' {
+                                variable_expansion_found = true;
+                                colon_found = true;
+                                break
+                            } else {
+                                variable.push(character);
+                            }
+                        }
+                    }
+                }
 
+                if colon_found {
+                    infixes.push(self.get_var(&variable).map_or(String::from(":"), |value| value + ":"));
+                } else {
+                    infixes.push(self.get_var(&variable).map_or(String::default(), |value| value));
+                }
+            } else if !brace_found {
+                return input;
+            } else {
+                brace_found = false;
+                ignore_next = false;
+                let mut current = String::new();
+                while let Some(character) = char_iter.next() {
+                    match character {
+                        '}'  if !ignore_next => {
+                            infixes.push(current.clone());
+                            current.clear();
+                            brace_found = true;
+                            break
+                        },
+                        '\\' if !ignore_next => ignore_next = true,
+                        '\\'                 => { current.push(character); ignore_next = false; },
+                        ',' if !ignore_next  => { infixes.push(current.clone()); current.clear(); },
+                        _ if ignore_next     => { current.push(character); ignore_next = false; },
+                        _                    => current.push(character),
+                    }
+                }
 
-        // Suffix Phase
-        ignore_next = false;
-        let mut suffix = String::new();
-        for character in char_iter {
-            match character {
-                '\\' if !ignore_next => ignore_next = true,
-                _    if !ignore_next => suffix.push(character),
-                _                    => { suffix.push(character); ignore_next = false; },
+                if !brace_found { return input; }
             }
-        }
 
-        // Combine
-        infixes.iter().map(|infix| prefix.clone() + infix + &suffix).collect::<Vec<String>>().join(" ")
+            // Suffix Phase
+            ignore_next = false;
+            let mut suffix = String::new();
+            for character in char_iter {
+                match character {
+                    '\\' if !ignore_next => ignore_next = true,
+                    _    if !ignore_next => suffix.push(character),
+                    _                    => { suffix.push(character); ignore_next = false; },
+                }
+            }
+
+            // Combine
+            output = infixes.iter().map(|infix| prefix.clone() + infix + &suffix)
+                .collect::<Vec<String>>().join(" ");
+
+            if !variable_expansion_found { break }
+        }
+        output
     }
 
     pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> String {
@@ -409,6 +429,25 @@ mod tests {
         assert_eq!("FOOBAR", &expanded);
         let expanded = variables.expand_string(" FOO${FOO} ", &new_dir_stack());
         assert_eq!(" FOOBAR ", &expanded);
+    }
+
+    #[test]
+    fn expand_variables_with_colons() {
+        let mut variables = Variables::default();
+        variables.let_(vec!["let", "FOO", "=", "FOO"]);
+        variables.let_(vec!["let", "BAR", "=", "BAR"]);
+        let expanded = variables.expand_string("$FOO:$BAR", &new_dir_stack());
+        assert_eq!("FOO:BAR", &expanded);
+    }
+
+    #[test]
+    fn expand_multiple_variables() {
+        let mut variables = Variables::default();
+        variables.let_(vec!["let", "A", "=", "test"]);
+        variables.let_(vec!["let", "B", "=", "ing"]);
+        variables.let_(vec!["let", "C", "=", "1 2 3"]);
+        let expanded = variables.expand_string("${A}${B}...${C}", &new_dir_stack());
+        assert_eq!("testing...1 2 3", &expanded);
     }
 
     #[test]
