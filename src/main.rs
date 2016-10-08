@@ -80,15 +80,20 @@ impl Shell {
                     };
 
                     if filename {
-                        let pathbuf = env::current_dir().unwrap();
-                        let url = pathbuf.to_str().unwrap();
-                        //HACK FOR LINER LOOKUP ON REDOX
-                        let reference = match url.find(':') {
-                            Some(i) => &url[i + 1..],
-                            None => url
-                        };
-                        let completer = FilenameCompleter::new(Some(reference));
-                        mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                        if let Ok(current_dir) = env::current_dir() {
+                            if let Some(url) = current_dir.to_str() {
+                                //HACK FOR LINER LOOKUP ON REDOX
+                                let mut reference = match url.find(':') {
+                                    Some(i) => url[i + 1..].to_string(),
+                                    None => url.to_string()
+                                };
+                                if ! reference.starts_with('/') {
+                                    reference.insert(0, '/');
+                                }
+                                let completer = FilenameCompleter::new(Some(reference));
+                                mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                            }
+                        }
                     } else {
                         let completer = FilenameCompleter::new(Some("/bin/"));
                         mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
