@@ -12,6 +12,10 @@ authors = [
   "Łukasz Niemier <lukasz@niemier.pl>",
 ]
 
+[[bin]]
+name = "ion"
+
+
 [dependencies]
 glob = "0.2"
 liner = "0.1"
