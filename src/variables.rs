@@ -94,6 +94,10 @@ impl Variables {
         self.variables.remove(name)
     }
 
+    pub fn get_vars(&self) -> Vec<String> {
+        self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k)).collect()
+    }
+
     fn parse_assignment<I: IntoIterator>(args: I) -> (Option<String>, Option<String>)
         where I::Item: AsRef<str>
     {
