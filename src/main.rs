@@ -68,18 +68,23 @@ impl Shell {
         let prompt = self.prompt();
 
         let funcs = &self.functions;
+        let vars = &self.variables;
+
         let line = self.context.read_line(prompt,
                                           &mut move |Event { editor, kind }| {
             match kind {
                 EventKind::BeforeComplete => {
-                    let (_, pos) = editor.get_words_and_cursor_position();
+                    let (words, pos) = editor.get_words_and_cursor_position();
 
                     let filename = match pos {
                         CursorPosition::InWord(i) => i > 0,
                         CursorPosition::InSpace(Some(_), _) => true,
                         CursorPosition::InSpace(None, _) => false,
                         CursorPosition::OnWordLeftEdge(i) => i >= 1,
-                        CursorPosition::OnWordRightEdge(i) => i >= 1,
+                        CursorPosition::OnWordRightEdge(i) => i >= 1 && !words.into_iter().nth(i).map(|(start, end)| {
+                            let buf = editor.current_buffer();
+                            buf.range(start, end).trim().starts_with("$")
+                        }).unwrap_or(false)
                     };
 
                     if filename {
@@ -99,11 +104,13 @@ impl Shell {
                         }
                     } else {
                         let file_completer = FilenameCompleter::new(Some("/bin/"));
-                        let custom_completer = BasicCompleter::new(Command::map()
+                        let words = Command::map()
                                 .into_iter()
                                 .map(|(s, _)| String::from(s))
                                 .chain(funcs.keys().cloned())
-                                .collect());
+                                .chain(vars.get_vars().into_iter().map(|s| format!("${}", s)))
+                                .collect();
+                        let custom_completer = BasicCompleter::new(words);
                         let completer = MultiCompleter::new(file_completer, custom_completer);
                         mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                     }
