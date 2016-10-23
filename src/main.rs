@@ -14,8 +14,9 @@ use std::env::{self, current_dir, home_dir};
 use std::mem;
 use std::process;
 
-use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter};
+use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter, BasicCompleter};
 
+use self::completer::MultiCompleter;
 use self::directory_stack::DirectoryStack;
 use self::peg::{parse, Pipeline};
 use self::variables::Variables;
@@ -24,6 +25,7 @@ use self::status::{SUCCESS, NO_SUCH_COMMAND};
 use self::function::Function;
 use self::pipe::execute_pipeline;
 
+pub mod completer;
 pub mod pipe;
 pub mod directory_stack;
 pub mod to_num;
@@ -65,8 +67,9 @@ impl Shell {
     fn readln(&mut self) -> Option<String> {
         let prompt = self.prompt();
 
+        let funcs = &self.functions;
         let line = self.context.read_line(prompt,
-                                          &mut |Event { editor, kind }| {
+                                          &mut move |Event { editor, kind }| {
             match kind {
                 EventKind::BeforeComplete => {
                     let (_, pos) = editor.get_words_and_cursor_position();
@@ -95,7 +98,13 @@ impl Shell {
                             }
                         }
                     } else {
-                        let completer = FilenameCompleter::new(Some("/bin/"));
+                        let file_completer = FilenameCompleter::new(Some("/bin/"));
+                        let custom_completer = BasicCompleter::new(Command::map()
+                                .into_iter()
+                                .map(|(s, _)| String::from(s))
+                                .chain(funcs.keys().cloned())
+                                .collect());
+                        let completer = MultiCompleter::new(file_completer, custom_completer);
                         mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                     }
                 }
@@ -630,3 +639,4 @@ impl Command {
 fn main() {
     Shell::default().execute();
 }
+
