@@ -16,16 +16,12 @@ impl ToNum for str {
 
         let mut num = 0;
         for c in self.chars() {
-            let digit;
-            if c >= '0' && c <= '9' {
-                digit = c as usize - '0' as usize
-            } else if c >= 'A' && c <= 'Z' {
-                digit = c as usize - 'A' as usize + 10
-            } else if c >= 'a' && c <= 'z' {
-                digit = c as usize - 'a' as usize + 10
-            } else {
-                break;
-            }
+            let digit = match c {
+                '0'...'9' => c as usize - '0' as usize,
+                'A'...'Z' => c as usize - 'A' as usize + 10,
+                'a'...'z' => c as usize - 'a' as usize + 10,
+                _ => break,
+            };
 
             if digit >= radix {
                 break;
