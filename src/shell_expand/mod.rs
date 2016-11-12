@@ -14,7 +14,7 @@ pub enum ExpandErr {
 /// Performs shell expansions to an input string, efficiently returning the final expanded form.
 /// Shells must provide their own batteries for expanding tilde and variable words.
 pub fn expand_string<T, V>(original: &str, expand_tilde: T, expand_variable: V) -> Result<String, ExpandErr>
-    where T: Fn(&str) -> String,
+    where T: Fn(&str) -> Option<String>,
           V: Fn(&str) -> Option<String>,
 {
     let mut output = String::with_capacity(original.len() >> 1);
@@ -23,9 +23,10 @@ pub fn expand_string<T, V>(original: &str, expand_tilde: T, expand_variable: V) 
             WordToken::Normal(text) => {
                 output.push_str(text);
             },
-            WordToken::Tilde(text) => {
-                output.push_str(&expand_tilde(text));
-            }
+            WordToken::Tilde(text) => match expand_tilde(text) {
+                Some(expanded) => output.push_str(&expanded),
+                None           => output.push_str(text),
+            },
             WordToken::Variable(text) => {
                 variables::expand(&mut output, text, |variable| expand_variable(variable));
             },
@@ -47,7 +48,7 @@ pub fn expand_string<T, V>(original: &str, expand_tilde: T, expand_variable: V) 
 fn expand_long_braces() {
     let line = "The pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
     let expected = "The prodigal programmer processed prototype procedures proficiently proving prospective projections";
-    let expanded = expand_string(line, |_| String::new(), |_| None).unwrap();
+    let expanded = expand_string(line, |_| None, |_| None).unwrap();
     assert_eq!(expected, &expanded);
 }
 
@@ -55,7 +56,7 @@ fn expand_long_braces() {
 fn expand_several_braces() {
     let line = "The {barb,veget}arian eat{ers,ing} appl{esauce,ied} am{ple,ounts} of eff{ort,ectively}";
     let expected = "The barbarian vegetarian eaters eating applesauce applied ample amounts of effort effectively";
-    let expanded = expand_string(line, |_| String::new(), |_| None).unwrap();
+    let expanded = expand_string(line, |_| None, |_| None).unwrap();
     assert_eq!(expected, &expanded);
 }
 
@@ -66,18 +67,18 @@ fn expand_several_variables() {
         "X"   => Some("Y".to_owned()),
         _     => None,
     };
-    let expanded = expand_string("variables: $FOO $X", |_| String::new(), expand_var).unwrap();
+    let expanded = expand_string("variables: $FOO $X", |_| None, expand_var).unwrap();
     assert_eq!("variables: BAR Y", &expanded);
 }
 
 #[test]
 fn expand_variable_braces() {
     let expand_var = |var: &str| if var == "FOO" { Some("BAR".to_owned()) } else { None };
-    let expanded = expand_string("FOO$FOO", |_| String::new(), expand_var).unwrap();
+    let expanded = expand_string("FOO$FOO", |_| None, expand_var).unwrap();
     assert_eq!("FOOBAR", &expanded);
 
     let expand_var = |var: &str| if var == "FOO" { Some("BAR".to_owned()) } else { None };
-    let expanded = expand_string(" FOO$FOO ", |_| String::new(), expand_var).unwrap();
+    let expanded = expand_string(" FOO$FOO ", |_| None, expand_var).unwrap();
     assert_eq!(" FOOBAR ", &expanded);
 }
 
@@ -88,7 +89,7 @@ fn expand_variables_with_colons() {
         "BAR" => Some("BAR".to_owned()),
         _     => None,
     };
-    let expanded = expand_string("$FOO:$BAR", |_| String::new(), expand_var).unwrap();
+    let expanded = expand_string("$FOO:$BAR", |_| None, expand_var).unwrap();
     assert_eq!("FOO:BAR", &expanded);
 }
 
@@ -100,13 +101,13 @@ fn expand_multiple_variables() {
         "C" => Some("1 2 3".to_owned()),
         _   => None,
     };
-    let expanded = expand_string("${A}${B}...${C}", |_| String::new(), expand_var).unwrap();
+    let expanded = expand_string("${A}${B}...${C}", |_| None, expand_var).unwrap();
     assert_eq!("testing...1 2 3", &expanded);
 }
 
 #[test]
 fn escape_with_backslash() {
-    let expanded = expand_string("\\$FOO", |_| String::new(), |_| None).unwrap();
+    let expanded = expand_string("\\$FOO", |_| None, |_| None).unwrap();
     assert_eq!("$FOO", &expanded);
 }
 
@@ -114,7 +115,7 @@ fn escape_with_backslash() {
 fn expand_variable_alongside_braces() {
     let line = "$A{1,2}";
     let expected = "11 12";
-    let expanded = expand_string(line, |_| String::new(), |variable| {
+    let expanded = expand_string(line, |_| None, |variable| {
         if variable == "A" { Some("1".to_owned()) } else { None }
     }).unwrap();
     assert_eq!(expected, &expanded);
@@ -124,7 +125,7 @@ fn expand_variable_alongside_braces() {
 fn expand_variable_within_braces() {
     let line = "1{$A,2}";
     let expected = "11 12";
-    let expanded = expand_string(line, |_| String::new(), |variable| {
+    let expanded = expand_string(line, |_| None, |variable| {
         if variable == "A" { Some("1".to_owned()) } else { None }
     }).unwrap();
     assert_eq!(expected, &expanded);

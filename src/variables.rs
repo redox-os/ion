@@ -177,75 +177,73 @@ impl Variables {
         name.chars().all(Variables::is_valid_variable_character)
     }
 
-    pub fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> String {
-        {
-            let mut chars = word.char_indices();
+    pub fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> Option<String> {
+        let mut chars = word.char_indices();
 
-            let tilde_prefix;
-            let remainder;
+        let tilde_prefix;
+        let remainder;
 
-            loop {
-                if let Some((ind, c)) = chars.next() {
-                    if c == '/' || c == '$' {
-                        tilde_prefix = &word[1..ind];
-                        remainder = &word[ind..];
-                        break;
-                    }
-                } else {
-                    tilde_prefix = &word[1..];
-                    remainder = "";
+        loop {
+            if let Some((ind, c)) = chars.next() {
+                if c == '/' || c == '$' {
+                    tilde_prefix = &word[1..ind];
+                    remainder = &word[ind..];
                     break;
                 }
+            } else {
+                tilde_prefix = &word[1..];
+                remainder = "";
+                break;
             }
+        }
 
-            match tilde_prefix {
-                "" => {
-                    if let Some(home) = env::home_dir() {
-                        return home.to_string_lossy().to_string() + remainder;
-                    }
+        match tilde_prefix {
+            "" => {
+                if let Some(home) = env::home_dir() {
+                    return Some(home.to_string_lossy().to_string() + remainder);
                 }
-                "+" => {
-                    if let Some(pwd) = self.get_var("PWD") {
-                        return pwd.to_string() + remainder;
-                    } else if let Ok(pwd) = env::current_dir() {
-                        return pwd.to_string_lossy().to_string() + remainder;
-                    }
+            }
+            "+" => {
+                if let Some(pwd) = self.get_var("PWD") {
+                    return Some(pwd.to_string() + remainder);
+                } else if let Ok(pwd) = env::current_dir() {
+                    return Some(pwd.to_string_lossy().to_string() + remainder);
                 }
-                "-" => {
-                    if let Some(oldpwd) = self.get_var("OLDPWD") {
-                        return oldpwd.to_string() + remainder;
-                    }
+            }
+            "-" => {
+                if let Some(oldpwd) = self.get_var("OLDPWD") {
+                    return Some(oldpwd.to_string() + remainder);
                 }
-                _ => {
-                    let neg;
-                    let tilde_num;
+            }
+            _ => {
+                let neg;
+                let tilde_num;
 
-                    if tilde_prefix.starts_with('+') {
-                        tilde_num = &tilde_prefix[1..];
-                        neg = false;
-                    } else if tilde_prefix.starts_with('-') {
-                        tilde_num = &tilde_prefix[1..];
-                        neg = true;
+                if tilde_prefix.starts_with('+') {
+                    tilde_num = &tilde_prefix[1..];
+                    neg = false;
+                } else if tilde_prefix.starts_with('-') {
+                    tilde_num = &tilde_prefix[1..];
+                    neg = true;
+                } else {
+                    tilde_num = tilde_prefix;
+                    neg = false;
+                }
+
+                if let Ok(num) = tilde_num.parse::<usize>() {
+                    let res = if neg {
+                        dir_stack.dir_from_top(num)
                     } else {
-                        tilde_num = tilde_prefix;
-                        neg = false;
-                    }
+                        dir_stack.dir_from_bottom(num)
+                    };
 
-                    if let Ok(num) = tilde_num.parse::<usize>() {
-                        let res = if neg {
-                            dir_stack.dir_from_top(num)
-                        } else {
-                            dir_stack.dir_from_bottom(num)
-                        };
-
-                        if let Some(path) = res {
-                            return path.to_str().unwrap().to_string();
-                        }
+                    if let Some(path) = res {
+                        return Some(path.to_str().unwrap().to_string());
                     }
                 }
             }
         }
-        word.to_owned()
+        None
     }
 
     pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> Result<String, ExpandErr> {
