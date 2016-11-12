@@ -1,41 +1,40 @@
-pub enum WordToken {
-    Normal(String),
-    Tilde(String),
-    Brace(String, bool),
-    Variable(String)
+#[derive(Debug, PartialEq)]
+pub enum WordToken<'a> {
+    Normal(&'a str),
+    Tilde(&'a str),
+    Brace(&'a str, bool),
+    Variable(&'a str)
 }
 
 pub struct WordIterator<'a> {
     data: &'a str,
     read: usize,
     whitespace: bool,
-    complete:   bool,
 }
 
 impl<'a> WordIterator<'a> {
     pub fn new(data: &'a str) -> WordIterator<'a> {
-        WordIterator { data: data, read: 0, whitespace: false, complete: false }
+        WordIterator { data: data, read: 0, whitespace: false }
     }
 }
 
 impl<'a> Iterator for WordIterator<'a> {
-    type Item = WordToken;
+    type Item = WordToken<'a>;
 
-    fn next(&mut self) -> Option<WordToken> {
-        if self.complete { return None; }
-        let mut output = "".to_owned();
+    fn next(&mut self) -> Option<WordToken<'a>> {
+        let start = self.read;
 
         if self.whitespace {
             self.whitespace = false;
             for character in self.data.chars().skip(self.read) {
                 if character != ' ' {
-                    return Some(WordToken::Normal(output));
+                    return Some(WordToken::Normal(&self.data[start..self.read]));
                 }
                 self.read += 1;
-                output.push(character);
             }
-            if !output.is_empty() {
-                Some(WordToken::Normal(output))
+
+            if start != self.read {
+                Some(WordToken::Normal(&self.data[start..self.read]))
             } else {
                 None
             }
@@ -54,37 +53,55 @@ impl<'a> Iterator for WordIterator<'a> {
                 } else if character == '$' {
                     contains_variables = true;
                     previous_char_was_dollar = true;
-                } else if character == '~' && output.is_empty() {
+                } else if character == '~' && start == self.read {
                     contains_tilde = true;
                 } else if character == ' ' {
                     self.whitespace = true;
                     return if contains_braces {
-                        Some(WordToken::Brace(output, contains_variables))
+                        Some(WordToken::Brace(&self.data[start..self.read], contains_variables))
                     } else if contains_variables {
-                        Some(WordToken::Variable(output))
+                        Some(WordToken::Variable(&self.data[start..self.read]))
                     } else if contains_tilde {
-                        Some(WordToken::Tilde(output))
+                        Some(WordToken::Tilde(&self.data[start..self.read]))
                     } else {
-                        Some(WordToken::Normal(output))
+                        Some(WordToken::Normal(&self.data[start..self.read]))
                     };
                 } else {
                     previous_char_was_dollar = false;
                 }
                 self.read += 1;
-                output.push(character);
             }
 
-            if output.is_empty() { return None; }
-            self.complete = true;
+            if start == self.read { return None; }
             if contains_braces {
-                Some(WordToken::Brace(output, contains_variables))
+                Some(WordToken::Brace(&self.data[start..self.read], contains_variables))
             } else if contains_variables {
-                Some(WordToken::Variable(output))
+                Some(WordToken::Variable(&self.data[start..self.read]))
             } else if contains_tilde {
-                Some(WordToken::Tilde(output))
+                Some(WordToken::Tilde(&self.data[start..self.read]))
             } else {
-                Some(WordToken::Normal(output))
+                Some(WordToken::Normal(&self.data[start..self.read]))
             }
         }
+    }
+}
+
+#[test]
+fn test_words() {
+    let input = "echo $ABC ${ABC} one{$ABC,$ABC} ~";
+    let expected = vec![
+        WordToken::Normal("echo"),
+        WordToken::Normal(" "),
+        WordToken::Variable("$ABC"),
+        WordToken::Normal(" "),
+        WordToken::Variable("${ABC}"),
+        WordToken::Normal(" "),
+        WordToken::Brace("one{$ABC,$ABC}", true),
+        WordToken::Normal(" "),
+        WordToken::Tilde("~")
+    ];
+
+    for (actual, expected) in WordIterator::new(input).zip(expected.iter()) {
+        assert_eq!(actual, *expected);
     }
 }

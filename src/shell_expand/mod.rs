@@ -14,14 +14,14 @@ pub enum ExpandErr {
 /// Performs shell expansions to an input string, efficiently returning the final expanded form.
 /// Shells must provide their own batteries for expanding tilde and variable words.
 pub fn expand_string<T, V>(original: &str, expand_tilde: T, expand_variable: V) -> Result<String, ExpandErr>
-    where T: Fn(String) -> String,
-          V: Fn(&str)   -> Option<String>,
+    where T: Fn(&str) -> String,
+          V: Fn(&str) -> Option<String>,
 {
     let mut output = String::with_capacity(original.len() >> 1);
     for word in WordIterator::new(original) {
         match word {
             WordToken::Normal(text) => {
-                output.push_str(&text);
+                output.push_str(text);
             },
             WordToken::Tilde(text) => {
                 output.push_str(&expand_tilde(text));
@@ -33,9 +33,9 @@ pub fn expand_string<T, V>(original: &str, expand_tilde: T, expand_variable: V) 
                 if contains_variables {
                     let mut temp = String::new();
                     variables::expand(&mut temp, text, |variable| expand_variable(variable));
-                    try!(braces::expand_braces(&mut output, temp).map_err(ExpandErr::Brace));
+                    braces::expand_braces(&mut output, &temp).map_err(ExpandErr::Brace)?;
                 } else {
-                    try!(braces::expand_braces(&mut output, text).map_err(ExpandErr::Brace));
+                    braces::expand_braces(&mut output, text).map_err(ExpandErr::Brace)?;
                 }
             }
         }

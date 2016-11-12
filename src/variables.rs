@@ -177,7 +177,7 @@ impl Variables {
         name.chars().all(Variables::is_valid_variable_character)
     }
 
-    pub fn tilde_expansion(&self, word: String, dir_stack: &DirectoryStack) -> String {
+    pub fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> String {
         {
             let mut chars = word.char_indices();
 
@@ -245,11 +245,11 @@ impl Variables {
                 }
             }
         }
-        word
+        word.to_owned()
     }
 
     pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> Result<String, ExpandErr> {
-        let tilde_fn    = |tilde: String | self.tilde_expansion(tilde, dir_stack);
+        let tilde_fn    = |tilde:    &str| self.tilde_expansion(tilde, dir_stack);
         let variable_fn = |variable: &str| self.get_var(variable);
         shell_expand::expand_string(original, tilde_fn, variable_fn)
     }

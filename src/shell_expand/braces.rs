@@ -13,7 +13,7 @@ pub enum BraceErr {
 /// tokenized into a collection of `BraceToken`s, separating the expanders from the normal text. Each expander's
 /// associated elements will be collected separately and permutated together before being finally integrated into a
 /// single output string.
-pub fn expand_braces(output: &mut String, input: String) -> Result<(), BraceErr> {
+pub fn expand_braces(output: &mut String, input: &str) -> Result<(), BraceErr> {
     let mut tokens:           Vec<BraceToken> = Vec::new();
     let mut expanders:        Vec<Vec<&str>>  = Vec::new();
     let mut current_expander: Vec<&str>       = Vec::new();
@@ -75,21 +75,21 @@ pub fn expand_braces(output: &mut String, input: String) -> Result<(), BraceErr>
 #[test]
 fn escaped_braces() {
     let mut output = String::new();
-    expand_braces(&mut output, "e\\{sdf{1\\{2,34}".to_owned()).unwrap();
-    assert_eq!(output, "e{sdf1{2 e{sdf34".to_owned());
+    expand_braces(&mut output, "e\\{sdf{1\\{2,34}").unwrap();
+    assert_eq!(output, "e{sdf1{2 e{sdf34");
 }
 
 #[test]
 fn test_malformed_brace_input() {
-    assert_eq!(expand_braces(&mut String::new(), "AB{CD".to_owned()), Err(BraceErr::UnmatchedBraces(2)));
-    assert_eq!(expand_braces(&mut String::new(), "AB{{}".to_owned()), Err(BraceErr::InnerBracesNotImplemented));
-    assert_eq!(expand_braces(&mut String::new(), "AB}CD".to_owned()), Err(BraceErr::UnmatchedBraces(2)));
+    assert_eq!(expand_braces(&mut String::new(), "AB{CD"), Err(BraceErr::UnmatchedBraces(2)));
+    assert_eq!(expand_braces(&mut String::new(), "AB{{}"), Err(BraceErr::InnerBracesNotImplemented));
+    assert_eq!(expand_braces(&mut String::new(), "AB}CD"), Err(BraceErr::UnmatchedBraces(2)));
 }
 
 #[test]
 fn test_expand_brace_permutations() {
     let mut actual = String::new();
-    expand_braces(&mut actual, "AB{12,34}CD{4,5}EF".to_owned()).unwrap();
+    expand_braces(&mut actual, "AB{12,34}CD{4,5}EF").unwrap();
     let expected = String::from("AB12CD4EF AB12CD5EF AB34CD4EF AB34CD5EF");
     assert_eq!(actual, expected);
 }
@@ -97,11 +97,11 @@ fn test_expand_brace_permutations() {
 #[test]
 fn test_expand_brace() {
     let mut actual = String::new();
-    expand_braces(&mut actual, "AB{12,34}EF".to_owned()).unwrap();
+    expand_braces(&mut actual, "AB{12,34}EF").unwrap();
     let expected = String::from("AB12EF AB34EF");
     assert_eq!(actual, expected);
     let mut actual = String::new();
-    expand_braces(&mut actual, "A{12,34}".to_owned()).unwrap();
+    expand_braces(&mut actual, "A{12,34}").unwrap();
     let expected = String::from("A12 A34");
     assert_eq!(actual, expected);
 }

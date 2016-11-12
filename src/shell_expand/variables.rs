@@ -1,6 +1,6 @@
 /// Given an `input` string, this function will expand the variables that are discovered, using the closure provided
 /// as the `action`. In the case of this program specifically, that action will be `self.get_var(&variable)`.
-pub fn expand<F>(output: &mut String, input: String, action: F)
+pub fn expand<F>(output: &mut String, input: &str, action: F)
     where F: Fn(&str) -> Option<String>
 {
     for var_token in VariableIterator::new(&input.chars().collect::<Vec<char>>()) {
