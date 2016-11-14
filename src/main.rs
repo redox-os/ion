@@ -90,15 +90,7 @@ impl Shell {
                     if filename {
                         if let Ok(current_dir) = env::current_dir() {
                             if let Some(url) = current_dir.to_str() {
-                                //HACK FOR LINER LOOKUP ON REDOX
-                                let mut reference = match url.find(':') {
-                                    Some(i) => url[i + 1..].to_string(),
-                                    None => url.to_string()
-                                };
-                                if ! reference.starts_with('/') {
-                                    reference.insert(0, '/');
-                                }
-                                let completer = FilenameCompleter::new(Some(reference));
+                                let completer = FilenameCompleter::new(Some(url));
                                 mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                             }
                         }
@@ -646,4 +638,3 @@ impl Command {
 fn main() {
     Shell::default().execute();
 }
-
