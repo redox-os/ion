@@ -20,3 +20,6 @@ name = "ion"
 glob = "0.2"
 liner = "0.1"
 peg = "0.3"
+
+[target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
+users = "0.5.1"

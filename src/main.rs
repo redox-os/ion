@@ -7,6 +7,9 @@
 extern crate glob;
 extern crate liner;
 
+#[cfg(all(unix, not(target_os = "redox")))]
+extern crate users as users_unix;
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
