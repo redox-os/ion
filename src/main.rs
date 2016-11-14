@@ -6,10 +6,12 @@
 
 extern crate glob;
 extern crate liner;
+mod shell_expand;
 
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
+use std::iter;
 use std::env::{self, current_dir, home_dir};
 use std::mem;
 use std::process;
@@ -24,6 +26,8 @@ use self::flow_control::{FlowControl, Statement, Comparitor};
 use self::status::{SUCCESS, NO_SUCH_COMMAND};
 use self::function::Function;
 use self::pipe::execute_pipeline;
+use self::shell_expand::ExpandErr;
+use self::shell_expand::braces::BraceErr;
 
 pub mod completer;
 pub mod pipe;
@@ -236,7 +240,20 @@ impl Shell {
                 prompt.push_str("fn> ");
             },
             _ => {
-                prompt.push_str(&self.variables.expand_string(&self.variables.get_var_or_empty("PROMPT"), &self.directory_stack));
+                let prompt_var = self.variables.get_var_or_empty("PROMPT");
+                match self.variables.expand_string(&prompt_var, &self.directory_stack) {
+                    Ok(ref expanded_string) => prompt.push_str(expanded_string),
+                    Err(ExpandErr::Brace(BraceErr::UnmatchedBraces(position))) => {
+                        println!("ion: expand error: unmatched braces");
+                        println!("{}", prompt_var);
+                        println!("{}^", iter::repeat("-").take(position).collect::<String>());
+                        prompt.push_str("ERROR: ");
+                    },
+                    Err(ExpandErr::Brace(BraceErr::InnerBracesNotImplemented)) => {
+                        println!("ion: expand error: inner braces not yet implemented");
+                        prompt.push_str("ERROR: ");
+                    }
+                }
             }
         }
 

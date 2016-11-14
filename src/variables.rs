@@ -1,11 +1,14 @@
 use std::collections::BTreeMap;
 use std::env;
+use std::iter;
 
 use liner::Context;
 
 use super::peg::{Pipeline, Job};
 use super::status::{SUCCESS, FAILURE};
 use super::directory_stack::DirectoryStack;
+use super::shell_expand::{self, ExpandErr};
+use super::shell_expand::braces::BraceErr;
 
 pub struct Variables {
     variables: BTreeMap<String, String>,
@@ -64,7 +67,7 @@ impl Variables {
             return FAILURE;
         }
         for variable in args.iter().skip(1) {
-            if let None = self.unset_var(variable.as_ref()) {
+            if self.unset_var(variable.as_ref()).is_none() {
                 println!("Undefined variable: {}", variable.as_ref());
                 return FAILURE;
             }
@@ -144,11 +147,26 @@ impl Variables {
 
     pub fn expand_job(&self, job: &Job, dir_stack: &DirectoryStack) -> Job {
         // TODO don't copy everything
+        // TODO expansion can error
         Job::new(job.args
-                     .iter()
-                     .map(|original: &String| self.expand_string(original, dir_stack))
-                     .collect(),
-                 job.background)
+                    .iter()
+                    .map(|original: &String| {
+                        match self.expand_string(original, dir_stack) {
+                            Ok(expanded_string) => expanded_string,
+                            Err(ExpandErr::Brace(BraceErr::UnmatchedBraces(position))) => {
+                                println!("ion: expand error: unmatched braces");
+                                println!("{}", original);
+                                println!("{}^", iter::repeat("-").take(position).collect::<String>());
+                                "".to_owned()
+                            },
+                            Err(ExpandErr::Brace(BraceErr::InnerBracesNotImplemented)) => {
+                                println!("ion: expand error: inner braces not yet implemented");
+                                "".to_owned()
+                            }
+                        }
+                    })
+                    .collect(),
+                job.background)
     }
 
     pub fn is_valid_variable_character(c: char) -> bool {
@@ -159,202 +177,79 @@ impl Variables {
         name.chars().all(Variables::is_valid_variable_character)
     }
 
-    pub fn tilde_expansion(&self, word: String, dir_stack: &DirectoryStack) -> String {
-        // If the word doesn't start with ~, just return it to avoid allocating an iterator
-        if word.starts_with('~') {
-            let mut chars = word.char_indices();
+    pub fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> Option<String> {
+        let mut chars = word.char_indices();
 
-            let tilde_prefix;
-            let remainder;
-
-            loop {
-                if let Some((ind, c)) = chars.next() {
-                    if c == '/' || c == '$' {
-                        tilde_prefix = &word[1..ind];
-                        remainder = &word[ind..];
-                        break;
-                    }
-                } else {
-                    tilde_prefix = &word[1..];
-                    remainder = "";
-                    break;
-                }
-            }
-
-            match tilde_prefix {
-                "" => {
-                    if let Some(home) = env::home_dir() {
-                        return home.to_string_lossy().to_string() + remainder;
-                    }
-                }
-                "+" => {
-                    if let Some(pwd) = self.get_var("PWD") {
-                        return pwd.to_string() + remainder;
-                    } else if let Ok(pwd) = env::current_dir() {
-                        return pwd.to_string_lossy().to_string() + remainder;
-                    }
-                }
-                "-" => {
-                    if let Some(oldpwd) = self.get_var("OLDPWD") {
-                        return oldpwd.to_string() + remainder;
-                    }
-                }
-                _ => {
-                    let neg;
-                    let tilde_num;
-
-                    if tilde_prefix.starts_with('+') {
-                        tilde_num = &tilde_prefix[1..];
-                        neg = false;
-                    } else if tilde_prefix.starts_with('-') {
-                        tilde_num = &tilde_prefix[1..];
-                        neg = true;
-                    } else {
-                        tilde_num = tilde_prefix;
-                        neg = false;
-                    }
-
-                    if let Ok(num) = tilde_num.parse::<usize>() {
-                        let res = if neg {
-                            dir_stack.dir_from_top(num)
-                        } else {
-                            dir_stack.dir_from_bottom(num)
-                        };
-
-                        if let Some(path) = res {
-                            return path.to_str().unwrap().to_string();
-                        }
-                    }
-                }
-            }
-        }
-
-        word
-    }
-
-    fn brace_expand(&self, input: String) -> String {
-        let mut ignore_next = false;
-        let mut brace_found = false;
-        let mut variable_expansion_found;
-        let mut infix_is_variable = false;
-        let mut output = input.clone();
+        let tilde_prefix;
+        let remainder;
 
         loop {
-            variable_expansion_found = false;
-            let temp = output.clone();
-            let mut char_iter = temp.chars();
-
-            // Prefix Phase
-            let mut prefix = String::new();
-            while let Some(character) = char_iter.next() {
-                match character {
-                    '$'  if !ignore_next => { infix_is_variable = true; break },
-                    '{'  if !ignore_next => {
-                        brace_found = true;
-                        break
-                    },
-                    '\\' if !ignore_next => ignore_next = true,
-                    '\\'                 => { prefix.push(character); ignore_next = false; },
-                    _ if ignore_next     => { prefix.push(character); ignore_next = false; },
-                    _                    => prefix.push(character),
+            if let Some((ind, c)) = chars.next() {
+                if c == '/' || c == '$' {
+                    tilde_prefix = &word[1..ind];
+                    remainder = &word[ind..];
+                    break;
                 }
-            }
-
-            // Infix Phase
-            let mut infixes = Vec::new();
-            if infix_is_variable {
-                let mut colon_found = false;
-                let mut variable = String::new();
-                if let Some(character) = char_iter.next() {
-                    if character == '{' {
-                        variable_expansion_found = true;
-                        while let Some(character) = char_iter.next() {
-                            if character == '}' { break }
-                            variable.push(character);
-                        }
-                    } else {
-                        variable.push(character);
-                        while let Some(character) = char_iter.next() {
-                            if character == ':' {
-                                variable_expansion_found = true;
-                                colon_found = true;
-                                break
-                            } else {
-                                variable.push(character);
-                            }
-                        }
-                    }
-                }
-
-                if colon_found {
-                    infixes.push(self.get_var(&variable).map_or(String::from(":"), |value| value + ":"));
-                } else {
-                    infixes.push(self.get_var(&variable).map_or(String::default(), |value| value));
-                }
-            } else if !brace_found {
-                return input;
             } else {
-                brace_found = false;
-                ignore_next = false;
-                let mut current = String::new();
-                while let Some(character) = char_iter.next() {
-                    match character {
-                        '}'  if !ignore_next => {
-                            infixes.push(current.clone());
-                            current.clear();
-                            brace_found = true;
-                            break
-                        },
-                        '\\' if !ignore_next => ignore_next = true,
-                        '\\'                 => { current.push(character); ignore_next = false; },
-                        ',' if !ignore_next  => { infixes.push(current.clone()); current.clear(); },
-                        _ if ignore_next     => { current.push(character); ignore_next = false; },
-                        _                    => current.push(character),
+                tilde_prefix = &word[1..];
+                remainder = "";
+                break;
+            }
+        }
+
+        match tilde_prefix {
+            "" => {
+                if let Some(home) = env::home_dir() {
+                    return Some(home.to_string_lossy().to_string() + remainder);
+                }
+            }
+            "+" => {
+                if let Some(pwd) = self.get_var("PWD") {
+                    return Some(pwd.to_string() + remainder);
+                } else if let Ok(pwd) = env::current_dir() {
+                    return Some(pwd.to_string_lossy().to_string() + remainder);
+                }
+            }
+            "-" => {
+                if let Some(oldpwd) = self.get_var("OLDPWD") {
+                    return Some(oldpwd.to_string() + remainder);
+                }
+            }
+            _ => {
+                let neg;
+                let tilde_num;
+
+                if tilde_prefix.starts_with('+') {
+                    tilde_num = &tilde_prefix[1..];
+                    neg = false;
+                } else if tilde_prefix.starts_with('-') {
+                    tilde_num = &tilde_prefix[1..];
+                    neg = true;
+                } else {
+                    tilde_num = tilde_prefix;
+                    neg = false;
+                }
+
+                if let Ok(num) = tilde_num.parse::<usize>() {
+                    let res = if neg {
+                        dir_stack.dir_from_top(num)
+                    } else {
+                        dir_stack.dir_from_bottom(num)
+                    };
+
+                    if let Some(path) = res {
+                        return Some(path.to_str().unwrap().to_string());
                     }
                 }
-
-                if !brace_found { return input; }
             }
-
-            // Suffix Phase
-            ignore_next = false;
-            let mut suffix = String::new();
-            for character in char_iter {
-                match character {
-                    '\\' if !ignore_next => ignore_next = true,
-                    _    if !ignore_next => suffix.push(character),
-                    _                    => { suffix.push(character); ignore_next = false; },
-                }
-            }
-
-            // Combine
-            output = infixes.iter().map(|infix| prefix.clone() + infix + &suffix)
-                .collect::<Vec<String>>().join(" ");
-
-            if !variable_expansion_found { break }
         }
-        output
+        None
     }
 
-    pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> String {
-        let mut output = String::new();
-        let mut current = String::new();
-        for character in original.chars() {
-            match character {
-                ' ' if current.is_empty() => output.push(' '),
-                ' ' => {
-                    output.push_str(&self.brace_expand(self.tilde_expansion(current.clone(), dir_stack)));
-                    output.push(' ');
-                    current.clear();
-                },
-                _ => current.push(character)
-            }
-        }
-
-        if !current.is_empty() {
-            output.push_str(&self.brace_expand(self.tilde_expansion(current, dir_stack)));
-        }
-        output
+    pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> Result<String, ExpandErr> {
+        let tilde_fn    = |tilde:    &str| self.tilde_expansion(tilde, dir_stack);
+        let variable_fn = |variable: &str| self.get_var(variable);
+        shell_expand::expand_string(original, tilde_fn, variable_fn)
     }
 }
 
@@ -371,7 +266,7 @@ mod tests {
     #[test]
     fn undefined_variable_expands_to_empty_string() {
         let variables = Variables::default();
-        let expanded = variables.expand_string("$FOO", &new_dir_stack());
+        let expanded = variables.expand_string("$FOO", &new_dir_stack()).unwrap();
         assert_eq!("", &expanded);
     }
 
@@ -379,7 +274,7 @@ mod tests {
     fn let_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.let_(vec!["let", "FOO", "=", "BAR"]);
-        let expanded = variables.expand_string("$FOO", &new_dir_stack());
+        let expanded = variables.expand_string("$FOO", &new_dir_stack()).unwrap();
         assert_eq!("BAR", &expanded);
     }
 
@@ -387,7 +282,7 @@ mod tests {
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
-        let expanded = variables.expand_string("$FOO", &new_dir_stack());
+        let expanded = variables.expand_string("$FOO", &new_dir_stack()).unwrap();
         assert_eq!("BAR", &expanded);
     }
 
@@ -396,69 +291,6 @@ mod tests {
         let mut variables = Variables::default();
         let return_status = variables.let_(vec!["let", "FOO"]);
         assert_eq!(FAILURE, return_status);
-    }
-
-    #[test]
-    fn expand_several_variables() {
-        let mut variables = Variables::default();
-        variables.let_(vec!["let", "FOO", "=", "BAR"]);
-        variables.let_(vec!["let", "X", "=", "Y"]);
-        let expanded = variables.expand_string("variables: $FOO $X", &new_dir_stack());
-        assert_eq!("variables: BAR Y", &expanded);
-    }
-
-    #[test]
-    fn expand_long_braces() {
-        let variables = Variables::default();
-        let line = "The pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
-        let expected = "The prodigal programmer processed prototype procedures proficiently proving prospective projections";
-        let expanded = variables.expand_string(line, &new_dir_stack());
-        assert_eq!(expected, &expanded);
-    }
-
-    #[test]
-    fn expand_several_braces() {
-        let variables = Variables::default();
-        let line = "The {barb,veget}arian eat{ers,ing} appl{esauce,ied} am{ple,ounts} of eff{ort,ectively}";
-        let expected = "The barbarian vegetarian eaters eating applesauce applied ample amounts of effort effectively";
-        let expanded = variables.expand_string(line, &new_dir_stack());
-        assert_eq!(expected, &expanded);
-    }
-
-    #[test]
-    fn expand_variable_braces() {
-        let mut variables = Variables::default();
-        variables.let_(vec!["let", "FOO", "=", "BAR"]);
-        let expanded = variables.expand_string("FOO$FOO", &new_dir_stack());
-        assert_eq!("FOOBAR", &expanded);
-        let expanded = variables.expand_string(" FOO${FOO} ", &new_dir_stack());
-        assert_eq!(" FOOBAR ", &expanded);
-    }
-
-    #[test]
-    fn expand_variables_with_colons() {
-        let mut variables = Variables::default();
-        variables.let_(vec!["let", "FOO", "=", "FOO"]);
-        variables.let_(vec!["let", "BAR", "=", "BAR"]);
-        let expanded = variables.expand_string("$FOO:$BAR", &new_dir_stack());
-        assert_eq!("FOO:BAR", &expanded);
-    }
-
-    #[test]
-    fn expand_multiple_variables() {
-        let mut variables = Variables::default();
-        variables.let_(vec!["let", "A", "=", "test"]);
-        variables.let_(vec!["let", "B", "=", "ing"]);
-        variables.let_(vec!["let", "C", "=", "1 2 3"]);
-        let expanded = variables.expand_string("${A}${B}...${C}", &new_dir_stack());
-        assert_eq!("testing...1 2 3", &expanded);
-    }
-
-    #[test]
-    fn escape_with_backslash() {
-        let variables = Variables::default();
-        let expanded = variables.expand_string("\\$FOO", &new_dir_stack());
-        assert_eq!("\\$FOO", &expanded);
     }
 
     #[test]
@@ -474,7 +306,7 @@ mod tests {
         variables.set_var("FOO", "BAR");
         let return_status = variables.drop_variable(vec!["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = variables.expand_string("$FOO", &new_dir_stack());
+        let expanded = variables.expand_string("$FOO", &new_dir_stack()).unwrap();
         assert_eq!("", expanded);
     }
 
