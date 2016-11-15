@@ -13,9 +13,10 @@ pub enum ExpandErr {
 
 /// Performs shell expansions to an input string, efficiently returning the final expanded form.
 /// Shells must provide their own batteries for expanding tilde and variable words.
-pub fn expand_string<T, V>(original: &str, expand_tilde: T, expand_variable: V) -> Result<String, ExpandErr>
+pub fn expand_string<T, V, C>(original: &str, expand_tilde: T, expand_variable: V, expand_command: C) -> Result<String, ExpandErr>
     where T: Fn(&str) -> Option<String>,
           V: Fn(&str) -> Option<String>,
+          C: Fn(&str) -> Option<String>,
 {
     let mut output = String::with_capacity(original.len() >> 1);
     for word in WordIterator::new(original) {
@@ -28,12 +29,12 @@ pub fn expand_string<T, V>(original: &str, expand_tilde: T, expand_variable: V) 
                 None           => output.push_str(text),
             },
             WordToken::Variable(text) => {
-                variables::expand(&mut output, text, |variable| expand_variable(variable));
+                variables::expand(&mut output, text, |variable| expand_variable(variable), |command| expand_command(command));
             },
             WordToken::Brace(text, contains_variables) => {
                 if contains_variables {
                     let mut temp = String::new();
-                    variables::expand(&mut temp, text, |variable| expand_variable(variable));
+                    variables::expand(&mut temp, text, |variable| expand_variable(variable), |command| expand_command(command));
                     braces::expand_braces(&mut output, &temp).map_err(ExpandErr::Brace)?;
                 } else {
                     braces::expand_braces(&mut output, text).map_err(ExpandErr::Brace)?;
