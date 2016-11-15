@@ -8,7 +8,8 @@ use self::words::{WordIterator, WordToken};
 
 #[derive(Debug, PartialEq)]
 pub enum ExpandErr {
-    Brace(braces::BraceErr),
+    UnmatchedBraces(usize),
+    InnerBracesNotImplemented
 }
 
 /// Performs shell expansions to an input string, efficiently returning the final expanded form.
@@ -18,30 +19,43 @@ pub fn expand_string<T, V>(original: &str, expand_tilde: T, expand_variable: V) 
           V: Fn(&str) -> Option<String>,
 {
     let mut output = String::with_capacity(original.len() >> 1);
-    for word in WordIterator::new(original) {
-        match word {
-            WordToken::Normal(text) => {
-                output.push_str(text);
-            },
-            WordToken::Tilde(text) => match expand_tilde(text) {
-                Some(expanded) => output.push_str(&expanded),
-                None           => output.push_str(text),
-            },
-            WordToken::Variable(text) => {
-                variables::expand(&mut output, text, |variable| expand_variable(variable));
-            },
-            WordToken::Brace(text, contains_variables) => {
-                if contains_variables {
-                    let mut temp = String::new();
-                    variables::expand(&mut temp, text, |variable| expand_variable(variable));
-                    braces::expand_braces(&mut output, &temp).map_err(ExpandErr::Brace)?;
-                } else {
-                    braces::expand_braces(&mut output, text).map_err(ExpandErr::Brace)?;
+    for result in WordIterator::new(original) {
+        match result {
+            Ok(word) => match word {
+                WordToken::Normal(text) => {
+                    output.push_str(text);
+                },
+                WordToken::Tilde(text) => match expand_tilde(text) {
+                    Some(expanded) => output.push_str(&expanded),
+                    None           => output.push_str(text),
+                },
+                WordToken::Variable(text) => {
+                    variables::expand(&mut output, text, |variable| expand_variable(variable));
+                },
+                WordToken::Brace(text, contains_variables) => {
+                    if contains_variables {
+                        let mut temp = String::new();
+                        variables::expand(&mut temp, text, |variable| expand_variable(variable));
+                        braces::expand_braces(&mut output, &temp);
+                    } else {
+                        braces::expand_braces(&mut output, text);
+                    }
                 }
-            }
+            },
+            Err(cause) => return Err(cause)
         }
     }
     Ok(output)
+}
+
+#[test]
+fn expand_variable_normal_variable() {
+    let input = "$A:NOT:$B";
+    let expected = "FOO:NOT:BAR";
+    let expanded = expand_string(input, |_| None, |var| {
+        if var == "A" { Some("FOO".to_owned()) } else if var == "B" { Some("BAR".to_owned()) } else { None }
+    }).unwrap();
+    assert_eq!(expected, &expanded);
 }
 
 #[test]
