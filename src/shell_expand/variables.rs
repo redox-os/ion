@@ -163,10 +163,12 @@ impl<'a> Iterator for VariableIterator<'a> {
 
 #[test]
 fn test_variables() {
-    let input = "${var1}${var2}  \\$\\\\$var1:$var2  $var1 $var2  abc${var1}def $var1,$var2";
+    let input = "$(echo bar) ${var1}${var2}  \\$\\\\$var1:$var2  $var1 $var2  abc${var1}def $var1,$var2 $(echo foo)";
     let input = input.chars().collect::<Vec<char>>();
     let tokens = VariableIterator::new(&input);
     let expected = vec![
+        VariableToken::Command("echo bar".to_string()),
+        VariableToken::Normal(" ".to_string()),
         VariableToken::Variable("var1".to_string()),
         VariableToken::Variable("var2".to_string()),
         VariableToken::Normal("  $\\".to_string()),
@@ -183,6 +185,8 @@ fn test_variables() {
         VariableToken::Variable("var1".to_string()),
         VariableToken::Normal(",".to_string()),
         VariableToken::Variable("var2".to_string()),
+        VariableToken::Normal(" ".to_string()),
+        VariableToken::Command("echo foo".to_string()),
     ];
 
     let mut correct = 0;

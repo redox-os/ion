@@ -39,6 +39,7 @@ impl<'a> Iterator for WordIterator<'a> {
                 None
             }
         } else {
+            let mut break_char = None;
             let (mut contains_braces, mut contains_variables, mut contains_tilde,
                 mut backslash, mut previous_char_was_dollar) = (false, false, false, false, false);
             for character in self.data.chars().skip(self.read) {
@@ -50,12 +51,15 @@ impl<'a> Iterator for WordIterator<'a> {
                     previous_char_was_dollar = false;
                 } else if character == '{' && !previous_char_was_dollar {
                     contains_braces = true;
+                } else if character == '(' && previous_char_was_dollar {
+                    break_char = Some(')');
+                    previous_char_was_dollar = false;
                 } else if character == '$' {
                     contains_variables = true;
                     previous_char_was_dollar = true;
                 } else if character == '~' && start == self.read {
                     contains_tilde = true;
-                } else if character == ' ' {
+                } else if character == ' ' && break_char.is_none() {
                     self.whitespace = true;
                     return if contains_braces {
                         Some(WordToken::Brace(&self.data[start..self.read], contains_variables))
@@ -66,6 +70,8 @@ impl<'a> Iterator for WordIterator<'a> {
                     } else {
                         Some(WordToken::Normal(&self.data[start..self.read]))
                     };
+                } else if break_char == Some(character) {
+                    break_char = None;
                 } else {
                     previous_char_was_dollar = false;
                 }
@@ -88,7 +94,7 @@ impl<'a> Iterator for WordIterator<'a> {
 
 #[test]
 fn test_words() {
-    let input = "echo $ABC ${ABC} one{$ABC,$ABC} ~";
+    let input = "echo $ABC ${ABC} one{$ABC,$ABC} ~ $(echo foo)";
     let expected = vec![
         WordToken::Normal("echo"),
         WordToken::Normal(" "),
@@ -98,10 +104,15 @@ fn test_words() {
         WordToken::Normal(" "),
         WordToken::Brace("one{$ABC,$ABC}", true),
         WordToken::Normal(" "),
-        WordToken::Tilde("~")
+        WordToken::Tilde("~"),
+        WordToken::Normal(" "),
+        WordToken::Variable("$(echo foo)")
     ];
 
+    let mut correct = 0;
     for (actual, expected) in WordIterator::new(input).zip(expected.iter()) {
         assert_eq!(actual, *expected);
+        correct += 1;
     }
+    assert_eq!(expected.len(), correct);
 }
