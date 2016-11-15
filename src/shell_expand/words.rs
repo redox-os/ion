@@ -1,3 +1,5 @@
+use super::ExpandErr;
+
 #[derive(Debug, PartialEq)]
 pub enum WordToken<'a> {
     Normal(&'a str),
@@ -19,28 +21,30 @@ impl<'a> WordIterator<'a> {
 }
 
 impl<'a> Iterator for WordIterator<'a> {
-    type Item = WordToken<'a>;
+    type Item = Result<WordToken<'a>, ExpandErr>;
 
-    fn next(&mut self) -> Option<WordToken<'a>> {
+    fn next(&mut self) -> Option<Result<WordToken<'a>, ExpandErr>> {
         let start = self.read;
+        let mut open_brace_id = 0;
 
         if self.whitespace {
             self.whitespace = false;
             for character in self.data.chars().skip(self.read) {
                 if character != ' ' {
-                    return Some(WordToken::Normal(&self.data[start..self.read]));
+                    return Some(Ok(WordToken::Normal(&self.data[start..self.read])));
                 }
                 self.read += 1;
             }
 
             if start != self.read {
-                Some(WordToken::Normal(&self.data[start..self.read]))
+                Some(Ok(WordToken::Normal(&self.data[start..self.read])))
             } else {
                 None
             }
         } else {
             let (mut contains_braces, mut contains_variables, mut contains_tilde,
-                mut backslash, mut previous_char_was_dollar) = (false, false, false, false, false);
+                mut backslash, mut previous_char_was_dollar, mut open_brace) =
+                    (false, false, false, false, false, false);
             for character in self.data.chars().skip(self.read) {
                 if backslash {
                     if character == '$' { contains_variables = true; }
@@ -48,8 +52,14 @@ impl<'a> Iterator for WordIterator<'a> {
                 } else if character == '\\' {
                     backslash = true;
                     previous_char_was_dollar = false;
-                } else if character == '{' && !previous_char_was_dollar {
-                    contains_braces = true;
+                } else if character == '{' {
+                    if !previous_char_was_dollar { contains_braces = true; }
+                    if open_brace { return Some(Err(ExpandErr::InnerBracesNotImplemented)); }
+                    open_brace_id = self.read;
+                    open_brace = true;
+                } else if character == '}' {
+                    if !open_brace { return Some(Err(ExpandErr::UnmatchedBraces(self.read))); }
+                    open_brace = false;
                 } else if character == '$' {
                     contains_variables = true;
                     previous_char_was_dollar = true;
@@ -58,13 +68,13 @@ impl<'a> Iterator for WordIterator<'a> {
                 } else if character == ' ' {
                     self.whitespace = true;
                     return if contains_braces {
-                        Some(WordToken::Brace(&self.data[start..self.read], contains_variables))
+                        Some(Ok(WordToken::Brace(&self.data[start..self.read], contains_variables)))
                     } else if contains_variables {
-                        Some(WordToken::Variable(&self.data[start..self.read]))
+                        Some(Ok(WordToken::Variable(&self.data[start..self.read])))
                     } else if contains_tilde {
-                        Some(WordToken::Tilde(&self.data[start..self.read]))
+                        Some(Ok(WordToken::Tilde(&self.data[start..self.read])))
                     } else {
-                        Some(WordToken::Normal(&self.data[start..self.read]))
+                        Some(Ok(WordToken::Normal(&self.data[start..self.read])))
                     };
                 } else {
                     previous_char_was_dollar = false;
@@ -72,18 +82,28 @@ impl<'a> Iterator for WordIterator<'a> {
                 self.read += 1;
             }
 
-            if start == self.read { return None; }
-            if contains_braces {
-                Some(WordToken::Brace(&self.data[start..self.read], contains_variables))
+            if open_brace {
+                Some(Err(ExpandErr::UnmatchedBraces(open_brace_id)))
+            } else if start == self.read {
+                None
+            } else if contains_braces {
+                Some(Ok(WordToken::Brace(&self.data[start..self.read], contains_variables)))
             } else if contains_variables {
-                Some(WordToken::Variable(&self.data[start..self.read]))
+                Some(Ok(WordToken::Variable(&self.data[start..self.read])))
             } else if contains_tilde {
-                Some(WordToken::Tilde(&self.data[start..self.read]))
+                Some(Ok(WordToken::Tilde(&self.data[start..self.read])))
             } else {
-                Some(WordToken::Normal(&self.data[start..self.read]))
+                Some(Ok(WordToken::Normal(&self.data[start..self.read])))
             }
         }
     }
+}
+
+#[test]
+fn test_malformed_brace_input() {
+    assert_eq!(WordIterator::new("AB{CD").next(), Some(Err(ExpandErr::UnmatchedBraces(2))));
+    assert_eq!(WordIterator::new("AB{{}").next(), Some(Err(ExpandErr::InnerBracesNotImplemented)));
+    assert_eq!(WordIterator::new("AB}CD").next(), Some(Err(ExpandErr::UnmatchedBraces(2))));
 }
 
 #[test]
@@ -102,6 +122,7 @@ fn test_words() {
     ];
 
     for (actual, expected) in WordIterator::new(input).zip(expected.iter()) {
-        assert_eq!(actual, *expected);
+        let actual = actual.expect(&format!("Expected {:?}", *expected));
+        assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
     }
 }

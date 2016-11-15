@@ -8,7 +8,6 @@ use super::peg::{Pipeline, Job};
 use super::status::{SUCCESS, FAILURE};
 use super::directory_stack::DirectoryStack;
 use super::shell_expand::{self, ExpandErr};
-use super::shell_expand::braces::BraceErr;
 
 pub struct Variables {
     variables: BTreeMap<String, String>,
@@ -145,28 +144,44 @@ impl Variables {
                       pipeline.stdout.clone())
     }
 
+    /// Takes the current job's arguments and expands them, one argument at a
+    /// time, returning a new `Job` with the expanded arguments.
     pub fn expand_job(&self, job: &Job, dir_stack: &DirectoryStack) -> Job {
-        // TODO don't copy everything
-        // TODO expansion can error
-        Job::new(job.args
-                    .iter()
-                    .map(|original: &String| {
-                        match self.expand_string(original, dir_stack) {
-                            Ok(expanded_string) => expanded_string,
-                            Err(ExpandErr::Brace(BraceErr::UnmatchedBraces(position))) => {
-                                println!("ion: expand error: unmatched braces");
-                                println!("{}", original);
-                                println!("{}^", iter::repeat("-").take(position).collect::<String>());
-                                "".to_owned()
-                            },
-                            Err(ExpandErr::Brace(BraceErr::InnerBracesNotImplemented)) => {
-                                println!("ion: expand error: inner braces not yet implemented");
-                                "".to_owned()
-                            }
-                        }
-                    })
-                    .collect(),
-                job.background)
+        // Expand each of the current job's arguments using the `expand_string` method.
+        // If an error occurs, mark that error and break;
+        let mut expanded: Vec<String> = Vec::new();
+        let mut nth_argument = 0;
+        let mut error_occurred = None;
+        for (job, result) in job.args.iter().map(|argument| self.expand_string(argument, dir_stack)).enumerate() {
+            match result {
+                Ok(expanded_string) => expanded.push(expanded_string),
+                Err(cause) => {
+                    nth_argument   = job;
+                    error_occurred = Some(cause);
+                    expanded = vec!["".to_owned()];
+                    break
+                }
+            }
+        }
+
+        // If an error was detected, handle that error.
+        if let Some(cause) = error_occurred {
+            match cause {
+                ExpandErr::UnmatchedBraces(position) => {
+                    let original = job.args.join(" ");
+                    let n_chars = job.args.iter().take(nth_argument)
+                        .fold(0, |total, arg| total + 1 + arg.len()) + position;
+                    println!("ion: expand error: unmatched braces");
+                    println!("{}", original);
+                    println!("{}^", iter::repeat("-").take(n_chars).collect::<String>());
+                },
+                ExpandErr::InnerBracesNotImplemented => {
+                    println!("ion: expand error: inner braces not yet implemented");
+                }
+            }
+        }
+
+        Job::new(expanded, job.background)
     }
 
     pub fn is_valid_variable_character(c: char) -> bool {
@@ -246,6 +261,7 @@ impl Variables {
         None
     }
 
+    /// Takes an argument string as input and expands it.
     pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> Result<String, ExpandErr> {
         let tilde_fn    = |tilde:    &str| self.tilde_expansion(tilde, dir_stack);
         let variable_fn = |variable: &str| self.get_var(variable);

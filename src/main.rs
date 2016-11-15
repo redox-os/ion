@@ -27,7 +27,6 @@ use self::status::{SUCCESS, NO_SUCH_COMMAND};
 use self::function::Function;
 use self::pipe::execute_pipeline;
 use self::shell_expand::ExpandErr;
-use self::shell_expand::braces::BraceErr;
 
 pub mod completer;
 pub mod pipe;
@@ -243,13 +242,13 @@ impl Shell {
                 let prompt_var = self.variables.get_var_or_empty("PROMPT");
                 match self.variables.expand_string(&prompt_var, &self.directory_stack) {
                     Ok(ref expanded_string) => prompt.push_str(expanded_string),
-                    Err(ExpandErr::Brace(BraceErr::UnmatchedBraces(position))) => {
+                    Err(ExpandErr::UnmatchedBraces(position)) => {
                         println!("ion: expand error: unmatched braces");
                         println!("{}", prompt_var);
                         println!("{}^", iter::repeat("-").take(position).collect::<String>());
                         prompt.push_str("ERROR: ");
                     },
-                    Err(ExpandErr::Brace(BraceErr::InnerBracesNotImplemented)) => {
+                    Err(ExpandErr::InnerBracesNotImplemented) => {
                         println!("ion: expand error: inner braces not yet implemented");
                         prompt.push_str("ERROR: ");
                     }
