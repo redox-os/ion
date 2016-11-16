@@ -250,7 +250,10 @@ impl Variables {
     pub fn command_expansion(&self, command: &str) -> Option<String> {
         if let Ok(exe) = env::current_exe() {
             if let Ok(output) = process::Command::new(exe).arg("-c").arg(command).output() {
-                if let Ok(stdout) = String::from_utf8(output.stdout) {
+                if let Ok(mut stdout) = String::from_utf8(output.stdout) {
+                    if stdout.ends_with('\n') {
+                        stdout.pop();
+                    }
                     return Some(stdout);
                 }
             }
