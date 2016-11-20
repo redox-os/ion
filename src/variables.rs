@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::iter;
+use std::process;
 
 use liner::Context;
 
@@ -261,11 +262,27 @@ impl Variables {
         None
     }
 
+    pub fn command_expansion(&self, command: &str) -> Option<String> {
+        if let Ok(exe) = env::current_exe() {
+            if let Ok(output) = process::Command::new(exe).arg("-c").arg(command).output() {
+                if let Ok(mut stdout) = String::from_utf8(output.stdout) {
+                    if stdout.ends_with('\n') {
+                        stdout.pop();
+                    }
+                    return Some(stdout);
+                }
+            }
+        }
+
+        None
+    }
+
     /// Takes an argument string as input and expands it.
     pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> Result<String, ExpandErr> {
         let tilde_fn    = |tilde:    &str| self.tilde_expansion(tilde, dir_stack);
         let variable_fn = |variable: &str| self.get_var(variable);
-        shell_expand::expand_string(original, tilde_fn, variable_fn)
+        let command_fn  = |command:  &str| self.command_expansion(command);
+        shell_expand::expand_string(original, tilde_fn, variable_fn, command_fn)
     }
 }
 
