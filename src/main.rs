@@ -10,11 +10,12 @@ mod shell_expand;
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Read;
 use std::iter;
-use std::env::{self, current_dir, home_dir};
+use std::io::{ErrorKind, Read};
+use std::env;
 use std::mem;
 use std::process;
+use std::time::SystemTime;
 
 use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter, BasicCompleter};
 
@@ -52,17 +53,14 @@ pub struct Shell {
 impl Default for Shell {
     /// Panics if DirectoryStack construction fails
     fn default() -> Shell {
-        let mut new_shell = Shell {
+        Shell {
             context: Context::new(),
             variables: Variables::default(),
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new().expect(""),
-            functions: HashMap::new(),
+            functions: HashMap::default(),
             previous_status: 0,
-        };
-        new_shell.initialize_default_variables();
-        new_shell.evaluate_init_file();
-        new_shell
+        }
     }
 }
 
@@ -165,30 +163,8 @@ impl Shell {
         process::exit(self.previous_status);
     }
 
-    /// This function will initialize the default variables used by the shell. This function will
-    /// be called before evaluating the init
-    fn initialize_default_variables(&mut self) {
-        self.variables.set_var("DIRECTORY_STACK_SIZE", "1000");
-        self.variables.set_var("HISTORY_SIZE", "1000");
-        self.variables.set_var("HISTORY_FILE_ENABLED", "0");
-        self.variables.set_var("HISTORY_FILE_SIZE", "1000");
-        self.variables.set_var("PROMPT", "\x1B[0m\x1B[1;38;5;85m${USER}\x1B[37m:\x1B[38;5;75m${PWD}\x1B[37m#\x1B[0m ");
-
-        // Initialize the HISTORY_FILE variable
-        home_dir().map(|mut history_path| {
-            history_path.push(".ion_history");
-            self.variables.set_var("HISTORY_FILE", history_path.to_str().unwrap_or("?"));
-        });
-
-        // Initialize the PWD (Present Working Directory) variable
-        current_dir().ok().map_or_else(|| env::set_var("PWD", "?"), |path| env::set_var("PWD", path.to_str().unwrap_or("?")));
-
-        // Initialize the HOME variable
-        home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| env::set_var("HOME", path.to_str().unwrap_or("?")));
-    }
-
-    /// This functional will update variables that need to be kept consistent with each iteration
-    /// of the prompt. In example, the PWD variable needs to be updated to reflect changes to the
+    /// This function updates variables that need to be kept consistent with each iteration
+    /// of the prompt. For example, the PWD variable needs to be updated to reflect changes to the
     /// the current working directory.
     fn update_variables(&mut self) {
         // Update the PWD (Present Working Directory) variable if the current working directory has
@@ -206,9 +182,7 @@ impl Shell {
 
     /// Evaluates the source init file in the user's home directory.
     fn evaluate_init_file(&mut self) {
-
-        // Obtain home directory
-        home_dir().map_or_else(|| println!("ion: could not get home directory"), |mut source_file| {
+        env::home_dir().map_or_else(|| println!("ion: could not get home directory"), |mut source_file| {
             source_file.push(".ionrc");
             if let Ok(mut file) = File::open(&source_file) {
                 let mut command_list = String::new();
@@ -260,27 +234,11 @@ impl Shell {
     }
 
     fn on_command(&mut self, command_string: &str) {
-        if !command_string.trim().is_empty() {
-            if self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") == "1" {
-                let file_name = self.variables.get_var_or_empty("HISTORY_FILE");
-                self.context.history.set_file_name(Some(file_name));
+        self.set_context_history_from_vars();
 
-                let max_file_size = self.variables
-                    .get_var_or_empty("HISTORY_FILE_SIZE")
-                    .parse()
-                    .unwrap_or(1000);
-                let max_size = self.variables
-                    .get_var_or_empty("HISTORY_SIZE")
-                    .parse()
-                    .unwrap_or(1000);
-
-                self.context.history.set_max_file_size(max_file_size);
-                self.context.history.set_max_size(max_size);
-            } else {
-                self.context.history.set_file_name(None);
-            }
-
-            if let Err(err) = self.context.history.push(command_string.into()) {
+        let trimmed_command = command_string.trim();
+        if !trimmed_command.is_empty() {
+            if let Err(err) = self.context.history.push(trimmed_command.into()) {
                 println!("ion: {}", err);
             }
         }
@@ -395,9 +353,44 @@ impl Shell {
         }
     }
 
+    /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if it
+    /// is set otherwise to a default value (1000).
+    ///
+    /// If the HISTORY_FILE_ENABLED shell variable is set to 1, then HISTORY_FILE_SIZE is synced
+    /// with the shell context as well. Otherwise, the history file name is set to None in the
+    /// shell context.
+    ///
+    /// This is called in on_command so that the history length and history file state will be
+    /// updated correctly after a command is entered that alters them and just before loading the
+    /// history file so that it will be loaded correctly.
+    fn set_context_history_from_vars(&mut self) {
+        let max_history_size = self.variables
+            .get_var_or_empty("HISTORY_SIZE")
+            .parse()
+            .unwrap_or(1000);
+
+        self.context.history.set_max_size(max_history_size);
+
+        if self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") == "1" {
+            let file_name = self.variables.get_var("HISTORY_FILE");
+            self.context.history.set_file_name(file_name);
+
+            let max_history_file_size = self.variables
+                .get_var_or_empty("HISTORY_FILE_SIZE")
+                .parse()
+                .unwrap_or(1000);
+            self.context.history.set_max_file_size(max_history_file_size);
+        } else {
+            self.context.history.set_file_name(None);
+        }
+    }
+
     fn run_pipeline(&mut self, pipeline: &Pipeline) -> Option<i32> {
         let mut pipeline = self.variables.expand_pipeline(pipeline, &self.directory_stack);
         pipeline.expand_globs();
+
+        let command_start_time = SystemTime::now();
+
         // Branch if -> input == shell command i.e. echo
         // Run the 'main' of the command and set exit_status
         let exit_status = if let Some(command) = Command::map().get(pipeline.jobs[0].command.as_str()) {
@@ -429,6 +422,21 @@ impl Shell {
         } else {
             Some(execute_pipeline(pipeline))
         };
+
+        if let Some(elapsed_time) = command_start_time.elapsed().ok() {
+            let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
+                                  elapsed_time.as_secs(), elapsed_time.subsec_nanos());
+
+            // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the pipline
+            // just executed to the the file and context histories. At the moment, this means
+            // record how long it took.
+            if "1" == self.variables.get_var_or_empty("RECORD_SUMMARY") {
+                self.context.history.push(summary.into()).unwrap_or_else(|err| {
+                    println!("ion: {}", err);
+                });
+            }
+        }
+
         // Retrieve the exit_status and set the $? variable and history.previous_status
         if let Some(code) = exit_status {
             self.variables.set_var("?", &code.to_string());
@@ -652,5 +660,26 @@ impl Command {
 }
 
 fn main() {
-    Shell::default().execute();
+    let mut shell = Shell::default();
+    shell.evaluate_init_file();
+    // Clear the history just added by the init file being evaluated.
+    shell.context.history.buffers.clear();
+    shell.set_context_history_from_vars();
+
+    if "1" == shell.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {
+        match shell.context.history.load_history() {
+            Ok(()) => {
+                // pass
+            }
+            Err(ref err) if err.kind() == ErrorKind::NotFound => {
+                let history_filename = shell.variables.get_var_or_empty("HISTORY_FILE");
+                println!("ion: failed to find history file {}: {}", history_filename, err);
+            },
+            Err(err) => {
+                println!("failed here!");
+                println!("ion: {}", err);
+            }
+        }
+    }
+    shell.execute();
 }
