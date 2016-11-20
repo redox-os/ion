@@ -13,7 +13,7 @@ EXIT_VAL=0
 function check_return_value {
 
     # Check number of parameters passed into the check function
-    if [[ $# -ne 1 ]]; then 
+    if [[ $# -ne 1 ]]; then
         echo -e "Illegal number of parameters.${TAGFAIL}";
         return 1;
     fi
