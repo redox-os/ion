@@ -179,10 +179,43 @@ mod tests {
 
     #[test]
     fn double_quoting() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo \"Hello World\"") {
+        if let Statement::Pipelines(mut pipelines) = parse("echo \"Hello World\" \"From Rust\"") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(3, jobs[0].args.len());
+            assert_eq!("\"Hello World\"", jobs[0].args[1]);
+            assert_eq!("\"From Rust\"", jobs[0].args[2]);
+        } else {
+            assert!(false)
+        }
+    }
+
+
+
+    #[test]
+    fn double_quoting_contains_single() {
+        if let Statement::Pipelines(mut pipelines) = parse("echo \"Hello 'Rusty' World\"") {
             let jobs = pipelines.remove(0).jobs;
             assert_eq!(2, jobs[0].args.len());
-            assert_eq!("Hello World", jobs[0].args[1]);
+            assert_eq!("\"Hello \'Rusty\' World\"", jobs[0].args[1]);
+        } else {
+            assert!(false)
+        }
+    }
+
+    #[test]
+    fn multi_quotes() {
+        if let Statement::Pipelines(mut pipelines) = parse("echo \"Hello \"Rusty\" World\"") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(2, jobs[0].args.len());
+            assert_eq!("\"Hello \"Rusty\" World\"", jobs[0].args[1]);
+        } else {
+            assert!(false)
+        }
+
+        if let Statement::Pipelines(mut pipelines) = parse("echo \'Hello \'Rusty\' World\'") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(2, jobs[0].args.len());
+            assert_eq!("\'Hello \'Rusty\' World\'", jobs[0].args[1]);
         } else {
             assert!(false)
         }
@@ -230,6 +263,7 @@ mod tests {
     #[test]
     fn lone_comment() {
         if let Statement::Pipelines(pipelines) = parse("# ; \t as!!+dfa") {
+            println!("{:?}", pipelines);
             assert_eq!(0, pipelines.len());
         } else {
             assert!(false);
@@ -239,6 +273,7 @@ mod tests {
     #[test]
     fn command_followed_by_comment() {
         if let Statement::Pipelines(pipelines) = parse("cat # ; \t as!!+dfa") {
+            println!("{:?}", pipelines);
             assert_eq!(1, pipelines.len());
             assert_eq!(1, pipelines[0].jobs[0].args.len());
         } else {
@@ -290,7 +325,7 @@ mod tests {
     fn single_quoting() {
         if let Statement::Pipelines(mut pipelines) = parse("echo '#!!;\"\\'") {
             let jobs = pipelines.remove(0).jobs;
-            assert_eq!("#!!;\"\\", jobs[0].args[1]);
+            assert_eq!("'#!!;\"\\'", jobs[0].args[1]);
         } else {
             assert!(false);
         }
@@ -298,12 +333,13 @@ mod tests {
 
     #[test]
     fn mixed_quoted_and_unquoted() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo '#!!;\"\\' and \t some \"more' 'stuff\"") {
+        if let Statement::Pipelines(mut pipelines) = parse("echo 123 456 \"ABC 'DEF' GHI\" 789 one'  'two") {
             let jobs = pipelines.remove(0).jobs;
-            assert_eq!("#!!;\"\\", jobs[0].args[1]);
-            assert_eq!("and", jobs[0].args[2]);
-            assert_eq!("some", jobs[0].args[3]);
-            assert_eq!("more' 'stuff", jobs[0].args[4]);
+            assert_eq!("123", jobs[0].args[1]);
+            assert_eq!("456", jobs[0].args[2]);
+            assert_eq!("\"ABC 'DEF' GHI\"", jobs[0].args[3]);
+            assert_eq!("789", jobs[0].args[4]);
+            assert_eq!("one'  'two", jobs[0].args[5]);
         } else {
             assert!(false);
         }

@@ -55,52 +55,341 @@ _not_comparitor -> String
 
 #[pub]
 pipelines -> Statement
-    = (unused* newline)* pipelines:pipeline ++ ((job_ending+ unused*)+) (newline unused*)* { Statement::Pipelines(pipelines) }
+    = (unused* newline)* [#] .* { Statement::Pipelines(vec![]) }
+    / [ \n\t\r]* _pipelines
     / (unused*) ** newline { Statement::Pipelines(vec![]) }
 
-pipeline -> Pipeline
-    = whitespace? res:job ++ pipeline_sep whitespace? redir:redirection whitespace? comment? { Pipeline::new(res, redir.0, redir.1) }
 
-job -> Job
-    = args:word ++ whitespace background:background_token? {
-        Job::new(args.iter().map(|arg|arg.to_string()).collect(), background.is_some())
+// Converts the pipeline string into a statement, handling redirection, piping, and backgrounds.
+_pipelines -> Statement
+    = pipeline_statements:pipeline_statements {?
+    let mut possible_error = None;
+    let mut pipelines: Vec<Pipeline> = Vec::new();
+    for args in pipeline_statements {
+        let mut args_iter = args.chars();
+        let (mut index, mut comm_end, mut arg_start) = (0, 0, 0);
+
+        while let Some(character) = args_iter.next() {
+            if character == ' ' || character == '\t' {
+                comm_end = index;
+                break
+            }
+            index += 1;
+        }
+
+        if comm_end == 0 {
+            let jobs = vec![Job::new(vec![args[0..].to_owned()], false)];
+            pipelines.push(Pipeline::new(jobs, None, None));
+        } else {
+            while let Some(character) = args_iter.next() {
+                index += 1;
+                if character != ' ' && character != '\t' {
+                    arg_start = index;
+                    break
+                }
+            }
+
+            if arg_start == 0 {
+                let jobs = vec![Job::new(vec![args[0..comm_end].to_owned()], false)];
+                pipelines.push(Pipeline::new(jobs, None, None));
+            } else {
+                let mut jobs: Vec<Job> = Vec::new();
+
+                let (mut double_quote, mut single_quote, mut backslash) = (false, false, false);
+                let mut process_match = 0;
+                let mut arguments: Vec<String> = vec![args[0..comm_end].to_owned()];
+
+                #[derive(PartialEq)]
+                enum RedirMode { False, Stdin, Stdout, StdoutAppend }
+                let (mut in_file, mut out_file) = (None, None);
+                let mut mode = RedirMode::False;
+
+                match args.chars().nth(index).unwrap() {
+                    '\'' => single_quote = !single_quote,
+                    '"'  => double_quote = !double_quote,
+                    '$' if process_match == 0 => process_match = 1,
+                    '\\' => backslash = !backslash,
+                    '|'  => {
+                        jobs.push(Job::new(arguments.clone(), false));
+                        arguments.clear();
+                        arg_start = index + 1;
+                    },
+                    '&' => {
+                        jobs.push(Job::new(arguments.clone(), true));
+                        arguments.clear();
+                        arg_start = index + 1;
+                    },
+                    '>' => {
+                        mode = RedirMode::Stdout;
+                    },
+                    '<' => {
+                        mode = RedirMode::Stdin;
+                    },
+                    _    => ()
+                }
+
+
+                'outer: loop {
+                    match mode {
+                        RedirMode::False => {
+                            while let Some(character) = args_iter.next() {
+                                index += 1;
+                                match character {
+                                    _ if backslash => backslash = false,
+                                    '\\' => backslash = true,
+                                    '$'  if (process_match == 0) => process_match = 1,
+                                    '('  if process_match == 1 => process_match = 2,
+                                    ')'  if process_match == 2 => process_match = 0,
+                                    '\'' => single_quote = !single_quote,
+                                    '|'  if !double_quote & !single_quote & (process_match != 2) => {
+                                        jobs.push(Job::new(arguments.clone(), false));
+                                        arguments.clear();
+                                        arg_start = index + 1;
+                                    },
+                                    '"'  => double_quote = !double_quote,
+                                    ' ' | '\t' if !double_quote & !single_quote & (process_match != 2) => {
+                                        if arg_start != index {
+                                            arguments.push(args[arg_start..index].to_owned());
+                                            arg_start = index + 1;
+                                        } else {
+                                            arg_start += 1;
+                                        }
+                                    },
+                                    '&' if !double_quote & !single_quote & (process_match != 2) => {
+                                        jobs.push(Job::new(arguments.clone(), true));
+                                        arguments.clear();
+                                        arg_start = index + 1;
+                                    },
+                                    '>' if !double_quote & !single_quote & (process_match != 2) => {
+                                        mode = RedirMode::Stdout;
+                                        continue 'outer
+                                    },
+                                    '<' if !double_quote & !single_quote & (process_match != 2) => {
+                                        mode = RedirMode::Stdin;
+                                        continue 'outer
+                                    },
+                                    _ if process_match != 2 => process_match = 0,
+                                    _ => (),
+                                }
+                            }
+                            break 'outer
+                        },
+                        RedirMode::Stdout | RedirMode::StdoutAppend => {
+                            match args_iter.next() {
+                                Some(character) => match character {
+                                    '>' => mode = RedirMode::StdoutAppend,
+                                    _   => (),
+                                },
+                                None => {
+                                    possible_error = Some("missing standard output file argument after '>'");
+                                    break 'outer
+                                }
+                            }
+
+                            let mut stdout_file = String::new();
+                            let mut found_file = false;
+                            while let Some(character) = args_iter.next() {
+                                if found_file {
+                                    if character == '<' {
+                                        if in_file.is_some() {
+                                            break 'outer
+                                        } else {
+                                            mode = RedirMode::Stdin;
+                                            continue 'outer
+                                        }
+                                    }
+                                } else {
+                                    match character {
+                                        _ if backslash => {
+                                            stdout_file.push(character);
+                                            backslash = false;
+                                        }
+                                        '\\' => backslash = false,
+                                        ' ' | '\t' | '|' if stdout_file.is_empty() => (),
+                                        ' ' | '\t' | '|' => {
+                                            found_file = true;
+                                            out_file = Some(Redirection {
+                                                file: stdout_file.clone(),
+                                                append: mode == RedirMode::StdoutAppend
+                                            });
+                                        },
+                                        '<' if stdout_file.is_empty() => {
+                                            possible_error = Some("missing standard output file argument after '>'");
+                                            break 'outer
+                                        }
+                                        '<' => {
+                                            out_file = Some(Redirection {
+                                                file: stdout_file.clone(),
+                                                append: mode == RedirMode::StdoutAppend
+                                            });
+
+                                            if in_file.is_some() {
+                                                break 'outer
+                                            } else {
+                                                mode = RedirMode::Stdin;
+                                                continue 'outer
+                                            }
+                                        },
+                                        _ => stdout_file.push(character),
+                                    }
+                                }
+                            }
+
+                            if out_file.is_none() {
+                                if stdout_file.is_empty() {
+                                    possible_error = Some("missing standard output file argument after '>'");
+                                } else {
+                                    out_file = Some(Redirection {
+                                        file: stdout_file,
+                                        append: mode == RedirMode::StdoutAppend
+                                    });
+                                }
+                            }
+
+                            break 'outer
+                        },
+                        RedirMode::Stdin => {
+                            let mut stdin_file = String::new();
+                            let mut found_file = false;
+                            while let Some(character) = args_iter.next() {
+                                if found_file {
+                                    if character == '>' {
+                                        if out_file.is_some() {
+                                            break 'outer
+                                        } else {
+                                            mode = RedirMode::Stdout;
+                                            continue 'outer
+                                        }
+                                    }
+                                } else {
+                                    match character {
+                                        _ if backslash => {
+                                            stdin_file.push(character);
+                                            backslash = false;
+                                        }
+                                        '\\' => backslash = false,
+                                        ' ' | '\t' | '|' if stdin_file.is_empty() => (),
+                                        ' ' | '\t' | '|' => {
+                                            found_file = true;
+                                            in_file = Some(Redirection { file: stdin_file.clone(), append: false });
+                                        },
+                                        '>' if stdin_file.is_empty() => {
+                                            possible_error = Some("missing standard input file argument after '<'");
+                                            break 'outer
+                                        }
+                                        '>' => {
+                                            in_file = Some(Redirection { file: stdin_file.clone(), append: false });
+
+                                            if out_file.is_some() {
+                                                break 'outer
+                                            } else {
+                                                mode = RedirMode::Stdin;
+                                                continue 'outer
+                                            }
+                                        },
+                                        _ => stdin_file.push(character),
+                                    }
+                                }
+                            }
+
+                            if in_file.is_none() {
+                                if stdin_file.is_empty() {
+                                    possible_error = Some("missing standard input file argument after '<'");
+                                } else {
+                                    in_file = Some(Redirection { file: stdin_file, append: false });
+                                }
+                            }
+
+                            break 'outer
+                        }
+                    }
+                }
+
+                if arg_start != index {
+                    arguments.push(args[arg_start..index+1].to_owned());
+                }
+
+                if !arguments.is_empty() {
+                    jobs.push(Job::new(arguments, false));
+                }
+
+                pipelines.push(Pipeline::new(jobs, in_file, out_file));
+            }
+        }
     }
 
-redirection -> (Option<Redirection>, Option<Redirection>)
-    = stdin:redirect_stdin whitespace? stdout:redirect_stdout? { (Some(stdin), stdout) }
-    / stdout:redirect_stdout whitespace? stdin:redirect_stdin? { (stdin, Some(stdout)) }
-    / { (None, None) }
+    if possible_error.is_none() {
+        Ok(Statement::Pipelines(pipelines))
+    } else {
+        Err(possible_error.unwrap())
+    }
+}
 
-redirect_stdin -> Redirection
-    = [<] whitespace? file:word { Redirection { file: file.to_string(), append: false } }
+// Returns a vector of pipeline strings, with comments and excessive whitespace removed.
+pipeline_statements -> Vec<&'input str>
+    = .+ {
+    let mut output = Vec::new();
+    let (mut single_quote, mut double_quote, mut backslash, mut whitespace, mut comment)
+        = (false, false, false, false, false);
+    let mut index = 0;
+    let mut white_pos = 0;
+    for (id, character) in match_str.chars().enumerate() {
+        if comment {
+            if character == '\n' {
+                comment = false;
+                index = id + 1;
+            }
+        } else {
+            match character {
+                _ if backslash                                     => backslash = false,
+                '\\'                                               => backslash = true,
+                '\'' if !double_quote                              => single_quote = !single_quote,
+                '"'  if !single_quote                              => double_quote = !double_quote,
+                '#'  if whitespace & !single_quote & !double_quote => {
+                    if index < white_pos {
+                        let command = &match_str[index..white_pos];
+                        output.push(command);
+                    }
+                    white_pos = 0;
+                    index = id + 1;
+                    comment = true;
+                },
+                ' ' | '\t' if !single_quote & !double_quote => {
+                    if index == id { index += 1; }
+                    whitespace = true;
+                    if white_pos == 0 { white_pos = id; }
+                    continue
+                },
+                ';' | '\n' | '\r' if !single_quote & !double_quote => {
+                    if index == id {
+                        index += 1;
+                    } else {
+                        let command = &match_str[index..id];
+                        if command.chars().any(|x| x != ' ' && x != '\n' && x != '\r' && x != '\t') {
+                            output.push(command);
+                        }
+                        index = id + 1;
+                    }
+                    whitespace = true;
+                    if white_pos == 0 { white_pos = id; }
+                    continue
+                },
+                _ => (),
+            }
+            whitespace = false;
+            white_pos = 0;
+        }
+    }
 
-redirect_stdout -> Redirection
-    = [>]{2} whitespace? file:word { Redirection { file: file.to_string(), append: true } }
-    / [>] whitespace? file:word { Redirection { file: file.to_string(), append: false } }
+    if !comment && match_str.len() > index {
+        let command = &match_str[index..];
+        if command.chars().any(|x| x != ' ' && x != '\n' && x != '\r' && x != '\t') {
+            output.push(command);
+        }
+    }
 
-pipeline_sep -> ()
-    = (whitespace? [|] whitespace?) { }
-
-background_token -> ()
-    = [&]
-    / whitespace [&]
-
-word -> &'input str
-    = double_quoted_word
-    / single_quoted_word
-    / [^ \t\r\n#;&|<>]+ { match_str }
-
-double_quoted_word -> &'input str
-    = ["] word:_double_quoted_word ["] { word }
-
-_double_quoted_word -> &'input str
-    = [^"]+ { match_str }
-
-single_quoted_word -> &'input str
-    = ['] word:_single_quoted_word ['] { word }
-
-_single_quoted_word -> &'input str
-    = [^']+ { match_str }
+    output
+}
 
 unused -> ()
     = whitespace comment? { () }
@@ -114,7 +403,6 @@ whitespace -> ()
 
 job_ending -> ()
     = [;]
-    / newline
     / newline
 
 newline -> ()

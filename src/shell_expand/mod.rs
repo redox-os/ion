@@ -122,8 +122,8 @@ fn expand_multiple_variables() {
 
 #[test]
 fn escape_with_backslash() {
-    let expanded = expand_string("\\$FOO", |_| None, |_| None, |_| None).unwrap();
-    assert_eq!("$FOO", &expanded);
+    let expanded = expand_string("\\$FOO\\$FOO \\$FOO", |_| None, |_| None, |_| None).unwrap();
+    assert_eq!("$FOO$FOO $FOO", &expanded);
 }
 
 #[test]

@@ -9,15 +9,28 @@ pub enum WordToken<'a> {
 }
 
 pub struct WordIterator<'a> {
-    data: &'a str,
-    read: usize,
-    whitespace: bool,
+    data:         &'a str,
+    read:         usize,
+    whitespace:   bool,
+    single_quote: bool,
+    double_quote: bool,
 }
 
 impl<'a> WordIterator<'a> {
     pub fn new(data: &'a str) -> WordIterator<'a> {
-        WordIterator { data: data, read: 0, whitespace: false }
+        WordIterator { data: data, read: 0, whitespace: false, single_quote: false, double_quote: false }
     }
+}
+
+fn collect_whitespaces<'a>(read: &mut usize, start: usize, data: &'a str) -> Option<WordToken<'a>> {
+    for character in data.chars().skip(*read) {
+        if character != ' ' {
+            return Some(WordToken::Normal(&data[start..*read]));
+        }
+        *read += 1;
+    }
+
+    if start != *read { Some(WordToken::Normal(&data[start..*read])) } else { None }
 }
 
 impl<'a> Iterator for WordIterator<'a> {
@@ -29,18 +42,7 @@ impl<'a> Iterator for WordIterator<'a> {
 
         if self.whitespace {
             self.whitespace = false;
-            for character in self.data.chars().skip(self.read) {
-                if character != ' ' {
-                    return Some(Ok(WordToken::Normal(&self.data[start..self.read])));
-                }
-                self.read += 1;
-            }
-
-            if start != self.read {
-                Some(Ok(WordToken::Normal(&self.data[start..self.read])))
-            } else {
-                None
-            }
+            collect_whitespaces(&mut self.read, start, self.data).map(Ok)
         } else {
             let mut break_char = None;
             let (mut contains_braces, mut contains_variables, mut contains_tilde,
@@ -48,27 +50,62 @@ impl<'a> Iterator for WordIterator<'a> {
                     (false, false, false, false, false, false);
             for character in self.data.chars().skip(self.read) {
                 if backslash {
-                    if character == '$' { contains_variables = true; }
                     backslash = false;
+                    if character == '$' { contains_variables = true; }
                 } else if character == '\\' {
                     backslash = true;
                     previous_char_was_dollar = false;
-                } else if character == '{' {
+                } else if character == '\'' && !self.double_quote {
+                    let return_value = if self.single_quote {
+                        Ok(WordToken::Normal(&self.data[start..self.read]))
+                    } else if contains_braces {
+                        Ok(WordToken::Brace(&self.data[start..self.read], contains_variables))
+                    } else if contains_variables {
+                        Ok(WordToken::Variable(&self.data[start..self.read]))
+                    } else if contains_tilde {
+                        Ok(WordToken::Tilde(&self.data[start..self.read]))
+                    } else {
+                        Ok(WordToken::Normal(&self.data[start..self.read]))
+                    };
+                    self.read += 1;
+                    self.single_quote = !self.single_quote;
+                    return Some(return_value);
+                } else if character == '"' && !self.single_quote {
+                    let return_value = if self.single_quote {
+                        if contains_variables {
+                            Ok(WordToken::Variable(&self.data[start..self.read]))
+                        } else {
+                            Ok(WordToken::Normal(&self.data[start..self.read]))
+                        }
+                    } else if contains_braces {
+                        Ok(WordToken::Brace(&self.data[start..self.read], contains_variables))
+                    } else if contains_variables {
+                        Ok(WordToken::Variable(&self.data[start..self.read]))
+                    } else if contains_tilde {
+                        Ok(WordToken::Tilde(&self.data[start..self.read]))
+                    } else {
+                        Ok(WordToken::Normal(&self.data[start..self.read]))
+                    };
+                    self.read += 1;
+                    self.double_quote = !self.double_quote;
+                    return Some(return_value);
+                } else if character == '{' && !self.single_quote && !self.double_quote {
                     if !previous_char_was_dollar { contains_braces = true; }
                     if open_brace { return Some(Err(ExpandErr::InnerBracesNotImplemented)); }
                     open_brace_id = self.read;
                     open_brace = true;
-                } else if character == '}' {
+                } else if character == '}' && !self.single_quote && !self.double_quote {
                     if !open_brace { return Some(Err(ExpandErr::UnmatchedBraces(self.read))); }
                     open_brace = false;
-                }else if character == '(' && previous_char_was_dollar {
+                } else if !self.single_quote && character == '(' && previous_char_was_dollar {
                     break_char = Some(')');
                     previous_char_was_dollar = false;
-                } else if character == '$' {
+                } else if !self.single_quote && character == '$' {
                     contains_variables = true;
                     previous_char_was_dollar = true;
-                } else if character == '~' && start == self.read {
+                } else if !self.single_quote && !self.double_quote && character == '~' && start == self.read {
                     contains_tilde = true;
+                    previous_char_was_dollar = false;
                 } else if character == ' ' && break_char.is_none() {
                     self.whitespace = true;
                     return if contains_braces {
