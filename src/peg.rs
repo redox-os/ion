@@ -119,7 +119,7 @@ mod tests {
     }
 
     #[test]
-    fn single_job_some_args() {
+    fn single_job_with_single_character_arguments() {
         if let Statement::Pipelines(mut pipelines) = parse("echo a b c") {
             let jobs = pipelines.remove(0).jobs;
             assert_eq!(1, jobs.len());
@@ -371,6 +371,10 @@ mod tests {
     fn pipelines_with_redirection() {
         if let Statement::Pipelines(pipelines) = parse("cat | echo hello | cat < stuff > other") {
             assert_eq!(3, pipelines[0].jobs.len());
+            assert_eq!("cat", &pipelines[0].clone().jobs[0].args[0]);
+            assert_eq!("echo", &pipelines[0].clone().jobs[1].args[0]);
+            assert_eq!("hello", &pipelines[0].clone().jobs[1].args[1]);
+            assert_eq!("cat", &pipelines[0].clone().jobs[2].args[0]);
             assert_eq!("stuff", &pipelines[0].clone().stdin.unwrap().file);
             assert_eq!("other", &pipelines[0].clone().stdout.unwrap().file);
             assert!(!pipelines[0].clone().stdout.unwrap().append);
