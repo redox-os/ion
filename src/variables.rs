@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::env;
+use std::fmt;
 use std::iter;
+use std::path::PathBuf;
 use std::process;
 
 use liner::Context;
@@ -16,7 +18,34 @@ pub struct Variables {
 
 impl Default for Variables {
     fn default() -> Variables {
-        Variables { variables: BTreeMap::new() }
+        let mut map = BTreeMap::new();
+        map.insert("DIRECTORY_STACK_SIZE".to_string(), "1000".to_string());
+        map.insert("HISTORY_SIZE".into(), "1000".into());
+        map.insert("HISTORY_FILE_ENABLED".into(), "0".into());
+        map.insert("HISTORY_FILE_SIZE".into(), "1000".into());
+        map.insert("PROMPT".into(), "\x1B[0m\x1B[1;38;5;85mion\x1B[37m:\x1B[38;5;75m${PWD}\x1B[37m#\x1B[0m ".into());
+
+        // Initialize the HISTORY_FILE variable
+        env::home_dir().map(|mut home_path: PathBuf| {
+            home_path.push(".ion_history");
+            map.insert("HISTORY_FILE".into(), home_path.to_str().unwrap_or("?").into());
+        });
+
+        // Initialize the PWD (Present Working Directory) variable
+        env::current_dir().ok().map_or_else(|| env::set_var("PWD", "?"), |path| env::set_var("PWD", path.to_str().unwrap_or("?")));
+
+        // Initialize the HOME variable
+        env::home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| env::set_var("HOME", path.to_str().unwrap_or("?")));
+        Variables { variables: map }
+    }
+}
+
+impl fmt::Display for Variables {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (key, value) in &self.variables {
+            try!(writeln!(f, "{}={}", key, value));
+        }
+        Ok(())
     }
 }
 

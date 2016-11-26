@@ -20,5 +20,5 @@ name = "ion"
 [dependencies]
 glob = "0.2"
 liner = "0.1"
-peg = "0.3"
+peg-syntax-ext = "0.4"
 permutate = "0.1"

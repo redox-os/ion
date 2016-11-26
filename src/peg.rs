@@ -119,6 +119,21 @@ mod tests {
     }
 
     #[test]
+    fn single_job_some_args() {
+        if let Statement::Pipelines(mut pipelines) = parse("echo a b c") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!(1, jobs.len());
+            assert_eq!("echo", jobs[0].args[0]);
+            assert_eq!("a", jobs[0].args[1]);
+            assert_eq!("b", jobs[0].args[2]);
+            assert_eq!("c", jobs[0].args[3]);
+            assert_eq!(4, jobs[0].args.len());
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
     fn single_job_with_args() {
         if let Statement::Pipelines(mut pipelines) = parse("ls -al dir") {
             let jobs = pipelines.remove(0).jobs;
@@ -263,7 +278,6 @@ mod tests {
     #[test]
     fn lone_comment() {
         if let Statement::Pipelines(pipelines) = parse("# ; \t as!!+dfa") {
-            println!("{:?}", pipelines);
             assert_eq!(0, pipelines.len());
         } else {
             assert!(false);
@@ -273,7 +287,6 @@ mod tests {
     #[test]
     fn command_followed_by_comment() {
         if let Statement::Pipelines(pipelines) = parse("cat # ; \t as!!+dfa") {
-            println!("{:?}", pipelines);
             assert_eq!(1, pipelines.len());
             assert_eq!(1, pipelines[0].jobs[0].args.len());
         } else {

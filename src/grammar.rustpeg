@@ -30,13 +30,13 @@ fn_ -> Statement
     = whitespace* "fn " n:_name whitespace* args:_args whitespace* { Statement::Function{name: n.to_string(), args: args} }
 
 _name -> String
-      = [A-z]+ { match_str.to_string() }
+      = n:$([A-z]+) { n.to_string() }
 
 _args -> Vec<String>
       = _arg ** " "
 
 _arg -> String
-     = [A-z0-9]+ { match_str.to_string() }
+     = n:$([A-z0-9]+) { n.to_string() }
 
 #[pub]
 for_ -> Statement
@@ -51,7 +51,7 @@ comparitor -> Comparitor
     / ">"  { Comparitor::GreaterThan }
 
 _not_comparitor -> String
-    = !comparitor [^ ]+ { match_str.to_string() }
+    = !comparitor n:$([^ ]+) { n.to_string() }
 
 #[pub]
 pipelines -> Statement
@@ -305,7 +305,7 @@ _pipelines -> Statement
                     }
                 }
 
-                if arg_start != index {
+                if arg_start < index+1 {
                     arguments.push(args[arg_start..index+1].to_owned());
                 }
 
@@ -327,7 +327,7 @@ _pipelines -> Statement
 
 // Returns a vector of pipeline strings, with comments and excessive whitespace removed.
 pipeline_statements -> Vec<&'input str>
-    = .+ {
+    = match_str:$(.+) {
     let mut output = Vec::new();
     let (mut single_quote, mut double_quote, mut backslash, mut whitespace, mut comment)
         = (false, false, false, false, false);
