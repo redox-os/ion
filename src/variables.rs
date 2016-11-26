@@ -23,7 +23,7 @@ impl Default for Variables {
         map.insert("HISTORY_SIZE".into(), "1000".into());
         map.insert("HISTORY_FILE_ENABLED".into(), "0".into());
         map.insert("HISTORY_FILE_SIZE".into(), "1000".into());
-        map.insert("PROMPT".into(), "\x1B[0m\x1B[1;38;5;85mion\x1B[37m:\x1B[38;5;75m$PWD\x1B[37m#\x1B[0m ".into());
+        map.insert("PROMPT".into(), "\x1B[0m\x1B[1;38;5;85mion\x1B[37m:\x1B[38;5;75m${PWD}\x1B[37m#\x1B[0m ".into());
 
         // Initialize the HISTORY_FILE variable
         env::home_dir().map(|mut home_path: PathBuf| {
@@ -130,13 +130,39 @@ impl Variables {
         self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k)).collect()
     }
 
+    /// Parses let bindings, `let VAR = KEY`, returning the result as a `(key, value)` tuple.
     fn parse_assignment<I: IntoIterator>(args: I) -> (Option<String>, Option<String>)
         where I::Item: AsRef<str>
     {
-        let args = args.into_iter();
-        let string: String = args.skip(1).fold(String::new(), |string, x| string + x.as_ref());
-        let mut split = string.split('=');
-        (split.next().and_then(|x| if x == "" { None } else { Some(x.to_owned()) }), split.next().and_then(|x| Some(x.to_owned())))
+        // Write all the arguments into a single `String`
+        let arguments = args.into_iter().skip(1).fold(String::new(), |a, b| a + " " + b.as_ref());
+
+        // Create a character iterator from the arguments.
+        let mut char_iter = arguments.chars();
+
+        // Find the key and advance the iterator until the equals operator is found.
+        let mut key = "".to_owned();
+        let mut found_key = false;
+        while let Some(character) = char_iter.next() {
+            match character {
+                ' ' if key.is_empty() => (),
+                ' ' => found_key = true,
+                '=' => {
+                    found_key = true;
+                    break
+                },
+                _ if !found_key => key.push(character),
+                _ => ()
+            }
+        }
+
+        // If no key was found, return `None`
+        if !found_key && key.is_empty() { return (None, None); }
+
+        let value = char_iter.skip_while(|&x| x == ' ').collect::<String>();
+
+        // Return the variable and value if the value is not empty
+        if value.is_empty() { (Some(key), None) } else { (Some(key), Some(value)) }
     }
 
     pub fn export_variable<I: IntoIterator>(&mut self, args: I) -> i32
@@ -298,7 +324,7 @@ impl Variables {
                     if stdout.ends_with('\n') {
                         stdout.pop();
                     }
-                    return Some(stdout);
+                    return Some(stdout.replace("\n", " "));
                 }
             }
         }
