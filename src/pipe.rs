@@ -1,58 +1,74 @@
 use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
 use std::fs::{File, OpenOptions};
+use std::io::Write;
 
 use super::status::{TERMINATED, NO_SUCH_COMMAND};
-use super::peg::Pipeline;
+use super::peg::{Pipeline,Redirection};
 
 pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
     let mut piped_commands: Vec<Command> = pipeline.jobs
                                                    .iter()
                                                    .map(|job| { job.build_command() })
                                                    .collect();
+    let num_commands = piped_commands.len();
+    let mut stdin_init = None;
     if let (Some(stdin), Some(command)) = (pipeline.stdin, piped_commands.first_mut()) {
-        match File::open(&stdin.file) {
-            Ok(file) => unsafe { command.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
-            Err(err) => println!("ion: failed to redirect stdin into {}: {}", stdin.file, err)
-        }
-    }
-    if let Some(stdout) = pipeline.stdout {
-        if let Some(mut command) = piped_commands.last_mut() {
-            let file = if stdout.append {
-                OpenOptions::new().write(true).append(true).open(&stdout.file)
-            } else {
-                File::create(&stdout.file)
-            };
-            match file {
-                Ok(f) => unsafe { command.stdout(Stdio::from_raw_fd(f.into_raw_fd())); },
-                Err(err) => println!("ion: failed to redirect stdout into {}: {}", stdout.file, err)
+        match stdin {
+            Redirection::File { file : f, .. } => {
+                match File::open(&f) {
+                    Ok(file) => unsafe { command.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
+                    Err(err) => println!("ion: failed to redirect stdin into {}: {}", f, err)
+                }
+            }
+            Redirection::Herestring { literal: l } => {
+                command.stdin(Stdio::piped());
+                stdin_init = Some(l);
             }
         }
     }
-    pipe(&mut piped_commands)
-}
-
-/// This function will panic if called with an empty slice
-pub fn pipe(commands: &mut [Command]) -> i32 {
-    let end = commands.len() - 1;
-    for command in &mut commands[..end] {
+    for mut command in piped_commands.iter_mut().take(num_commands - 1) {
         command.stdout(Stdio::piped());
     }
+    if let Some(Redirection::File { file : filename, append }) = pipeline.stdout {
+        if let Some(mut command) = piped_commands.last_mut() {
+            let file = if append {
+                OpenOptions::new().write(true).append(true).open(&filename)
+            } else {
+                File::create(&filename)
+            };
+            match file {
+                Ok(f) => unsafe { command.stdout(Stdio::from_raw_fd(f.into_raw_fd())); },
+                Err(err) => println!("ion: failed to redirect stdout into {}: {}", filename, err)
+            }
+        }
+    }
     let mut children: Vec<Option<Child>> = vec![];
-    for command in commands {
+    for mut command in piped_commands {
         if let Some(spawned) = children.last() {
             if let Some(ref child) = *spawned {
                 if let Some(ref stdout) = child.stdout {
                     unsafe { command.stdin(Stdio::from_raw_fd(stdout.as_raw_fd())); }
                 }
             } else {
-                // The previous command failed to spawn
                 command.stdin(Stdio::null());
             }
         }
-        let child = command.spawn().ok();
+        let mut child = command.spawn().ok();
         if child.is_none() {
             println!("ion: command not found: {}", get_command_name(&command));
+        }
+        if children.last().is_none() && stdin_init.is_some() {
+            if let Some(stdin) = child.as_mut().and_then(|ch| ch.stdin.as_mut()) {
+                if let Some(init) = stdin_init.take() {
+                    if let Err(err) = stdin.write(init.as_bytes()).and_then(|_| stdin.write("\n".as_bytes())) {
+                        println!("ion: failed to send input to stdin of first process: {}", err);
+                    }
+                    if let Err(err) = stdin.flush() {
+                        println!("ion: failed to flush stdin of first process: {}", err);
+                    }
+                }
+            }
         }
         children.push(child);
     }

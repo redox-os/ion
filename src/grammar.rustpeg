@@ -72,11 +72,12 @@ redirection -> (Option<Redirection>, Option<Redirection>)
     / { (None, None) }
 
 redirect_stdin -> Redirection
-    = [<] whitespace? file:word { Redirection { file: file.to_string(), append: false } }
+    = [<] whitespace? file:word { Redirection::File { file: file.to_string(), append: false } }
+    / [<]*<3> whitespace? lit:word { Redirection::Herestring { literal: lit.to_string() } }
 
 redirect_stdout -> Redirection
-    = [>]*<2> whitespace? file:word { Redirection { file: file.to_string(), append: true } }
-    / [>] whitespace? file:word { Redirection { file: file.to_string(), append: false } }
+    = [>]*<2> whitespace? file:word { Redirection::File { file: file.to_string(), append: true } }
+    / [>] whitespace? file:word { Redirection::File { file: file.to_string(), append: false } }
 
 pipeline_sep -> ()
     = (whitespace? [|] whitespace?) { }

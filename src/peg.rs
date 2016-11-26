@@ -8,9 +8,9 @@ use glob::glob;
 
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Redirection {
-    pub file: String,
-    pub append: bool
+pub enum Redirection {
+    File { file: String, append: bool },
+    Herestring { literal: String },
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -322,9 +322,13 @@ mod tests {
     fn pipelines_with_redirection() {
         if let Statement::Pipelines(pipelines) = parse("cat | echo hello | cat < stuff > other") {
             assert_eq!(3, pipelines[0].jobs.len());
-            assert_eq!("stuff", &pipelines[0].clone().stdin.unwrap().file);
-            assert_eq!("other", &pipelines[0].clone().stdout.unwrap().file);
-            assert!(!pipelines[0].clone().stdout.unwrap().append);
+            if let Redirection::File { file, .. } = pipelines[0].clone().stdin.unwrap() {
+                assert_eq!("stuff", file);
+            }
+            if let Redirection::File { file, append } = pipelines[0].clone().stdout.unwrap() {
+                assert_eq!("other", file);
+                assert!(!append);
+            }
         } else {
             assert!(false);
         }
@@ -333,10 +337,14 @@ mod tests {
     #[test]
     fn pipeline_with_redirection_append() {
         if let Statement::Pipelines(pipelines) = parse("cat | echo hello | cat < stuff >> other") {
-        assert_eq!(3, pipelines[0].jobs.len());
-        assert_eq!("stuff", &pipelines[0].clone().stdin.unwrap().file);
-        assert_eq!("other", &pipelines[0].clone().stdout.unwrap().file);
-        assert!(pipelines[0].clone().stdout.unwrap().append);
+            assert_eq!(3, pipelines[0].jobs.len());
+            if let Redirection::File { file, .. } = pipelines[0].clone().stdin.unwrap() {
+                assert_eq!("stuff", file);
+            }
+            if let Redirection::File { file, append } = pipelines[0].clone().stdout.unwrap() {
+                assert_eq!("other", file);
+                assert!(append);
+            }
         } else {
             assert!(false);
         }
@@ -346,8 +354,26 @@ mod tests {
     fn pipelines_with_redirection_reverse_order() {
         if let Statement::Pipelines(pipelines) = parse("cat | echo hello | cat > stuff < other") {
             assert_eq!(3, pipelines[0].jobs.len());
-            assert_eq!("other", &pipelines[0].clone().stdin.unwrap().file);
-            assert_eq!("stuff", &pipelines[0].clone().stdout.unwrap().file);
+            if let Redirection::File { file, .. } = pipelines[0].clone().stdin.unwrap() {
+                assert_eq!("other", file);
+            }
+            if let Redirection::File { file, .. } = pipelines[0].clone().stdout.unwrap() {
+                assert_eq!("stuff", file);
+            }
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn pipelines_with_redirection_herestring() {
+        if let Statement::Pipelines(pipelines) = parse("cat <<< stuff > other") {
+            if let Redirection::Herestring { literal } = pipelines[0].clone().stdin.unwrap() {
+                assert_eq!("stuff", literal);
+            }
+            if let Redirection::File { file, .. } = pipelines[0].clone().stdout.unwrap() {
+                assert_eq!("other", file);
+            }
         } else {
             assert!(false);
         }
