@@ -121,9 +121,11 @@ _pipelines -> Statement
                     },
                     '>' => {
                         mode = RedirMode::Stdout;
+                        arg_start = index + 1;
                     },
                     '<' => {
                         mode = RedirMode::Stdin;
+                        arg_start = index + 1;
                     },
                     _    => ()
                 }
@@ -137,9 +139,9 @@ _pipelines -> Statement
                                 match character {
                                     _ if backslash => backslash = false,
                                     '\\' => backslash = true,
-                                    '$'  if (process_match == 0) => process_match = 1,
-                                    '('  if process_match == 1 => process_match = 2,
-                                    ')'  if process_match == 2 => process_match = 0,
+                                    '$'  if (process_match == 0) & !single_quote => process_match = 1,
+                                    '('  if (process_match == 1) & !single_quote => process_match = 2,
+                                    ')'  if (process_match == 2) & !single_quote => process_match = 0,
                                     '\'' => single_quote = !single_quote,
                                     '|'  if !double_quote & !single_quote & (process_match != 2) => {
                                         jobs.push(Job::new(arguments.clone(), false));
@@ -162,10 +164,12 @@ _pipelines -> Statement
                                     },
                                     '>' if !double_quote & !single_quote & (process_match != 2) => {
                                         mode = RedirMode::Stdout;
+                                        arg_start = index + 1;
                                         continue 'outer
                                     },
                                     '<' if !double_quote & !single_quote & (process_match != 2) => {
                                         mode = RedirMode::Stdin;
+                                        arg_start = index + 1;
                                         continue 'outer
                                     },
                                     _ if process_match != 2 => process_match = 0,
@@ -333,6 +337,8 @@ pipeline_statements -> Vec<&'input str>
         = (false, false, false, false, false);
     let mut index = 0;
     let mut white_pos = 0;
+    let mut process_matched = 0u8;
+
     for (id, character) in match_str.chars().enumerate() {
         if comment {
             if character == '\n' {
@@ -343,9 +349,12 @@ pipeline_statements -> Vec<&'input str>
             match character {
                 _ if backslash                                     => backslash = false,
                 '\\'                                               => backslash = true,
-                '\'' if !double_quote                              => single_quote = !single_quote,
-                '"'  if !single_quote                              => double_quote = !double_quote,
-                '#'  if whitespace & !single_quote & !double_quote => {
+                '\'' if (process_matched != 2) & !double_quote     => single_quote = !single_quote,
+                '"'  if (process_matched != 2) & !single_quote     => double_quote = !double_quote,
+                '$'  if (process_matched == 0) & !single_quote     => process_matched = 1,
+                '('  if (process_matched == 1) & !single_quote     => process_matched = 2,
+                ')'  if (process_matched == 2) & !single_quote     => process_matched = 0,
+                '#'  if (process_matched != 2) & whitespace & !single_quote & !double_quote => {
                     if index < white_pos {
                         let command = &match_str[index..white_pos];
                         output.push(command);
@@ -354,13 +363,13 @@ pipeline_statements -> Vec<&'input str>
                     index = id + 1;
                     comment = true;
                 },
-                ' ' | '\t' if !single_quote & !double_quote => {
+                ' ' | '\t' if (process_matched != 2) & !single_quote & !double_quote => {
                     if index == id { index += 1; }
                     whitespace = true;
                     if white_pos == 0 { white_pos = id; }
                     continue
                 },
-                ';' | '\n' | '\r' if !single_quote & !double_quote => {
+                ';' | '\n' | '\r' if (process_matched != 2) & !single_quote & !double_quote => {
                     if index == id {
                         index += 1;
                     } else {
@@ -374,6 +383,7 @@ pipeline_statements -> Vec<&'input str>
                     if white_pos == 0 { white_pos = id; }
                     continue
                 },
+                _ if process_matched != 2 => process_matched = 0,
                 _ => (),
             }
             whitespace = false;
