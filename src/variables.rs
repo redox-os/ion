@@ -317,14 +317,15 @@ impl Variables {
         None
     }
 
-    pub fn command_expansion(&self, command: &str) -> Option<String> {
+    pub fn command_expansion(&self, command: &str, quoted: bool) -> Option<String> {
         if let Ok(exe) = env::current_exe() {
             if let Ok(output) = process::Command::new(exe).arg("-c").arg(command).output() {
                 if let Ok(mut stdout) = String::from_utf8(output.stdout) {
                     if stdout.ends_with('\n') {
                         stdout.pop();
                     }
-                    return Some(stdout.replace("\n", " "));
+
+                    return if quoted { Some(stdout) } else { Some(stdout.replace("\n", " ")) };
                 }
             }
         }
@@ -335,8 +336,10 @@ impl Variables {
     /// Takes an argument string as input and expands it.
     pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> Result<String, ExpandErr> {
         let tilde_fn    = |tilde:    &str| self.tilde_expansion(tilde, dir_stack);
-        let variable_fn = |variable: &str| self.get_var(variable);
-        let command_fn  = |command:  &str| self.command_expansion(command);
+        let variable_fn = |variable: &str, quoted: bool| {
+            if quoted { self.get_var(variable) } else { self.get_var(variable).map(|x| x.replace("\n", " ")) } 
+        };
+        let command_fn  = |command:  &str, quoted: bool| self.command_expansion(command, quoted);
         shell_expand::expand_string(original, tilde_fn, variable_fn, command_fn)
     }
 }

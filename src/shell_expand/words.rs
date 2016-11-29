@@ -5,7 +5,7 @@ pub enum WordToken<'a> {
     Normal(&'a str),
     Tilde(&'a str),
     Brace(&'a str, bool),
-    Variable(&'a str)
+    Variable(&'a str, bool)
 }
 
 pub struct WordIterator<'a> {
@@ -37,7 +37,7 @@ impl<'a> Iterator for WordIterator<'a> {
     type Item = Result<WordToken<'a>, ExpandErr>;
 
     fn next(&mut self) -> Option<Result<WordToken<'a>, ExpandErr>> {
-        let start = self.read;
+        let mut start = self.read;
         let mut open_brace_id = 0;
 
         if self.whitespace {
@@ -56,39 +56,47 @@ impl<'a> Iterator for WordIterator<'a> {
                     backslash = true;
                     previous_char_was_dollar = false;
                 } else if character == '\'' && !self.double_quote {
-                    let return_value = if self.single_quote {
-                        Ok(WordToken::Normal(&self.data[start..self.read]))
-                    } else if contains_braces {
-                        Ok(WordToken::Brace(&self.data[start..self.read], contains_variables))
-                    } else if contains_variables {
-                        Ok(WordToken::Variable(&self.data[start..self.read]))
-                    } else if contains_tilde {
-                        Ok(WordToken::Tilde(&self.data[start..self.read]))
-                    } else {
-                        Ok(WordToken::Normal(&self.data[start..self.read]))
-                    };
-                    self.read += 1;
-                    self.single_quote = !self.single_quote;
-                    return Some(return_value);
-                } else if character == '"' && !self.single_quote {
-                    let return_value = if self.single_quote {
-                        if contains_variables {
-                            Ok(WordToken::Variable(&self.data[start..self.read]))
+                    if start != self.read {
+                        let return_value = if self.single_quote {
+                            Ok(WordToken::Normal(&self.data[start..self.read]))
+                        } else if contains_braces {
+                            Ok(WordToken::Brace(&self.data[start..self.read], contains_variables))
+                        } else if contains_variables {
+                            Ok(WordToken::Variable(&self.data[start..self.read], self.double_quote))
+                        } else if contains_tilde {
+                            Ok(WordToken::Tilde(&self.data[start..self.read]))
                         } else {
                             Ok(WordToken::Normal(&self.data[start..self.read]))
-                        }
-                    } else if contains_braces {
-                        Ok(WordToken::Brace(&self.data[start..self.read], contains_variables))
-                    } else if contains_variables {
-                        Ok(WordToken::Variable(&self.data[start..self.read]))
-                    } else if contains_tilde {
-                        Ok(WordToken::Tilde(&self.data[start..self.read]))
-                    } else {
-                        Ok(WordToken::Normal(&self.data[start..self.read]))
-                    };
-                    self.read += 1;
+                        };
+                        self.read += 1;
+                        self.single_quote = !self.single_quote;
+                        return Some(return_value);
+                    }
+                    start += 1;
+                    self.single_quote = !self.single_quote;
+                } else if character == '"' && !self.single_quote {
+                    if start != self.read {
+                        let return_value = if self.single_quote {
+                            if contains_variables {
+                                Ok(WordToken::Variable(&self.data[start..self.read], self.double_quote))
+                            } else {
+                                Ok(WordToken::Normal(&self.data[start..self.read]))
+                            }
+                        } else if contains_braces {
+                            Ok(WordToken::Brace(&self.data[start..self.read], contains_variables))
+                        } else if contains_variables {
+                            Ok(WordToken::Variable(&self.data[start..self.read], self.double_quote))
+                        } else if contains_tilde {
+                            Ok(WordToken::Tilde(&self.data[start..self.read]))
+                        } else {
+                            Ok(WordToken::Normal(&self.data[start..self.read]))
+                        };
+                        self.read += 1;
+                        self.double_quote = !self.double_quote;
+                        return Some(return_value);
+                    }
+                    start += 1;
                     self.double_quote = !self.double_quote;
-                    return Some(return_value);
                 } else if character == '{' && !self.single_quote && !self.double_quote {
                     if !previous_char_was_dollar { contains_braces = true; }
                     if open_brace { return Some(Err(ExpandErr::InnerBracesNotImplemented)); }
@@ -111,7 +119,7 @@ impl<'a> Iterator for WordIterator<'a> {
                     return if contains_braces {
                         Some(Ok(WordToken::Brace(&self.data[start..self.read], contains_variables)))
                     } else if contains_variables {
-                        Some(Ok(WordToken::Variable(&self.data[start..self.read])))
+                        Some(Ok(WordToken::Variable(&self.data[start..self.read], self.double_quote)))
                     } else if contains_tilde {
                         Some(Ok(WordToken::Tilde(&self.data[start..self.read])))
                     } else {
@@ -132,7 +140,7 @@ impl<'a> Iterator for WordIterator<'a> {
             } else if contains_braces {
                 Some(Ok(WordToken::Brace(&self.data[start..self.read], contains_variables)))
             } else if contains_variables {
-                Some(Ok(WordToken::Variable(&self.data[start..self.read])))
+                Some(Ok(WordToken::Variable(&self.data[start..self.read], self.double_quote)))
             } else if contains_tilde {
                 Some(Ok(WordToken::Tilde(&self.data[start..self.read])))
             } else {
@@ -151,19 +159,21 @@ fn test_malformed_brace_input() {
 
 #[test]
 fn test_words() {
-    let input = "echo $ABC ${ABC} one{$ABC,$ABC} ~ $(echo foo)";
+    let input = "echo $ABC ${ABC} one{$ABC,$ABC} ~ $(echo foo) \"$(seq 1 100)\"";
     let expected = vec![
         WordToken::Normal("echo"),
         WordToken::Normal(" "),
-        WordToken::Variable("$ABC"),
+        WordToken::Variable("$ABC", false),
         WordToken::Normal(" "),
-        WordToken::Variable("${ABC}"),
+        WordToken::Variable("${ABC}", false),
         WordToken::Normal(" "),
         WordToken::Brace("one{$ABC,$ABC}", true),
         WordToken::Normal(" "),
         WordToken::Tilde("~"),
         WordToken::Normal(" "),
-        WordToken::Variable("$(echo foo)")
+        WordToken::Variable("$(echo foo)", false),
+        WordToken::Normal(" "),
+        WordToken::Variable("$(seq 1 100)", true)
     ];
 
     let mut correct = 0;
