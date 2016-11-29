@@ -99,6 +99,115 @@ pub fn parse(code: &str) -> Statement {
 
 peg_file! grammar("grammar.rustpeg");
 
+/// An iterator that splits a given command into pipelines
+struct PipelineIterator<'a> {
+    match_str:       &'a str,
+    single_quote:    bool,
+    double_quote:    bool,
+    backslash:       bool,
+    whitespace:      bool,
+    comment:         bool,
+    index_start:     usize,
+    index_end:       usize,
+    white_pos:       usize,
+    process_matched: u8,
+}
+
+impl<'a> PipelineIterator<'a> {
+    fn new(match_str: &'a str) -> PipelineIterator<'a> {
+        PipelineIterator {
+            match_str:       match_str,
+            single_quote:    false,
+            double_quote:    false,
+            backslash:       false,
+            whitespace:      false,
+            comment:         match_str.chars().next().unwrap() == '#',
+            index_start:     0,
+            index_end:       0,
+            white_pos:       0,
+            process_matched: 0u8,
+        }
+    }
+}
+
+impl<'a> Iterator for PipelineIterator<'a> {
+    type Item = &'a str;
+    fn next(&mut self) -> Option<&'a str> {
+        for character in self.match_str.chars().skip(self.index_end) {
+            if self.comment {
+                self.index_end += 1;
+                if character == '\n' {
+                    self.comment = false;
+                    self.index_start = self.index_end;
+                }
+            } else {
+                match character {
+                    _ if self.backslash                                 => self.backslash = false,
+                    '\\'                                                => self.backslash = true,
+                    '\'' if (self.process_matched != 2) & !self.double_quote => self.single_quote = !self.single_quote,
+                    '"'  if (self.process_matched != 2) & !self.single_quote => self.double_quote = !self.double_quote,
+                    '$'  if (self.process_matched == 0) & !self.single_quote => self.process_matched = 1,
+                    '('  if (self.process_matched == 1) & !self.single_quote => self.process_matched = 2,
+                    ')'  if (self.process_matched == 2) & !self.single_quote => self.process_matched = 0,
+                    '#'  if (self.process_matched != 2) & self.whitespace & !self.single_quote & !self.double_quote => {
+                        if self.index_start < self.white_pos {
+                            let command = &self.match_str[self.index_start..self.white_pos];
+                            self.index_start = self.index_end + 1;
+                            self.comment = true;
+                            self.index_end += 1;
+                            return Some(command)
+                        } else {
+                            self.index_start = self.index_end + 1;
+                            self.comment = true;
+                        }
+                    },
+                    ' ' | '\t' if (self.process_matched != 2) & !self.single_quote & !self.double_quote => {
+                        if self.index_start == self.index_end { self.index_start += 1; }
+                        self.whitespace = true;
+                        if self.white_pos == 0 { self.white_pos = self.index_end; }
+                        self.index_end += 1;
+                        continue
+                    },
+                    ';' | '\n' | '\r' if (self.process_matched != 2) & !self.single_quote & !self.double_quote => {
+                        if self.index_start == self.index_end {
+                            self.index_start += 1;
+                            self.whitespace = true;
+                            if self.white_pos == 0 { self.white_pos = self.index_end; }
+                        } else {
+                            let command = &self.match_str[self.index_start..self.index_end];
+                            self.index_start = self.index_end + 1;
+                            self.whitespace = true;
+                            if self.white_pos == 0 { self.white_pos = self.index_end; }
+                            if command.chars().any(|x| x != ' ' && x != '\n' && x != '\r' && x != '\t') {
+                                self.index_end += 1;
+                                return Some(command);
+                            }
+                        }
+                        self.index_end += 1;
+                        continue
+                    },
+                    _ if self.process_matched != 2 => self.process_matched = 0,
+                    _ => (),
+                }
+                self.whitespace = false;
+                self.white_pos = 0;
+                self.index_end += 1;
+            }
+        }
+
+        if !self.comment && self.match_str.len() > self.index_start {
+            let command = &self.match_str[self.index_start..];
+            self.index_start = self.match_str.len() + 1;
+            if command.chars().any(|x| x != ' ' && x != '\n' && x != '\r' && x != '\t') {
+                Some(command)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
