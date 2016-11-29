@@ -1,6 +1,7 @@
 use peg::Pipeline;
 use peg::Job;
 use peg::Redirection;
+use peg::PipelineIterator;
 use flow_control::Statement;
 use flow_control::Comparitor;
 
@@ -62,10 +63,10 @@ pipelines -> Statement
 
 // Converts the pipeline string into a statement, handling redirection, piping, and backgrounds.
 _pipelines -> Statement
-    = pipeline_statements:pipeline_statements {?
+    = command:$(.+) {?
     let mut possible_error = None;
     let mut pipelines: Vec<Pipeline> = Vec::new();
-    for args in pipeline_statements {
+    for args in PipelineIterator::new(command) {
         let mut args_iter = args.chars();
         let (mut index, mut comm_end, mut arg_start) = (0, 0, 0);
 
@@ -327,78 +328,6 @@ _pipelines -> Statement
     } else {
         Err(possible_error.unwrap())
     }
-}
-
-// Returns a vector of pipeline strings, with comments and excessive whitespace removed.
-pipeline_statements -> Vec<&'input str>
-    = match_str:$(.+) {
-    let mut output = Vec::new();
-    let (mut single_quote, mut double_quote, mut backslash, mut whitespace, mut comment)
-        = (false, false, false, false, false);
-    let mut index = 0;
-    let mut white_pos = 0;
-    let mut process_matched = 0u8;
-
-    for (id, character) in match_str.chars().enumerate() {
-        if comment {
-            if character == '\n' {
-                comment = false;
-                index = id + 1;
-            }
-        } else {
-            match character {
-                _ if backslash                                     => backslash = false,
-                '\\'                                               => backslash = true,
-                '\'' if (process_matched != 2) & !double_quote     => single_quote = !single_quote,
-                '"'  if (process_matched != 2) & !single_quote     => double_quote = !double_quote,
-                '$'  if (process_matched == 0) & !single_quote     => process_matched = 1,
-                '('  if (process_matched == 1) & !single_quote     => process_matched = 2,
-                ')'  if (process_matched == 2) & !single_quote     => process_matched = 0,
-                '#'  if (process_matched != 2) & whitespace & !single_quote & !double_quote => {
-                    if index < white_pos {
-                        let command = &match_str[index..white_pos];
-                        output.push(command);
-                    }
-                    white_pos = 0;
-                    index = id + 1;
-                    comment = true;
-                },
-                ' ' | '\t' if (process_matched != 2) & !single_quote & !double_quote => {
-                    if index == id { index += 1; }
-                    whitespace = true;
-                    if white_pos == 0 { white_pos = id; }
-                    continue
-                },
-                ';' | '\n' | '\r' if (process_matched != 2) & !single_quote & !double_quote => {
-                    if index == id {
-                        index += 1;
-                    } else {
-                        let command = &match_str[index..id];
-                        if command.chars().any(|x| x != ' ' && x != '\n' && x != '\r' && x != '\t') {
-                            output.push(command);
-                        }
-                        index = id + 1;
-                    }
-                    whitespace = true;
-                    if white_pos == 0 { white_pos = id; }
-                    continue
-                },
-                _ if process_matched != 2 => process_matched = 0,
-                _ => (),
-            }
-            whitespace = false;
-            white_pos = 0;
-        }
-    }
-
-    if !comment && match_str.len() > index {
-        let command = &match_str[index..];
-        if command.chars().any(|x| x != ' ' && x != '\n' && x != '\r' && x != '\t') {
-            output.push(command);
-        }
-    }
-
-    output
 }
 
 unused -> ()
