@@ -78,14 +78,16 @@ impl Shell {
                     let (words, pos) = editor.get_words_and_cursor_position();
 
                     let filename = match pos {
-                        CursorPosition::InWord(i) => i > 0,
+                        CursorPosition::InWord(index) => index > 0,
                         CursorPosition::InSpace(Some(_), _) => true,
                         CursorPosition::InSpace(None, _) => false,
-                        CursorPosition::OnWordLeftEdge(i) => i >= 1,
-                        CursorPosition::OnWordRightEdge(i) => i >= 1 && !words.into_iter().nth(i).map(|(start, end)| {
-                            let buf = editor.current_buffer();
-                            buf.range(start, end).trim().starts_with("$")
-                        }).unwrap_or(false)
+                        CursorPosition::OnWordLeftEdge(index) => index >= 1,
+                        CursorPosition::OnWordRightEdge(index) => {
+                            index >= 1 && !words.into_iter().nth(index).map(|(start, end)| {
+                                let buf = editor.current_buffer();
+                                buf.range(start, end).trim().starts_with('$')
+                            }).unwrap_or(false)
+                        }
                     };
 
                     if filename {
@@ -298,20 +300,7 @@ impl Shell {
                         .collect();
                 self.functions.insert(name.clone(), Function { name: name.clone(), pipelines: block_jobs.clone(), args: args.clone() });
             },
-            Statement::If{..} => {
-                self.flow_control.modes.pop();
-                if self.flow_control.modes.is_empty() {
-                    let block_jobs: Vec<Pipeline> = self.flow_control
-                        .current_block
-                        .pipelines
-                        .drain(..)
-                        .collect();
-                    for pipeline in &block_jobs {
-                        self.run_pipeline(pipeline);
-                    }
-                }
-            },
-            Statement::Else => {
+            Statement::If{..} | Statement::Else => {
                 self.flow_control.modes.pop();
                 if self.flow_control.modes.is_empty() {
                     let block_jobs: Vec<Pipeline> = self.flow_control
@@ -423,7 +412,7 @@ impl Shell {
             Some(execute_pipeline(pipeline))
         };
 
-        if let Some(elapsed_time) = command_start_time.elapsed().ok() {
+        if let Ok(elapsed_time) = command_start_time.elapsed() {
             let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
                                   elapsed_time.as_secs(), elapsed_time.subsec_nanos());
 
@@ -447,7 +436,7 @@ impl Shell {
 
     /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
     fn source_command(&mut self, arguments: &[String]) -> i32 {
-        match arguments.iter().skip(1).next() {
+        match arguments.get(1) {
             Some(argument) => {
                 if let Ok(mut file) = File::open(&argument) {
                     let mut command_list = String::new();
