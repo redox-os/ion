@@ -4,7 +4,7 @@ pub fn expand<V, C>(output: &mut String, input: &str, expand_variable: V, expand
     where V: Fn(&str) -> Option<String>,
           C: Fn(&str) -> Option<String>
 {
-    for var_token in VariableIterator::new(&input.chars().collect::<Vec<char>>()) {
+    for var_token in VariableIterator::new(input) {
         match var_token {
             VariableToken::Normal(data) => {
                 output.push_str(&data);
@@ -33,24 +33,24 @@ enum VariableToken {
 
 /// A `VariableIterator` searches for variable patterns within a character array, returning `VariableToken`s.
 struct VariableIterator<'a> {
-    data:            &'a [char],
+    data:            &'a str,
     buffer:          String,
-    backslash:       bool,
-    braced_variable: bool,
-    parens_variable: bool,
-    variable_found:  bool,
+    flags:           u8,
     read:            usize,
 }
 
+/// Bit flags used by `VariableIterator`'s flags field.
+const BACK:       u8 = 1;
+const BRACED_VAR: u8 = 2;
+const PARENS_VAR: u8 = 4;
+const VAR_FOUND:  u8 = 8;
+
 impl<'a> VariableIterator<'a> {
-    fn new(input: &'a [char]) -> VariableIterator<'a> {
+    fn new(input: &'a str) -> VariableIterator<'a> {
         VariableIterator {
             data:            input,
             buffer:          String::with_capacity(128),
-            backslash:       false,
-            braced_variable: false,
-            parens_variable: false,
-            variable_found:  false,
+            flags:           0u8,
             read:            0,
         }
     }
@@ -60,59 +60,63 @@ impl<'a> Iterator for VariableIterator<'a> {
     type Item = VariableToken;
 
     fn next(&mut self) -> Option<VariableToken> {
-        for &character in self.data.iter().skip(self.read) {
+        for character in self.data.chars().skip(self.read) {
             self.read += 1;
             if character == '\\' {
-                if self.backslash { self.buffer.push(character); }
-                self.backslash = !self.backslash;
-            } else if self.backslash {
+                if self.flags & BACK == BACK { self.buffer.push(character); }
+                self.flags ^= BACK;
+            } else if self.flags & BACK == BACK {
                 match character {
                     '{' | '}' | '(' | ')' | '$' | ' ' | ':' | ',' | '@' | '#' => (),
                     _ => self.buffer.push('\\')
                 }
                 self.buffer.push(character);
-                self.backslash = false;
-            } else if self.braced_variable {
+                self.flags ^= BACK;
+            } else if self.flags & BRACED_VAR == BRACED_VAR {
                 if character == '}' {
                     let output = VariableToken::Variable(self.buffer.clone());
                     self.buffer.clear();
-                    self.braced_variable = false;
+                    self.flags &= 255 ^ BRACED_VAR;
                     return Some(output);
                 } else {
                     self.buffer.push(character);
                 }
-            } else if self.parens_variable {
+            } else if self.flags & PARENS_VAR == PARENS_VAR {
                 if character == ')' {
                     let output = VariableToken::Command(self.buffer.clone());
                     self.buffer.clear();
-                    self.parens_variable = false;
+                    self.flags &= 255 ^ PARENS_VAR;
                     return Some(output);
                 } else {
                     self.buffer.push(character);
                 }
-            } else if self.variable_found {
+            } else if self.flags & VAR_FOUND == VAR_FOUND {
                 match character {
                     '{' => {
-                        if self.read < 3 || (self.data[self.read-2] == '$' && self.data[self.read-3] != '\\') {
-                            self.braced_variable = true;
-                            self.variable_found  = false;
+                        if self.read < 3 || (self.data.chars().nth(self.read-2).unwrap() == '$'
+                            && self.data.chars().nth(self.read-3).unwrap() != '\\')
+                        {
+                            self.flags |= BRACED_VAR;
+                            self.flags &= 255 ^ VAR_FOUND;
                         } else {
                             let output = VariableToken::Variable(self.buffer.clone());
                             self.buffer.clear();
                             self.buffer.push(character);
-                            self.variable_found = false;
+                            self.flags &= 255 ^ VAR_FOUND;
                             return Some(output);
                         }
                     },
                     '(' => {
-                        if self.read < 3 || (self.data[self.read-2] == '$' && self.data[self.read-3] != '\\') {
-                            self.parens_variable = true;
-                            self.variable_found  = false;
+                        if self.read < 3 || (self.data.chars().nth(self.read-2).unwrap() == '$'
+                            && self.data.chars().nth(self.read-3).unwrap() != '\\')
+                        {
+                            self.flags |= PARENS_VAR;
+                            self.flags &= 255 ^ VAR_FOUND;
                         } else {
                             let output = VariableToken::Variable(self.buffer.clone());
                             self.buffer.clear();
                             self.buffer.push(character);
-                            self.variable_found = false;
+                            self.flags &= 255 ^ VAR_FOUND;
                             return Some(output);
                         }
                     },
@@ -125,7 +129,7 @@ impl<'a> Iterator for VariableIterator<'a> {
                         let output = VariableToken::Variable(self.buffer.clone());
                         self.buffer.clear();
                         self.buffer.push(character);
-                        self.variable_found = false;
+                        self.flags &= 255 ^ VAR_FOUND;
                         return Some(output);
                     },
                     _ => self.buffer.push(character),
@@ -133,12 +137,12 @@ impl<'a> Iterator for VariableIterator<'a> {
             } else {
                 match character {
                     '$' if self.buffer.is_empty() => {
-                        self.variable_found = true;
+                        self.flags |= VAR_FOUND;
                     },
                     '$' => {
                         let output = VariableToken::Normal(self.buffer.clone());
                         self.buffer.clear();
-                        self.variable_found = true;
+                        self.flags |= VAR_FOUND;
                         return Some(output);
                     },
                     _ => self.buffer.push(character)
@@ -148,8 +152,8 @@ impl<'a> Iterator for VariableIterator<'a> {
 
         if self.buffer.is_empty() {
             None
-        } else if self.variable_found {
-            self.variable_found = false;
+        } else if self.flags & VAR_FOUND == VAR_FOUND {
+            self.flags &= 255 ^ VAR_FOUND;
             let output = VariableToken::Variable(self.buffer.clone());
             self.buffer.clear();
             Some(output)
@@ -164,8 +168,7 @@ impl<'a> Iterator for VariableIterator<'a> {
 #[test]
 fn test_variables() {
     let input = "$(echo bar) ${var1}${var2}  \\$\\\\$var1:$var2  $var1 $var2  abc${var1}def $var1,$var2 $(echo foo)";
-    let input = input.chars().collect::<Vec<char>>();
-    let tokens = VariableIterator::new(&input);
+    let tokens = VariableIterator::new(input);
     let expected = vec![
         VariableToken::Command("echo bar".to_string()),
         VariableToken::Normal(" ".to_string()),
@@ -197,8 +200,7 @@ fn test_variables() {
     assert_eq!(expected.len(), correct);
 
     let input = "ABC${var1}DEF";
-    let input = input.chars().collect::<Vec<char>>();
-    let tokens = VariableIterator::new(&input);
+    let tokens = VariableIterator::new(input);
     let expected = vec![
         VariableToken::Normal("ABC".to_string()),
         VariableToken::Variable("var1".to_string()),
