@@ -122,7 +122,7 @@ impl<'a> PipelineIterator<'a> {
     fn new(match_str: &'a str) -> PipelineIterator<'a> {
         PipelineIterator {
             match_str:       match_str,
-            flags:           if match_str.chars().next().unwrap() == '#' { COMMENT } else { 0u8 },
+            flags:           if match_str.chars().next().unwrap() == '#' { COMMENT + PROCESS_ZERO } else { PROCESS_ZERO },
             index_start:     0,
             index_end:       0,
             white_pos:       0,
@@ -134,7 +134,7 @@ impl<'a> Iterator for PipelineIterator<'a> {
     type Item = &'a str;
     fn next(&mut self) -> Option<&'a str> {
         for character in self.match_str.chars().skip(self.index_end) {
-            if self.flags & COMMENT == COMMENT {
+            if self.flags & COMMENT != 0 {
                 self.index_end += 1;
                 if character == '\n' {
                     self.flags &= 255 ^ COMMENT;
@@ -142,24 +142,24 @@ impl<'a> Iterator for PipelineIterator<'a> {
                 }
             } else {
                 match character {
-                    _ if self.flags & BACKSLASH == BACKSLASH                => self.flags ^= BACKSLASH,
+                    _ if self.flags & BACKSLASH != 0                        => self.flags ^= BACKSLASH,
                     '\\'                                                    => self.flags |= BACKSLASH,
                     '\'' if self.flags & (PROCESS_TWO + DOUBLE_QUOTE) == 0  => self.flags ^= SINGLE_QUOTE,
                     '"'  if self.flags & (PROCESS_TWO + SINGLE_QUOTE) == 0  => self.flags ^= DOUBLE_QUOTE,
-                    '$'  if self.flags & (PROCESS_ZERO + SINGLE_QUOTE) == 0 => {
+                    '$'  if self.flags & SINGLE_QUOTE == 0 && self.flags & PROCESS_ZERO != 0 => {
                         self.flags |= PROCESS_ONE;
-                        self.flags &= 255 ^ (PROCESS_ZERO + PROCESS_TWO);
+                        self.flags &= 255 ^ PROCESS_ZERO;
                     },
-                    '('  if self.flags & (PROCESS_ONE + SINGLE_QUOTE) == 0 => {
+                    '('  if self.flags & SINGLE_QUOTE == 0 && self.flags & PROCESS_ONE != 0 => {
                         self.flags |= PROCESS_TWO;
-                        self.flags &= 255 ^ (PROCESS_ZERO + PROCESS_ONE);
+                        self.flags &= 255 ^ PROCESS_ONE;
                     },
-                    ')'  if self.flags & (PROCESS_TWO + SINGLE_QUOTE) == 0 => {
+                    ')'  if self.flags & SINGLE_QUOTE == 0 && self.flags & PROCESS_TWO != 0 => {
                         self.flags |= PROCESS_ZERO;
-                        self.flags &= 255 ^ (PROCESS_ONE + PROCESS_TWO);
+                        self.flags &= 255 ^ PROCESS_TWO;
                     },
                     '#'  if self.flags & (PROCESS_TWO + SINGLE_QUOTE + DOUBLE_QUOTE) == 0 &&
-                        self.flags & WHITESPACE == WHITESPACE =>
+                        self.flags & WHITESPACE != 0 =>
                     {
                         if self.index_start < self.white_pos {
                             let command = &self.match_str[self.index_start..self.white_pos];
@@ -197,7 +197,7 @@ impl<'a> Iterator for PipelineIterator<'a> {
                         self.index_end += 1;
                         continue
                     },
-                    _ if self.flags & PROCESS_TWO != PROCESS_TWO => {
+                    _ if self.flags & PROCESS_TWO == 0 => {
                         self.flags |= PROCESS_ZERO;
                         self.flags &= 255 ^ (PROCESS_ONE + PROCESS_TWO);
                     },
@@ -209,7 +209,7 @@ impl<'a> Iterator for PipelineIterator<'a> {
             }
         }
 
-        if self.flags & COMMENT != COMMENT && self.match_str.len() > self.index_start {
+        if self.flags & COMMENT == 0 && self.match_str.len() > self.index_start {
             let command = &self.match_str[self.index_start..];
             self.index_start = self.match_str.len() + 1;
             if command.chars().any(|x| x != ' ' && x != '\n' && x != '\r' && x != '\t') {
@@ -228,6 +228,50 @@ mod tests {
     use super::*;
     use super::grammar::*;
     use flow_control::{Statement, Comparitor};
+
+    #[test]
+    fn quoted_process_with_extra_commands() {
+        if let Statement::Pipelines(mut pipelines) = parse("let A = \"$(seq 1 10)\"; echo $A; echo \"$A\"") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!("let", jobs[0].args[0]);
+            assert_eq!("A", jobs[0].args[1]);
+            assert_eq!("=", jobs[0].args[2]);
+            assert_eq!("\"$(seq 1 10)\"", jobs[0].args[3]);
+            assert_eq!(4, jobs[0].args.len());
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!("echo", jobs[0].args[0]);
+            assert_eq!("$A", jobs[0].args[1]);
+            assert_eq!(2, jobs[0].args.len());
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!("echo", jobs[0].args[0]);
+            assert_eq!("\"$A\"", jobs[0].args[1]);
+            assert_eq!(2, jobs[0].args.len());
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn process_with_extra_commands() {
+        if let Statement::Pipelines(mut pipelines) = parse("let A = $(seq 1 10); echo $A; echo \"$A\"") {
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!("let", jobs[0].args[0]);
+            assert_eq!("A", jobs[0].args[1]);
+            assert_eq!("=", jobs[0].args[2]);
+            assert_eq!("$(seq 1 10)", jobs[0].args[3]);
+            assert_eq!(4, jobs[0].args.len());
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!("echo", jobs[0].args[0]);
+            assert_eq!("$A", jobs[0].args[1]);
+            assert_eq!(2, jobs[0].args.len());
+            let jobs = pipelines.remove(0).jobs;
+            assert_eq!("echo", jobs[0].args[0]);
+            assert_eq!("\"$A\"", jobs[0].args[1]);
+            assert_eq!(2, jobs[0].args.len());
+        } else {
+            assert!(false);
+        }
+    }
 
     #[test]
     fn single_job_no_args() {
