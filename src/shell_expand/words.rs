@@ -75,12 +75,12 @@ impl<'a> Iterator for WordIterator<'a> {
                     }
                     start += 1;
                     self.flags ^= DOUBLE_QUOTE;
-                } else if character == '{' && self.flags & SINGLE_QUOTE != SINGLE_QUOTE && self.flags & DOUBLE_QUOTE != DOUBLE_QUOTE {
+                } else if character == '{' && self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 {
                     if self.flags & PREV_WAS_VAR != PREV_WAS_VAR { self.flags |= BRACES; }
                     if self.flags & OPEN_BRACE == OPEN_BRACE { return Some(Err(ExpandErr::InnerBracesNotImplemented)); }
                     open_brace_id = self.read;
                     self.flags |= OPEN_BRACE;
-                } else if character == '}' && self.flags & SINGLE_QUOTE != SINGLE_QUOTE && self.flags & DOUBLE_QUOTE != DOUBLE_QUOTE {
+                } else if character == '}' && self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 {
                     if self.flags & OPEN_BRACE != OPEN_BRACE { return Some(Err(ExpandErr::UnmatchedBraces(self.read))); }
                     self.flags &= 255 ^ OPEN_BRACE;
                 } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && character == '(' && self.flags & PREV_WAS_VAR == PREV_WAS_VAR {
@@ -88,7 +88,7 @@ impl<'a> Iterator for WordIterator<'a> {
                     self.flags &= 255 ^ PREV_WAS_VAR;
                 } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && character == '$' {
                     self.flags |= VARIABLES + PREV_WAS_VAR;
-                } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && self.flags & DOUBLE_QUOTE != DOUBLE_QUOTE && character == '~' && start == self.read {
+                } else if self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 && character == '~' && start == self.read {
                     self.flags |= TILDE;
                     self.flags &= 255 ^ PREV_WAS_VAR;
                 } else if character == ' ' && break_char.is_none() {
