@@ -47,7 +47,7 @@ pub fn expand_braces(output: &mut String, input: &str) {
         let vector_of_arrays: Vec<&[&str]> = expanders.iter().map(AsRef::as_ref).collect();
         multiple_brace_expand(output, &vector_of_arrays[..], &tokens);
     } else if expanders.len() == 1 {
-        let elements = expanders.get(0).unwrap();
+        let elements = &expanders[0];
         single_brace_expand(output, elements, &tokens);
     }
 }
