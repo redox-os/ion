@@ -125,11 +125,11 @@ struct PipelineIterator<'a> {
 impl<'a> PipelineIterator<'a> {
     fn new(match_str: &'a str) -> PipelineIterator<'a> {
         PipelineIterator {
-            match_str:       match_str,
-            flags:           if match_str.bytes().next().unwrap() == b'#' { COMMENT } else { 0 },
-            index_start:     0,
-            index_end:       0,
-            white_pos:       0,
+            match_str:   match_str,
+            flags:       if match_str.bytes().next().unwrap() == b'#' { COMMENT } else { 0 },
+            index_start: 0,
+            index_end:   0,
+            white_pos:   0,
         }
     }
 }
@@ -288,7 +288,7 @@ pub fn collect_pipelines(pipelines: &mut Vec<Pipeline>, possible_error: &mut Opt
                             b'&' if (flags & IS_VALID == 0) => job_found!(true),
                             b'>' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdout),
                             b'<' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdin),
-                            _   if (flags >> 6 != 2)       => flags &= 255 ^ (PROCESS_ONE + PROCESS_TWO),
+                            _   if (flags >> 6 != 2)        => flags &= 255 ^ (PROCESS_ONE + PROCESS_TWO),
                             _ => (),
                         }
                         index += 1;
@@ -938,22 +938,6 @@ else
 
         // Leading spaces after final value
         let parsed_if = fn_("         fn bob a b").unwrap();
-        assert_eq!(correct_parse, parsed_if);
-    }
-
-    #[test]
-    fn parsing_fors() {
-        // Default case where spaced normally
-        let parsed_if = for_("for i in a b").unwrap();
-        let correct_parse = Statement::For{variable: "i".to_string(), values: vec!("a".to_string(), "b".to_string())};
-        assert_eq!(correct_parse, parsed_if);
-
-        // Trailing spaces after final value
-        let parsed_if = for_("for i in a b        ").unwrap();
-        assert_eq!(correct_parse, parsed_if);
-
-        // Leading spaces after final value
-        let parsed_if = for_("         for i in a b").unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 }

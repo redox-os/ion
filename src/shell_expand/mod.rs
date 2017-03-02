@@ -1,8 +1,8 @@
 extern crate permutate;
 
 pub mod braces;
-mod variables;
-mod words;
+pub mod variables;
+pub mod words;
 
 use self::words::{WordIterator, WordToken};
 
