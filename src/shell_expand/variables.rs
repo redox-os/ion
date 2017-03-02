@@ -34,7 +34,7 @@ enum VariableToken {
 /// A `VariableIterator` searches for variable patterns within a character array, returning `VariableToken`s.
 struct VariableIterator<'a> {
     data:            &'a str,
-    buffer:          String,
+    buffer:          Vec<u8>,
     flags:           u8,
     read:            usize,
 }
@@ -48,10 +48,10 @@ const VAR_FOUND:  u8 = 8;
 impl<'a> VariableIterator<'a> {
     fn new(input: &'a str) -> VariableIterator<'a> {
         VariableIterator {
-            data:            input,
-            buffer:          String::with_capacity(128),
-            flags:           0u8,
-            read:            0,
+            data:   input,
+            buffer: Vec::with_capacity(128),
+            flags:  0u8,
+            read:   0,
         }
     }
 }
@@ -60,21 +60,21 @@ impl<'a> Iterator for VariableIterator<'a> {
     type Item = VariableToken;
 
     fn next(&mut self) -> Option<VariableToken> {
-        for character in self.data.chars().skip(self.read) {
+        for character in self.data.bytes().skip(self.read) {
             self.read += 1;
-            if character == '\\' {
+            if character == b'\\' {
                 if self.flags & BACK == BACK { self.buffer.push(character); }
                 self.flags ^= BACK;
             } else if self.flags & BACK == BACK {
                 match character {
-                    '{' | '}' | '(' | ')' | '$' | ' ' | ':' | ',' | '@' | '#' => (),
-                    _ => self.buffer.push('\\')
+                    b'{' | b'}' | b'(' | b')' | b'$' | b' ' | b':' | b',' | b'@' | b'#' => (),
+                    _ => self.buffer.push(b'\\')
                 }
                 self.buffer.push(character);
                 self.flags ^= BACK;
             } else if self.flags & BRACED_VAR == BRACED_VAR {
-                if character == '}' {
-                    let output = VariableToken::Variable(self.buffer.clone());
+                if character == b'}' {
+                    let output = VariableToken::Variable(convert_to_string(self.buffer.clone()));
                     self.buffer.clear();
                     self.flags &= 255 ^ BRACED_VAR;
                     return Some(output);
@@ -82,8 +82,8 @@ impl<'a> Iterator for VariableIterator<'a> {
                     self.buffer.push(character);
                 }
             } else if self.flags & PARENS_VAR == PARENS_VAR {
-                if character == ')' {
-                    let output = VariableToken::Command(self.buffer.clone());
+                if character == b')' {
+                    let output = VariableToken::Command(convert_to_string(self.buffer.clone()));
                     self.buffer.clear();
                     self.flags &= 255 ^ PARENS_VAR;
                     return Some(output);
@@ -92,41 +92,41 @@ impl<'a> Iterator for VariableIterator<'a> {
                 }
             } else if self.flags & VAR_FOUND == VAR_FOUND {
                 match character {
-                    '{' => {
-                        if self.read < 3 || (self.data.chars().nth(self.read-2).unwrap() == '$'
-                            && self.data.chars().nth(self.read-3).unwrap() != '\\')
+                    b'{' => {
+                        if self.read < 3 || (self.data.bytes().nth(self.read-2).unwrap() == b'$'
+                            && self.data.bytes().nth(self.read-3).unwrap() != b'\\')
                         {
                             self.flags |= BRACED_VAR;
                             self.flags &= 255 ^ VAR_FOUND;
                         } else {
-                            let output = VariableToken::Variable(self.buffer.clone());
+                            let output = VariableToken::Variable(convert_to_string(self.buffer.clone()));
                             self.buffer.clear();
                             self.buffer.push(character);
                             self.flags &= 255 ^ VAR_FOUND;
                             return Some(output);
                         }
                     },
-                    '(' => {
-                        if self.read < 3 || (self.data.chars().nth(self.read-2).unwrap() == '$'
-                            && self.data.chars().nth(self.read-3).unwrap() != '\\')
+                    b'(' => {
+                        if self.read < 3 || (self.data.bytes().nth(self.read-2).unwrap() == b'$'
+                            && self.data.bytes().nth(self.read-3).unwrap() != b'\\')
                         {
                             self.flags |= PARENS_VAR;
                             self.flags &= 255 ^ VAR_FOUND;
                         } else {
-                            let output = VariableToken::Variable(self.buffer.clone());
+                            let output = VariableToken::Variable(convert_to_string(self.buffer.clone()));
                             self.buffer.clear();
                             self.buffer.push(character);
                             self.flags &= 255 ^ VAR_FOUND;
                             return Some(output);
                         }
                     },
-                    '$' => {
-                        let output = VariableToken::Variable(self.buffer.clone());
+                    b'$' => {
+                        let output = VariableToken::Variable(convert_to_string(self.buffer.clone()));
                         self.buffer.clear();
                         return Some(output);
                     },
-                    ' ' | ':' | ',' | '@' | '#' | '}' | ')' => {
-                        let output = VariableToken::Variable(self.buffer.clone());
+                    b' ' | b':' | b',' | b'@' | b'#' | b'}' | b')' => {
+                        let output = VariableToken::Variable(convert_to_string(self.buffer.clone()));
                         self.buffer.clear();
                         self.buffer.push(character);
                         self.flags &= 255 ^ VAR_FOUND;
@@ -136,11 +136,11 @@ impl<'a> Iterator for VariableIterator<'a> {
                 }
             } else {
                 match character {
-                    '$' if self.buffer.is_empty() => {
+                    b'$' if self.buffer.is_empty() => {
                         self.flags |= VAR_FOUND;
                     },
-                    '$' => {
-                        let output = VariableToken::Normal(self.buffer.clone());
+                    b'$' => {
+                        let output = VariableToken::Normal(convert_to_string(self.buffer.clone()));
                         self.buffer.clear();
                         self.flags |= VAR_FOUND;
                         return Some(output);
@@ -154,15 +154,20 @@ impl<'a> Iterator for VariableIterator<'a> {
             None
         } else if self.flags & VAR_FOUND == VAR_FOUND {
             self.flags &= 255 ^ VAR_FOUND;
-            let output = VariableToken::Variable(self.buffer.clone());
+            let output = VariableToken::Variable(convert_to_string(self.buffer.clone()));
             self.buffer.clear();
             Some(output)
         } else {
-            let output = VariableToken::Normal(self.buffer.clone());
+            let output = VariableToken::Normal(convert_to_string(self.buffer.clone()));
             self.buffer.clear();
             Some(output)
         }
     }
+}
+
+#[inline]
+fn convert_to_string(data: Vec<u8>) -> String {
+    unsafe { String::from_utf8_unchecked(data) }
 }
 
 #[test]

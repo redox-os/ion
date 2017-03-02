@@ -25,9 +25,9 @@ pub enum WordToken<'a> {
 }
 
 pub struct WordIterator<'a> {
-    data:         &'a str,
-    read:         usize,
-    flags:        u8
+    data:  &'a str,
+    read:  usize,
+    flags: u8
 }
 
 impl<'a> WordIterator<'a> {
@@ -50,14 +50,14 @@ impl<'a> Iterator for WordIterator<'a> {
             let mut break_char = None;
             let mut backslash = false;
             self.flags &= 255 ^ (BRACES + TILDE + VARIABLES + PREV_WAS_VAR + OPEN_BRACE);
-            for character in self.data.chars().skip(self.read) {
+            for character in self.data.bytes().skip(self.read) {
                 if backslash {
                     backslash = false;
-                    if character == '$' { self.flags |= VARIABLES; }
-                } else if character == '\\' {
+                    if character == b'$' { self.flags |= VARIABLES; }
+                } else if character == b'\\' {
                     backslash = true;
                     self.flags &= 255 ^ PREV_WAS_VAR;
-                } else if character == '\'' && self.flags & DOUBLE_QUOTE != DOUBLE_QUOTE {
+                } else if character == b'\'' && self.flags & DOUBLE_QUOTE != DOUBLE_QUOTE {
                     if start != self.read {
                         let return_value = collect_at_single_quote(self.flags, start, self.read, self.data);
                         self.read += 1;
@@ -66,7 +66,7 @@ impl<'a> Iterator for WordIterator<'a> {
                     }
                     start += 1;
                     self.flags ^= SINGLE_QUOTE
-                } else if character == '"' && self.flags & SINGLE_QUOTE != SINGLE_QUOTE {
+                } else if character == b'"' && self.flags & SINGLE_QUOTE != SINGLE_QUOTE {
                     if start != self.read {
                         let return_value = collect_at_double_quote(self.flags, start, self.read, self.data);
                         self.read += 1;
@@ -75,23 +75,23 @@ impl<'a> Iterator for WordIterator<'a> {
                     }
                     start += 1;
                     self.flags ^= DOUBLE_QUOTE;
-                } else if character == '{' && self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 {
+                } else if character == b'{' && self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 {
                     if self.flags & PREV_WAS_VAR != PREV_WAS_VAR { self.flags |= BRACES; }
                     if self.flags & OPEN_BRACE == OPEN_BRACE { return Some(Err(ExpandErr::InnerBracesNotImplemented)); }
                     open_brace_id = self.read;
                     self.flags |= OPEN_BRACE;
-                } else if character == '}' && self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 {
+                } else if character == b'}' && self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 {
                     if self.flags & OPEN_BRACE != OPEN_BRACE { return Some(Err(ExpandErr::UnmatchedBraces(self.read))); }
                     self.flags &= 255 ^ OPEN_BRACE;
-                } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && character == '(' && self.flags & PREV_WAS_VAR == PREV_WAS_VAR {
-                    break_char = Some(')');
+                } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && character == b'(' && self.flags & PREV_WAS_VAR == PREV_WAS_VAR {
+                    break_char = Some(b')');
                     self.flags &= 255 ^ PREV_WAS_VAR;
-                } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && character == '$' {
+                } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && character == b'$' {
                     self.flags |= VARIABLES + PREV_WAS_VAR;
-                } else if self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 && character == '~' && start == self.read {
+                } else if self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 && character == b'~' && start == self.read {
                     self.flags |= TILDE;
                     self.flags &= 255 ^ PREV_WAS_VAR;
-                } else if character == ' ' && break_char.is_none() {
+                } else if character == b' ' && break_char.is_none() {
                     self.flags |= WHITESPACE;
                     return if self.flags & BRACES == BRACES {
                         Some(Ok(WordToken::Brace(&self.data[start..self.read], self.flags & VARIABLES == VARIABLES)))
@@ -116,8 +116,8 @@ impl<'a> Iterator for WordIterator<'a> {
 }
 
 fn collect_whitespaces<'a>(read: &mut usize, start: usize, data: &'a str) -> Option<WordToken<'a>> {
-    for character in data.chars().skip(*read) {
-        if character != ' ' {
+    for character in data.bytes().skip(*read) {
+        if character != b' ' {
             return Some(WordToken::Normal(&data[start..*read]));
         }
         *read += 1;
