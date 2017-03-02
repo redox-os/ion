@@ -126,7 +126,7 @@ impl<'a> PipelineIterator<'a> {
     fn new(match_str: &'a str) -> PipelineIterator<'a> {
         PipelineIterator {
             match_str:       match_str,
-            flags:           if match_str.chars().next().unwrap() == '#' { COMMENT } else { 0 },
+            flags:           if match_str.bytes().next().unwrap() == b'#' { COMMENT } else { 0 },
             index_start:     0,
             index_end:       0,
             white_pos:       0,
@@ -137,23 +137,23 @@ impl<'a> PipelineIterator<'a> {
 impl<'a> Iterator for PipelineIterator<'a> {
     type Item = &'a str;
     fn next(&mut self) -> Option<&'a str> {
-        for character in self.match_str.chars().skip(self.index_end) {
+        for character in self.match_str.bytes().skip(self.index_end) {
             if self.flags & COMMENT != 0 {
                 self.index_end += 1;
-                if character == '\n' {
+                if character == b'\n' {
                     self.flags &= 255 ^ COMMENT;
                     self.index_start = self.index_end;
                 }
             } else {
                 match character {
                     _ if self.flags & BACKSLASH != 0                        => self.flags ^= BACKSLASH,
-                    '\\'                                                    => self.flags |= BACKSLASH,
-                    '\'' if self.flags & (PROCESS_TWO + DOUBLE_QUOTE) == 0  => self.flags ^= SINGLE_QUOTE,
-                    '"'  if self.flags & (PROCESS_TWO + SINGLE_QUOTE) == 0  => self.flags ^= DOUBLE_QUOTE,
-                    '$'  if self.flags & PROCESS_VAL == 0                   => self.flags |= PROCESS_ONE,
-                    '('  if self.flags & PROCESS_VAL == PROCESS_ONE         => self.flags ^= PROCESS_ONE + PROCESS_TWO,
-                    ')'  if self.flags & PROCESS_VAL == PROCESS_TWO         => self.flags &= 255 ^ PROCESS_TWO,
-                    '#'  if self.flags == WHITESPACE => {
+                    b'\\'                                                    => self.flags |= BACKSLASH,
+                    b'\'' if self.flags & (PROCESS_TWO + DOUBLE_QUOTE) == 0  => self.flags ^= SINGLE_QUOTE,
+                    b'"'  if self.flags & (PROCESS_TWO + SINGLE_QUOTE) == 0  => self.flags ^= DOUBLE_QUOTE,
+                    b'$'  if self.flags & PROCESS_VAL == 0                   => self.flags |= PROCESS_ONE,
+                    b'('  if self.flags & PROCESS_VAL == PROCESS_ONE         => self.flags ^= PROCESS_ONE + PROCESS_TWO,
+                    b')'  if self.flags & PROCESS_VAL == PROCESS_TWO         => self.flags &= 255 ^ PROCESS_TWO,
+                    b'#'  if self.flags == WHITESPACE => {
                         if self.index_start < self.white_pos {
                             let command = &self.match_str[self.index_start..self.white_pos];
                             self.index_start = self.index_end + 1;
@@ -165,14 +165,14 @@ impl<'a> Iterator for PipelineIterator<'a> {
                             self.flags |= COMMENT;
                         }
                     },
-                    ' ' | '\t' if self.flags & IS_VALID == 0 => {
+                    b' ' | b'\t' if self.flags & IS_VALID == 0 => {
                         if self.index_start == self.index_end { self.index_start += 1; }
                         self.flags |= WHITESPACE;
                         if self.white_pos == 0 { self.white_pos = self.index_end; }
                         self.index_end += 1;
                         continue
                     },
-                    ';' | '\n' | '\r' if self.flags & IS_VALID == 0 => {
+                    b';' | b'\n' | b'\r' if self.flags & IS_VALID == 0 => {
                         if self.index_start == self.index_end {
                             self.index_start += 1;
                             self.flags |= WHITESPACE;
@@ -220,7 +220,7 @@ enum RedirMode { False, Stdin, Stdout, StdoutAppend }
 pub fn collect_pipelines(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>, command: &str) {
     for args in PipelineIterator::new(command) {
         let mut jobs: Vec<Job> = Vec::new();
-        let mut args_iter = args.chars();
+        let mut args_iter = args.bytes();
         let (mut index, mut arg_start) = (0, 0);
         let mut flags = 0u8; // (backslash, single_quote, double_quote, x, x, x, process_one, process_two)
 
@@ -235,7 +235,10 @@ pub fn collect_pipelines(pipelines: &mut Vec<Pipeline>, possible_error: &mut Opt
                     if $name.is_empty() {
                         *possible_error = Some("missing standard output file argument after '>'");
                     } else {
-                        $file = Some(Redirection { file: $name, append: $is_append });
+                        $file = Some(Redirection {
+                            file: unsafe { String::from_utf8_unchecked($name) },
+                            append: $is_append
+                        });
                     }
                 }
             }}
@@ -252,6 +255,9 @@ pub fn collect_pipelines(pipelines: &mut Vec<Pipeline>, possible_error: &mut Opt
                     if arguments.is_empty() {
                         jobs.push(Job::new(vec![args[arg_start..index].to_owned()], $is_background));
                     } else {
+                        if args.as_bytes()[index-1] != b' ' {
+                            arguments.push(args[arg_start..index].to_owned());
+                        }
                         jobs.push(Job::new(arguments.clone(), $is_background));
                         arguments.clear();
                     }
@@ -263,14 +269,14 @@ pub fn collect_pipelines(pipelines: &mut Vec<Pipeline>, possible_error: &mut Opt
                 RedirMode::False => {
                     while let Some(character) = args_iter.next() {
                         match character {
-                            _ if flags & BACKSLASH != 0                => flags ^= BACKSLASH,
-                            '\\'                                       => flags ^= BACKSLASH,
-                            '$'  if flags & PROCESS_VAL == 0           => flags |= PROCESS_ONE,
-                            '('  if flags & PROCESS_VAL == PROCESS_ONE => flags ^= PROCESS_ONE + PROCESS_TWO,
-                            ')'  if flags & PROCESS_VAL == PROCESS_TWO => flags &= 255 ^ PROCESS_TWO,
-                            '\''                                       => flags ^= SINGLE_QUOTE,
-                            '"'                                        => flags ^= DOUBLE_QUOTE,
-                            ' ' | '\t' if (flags & IS_VALID == 0) => {
+                            _ if flags & BACKSLASH != 0                 => flags ^= BACKSLASH,
+                            b'\\'                                       => flags ^= BACKSLASH,
+                            b'$'  if flags & PROCESS_VAL == 0           => flags |= PROCESS_ONE,
+                            b'('  if flags & PROCESS_VAL == PROCESS_ONE => flags ^= PROCESS_ONE + PROCESS_TWO,
+                            b')'  if flags & PROCESS_VAL == PROCESS_TWO => flags &= 255 ^ PROCESS_TWO,
+                            b'\''                                       => flags ^= SINGLE_QUOTE,
+                            b'"'                                        => flags ^= DOUBLE_QUOTE,
+                            b' ' | b'\t' if (flags & IS_VALID == 0) => {
                                 if arg_start != index {
                                     arguments.push(args[arg_start..index].to_owned());
                                     arg_start = index + 1;
@@ -278,10 +284,10 @@ pub fn collect_pipelines(pipelines: &mut Vec<Pipeline>, possible_error: &mut Opt
                                     arg_start += 1;
                                 }
                             },
-                            '|' if (flags & IS_VALID == 0) => job_found!(false),
-                            '&' if (flags & IS_VALID == 0) => job_found!(true),
-                            '>' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdout),
-                            '<' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdin),
+                            b'|' if (flags & (255 ^ (BACKSLASH + COMMENT)) == 0) => job_found!(false),
+                            b'&' if (flags & IS_VALID == 0) => job_found!(true),
+                            b'>' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdout),
+                            b'<' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdin),
                             _   if (flags >> 6 != 2)       => flags &= 255 ^ (PROCESS_ONE + PROCESS_TWO),
                             _ => (),
                         }
@@ -291,18 +297,18 @@ pub fn collect_pipelines(pipelines: &mut Vec<Pipeline>, possible_error: &mut Opt
                 },
                 RedirMode::Stdout | RedirMode::StdoutAppend => {
                     match args_iter.next() {
-                        Some(character) => if character == '>' { mode = RedirMode::StdoutAppend; },
+                        Some(character) => if character == b'>' { mode = RedirMode::StdoutAppend; },
                         None => {
                             *possible_error = Some("missing standard output file argument after '>'");
                             break 'outer
                         }
                     }
 
-                    let mut stdout_file = String::new();
+                    let mut stdout_file = Vec::new();
                     let mut found_file = false;
                     while let Some(character) = args_iter.next() {
                         if found_file {
-                            if character == '<' {
+                            if character == b'<' {
                                 if in_file.is_some() {
                                     break 'outer
                                 } else {
@@ -316,22 +322,22 @@ pub fn collect_pipelines(pipelines: &mut Vec<Pipeline>, possible_error: &mut Opt
                                     stdout_file.push(character);
                                     flags ^= BACKSLASH;
                                 }
-                                '\\' => flags ^= BACKSLASH,
-                                ' ' | '\t' | '|' if stdout_file.is_empty() => (),
-                                ' ' | '\t' | '|' => {
+                                b'\\' => flags ^= BACKSLASH,
+                                b' ' | b'\t' | b'|' if stdout_file.is_empty() => (),
+                                b' ' | b'\t' | b'|' => {
                                     found_file = true;
                                     out_file = Some(Redirection {
-                                        file: stdout_file.clone(),
+                                        file: unsafe { String::from_utf8_unchecked(stdout_file.clone()) },
                                         append: mode == RedirMode::StdoutAppend
                                     });
                                 },
-                                '<' if stdout_file.is_empty() => {
+                                b'<' if stdout_file.is_empty() => {
                                     *possible_error = Some("missing standard output file argument after '>'");
                                     break 'outer
                                 }
-                                '<' => {
+                                b'<' => {
                                     out_file = Some(Redirection {
-                                        file: stdout_file.clone(),
+                                        file: unsafe { String::from_utf8_unchecked(stdout_file.clone()) },
                                         append: mode == RedirMode::StdoutAppend
                                     });
 
@@ -352,12 +358,12 @@ pub fn collect_pipelines(pipelines: &mut Vec<Pipeline>, possible_error: &mut Opt
                     break 'outer
                 },
                 RedirMode::Stdin => {
-                    let mut stdin_file = String::new();
+                    let mut stdin_file = Vec::new();
                     let mut found_file = false;
 
                     while let Some(character) = args_iter.next() {
                         if found_file {
-                            if character == '>' {
+                            if character == b'>' {
                                 if out_file.is_some() {
                                     break 'outer
                                 } else {
@@ -371,18 +377,24 @@ pub fn collect_pipelines(pipelines: &mut Vec<Pipeline>, possible_error: &mut Opt
                                     stdin_file.push(character);
                                     flags ^= BACKSLASH;
                                 }
-                                '\\' => flags ^= BACKSLASH,
-                                ' ' | '\t' | '|' if stdin_file.is_empty() => (),
-                                ' ' | '\t' | '|' => {
+                                b'\\' => flags ^= BACKSLASH,
+                                b' ' | b'\t' | b'|' if stdin_file.is_empty() => (),
+                                b' ' | b'\t' | b'|' => {
                                     found_file = true;
-                                    in_file = Some(Redirection { file: stdin_file.clone(), append: false });
+                                    in_file = Some(Redirection {
+                                        file: unsafe { String::from_utf8_unchecked(stdin_file.clone()) },
+                                        append: false
+                                    });
                                 },
-                                '>' if stdin_file.is_empty() => {
+                                b'>' if stdin_file.is_empty() => {
                                     *possible_error = Some("missing standard input file argument after '<'");
                                     break 'outer
                                 }
-                                '>' => {
-                                    in_file = Some(Redirection { file: stdin_file.clone(), append: false });
+                                b'>' => {
+                                    in_file = Some(Redirection {
+                                        file: unsafe { String::from_utf8_unchecked(stdin_file.clone()) },
+                                        append: false
+                                    });
 
                                     if out_file.is_some() {
                                         break 'outer

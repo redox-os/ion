@@ -14,24 +14,24 @@ pub fn expand_braces(output: &mut String, input: &str) {
     let mut expander_found                    = false;
     let mut backslash                         = false;
 
-    for (id, character) in input.chars().enumerate() {
+    for (id, character) in input.bytes().enumerate() {
         if backslash {
             backslash = false;
-        } else if character == '\\' {
+        } else if character == b'\\' {
             backslash = true;
         } else if expander_found {
-            if character == '}' {
+            if character == b'}' {
                 expander_found = false;
                 current_expander.push(&input[start..id]);
                 start = id+1;
                 tokens.push(BraceToken::Expander);
                 expanders.push(current_expander.clone());
                 current_expander.clear();
-            } else if character == ',' {
+            } else if character == b',' {
                 current_expander.push(&input[start..id]);
                 start = id+1;
             }
-        } else if character == '{' {
+        } else if character == b'{' {
             expander_found = true;
             if id != start {
                 tokens.push(BraceToken::Normal(&input[start..id]));
