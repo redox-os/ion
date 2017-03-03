@@ -37,6 +37,55 @@ pub mod flow_control;
 pub mod status;
 pub mod function;
 
+struct StatementSplitter<'a> {
+    data: &'a str,
+    read: usize,
+    flags: u8
+}
+
+impl<'a> StatementSplitter<'a> {
+    fn new(data: &'a str) -> StatementSplitter<'a> {
+        StatementSplitter { data: data, read: 0, flags: 0 }
+    }
+}
+
+const SQUOTE: u8 = 1;
+const DQUOTE: u8 = 2;
+const BACKSL: u8 = 4;
+const COMM_1: u8 = 8;
+const COMM_2: u8 = 16;
+
+impl<'a> Iterator for StatementSplitter<'a> {
+    type Item = &'a str;
+    fn next(&mut self) -> Option<&'a str> {
+        let start = self.read;
+        for character in self.data.bytes().skip(self.read) {
+            self.read += 1;
+            match character {
+                _ if self.flags & BACKSL != 0                => self.flags ^= BACKSL,
+                b'\'' if self.flags & DQUOTE == 0            => self.flags ^= SQUOTE,
+                b'"'  if self.flags & SQUOTE == 0            => self.flags ^= DQUOTE,
+                b'\\' if self.flags & (SQUOTE + DQUOTE) == 0 => self.flags |= BACKSL,
+                b'$'  if self.flags & (SQUOTE + DQUOTE) == 0 => { self.flags |= COMM_1; continue },
+                b'('  if self.flags & COMM_1 != 0            => self.flags |= COMM_2,
+                b')'  if self.flags & COMM_2 != 0            => self.flags ^= COMM_2,
+                b';'  if self.flags & (SQUOTE + DQUOTE + COMM_2) == 0 => {
+                    return Some(&self.data[start..self.read-1])
+                }
+                _ => ()
+            }
+            self.flags &= 255 ^ COMM_1;
+        }
+
+        if start == self.read {
+            None
+        } else {
+            self.read = self.data.len();
+            Some(&self.data[start..])
+        }
+    }
+}
+
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell {
@@ -154,7 +203,9 @@ impl Shell {
         while let Some(command) = self.readln() {
             let command = command.trim();
             if ! command.is_empty() {
-                self.on_command(command);
+                for statement in StatementSplitter::new(command) {
+                    self.on_command(statement);
+                }
             }
             self.update_variables();
         }
@@ -255,7 +306,6 @@ impl Shell {
             Statement::Pipelines(pipelines)        => self.handle_pipelines(pipelines),
             _                                      => {}
         }
-
     }
 
     fn handle_if(&mut self, left: String, comparitor: Comparitor, right: String) {
