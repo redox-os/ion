@@ -21,7 +21,7 @@ use completer::MultiCompleter;
 use directory_stack::DirectoryStack;
 use peg::{parse, Pipeline};
 use variables::Variables;
-use flow_control::{FlowControl, Statement, Comparitor, parse_for};
+use flow_control::{FlowControl, Statement, Comparitor, parse_for, ForKind};
 use status::{SUCCESS, NO_SUCH_COMMAND};
 use function::Function;
 use pipe::execute_pipeline;
@@ -291,10 +291,23 @@ impl Shell {
                     .pipelines
                     .drain(..)
                     .collect();
-                for value in parse_for(vals.as_str(), &self.directory_stack, &self.variables).split_whitespace() {
-                    self.variables.set_var(&var, value);
-                    for pipeline in &block_jobs {
-                        self.run_pipeline(pipeline);
+
+                match parse_for(vals.as_str(), &self.directory_stack, &self.variables) {
+                    ForKind::Normal(expression) => {
+                        for value in expression.split_whitespace() {
+                            self.variables.set_var(&var, value);
+                            for pipeline in &block_jobs {
+                                self.run_pipeline(pipeline);
+                            }
+                        }
+                    },
+                    ForKind::Range(start, end) => {
+                        for value in (start..end).map(|x| x.to_string()) {
+                            self.variables.set_var(&var, &value);
+                            for pipeline in &block_jobs {
+                                self.run_pipeline(pipeline);
+                            }
+                        }
                     }
                 }
             },

@@ -78,7 +78,12 @@ impl Default for FlowControl {
     }
 }
 
-pub fn parse_for(expression: &str, dir_stack: &DirectoryStack, variables: &Variables) -> String {
+pub enum ForKind {
+    Normal(String),
+    Range(usize, usize)
+}
+
+pub fn parse_for(expression: &str, dir_stack: &DirectoryStack, variables: &Variables) -> ForKind {
     let mut output = String::new();
     let mut word_iterator = WordIterator::new(expression);
 
@@ -117,5 +122,35 @@ pub fn parse_for(expression: &str, dir_stack: &DirectoryStack, variables: &Varia
         }
     }
 
-    output
+    {
+        let mut bytes_iterator = output.bytes().enumerate();
+        while let Some((id, byte)) = bytes_iterator.next() {
+            match byte {
+                b'0'...b'9' => continue,
+                b'.' => match output[0..id].parse::<usize>().ok() {
+                    Some(first_number) => {
+                        let mut dots = 1;
+                        for (_, byte) in bytes_iterator {
+                            if byte == b'.' { dots += 1 } else { break }
+                        }
+
+                        match output[id+dots..].parse::<usize>().ok() {
+                            Some(second_number) => {
+                                match dots {
+                                    2 => return ForKind::Range(first_number, second_number),
+                                    3 => return ForKind::Range(first_number, second_number+1),
+                                    _ => break
+                                }
+                            },
+                            None => break
+                        }
+                    },
+                    None => break
+                },
+                _ => break
+            }
+        }
+    }
+
+    ForKind::Normal(output)
 }
