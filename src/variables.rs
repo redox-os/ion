@@ -115,7 +115,7 @@ impl Variables {
     }
 
     pub fn get_var(&self, name: &str) -> Option<String> {
-        self.variables.get(name).cloned().or(env::var(name).ok())
+        self.variables.get(name).cloned().or_else(|| env::var(name).ok())
     }
 
     pub fn get_var_or_empty(&self, name: &str) -> String {
@@ -337,7 +337,7 @@ impl Variables {
     pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> Result<String, ExpandErr> {
         let tilde_fn    = |tilde:    &str| self.tilde_expansion(tilde, dir_stack);
         let variable_fn = |variable: &str, quoted: bool| {
-            if quoted { self.get_var(variable) } else { self.get_var(variable).map(|x| x.replace("\n", " ")) } 
+            if quoted { self.get_var(variable) } else { self.get_var(variable).map(|x| x.replace("\n", " ")) }
         };
         let command_fn  = |command:  &str, quoted: bool| self.command_expansion(command, quoted);
         shell_expand::expand_string(original, tilde_fn, variable_fn, command_fn)

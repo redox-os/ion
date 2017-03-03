@@ -39,7 +39,12 @@ _arg -> String
 
 #[pub]
 for_ -> Statement
-    = whitespace* "for " n:_name " in " args:_args whitespace* { Statement::For{variable: n.to_string(), values: args} }
+    = whitespace* "for " n:_name " in " expr:$(.*) {
+        Statement::For{
+            variable: n.to_string(),
+            values:   expr.to_string(),
+        }
+    }
 
 comparitor -> Comparitor
     = "==" { Comparitor::Equal }

@@ -2,7 +2,6 @@
 #![feature(box_syntax)]
 #![feature(plugin)]
 #![plugin(peg_syntax_ext)]
-
 extern crate glob;
 extern crate liner;
 mod shell_expand;
@@ -18,15 +17,15 @@ use std::time::SystemTime;
 
 use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter, BasicCompleter};
 
-use self::completer::MultiCompleter;
-use self::directory_stack::DirectoryStack;
-use self::peg::{parse, Pipeline};
-use self::variables::Variables;
-use self::flow_control::{FlowControl, Statement, Comparitor};
-use self::status::{SUCCESS, NO_SUCH_COMMAND};
-use self::function::Function;
-use self::pipe::execute_pipeline;
-use self::shell_expand::ExpandErr;
+use completer::MultiCompleter;
+use directory_stack::DirectoryStack;
+use peg::{parse, Pipeline};
+use variables::Variables;
+use flow_control::{FlowControl, Statement, Comparitor, parse_for, ForKind};
+use status::{SUCCESS, NO_SUCH_COMMAND};
+use function::Function;
+use pipe::execute_pipeline;
+use shell_expand::ExpandErr;
 
 pub mod completer;
 pub mod pipe;
@@ -283,24 +282,34 @@ impl Shell {
         self.flow_control.modes.push(flow_control::Mode{value: value})
     }
 
-
     fn handle_end(&mut self){
         self.flow_control.collecting_block = false;
         match self.flow_control.current_statement.clone() {
             Statement::For{variable: ref var, values: ref vals} => {
-                    let block_jobs: Vec<Pipeline> = self.flow_control
-                        .current_block
-                        .pipelines
-                        .drain(..)
-                        .collect();
-                let variable = var.clone();
-                let values = vals.clone();
-                for value in values {
-                    self.variables.set_var(&variable, &value);
-                    for pipeline in &block_jobs {
-                        self.run_pipeline(pipeline);
+                let block_jobs: Vec<Pipeline> = self.flow_control
+                    .current_block
+                    .pipelines
+                    .drain(..)
+                    .collect();
+
+                match parse_for(vals.as_str(), &self.directory_stack, &self.variables) {
+                    ForKind::Normal(expression) => {
+                        for value in expression.split_whitespace() {
+                            self.variables.set_var(&var, value);
+                            for pipeline in &block_jobs {
+                                self.run_pipeline(pipeline);
+                            }
+                        }
+                    },
+                    ForKind::Range(start, end) => {
+                        for value in (start..end).map(|x| x.to_string()) {
+                            self.variables.set_var(&var, &value);
+                            for pipeline in &block_jobs {
+                                self.run_pipeline(pipeline);
+                            }
                         }
                     }
+                }
             },
             Statement::Function{ref name, ref args} => {
                     let block_jobs: Vec<Pipeline> = self.flow_control
