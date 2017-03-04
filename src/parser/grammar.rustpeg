@@ -1,5 +1,5 @@
-use peg::Pipeline;
-use peg::collect_pipelines;
+use parser::peg::Pipeline;
+use parser::pipelines;
 use flow_control::Statement;
 use flow_control::Comparitor;
 
@@ -39,7 +39,7 @@ _arg -> String
 
 #[pub]
 for_ -> Statement
-    = whitespace* "for " n:_name " in " whitespace* expr:$(.*) {
+    = whitespace* "for" whitespace? n:_name whitespace? "in" whitespace? expr:$(.*) {
         Statement::For { variable: n.to_string(), values: expr.to_string() }
     }
 
@@ -67,7 +67,7 @@ _pipelines -> Statement
     let mut possible_error = None;
     let mut pipelines: Vec<Pipeline> = Vec::new();
 
-    collect_pipelines(&mut pipelines, &mut possible_error, command);
+    pipelines::collect(&mut pipelines, &mut possible_error, command);
 
     if possible_error.is_none() {
         Ok(Statement::Pipelines(pipelines))

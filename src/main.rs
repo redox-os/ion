@@ -4,7 +4,6 @@
 #![plugin(peg_syntax_ext)]
 extern crate glob;
 extern crate liner;
-mod shell_expand;
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -19,72 +18,24 @@ use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter, BasicC
 
 use completer::MultiCompleter;
 use directory_stack::DirectoryStack;
-use peg::{parse, Pipeline};
 use variables::Variables;
-use flow_control::{FlowControl, Statement, Comparitor, parse_for, ForKind};
 use status::{SUCCESS, NO_SUCH_COMMAND};
 use function::Function;
 use pipe::execute_pipeline;
-use shell_expand::ExpandErr;
+use parser::shell_expand::ExpandErr;
+use parser::{ForExpression, StatementSplitter};
+use parser::peg::{parse, Pipeline};
+use flow_control::{FlowControl, Statement, Comparitor};
 
 pub mod completer;
 pub mod pipe;
 pub mod directory_stack;
 pub mod to_num;
-pub mod peg;
 pub mod variables;
-pub mod flow_control;
 pub mod status;
 pub mod function;
-
-struct StatementSplitter<'a> {
-    data: &'a str,
-    read: usize,
-    flags: u8
-}
-
-impl<'a> StatementSplitter<'a> {
-    fn new(data: &'a str) -> StatementSplitter<'a> {
-        StatementSplitter { data: data, read: 0, flags: 0 }
-    }
-}
-
-const SQUOTE: u8 = 1;
-const DQUOTE: u8 = 2;
-const BACKSL: u8 = 4;
-const COMM_1: u8 = 8;
-const COMM_2: u8 = 16;
-
-impl<'a> Iterator for StatementSplitter<'a> {
-    type Item = &'a str;
-    fn next(&mut self) -> Option<&'a str> {
-        let start = self.read;
-        for character in self.data.bytes().skip(self.read) {
-            self.read += 1;
-            match character {
-                _ if self.flags & BACKSL != 0                => self.flags ^= BACKSL,
-                b'\'' if self.flags & DQUOTE == 0            => self.flags ^= SQUOTE,
-                b'"'  if self.flags & SQUOTE == 0            => self.flags ^= DQUOTE,
-                b'\\' if self.flags & (SQUOTE + DQUOTE) == 0 => self.flags |= BACKSL,
-                b'$'  if self.flags & (SQUOTE + DQUOTE) == 0 => { self.flags |= COMM_1; continue },
-                b'('  if self.flags & COMM_1 != 0            => self.flags |= COMM_2,
-                b')'  if self.flags & COMM_2 != 0            => self.flags ^= COMM_2,
-                b';'  if self.flags & (SQUOTE + DQUOTE + COMM_2) == 0 => {
-                    return Some(&self.data[start..self.read-1])
-                }
-                _ => ()
-            }
-            self.flags &= 255 ^ COMM_1;
-        }
-
-        if start == self.read {
-            None
-        } else {
-            self.read = self.data.len();
-            Some(&self.data[start..])
-        }
-    }
-}
+pub mod flow_control;
+mod parser;
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
@@ -342,18 +293,18 @@ impl Shell {
                     .drain(..)
                     .collect();
 
-                match parse_for(vals.as_str(), &self.directory_stack, &self.variables) {
-                    ForKind::Normal(expression) => {
+                match ForExpression::new(vals.as_str(), &self.directory_stack, &self.variables) {
+                    ForExpression::Normal(expression) => {
                         for value in expression.split_whitespace() {
-                            self.variables.set_var(&var, value);
+                            self.variables.set_var(var, value);
                             for pipeline in &block_jobs {
                                 self.run_pipeline(pipeline);
                             }
                         }
                     },
-                    ForKind::Range(start, end) => {
+                    ForExpression::Range(start, end) => {
                         for value in (start..end).map(|x| x.to_string()) {
-                            self.variables.set_var(&var, &value);
+                            self.variables.set_var(var, &value);
                             for pipeline in &block_jobs {
                                 self.run_pipeline(pipeline);
                             }
