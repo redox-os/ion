@@ -1,4 +1,4 @@
-use super::peg::Pipeline;
+use parser::peg::Pipeline;
 
 #[derive(Clone)]
 pub struct Function {

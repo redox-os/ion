@@ -7,10 +7,10 @@ use std::process;
 
 use liner::Context;
 
-use super::peg::{Pipeline, Job};
-use super::status::{SUCCESS, FAILURE};
-use super::directory_stack::DirectoryStack;
-use super::shell_expand::{self, ExpandErr};
+use parser::peg::{Pipeline, Job};
+use status::{SUCCESS, FAILURE};
+use directory_stack::DirectoryStack;
+use parser::shell_expand::{self, ExpandErr};
 
 pub struct Variables {
     variables: BTreeMap<String, String>,

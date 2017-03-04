@@ -33,10 +33,10 @@ enum VariableToken {
 
 /// A `VariableIterator` searches for variable patterns within a character array, returning `VariableToken`s.
 struct VariableIterator<'a> {
-    data:            &'a str,
-    buffer:          Vec<u8>,
-    flags:           u8,
-    read:            usize,
+    data:   &'a str,
+    buffer: Vec<u8>,
+    flags:  u8,
+    read:   usize,
 }
 
 /// Bit flags used by `VariableIterator`'s flags field.
@@ -60,6 +60,7 @@ impl<'a> Iterator for VariableIterator<'a> {
     type Item = VariableToken;
 
     fn next(&mut self) -> Option<VariableToken> {
+        let mut levels = 0;
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             if character == b'\\' {
@@ -82,14 +83,23 @@ impl<'a> Iterator for VariableIterator<'a> {
                     self.buffer.push(character);
                 }
             } else if self.flags & PARENS_VAR == PARENS_VAR {
-                if character == b')' {
-                    let output = VariableToken::Command(convert_to_string(self.buffer.clone()));
-                    self.buffer.clear();
-                    self.flags &= 255 ^ PARENS_VAR;
-                    return Some(output);
-                } else {
+                if character == b'$' {
                     self.buffer.push(character);
+                    self.flags |= VAR_FOUND;
+                    continue
+                } else if character == b')' {
+                    levels -= 1;
+                    if levels == 0 {
+                        let output = VariableToken::Command(convert_to_string(self.buffer.clone()));
+                        self.buffer.clear();
+                        self.flags &= 255 ^ PARENS_VAR;
+                        return Some(output);
+                    }
+                } else if character == b'(' && self.flags & VAR_FOUND != 0 {
+                    levels += 1;
                 }
+                self.flags &= 255 ^ VAR_FOUND;
+                self.buffer.push(character);
             } else if self.flags & VAR_FOUND == VAR_FOUND {
                 match character {
                     b'{' => {
@@ -110,6 +120,7 @@ impl<'a> Iterator for VariableIterator<'a> {
                         if self.read < 3 || (self.data.bytes().nth(self.read-2).unwrap() == b'$'
                             && self.data.bytes().nth(self.read-3).unwrap() != b'\\')
                         {
+                            levels += 1;
                             self.flags |= PARENS_VAR;
                             self.flags &= 255 ^ VAR_FOUND;
                         } else {

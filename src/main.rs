@@ -4,7 +4,6 @@
 #![plugin(peg_syntax_ext)]
 extern crate glob;
 extern crate liner;
-mod shell_expand;
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -19,72 +18,24 @@ use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter, BasicC
 
 use completer::MultiCompleter;
 use directory_stack::DirectoryStack;
-use peg::{parse, Pipeline};
 use variables::Variables;
-use flow_control::{FlowControl, Statement, Comparitor, parse_for, ForKind};
 use status::{SUCCESS, NO_SUCH_COMMAND};
 use function::Function;
 use pipe::execute_pipeline;
-use shell_expand::ExpandErr;
+use parser::shell_expand::ExpandErr;
+use parser::{ForExpression, StatementSplitter};
+use parser::peg::{parse, Pipeline};
+use flow_control::{FlowControl, Statement, Comparitor};
 
 pub mod completer;
 pub mod pipe;
 pub mod directory_stack;
 pub mod to_num;
-pub mod peg;
 pub mod variables;
-pub mod flow_control;
 pub mod status;
 pub mod function;
-
-struct StatementSplitter<'a> {
-    data: &'a str,
-    read: usize,
-    flags: u8
-}
-
-impl<'a> StatementSplitter<'a> {
-    fn new(data: &'a str) -> StatementSplitter<'a> {
-        StatementSplitter { data: data, read: 0, flags: 0 }
-    }
-}
-
-const SQUOTE: u8 = 1;
-const DQUOTE: u8 = 2;
-const BACKSL: u8 = 4;
-const COMM_1: u8 = 8;
-const COMM_2: u8 = 16;
-
-impl<'a> Iterator for StatementSplitter<'a> {
-    type Item = &'a str;
-    fn next(&mut self) -> Option<&'a str> {
-        let start = self.read;
-        for character in self.data.bytes().skip(self.read) {
-            self.read += 1;
-            match character {
-                _ if self.flags & BACKSL != 0                => self.flags ^= BACKSL,
-                b'\'' if self.flags & DQUOTE == 0            => self.flags ^= SQUOTE,
-                b'"'  if self.flags & SQUOTE == 0            => self.flags ^= DQUOTE,
-                b'\\' if self.flags & (SQUOTE + DQUOTE) == 0 => self.flags |= BACKSL,
-                b'$'  if self.flags & (SQUOTE + DQUOTE) == 0 => { self.flags |= COMM_1; continue },
-                b'('  if self.flags & COMM_1 != 0            => self.flags |= COMM_2,
-                b')'  if self.flags & COMM_2 != 0            => self.flags ^= COMM_2,
-                b';'  if self.flags & (SQUOTE + DQUOTE + COMM_2) == 0 => {
-                    return Some(&self.data[start..self.read-1])
-                }
-                _ => ()
-            }
-            self.flags &= 255 ^ COMM_1;
-        }
-
-        if start == self.read {
-            None
-        } else {
-            self.read = self.data.len();
-            Some(&self.data[start..])
-        }
-    }
-}
+pub mod flow_control;
+mod parser;
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
@@ -184,7 +135,7 @@ impl Shell {
                             let mut command_list = String::new();
                             match file.read_to_string(&mut command_list) {
                                 Ok(_) => {
-                                    for command in command_list.split('\n') {
+                                    for command in command_list.lines() {
                                         self.on_command(command);
                                     }
                                 },
@@ -203,9 +154,13 @@ impl Shell {
         while let Some(command) = self.readln() {
             let command = command.trim();
             if ! command.is_empty() {
-                for statement in StatementSplitter::new(command) {
-                    self.on_command(statement);
+                // Mark the command in the context history
+                self.set_context_history_from_vars();
+                if let Err(err) = self.context.history.push(command.into()) {
+                    println!("ion: {}", err);
                 }
+
+                self.on_command(command);
             }
             self.update_variables();
         }
@@ -240,7 +195,9 @@ impl Shell {
                 if let Err(message) = file.read_to_string(&mut command_list) {
                     println!("{}: Failed to read {:?}", message, source_file)
                 } else {
-                    self.on_command(&command_list)
+                    for command in command_list.lines() {
+                        self.on_command(command);
+                    }
                 }
             }
         });
@@ -285,40 +242,25 @@ impl Shell {
     }
 
     fn on_command(&mut self, command_string: &str) {
-        self.set_context_history_from_vars();
-
-        let trimmed_command = command_string.trim();
-        if !trimmed_command.is_empty() {
-            if let Err(err) = self.context.history.push(trimmed_command.into()) {
-                println!("ion: {}", err);
+        for statement in StatementSplitter::new(command_string) {
+            let update = parse(statement);
+            if update.is_flow_control() {
+                self.flow_control.current_statement = update.clone();
+                self.flow_control.collecting_block = true;
             }
-        }
 
-        let update = parse(command_string);
-        if update.is_flow_control() {
-            self.flow_control.current_statement = update.clone();
-            self.flow_control.collecting_block = true;
-        }
-
-        match update {
-            Statement::End                         => self.handle_end(),
-            Statement::If{left, right, comparitor} => self.handle_if(left, comparitor, right),
-            Statement::Pipelines(pipelines)        => self.handle_pipelines(pipelines),
-            _                                      => {}
+            match update {
+                Statement::End                         => self.handle_end(),
+                Statement::If{left, right, comparitor} => self.handle_if(left, comparitor, right),
+                Statement::Pipelines(pipelines)        => self.handle_pipelines(pipelines),
+                _                                      => {}
+            }
         }
     }
 
     fn handle_if(&mut self, left: String, comparitor: Comparitor, right: String) {
-
-        let left = match self.variables.expand_string(&left, &self.directory_stack) {
-            Ok(ref expanded_string) => { expanded_string.clone() },
-            Err(_) => { "".to_string() },
-        };
-
-        let right = match self.variables.expand_string(&right, &self.directory_stack) {
-            Ok(ref expanded_string) => { expanded_string.clone() },
-            Err(_) => { "".to_string() },
-        };
+        let left  = self.variables.expand_string(&left, &self.directory_stack).unwrap_or_else(|_| "".to_string());
+        let right = self.variables.expand_string(&right, &self.directory_stack).unwrap_or_else(|_| "".to_string());
 
         let value = match comparitor {
             Comparitor::GreaterThan        => { left >  right },
@@ -342,18 +284,18 @@ impl Shell {
                     .drain(..)
                     .collect();
 
-                match parse_for(vals.as_str(), &self.directory_stack, &self.variables) {
-                    ForKind::Normal(expression) => {
+                match ForExpression::new(vals.as_str(), &self.directory_stack, &self.variables) {
+                    ForExpression::Normal(expression) => {
                         for value in expression.split_whitespace() {
-                            self.variables.set_var(&var, value);
+                            self.variables.set_var(var, value);
                             for pipeline in &block_jobs {
                                 self.run_pipeline(pipeline);
                             }
                         }
                     },
-                    ForKind::Range(start, end) => {
+                    ForExpression::Range(start, end) => {
                         for value in (start..end).map(|x| x.to_string()) {
-                            self.variables.set_var(&var, &value);
+                            self.variables.set_var(var, &value);
                             for pipeline in &block_jobs {
                                 self.run_pipeline(pipeline);
                             }
@@ -513,7 +455,9 @@ impl Shell {
                         println!("{}: Failed to read {}", message, argument);
                         status::FAILURE
                     } else {
-                        self.on_command(&command_list);
+                        for command in command_list.lines() {
+                            self.on_command(command);
+                        }
                         status::SUCCESS
                     }
                 } else {

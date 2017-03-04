@@ -184,6 +184,19 @@ fn test_malformed_brace_input() {
 }
 
 #[test]
+fn process_recursion() {
+    let input = "echo $(echo $(echo one))";
+    let expected = vec![WordToken::Normal("echo"), WordToken::Normal(" "), WordToken::Variable("$(echo $(echo one))", false)];
+    let mut correct = 0;
+    for (actual, expected) in WordIterator::new(input).zip(expected.iter()) {
+        let actual = actual.expect(&format!("Expected {:?}", *expected));
+        assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
+        correct += 1;
+    }
+    assert_eq!(expected.len(), correct);
+}
+
+#[test]
 fn test_words() {
     let input = "echo $ABC ${ABC} one{$ABC,$ABC} ~ $(echo foo) \"$(seq 1 100)\"";
     let expected = vec![

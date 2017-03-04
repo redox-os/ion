@@ -2,8 +2,8 @@ use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
 use std::fs::{File, OpenOptions};
 
-use super::status::{TERMINATED, NO_SUCH_COMMAND};
-use super::peg::Pipeline;
+use status::{TERMINATED, NO_SUCH_COMMAND};
+use parser::peg::Pipeline;
 
 pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
     let mut piped_commands: Vec<Command> = pipeline.jobs
