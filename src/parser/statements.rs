@@ -2,12 +2,11 @@ const SQUOTE: u8 = 1;
 const DQUOTE: u8 = 2;
 const BACKSL: u8 = 4;
 const COMM_1: u8 = 8;
-const COMM_2: u8 = 16;
 
 pub struct StatementSplitter<'a> {
     data:  &'a str,
     read:  usize,
-    flags: u8
+    flags: u8,
 }
 
 impl<'a> StatementSplitter<'a> {
@@ -20,6 +19,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
     type Item = &'a str;
     fn next(&mut self) -> Option<&'a str> {
         let start = self.read;
+        let mut levels = 0u8;
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             match character {
@@ -28,12 +28,12 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'"'  if self.flags & SQUOTE == 0            => self.flags ^= DQUOTE,
                 b'\\' if self.flags & (SQUOTE + DQUOTE) == 0 => self.flags |= BACKSL,
                 b'$'  if self.flags & (SQUOTE + DQUOTE) == 0 => { self.flags |= COMM_1; continue },
-                b'('  if self.flags & COMM_1 != 0            => self.flags |= COMM_2,
-                b')'  if self.flags & COMM_2 != 0            => self.flags ^= COMM_2,
-                b';'  if self.flags & (SQUOTE + DQUOTE + COMM_2) == 0 => {
+                b'('  if self.flags & COMM_1 != 0            => levels += 1,
+                b')'  if levels > 0                          => levels -= 1,
+                b';'  if (self.flags & (SQUOTE + DQUOTE) == 0) && levels == 0 => {
                     return Some(self.data[start..self.read-1].trim())
                 },
-                b'#' if self.flags & (SQUOTE + DQUOTE + COMM_2) == 0 => {
+                b'#' if (self.flags & (SQUOTE + DQUOTE) == 0) && levels == 0 => {
                     let output = self.data[start..self.read-1].trim();
                     self.read = self.data.len();
                     return Some(output);
