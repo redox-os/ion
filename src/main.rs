@@ -258,16 +258,8 @@ impl Shell {
     }
 
     fn handle_if(&mut self, left: String, comparitor: Comparitor, right: String) {
-
-        let left = match self.variables.expand_string(&left, &self.directory_stack) {
-            Ok(ref expanded_string) => { expanded_string.clone() },
-            Err(_) => { "".to_string() },
-        };
-
-        let right = match self.variables.expand_string(&right, &self.directory_stack) {
-            Ok(ref expanded_string) => { expanded_string.clone() },
-            Err(_) => { "".to_string() },
-        };
+        let left  = self.variables.expand_string(&left, &self.directory_stack).unwrap_or_else(|_| "".to_string());
+        let right = self.variables.expand_string(&right, &self.directory_stack).unwrap_or_else(|_| "".to_string());
 
         let value = match comparitor {
             Comparitor::GreaterThan        => { left >  right },

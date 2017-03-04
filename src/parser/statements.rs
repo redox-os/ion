@@ -32,7 +32,12 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b')'  if self.flags & COMM_2 != 0            => self.flags ^= COMM_2,
                 b';'  if self.flags & (SQUOTE + DQUOTE + COMM_2) == 0 => {
                     return Some(self.data[start..self.read-1].trim())
-                }
+                },
+                b'#' if self.flags & (SQUOTE + DQUOTE + COMM_2) == 0 => {
+                    let output = self.data[start..self.read-1].trim();
+                    self.read = self.data.len();
+                    return Some(output);
+                },
                 _ => ()
             }
             self.flags &= 255 ^ COMM_1;
@@ -70,4 +75,13 @@ fn statements_with_quotes() {
     assert_eq!(results.len(), 2);
     assert_eq!(results[0], "echo \"This ;'is a test\"");
     assert_eq!(results[1], "echo 'This ;\" is also a test'");
+}
+
+#[test]
+fn statements_with_comments() {
+    let command = "echo $(echo one # two); echo three # four";
+    let results = StatementSplitter::new(command).collect::<Vec<&str>>();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0], "echo $(echo one # two)");
+    assert_eq!(results[1], "echo three");
 }
