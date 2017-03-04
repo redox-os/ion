@@ -135,7 +135,7 @@ impl Shell {
                             let mut command_list = String::new();
                             match file.read_to_string(&mut command_list) {
                                 Ok(_) => {
-                                    for command in command_list.split('\n') {
+                                    for command in command_list.lines() {
                                         self.on_command(command);
                                     }
                                 },
@@ -160,10 +160,7 @@ impl Shell {
                     println!("ion: {}", err);
                 }
 
-                // Split the command into multiple statements if multiple statements were given.
-                for statement in StatementSplitter::new(command) {
-                    self.on_command(statement);
-                }
+                self.on_command(command);
             }
             self.update_variables();
         }
@@ -198,7 +195,9 @@ impl Shell {
                 if let Err(message) = file.read_to_string(&mut command_list) {
                     println!("{}: Failed to read {:?}", message, source_file)
                 } else {
-                    self.on_command(&command_list)
+                    for command in command_list.lines() {
+                        self.on_command(command);
+                    }
                 }
             }
         });
@@ -243,17 +242,19 @@ impl Shell {
     }
 
     fn on_command(&mut self, command_string: &str) {
-        let update = parse(command_string);
-        if update.is_flow_control() {
-            self.flow_control.current_statement = update.clone();
-            self.flow_control.collecting_block = true;
-        }
+        for statement in StatementSplitter::new(command_string) {
+            let update = parse(statement);
+            if update.is_flow_control() {
+                self.flow_control.current_statement = update.clone();
+                self.flow_control.collecting_block = true;
+            }
 
-        match update {
-            Statement::End                         => self.handle_end(),
-            Statement::If{left, right, comparitor} => self.handle_if(left, comparitor, right),
-            Statement::Pipelines(pipelines)        => self.handle_pipelines(pipelines),
-            _                                      => {}
+            match update {
+                Statement::End                         => self.handle_end(),
+                Statement::If{left, right, comparitor} => self.handle_if(left, comparitor, right),
+                Statement::Pipelines(pipelines)        => self.handle_pipelines(pipelines),
+                _                                      => {}
+            }
         }
     }
 
@@ -454,7 +455,9 @@ impl Shell {
                         println!("{}: Failed to read {}", message, argument);
                         status::FAILURE
                     } else {
-                        self.on_command(&command_list);
+                        for command in command_list.lines() {
+                            self.on_command(command);
+                        }
                         status::SUCCESS
                     }
                 } else {
