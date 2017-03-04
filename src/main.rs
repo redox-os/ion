@@ -154,6 +154,13 @@ impl Shell {
         while let Some(command) = self.readln() {
             let command = command.trim();
             if ! command.is_empty() {
+                // Mark the command in the context history
+                self.set_context_history_from_vars();
+                if let Err(err) = self.context.history.push(command.into()) {
+                    println!("ion: {}", err);
+                }
+
+                // Split the command into multiple statements if multiple statements were given.
                 for statement in StatementSplitter::new(command) {
                     self.on_command(statement);
                 }
@@ -236,15 +243,6 @@ impl Shell {
     }
 
     fn on_command(&mut self, command_string: &str) {
-        self.set_context_history_from_vars();
-
-        let trimmed_command = command_string.trim();
-        if !trimmed_command.is_empty() {
-            if let Err(err) = self.context.history.push(trimmed_command.into()) {
-                println!("ion: {}", err);
-            }
-        }
-
         let update = parse(command_string);
         if update.is_flow_control() {
             self.flow_control.current_statement = update.clone();
