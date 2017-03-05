@@ -39,6 +39,7 @@ impl<'a> WordIterator<'a> {
 impl<'a> Iterator for WordIterator<'a> {
     type Item = Result<WordToken<'a>, ExpandErr>;
 
+    // TODO: Rewrite this in a more efficient / simpler way
     fn next(&mut self) -> Option<Result<WordToken<'a>, ExpandErr>> {
         let mut start = self.read;
         let mut open_brace_id = 0;
@@ -49,6 +50,7 @@ impl<'a> Iterator for WordIterator<'a> {
         } else {
             let mut break_char = None;
             let mut backslash = false;
+            let mut levels = 0;
             self.flags &= 255 ^ (BRACES + TILDE + VARIABLES + PREV_WAS_VAR + OPEN_BRACE);
             for character in self.data.bytes().skip(self.read) {
                 if backslash {
@@ -57,7 +59,7 @@ impl<'a> Iterator for WordIterator<'a> {
                 } else if character == b'\\' {
                     backslash = true;
                     self.flags &= 255 ^ PREV_WAS_VAR;
-                } else if character == b'\'' && self.flags & DOUBLE_QUOTE != DOUBLE_QUOTE {
+                } else if character == b'\'' && self.flags & DOUBLE_QUOTE == 0 && break_char.is_none() {
                     if start != self.read {
                         let return_value = collect_at_single_quote(self.flags, start, self.read, self.data);
                         self.read += 1;
@@ -66,7 +68,7 @@ impl<'a> Iterator for WordIterator<'a> {
                     }
                     start += 1;
                     self.flags ^= SINGLE_QUOTE
-                } else if character == b'"' && self.flags & SINGLE_QUOTE != SINGLE_QUOTE {
+                } else if character == b'"' && self.flags & SINGLE_QUOTE != SINGLE_QUOTE && break_char.is_none() {
                     if start != self.read {
                         let return_value = collect_at_double_quote(self.flags, start, self.read, self.data);
                         self.read += 1;
@@ -76,7 +78,7 @@ impl<'a> Iterator for WordIterator<'a> {
                     start += 1;
                     self.flags ^= DOUBLE_QUOTE;
                 } else if character == b'{' && self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 {
-                    if self.flags & PREV_WAS_VAR != PREV_WAS_VAR { self.flags |= BRACES; }
+                    if self.flags & PREV_WAS_VAR != PREV_WAS_VAR && break_char.is_none() { self.flags |= BRACES; }
                     if self.flags & OPEN_BRACE == OPEN_BRACE { return Some(Err(ExpandErr::InnerBracesNotImplemented)); }
                     open_brace_id = self.read;
                     self.flags |= OPEN_BRACE;
@@ -85,6 +87,7 @@ impl<'a> Iterator for WordIterator<'a> {
                     self.flags &= 255 ^ OPEN_BRACE;
                 } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && character == b'(' && self.flags & PREV_WAS_VAR == PREV_WAS_VAR {
                     break_char = Some(b')');
+                    levels += 1;
                     self.flags &= 255 ^ PREV_WAS_VAR;
                 } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && character == b'$' {
                     self.flags |= VARIABLES + PREV_WAS_VAR;
@@ -103,7 +106,9 @@ impl<'a> Iterator for WordIterator<'a> {
                         Some(Ok(WordToken::Normal(&self.data[start..self.read])))
                     };
                 } else if break_char == Some(character) {
-                    break_char = None;
+                    levels -= 1;
+                    if levels == 0 { break_char = None; }
+                    // break_char = None;
                 } else {
                     self.flags &= 255 ^ PREV_WAS_VAR;
                 }
@@ -176,50 +181,77 @@ fn collect_at_end(flags: u8, start: usize, end: usize, open_brace_id: usize, dat
     }
 }
 
-#[test]
-fn test_malformed_brace_input() {
-    assert_eq!(WordIterator::new("AB{CD").next(), Some(Err(ExpandErr::UnmatchedBraces(2))));
-    assert_eq!(WordIterator::new("AB{{}").next(), Some(Err(ExpandErr::InnerBracesNotImplemented)));
-    assert_eq!(WordIterator::new("AB}CD").next(), Some(Err(ExpandErr::UnmatchedBraces(2))));
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn process_recursion() {
-    let input = "echo $(echo $(echo one))";
-    let expected = vec![WordToken::Normal("echo"), WordToken::Normal(" "), WordToken::Variable("$(echo $(echo one))", false)];
-    let mut correct = 0;
-    for (actual, expected) in WordIterator::new(input).zip(expected.iter()) {
-        let actual = actual.expect(&format!("Expected {:?}", *expected));
-        assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
-        correct += 1;
+    fn compare(input: &str, expected: Vec<WordToken>) {
+        let mut correct = 0;
+        for (actual, expected) in WordIterator::new(input).zip(expected.iter()) {
+            let actual = actual.expect(&format!("Expected {:?}", *expected));
+            assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
+            correct += 1;
+        }
+        assert_eq!(expected.len(), correct);
     }
-    assert_eq!(expected.len(), correct);
-}
 
-#[test]
-fn test_words() {
-    let input = "echo $ABC ${ABC} one{$ABC,$ABC} ~ $(echo foo) \"$(seq 1 100)\"";
-    let expected = vec![
-        WordToken::Normal("echo"),
-        WordToken::Normal(" "),
-        WordToken::Variable("$ABC", false),
-        WordToken::Normal(" "),
-        WordToken::Variable("${ABC}", false),
-        WordToken::Normal(" "),
-        WordToken::Brace("one{$ABC,$ABC}", true),
-        WordToken::Normal(" "),
-        WordToken::Tilde("~"),
-        WordToken::Normal(" "),
-        WordToken::Variable("$(echo foo)", false),
-        WordToken::Normal(" "),
-        WordToken::Variable("$(seq 1 100)", true)
-    ];
-
-    let mut correct = 0;
-    for (actual, expected) in WordIterator::new(input).zip(expected.iter()) {
-        let actual = actual.expect(&format!("Expected {:?}", *expected));
-        assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
-        correct += 1;
+    #[test]
+    fn test_malformed_brace_input() {
+        assert_eq!(WordIterator::new("AB{CD").next(), Some(Err(ExpandErr::UnmatchedBraces(2))));
+        assert_eq!(WordIterator::new("AB{{}").next(), Some(Err(ExpandErr::InnerBracesNotImplemented)));
+        assert_eq!(WordIterator::new("AB}CD").next(), Some(Err(ExpandErr::UnmatchedBraces(2))));
     }
-    assert_eq!(expected.len(), correct);
+
+    #[test]
+    fn words_process_recursion() {
+        let input = "echo $(echo $(echo one)) $(echo one $(echo two) three)";
+        let expected = vec![
+            WordToken::Normal("echo"),
+            WordToken::Normal(" "),
+            WordToken::Variable("$(echo $(echo one))", false),
+            WordToken::Normal(" "),
+            WordToken::Variable("$(echo one $(echo two) three)", false),
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn words_process_with_quotes() {
+        let input = "echo $(git branch | rg '[*]' | awk '{print $2}')";
+        let expected = vec![
+            WordToken::Normal("echo"),
+            WordToken::Normal(" "),
+            WordToken::Variable("$(git branch | rg '[*]' | awk '{print $2}')", false),
+        ];
+        compare(input, expected);
+
+        let input = "echo $(git branch | rg \"[*]\" | awk '{print $2}')";
+        let expected = vec![
+            WordToken::Normal("echo"),
+            WordToken::Normal(" "),
+            WordToken::Variable("$(git branch | rg \"[*]\" | awk '{print $2}')", false),
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn test_words() {
+        let input = "echo $ABC ${ABC} one{$ABC,$ABC} ~ $(echo foo) \"$(seq 1 100)\"";
+        let expected = vec![
+            WordToken::Normal("echo"),
+            WordToken::Normal(" "),
+            WordToken::Variable("$ABC", false),
+            WordToken::Normal(" "),
+            WordToken::Variable("${ABC}", false),
+            WordToken::Normal(" "),
+            WordToken::Brace("one{$ABC,$ABC}", true),
+            WordToken::Normal(" "),
+            WordToken::Tilde("~"),
+            WordToken::Normal(" "),
+            WordToken::Variable("$(echo foo)", false),
+            WordToken::Normal(" "),
+            WordToken::Variable("$(seq 1 100)", true)
+        ];
+        compare(input, expected);
+    }
 }

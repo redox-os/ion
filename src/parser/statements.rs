@@ -85,3 +85,16 @@ fn statements_with_comments() {
     assert_eq!(results[0], "echo $(echo one # two)");
     assert_eq!(results[1], "echo three");
 }
+
+#[test]
+fn statements_with_process_recursion() {
+    let command = "echo $(echo one $(echo two) three)";
+    let results = StatementSplitter::new(command).collect::<Vec<&str>>();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0], command);
+
+    let command = "echo $(echo $(echo one; echo two); echo two)";
+    let results = StatementSplitter::new(command).collect::<Vec<&str>>();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0], command);
+}
