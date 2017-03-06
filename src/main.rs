@@ -65,7 +65,6 @@ impl Default for Shell {
 impl Shell {
     fn readln(&mut self) -> Option<String> {
         let prompt = self.prompt();
-
         let funcs = &self.functions;
         let vars = &self.variables;
 
@@ -100,6 +99,7 @@ impl Shell {
                         let words = Command::map()
                                 .into_iter()
                                 .map(|(s, _)| String::from(s))
+                                .chain(vars.aliases.keys().cloned())
                                 .chain(funcs.keys().cloned())
                                 .chain(vars.get_vars().into_iter().map(|s| format!("${}", s)))
                                 .collect();
@@ -242,17 +242,16 @@ impl Shell {
     }
 
     fn on_command(&mut self, command_string: &str) {
-        for statement in StatementSplitter::new(command_string) {
-            let update = parse(statement);
-            if update.is_flow_control() {
-                self.flow_control.current_statement = update.clone();
+        for statement in StatementSplitter::new(command_string).map(parse) {
+            if statement.is_flow_control() {
+                self.flow_control.current_statement = statement.clone();
                 self.flow_control.collecting_block = true;
             }
 
-            match update {
+            match statement {
                 Statement::End                         => self.handle_end(),
                 Statement::If{left, right, comparitor} => self.handle_if(left, comparitor, right),
-                Statement::Pipelines(pipelines)        => self.handle_pipelines(pipelines),
+                Statement::Pipelines(pipelines)        => { let _ = self.handle_pipelines(pipelines, false); },
                 _                                      => {}
             }
         }
@@ -289,7 +288,7 @@ impl Shell {
                         for value in expression.split_whitespace() {
                             self.variables.set_var(var, value);
                             for pipeline in &block_jobs {
-                                self.run_pipeline(pipeline);
+                                self.run_pipeline(pipeline, false);
                             }
                         }
                     },
@@ -297,7 +296,7 @@ impl Shell {
                         for value in (start..end).map(|x| x.to_string()) {
                             self.variables.set_var(var, &value);
                             for pipeline in &block_jobs {
-                                self.run_pipeline(pipeline);
+                                self.run_pipeline(pipeline, false);
                             }
                         }
                     }
@@ -320,7 +319,7 @@ impl Shell {
                         .drain(..)
                         .collect();
                     for pipeline in &block_jobs {
-                        self.run_pipeline(pipeline);
+                        self.run_pipeline(pipeline, false);
                     }
                 }
             },
@@ -331,14 +330,15 @@ impl Shell {
                         .drain(..)
                         .collect();
                 for pipeline in &block_jobs {
-                    self.run_pipeline(pipeline);
+                    self.run_pipeline(pipeline, false);
                 }
             }
         }
         self.flow_control.current_statement = Statement::Default;
     }
 
-    fn handle_pipelines(&mut self, mut pipelines: Vec<Pipeline>) {
+    fn handle_pipelines(&mut self, mut pipelines: Vec<Pipeline>, noalias: bool) -> Option<i32> {
+        let mut return_value = None;
         for pipeline in pipelines.drain(..) {
             if self.flow_control.collecting_block {
                 let mode = self.flow_control.modes.last().unwrap_or(&flow_control::Mode{value: false}).value;
@@ -347,10 +347,12 @@ impl Shell {
                     (_, Statement::For{..}) |(_, Statement::Function{..}) => self.flow_control.current_block.pipelines.push(pipeline),
                     _ => {}
                 }
+                return_value = None;
             } else {
-                self.run_pipeline(&pipeline);
+                return_value = self.run_pipeline(&pipeline, noalias);
             }
         }
+        return_value
     }
 
     /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if it
@@ -385,43 +387,79 @@ impl Shell {
         }
     }
 
-    fn run_pipeline(&mut self, pipeline: &Pipeline) -> Option<i32> {
+    /// Executes a pipeline and returns the final exit status of the pipeline.
+    /// To avoid infinite recursion when using aliases, the noalias boolean will be set the true
+    /// if an alias branch was executed.
+    fn run_pipeline(&mut self, pipeline: &Pipeline, noalias: bool) -> Option<i32> {
         let mut pipeline = self.variables.expand_pipeline(pipeline, &self.directory_stack);
         pipeline.expand_globs();
 
         let command_start_time = SystemTime::now();
 
-        // Branch if -> input == shell command i.e. echo
-        // Run the 'main' of the command and set exit_status
-        let exit_status = if let Some(command) = Command::map().get(pipeline.jobs[0].command.as_str()) {
-            Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
-        // Branch else if -> input == shell function and set the exit_status
-        } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
-            if pipeline.jobs[0].args.len() - 1 == function.args.len() {
-                let mut variables_backup: HashMap<&str, Option<String>> = HashMap::new();
-                for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
-                    variables_backup.insert(name, self.variables.get_var(name));
-                    self.variables.set_var(name, value);
+        let mut exit_status = None;
+        let mut branched = false;
+
+        if !noalias {
+            if let Some(mut alias) = self.variables.aliases.get(pipeline.jobs[0].command.as_str()).cloned() {
+                branched = true;
+                // Append arguments supplied by the current job to the alias.
+                alias += " ";
+                for argument in pipeline.jobs[0].args.iter().skip(1) {
+                    alias += argument;
                 }
-                let mut return_value = None;
-                for function_pipeline in &function.pipelines {
-                    return_value = self.run_pipeline(function_pipeline)
-                }
-                for (name, value_option) in &variables_backup {
-                    match *value_option {
-                        Some(ref value) => self.variables.set_var(name, value),
-                        None => {self.variables.unset_var(name);},
+
+                // Execute each statement within the alias and return the last return value.
+                for statement in StatementSplitter::new(&alias).map(parse) {
+                    if statement.is_flow_control() {
+                        self.flow_control.current_statement = statement.clone();
+                        self.flow_control.collecting_block = true;
+                    }
+
+                    match statement {
+                        Statement::End                         => self.handle_end(),
+                        Statement::If{left, right, comparitor} => self.handle_if(left, comparitor, right),
+                        Statement::Pipelines(pipelines)        => {
+                            exit_status = self.handle_pipelines(pipelines, true);
+                        },
+                        _ => {}
                     }
                 }
-                return_value
-            } else {
-                println!("This function takes {} arguments, but you provided {}", function.args.len(), pipeline.jobs[0].args.len()-1);
-                Some(NO_SUCH_COMMAND) // not sure if this is the right error code
             }
-        // If not a shell command or a shell function execute the pipeline and set the exit_status
-        } else {
-            Some(execute_pipeline(pipeline))
-        };
+        }
+
+        if !branched {
+            // Branch if -> input == shell command i.e. echo
+            exit_status = if let Some(command) = Command::map().get(pipeline.jobs[0].command.as_str()) {
+                // Run the 'main' of the command and set exit_status
+                Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
+            // Branch else if -> input == shell function and set the exit_status
+            } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
+                if pipeline.jobs[0].args.len() - 1 == function.args.len() {
+                    let mut variables_backup: HashMap<&str, Option<String>> = HashMap::new();
+                    for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
+                        variables_backup.insert(name, self.variables.get_var(name));
+                        self.variables.set_var(name, value);
+                    }
+                    let mut return_value = None;
+                    for function_pipeline in &function.pipelines {
+                        return_value = self.run_pipeline(function_pipeline, false)
+                    }
+                    for (name, value_option) in &variables_backup {
+                        match *value_option {
+                            Some(ref value) => self.variables.set_var(name, value),
+                            None => {self.variables.unset_var(name);},
+                        }
+                    }
+                    return_value
+                } else {
+                    println!("This function takes {} arguments, but you provided {}", function.args.len(), pipeline.jobs[0].args.len()-1);
+                    Some(NO_SUCH_COMMAND) // not sure if this is the right error code
+                }
+            // If not a shell command or a shell function execute the pipeline and set the exit_status
+            } else {
+                Some(execute_pipeline(pipeline))
+            };
+        }
 
         if let Ok(elapsed_time) = command_start_time.elapsed() {
             let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
@@ -538,6 +576,15 @@ impl Command {
                             help: "View, set or unset variables",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.variables.let_(args)
+                            },
+                        });
+
+        commands.insert("alias",
+                        Command {
+                            name: "alias",
+                            help: "View, set or unset aliases",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.alias_(args)
                             },
                         });
 

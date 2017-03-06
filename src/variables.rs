@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt;
+use std::io::{self, Write};
 use std::iter;
 use std::path::PathBuf;
 use std::process;
@@ -14,6 +15,48 @@ use parser::shell_expand::{self, ExpandErr};
 
 pub struct Variables {
     variables: BTreeMap<String, String>,
+    pub aliases: BTreeMap<String, String>
+}
+
+enum Binding {
+    ListEntries,
+    KeyOnly(String),
+    KeyValue(String, String),
+}
+
+/// Parses let bindings, `let VAR = KEY`, returning the result as a `(key, value)` tuple.
+fn parse_assignment<I: IntoIterator>(args: I) -> Binding
+    where I::Item: AsRef<str>
+{
+    // Write all the arguments into a single `String`
+    let arguments = args.into_iter().skip(1).fold(String::new(), |a, b| a + " " + b.as_ref());
+
+    // Create a character iterator from the arguments.
+    let mut char_iter = arguments.chars();
+
+    // Find the key and advance the iterator until the equals operator is found.
+    let mut key = "".to_owned();
+    let mut found_key = false;
+
+    while let Some(character) = char_iter.next() {
+        match character {
+            ' ' if key.is_empty() => (),
+            ' ' => found_key = true,
+            '=' => {
+                found_key = true;
+                break
+            },
+            _ if !found_key => key.push(character),
+            _ => ()
+        }
+    }
+
+    if !found_key && key.is_empty() {
+        Binding::ListEntries
+    } else {
+        let value = char_iter.skip_while(|&x| x == ' ').collect::<String>();
+        if value.is_empty() { Binding::KeyOnly(key) } else { Binding::KeyValue(key, value) }
+    }
 }
 
 impl Default for Variables {
@@ -36,7 +79,7 @@ impl Default for Variables {
 
         // Initialize the HOME variable
         env::home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| env::set_var("HOME", path.to_str().unwrap_or("?")));
-        Variables { variables: map }
+        Variables { variables: map, aliases: BTreeMap::new() }
     }
 }
 
@@ -63,25 +106,63 @@ impl Variables {
         SUCCESS
     }
 
+    pub fn alias_<I: IntoIterator>(&mut self, args: I) -> i32
+        where I::Item: AsRef<str>
+    {
+        match parse_assignment(args) {
+            Binding::KeyValue(key, value) => {
+                if !Variables::is_valid_variable_name(&key) {
+                    let stderr = io::stderr();
+                    let _ = writeln!(&mut stderr.lock(), "ion: alias name, '{}', is invalid", key);
+                    return FAILURE;
+                }
+                self.aliases.insert(key.to_string(), value.to_string());
+            },
+            Binding::ListEntries => {
+                let stdout = io::stdout();
+                let stdout = &mut stdout.lock();
+
+                for (key, value) in &self.aliases {
+                    let _ = stdout.write(key.as_bytes())
+                        .and_then(|_| stdout.write_all(b" = "))
+                        .and_then(|_| stdout.write_all(value.as_bytes()));
+                }
+            },
+            Binding::KeyOnly(key) => {
+                let stderr = io::stderr();
+                let _ = writeln!(&mut stderr.lock(), "ion: please provide value for alias '{}'", key);
+                return FAILURE;
+            }
+        }
+        SUCCESS
+    }
+
     pub fn let_<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
-        match Variables::parse_assignment(args) {
-            (Some(key), Some(value)) => {
+        match parse_assignment(args) {
+            Binding::KeyValue(key, value) => {
                 if !Variables::is_valid_variable_name(&key) {
-                    println!("Invalid variable name");
+                    let stderr = io::stderr();
+                    let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
                     return FAILURE;
                 }
                 self.variables.insert(key.to_string(), value.to_string());
             },
-            (Some(_), None) => {
-                println!("Please provide a value for the variable");
-                return FAILURE;
-            },
-            _ => {
+            Binding::ListEntries => {
+                let stdout = io::stdout();
+                let stdout = &mut stdout.lock();
+
                 for (key, value) in &self.variables {
-                    println!("{}={}", key, value);
+                    let _ = stdout.write(key.as_bytes())
+                        .and_then(|_| stdout.write_all(b" = "))
+                        .and_then(|_| stdout.write_all(value.as_bytes()));
                 }
+            },
+            Binding::KeyOnly(key) => {
+                let stderr = io::stderr();
+                let _ = writeln!(&mut stderr.lock(), "ion: please provide value for variable '{}'", key);
+                return FAILURE;
             }
         }
         SUCCESS
@@ -92,12 +173,14 @@ impl Variables {
     {
         let args = args.into_iter().collect::<Vec<I::Item>>();
         if args.len() <= 1 {
-            println!("You must specify a variable name");
+            let stderr = io::stderr();
+            let _ = writeln!(&mut stderr.lock(), "ion: you must specify a variable name");
             return FAILURE;
         }
         for variable in args.iter().skip(1) {
             if self.unset_var(variable.as_ref()).is_none() {
-                println!("Undefined variable: {}", variable.as_ref());
+                let stderr = io::stderr();
+                let _ = writeln!(&mut stderr.lock(), "ion: undefined variable: {}", variable.as_ref());
                 return FAILURE;
             }
         }
@@ -130,62 +213,30 @@ impl Variables {
         self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k)).collect()
     }
 
-    /// Parses let bindings, `let VAR = KEY`, returning the result as a `(key, value)` tuple.
-    fn parse_assignment<I: IntoIterator>(args: I) -> (Option<String>, Option<String>)
-        where I::Item: AsRef<str>
-    {
-        // Write all the arguments into a single `String`
-        let arguments = args.into_iter().skip(1).fold(String::new(), |a, b| a + " " + b.as_ref());
-
-        // Create a character iterator from the arguments.
-        let mut char_iter = arguments.chars();
-
-        // Find the key and advance the iterator until the equals operator is found.
-        let mut key = "".to_owned();
-        let mut found_key = false;
-        while let Some(character) = char_iter.next() {
-            match character {
-                ' ' if key.is_empty() => (),
-                ' ' => found_key = true,
-                '=' => {
-                    found_key = true;
-                    break
-                },
-                _ if !found_key => key.push(character),
-                _ => ()
-            }
-        }
-
-        // If no key was found, return `None`
-        if !found_key && key.is_empty() { return (None, None); }
-
-        let value = char_iter.skip_while(|&x| x == ' ').collect::<String>();
-
-        // Return the variable and value if the value is not empty
-        if value.is_empty() { (Some(key), None) } else { (Some(key), Some(value)) }
-    }
-
     pub fn export_variable<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
-        match Variables::parse_assignment(args) {
-            (Some(key), Some(value)) => {
+        match parse_assignment(args) {
+            Binding::KeyValue(key, value) => {
                 if !Variables::is_valid_variable_name(&key) {
-                    println!("Invalid variable name");
+                    let stderr = io::stderr();
+                    let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
                     return FAILURE;
                 }
                 env::set_var(key, value);
             },
-            (Some(key), None) => {
+            Binding::KeyOnly(key) => {
                 if let Some(local_value) = self.get_var(&key) {
                     env::set_var(key, local_value);
                 } else {
-                    println!("Unknown variable: {}", &key);
+                    let stderr = io::stderr();
+                    let _ = writeln!(&mut stderr.lock(), "ion: unknown variable, '{}'", key);
                     return FAILURE;
                 }
             },
             _ => {
-                println!("Usage: export KEY=VALUE");
+                let stderr = io::stderr();
+                let _ = writeln!(&mut stderr.lock(), "ion usage: export KEY=VALUE");
                 return FAILURE;
             }
         }
@@ -227,12 +278,13 @@ impl Variables {
                     let original = job.args.join(" ");
                     let n_chars = job.args.iter().take(nth_argument)
                         .fold(0, |total, arg| total + 1 + arg.len()) + position;
-                    println!("ion: expand error: unmatched braces");
-                    println!("{}", original);
-                    println!("{}^", iter::repeat("-").take(n_chars).collect::<String>());
+                    let stderr = io::stderr();
+                    let _ = writeln!(&mut stderr.lock(), "ion: expand error: unmatched braces\n{}\n{}^",
+                        original, iter::repeat("-").take(n_chars).collect::<String>());
                 },
                 ExpandErr::InnerBracesNotImplemented => {
-                    println!("ion: expand error: inner braces not yet implemented");
+                    let stderr = io::stderr();
+                    let _ = writeln!(&mut stderr.lock(), "ion: expand error: inner braces not yet implemented");
                 }
             }
         }
