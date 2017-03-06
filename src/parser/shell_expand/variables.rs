@@ -41,6 +41,7 @@ const BACK:       u8 = 1;
 const BRACED_VAR: u8 = 2;
 const PARENS_VAR: u8 = 4;
 const VAR_FOUND:  u8 = 8;
+const SQUOTE:     u8 = 16;
 
 /// Commands need to have variables expanded before they are submitted. This custom `Iterator` structure is
 /// responsible for slicing the variables from within commands so that they can be expanded beforehand.
@@ -72,7 +73,8 @@ impl<'a> Iterator for CommandExpander<'a> {
             self.read += 1;
             match character {
                 b'\\' => { self.flags ^= BACK; continue },
-                b'$' if self.flags & (VAR_FOUND + BACK) == 0 => {
+                b'\'' if self.flags & BACK == 0 => self.flags ^= SQUOTE,
+                b'$' if self.flags & (VAR_FOUND + BACK + SQUOTE) == 0 => {
                     if let Some(character) = self.data.bytes().nth(self.read) {
                         if character == b'(' { continue }
                     }
@@ -106,7 +108,7 @@ impl<'a> Iterator for CommandExpander<'a> {
                                     self.read += 1;
                                     return Some(CommandToken::Variable(&self.data[start..self.read-1]))
                                 }
-                                b'{' | b'}' | b'(' | b')' | b' ' | b':' | b',' | b'@' | b'#' =>
+                                b'{' | b'}' | b'(' | b')' | b' ' | b':' | b',' | b'@' | b'#' | b'\'' | b'"' =>
                                     return Some(CommandToken::Variable(&self.data[start..self.read])),
                                 _ => ()
                             }

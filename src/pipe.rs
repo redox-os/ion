@@ -1,3 +1,4 @@
+use std::io::{self, Write};
 use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
 use std::fs::{File, OpenOptions};
@@ -13,7 +14,11 @@ pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
     if let (Some(stdin), Some(command)) = (pipeline.stdin, piped_commands.first_mut()) {
         match File::open(&stdin.file) {
             Ok(file) => unsafe { command.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
-            Err(err) => println!("ion: failed to redirect stdin into {}: {}", stdin.file, err)
+            Err(err) => {
+                let stderr = io::stderr();
+                let mut stderr = stderr.lock();
+                let _ = writeln!(stderr, "ion: failed to redirect stdin into {}: {}", stdin.file, err);
+            }
         }
     }
     if let Some(stdout) = pipeline.stdout {
@@ -25,7 +30,11 @@ pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
             };
             match file {
                 Ok(f) => unsafe { command.stdout(Stdio::from_raw_fd(f.into_raw_fd())); },
-                Err(err) => println!("ion: failed to redirect stdout into {}: {}", stdout.file, err)
+                Err(err) => {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: failed to redirect stdout into {}: {}", stdout.file, err);
+                }
             }
         }
     }
@@ -52,7 +61,9 @@ pub fn pipe(commands: &mut [Command]) -> i32 {
         }
         let child = command.spawn().ok();
         if child.is_none() {
-            println!("ion: command not found: {}", get_command_name(&command));
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(&command));
         }
         children.push(child);
     }
@@ -73,12 +84,16 @@ fn wait(children: &mut Vec<Option<Child>>) -> i32 {
                 if let Some(code) = status.code() {
                     code
                 } else {
-                    println!("Child ended by signal");
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = stderr.write_all(b"ion: child ended by signal\n");
                     TERMINATED
                 }
             }
             Err(err) => {
-                println!("Failed to wait: {}", err);
+                let stderr = io::stderr();
+                let mut stderr = stderr.lock();
+                let _ = writeln!(stderr, "ion: failed to wait: {}", err);
                 100 // TODO what should we return here?
             }
         }

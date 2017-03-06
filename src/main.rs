@@ -8,7 +8,7 @@ extern crate liner;
 use std::collections::HashMap;
 use std::fs::File;
 use std::iter;
-use std::io::{ErrorKind, Read};
+use std::io::{self, ErrorKind, Read, Write};
 use std::env;
 use std::mem;
 use std::process;
@@ -19,7 +19,7 @@ use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter, BasicC
 use completer::MultiCompleter;
 use directory_stack::DirectoryStack;
 use variables::Variables;
-use status::{SUCCESS, NO_SUCH_COMMAND};
+use status::*;
 use function::Function;
 use pipe::execute_pipeline;
 use parser::shell_expand::ExpandErr;
@@ -68,54 +68,74 @@ impl Shell {
         let funcs = &self.functions;
         let vars = &self.variables;
 
-        let line = self.context.read_line(prompt,
-                                          &mut move |Event { editor, kind }| {
-            match kind {
-                EventKind::BeforeComplete => {
-                    let (words, pos) = editor.get_words_and_cursor_position();
+        // Collects the current list of values from history for completion.
+        let history = &self.context.history.buffers.iter()
+            // Map each underlying `liner::Buffer` into a `String`.
+            .map(|x| x.chars().cloned().collect::<String>())
+            // Collect each result into a vector to avoid borrowing issues.
+            .collect::<Vec<String>>();
 
-                    let filename = match pos {
-                        CursorPosition::InWord(index) => index > 0,
-                        CursorPosition::InSpace(Some(_), _) => true,
-                        CursorPosition::InSpace(None, _) => false,
-                        CursorPosition::OnWordLeftEdge(index) => index >= 1,
-                        CursorPosition::OnWordRightEdge(index) => {
-                            index >= 1 && !words.into_iter().nth(index).map(|(start, end)| {
-                                let buf = editor.current_buffer();
-                                buf.range(start, end).trim().starts_with('$')
-                            }).unwrap_or(false)
-                        }
-                    };
+        let line = self.context.read_line(prompt, &mut move |Event { editor, kind }| {
+            if let EventKind::BeforeComplete = kind {
+                let (words, pos) = editor.get_words_and_cursor_position();
 
-                    if filename {
-                        if let Ok(current_dir) = env::current_dir() {
-                            if let Some(url) = current_dir.to_str() {
-                                let completer = FilenameCompleter::new(Some(url));
-                                mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
-                            }
-                        }
-                    } else {
-                        let file_completer = FilenameCompleter::new(Some("/bin/"));
-                        let words = Command::map()
-                                .into_iter()
-                                .map(|(s, _)| String::from(s))
-                                .chain(vars.aliases.keys().cloned())
-                                .chain(funcs.keys().cloned())
-                                .chain(vars.get_vars().into_iter().map(|s| format!("${}", s)))
-                                .collect();
-                        let custom_completer = BasicCompleter::new(words);
-                        let completer = MultiCompleter::new(file_completer, custom_completer);
-                        mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                let filename = match pos {
+                    CursorPosition::InWord(index) => index > 0,
+                    CursorPosition::InSpace(Some(_), _) => true,
+                    CursorPosition::InSpace(None, _) => false,
+                    CursorPosition::OnWordLeftEdge(index) => index >= 1,
+                    CursorPosition::OnWordRightEdge(index) => {
+                        index >= 1 && !words.into_iter().nth(index).map(|(start, end)| {
+                            let buf = editor.current_buffer();
+                            buf.range(start, end).trim().starts_with('$')
+                        }).unwrap_or(false)
                     }
+                };
+
+                if filename {
+                    if let Ok(current_dir) = env::current_dir() {
+                        if let Some(url) = current_dir.to_str() {
+                            let completer = FilenameCompleter::new(Some(url));
+                            mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                        }
+                    }
+                } else {
+                    // TODO: Definitions should be collected from all paths listed in `${PATH}`.
+                    // Creates a completer containing definitions from `/bin/`
+                    let file_completer = FilenameCompleter::new(Some("/bin/"));
+
+                    // Creates a list of definitions from the shell environment that will be used
+                    // in the creation of a custom completer.
+                    let words = Command::map().into_iter()
+                            // Add built-in commands to the completer's definitions.
+                            .map(|(s, _)| String::from(s))
+                            // Add the history list to the completer's definitions.
+                            .chain(history.iter().cloned())
+                            // Add the aliases to the completer's definitions.
+                            .chain(vars.aliases.keys().cloned())
+                            // Add the list of available functions to the completer's definitions.
+                            .chain(funcs.keys().cloned())
+                            // Add the list of available variables to the completer's definitions.
+                            .chain(vars.get_vars().into_iter().map(|s| format!("${}", s)))
+                            .collect();
+
+                    // Initialize a new completer from the definitions collected.
+                    let custom_completer = BasicCompleter::new(words);
+                    // Merge the collected definitions with the file path definitions.
+                    let completer = MultiCompleter::new(file_completer, custom_completer);
+
+                    // Replace the shell's current completer with the newly-created completer.
+                    mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                 }
-                _ => (),
             }
         });
 
         match line {
             Ok(line) => Some(line),
             Err(err) => {
-                println!("ion: {}", err);
+                let stderr = io::stderr();
+                let mut stderr = stderr.lock();
+                let _ = writeln!(stderr, "ion: {}", err);
                 None
             }
         }
@@ -139,10 +159,18 @@ impl Shell {
                                         self.on_command(command);
                                     }
                                 },
-                                Err(err) => println!("ion: failed to read {}: {}", arg, err)
+                                Err(err) => {
+                                    let stderr = io::stderr();
+                                    let mut stderr = stderr.lock();
+                                    let _ = writeln!(stderr, "ion: failed to read {}: {}", arg, err);
+                                }
                             }
                         },
-                        Err(err) => println!("ion: failed to open {}: {}", arg, err)
+                        Err(err) => {
+                            let stderr = io::stderr();
+                            let mut stderr = stderr.lock();
+                            let _ = writeln!(stderr, "ion: failed to open {}: {}", arg, err);
+                        }
                     }
                 }
 
@@ -157,7 +185,9 @@ impl Shell {
                 // Mark the command in the context history
                 self.set_context_history_from_vars();
                 if let Err(err) = self.context.history.push(command.into()) {
-                    println!("ion: {}", err);
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: {}", err);
                 }
 
                 self.on_command(command);
@@ -188,12 +218,19 @@ impl Shell {
 
     /// Evaluates the source init file in the user's home directory.
     fn evaluate_init_file(&mut self) {
-        env::home_dir().map_or_else(|| println!("ion: could not get home directory"), |mut source_file| {
+        env::home_dir().map_or_else(|| {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = stderr.write_all(b"ion: could not get home directory");
+        }, |mut source_file| {
             source_file.push(".ionrc");
             if let Ok(mut file) = File::open(&source_file) {
-                let mut command_list = String::new();
+                let capacity = file.metadata().map(|x| x.len()).unwrap_or(0) as usize;
+                let mut command_list = String::with_capacity(capacity);
                 if let Err(message) = file.read_to_string(&mut command_list) {
-                    println!("{}: Failed to read {:?}", message, source_file)
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: {}: failed to read {:?}", message, source_file);
                 } else {
                     for command in command_list.lines() {
                         self.on_command(command);
@@ -225,13 +262,16 @@ impl Shell {
                 match self.variables.expand_string(&prompt_var, &self.directory_stack) {
                     Ok(ref expanded_string) => prompt.push_str(expanded_string),
                     Err(ExpandErr::UnmatchedBraces(position)) => {
-                        println!("ion: expand error: unmatched braces");
-                        println!("{}", prompt_var);
-                        println!("{}^", iter::repeat("-").take(position).collect::<String>());
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: expand error: unmatched braces\n{}\n{}^",
+                            prompt_var, iter::repeat("-").take(position).collect::<String>());
                         prompt.push_str("ERROR: ");
                     },
                     Err(ExpandErr::InnerBracesNotImplemented) => {
-                        println!("ion: expand error: inner braces not yet implemented");
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = stderr.write_all(b"ion: expand error: inner braces not yet implemented\n");
                         prompt.push_str("ERROR: ");
                     }
                 }
@@ -452,7 +492,10 @@ impl Shell {
                     }
                     return_value
                 } else {
-                    println!("This function takes {} arguments, but you provided {}", function.args.len(), pipeline.jobs[0].args.len()-1);
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "This function takes {} arguments, but you provided {}",
+                        function.args.len(), pipeline.jobs[0].args.len()-1);
                     Some(NO_SUCH_COMMAND) // not sure if this is the right error code
                 }
             // If not a shell command or a shell function execute the pipeline and set the exit_status
@@ -470,7 +513,9 @@ impl Shell {
             // record how long it took.
             if "1" == self.variables.get_var_or_empty("RECORD_SUMMARY") {
                 self.context.history.push(summary.into()).unwrap_or_else(|err| {
-                    println!("ion: {}", err);
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: {}\n", err);
                 });
             }
         }
@@ -484,36 +529,37 @@ impl Shell {
     }
 
     /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
-    fn source_command(&mut self, arguments: &[String]) -> i32 {
+    fn source_command(&mut self, arguments: &[String]) -> Result<(), String> {
         match arguments.get(1) {
             Some(argument) => {
                 if let Ok(mut file) = File::open(&argument) {
-                    let mut command_list = String::new();
-                    if let Err(message) = file.read_to_string(&mut command_list) {
-                        println!("{}: Failed to read {}", message, argument);
-                        status::FAILURE
-                    } else {
-                        for command in command_list.lines() {
-                            self.on_command(command);
-                        }
-                        status::SUCCESS
-                    }
+                    let capacity = file.metadata().map(|x| x.len()).unwrap_or(0) as usize;
+                    let mut command_list = String::with_capacity(capacity);
+                    file.read_to_string(&mut command_list)
+                        .map_err(|message| format!("ion: {}: failed to read {}\n", message, argument))
+                        .map(|_| {
+                            for command in command_list.lines() { self.on_command(command); }
+                            ()
+                        })
                 } else {
-                    println!("Failed to open {}", argument);
-                    status::FAILURE
+                    Err(format!("ion: failed to open {}\n", argument))
                 }
             },
             None => {
                 self.evaluate_init_file();
-                status::SUCCESS
+                Ok(())
             },
         }
     }
 
     fn print_history(&self, _arguments: &[String]) -> i32 {
+        let mut buffer = Vec::with_capacity(8*1024);
         for command in &self.context.history.buffers {
-            println!("{}", command);
+            let _ = writeln!(buffer, "{}", command);
         }
+        let stdout = io::stdout();
+        let mut stdout = stdout.lock();
+        let _ = stdout.write_all(&buffer);
         SUCCESS
     }
 }
@@ -548,7 +594,15 @@ impl Command {
                             name: "cd",
                             help: "Change the current directory\n    cd <path>",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.directory_stack.cd(args, &shell.variables)
+                                match shell.directory_stack.cd(args, &shell.variables) {
+                                    Ok(()) => SUCCESS,
+                                    Err(why) => {
+                                        let stderr = io::stderr();
+                                        let mut stderr = stderr.lock();
+                                        let _ = stderr.write_all(why.as_bytes());
+                                        FAILURE
+                                    }
+                                }
                             },
                         });
 
@@ -566,7 +620,15 @@ impl Command {
                             name: "pushd",
                             help: "Push a directory to the stack",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.directory_stack.pushd(args, &shell.variables)
+                                match shell.directory_stack.pushd(args, &shell.variables) {
+                                    Ok(()) => SUCCESS,
+                                    Err(why) => {
+                                        let stderr = io::stderr();
+                                        let mut stderr = stderr.lock();
+                                        let _ = stderr.write_all(why.as_bytes());
+                                        FAILURE
+                                    }
+                                }
                             },
                         });
 
@@ -575,7 +637,15 @@ impl Command {
                             name: "popd",
                             help: "Pop a directory from the stack",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.directory_stack.popd(args)
+                                match shell.directory_stack.popd(args) {
+                                    Ok(()) => SUCCESS,
+                                    Err(why) => {
+                                        let stderr = io::stderr();
+                                        let mut stderr = stderr.lock();
+                                        let _ = stderr.write_all(why.as_bytes());
+                                        FAILURE
+                                    }
+                                }
                             },
                         });
 
@@ -660,7 +730,15 @@ impl Command {
                             name: "source",
                             help: "Evaluate the file following the command or re-initialize the init file",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.source_command(args)
+                                match shell.source_command(args) {
+                                    Ok(()) => SUCCESS,
+                                    Err(why) => {
+                                        let stderr = io::stderr();
+                                        let mut stderr = stderr.lock();
+                                        let _ = stderr.write_all(why.as_bytes());
+                                        FAILURE
+                                    }
+                                }
 
                             },
                         });
@@ -695,26 +773,26 @@ impl Command {
                             help: "Display helpful information about a given command, or list \
                                    commands if none specified\n    help <command>",
                             main: box move |args: &[String], _: &mut Shell| -> i32 {
+                                let stdout = io::stdout();
+                                let mut stdout = stdout.lock();
                                 if let Some(command) = args.get(1) {
                                     if command_helper.contains_key(command.as_str()) {
-                                        match command_helper.get(command.as_str()) {
-                                            Some(help) => println!("{}", help),
-                                            None => {
-                                                println!("Command helper not found [run 'help']...")
-                                            }
+                                        if let Some(help) = command_helper.get(command.as_str()) {
+                                            let _ = stdout.write_all(help.as_bytes());
+                                            let _ = stdout.write_all(b"\n");
                                         }
-                                    } else {
-                                        println!("Command helper not found [run 'help']...");
                                     }
+                                    let _ = stdout.write_all(b"Command helper not found [run 'help']...");
+                                    let _ = stdout.write_all(b"\n");
                                 } else {
-                                    let mut commands = Vec::new();
-                                    for command in command_helper.keys() {
-                                        commands.push(command);
-                                    }
+                                    let mut commands = command_helper.keys().cloned().collect::<Vec<&str>>();
                                     commands.sort();
-                                    for command in commands.iter() {
-                                        println!("{}", command);
+
+                                    let mut buffer: Vec<u8> = Vec::new();
+                                    for command in commands {
+                                        let _ = writeln!(buffer, "{}", command);
                                     }
+                                    let _ = stdout.write_all(&buffer);
                                 }
                                 SUCCESS
                             },
