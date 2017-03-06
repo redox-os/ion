@@ -542,6 +542,7 @@ impl Command {
     pub fn map() -> HashMap<&'static str, Self> {
         let mut commands: HashMap<&str, Self> = HashMap::new();
 
+        /* Directories */
         commands.insert("cd",
                         Command {
                             name: "cd",
@@ -557,43 +558,6 @@ impl Command {
                             help: "Display the current directory stack",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 shell.directory_stack.dirs(args)
-                            },
-                        });
-
-        commands.insert("exit",
-                        Command {
-                            name: "exit",
-                            help: "To exit the curent session",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
-                                    .unwrap_or(shell.previous_status))
-                            },
-                        });
-
-        commands.insert("let",
-                        Command {
-                            name: "let",
-                            help: "View, set or unset variables",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.let_(args)
-                            },
-                        });
-
-        commands.insert("alias",
-                        Command {
-                            name: "alias",
-                            help: "View, set or unset aliases",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.alias_(args)
-                            },
-                        });
-
-        commands.insert("read",
-                        Command {
-                            name: "read",
-                            help: "Read some variables\n    read <variable>",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.read(args)
                             },
                         });
 
@@ -615,6 +579,73 @@ impl Command {
                             },
                         });
 
+        /* Aliases */
+        commands.insert("alias",
+                        Command {
+                            name: "alias",
+                            help: "View, set or unset aliases",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.alias_(args)
+                            },
+                        });
+
+        commands.insert("unalias",
+                        Command {
+                            name: "drop",
+                            help: "Delete an alias",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.drop_alias(args)
+                            },
+                        });
+
+        /* Variables */
+        commands.insert("export",
+                        Command {
+                            name: "export",
+                            help: "Set an environment variable",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.export_variable(args)
+                            }
+                        });
+
+        commands.insert("let",
+                        Command {
+                            name: "let",
+                            help: "View, set or unset variables",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.let_(args)
+                            },
+                        });
+
+        commands.insert("read",
+                        Command {
+                            name: "read",
+                            help: "Read some variables\n    read <variable>",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.read(args)
+                            },
+                        });
+
+        commands.insert("drop",
+                        Command {
+                            name: "drop",
+                            help: "Delete a variable",
+                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                                shell.variables.drop_variable(args)
+                            },
+                        });
+
+        /* Misc */
+        commands.insert("exit",
+                Command {
+                    name: "exit",
+                    help: "To exit the curent session",
+                    main: box |args: &[String], shell: &mut Shell| -> i32 {
+                        process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
+                            .unwrap_or(shell.previous_status))
+                    },
+                });
+
         commands.insert("history",
                         Command {
                             name: "history",
@@ -623,7 +654,6 @@ impl Command {
                                 shell.print_history(args)
                             },
                         });
-
 
         commands.insert("source",
                         Command {
@@ -653,25 +683,6 @@ impl Command {
                             },
                         });
 
-
-        commands.insert("drop",
-                        Command {
-                            name: "drop",
-                            help: "Delete a variable",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.drop_variable(args)
-                            },
-                        });
-
-        commands.insert("export",
-                        Command {
-                            name: "export",
-                            help: "Set an environment variable",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.export_variable(args)
-                            }
-                        });
-
         let command_helper: HashMap<&'static str, &'static str> = commands.iter()
                                                                           .map(|(k, v)| {
                                                                               (*k, v.help)
@@ -696,7 +707,12 @@ impl Command {
                                         println!("Command helper not found [run 'help']...");
                                     }
                                 } else {
+                                    let mut commands = Vec::new();
                                     for command in command_helper.keys() {
+                                        commands.push(command);
+                                    }
+                                    commands.sort();
+                                    for command in commands.iter() {
                                         println!("{}", command);
                                     }
                                 }

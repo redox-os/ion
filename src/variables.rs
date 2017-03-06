@@ -137,6 +137,25 @@ impl Variables {
         SUCCESS
     }
 
+    pub fn drop_alias<I: IntoIterator>(&mut self, args: I) -> i32
+        where I::Item: AsRef<str>
+    {
+        let args = args.into_iter().collect::<Vec<I::Item>>();
+        if args.len() <= 1 {
+            let stderr = io::stderr();
+            let _ = writeln!(&mut stderr.lock(), "ion: you must specify an alias name");
+            return FAILURE;
+        }
+        for alias in args.iter().skip(1) {
+            if self.aliases.remove(alias.as_ref()).is_none() {
+                let stderr = io::stderr();
+                let _ = writeln!(&mut stderr.lock(), "ion: undefined alias: {}", alias.as_ref());
+                return FAILURE;
+            }
+        }
+        SUCCESS
+    }
+
     pub fn let_<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
