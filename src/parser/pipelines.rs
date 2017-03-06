@@ -1,4 +1,4 @@
-use parser::peg::{Job, Pipeline, Redirection};
+use parser::peg::{Job, JobKind, Pipeline, Redirection};
 
 const BACKSLASH:    u8 = 1;
 const SINGLE_QUOTE: u8 = 2;
@@ -146,8 +146,8 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                                     arg_start += 1;
                                 }
                             },
-                            b'|' if (flags & (255 ^ BACKSLASH) == 0) => job_found!(false),
-                            b'&' if (flags & IS_VALID == 0) => job_found!(true),
+                            b'|' if (flags & (255 ^ BACKSLASH) == 0) => job_found!(JobKind::Pipe),
+                            b'&' if (flags & IS_VALID == 0) => job_found!(JobKind::And),
                             b'>' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdout),
                             b'<' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdin),
                             _   if (flags >> 6 != 2)        => flags &= 255 ^ (PROCESS_ONE + PROCESS_TWO),
@@ -282,7 +282,7 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
         }
 
         if !arguments.is_empty() {
-            jobs.push(Job::new(arguments, false));
+            jobs.push(Job::new(arguments, JobKind::Pipe));
         }
 
         pipelines.push(Pipeline::new(jobs, in_file, out_file));
