@@ -38,8 +38,8 @@ impl Pipeline {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum JobKind { And, Background, Or, Pipe }
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum JobKind { And, Background, Last, Or, Pipe }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Job {

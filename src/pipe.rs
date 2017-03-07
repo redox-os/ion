@@ -2,18 +2,19 @@ use std::io::{self, Write};
 use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
 use std::fs::{File, OpenOptions};
+use std::thread;
 
-use status::{TERMINATED, NO_SUCH_COMMAND};
-use parser::peg::Pipeline;
+use status::*;
+use parser::peg::{Pipeline, JobKind};
 
 pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
-    let mut piped_commands: Vec<Command> = pipeline.jobs
-                                                   .iter()
-                                                   .map(|job| { job.build_command() })
-                                                   .collect();
+    // Generate a list of commands from the given pipeline
+    let mut piped_commands: Vec<(Command, JobKind)> = pipeline.jobs
+        .iter().map(|job| (job.build_command(), job.kind)).collect();
+
     if let (Some(stdin), Some(command)) = (pipeline.stdin, piped_commands.first_mut()) {
         match File::open(&stdin.file) {
-            Ok(file) => unsafe { command.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
+            Ok(file) => unsafe { command.0.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
             Err(err) => {
                 let stderr = io::stderr();
                 let mut stderr = stderr.lock();
@@ -21,6 +22,7 @@ pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
             }
         }
     }
+
     if let Some(stdout) = pipeline.stdout {
         if let Some(mut command) = piped_commands.last_mut() {
             let file = if stdout.append {
@@ -29,7 +31,7 @@ pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
                 File::create(&stdout.file)
             };
             match file {
-                Ok(f) => unsafe { command.stdout(Stdio::from_raw_fd(f.into_raw_fd())); },
+                Ok(f) => unsafe { command.0.stdout(Stdio::from_raw_fd(f.into_raw_fd())); },
                 Err(err) => {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();
@@ -38,36 +40,122 @@ pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
             }
         }
     }
+
     pipe(&mut piped_commands)
 }
 
 /// This function will panic if called with an empty slice
-pub fn pipe(commands: &mut [Command]) -> i32 {
-    let end = commands.len() - 1;
-    for command in &mut commands[..end] {
-        command.stdout(Stdio::piped());
-    }
-    let mut children: Vec<Option<Child>> = vec![];
-    for command in commands {
-        if let Some(spawned) = children.last() {
-            if let Some(ref child) = *spawned {
-                if let Some(ref stdout) = child.stdout {
-                    unsafe { command.stdin(Stdio::from_raw_fd(stdout.as_raw_fd())); }
+pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
+    let mut previous_status = SUCCESS;
+    let mut previous_kind = JobKind::And;
+    let mut commands = commands.iter_mut();
+    while let Some(&mut (ref mut command, kind)) = commands.next() {
+        // When an `&&` or `||` operator is utilized, execute commands based on the previous status.
+        match previous_kind {
+            JobKind::And => if previous_status != SUCCESS {
+                if let JobKind::Or = kind { previous_kind = kind }
+                continue
+            },
+            JobKind::Or => if previous_status == SUCCESS {
+                if let JobKind::And = kind { previous_kind = kind }
+                continue
+            },
+            _ => ()
+        }
+
+        match kind {
+            JobKind::Background => {
+                match command.spawn() {
+                    Ok(child) => {
+                        let _ = thread::spawn(move || {
+                            // TODO: Implement proper backgrounding support
+                            let status = wait_on_child(child);
+                            println!("ion: background task completed: {}", status);
+                        });
+                    },
+                    Err(_) => {
+
+                    }
                 }
-            } else {
-                // The previous command failed to spawn
-                command.stdin(Stdio::null());
+            },
+            JobKind::Pipe => {
+                let mut children: Vec<Option<Child>> = Vec::new();
+
+                // Initialize the first job
+                command.stdout(Stdio::piped());
+                let child = command.spawn().ok();
+                if child.is_none() {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(&command));
+                }
+                children.push(child);
+
+                // Append other jobs until all piped jobs are running.
+                while let Some(&mut (ref mut command, kind)) = commands.next() {
+                    if let JobKind::Pipe = kind { command.stdout(Stdio::piped()); }
+                    if let Some(spawned) = children.last() {
+                        if let Some(ref child) = *spawned {
+                            if let Some(ref stdout) = child.stdout {
+                                unsafe { command.stdin(Stdio::from_raw_fd(stdout.as_raw_fd())); }
+                            }
+                        } else {
+                            // The previous command failed to spawn
+                            command.stdin(Stdio::null());
+                        }
+                    }
+                    let child = command.spawn().ok();
+                    if child.is_none() {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(&command));
+                    }
+                    children.push(child);
+
+                    if let JobKind::Pipe = kind { continue } else { previous_kind = kind; break}
+                }
+                previous_status = wait(&mut children);
+            }
+            _ => {
+                previous_status = execute_command(command);
+                previous_kind = kind;
             }
         }
-        let child = command.spawn().ok();
-        if child.is_none() {
+    }
+    previous_status
+}
+
+fn execute_command(command: &mut Command) -> i32 {
+    match command.spawn() {
+        Ok(child) => wait_on_child(child),
+        Err(_) => {
             let stderr = io::stderr();
             let mut stderr = stderr.lock();
             let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(&command));
+            FAILURE
         }
-        children.push(child);
     }
-    wait(&mut children)
+}
+
+fn wait_on_child(mut child: Child) -> i32 {
+    match child.wait() {
+        Ok(status) => {
+            if let Some(code) = status.code() {
+                code
+            } else {
+                let stderr = io::stderr();
+                let mut stderr = stderr.lock();
+                let _ = stderr.write_all(b"ion: child ended by signal\n");
+                TERMINATED
+            }
+        }
+        Err(err) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "ion: failed to wait: {}", err);
+            100 // TODO what should we return here?
+        }
+    }
 }
 
 /// This function will panic if called with an empty vector
