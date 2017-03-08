@@ -101,8 +101,20 @@ impl Shell {
                     }
                 } else {
                     // TODO: Definitions should be collected from all paths listed in `${PATH}`.
+                    let file_completers = match env::var("PATH") {
+                        Ok(val) => {
+                            let mut compl = Vec::new();
+                            for x in val.split(":") {
+                                compl.push(FilenameCompleter::new(Some(x)));
+                            }
+                            compl
+                        },
+                        Err(_) => {
+                            vec![FilenameCompleter::new(Some("/bin/"))]
+                        },
+                    };
                     // Creates a completer containing definitions from `/bin/`
-                    let file_completer = FilenameCompleter::new(Some("/bin/"));
+                    //let file_completer = FilenameCompleter::new(Some("/bin/"));
 
                     // Creates a list of definitions from the shell environment that will be used
                     // in the creation of a custom completer.
@@ -122,7 +134,7 @@ impl Shell {
                     // Initialize a new completer from the definitions collected.
                     let custom_completer = BasicCompleter::new(words);
                     // Merge the collected definitions with the file path definitions.
-                    let completer = MultiCompleter::new(file_completer, custom_completer);
+                    let completer = MultiCompleter::new(file_completers, custom_completer);
 
                     // Replace the shell's current completer with the newly-created completer.
                     mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
