@@ -308,7 +308,7 @@ impl Variables {
             }
         }
 
-        Job::new(expanded, job.background)
+        Job::new(expanded, job.kind)
     }
 
     pub fn is_valid_variable_character(c: char) -> bool {

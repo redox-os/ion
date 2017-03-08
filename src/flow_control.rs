@@ -17,12 +17,12 @@ pub enum Statement {
     },
     Else,
     End,
+    // TODO: Vec is unnecessary here because there will always be one pipeline parsed
     Pipelines(Vec<Pipeline>),
     Default
 }
 
 impl Statement {
-
     pub fn is_flow_control(&self) -> bool {
         match *self {
             Statement::If{..}  |
