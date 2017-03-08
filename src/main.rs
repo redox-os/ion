@@ -23,7 +23,7 @@ use status::*;
 use function::Function;
 use pipe::execute_pipeline;
 use parser::shell_expand::ExpandErr;
-use parser::{ForExpression, StatementSplitter};
+use parser::{parse_while, ForExpression, StatementSplitter};
 use parser::peg::{parse, Pipeline};
 use flow_control::{FlowControl, Statement, Comparitor};
 
@@ -100,27 +100,20 @@ impl Shell {
                         }
                     }
                 } else {
-                    // TODO: Definitions should be collected from all paths listed in `${PATH}`.
+                    // Creates completers containing definitions from all directories listed
+                    // in the environment's **$PATH** variable.
                     let file_completers = match env::var("PATH") {
                         Ok(val) => {
-                            let mut compl = Vec::new();
                             if cfg!(unix) {
-                                for x in val.split(":") {
-                                    compl.push(FilenameCompleter::new(Some(x)));
-                                }
-                            }else{
-                                for x in val.split(";") {
-                                    compl.push(FilenameCompleter::new(Some(x)));
-                                }
+                                // UNIX systems separate paths with the `:` character.
+                                val.split(':').map(|x| FilenameCompleter::new(Some(x))).collect::<Vec<_>>()
+                            } else {
+                                // Redox and Windows use the `;` character to separate paths
+                                val.split(';').map(|x| FilenameCompleter::new(Some(x))).collect::<Vec<_>>()
                             }
-                            compl
                         },
-                        Err(_) => {
-                            vec![FilenameCompleter::new(Some("/bin/"))]
-                        },
+                        Err(_) => vec![FilenameCompleter::new(Some("/bin/"))],
                     };
-                    // Creates a completer containing definitions from `/bin/`
-                    //let file_completer = FilenameCompleter::new(Some("/bin/"));
 
                     // Creates a list of definitions from the shell environment that will be used
                     // in the creation of a custom completer.
@@ -272,6 +265,9 @@ impl Shell {
             Statement::For { .. } => {
                 prompt.push_str("for> ");
             },
+            Statement::While { .. } => {
+                prompt.push_str("while> ");
+            },
             Statement::Function { .. } => {
                 prompt.push_str("fn> ");
             },
@@ -334,6 +330,15 @@ impl Shell {
     fn handle_end(&mut self){
         self.flow_control.collecting_block = false;
         match self.flow_control.current_statement.clone() {
+            Statement::While{ref expression} => {
+                let block_jobs: Vec<Pipeline> = self.flow_control.current_block
+                    .pipelines.drain(..).collect();
+                while parse_while(expression, &self.directory_stack, &self.variables) {
+                    for pipeline in &block_jobs {
+                        self.run_pipeline(pipeline, false);
+                    }
+                }
+            },
             Statement::For{variable: ref var, values: ref vals} => {
                 let block_jobs: Vec<Pipeline> = self.flow_control
                     .current_block
@@ -401,7 +406,7 @@ impl Shell {
             if self.flow_control.collecting_block {
                 let mode = self.flow_control.modes.last().unwrap_or(&flow_control::Mode{value: false}).value;
                 match (mode, self.flow_control.current_statement.clone()) {
-                    (true, Statement::If{..}) | (false, Statement::Else) |
+                    (true, Statement::If{..}) | (false, Statement::Else) | (_, Statement::While{..}) |
                     (_, Statement::For{..}) |(_, Statement::Function{..}) => self.flow_control.current_block.pipelines.push(pipeline),
                     _ => {}
                 }

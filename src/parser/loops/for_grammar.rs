@@ -1,7 +1,7 @@
 use directory_stack::DirectoryStack;
 use variables::Variables;
-use super::shell_expand::words::{WordIterator, WordToken};
-use super::shell_expand::{braces, variables};
+use parser::shell_expand::words::{WordIterator, WordToken};
+use parser::shell_expand::{braces, variables};
 
 #[derive(Debug, PartialEq)]
 pub enum ForExpression {

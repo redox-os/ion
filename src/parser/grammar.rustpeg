@@ -8,6 +8,7 @@ parse_ -> Statement
       = if_
       / else_
       / for_
+      / while_
       / fn_
       / end_
       / pipelines
@@ -43,6 +44,12 @@ for_ -> Statement
         Statement::For { variable: n.to_string(), values: expr.to_string() }
     }
 
+#[pub]
+while_ -> Statement
+    = whitespace* "while" whitespace? expr:$(.*) {
+        Statement::While { expression: expr.to_string() }
+    }
+
 comparitor -> Comparitor
     = "==" { Comparitor::Equal }
     / "!=" { Comparitor::NotEqual }
@@ -69,10 +76,9 @@ _pipelines -> Statement
 
     pipelines::collect(&mut pipelines, &mut possible_error, command);
 
-    if possible_error.is_none() {
-        Ok(Statement::Pipelines(pipelines))
-    } else {
-        Err(possible_error.unwrap())
+    match possible_error {
+        Some(error) => Err(error),
+        None        => Ok(Statement::Pipelines(pipelines))
     }
 }
 

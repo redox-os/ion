@@ -15,6 +15,9 @@ pub enum Statement {
         variable: String,
         values: String,
     },
+    While {
+        expression: String
+    },
     Else,
     End,
     // TODO: Vec is unnecessary here because there will always be one pipeline parsed
@@ -28,6 +31,7 @@ impl Statement {
             Statement::If{..}  |
             Statement::Else    |
             Statement::For{..} |
+            Statement::While{..} |
             Statement::Function{..} => true,
 
             Statement::End           |
