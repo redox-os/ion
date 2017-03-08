@@ -38,20 +38,23 @@ impl Pipeline {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum JobKind { And, Background, Last, Or, Pipe }
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Job {
     pub command: String,
     pub args: Vec<String>,
-    pub background: bool,
+    pub kind: JobKind,
 }
 
 impl Job {
-    pub fn new(args: Vec<String>, background: bool) -> Self {
+    pub fn new(args: Vec<String>, kind: JobKind) -> Self {
         let command = args[0].clone();
         Job {
             command: command,
             args: args,
-            background: background,
+            kind: kind,
         }
     }
 
