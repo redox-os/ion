@@ -104,7 +104,7 @@ impl Shell {
                     let file_completers = match env::var("PATH") {
                         Ok(val) => {
                             let mut compl = Vec::new();
-                            if cfg!(target_os="linux") {
+                            if cfg!(unix) {
                                 for x in val.split(":") {
                                     compl.push(FilenameCompleter::new(Some(x)));
                                 }
