@@ -74,7 +74,9 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                         });
                     },
                     Err(_) => {
-
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(&command));
                     }
                 }
             },

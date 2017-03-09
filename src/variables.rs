@@ -125,7 +125,8 @@ impl Variables {
                 for (key, value) in &self.aliases {
                     let _ = stdout.write(key.as_bytes())
                         .and_then(|_| stdout.write_all(b" = "))
-                        .and_then(|_| stdout.write_all(value.as_bytes()));
+                        .and_then(|_| stdout.write_all(value.as_bytes()))
+                        .and_then(|_| stdout.write_all(b"\n"));
                 }
             },
             Binding::KeyOnly(key) => {
@@ -175,7 +176,8 @@ impl Variables {
                 for (key, value) in &self.variables {
                     let _ = stdout.write(key.as_bytes())
                         .and_then(|_| stdout.write_all(b" = "))
-                        .and_then(|_| stdout.write_all(value.as_bytes()));
+                        .and_then(|_| stdout.write_all(value.as_bytes()))
+                        .and_then(|_| stdout.write_all(b"\n"));
                 }
             },
             Binding::KeyOnly(key) => {

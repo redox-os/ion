@@ -118,17 +118,17 @@ impl Shell {
                     // Creates a list of definitions from the shell environment that will be used
                     // in the creation of a custom completer.
                     let words = Command::map().into_iter()
-                            // Add built-in commands to the completer's definitions.
-                            .map(|(s, _)| String::from(s))
-                            // Add the history list to the completer's definitions.
-                            .chain(history.iter().cloned())
-                            // Add the aliases to the completer's definitions.
-                            .chain(vars.aliases.keys().cloned())
-                            // Add the list of available functions to the completer's definitions.
-                            .chain(funcs.keys().cloned())
-                            // Add the list of available variables to the completer's definitions.
-                            .chain(vars.get_vars().into_iter().map(|s| format!("${}", s)))
-                            .collect();
+                        // Add built-in commands to the completer's definitions.
+                        .map(|(s, _)| String::from(s))
+                        // Add the history list to the completer's definitions.
+                        .chain(history.iter().cloned())
+                        // Add the aliases to the completer's definitions.
+                        .chain(vars.aliases.keys().cloned())
+                        // Add the list of available functions to the completer's definitions.
+                        .chain(funcs.keys().cloned())
+                        // Add the list of available variables to the completer's definitions.
+                        .chain(vars.get_vars().into_iter().map(|s| format!("${}", s)))
+                        .collect();
 
                     // Initialize a new completer from the definitions collected.
                     let custom_completer = BasicCompleter::new(words);
