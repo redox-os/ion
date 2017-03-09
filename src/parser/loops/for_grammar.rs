@@ -1,7 +1,6 @@
 use directory_stack::DirectoryStack;
 use variables::Variables;
-use parser::shell_expand::words::{WordIterator, WordToken};
-use parser::shell_expand::{braces, variables};
+use parser::expand_string;
 
 #[derive(Debug, PartialEq)]
 pub enum ForExpression {
@@ -11,43 +10,7 @@ pub enum ForExpression {
 
 impl ForExpression {
     pub fn new(expression: &str, dir_stack: &DirectoryStack, variables: &Variables) -> ForExpression {
-        let mut output = String::new();
-        let mut word_iterator = WordIterator::new(expression);
-
-        let expand_variable = |variable: &str, _: bool| {
-            variables.get_var(variable)
-        };
-        let expand_command = |command:  &str, quoted: bool| {
-            variables.command_expansion(command, quoted)
-        };
-
-        while let Some(Ok(word)) = word_iterator.next() {
-            match word {
-                WordToken::Brace(text, contains_variables) => {
-                    if contains_variables {
-                        let mut temp = String::new();
-                        variables::expand(&mut temp, text,
-                            |variable| expand_variable(variable, false),
-                            |command| expand_command(command, false)
-                        );
-                        braces::expand_braces(&mut output, &temp);
-                    } else {
-                        braces::expand_braces(&mut output, text);
-                    }
-                },
-                WordToken::Normal(expr) => output.push_str(expr),
-                WordToken::Tilde(tilde) => match variables.tilde_expansion(tilde, dir_stack) {
-                    Some(expanded) => output.push_str(&expanded),
-                    None           => output.push_str(tilde),
-                },
-                WordToken::Variable(text, quoted) => {
-                    variables::expand(&mut output, text,
-                        |variable| expand_variable(variable, quoted),
-                        |command| expand_command(command, quoted)
-                    );
-                }
-            }
-        }
+        let output = expand_string(expression, variables, dir_stack).unwrap_or_else(|_| String::from(""));
 
         {
             let mut bytes_iterator = output.bytes().enumerate();

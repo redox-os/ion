@@ -16,6 +16,7 @@ use std::time::SystemTime;
 
 use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter, BasicCompleter};
 
+use builtins::*;
 use completer::MultiCompleter;
 use directory_stack::DirectoryStack;
 use variables::Variables;
@@ -23,7 +24,7 @@ use status::*;
 use function::Function;
 use pipe::execute_pipeline;
 use parser::shell_expand::ExpandErr;
-use parser::{parse_while, ForExpression, StatementSplitter};
+use parser::{expand_string, parse_while, ForExpression, StatementSplitter};
 use parser::peg::{parse, Pipeline};
 use flow_control::{FlowControl, Statement, Comparitor};
 
@@ -35,6 +36,7 @@ pub mod variables;
 pub mod status;
 pub mod function;
 pub mod flow_control;
+mod builtins;
 mod parser;
 
 /// This struct will contain all of the data structures related to this
@@ -273,7 +275,7 @@ impl Shell {
             },
             _ => {
                 let prompt_var = self.variables.get_var_or_empty("PROMPT");
-                match self.variables.expand_string(&prompt_var, &self.directory_stack) {
+                match expand_string(&prompt_var, &self.variables, &self.directory_stack) {
                     Ok(ref expanded_string) => prompt.push_str(expanded_string),
                     Err(ExpandErr::UnmatchedBraces(position)) => {
                         let stderr = io::stderr();
@@ -312,8 +314,8 @@ impl Shell {
     }
 
     fn handle_if(&mut self, left: String, comparitor: Comparitor, right: String) {
-        let left  = self.variables.expand_string(&left, &self.directory_stack).unwrap_or_else(|_| "".to_string());
-        let right = self.variables.expand_string(&right, &self.directory_stack).unwrap_or_else(|_| "".to_string());
+        let left  = expand_string(&left, &self.variables, &self.directory_stack).unwrap_or_else(|_| "".to_string());
+        let right = expand_string(&right, &self.variables, &self.directory_stack).unwrap_or_else(|_| "".to_string());
 
         let value = match comparitor {
             Comparitor::GreaterThan        => { left >  right },
@@ -678,7 +680,7 @@ impl Command {
                             name: "alias",
                             help: "View, set or unset aliases",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.alias_(args)
+                                alias(&mut shell.variables, args)
                             },
                         });
 
@@ -687,7 +689,7 @@ impl Command {
                             name: "drop",
                             help: "Delete an alias",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.drop_alias(args)
+                                drop_alias(&mut shell.variables, args)
                             },
                         });
 
@@ -697,7 +699,7 @@ impl Command {
                             name: "export",
                             help: "Set an environment variable",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.export_variable(args)
+                                export_variable(&mut shell.variables, args)
                             }
                         });
 
@@ -706,7 +708,7 @@ impl Command {
                             name: "let",
                             help: "View, set or unset variables",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.let_(args)
+                                let_(&mut shell.variables, args)
                             },
                         });
 
@@ -724,7 +726,7 @@ impl Command {
                             name: "drop",
                             help: "Delete a variable",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                shell.variables.drop_variable(args)
+                                drop_variable(&mut shell.variables, args)
                             },
                         });
 
