@@ -6,57 +6,16 @@ use std::iter;
 use std::path::PathBuf;
 use std::process;
 
-use liner::Context;
-
-use parser::peg::{Pipeline, Job};
-use status::{SUCCESS, FAILURE};
 use directory_stack::DirectoryStack;
-use parser::shell_expand::{self, ExpandErr};
+use liner::Context;
+use parser::expand_string;
+use parser::peg::{Pipeline, Job};
+use parser::shell_expand::ExpandErr;
+use status::{SUCCESS, FAILURE};
 
 pub struct Variables {
-    variables: BTreeMap<String, String>,
+    pub variables: BTreeMap<String, String>,
     pub aliases: BTreeMap<String, String>
-}
-
-enum Binding {
-    ListEntries,
-    KeyOnly(String),
-    KeyValue(String, String),
-}
-
-/// Parses let bindings, `let VAR = KEY`, returning the result as a `(key, value)` tuple.
-fn parse_assignment<I: IntoIterator>(args: I) -> Binding
-    where I::Item: AsRef<str>
-{
-    // Write all the arguments into a single `String`
-    let arguments = args.into_iter().skip(1).fold(String::new(), |a, b| a + " " + b.as_ref());
-
-    // Create a character iterator from the arguments.
-    let mut char_iter = arguments.chars();
-
-    // Find the key and advance the iterator until the equals operator is found.
-    let mut key = "".to_owned();
-    let mut found_key = false;
-
-    while let Some(character) = char_iter.next() {
-        match character {
-            ' ' if key.is_empty() => (),
-            ' ' => found_key = true,
-            '=' => {
-                found_key = true;
-                break
-            },
-            _ if !found_key => key.push(character),
-            _ => ()
-        }
-    }
-
-    if !found_key && key.is_empty() {
-        Binding::ListEntries
-    } else {
-        let value = char_iter.skip_while(|&x| x == ' ').collect::<String>();
-        if value.is_empty() { Binding::KeyOnly(key) } else { Binding::KeyValue(key, value) }
-    }
 }
 
 impl Default for Variables {
@@ -106,106 +65,6 @@ impl Variables {
         SUCCESS
     }
 
-    pub fn alias_<I: IntoIterator>(&mut self, args: I) -> i32
-        where I::Item: AsRef<str>
-    {
-        match parse_assignment(args) {
-            Binding::KeyValue(key, value) => {
-                if !Variables::is_valid_variable_name(&key) {
-                    let stderr = io::stderr();
-                    let _ = writeln!(&mut stderr.lock(), "ion: alias name, '{}', is invalid", key);
-                    return FAILURE;
-                }
-                self.aliases.insert(key.to_string(), value.to_string());
-            },
-            Binding::ListEntries => {
-                let stdout = io::stdout();
-                let stdout = &mut stdout.lock();
-
-                for (key, value) in &self.aliases {
-                    let _ = stdout.write(key.as_bytes())
-                        .and_then(|_| stdout.write_all(b" = "))
-                        .and_then(|_| stdout.write_all(value.as_bytes()));
-                }
-            },
-            Binding::KeyOnly(key) => {
-                let stderr = io::stderr();
-                let _ = writeln!(&mut stderr.lock(), "ion: please provide value for alias '{}'", key);
-                return FAILURE;
-            }
-        }
-        SUCCESS
-    }
-
-    pub fn drop_alias<I: IntoIterator>(&mut self, args: I) -> i32
-        where I::Item: AsRef<str>
-    {
-        let args = args.into_iter().collect::<Vec<I::Item>>();
-        if args.len() <= 1 {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: you must specify an alias name");
-            return FAILURE;
-        }
-        for alias in args.iter().skip(1) {
-            if self.aliases.remove(alias.as_ref()).is_none() {
-                let stderr = io::stderr();
-                let _ = writeln!(&mut stderr.lock(), "ion: undefined alias: {}", alias.as_ref());
-                return FAILURE;
-            }
-        }
-        SUCCESS
-    }
-
-    pub fn let_<I: IntoIterator>(&mut self, args: I) -> i32
-        where I::Item: AsRef<str>
-    {
-        match parse_assignment(args) {
-            Binding::KeyValue(key, value) => {
-                if !Variables::is_valid_variable_name(&key) {
-                    let stderr = io::stderr();
-                    let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
-                    return FAILURE;
-                }
-                self.variables.insert(key.to_string(), value.to_string());
-            },
-            Binding::ListEntries => {
-                let stdout = io::stdout();
-                let stdout = &mut stdout.lock();
-
-                for (key, value) in &self.variables {
-                    let _ = stdout.write(key.as_bytes())
-                        .and_then(|_| stdout.write_all(b" = "))
-                        .and_then(|_| stdout.write_all(value.as_bytes()));
-                }
-            },
-            Binding::KeyOnly(key) => {
-                let stderr = io::stderr();
-                let _ = writeln!(&mut stderr.lock(), "ion: please provide value for variable '{}'", key);
-                return FAILURE;
-            }
-        }
-        SUCCESS
-    }
-
-    pub fn drop_variable<I: IntoIterator>(&mut self, args: I) -> i32
-        where I::Item: AsRef<str>
-    {
-        let args = args.into_iter().collect::<Vec<I::Item>>();
-        if args.len() <= 1 {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: you must specify a variable name");
-            return FAILURE;
-        }
-        for variable in args.iter().skip(1) {
-            if self.unset_var(variable.as_ref()).is_none() {
-                let stderr = io::stderr();
-                let _ = writeln!(&mut stderr.lock(), "ion: undefined variable: {}", variable.as_ref());
-                return FAILURE;
-            }
-        }
-        SUCCESS
-    }
-
     pub fn set_var(&mut self, name: &str, value: &str) {
         if !name.is_empty() {
             if value.is_empty() {
@@ -232,36 +91,6 @@ impl Variables {
         self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k)).collect()
     }
 
-    pub fn export_variable<I: IntoIterator>(&mut self, args: I) -> i32
-        where I::Item: AsRef<str>
-    {
-        match parse_assignment(args) {
-            Binding::KeyValue(key, value) => {
-                if !Variables::is_valid_variable_name(&key) {
-                    let stderr = io::stderr();
-                    let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
-                    return FAILURE;
-                }
-                env::set_var(key, value);
-            },
-            Binding::KeyOnly(key) => {
-                if let Some(local_value) = self.get_var(&key) {
-                    env::set_var(key, local_value);
-                } else {
-                    let stderr = io::stderr();
-                    let _ = writeln!(&mut stderr.lock(), "ion: unknown variable, '{}'", key);
-                    return FAILURE;
-                }
-            },
-            _ => {
-                let stderr = io::stderr();
-                let _ = writeln!(&mut stderr.lock(), "ion usage: export KEY=VALUE");
-                return FAILURE;
-            }
-        }
-        SUCCESS
-    }
-
     pub fn expand_pipeline(&self, pipeline: &Pipeline, dir_stack: &DirectoryStack) -> Pipeline {
         // TODO don't copy everything
         // TODO ugh, I made it worse
@@ -278,7 +107,7 @@ impl Variables {
         let mut expanded: Vec<String> = Vec::new();
         let mut nth_argument = 0;
         let mut error_occurred = None;
-        for (job, result) in job.args.iter().map(|argument| self.expand_string(argument, dir_stack)).enumerate() {
+        for (job, result) in job.args.iter().map(|argument| expand_string(argument, self, dir_stack)).enumerate() {
             match result {
                 Ok(expanded_string) => expanded.push(expanded_string),
                 Err(cause) => {
@@ -403,23 +232,13 @@ impl Variables {
 
         None
     }
-
-    /// Takes an argument string as input and expands it.
-    pub fn expand_string<'a>(&'a self, original: &'a str, dir_stack: &DirectoryStack) -> Result<String, ExpandErr> {
-        let tilde_fn    = |tilde:    &str| self.tilde_expansion(tilde, dir_stack);
-        let variable_fn = |variable: &str, quoted: bool| {
-            if quoted { self.get_var(variable) } else { self.get_var(variable).map(|x| x.replace("\n", " ")) }
-        };
-        let command_fn  = |command:  &str, quoted: bool| self.command_expansion(command, quoted);
-        shell_expand::expand_string(original, tilde_fn, variable_fn, command_fn)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use status::{FAILURE, SUCCESS};
     use directory_stack::DirectoryStack;
+    use parser::expand_string;
 
     fn new_dir_stack() -> DirectoryStack {
         DirectoryStack::new().unwrap()
@@ -428,61 +247,15 @@ mod tests {
     #[test]
     fn undefined_variable_expands_to_empty_string() {
         let variables = Variables::default();
-        let expanded = variables.expand_string("$FOO", &new_dir_stack()).unwrap();
+        let expanded = expand_string("$FOO", &variables, &new_dir_stack()).unwrap();
         assert_eq!("", &expanded);
-    }
-
-    #[test]
-    fn let_and_expand_a_variable() {
-        let mut variables = Variables::default();
-        variables.let_(vec!["let", "FOO", "=", "BAR"]);
-        let expanded = variables.expand_string("$FOO", &new_dir_stack()).unwrap();
-        assert_eq!("BAR", &expanded);
     }
 
     #[test]
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
-        let expanded = variables.expand_string("$FOO", &new_dir_stack()).unwrap();
+        let expanded = expand_string("$FOO", &variables, &new_dir_stack()).unwrap();
         assert_eq!("BAR", &expanded);
-    }
-
-    #[test]
-    fn let_fails_if_no_value() {
-        let mut variables = Variables::default();
-        let return_status = variables.let_(vec!["let", "FOO"]);
-        assert_eq!(FAILURE, return_status);
-    }
-
-    #[test]
-    fn let_checks_variable_name() {
-        let mut variables = Variables::default();
-        let return_status = variables.let_(vec!["let", ",;!:", "=", "FOO"]);
-        assert_eq!(FAILURE, return_status);
-    }
-
-    #[test]
-    fn drop_deletes_variable() {
-        let mut variables = Variables::default();
-        variables.set_var("FOO", "BAR");
-        let return_status = variables.drop_variable(vec!["drop", "FOO"]);
-        assert_eq!(SUCCESS, return_status);
-        let expanded = variables.expand_string("$FOO", &new_dir_stack()).unwrap();
-        assert_eq!("", expanded);
-    }
-
-    #[test]
-    fn drop_fails_with_no_arguments() {
-        let mut variables = Variables::default();
-        let return_status = variables.drop_variable(vec!["drop"]);
-        assert_eq!(FAILURE, return_status);
-    }
-
-    #[test]
-    fn drop_fails_with_undefined_variable() {
-        let mut variables = Variables::default();
-        let return_status = variables.drop_variable(vec!["drop", "FOO"]);
-        assert_eq!(FAILURE, return_status);
     }
 }
