@@ -46,8 +46,19 @@ for_ -> Statement
 
 #[pub]
 while_ -> Statement
-    = whitespace* "while" whitespace? expr:$(.*) {
-        Statement::While { expression: expr.to_string() }
+    = whitespace* "while" whitespace? command:$(.*) {?
+        let mut possible_error = None;
+        let mut pipelines: Vec<Pipeline> = Vec::new();
+
+        pipelines::collect(&mut pipelines, &mut possible_error, command);
+
+        match possible_error {
+            Some(error) => Err(error),
+            None => match pipelines.drain(..).next() {
+                Some(pipeline) => Ok(Statement::While { expression: pipeline }),
+                None => unreachable!()
+            }
+        }
     }
 
 comparitor -> Comparitor
