@@ -24,7 +24,7 @@ use status::*;
 use function::Function;
 use pipe::execute_pipeline;
 use parser::shell_expand::ExpandErr;
-use parser::{expand_string, parse_while, ForExpression, StatementSplitter};
+use parser::{expand_string, ForExpression, StatementSplitter};
 use parser::peg::{parse, Pipeline};
 use flow_control::{FlowControl, Statement, Comparitor};
 
@@ -335,7 +335,7 @@ impl Shell {
             Statement::While{ref expression} => {
                 let block_jobs: Vec<Pipeline> = self.flow_control.current_block
                     .pipelines.drain(..).collect();
-                while parse_while(expression, &self.directory_stack, &self.variables) {
+                while self.run_pipeline(expression, false) == Some(SUCCESS) {
                     for pipeline in &block_jobs {
                         self.run_pipeline(pipeline, false);
                     }

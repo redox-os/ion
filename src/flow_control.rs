@@ -7,7 +7,7 @@ pub enum Statement {
         comparitor: Comparitor,
         right: String
     },
-    Function{
+    Function {
         name: String,
         args: Vec<String>
     },
@@ -15,9 +15,7 @@ pub enum Statement {
         variable: String,
         values: String,
     },
-    While {
-        expression: String
-    },
+    While { expression: Pipeline },
     Else,
     End,
     // TODO: Vec is unnecessary here because there will always be one pipeline parsed
