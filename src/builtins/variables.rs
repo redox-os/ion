@@ -22,6 +22,15 @@ enum Binding {
     ListEntries,
     KeyOnly(String),
     KeyValue(String, String),
+    Math(String, Operator, f32),
+    MathInvalid(String)
+}
+
+enum Operator {
+    Plus,
+    Minus,
+    Divide,
+    Multiply
 }
 
 /// Parses let bindings, `let VAR = KEY`, returning the result as a `(key, value)` tuple.
@@ -37,6 +46,7 @@ fn parse_assignment<I: IntoIterator>(args: I)
     // Find the key and advance the iterator until the equals operator is found.
     let mut key = "".to_owned();
     let mut found_key = false;
+    let mut operator = None;
 
     // Scans through characters until the key is found, then continues to scan until
     // the equals operator is found.
@@ -44,6 +54,34 @@ fn parse_assignment<I: IntoIterator>(args: I)
         match character {
             ' ' if key.is_empty() => (),
             ' ' => found_key = true,
+            '+' => {
+                if char_iter.next() == Some('=') {
+                    operator = Some(Operator::Plus);
+                    found_key = true;
+                }
+                break
+            },
+            '-' => {
+                if char_iter.next() == Some('=') {
+                    operator = Some(Operator::Minus);
+                    found_key = true;
+                }
+                break
+            },
+            '*' => {
+                if char_iter.next() == Some('=') {
+                    operator = Some(Operator::Multiply);
+                    found_key = true;
+                }
+                break
+            },
+            '/' => {
+                if char_iter.next() == Some('=') {
+                    operator = Some(Operator::Divide);
+                    found_key = true;
+                }
+                break
+            },
             '=' => {
                 found_key = true;
                 break
@@ -62,7 +100,15 @@ fn parse_assignment<I: IntoIterator>(args: I)
         } else if !Variables::is_valid_variable_name(&key) {
             Binding::InvalidKey(key)
         } else {
-            Binding::KeyValue(key, value)
+            match operator {
+                Some(operator) => {
+                    match value.parse::<f32>() {
+                        Ok(value) => Binding::Math(key, operator, value),
+                        Err(_)    => Binding::MathInvalid(value)
+                    }
+                },
+                None => Binding::KeyValue(key, value)
+            }
         }
     }
 }
@@ -83,6 +129,11 @@ pub fn alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
         Binding::KeyOnly(key) => {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: please provide value for alias '{}'", key);
+            return FAILURE;
+        },
+        _ => {
+            let stderr = io::stderr();
+            let _ = writeln!(&mut stderr.lock(), "ion: invalid alias syntax");
             return FAILURE;
         }
     }
@@ -126,6 +177,29 @@ pub fn let_<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
         Binding::KeyOnly(key) => {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: please provide value for variable '{}'", key);
+            return FAILURE;
+        },
+        Binding::Math(key, operator, increment) => {
+            let value = vars.get_var_or_empty(&key);
+            let _ = match value.parse::<f32>() {
+                Ok(old_value) => match operator {
+                    Operator::Plus     => vars.variables.insert(key, (old_value + increment).to_string()),
+                    Operator::Minus    => vars.variables.insert(key, (old_value - increment).to_string()),
+                    Operator::Multiply => vars.variables.insert(key, (old_value * increment).to_string()),
+                    Operator::Divide   => vars.variables.insert(key, (old_value / increment).to_string()),
+                },
+                Err(_) => {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: original value, {}, is not a number", value);
+                    return FAILURE;
+                }
+            };
+        },
+        Binding::MathInvalid(value) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "ion: supplied value, {}, is not a number", value);
             return FAILURE;
         }
     }
@@ -173,6 +247,29 @@ pub fn export_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
                 let _ = writeln!(&mut stderr.lock(), "ion: unknown variable, '{}'", key);
                 return FAILURE;
             }
+        },
+        Binding::Math(key, operator, increment) => {
+            let value = vars.get_var(&key).unwrap_or_else(|| "".to_owned());
+            match value.parse::<f32>() {
+                Ok(old_value) => match operator {
+                    Operator::Plus     => env::set_var(key, (old_value + increment).to_string()),
+                    Operator::Minus    => env::set_var(key, (old_value - increment).to_string()),
+                    Operator::Multiply => env::set_var(key, (old_value * increment).to_string()),
+                    Operator::Divide   => env::set_var(key, (old_value / increment).to_string()),
+                },
+                Err(_) => {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: original value, {}, is not a number", value);
+                    return FAILURE;
+                }
+            }
+        },
+        Binding::MathInvalid(value) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "ion: supplied value, {}, is not a number", value);
+            return FAILURE;
         },
         _ => {
             let stderr = io::stderr();
