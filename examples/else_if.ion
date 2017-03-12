@@ -1,0 +1,7 @@
+if test 1 -gt 5
+    echo one
+else if test 1 -eq 1
+    echo two
+else
+    echo three
+end

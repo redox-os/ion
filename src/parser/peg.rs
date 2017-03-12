@@ -103,7 +103,8 @@ peg_file! grammar("grammar.rustpeg");
 #[cfg(test)]
 mod tests {
     use super::grammar::*;
-    use flow_control::{Statement, Comparitor};
+    use super::*;
+    use flow_control::Statement;
 
     #[test]
     fn full_script() {
@@ -161,24 +162,20 @@ else
     #[test]
     fn parsing_ifs() {
         // Default case where spaced normally
-        let parsed_if = if_("if 1 == 2").unwrap();
-        let correct_parse = Statement::If{left: "1".to_string(),
-                                        comparitor: Comparitor::Equal,
-                                        right: "2".to_string()};
+        let parsed_if = if_("if test 1 -eq 2").unwrap();
+        let correct_parse = Statement::If {
+            expression: Pipeline::new(
+                vec!(Job::new(
+                    vec!("test".to_owned(), "1".to_owned(), "-eq".to_owned(), "2".to_owned()), JobKind::Last)
+                ), None, None),
+            success: vec!(),
+            else_if: vec!(),
+            failure: vec!()
+        };
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = if_("if 1 == 2         ").unwrap();
-        let correct_parse = Statement::If{left: "1".to_string(),
-                                        comparitor: Comparitor::Equal,
-                                        right: "2".to_string()};
-        assert_eq!(correct_parse, parsed_if);
-
-        // Default case where spaced normally
-        let parsed_if = if_("if 1 <= 2").unwrap();
-        let correct_parse = Statement::If{left: "1".to_string(),
-                                        comparitor: Comparitor::LessThanOrEqual,
-                                        right: "2".to_string()};
+        let parsed_if = if_("if test 1 -eq 2         ").unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 
@@ -222,7 +219,11 @@ else
     fn parsing_functions() {
         // Default case where spaced normally
         let parsed_if = fn_("fn bob").unwrap();
-        let correct_parse = Statement::Function{name: "bob".to_string(), args: vec!()};
+        let correct_parse = Statement::Function{
+            name:       "bob".to_string(),
+            args:       vec!(),
+            statements: vec!()
+        };
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
@@ -235,7 +236,11 @@ else
 
         // Default case where spaced normally
         let parsed_if = fn_("fn bob a b").unwrap();
-        let correct_parse = Statement::Function{name: "bob".to_string(), args: vec!("a".to_string(), "b".to_string())};
+        let correct_parse = Statement::Function{
+            name:       "bob".to_owned(),
+            args:       vec!("a".to_owned(), "b".to_owned()),
+            statements: vec!()
+        };
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value

@@ -1,0 +1,5 @@
+for a in 0..10
+    for b in 1..10
+      echo $a$b
+    end
+end

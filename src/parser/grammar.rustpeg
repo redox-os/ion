@@ -1,11 +1,12 @@
 use parser::peg::Pipeline;
 use parser::pipelines;
 use flow_control::Statement;
-use flow_control::Comparitor;
+use flow_control::ElseIf;
 
 #[pub]
 parse_ -> Statement
       = if_
+      / else_if_
       / else_
       / for_
       / while_
@@ -15,7 +16,45 @@ parse_ -> Statement
 
 #[pub]
 if_ -> Statement
-    = whitespace* "if " l:_not_comparitor whitespace c:comparitor whitespace r:_not_comparitor whitespace* { Statement::If{ left: l, comparitor: c, right: r} }
+    = whitespace* "if" whitespace? command:$(.*) {?
+        let mut possible_error = None;
+        let mut pipelines: Vec<Pipeline> = Vec::new();
+
+        pipelines::collect(&mut pipelines, &mut possible_error, command);
+
+        match possible_error {
+            Some(error) => Err(error),
+            None => match pipelines.drain(..).next() {
+                Some(pipeline) => Ok(Statement::If {
+                    expression: pipeline,
+                    success: Vec::new(),
+                    else_if: Vec::new(),
+                    failure: Vec::new()
+                }),
+                None => unreachable!()
+            }
+        }
+    }
+
+#[pub]
+else_if_ -> Statement
+    = whitespace* "else" whitespace? "if" whitespace? command:$(.*) {?
+        let mut possible_error = None;
+        let mut pipelines: Vec<Pipeline> = Vec::new();
+
+        pipelines::collect(&mut pipelines, &mut possible_error, command);
+
+        match possible_error {
+            Some(error) => Err(error),
+            None => match pipelines.drain(..).next() {
+                Some(pipeline) => Ok(Statement::ElseIf(ElseIf {
+                    expression: pipeline,
+                    success:    Vec::new(),
+                })),
+                None => unreachable!()
+            }
+        }
+    }
 
 #[pub]
 else_ -> Statement
@@ -27,7 +66,13 @@ end_ -> Statement
 
 #[pub]
 fn_ -> Statement
-    = whitespace* "fn " n:_name whitespace* args:_args whitespace* { Statement::Function{name: n.to_string(), args: args} }
+    = whitespace* "fn " n:_name whitespace* args:_args whitespace* {
+        Statement::Function {
+            name: n.to_string(),
+            args: args,
+            statements: Vec::new(),
+        }
+    }
 
 _name -> String
       = n:$([A-z]+) { n.to_string() }
@@ -41,7 +86,11 @@ _arg -> String
 #[pub]
 for_ -> Statement
     = whitespace* "for" whitespace? n:_name whitespace? "in" whitespace? expr:$(.*) {
-        Statement::For { variable: n.to_string(), values: expr.to_string() }
+        Statement::For {
+            variable: n.to_string(),
+            values: expr.to_string(),
+            statements: Vec::new(),
+        }
     }
 
 #[pub]
@@ -55,22 +104,14 @@ while_ -> Statement
         match possible_error {
             Some(error) => Err(error),
             None => match pipelines.drain(..).next() {
-                Some(pipeline) => Ok(Statement::While { expression: pipeline }),
+                Some(pipeline) => Ok(Statement::While {
+                    expression: pipeline,
+                    statements: Vec::new()
+                }),
                 None => unreachable!()
             }
         }
     }
-
-comparitor -> Comparitor
-    = "==" { Comparitor::Equal }
-    / "!=" { Comparitor::NotEqual }
-    / "<=" { Comparitor::LessThanOrEqual }
-    / ">=" { Comparitor::GreaterThanOrEqual }
-    / "<"  { Comparitor::LessThan }
-    / ">"  { Comparitor::GreaterThan }
-
-_not_comparitor -> String
-    = !comparitor n:$([^ ]+) { n.to_string() }
 
 #[pub]
 pipelines -> Statement
