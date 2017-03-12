@@ -1,12 +1,14 @@
+pub mod source;
 pub mod variables;
 
-pub use self::variables::{alias, drop_alias, let_, drop_variable, export_variable};
+use self::variables::{alias, drop_alias, let_, drop_variable, export_variable};
+use self::source::source;
 
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::process;
 
-use shell::Shell;
+use shell::{Shell, ShellHistory};
 use status::*;
 
 /// Structure which represents a Terminal's command.
@@ -175,7 +177,7 @@ impl Builtin {
                             name: "source",
                             help: "Evaluate the file following the command or re-initialize the init file",
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                match shell.source_command(args) {
+                                match source(shell, args) {
                                     Ok(()) => SUCCESS,
                                     Err(why) => {
                                         let stderr = io::stderr();
