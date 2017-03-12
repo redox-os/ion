@@ -1,0 +1,5 @@
+let a = 1
+while test $a -lt 10
+    echo $a
+    let a += 1
+end

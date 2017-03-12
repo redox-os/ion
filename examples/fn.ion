@@ -5,3 +5,11 @@ fn test a b c
 end
 
 test hello world goodbye
+
+fn another_test
+    for i in 1..10
+        echo $i
+    end
+end
+
+another_test

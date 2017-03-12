@@ -1,5 +1,5 @@
-if 3 == 2
-    echo fail
-else
+if test 3 -eq 3
     echo pass
+else
+    echo fail
 end
