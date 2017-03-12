@@ -1,7 +1,44 @@
+# Single Else If Condition
+
 if test 1 -gt 5
     echo one
 else if test 1 -eq 1
     echo two
 else
     echo three
+end
+
+# Multiple Else Conditions
+
+let a = 4
+if test $a -eq 1
+    echo one
+else if test $a -eq 2
+    echo two
+else if test $a -eq 3
+    echo three
+else if test $a -eq 4
+    echo four
+else
+    echo five
+end
+
+# Nested Else If Conditions
+
+let a = 5
+let b = 10
+
+if test $a -gt 10
+    echo "a > 10"
+else if test $a -lt 10
+    echo "a < 10"
+    if test $a -gt $b
+        echo "a > b"
+    else if test $a -eq $b
+        echo "a == b"
+    else
+        echo "a < b"
+    end
+else
+    echo "a == 10"
 end

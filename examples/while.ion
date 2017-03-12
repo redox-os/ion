@@ -1,5 +1,19 @@
+# Simple While Loop
+
 let a = 1
 while test $a -lt 10
     echo $a
+    let a += 1
+end
+
+# While Loop With If Conditions
+
+let a = 1
+while test $a -lt 10
+    if test $a -eq 5
+        echo found 5
+    else
+        echo $a
+    end
     let a += 1
 end
