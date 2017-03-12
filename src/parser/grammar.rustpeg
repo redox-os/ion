@@ -12,7 +12,14 @@ parse_ -> Statement
       / while_
       / fn_
       / end_
+      / break_
       / pipelines
+
+#[pub]
+break_ -> Statement
+    = whitespace* "break" {
+        Statement::Break
+    }
 
 #[pub]
 if_ -> Statement

@@ -276,7 +276,7 @@ impl Shell {
         }
     }
 
-    fn execute_statements(&mut self, mut statements: Vec<Statement>) {
+    fn execute_statements(&mut self, mut statements: Vec<Statement>) -> bool {
         let mut iterator = statements.drain(..);
         while let Some(statement) = iterator.next() {
             match statement {
@@ -299,10 +299,11 @@ impl Shell {
                             let _ = writeln!(stderr, "{}", why);
                             self.flow_control.level = 0;
                             self.flow_control.current_if_mode = 0;
-                            println!("ABC");
-                            return
+                            return true
                         }
-                    self.execute_if(expression, success, else_if, failure);
+                    if self.execute_if(expression, success, else_if, failure) {
+                        return true
+                    }
                 },
                 Statement::Function { name, args, mut statements } => {
                     self.flow_control.level += 1;
@@ -312,21 +313,27 @@ impl Shell {
                         args:       args,
                         statements: statements
                     });
-                }
+                },
                 Statement::Pipelines(mut pipelines) => {
                     for pipeline in pipelines.drain(..) {
                         self.run_pipeline(&pipeline, false);
                     }
+                },
+                Statement::Break => {
+                    return true
                 }
                 _ => {}
             }
         }
+        false
     }
 
     fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) {
         while self.run_pipeline(&expression, false) == Some(SUCCESS) {
             // Cloning is needed so the statement can be re-iterated again if needed.
-            self.execute_statements(statements.clone())
+            if self.execute_statements(statements.clone()) {
+              break
+            }
         }
     }
 
@@ -335,31 +342,34 @@ impl Shell {
             ForExpression::Normal(expression) => {
                 for value in expression.split_whitespace() {
                     self.variables.set_var(variable, value);
-                    self.execute_statements(statements.clone())
+                    if self.execute_statements(statements.clone()) {
+                      break
+                    }
                 }
             },
             ForExpression::Range(start, end) => {
                 for value in (start..end).map(|x| x.to_string()) {
                     self.variables.set_var(variable, &value);
-                    self.execute_statements(statements.clone())
+                    if self.execute_statements(statements.clone()) {
+                      break
+                    }
                 }
             }
         }
     }
 
     fn execute_if(&mut self, expression: Pipeline, success: Vec<Statement>,
-        mut else_if: Vec<ElseIf>, failure: Vec<Statement>)
+        mut else_if: Vec<ElseIf>, failure: Vec<Statement>) -> bool
     {
         match self.run_pipeline(&expression, false) {
             Some(SUCCESS) => self.execute_statements(success),
             _             => {
                 for elseif in else_if.drain(..) {
                     if self.run_pipeline(&elseif.expression, false) == Some(SUCCESS) {
-                        self.execute_statements(elseif.success);
-                        return
+                        return self.execute_statements(elseif.success);
                     }
                 }
-                self.execute_statements(failure);
+                self.execute_statements(failure)
             }
         }
     }
