@@ -1,7 +1,6 @@
 // TODO:
 // - Implement Herestrings
 // - Implement Heredocs
-// - Implement Stderr Redirection
 // - Implement Stderr Piping
 // - Fix the cyclomatic complexity issue
 
@@ -21,7 +20,7 @@ const PROCESS_VAL:  u8 = 255 ^ (BACKSLASH + WHITESPACE + 32);
 const IS_VALID: u8 = 255 ^ (BACKSLASH + WHITESPACE);
 
 #[derive(PartialEq)]
-enum RedirMode { False, Stdin, Stdout, StdoutAppend }
+enum RedirMode { False, Stdin, Stdout(RedirectFrom), StdoutAppend(RedirectFrom) }
 
 fn get_job_kind(args: &str, index: usize, pipe_char_was_found: bool) -> (JobKind, bool) {
     if pipe_char_was_found {
@@ -41,7 +40,7 @@ fn get_job_kind(args: &str, index: usize, pipe_char_was_found: bool) -> (JobKind
 /// Parses each individual pipeline, separating arguments, pipes, background tasks, and redirections.
 pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>, args: &str) {
     let mut jobs: Vec<Job> = Vec::new();
-    let mut args_iter = args.bytes();
+    let mut args_iter = args.bytes().peekable();
     let (mut index, mut arg_start) = (0, 0);
     let mut flags = 0u8; // (backslash, single_quote, double_quote, x, x, x, process_one, process_two)
 
@@ -52,14 +51,14 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
     let mut levels = 0;
 
     macro_rules! redir_check {
-        ($file:ident, $name:ident, $is_append:expr) => {{
+        ($from:expr, $file:ident, $name:ident, $is_append:expr) => {{
             if $file.is_none() {
                 if $name.is_empty() {
                     *possible_error = Some("missing standard output file argument after '>'");
                 } else {
                     $file = Some(Redirection {
-                        from: RedirectFrom::Stdout,
-                        file: unsafe { String::from_utf8_unchecked($name) },
+                        from:   $from,
+                        file:   unsafe { String::from_utf8_unchecked($name) },
                         append: $is_append
                     });
                 }
@@ -125,8 +124,21 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                             }
                         },
                         b'|' if (flags & (255 ^ BACKSLASH) == 0) => job_found!(true),
-                        b'&' if (flags & IS_VALID == 0) => job_found!(false),
-                        b'>' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdout),
+                        b'&' if (flags & (255 ^ BACKSLASH) == 0) => {
+                            if args_iter.peek() == Some(&b'>') {
+                                let _ = args_iter.next();
+                                redir_found!(RedirMode::Stdout(RedirectFrom::Both));
+                            } else {
+                                job_found!(false)
+                            }
+                        },
+                        b'^' if (flags & IS_VALID == 0) => {
+                            if args_iter.peek() == Some(&b'>') {
+                                let _ = args_iter.next();
+                                redir_found!(RedirMode::Stdout(RedirectFrom::Stderr));
+                            }
+                        },
+                        b'>' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdout(RedirectFrom::Stdout)),
                         b'<' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdin),
                         _   if (flags >> 6 != 2)        => flags &= 255 ^ (PROCESS_ONE + PROCESS_TWO),
                         _ => (),
@@ -135,9 +147,9 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                 }
                 break 'outer
             },
-            RedirMode::Stdout | RedirMode::StdoutAppend => {
+            RedirMode::Stdout(from) | RedirMode::StdoutAppend(from) => {
                 match args_iter.next() {
-                    Some(character) => if character == b'>' { mode = RedirMode::StdoutAppend; },
+                    Some(character) => if character == b'>' { mode = RedirMode::StdoutAppend(from); },
                     None => {
                         *possible_error = Some("missing standard output file argument after '>'");
                         break 'outer
@@ -169,7 +181,7 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                                 out_file = Some(Redirection {
                                     from: RedirectFrom::Stdout,
                                     file: unsafe { String::from_utf8_unchecked(stdout_file.clone()) },
-                                    append: mode == RedirMode::StdoutAppend
+                                    append: if let RedirMode::StdoutAppend(_) = mode { true } else { false }
                                 });
                             },
                             b'<' if stdout_file.is_empty() => {
@@ -180,7 +192,7 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                                 out_file = Some(Redirection {
                                     from: RedirectFrom::Stdout,
                                     file: unsafe { String::from_utf8_unchecked(stdout_file.clone()) },
-                                    append: mode == RedirMode::StdoutAppend
+                                    append: if let RedirMode::StdoutAppend(_) = mode { true } else { false }
                                 });
 
                                 if in_file.is_some() {
@@ -195,7 +207,12 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                     }
                 }
 
-                redir_check!(out_file, stdout_file, mode == RedirMode::StdoutAppend);
+                redir_check!(
+                    from,
+                    out_file,
+                    stdout_file,
+                    if let RedirMode::StdoutAppend(_) = mode { true } else { false }
+                );
 
                 break 'outer
             },
@@ -209,7 +226,7 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                             if out_file.is_some() {
                                 break 'outer
                             } else {
-                                mode = RedirMode::Stdout;
+                                mode = RedirMode::Stdout(RedirectFrom::Stdout);
                                 continue 'outer
                             }
                         }
@@ -252,7 +269,8 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                     }
                 }
 
-                redir_check!(in_file, stdin_file, false);
+                let dummy_val = RedirectFrom::Stdout;
+                redir_check!(dummy_val, in_file, stdin_file, false);
 
                 break 'outer
             }
@@ -273,7 +291,26 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
 #[cfg(test)]
 mod tests {
     use flow_control::Statement;
-    use parser::peg::{parse, JobKind};
+    use parser::peg::{parse, JobKind, RedirectFrom, Redirection};
+
+    #[test]
+    fn stderr_redirection() {
+        if let Statement::Pipelines(mut pipelines) = parse("git rev-parse --abbrev-ref HEAD ^> /dev/null") {
+            let pipeline = pipelines.remove(0);
+            assert_eq!("git", pipeline.jobs[0].args[0]);
+            assert_eq!("rev-parse", pipeline.jobs[0].args[1]);
+            assert_eq!("--abbrev-ref", pipeline.jobs[0].args[2]);
+            assert_eq!("HEAD", pipeline.jobs[0].args[3]);
+
+            let expected = Redirection {
+                from: RedirectFrom::Stderr,
+                file: "/dev/null".to_owned(),
+                append: false
+            };
+
+            assert_eq!(Some(expected), pipeline.stdout);
+        }
+    }
 
     #[test]
     fn subshells_within_subshells() {

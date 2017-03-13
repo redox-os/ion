@@ -5,7 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::thread;
 
 use status::*;
-use parser::peg::{Pipeline, JobKind};
+use parser::peg::{Pipeline, JobKind, RedirectFrom};
 
 pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
     // Generate a list of commands from the given pipeline
@@ -31,7 +31,21 @@ pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
                 File::create(&stdout.file)
             };
             match file {
-                Ok(f) => unsafe { command.0.stdout(Stdio::from_raw_fd(f.into_raw_fd())); },
+                Ok(f) => unsafe {
+                    match stdout.from {
+                        RedirectFrom::Both => {
+                            let fd = f.into_raw_fd();
+                            command.0.stderr(Stdio::from_raw_fd(fd));
+                            command.0.stdout(Stdio::from_raw_fd(fd));
+                        },
+                        RedirectFrom::Stderr => {
+                            command.0.stderr(Stdio::from_raw_fd(f.into_raw_fd()));
+                        },
+                        RedirectFrom::Stdout => {
+                            command.0.stdout(Stdio::from_raw_fd(f.into_raw_fd()));
+                        },
+                    }
+                },
                 Err(err) => {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();

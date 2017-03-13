@@ -6,7 +6,7 @@ use self::grammar::parse_;
 
 use glob::glob;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RedirectFrom { Stdout, Stderr, Both}
 
 #[derive(Debug, PartialEq, Clone)]

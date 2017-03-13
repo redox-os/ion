@@ -15,8 +15,7 @@ The `let` keyword is utilized to create local variables within the shell. The `e
 a similar action, only setting the variable globally as an environment variable for the operating system.
 
 ```ion
-// TODO: Ion Shell does not yet implement stderr redirection.
-let git_branch = $(git rev-parse --abbrev-ref HEAD 2> /dev/null)
+let git_branch = $(git rev-parse --abbrev-ref HEAD ^> /dev/null)
 ```
 
 If the command is executed without any arguments, it will simply list all available variables.

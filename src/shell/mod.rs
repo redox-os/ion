@@ -188,7 +188,7 @@ impl Shell {
                 self.on_command(command);
 
                 // Mark the command in the context history if it was a success.
-                if self.previous_status == SUCCESS || self.flow_control.level > 0 {
+                if self.previous_status != NO_SUCH_COMMAND || self.flow_control.level > 0 {
                     self.set_context_history_from_vars();
                     if let Err(err) = self.context.history.push(command.into()) {
                         let stderr = io::stderr();
