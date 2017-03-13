@@ -1,10 +1,10 @@
+use std::io::{stderr, Write};
+
 use flow_control::Statement;
-
-use std::process::Command;
-
 use self::grammar::parse_;
-
-use glob::glob;
+use directory_stack::DirectoryStack;
+use shell::Job;
+use variables::Variables;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RedirectFrom { Stdout, Stderr, Both}
@@ -33,62 +33,11 @@ impl Pipeline {
         }
     }
 
-    pub fn expand_globs(&mut self) {
-        let jobs = self.jobs.drain(..).map(|mut job| {
+    pub fn expand(&mut self, variables: &Variables, dir_stack: &DirectoryStack) {
+        for job in &mut self.jobs {
+            job.expand(variables, dir_stack);
             job.expand_globs();
-            job
-        }).collect();
-        self.jobs = jobs;
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum JobKind { And, Background, Last, Or, Pipe }
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Job {
-    pub command: String,
-    pub args: Vec<String>,
-    pub kind: JobKind,
-}
-
-impl Job {
-    pub fn new(args: Vec<String>, kind: JobKind) -> Self {
-        let command = args[0].clone();
-        Job {
-            command: command,
-            args: args,
-            kind: kind,
         }
-    }
-
-    pub fn expand_globs(&mut self) {
-        let mut new_args: Vec<String> = vec![];
-        for arg in self.args.drain(..) {
-            let mut pushed_glob = false;
-            if arg.contains(|chr| chr == '?' || chr == '*' || chr == '[') {
-                if let Ok(expanded) = glob(&arg) {
-                    for path in expanded.filter_map(Result::ok) {
-                        pushed_glob = true;
-                        new_args.push(path.to_string_lossy().into_owned());
-                    }
-                }
-            }
-            if !pushed_glob {
-                new_args.push(arg);
-            }
-        }
-        self.args = new_args;
-    }
-
-    pub fn build_command(&self) -> Command {
-        let mut command = Command::new(&self.command);
-        for i in 1..self.args.len() {
-            if let Some(arg) = self.args.get(i) {
-                command.arg(arg);
-            }
-        }
-        command
     }
 }
 
@@ -96,7 +45,8 @@ pub fn parse(code: &str) -> Statement {
     match parse_(code) {
 		Ok(code_ok) => code_ok,
 		Err(err) => {
-			println!("ion: Syntax {}",err);
+            let stderr = stderr();
+            let _ = writeln!(stderr.lock(), "ion: Syntax {}", err);
 			Statement::Pipelines(vec![])
 		}
 	}
@@ -109,6 +59,7 @@ mod tests {
     use super::grammar::*;
     use super::*;
     use flow_control::Statement;
+    use shell::JobKind;
 
     #[test]
     fn full_script() {

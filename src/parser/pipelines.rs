@@ -4,7 +4,8 @@
 // - Implement Stderr Piping
 // - Fix the cyclomatic complexity issue
 
-use parser::peg::{Job, JobKind, Pipeline, Redirection, RedirectFrom};
+use parser::peg::{Pipeline, Redirection, RedirectFrom};
+use shell::{Job, JobKind};
 
 const BACKSLASH:    u8 = 1;
 const SINGLE_QUOTE: u8 = 2;
@@ -291,7 +292,8 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
 #[cfg(test)]
 mod tests {
     use flow_control::Statement;
-    use parser::peg::{parse, JobKind, RedirectFrom, Redirection};
+    use parser::peg::{parse, RedirectFrom, Redirection};
+    use shell::JobKind;
 
     #[test]
     fn stderr_redirection() {

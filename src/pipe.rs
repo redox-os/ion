@@ -4,26 +4,29 @@ use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
 use std::fs::{File, OpenOptions};
 use std::thread;
 
+use shell::JobKind;
 use status::*;
-use parser::peg::{Pipeline, JobKind, RedirectFrom};
+use parser::peg::{Pipeline, RedirectFrom};
 
-pub fn execute_pipeline(pipeline: Pipeline) -> i32 {
+pub fn execute_pipeline(pipeline: &mut Pipeline) -> i32 {
     // Generate a list of commands from the given pipeline
     let mut piped_commands: Vec<(Command, JobKind)> = pipeline.jobs
         .iter().map(|job| (job.build_command(), job.kind)).collect();
 
-    if let (Some(stdin), Some(command)) = (pipeline.stdin, piped_commands.first_mut()) {
-        match File::open(&stdin.file) {
-            Ok(file) => unsafe { command.0.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
-            Err(err) => {
-                let stderr = io::stderr();
-                let mut stderr = stderr.lock();
-                let _ = writeln!(stderr, "ion: failed to redirect stdin into {}: {}", stdin.file, err);
+    if let Some(ref stdin) = pipeline.stdin {
+        if let Some(command) = piped_commands.first_mut() {
+            match File::open(&stdin.file) {
+                Ok(file) => unsafe { command.0.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
+                Err(err) => {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: failed to redirect stdin into {}: {}", stdin.file, err);
+                }
             }
         }
     }
 
-    if let Some(stdout) = pipeline.stdout {
+    if let Some(ref stdout) = pipeline.stdout {
         if let Some(mut command) = piped_commands.last_mut() {
             let file = if stdout.append {
                 OpenOptions::new().write(true).append(true).open(&stdout.file)

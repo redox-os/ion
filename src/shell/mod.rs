@@ -1,7 +1,9 @@
 mod history;
+mod job;
 mod flow;
 
 pub use self::history::ShellHistory;
+pub use self::job::{Job, JobKind};
 pub use self::flow::FlowLogic;
 
 use std::collections::HashMap;
@@ -274,9 +276,8 @@ impl Shell {
     /// Executes a pipeline and returns the final exit status of the pipeline.
     /// To avoid infinite recursion when using aliases, the noalias boolean will be set the true
     /// if an alias branch was executed.
-    fn run_pipeline(&mut self, pipeline: &Pipeline, noalias: bool) -> Option<i32> {
-        let mut pipeline = self.variables.expand_pipeline(pipeline, &self.directory_stack);
-        pipeline.expand_globs();
+    fn run_pipeline(&mut self, pipeline: &mut Pipeline, noalias: bool) -> Option<i32> {
+        pipeline.expand(&self.variables, &self.directory_stack);
 
         let command_start_time = SystemTime::now();
 
@@ -294,8 +295,8 @@ impl Shell {
 
                 for statement in StatementSplitter::new(&alias).map(parse) {
                     match statement {
-                        Statement::Pipelines(mut pipelines) => for pipeline in pipelines.drain(..) {
-                            exit_status = self.run_pipeline(&pipeline, true);
+                        Statement::Pipelines(mut pipelines) => for mut pipeline in pipelines.drain(..) {
+                            exit_status = self.run_pipeline(&mut pipeline, true);
                         },
                         _ => {
                             exit_status = Some(FAILURE);

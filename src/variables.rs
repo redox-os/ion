@@ -1,16 +1,11 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::fmt;
-use std::io::{self, Write};
-use std::iter;
 use std::path::PathBuf;
 use std::process;
 
 use directory_stack::DirectoryStack;
 use liner::Context;
-use parser::expand_string;
-use parser::peg::{Pipeline, Job};
-use parser::shell_expand::ExpandErr;
 use status::{SUCCESS, FAILURE};
 
 pub struct Variables {
@@ -89,55 +84,6 @@ impl Variables {
 
     pub fn get_vars(&self) -> Vec<String> {
         self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k)).collect()
-    }
-
-    pub fn expand_pipeline(&self, pipeline: &Pipeline, dir_stack: &DirectoryStack) -> Pipeline {
-        // TODO don't copy everything
-        // TODO ugh, I made it worse
-        Pipeline::new(pipeline.jobs.iter().map(|job| self.expand_job(job, dir_stack)).collect(),
-                      pipeline.stdin.clone(),
-                      pipeline.stdout.clone())
-    }
-
-    /// Takes the current job's arguments and expands them, one argument at a
-    /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand_job(&self, job: &Job, dir_stack: &DirectoryStack) -> Job {
-        // Expand each of the current job's arguments using the `expand_string` method.
-        // If an error occurs, mark that error and break;
-        let mut expanded: Vec<String> = Vec::new();
-        let mut nth_argument = 0;
-        let mut error_occurred = None;
-        for (job, result) in job.args.iter().map(|argument| expand_string(argument, self, dir_stack)).enumerate() {
-            match result {
-                Ok(expanded_string) => expanded.push(expanded_string),
-                Err(cause) => {
-                    nth_argument   = job;
-                    error_occurred = Some(cause);
-                    expanded = vec!["".to_owned()];
-                    break
-                }
-            }
-        }
-
-        // If an error was detected, handle that error.
-        if let Some(cause) = error_occurred {
-            match cause {
-                ExpandErr::UnmatchedBraces(position) => {
-                    let original = job.args.join(" ");
-                    let n_chars = job.args.iter().take(nth_argument)
-                        .fold(0, |total, arg| total + 1 + arg.len()) + position;
-                    let stderr = io::stderr();
-                    let _ = writeln!(&mut stderr.lock(), "ion: expand error: unmatched braces\n{}\n{}^",
-                        original, iter::repeat("-").take(n_chars).collect::<String>());
-                },
-                ExpandErr::InnerBracesNotImplemented => {
-                    let stderr = io::stderr();
-                    let _ = writeln!(&mut stderr.lock(), "ion: expand error: inner braces not yet implemented");
-                }
-            }
-        }
-
-        Job::new(expanded, job.kind)
     }
 
     pub fn is_valid_variable_character(c: char) -> bool {

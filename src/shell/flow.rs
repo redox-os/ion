@@ -153,8 +153,8 @@ impl FlowLogic for Shell {
                     });
                 },
                 Statement::Pipelines(mut pipelines) => {
-                    for pipeline in pipelines.drain(..) {
-                        self.run_pipeline(&pipeline, false);
+                    for mut pipeline in pipelines.drain(..) {
+                        self.run_pipeline(&mut pipeline, false);
                     }
                 },
                 Statement::Break => {
@@ -166,8 +166,8 @@ impl FlowLogic for Shell {
         false
     }
 
-    fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) {
-        while self.run_pipeline(&expression, false) == Some(SUCCESS) {
+    fn execute_while(&mut self, mut expression: Pipeline, statements: Vec<Statement>) {
+        while self.run_pipeline(&mut expression, false) == Some(SUCCESS) {
             // Cloning is needed so the statement can be re-iterated again if needed.
             if self.execute_statements(statements.clone()) {
                 break
@@ -196,14 +196,14 @@ impl FlowLogic for Shell {
         }
     }
 
-    fn execute_if(&mut self, expression: Pipeline, success: Vec<Statement>,
+    fn execute_if(&mut self, mut expression: Pipeline, success: Vec<Statement>,
         mut else_if: Vec<ElseIf>, failure: Vec<Statement>) -> bool
     {
-        match self.run_pipeline(&expression, false) {
+        match self.run_pipeline(&mut expression, false) {
             Some(SUCCESS) => self.execute_statements(success),
             _             => {
-                for elseif in else_if.drain(..) {
-                    if self.run_pipeline(&elseif.expression, false) == Some(SUCCESS) {
+                for mut elseif in else_if.drain(..) {
+                    if self.run_pipeline(&mut elseif.expression, false) == Some(SUCCESS) {
                         return self.execute_statements(elseif.success);
                     }
                 }
@@ -307,8 +307,8 @@ impl FlowLogic for Shell {
             // Simply executes a provide pipeline, immediately.
             Statement::Pipelines(mut pipelines) => {
                 // Immediately execute the command as it has no dependents.
-                for pipeline in pipelines.drain(..) {
-                    let _ = self.run_pipeline(&pipeline, false);
+                for mut pipeline in pipelines.drain(..) {
+                    let _ = self.run_pipeline(&mut pipeline, false);
                 }
             },
             // At this level, else and else if keywords are forbidden.
