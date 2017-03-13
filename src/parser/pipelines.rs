@@ -1,4 +1,11 @@
-use parser::peg::{Job, JobKind, Pipeline, Redirection};
+// TODO:
+// - Implement Herestrings
+// - Implement Heredocs
+// - Implement Stderr Redirection
+// - Implement Stderr Piping
+// - Fix the cyclomatic complexity issue
+
+use parser::peg::{Job, JobKind, Pipeline, Redirection, RedirectFrom};
 
 const BACKSLASH:    u8 = 1;
 const SINGLE_QUOTE: u8 = 2;
@@ -30,6 +37,7 @@ fn get_job_kind(args: &str, index: usize, pipe_char_was_found: bool) -> (JobKind
     }
 }
 
+#[allow(cyclomatic_complexity)]
 /// Parses each individual pipeline, separating arguments, pipes, background tasks, and redirections.
 pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>, args: &str) {
     let mut jobs: Vec<Job> = Vec::new();
@@ -50,6 +58,7 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                     *possible_error = Some("missing standard output file argument after '>'");
                 } else {
                     $file = Some(Redirection {
+                        from: RedirectFrom::Stdout,
                         file: unsafe { String::from_utf8_unchecked($name) },
                         append: $is_append
                     });
@@ -158,6 +167,7 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                             b' ' | b'\t' | b'|' => {
                                 found_file = true;
                                 out_file = Some(Redirection {
+                                    from: RedirectFrom::Stdout,
                                     file: unsafe { String::from_utf8_unchecked(stdout_file.clone()) },
                                     append: mode == RedirMode::StdoutAppend
                                 });
@@ -168,6 +178,7 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                             }
                             b'<' => {
                                 out_file = Some(Redirection {
+                                    from: RedirectFrom::Stdout,
                                     file: unsafe { String::from_utf8_unchecked(stdout_file.clone()) },
                                     append: mode == RedirMode::StdoutAppend
                                 });
@@ -213,6 +224,7 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                             b' ' | b'\t' | b'|' => {
                                 found_file = true;
                                 in_file = Some(Redirection {
+                                    from: RedirectFrom::Stdout,
                                     file: unsafe { String::from_utf8_unchecked(stdin_file.clone()) },
                                     append: false
                                 });
@@ -223,6 +235,7 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                             }
                             b'>' => {
                                 in_file = Some(Redirection {
+                                    from: RedirectFrom::Stdout,
                                     file: unsafe { String::from_utf8_unchecked(stdin_file.clone()) },
                                     append: false
                                 });

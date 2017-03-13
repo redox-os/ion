@@ -4,7 +4,7 @@ fn fib n
     else
         let output = 1
         let previous = 1
-        for index in 2..$n
+        for _ in 2..$n
             let temp = $output
             let output += $previous
             let previous = $temp

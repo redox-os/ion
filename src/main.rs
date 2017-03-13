@@ -1,4 +1,5 @@
 #![allow(unknown_lints)]
+#![allow(while_let_on_iterator)]
 #![feature(box_syntax)]
 #![feature(plugin)]
 #![plugin(peg_syntax_ext)]

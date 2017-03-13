@@ -6,26 +6,30 @@ use self::grammar::parse_;
 
 use glob::glob;
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum RedirectFrom { Stdout, Stderr, Both}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Redirection {
-    pub file: String,
+    pub from:   RedirectFrom,
+    pub file:   String,
     pub append: bool
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Pipeline {
-    pub jobs: Vec<Job>,
+    pub jobs:   Vec<Job>,
     pub stdout: Option<Redirection>,
-    pub stdin: Option<Redirection>,
+    pub stdin:  Option<Redirection>,
 }
 
 impl Pipeline {
-    pub fn new(jobs: Vec<Job>, stdin: Option<Redirection>, stdout: Option<Redirection>) -> Self {
+    pub fn new(jobs: Vec<Job>, stdin: Option<Redirection>, stdout: Option<Redirection>) -> Self
+    {
         Pipeline {
-            jobs: jobs,
-            stdin: stdin,
-            stdout: stdout,
+            jobs:   jobs,
+            stdin:  stdin,
+            stdout: stdout
         }
     }
 
