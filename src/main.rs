@@ -17,7 +17,7 @@ mod builtins;
 mod parser;
 mod shell;
 
-use std::io::ErrorKind;
+use std::io::{stderr, Write, ErrorKind};
 
 use shell::Shell;
 
@@ -32,11 +32,10 @@ fn main() {
             }
             Err(ref err) if err.kind() == ErrorKind::NotFound => {
                 let history_filename = shell.variables.get_var_or_empty("HISTORY_FILE");
-                println!("ion: failed to find history file {}: {}", history_filename, err);
+                let _ = writeln!(stderr(), "ion: failed to find history file {}: {}", history_filename, err);
             },
             Err(err) => {
-                println!("failed here!");
-                println!("ion: {}", err);
+                let _ = writeln!(stderr(), "ion: failed to load history: {}", err);
             }
         }
     }
