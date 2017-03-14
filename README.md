@@ -96,13 +96,31 @@ command arg1 arg2 arg3
 command arg1 arg2 arg3; command arg1 arg2 arg3; command arg1 arg2 arg3
 ```
 
-### Pipelines & Redirections
+### Piping & Redirecting Standard Output
 
-It's currently only possible to pipe and redirect the standard output of one command to another command.
+The pipe (`|`) and redirect (`>`) operators are used for manipulating the standard output. 
 
 ```ion
 command arg1 | other_command | another_command arg2
 command arg1 > file
+```
+
+### Piping & Redirecting Standard Error
+
+The `^|` and `^>` operators are used for manipulating the standard error.
+
+```ion
+command arg1 ^| other_command # Not supported yet
+command arg1 ^> file
+```
+
+### Piping & Redirecting Both Standard Output & Standard Error
+
+The `&|` and `&>` operators are used for manipulating both the standard output and error.
+
+```ion
+command arg1 &| other_command # Not supported yet
+command arg1 &> file
 ```
 
 ### Conditional Operators
@@ -146,7 +164,8 @@ end
 ### For Loops
 
 For loops, on the other hand, will take a variable followed by a list of values or a range expression, and
-iterate through all contained statements until all values have been exhausted.
+iterate through all contained statements until all values have been exhausted. If the variable is `_`, it
+will be ignored.
 
 ```ion
 # Obtaining Values From a Subshell
@@ -168,6 +187,11 @@ end
 for a in 1...10
     echo $a
 end
+
+# Ignore Value
+for _ in 1..10
+   do_something
+end
 ```
 
 ### Functions
@@ -183,7 +207,7 @@ fn fib n
     else
         let output = 1
         let previous = 1
-        for index in 2..$n
+        for _ in 2..$n
             let temp = $output
             let output += $previous
             let previous = $temp
@@ -195,4 +219,12 @@ end
 for i in 1..20
     fib $i
 end
+```
+
+### Brace Expansion
+
+It is possible to perform brace expansions within the Ion shell. Currently, only permutation braces are supported.
+
+```ion
+echo abc{1,2,3}def{456,789,101112}
 ```
