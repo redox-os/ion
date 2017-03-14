@@ -97,7 +97,7 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                     }
                 }
             },
-            JobKind::Pipe => {
+            JobKind::Pipe(mut from) => {
                 let mut children: Vec<Option<Child>> = Vec::new();
 
                 // Initialize the first job
@@ -112,11 +112,22 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
 
                 // Append other jobs until all piped jobs are running.
                 while let Some(&mut (ref mut command, kind)) = commands.next() {
-                    if let JobKind::Pipe = kind { command.stdout(Stdio::piped()); }
+                    if let JobKind::Pipe(_) = kind { command.stdout(Stdio::piped()); }
                     if let Some(spawned) = children.last() {
                         if let Some(ref child) = *spawned {
-                            if let Some(ref stdout) = child.stdout {
-                                unsafe { command.stdin(Stdio::from_raw_fd(stdout.as_raw_fd())); }
+                            unsafe {
+                                match from {
+                                    // Find a way to properly implement this.
+                                    RedirectFrom::Both => if let Some(ref stderr) = child.stderr {
+                                        command.stdin(Stdio::from_raw_fd(stderr.as_raw_fd()));
+                                    },
+                                    RedirectFrom::Stderr => if let Some(ref stderr) = child.stderr {
+                                        command.stdin(Stdio::from_raw_fd(stderr.as_raw_fd()));
+                                    },
+                                    RedirectFrom::Stdout => if let Some(ref stdout) = child.stdout {
+                                        command.stdin(Stdio::from_raw_fd(stdout.as_raw_fd()));
+                                    }
+                                }
                             }
                         } else {
                             // The previous command failed to spawn
@@ -131,7 +142,13 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                     }
                     children.push(child);
 
-                    if let JobKind::Pipe = kind { continue } else { previous_kind = kind; break}
+                    if let JobKind::Pipe(next) = kind {
+                        from = next;
+                        continue
+                    } else {
+                        previous_kind = kind;
+                        break
+                    }
                 }
                 previous_status = wait(&mut children);
             }

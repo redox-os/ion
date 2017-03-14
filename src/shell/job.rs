@@ -5,11 +5,12 @@ use std::process::Command;
 use directory_stack::DirectoryStack;
 use glob::glob;
 use parser::expand_string;
+use parser::peg::RedirectFrom;
 use parser::shell_expand::ExpandErr;
 use variables::Variables;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum JobKind { And, Background, Last, Or, Pipe }
+pub enum JobKind { And, Background, Last, Or, Pipe(RedirectFrom) }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Job {
