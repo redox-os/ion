@@ -101,7 +101,12 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                 let mut children: Vec<Option<Child>> = Vec::new();
 
                 // Initialize the first job
-                command.stdout(Stdio::piped());
+                let _ = match from {
+                    RedirectFrom::Both => command.stderr(Stdio::piped()), // TODO: Fix this
+                    RedirectFrom::Stderr => command.stderr(Stdio::piped()),
+                    RedirectFrom::Stdout => command.stdout(Stdio::piped()),
+                };
+
                 let child = command.spawn().ok();
                 if child.is_none() {
                     let stderr = io::stderr();
@@ -112,12 +117,18 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
 
                 // Append other jobs until all piped jobs are running.
                 while let Some(&mut (ref mut command, kind)) = commands.next() {
-                    if let JobKind::Pipe(_) = kind { command.stdout(Stdio::piped()); }
+                    if let JobKind::Pipe(from) = kind {
+                        let _ = match from {
+                            RedirectFrom::Both => command.stderr(Stdio::piped()), // TODO: Fix this
+                            RedirectFrom::Stderr => command.stderr(Stdio::piped()),
+                            RedirectFrom::Stdout => command.stdout(Stdio::piped()),
+                        };
+                    }
                     if let Some(spawned) = children.last() {
                         if let Some(ref child) = *spawned {
                             unsafe {
                                 match from {
-                                    // Find a way to properly implement this.
+                                    // TODO: Find a way to properly implement this.
                                     RedirectFrom::Both => if let Some(ref stderr) = child.stderr {
                                         command.stdin(Stdio::from_raw_fd(stderr.as_raw_fd()));
                                     },

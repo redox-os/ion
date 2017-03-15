@@ -98,7 +98,7 @@ command arg1 arg2 arg3; command arg1 arg2 arg3; command arg1 arg2 arg3
 
 ### Piping & Redirecting Standard Output
 
-The pipe (`|`) and redirect (`>`) operators are used for manipulating the standard output. 
+The pipe (`|`) and redirect (`>`) operators are used for manipulating the standard output.
 
 ```ion
 command arg1 | other_command | another_command arg2
@@ -110,7 +110,7 @@ command arg1 > file
 The `^|` and `^>` operators are used for manipulating the standard error.
 
 ```ion
-command arg1 ^| other_command # Not supported yet
+command arg1 ^| other_command
 command arg1 ^> file
 ```
 

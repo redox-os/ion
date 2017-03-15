@@ -23,12 +23,16 @@ const IS_VALID: u8 = 255 ^ (BACKSLASH + WHITESPACE);
 #[derive(PartialEq)]
 enum RedirMode { False, Stdin, Stdout(RedirectFrom), StdoutAppend(RedirectFrom) }
 
+/// Determine which type of job will be selected based on the next character.
+///
+/// - If the `|` char was found and the next character is `|`, it's `Or`
+/// - If the `&` char was found and the next character is `&`, it's `And`
 fn get_job_kind(args: &str, index: usize, pipe_char_was_found: bool) -> (JobKind, bool) {
     if pipe_char_was_found {
         if args.bytes().nth(index) == Some(b'|') {
             (JobKind::Or, true)
         } else {
-            (JobKind::Pipe, false)
+            (JobKind::Pipe(RedirectFrom::Stdout), false)
         }
     } else if args.bytes().nth(index) == Some(b'&') {
         (JobKind::And, true)
@@ -74,12 +78,16 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
         }
 
         macro_rules! job_found {
-            ($pipe_char_was_found:expr) => {{
-                // Determine which type of job will be selected based on the next character.
-                //
-                // - If the `|` char was found and the next character is `|`, it's `Or`
-                // - If the `&` char was found and the next character is `&`, it's `And`
-                let (kind, advance) = get_job_kind(args, index+1, $pipe_char_was_found);
+            ($from:expr, $pipe_char_was_found:expr) => {{
+
+                let (kind, advance) = match $from {
+                    RedirectFrom::Stdout => get_job_kind(args, index+1, $pipe_char_was_found),
+                    _ => {
+                        arg_start += 1;
+                        index += 1;
+                        (JobKind::Pipe($from), true)
+                    }
+                };
 
                 // If either `And` or `Or` was found, advance the iterator once.
                 if advance { let _ = args_iter.next(); }
@@ -87,13 +95,14 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                 if arguments.is_empty() {
                     jobs.push(Job::new(vec![args[arg_start..index].to_owned()], kind));
                 } else {
-                    if args.as_bytes()[index-1] != b' ' {
+                    let byte_index = if $from == RedirectFrom::Stdout { index-1 } else { index-2 };
+                    if args.as_bytes()[byte_index] != b' ' {
                         arguments.push(args[arg_start..index].to_owned());
                     }
                     jobs.push(Job::new(arguments.clone(), kind));
                     arguments.clear();
                 }
-                if advance {  index += 1; }
+                if advance { index += 1; }
                 arg_start = index + 1;
             }}
         }
@@ -124,19 +133,27 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
                                 arg_start += 1;
                             }
                         },
-                        b'|' if (flags & (255 ^ BACKSLASH) == 0) => job_found!(true),
+                        b'|' if (flags & (255 ^ BACKSLASH) == 0) => job_found!(RedirectFrom::Stdout, true),
                         b'&' if (flags & (255 ^ BACKSLASH) == 0) => {
-                            if args_iter.peek() == Some(&b'>') {
-                                let _ = args_iter.next();
-                                redir_found!(RedirMode::Stdout(RedirectFrom::Both));
-                            } else {
-                                job_found!(false)
+                            match args_iter.peek() {
+                                Some(&b'>') => {
+                                    let _ = args_iter.next();
+                                    redir_found!(RedirMode::Stdout(RedirectFrom::Both));
+                                },
+                                _ => job_found!(RedirectFrom::Stdout, false)
                             }
                         },
                         b'^' if (flags & IS_VALID == 0) => {
-                            if args_iter.peek() == Some(&b'>') {
-                                let _ = args_iter.next();
-                                redir_found!(RedirMode::Stdout(RedirectFrom::Stderr));
+                            match args_iter.peek() {
+                                Some(&b'>') => {
+                                    let _ = args_iter.next();
+                                    redir_found!(RedirMode::Stdout(RedirectFrom::Stderr));
+                                },
+                                Some(&b'|') => {
+                                    let _ = args_iter.next();
+                                    job_found!(RedirectFrom::Stderr, true);
+                                }
+                                _ => ()
                             }
                         },
                         b'>' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdout(RedirectFrom::Stdout)),
