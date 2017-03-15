@@ -166,8 +166,8 @@ impl FlowLogic for Shell {
         false
     }
 
-    fn execute_while(&mut self, mut expression: Pipeline, statements: Vec<Statement>) {
-        while self.run_pipeline(&mut expression, false) == Some(SUCCESS) {
+    fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) {
+        while self.run_pipeline(&mut expression.clone(), false) == Some(SUCCESS) {
             // Cloning is needed so the statement can be re-iterated again if needed.
             if self.execute_statements(statements.clone()) {
                 break
