@@ -36,7 +36,6 @@ impl Pipeline {
     pub fn expand(&mut self, variables: &Variables, dir_stack: &DirectoryStack) {
         for job in &mut self.jobs {
             job.expand(variables, dir_stack);
-            job.expand_globs();
         }
     }
 }

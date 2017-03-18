@@ -11,7 +11,7 @@ use parser::peg::{Pipeline, RedirectFrom};
 pub fn execute_pipeline(pipeline: &mut Pipeline) -> i32 {
     // Generate a list of commands from the given pipeline
     let mut piped_commands: Vec<(Command, JobKind)> = pipeline.jobs
-        .iter().map(|job| (job.build_command(), job.kind)).collect();
+        .drain(..).map(|mut job| (job.build_command(), job.kind)).collect();
 
     if let Some(ref stdin) = pipeline.stdin {
         if let Some(command) = piped_commands.first_mut() {
