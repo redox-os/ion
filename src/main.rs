@@ -18,11 +18,12 @@ mod parser;
 mod shell;
 
 use std::io::{stderr, Write, ErrorKind};
-
+use builtins::Builtin;
 use shell::Shell;
 
 fn main() {
-    let mut shell = Shell::default();
+    let builtins = Builtin::map();
+    let mut shell = Shell::new(&builtins);
     shell.evaluate_init_file();
 
     if "1" == shell.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {

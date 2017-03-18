@@ -30,7 +30,8 @@ use parser::peg::{parse, Pipeline};
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
-pub struct Shell {
+pub struct Shell<'a> {
+    pub builtins: &'a HashMap<&'static str, Builtin>,
     pub context: Context,
     pub variables: Variables,
     flow_control: FlowControl,
@@ -39,10 +40,11 @@ pub struct Shell {
     pub previous_status: i32,
 }
 
-impl Default for Shell {
+impl<'a> Shell<'a> {
     /// Panics if DirectoryStack construction fails
-    fn default() -> Shell {
+    pub fn new(builtins: &'a HashMap<&'static str, Builtin>) -> Shell<'a> {
         Shell {
+            builtins: builtins,
             context: Context::new(),
             variables: Variables::default(),
             flow_control: FlowControl::default(),
@@ -51,13 +53,11 @@ impl Default for Shell {
             previous_status: 0,
         }
     }
-}
-
-impl Shell {
     fn readln(&mut self) -> Option<String> {
         let prompt = self.prompt();
         let funcs = &self.functions;
         let vars = &self.variables;
+        let builtins = self.builtins;
 
         // Collects the current list of values from history for completion.
         let history = &self.context.history.buffers.iter()
@@ -108,9 +108,9 @@ impl Shell {
 
                     // Creates a list of definitions from the shell environment that will be used
                     // in the creation of a custom completer.
-                    let words = Builtin::map().into_iter()
+                    let words = builtins.iter()
                         // Add built-in commands to the completer's definitions.
-                        .map(|(s, _)| String::from(s))
+                        .map(|(&s, _)| String::from(s))
                         // Add the history list to the completer's definitions.
                         .chain(history.iter().cloned())
                         // Add the aliases to the completer's definitions.
@@ -283,6 +283,7 @@ impl Shell {
 
         let mut exit_status = None;
         let mut branched = false;
+        let builtins = self.builtins;
 
         if !noalias {
             if let Some(mut alias) = self.variables.aliases.get(pipeline.jobs[0].command.as_str()).cloned() {
@@ -311,7 +312,7 @@ impl Shell {
 
         if !branched {
             // Branch if -> input == shell command i.e. echo
-            exit_status = if let Some(command) = Builtin::map().get(pipeline.jobs[0].command.as_str()) {
+            exit_status = if let Some(command) = builtins.get(pipeline.jobs[0].command.as_str()) {
                 // Run the 'main' of the command and set exit_status
                 Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
             // Branch else if -> input == shell function and set the exit_status

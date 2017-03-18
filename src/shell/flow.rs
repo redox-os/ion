@@ -18,7 +18,7 @@ pub trait FlowLogic {
     fn execute_statements(&mut self, statements: Vec<Statement>) -> bool;
 }
 
-impl FlowLogic for Shell {
+impl<'a> FlowLogic for Shell<'a> {
     fn on_command(&mut self, command_string: &str) {
         let mut iterator = StatementSplitter::new(command_string).map(parse);
 

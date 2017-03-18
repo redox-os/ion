@@ -20,7 +20,7 @@ pub trait ShellHistory {
     fn set_context_history_from_vars(&mut self);
 }
 
-impl ShellHistory for Shell {
+impl<'a> ShellHistory for Shell<'a> {
     fn print_history(&self, _arguments: &[String]) -> i32 {
         let mut buffer = Vec::with_capacity(8*1024);
         for command in &self.context.history.buffers {
