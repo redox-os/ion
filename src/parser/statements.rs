@@ -3,23 +3,31 @@ const DQUOTE: u8 = 2;
 const BACKSL: u8 = 4;
 const COMM_1: u8 = 8;
 
+#[derive(Debug, PartialEq)]
+pub enum StatementError {
+    InvalidCharacter(char, usize),
+    UnterminatedSubshell
+}
+
 pub struct StatementSplitter<'a> {
     data:  &'a str,
     read:  usize,
     flags: u8,
+    process_level: u8,
+    // brace_level: u8,
 }
 
 impl<'a> StatementSplitter<'a> {
     pub fn new(data: &'a str) -> StatementSplitter<'a> {
-        StatementSplitter { data: data, read: 0, flags: 0 }
+        StatementSplitter { data: data, read: 0, flags: 0, process_level: 0 }
     }
 }
 
 impl<'a> Iterator for StatementSplitter<'a> {
-    type Item = &'a str;
-    fn next(&mut self) -> Option<&'a str> {
+    type Item = Result<&'a str, StatementError>;
+    fn next(&mut self) -> Option<Result<&'a str, StatementError>> {
         let start = self.read;
-        let mut levels = 0u8;
+        let mut error = None;
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             match character {
@@ -28,15 +36,31 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'"'  if self.flags & SQUOTE == 0            => self.flags ^= DQUOTE,
                 b'\\' if self.flags & (SQUOTE + DQUOTE) == 0 => self.flags |= BACKSL,
                 b'$'  if self.flags & (SQUOTE + DQUOTE) == 0 => { self.flags |= COMM_1; continue },
-                b'('  if self.flags & COMM_1 != 0            => levels += 1,
-                b')'  if levels > 0                          => levels -= 1,
-                b';'  if (self.flags & (SQUOTE + DQUOTE) == 0) && levels == 0 => {
-                    return Some(self.data[start..self.read-1].trim())
+                b'('  if self.flags & COMM_1 == 0 => {
+                    if error.is_none() {
+                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                    }
                 },
-                b'#' if (self.flags & (SQUOTE + DQUOTE) == 0) && levels == 0 => {
+                b'('  if self.flags & COMM_1 != 0 => self.process_level += 1,
+                b')'  if self.process_level == 0 => {
+                    if error.is_none() {
+                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                    }
+                },
+                b')' => self.process_level -= 1,
+                b';'  if (self.flags & (SQUOTE + DQUOTE) == 0) && self.process_level == 0 => {
+                    return match error {
+                        Some(error) => Some(Err(error)),
+                        None        => Some(Ok(self.data[start..self.read-1].trim()))
+                    };
+                },
+                b'#' if (self.flags & (SQUOTE + DQUOTE) == 0) && self.process_level == 0 => {
                     let output = self.data[start..self.read-1].trim();
                     self.read = self.data.len();
-                    return Some(output);
+                    return match error {
+                        Some(error) => Some(Err(error)),
+                        None        => Some(Ok(output))
+                    };
                 },
                 _ => ()
             }
@@ -47,16 +71,31 @@ impl<'a> Iterator for StatementSplitter<'a> {
             None
         } else {
             self.read = self.data.len();
-            Some(self.data[start..].trim())
+            match error {
+                Some(error) => Some(Err(error)),
+                None if self.process_level != 0 => Some(Err(StatementError::UnterminatedSubshell)),
+                None => Some(Ok(self.data[start..].trim()))
+            }
         }
     }
+}
+
+#[test]
+fn statements_with_syntax_errors() {
+    let command = "echo (echo one); echo $((echo one); echo ) two; echo $(echo one";
+    let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
+    assert_eq!(results.len(), 4);
+    assert_eq!(results[0], Err(StatementError::InvalidCharacter('(', 6)));
+    assert_eq!(results[1], Err(StatementError::InvalidCharacter('(', 25)));
+    assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 42)));
+    assert_eq!(results[3], Err(StatementError::UnterminatedSubshell));
 }
 
 #[test]
 fn statements_with_processes() {
     let command = "echo $(seq 1 10); echo $(seq 1 10)";
     for statement in StatementSplitter::new(command) {
-        assert_eq!(statement, "echo $(seq 1 10)");
+        assert_eq!(statement, Ok("echo $(seq 1 10)"));
     }
 }
 
@@ -64,37 +103,37 @@ fn statements_with_processes() {
 fn statements_process_with_statements() {
     let command = "echo $(seq 1 10; seq 1 10)";
     for statement in StatementSplitter::new(command) {
-        assert_eq!(statement, command);
+        assert_eq!(statement, Ok(command));
     }
 }
 
 #[test]
 fn statements_with_quotes() {
     let command = "echo \"This ;'is a test\"; echo 'This ;\" is also a test'";
-    let results = StatementSplitter::new(command).collect::<Vec<&str>>();
+    let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0], "echo \"This ;'is a test\"");
-    assert_eq!(results[1], "echo 'This ;\" is also a test'");
+    assert_eq!(results[0], Ok("echo \"This ;'is a test\""));
+    assert_eq!(results[1], Ok("echo 'This ;\" is also a test'"));
 }
 
 #[test]
 fn statements_with_comments() {
     let command = "echo $(echo one # two); echo three # four";
-    let results = StatementSplitter::new(command).collect::<Vec<&str>>();
+    let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0], "echo $(echo one # two)");
-    assert_eq!(results[1], "echo three");
+    assert_eq!(results[0], Ok("echo $(echo one # two)"));
+    assert_eq!(results[1], Ok("echo three"));
 }
 
 #[test]
 fn statements_with_process_recursion() {
     let command = "echo $(echo one $(echo two) three)";
-    let results = StatementSplitter::new(command).collect::<Vec<&str>>();
+    let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0], command);
+    assert_eq!(results[0], Ok(command));
 
     let command = "echo $(echo $(echo one; echo two); echo two)";
-    let results = StatementSplitter::new(command).collect::<Vec<&str>>();
+    let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0], command);
+    assert_eq!(results[0], Ok(command));
 }

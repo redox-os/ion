@@ -25,7 +25,7 @@ use variables::Variables;
 use status::*;
 use pipe::execute_pipeline;
 use parser::shell_expand::ExpandErr;
-use parser::{expand_string, StatementSplitter};
+use parser::{expand_string, StatementError, StatementSplitter};
 use parser::peg::{parse, Pipeline};
 
 /// This struct will contain all of the data structures related to this
@@ -154,7 +154,8 @@ impl<'a> Shell<'a> {
                 } else {
                     match File::open(&arg) {
                         Ok(mut file) => {
-                            let mut command_list = String::new();
+                            let capacity = file.metadata().ok().map_or(0, |x| x.len());
+                            let mut command_list = String::with_capacity(capacity as usize);
                             match file.read_to_string(&mut command_list) {
                                 Ok(_) => {
                                     for command in command_list.lines() {
@@ -294,7 +295,25 @@ impl<'a> Shell<'a> {
                     alias += argument;
                 }
 
-                for statement in StatementSplitter::new(&alias).map(parse) {
+                for statement in StatementSplitter::new(&alias).filter_map(|statement| {
+                    match statement {
+                        Ok(statement) => Some(statement),
+                        Err(err) => {
+                            let stderr = io::stderr();
+                            match err {
+                                StatementError::InvalidCharacter(character, position) => {
+                                    let _ = writeln!(stderr.lock(),
+                                        "ion: syntax error: '{}' at position {} is out of place",
+                                        character, position);
+                                },
+                                StatementError::UnterminatedSubshell => {
+                                    let _ = writeln!(stderr.lock(), "ion: syntax error: unterminated subshell");
+                                }
+                            }
+                            None
+                        }
+                    }
+                }).map(parse) {
                     match statement {
                         Statement::Pipelines(mut pipelines) => for mut pipeline in pipelines.drain(..) {
                             exit_status = self.run_pipeline(&mut pipeline, true);
@@ -316,7 +335,7 @@ impl<'a> Shell<'a> {
                 // Run the 'main' of the command and set exit_status
                 Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
             // Branch else if -> input == shell function and set the exit_status
-        } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
+            } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
                 if pipeline.jobs[0].args.len() - 1 == function.args.len() {
                     let mut variables_backup: HashMap<&str, Option<String>> = HashMap::new();
                     for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
