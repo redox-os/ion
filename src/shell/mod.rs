@@ -25,7 +25,7 @@ use variables::Variables;
 use status::*;
 use pipe::execute_pipeline;
 use parser::shell_expand::ExpandErr;
-use parser::{expand_string, StatementSplitter, check_statement};
+use parser::{expand_string, StatementSplitter, check_statement, QuoteTerminator};
 use parser::peg::Pipeline;
 
 /// This struct will contain all of the data structures related to this
@@ -143,6 +143,21 @@ impl<'a> Shell<'a> {
         }
     }
 
+    pub fn terminate_quotes(&mut self, command: String) -> String {
+        let mut buffer = QuoteTerminator::new(command);
+        self.flow_control.level += 1;
+        while !buffer.is_terminated() {
+            loop {
+                if let Some(command) = self.readln() {
+                    buffer.append(command);
+                    break
+                }
+            }
+        }
+        self.flow_control.level -= 1;
+        buffer.consume()
+    }
+
     pub fn execute(&mut self) {
         let mut dash_c = false;
         for arg in env::args().skip(1) {
@@ -183,19 +198,9 @@ impl<'a> Shell<'a> {
         }
 
         while let Some(command) = self.readln() {
-            let command = command.trim();
             if ! command.is_empty() {
-                // NOTE: Future code currently under construction.
-                // let buffer = QuoteTerminator::new(command);
-                // while !buffer.is_terminated() {
-                //     loop {
-                //         if let Some(command) = self.readln() {
-                //             buffer.append(command);
-                //             break
-                //         }
-                //     }
-                // }
-                // let command = buffer.consume();
+                let command = self.terminate_quotes(command);
+                let command = command.trim();
 
                 // Parse and potentially execute the command.
                 self.on_command(command);
