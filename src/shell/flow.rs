@@ -4,8 +4,8 @@ use status::*;
 use super::Shell;
 
 use flow_control::{ElseIf, Function, Statement, collect_loops, collect_if};
-use parser::{ForExpression, StatementSplitter, StatementError};
-use parser::peg::{parse, Pipeline};
+use parser::{ForExpression, StatementSplitter, check_statement};
+use parser::peg::Pipeline;
 
 pub trait FlowLogic {
     fn on_command(&mut self, command_string: &str);
@@ -20,25 +20,7 @@ pub trait FlowLogic {
 
 impl<'a> FlowLogic for Shell<'a> {
     fn on_command(&mut self, command_string: &str) {
-        let mut iterator = StatementSplitter::new(command_string).filter_map(|statement| {
-            match statement {
-                Ok(statement) => Some(statement),
-                Err(err) => {
-                    let stderr = io::stderr();
-                    match err {
-                        StatementError::InvalidCharacter(character, position) => {
-                            let _ = writeln!(stderr.lock(),
-                                "ion: syntax error: '{}' at position {} is out of place",
-                                character, position);
-                        },
-                        StatementError::UnterminatedSubshell => {
-                            let _ = writeln!(stderr.lock(), "ion: syntax error: unterminated subshell");
-                        }
-                    }
-                    None
-                }
-            }
-        }).map(parse);
+        let mut iterator = StatementSplitter::new(command_string).filter_map(check_statement);
 
         // If the value is set to `0`, this means that we don't need to append to an existing
         // partial statement block in memory, but can read and execute new statements.

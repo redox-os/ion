@@ -25,8 +25,8 @@ use variables::Variables;
 use status::*;
 use pipe::execute_pipeline;
 use parser::shell_expand::ExpandErr;
-use parser::{expand_string, StatementError, StatementSplitter};
-use parser::peg::{parse, Pipeline};
+use parser::{expand_string, StatementSplitter, check_statement};
+use parser::peg::Pipeline;
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
@@ -185,7 +185,17 @@ impl<'a> Shell<'a> {
         while let Some(command) = self.readln() {
             let command = command.trim();
             if ! command.is_empty() {
-                // TODO: Validate that the command is terminated.
+                // NOTE: Future code currently under construction.
+                // let buffer = QuoteTerminator::new(command);
+                // while !buffer.is_terminated() {
+                //     loop {
+                //         if let Some(command) = self.readln() {
+                //             buffer.append(command);
+                //             break
+                //         }
+                //     }
+                // }
+                // let command = buffer.consume();
 
                 // Parse and potentially execute the command.
                 self.on_command(command);
@@ -295,25 +305,7 @@ impl<'a> Shell<'a> {
                     alias += argument;
                 }
 
-                for statement in StatementSplitter::new(&alias).filter_map(|statement| {
-                    match statement {
-                        Ok(statement) => Some(statement),
-                        Err(err) => {
-                            let stderr = io::stderr();
-                            match err {
-                                StatementError::InvalidCharacter(character, position) => {
-                                    let _ = writeln!(stderr.lock(),
-                                        "ion: syntax error: '{}' at position {} is out of place",
-                                        character, position);
-                                },
-                                StatementError::UnterminatedSubshell => {
-                                    let _ = writeln!(stderr.lock(), "ion: syntax error: unterminated subshell");
-                                }
-                            }
-                            None
-                        }
-                    }
-                }).map(parse) {
+                for statement in StatementSplitter::new(&alias).filter_map(check_statement) {
                     match statement {
                         Statement::Pipelines(mut pipelines) => for mut pipeline in pipelines.drain(..) {
                             exit_status = self.run_pipeline(&mut pipeline, true);

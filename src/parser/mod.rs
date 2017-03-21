@@ -9,7 +9,7 @@ pub mod shell_expand;
 mod statements;
 
 pub use self::loops::for_grammar::ForExpression;
-pub use self::statements::{StatementSplitter, StatementError};
+pub use self::statements::{StatementSplitter, StatementError, check_statement};
 
 /// Takes an argument string as input and expands it.
 pub fn expand_string<'a>(original: &'a str, vars: &Variables, dir_stack: &DirectoryStack) -> Result<String, ExpandErr> {

@@ -1,3 +1,7 @@
+use std::io::{self, Write};
+use flow_control::Statement;
+use super::peg::parse;
+
 const SQUOTE: u8 = 1;
 const DQUOTE: u8 = 2;
 const BACKSL: u8 = 4;
@@ -7,6 +11,26 @@ const COMM_1: u8 = 8;
 pub enum StatementError {
     InvalidCharacter(char, usize),
     UnterminatedSubshell
+}
+
+pub fn check_statement(statement: Result<&str, StatementError>) -> Option<Statement> {
+    match statement {
+        Ok(statement) => Some(parse(statement)),
+        Err(err) => {
+            let stderr = io::stderr();
+            match err {
+                StatementError::InvalidCharacter(character, position) => {
+                    let _ = writeln!(stderr.lock(),
+                        "ion: syntax error: '{}' at position {} is out of place",
+                        character, position);
+                },
+                StatementError::UnterminatedSubshell => {
+                    let _ = writeln!(stderr.lock(), "ion: syntax error: unterminated subshell");
+                }
+            }
+            None
+        }
+    }
 }
 
 pub struct StatementSplitter<'a> {
