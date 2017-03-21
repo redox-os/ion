@@ -173,8 +173,18 @@ impl<'a> Shell<'a> {
                             let mut command_list = String::with_capacity(capacity as usize);
                             match file.read_to_string(&mut command_list) {
                                 Ok(_) => {
-                                    for command in command_list.lines() {
-                                        self.on_command(command);
+                                    let mut lines = command_list.lines().map(|x| x.to_owned());
+                                    while let Some(command) = lines.next() {
+                                        let mut buffer = QuoteTerminator::new(command);
+                                        while !buffer.is_terminated() {
+                                            loop {
+                                                if let Some(command) = lines.next() {
+                                                    buffer.append(command);
+                                                    break
+                                                }
+                                            }
+                                        }
+                                        self.on_command(&buffer.consume());
                                     }
                                 },
                                 Err(err) => {
