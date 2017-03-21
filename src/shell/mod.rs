@@ -322,9 +322,7 @@ impl<'a> Shell<'a> {
 
                 for statement in StatementSplitter::new(&alias).filter_map(check_statement) {
                     match statement {
-                        Statement::Pipelines(mut pipelines) => for mut pipeline in pipelines.drain(..) {
-                            exit_status = self.run_pipeline(&mut pipeline, true);
-                        },
+                        Statement::Pipeline(mut pipeline) => exit_status = self.run_pipeline(&mut pipeline, true),
                         _ => {
                             exit_status = Some(FAILURE);
                             let stderr = io::stderr();

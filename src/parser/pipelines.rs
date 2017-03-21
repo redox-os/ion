@@ -1,7 +1,6 @@
 // TODO:
 // - Implement Herestrings
 // - Implement Heredocs
-// - Implement Stderr Piping
 // - Fix the cyclomatic complexity issue
 
 use parser::peg::{Pipeline, Redirection, RedirectFrom};
@@ -43,7 +42,7 @@ fn get_job_kind(args: &str, index: usize, pipe_char_was_found: bool) -> (JobKind
 
 #[allow(cyclomatic_complexity)]
 /// Parses each individual pipeline, separating arguments, pipes, background tasks, and redirections.
-pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>, args: &str) {
+pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
     let mut jobs: Vec<Job> = Vec::new();
     let mut args_iter = args.bytes().peekable();
     let (mut index, mut arg_start) = (0, 0);
@@ -303,7 +302,7 @@ pub fn collect(pipelines: &mut Vec<Pipeline>, possible_error: &mut Option<&str>,
         jobs.push(Job::new(arguments, JobKind::Last));
     }
 
-    pipelines.push(Pipeline::new(jobs, in_file, out_file));
+    Pipeline::new(jobs, in_file, out_file)
 }
 
 #[cfg(test)]
@@ -314,8 +313,7 @@ mod tests {
 
     #[test]
     fn stderr_redirection() {
-        if let Statement::Pipelines(mut pipelines) = parse("git rev-parse --abbrev-ref HEAD ^> /dev/null") {
-            let pipeline = pipelines.remove(0);
+        if let Statement::Pipeline(pipeline) = parse("git rev-parse --abbrev-ref HEAD ^> /dev/null") {
             assert_eq!("git", pipeline.jobs[0].args[0]);
             assert_eq!("rev-parse", pipeline.jobs[0].args[1]);
             assert_eq!("--abbrev-ref", pipeline.jobs[0].args[2]);
@@ -333,8 +331,8 @@ mod tests {
 
     #[test]
     fn subshells_within_subshells() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo $(echo one $(echo two) three)") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo $(echo one $(echo two) three)") {
+            let jobs = pipeline.jobs;
             assert_eq!("echo", jobs[0].args[0]);
             assert_eq!("$(echo one $(echo two) three)", jobs[0].args[1]);
         }
@@ -342,8 +340,8 @@ mod tests {
 
     #[test]
     fn quoted_process() {
-        if let Statement::Pipelines(mut pipelines) = parse("let A = \"$(seq 1 10)\"") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("let A = \"$(seq 1 10)\"") {
+            let jobs = pipeline.jobs;
             assert_eq!("let", jobs[0].args[0]);
             assert_eq!("A", jobs[0].args[1]);
             assert_eq!("=", jobs[0].args[2]);
@@ -356,8 +354,8 @@ mod tests {
 
     #[test]
     fn process() {
-        if let Statement::Pipelines(mut pipelines) = parse("let A = $(seq 1 10)") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("let A = $(seq 1 10)") {
+            let jobs = pipeline.jobs;
             assert_eq!("let", jobs[0].args[0]);
             assert_eq!("A", jobs[0].args[1]);
             assert_eq!("=", jobs[0].args[2]);
@@ -370,8 +368,8 @@ mod tests {
 
     #[test]
     fn single_job_no_args() {
-        if let Statement::Pipelines(mut pipelines) = parse("cat") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("cat") {
+            let jobs = pipeline.jobs;
             assert_eq!(1, jobs.len());
             assert_eq!("cat", jobs[0].command);
             assert_eq!(1, jobs[0].args.len());
@@ -382,8 +380,8 @@ mod tests {
 
     #[test]
     fn single_job_with_single_character_arguments() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo a b c") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo a b c") {
+            let jobs = pipeline.jobs;
             assert_eq!(1, jobs.len());
             assert_eq!("echo", jobs[0].args[0]);
             assert_eq!("a", jobs[0].args[1]);
@@ -397,8 +395,8 @@ mod tests {
 
     #[test]
     fn job_with_args() {
-        if let Statement::Pipelines(mut pipelines) = parse("ls -al dir") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("ls -al dir") {
+            let jobs = pipeline.jobs;
             assert_eq!(1, jobs.len());
             assert_eq!("ls", jobs[0].command);
             assert_eq!("-al", jobs[0].args[1]);
@@ -410,8 +408,8 @@ mod tests {
 
     #[test]
     fn parse_empty_string() {
-        if let Statement::Pipelines(pipelines) = parse("") {
-            assert_eq!(0, pipelines.len());
+        if let Statement::Default = parse("") {
+            ()
         } else {
             assert!(false);
         }
@@ -419,8 +417,8 @@ mod tests {
 
     #[test]
     fn multiple_white_space_between_words() {
-        if let Statement::Pipelines(mut pipelines) = parse("ls \t -al\t\tdir") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("ls \t -al\t\tdir") {
+            let jobs = pipeline.jobs;
             assert_eq!(1, jobs.len());
             assert_eq!("ls", jobs[0].command);
             assert_eq!("-al", jobs[0].args[1]);
@@ -432,10 +430,10 @@ mod tests {
 
     #[test]
     fn trailing_whitespace() {
-        if let Statement::Pipelines(pipelines) = parse("ls -al\t ") {
-            assert_eq!(1, pipelines.len());
-            assert_eq!("ls", pipelines[0].jobs[0].command);
-            assert_eq!("-al", pipelines[0].jobs[0].args[1]);
+        if let Statement::Pipeline(pipeline) = parse("ls -al\t ") {
+            assert_eq!(1, pipeline.jobs.len());
+            assert_eq!("ls", pipeline.jobs[0].command);
+            assert_eq!("-al", pipeline.jobs[0].args[1]);
         } else {
             assert!(false);
         }
@@ -443,8 +441,8 @@ mod tests {
 
     #[test]
     fn double_quoting() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo \"Hello World\" \"From Rust\"") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo \"Hello World\" \"From Rust\"") {
+            let jobs = pipeline.jobs;
             assert_eq!(3, jobs[0].args.len());
             assert_eq!("\"Hello World\"", jobs[0].args[1]);
             assert_eq!("\"From Rust\"", jobs[0].args[2]);
@@ -455,8 +453,8 @@ mod tests {
 
     #[test]
     fn double_quoting_contains_single() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo \"Hello 'Rusty' World\"") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo \"Hello 'Rusty' World\"") {
+            let jobs = pipeline.jobs;
             assert_eq!(2, jobs[0].args.len());
             assert_eq!("\"Hello \'Rusty\' World\"", jobs[0].args[1]);
         } else {
@@ -466,16 +464,16 @@ mod tests {
 
     #[test]
     fn multi_quotes() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo \"Hello \"Rusty\" World\"") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo \"Hello \"Rusty\" World\"") {
+            let jobs = pipeline.jobs;
             assert_eq!(2, jobs[0].args.len());
             assert_eq!("\"Hello \"Rusty\" World\"", jobs[0].args[1]);
         } else {
             assert!(false)
         }
 
-        if let Statement::Pipelines(mut pipelines) = parse("echo \'Hello \'Rusty\' World\'") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo \'Hello \'Rusty\' World\'") {
+            let jobs = pipeline.jobs;
             assert_eq!(2, jobs[0].args.len());
             assert_eq!("\'Hello \'Rusty\' World\'", jobs[0].args[1]);
         } else {
@@ -485,8 +483,8 @@ mod tests {
 
     #[test]
     fn all_whitespace() {
-        if let Statement::Pipelines(pipelines) = parse("  \t ") {
-            assert_eq!(0, pipelines.len());
+        if let Statement::Default = parse("  \t ") {
+            ()
         } else {
             assert!(false);
         }
@@ -494,8 +492,8 @@ mod tests {
 
     #[test]
     fn not_background_job() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo hello world") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo hello world") {
+            let jobs = pipeline.jobs;
             assert_eq!(JobKind::Last, jobs[0].kind);
         } else {
             assert!(false);
@@ -504,15 +502,15 @@ mod tests {
 
     #[test]
     fn background_job() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo hello world&") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo hello world&") {
+            let jobs = pipeline.jobs;
             assert_eq!(JobKind::Background, jobs[0].kind);
         } else {
             assert!(false);
         }
 
-        if let Statement::Pipelines(mut pipelines) = parse("echo hello world &") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo hello world &") {
+            let jobs = pipeline.jobs;
             assert_eq!(JobKind::Background, jobs[0].kind);
         } else {
             assert!(false);
@@ -521,8 +519,8 @@ mod tests {
 
     #[test]
     fn and_job() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo one && echo two") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo one && echo two") {
+            let jobs = pipeline.jobs;
             assert_eq!(JobKind::And, jobs[0].kind);
             assert_eq!(vec![String::from("echo"), String::from("one")], jobs[0].args);
             assert_eq!(vec![String::from("echo"), String::from("two")], jobs[1].args);
@@ -531,16 +529,16 @@ mod tests {
 
     #[test]
     fn or_job() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo one || echo two") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo one || echo two") {
+            let jobs = pipeline.jobs;
             assert_eq!(JobKind::Or, jobs[0].kind);
         }
     }
 
     #[test]
     fn lone_comment() {
-        if let Statement::Pipelines(pipelines) = parse("# ; \t as!!+dfa") {
-            assert_eq!(0, pipelines.len());
+        if let Statement::Default = parse("# ; \t as!!+dfa") {
+            ()
         } else {
             assert!(false);
         }
@@ -548,8 +546,8 @@ mod tests {
 
     #[test]
     fn leading_whitespace() {
-        if let Statement::Pipelines(mut pipelines) = parse("    \techo") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("    \techo") {
+            let jobs = pipeline.jobs;
             assert_eq!(1, jobs.len());
             assert_eq!("echo", jobs[0].command);
         } else {
@@ -559,8 +557,8 @@ mod tests {
 
     #[test]
     fn single_quoting() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo '#!!;\"\\'") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo '#!!;\"\\'") {
+            let jobs = pipeline.jobs;
             assert_eq!("'#!!;\"\\'", jobs[0].args[1]);
         } else {
             assert!(false);
@@ -569,8 +567,8 @@ mod tests {
 
     #[test]
     fn mixed_quoted_and_unquoted() {
-        if let Statement::Pipelines(mut pipelines) = parse("echo 123 456 \"ABC 'DEF' GHI\" 789 one'  'two") {
-            let jobs = pipelines.remove(0).jobs;
+        if let Statement::Pipeline(pipeline) = parse("echo 123 456 \"ABC 'DEF' GHI\" 789 one'  'two") {
+            let jobs = pipeline.jobs;
             assert_eq!("123", jobs[0].args[1]);
             assert_eq!("456", jobs[0].args[2]);
             assert_eq!("\"ABC 'DEF' GHI\"", jobs[0].args[3]);
@@ -583,24 +581,24 @@ mod tests {
 
     #[test]
     fn several_blank_lines() {
-        if let Statement::Pipelines(pipelines) = parse("\n\n\n") {
-            assert_eq!(0, pipelines.len());
+        if let Statement::Default = parse("\n\n\n") {
+            ()
         } else {
             assert!(false);
         }
     }
 
     #[test]
-    fn pipelines_with_redirection() {
-        if let Statement::Pipelines(pipelines) = parse("cat | echo hello | cat < stuff > other") {
-            assert_eq!(3, pipelines[0].jobs.len());
-            assert_eq!("cat", &pipelines[0].clone().jobs[0].args[0]);
-            assert_eq!("echo", &pipelines[0].clone().jobs[1].args[0]);
-            assert_eq!("hello", &pipelines[0].clone().jobs[1].args[1]);
-            assert_eq!("cat", &pipelines[0].clone().jobs[2].args[0]);
-            assert_eq!("stuff", &pipelines[0].clone().stdin.unwrap().file);
-            assert_eq!("other", &pipelines[0].clone().stdout.unwrap().file);
-            assert!(!pipelines[0].clone().stdout.unwrap().append);
+    fn pipeline_with_redirection() {
+        if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat < stuff > other") {
+            assert_eq!(3, pipeline.jobs.len());
+            assert_eq!("cat", &pipeline.clone().jobs[0].args[0]);
+            assert_eq!("echo", &pipeline.clone().jobs[1].args[0]);
+            assert_eq!("hello", &pipeline.clone().jobs[1].args[1]);
+            assert_eq!("cat", &pipeline.clone().jobs[2].args[0]);
+            assert_eq!("stuff", &pipeline.clone().stdin.unwrap().file);
+            assert_eq!("other", &pipeline.clone().stdout.unwrap().file);
+            assert!(!pipeline.clone().stdout.unwrap().append);
         } else {
             assert!(false);
         }
@@ -608,22 +606,22 @@ mod tests {
 
     #[test]
     fn pipeline_with_redirection_append() {
-        if let Statement::Pipelines(pipelines) = parse("cat | echo hello | cat < stuff >> other") {
-        assert_eq!(3, pipelines[0].jobs.len());
-        assert_eq!("stuff", &pipelines[0].clone().stdin.unwrap().file);
-        assert_eq!("other", &pipelines[0].clone().stdout.unwrap().file);
-        assert!(pipelines[0].clone().stdout.unwrap().append);
+        if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat < stuff >> other") {
+        assert_eq!(3, pipeline.jobs.len());
+        assert_eq!("stuff", &pipeline.clone().stdin.unwrap().file);
+        assert_eq!("other", &pipeline.clone().stdout.unwrap().file);
+        assert!(pipeline.clone().stdout.unwrap().append);
         } else {
             assert!(false);
         }
     }
 
     #[test]
-    fn pipelines_with_redirection_reverse_order() {
-        if let Statement::Pipelines(pipelines) = parse("cat | echo hello | cat > stuff < other") {
-            assert_eq!(3, pipelines[0].jobs.len());
-            assert_eq!("other", &pipelines[0].clone().stdin.unwrap().file);
-            assert_eq!("stuff", &pipelines[0].clone().stdout.unwrap().file);
+    fn pipeline_with_redirection_reverse_order() {
+        if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat > stuff < other") {
+            assert_eq!(3, pipeline.jobs.len());
+            assert_eq!("other", &pipeline.clone().stdin.unwrap().file);
+            assert_eq!("stuff", &pipeline.clone().stdout.unwrap().file);
         } else {
             assert!(false);
         }

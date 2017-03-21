@@ -32,8 +32,7 @@ pub enum Statement {
     Else,
     End,
     Break,
-    // TODO: Vec is unnecessary here because there will always be one pipeline parsed
-    Pipelines(Vec<Pipeline>),
+    Pipeline(Pipeline),
     Default
 }
 

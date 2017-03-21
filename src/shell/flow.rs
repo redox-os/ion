@@ -152,11 +152,7 @@ impl<'a> FlowLogic for Shell<'a> {
                         statements: statements
                     });
                 },
-                Statement::Pipelines(mut pipelines) => {
-                    for mut pipeline in pipelines.drain(..) {
-                        self.run_pipeline(&mut pipeline, false);
-                    }
-                },
+                Statement::Pipeline(mut pipeline) => { self.run_pipeline(&mut pipeline, false); },
                 Statement::Break => {
                     return true
                 }
@@ -304,13 +300,8 @@ impl<'a> FlowLogic for Shell<'a> {
                     }
                 }
             },
-            // Simply executes a provide pipeline, immediately.
-            Statement::Pipelines(mut pipelines) => {
-                // Immediately execute the command as it has no dependents.
-                for mut pipeline in pipelines.drain(..) {
-                    let _ = self.run_pipeline(&mut pipeline, false);
-                }
-            },
+            // Simply executes a provided pipeline, immediately.
+            Statement::Pipeline(mut pipeline) => { self.run_pipeline(&mut pipeline, false); },
             // At this level, else and else if keywords are forbidden.
             Statement::ElseIf{..} | Statement::Else => {
                 let stderr = io::stderr();

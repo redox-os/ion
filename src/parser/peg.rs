@@ -46,7 +46,7 @@ pub fn parse(code: &str) -> Statement {
 		Err(err) => {
             let stderr = stderr();
             let _ = writeln!(stderr.lock(), "ion: Syntax {}", err);
-			Statement::Pipelines(vec![])
+			Statement::Default
 		}
 	}
 }
