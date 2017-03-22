@@ -21,3 +21,6 @@ glob = "0.2"
 liner = "0.1"
 peg-syntax-ext = "0.4"
 permutate = "0.2"
+
+[target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
+users = "0.5.1"

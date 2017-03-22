@@ -147,15 +147,22 @@ impl Variables {
                     neg = false;
                 }
 
-                if let Ok(num) = tilde_num.parse::<usize>() {
-                    let res = if neg {
-                        dir_stack.dir_from_top(num)
-                    } else {
-                        dir_stack.dir_from_bottom(num)
-                    };
+                match tilde_num.parse() {
+                    Ok(num) => {
+                        let res = if neg {
+                            dir_stack.dir_from_top(num)
+                        } else {
+                            dir_stack.dir_from_bottom(num)
+                        };
 
-                    if let Some(path) = res {
-                        return Some(path.to_str().unwrap().to_string());
+                        if let Some(path) = res {
+                            return Some(path.to_str().unwrap().to_string());
+                        }
+                    }
+                    Err(_) => {
+                        if let Some(home) = get_user_home(tilde_prefix) {
+                            return Some(home + remainder);
+                        }
                     }
                 }
             }
@@ -178,6 +185,29 @@ impl Variables {
 
         None
     }
+}
+
+#[cfg(all(unix, not(target_os = "redox")))]
+fn get_user_home(username: &str) -> Option<String> {
+    use users_unix::get_user_by_name;
+    use users_unix::os::unix::UserExt;
+
+    match get_user_by_name(username) {
+        Some(user) => Some(user.home_dir().to_string_lossy().into_owned()),
+        None => None,
+    }
+}
+
+#[cfg(target_os = "redox")]
+fn get_user_home(_username: &str) -> Option<String> {
+    // TODO
+    None
+}
+
+#[cfg(not(any(unix, target_os = "redox")))]
+fn get_user_home(_username: &str) -> Option<String> {
+    // TODO
+    None
 }
 
 #[cfg(test)]

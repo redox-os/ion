@@ -6,6 +6,9 @@
 extern crate glob;
 extern crate liner;
 
+#[cfg(all(unix, not(target_os = "redox")))]
+extern crate users as users_unix;
+
 pub mod completer;
 pub mod pipe;
 pub mod directory_stack;
