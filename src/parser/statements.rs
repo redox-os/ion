@@ -55,30 +55,32 @@ impl<'a> Iterator for StatementSplitter<'a> {
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             match character {
-                _ if self.flags & BACKSL != 0                => self.flags ^= BACKSL,
-                b'\'' if self.flags & DQUOTE == 0            => self.flags ^= SQUOTE,
-                b'"'  if self.flags & SQUOTE == 0            => self.flags ^= DQUOTE,
-                b'\\' if self.flags & (SQUOTE + DQUOTE) == 0 => self.flags |= BACKSL,
-                b'$'  if self.flags & (SQUOTE + DQUOTE) == 0 => { self.flags |= COMM_1; continue },
+                _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
+                b'\\'                             => self.flags ^= BACKSL,
+                b'\'' if self.flags & DQUOTE == 0 => self.flags ^= SQUOTE,
+                b'"'  if self.flags & SQUOTE == 0 => self.flags ^= DQUOTE,
+                b'$'  if self.flags & SQUOTE == 0 => { self.flags |= COMM_1; continue },
                 b'('  if self.flags & COMM_1 == 0 => {
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
-                b'('  if self.flags & COMM_1 != 0 => self.process_level += 1,
-                b')'  if self.process_level == 0 => {
+                b'(' if self.flags & COMM_1 != 0  && self.flags & SQUOTE == 0 => {
+                    self.process_level += 1
+                },
+                b')' if self.process_level == 0 && self.flags & SQUOTE == 0 => {
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
-                b')' => self.process_level -= 1,
+                b')' if self.flags & SQUOTE == 0 => self.process_level -= 1,
                 b';'  if (self.flags & (SQUOTE + DQUOTE) == 0) && self.process_level == 0 => {
                     return match error {
                         Some(error) => Some(Err(error)),
                         None        => Some(Ok(self.data[start..self.read-1].trim()))
                     };
                 },
-                b'#' if (self.flags & (SQUOTE + DQUOTE) == 0) && self.process_level == 0 => {
+                b'#' if self.flags & (SQUOTE + DQUOTE) == 0 && self.process_level == 0 => {
                     let output = self.data[start..self.read-1].trim();
                     self.read = self.data.len();
                     return match error {

@@ -296,7 +296,7 @@ mod test {
         let mut variables = Variables::default();
         let dir_stack = new_dir_stack();
         let_(&mut variables, vec!["let", "FOO", "=", "BAR"]);
-        let expanded = expand_string("$FOO", &variables, &dir_stack).unwrap();
+        let expanded = expand_string("$FOO", &variables, &dir_stack).join("");
         assert_eq!("BAR", &expanded);
     }
 
@@ -320,7 +320,7 @@ mod test {
         variables.set_var("FOO", "BAR");
         let return_status = drop_variable(&mut variables, vec!["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = expand_string("$FOO", &variables, &new_dir_stack()).unwrap();
+        let expanded = expand_string("$FOO", &variables, &new_dir_stack()).join("");
         assert_eq!("", expanded);
     }
 

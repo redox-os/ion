@@ -22,7 +22,7 @@ pub enum Statement {
     },
     For {
         variable: String,
-        values: String,
+        values: Vec<String>,
         statements: Vec<Statement>
     },
     While {

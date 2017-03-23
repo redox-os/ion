@@ -12,7 +12,7 @@ pub trait FlowLogic {
     fn execute_toplevel<I>(&mut self, iterator: &mut I, statement: Statement) -> Result<(), &'static str>
         where I: Iterator<Item = Statement>;
     fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>);
-    fn execute_for(&mut self, variable: &str, values: &str, statements: Vec<Statement>);
+    fn execute_for(&mut self, variable: &str, values: &[String], statements: Vec<Statement>);
     fn execute_if(&mut self, expression: Pipeline, success: Vec<Statement>,
         else_if: Vec<ElseIf>, failure: Vec<Statement>) -> bool;
     fn execute_statements(&mut self, statements: Vec<Statement>) -> bool;
@@ -171,11 +171,19 @@ impl<'a> FlowLogic for Shell<'a> {
         }
     }
 
-    fn execute_for(&mut self, variable: &str, values: &str, statements: Vec<Statement>) {
+    fn execute_for(&mut self, variable: &str, values: &[String], statements: Vec<Statement>) {
         match ForExpression::new(values, &self.directory_stack, &self.variables) {
-            ForExpression::Normal(expression) => {
-                for value in expression.split_whitespace() {
+            ForExpression::Multiple(values) => {
+                for value in &values {
                     if value != "_" { self.variables.set_var(variable, value); }
+                    if self.execute_statements(statements.clone()) {
+                        break
+                    }
+                }
+            },
+            ForExpression::Normal(values) => {
+                for value in values.lines() {
+                    if value != "_" { self.variables.set_var(variable, &value); }
                     if self.execute_statements(statements.clone()) {
                         break
                     }

@@ -1,4 +1,4 @@
-use parser::pipelines;
+use parser::{pipelines, ArgumentSplitter};
 use flow_control::Statement;
 use flow_control::ElseIf;
 
@@ -84,7 +84,7 @@ for_ -> Statement
     = whitespace* "for" whitespace? n:_name whitespace? "in" whitespace? expr:$(.*) {
         Statement::For {
             variable: n.to_string(),
-            values: expr.to_string(),
+            values: ArgumentSplitter::new(expr).collect(),
             statements: Vec::new(),
         }
     }

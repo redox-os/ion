@@ -1,185 +1,279 @@
-use super::ExpandErr;
-
 // Bit Twiddling Guide:
-// var & FLAG == FLAG checks if FLAG is enabled
-// var & FLAG != FLAG checks if FLAG is disabled
+// var & FLAG != 0 checks if FLAG is enabled
+// var & FLAG == 0 checks if FLAG is disabled
 // var |= FLAG enables the FLAG
 // var &= 255 ^ FLAG disables the FLAG
 // var ^= FLAG swaps the state of FLAG
 
-const WHITESPACE:   u8 = 1;
-const SINGLE_QUOTE: u8 = 2;
-const DOUBLE_QUOTE: u8 = 4;
-const PREV_WAS_VAR: u8 = 8;
-const BRACES:       u8 = 16;
-const VARIABLES:    u8 = 32;
-const TILDE:        u8 = 64;
-const OPEN_BRACE:   u8 = 128;
+const BACKSL: u8 = 1;
+const SQUOTE: u8 = 2;
+const DQUOTE: u8 = 4;
 
 #[derive(Debug, PartialEq)]
 pub enum WordToken<'a> {
     Normal(&'a str),
+    Whitespace(&'a str),
     Tilde(&'a str),
-    Brace(&'a str, bool),
-    Variable(&'a str, bool)
+    Brace(Vec<&'a str>),
+    Variable(&'a str, bool),
+    // ArrayToString(&'a str, &'a str, &'a str, bool),
+    // Array(&'a str, bool),
+    // StringToArray(&'a str, &'a str, &'a str, bool),
+    Process(&'a str, bool),
 }
 
 pub struct WordIterator<'a> {
-    data:  &'a str,
-    read:  usize,
-    flags: u8
+    data:          &'a str,
+    read:          usize,
+    flags:         u8,
 }
 
 impl<'a> WordIterator<'a> {
     pub fn new(data: &'a str) -> WordIterator<'a> {
-        WordIterator { data: data, read: 0, flags: 0u8 }
+        WordIterator { data: data, read: 0, flags: 0 }
+    }
+
+    // Contains the grammar for collecting whitespace characters
+    fn whitespaces<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        self.read += 1;
+        while let Some(character) = iterator.next() {
+            if character == b' ' {
+                self.read += 1;
+            } else {
+                return WordToken::Whitespace(&self.data[start..self.read]);
+            }
+        }
+
+        WordToken::Whitespace(&self.data[start..self.read])
+    }
+
+    /// Contains the logic for parsing tilde syntax
+    fn tilde<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read - 1;
+        while let Some(character) = iterator.next() {
+            match character {
+                0...47 | 58...64 | 91...94 | 96 | 123...127 => {
+                    return WordToken::Tilde(&self.data[start..self.read]);
+                },
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        WordToken::Tilde(&self.data[start..])
+    }
+
+    // Contains the logic for parsing braced variables
+    fn braced_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        while let Some(character) = iterator.next() {
+            if character == b'}' {
+                let output = &self.data[start..self.read];
+                self.read += 1;
+                return WordToken::Variable(output, self.flags & DQUOTE != 0);
+            }
+            self.read += 1;
+        }
+
+        // The validator at the frontend should catch unterminated braced variables.
+        panic!("ion: fatal error with syntax validation parsing: unterminated braced variable");
+    }
+
+    /// Contains the logic for parsing variable syntax
+    fn variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        self.read += 1;
+        while let Some(character) = iterator.next() {
+            match character {
+                // If found, this is not a `Variable` but an `ArrayToString`
+                b'(' => {
+                    unimplemented!()
+                },
+                // Only alphanumerical and underscores are allowed in variable names
+                0...47 | 58...64 | 91...94 | 96 | 123...127 => {
+                    return WordToken::Variable(&self.data[start..self.read], self.flags & DQUOTE != 0);
+                },
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        WordToken::Variable(&self.data[start..], self.flags & DQUOTE != 0)
+    }
+
+    /// Contains the logic for parsing subshell syntax.
+    fn process<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        let mut level = 0;
+        while let Some(character) = iterator.next() {
+            match character {
+                _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
+                b'\\'                             => self.flags ^= BACKSL,
+                b'\'' if self.flags & DQUOTE == 0 => self.flags ^= SQUOTE,
+                b'"'  if self.flags & SQUOTE == 0 => self.flags ^= DQUOTE,
+                b'$'  if self.flags & SQUOTE == 0 => {
+                    if self.data.as_bytes()[self.read+1] == b'(' {
+                        level += 1;
+                    }
+                },
+                b')' if self.flags & SQUOTE == 0 => {
+                    if level == 0 {
+                        let output = &self.data[start..self.read];
+                        self.read += 1;
+                        return WordToken::Process(output, self.flags & DQUOTE != 0);
+                    } else {
+                        level -= 1;
+                    }
+                }
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        // The validator at the frontend should catch unterminated processes.
+        panic!("ion: fatal error with syntax validation: unterminated process");
+    }
+
+    /// Contains the grammar for parsing brace expansion syntax
+    fn braces<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let mut start = self.read;
+        let mut level = 0;
+        let mut elements = Vec::new();
+        while let Some(character) = iterator.next() {
+            match character {
+                _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
+                b'\\'                             => self.flags ^= BACKSL,
+                b'\'' if self.flags & DQUOTE == 0 => self.flags ^= SQUOTE,
+                b'"'  if self.flags & SQUOTE == 0 => self.flags ^= DQUOTE,
+                b','  if self.flags & (SQUOTE + DQUOTE) == 0 && level == 0 => {
+                    elements.push(&self.data[start..self.read]);
+                    start = self.read + 1;
+                },
+                b'{' if self.flags & (SQUOTE + DQUOTE) == 0 => level += 1,
+                b'}' if self.flags & (SQUOTE + DQUOTE) == 0 => {
+                    if level == 0 {
+                        elements.push(&self.data[start..self.read]);
+                        self.read += 1;
+                        return WordToken::Brace(elements);
+                    } else {
+                        level -= 1;
+                    }
+
+                },
+                _ => ()
+            }
+            self.read += 1;
+        }
+
+        panic!("ion: fatal error with syntax validation: unterminated brace")
     }
 }
 
 impl<'a> Iterator for WordIterator<'a> {
-    type Item = Result<WordToken<'a>, ExpandErr>;
+    type Item = WordToken<'a>;
 
-    // TODO: Rewrite this in a more efficient / simpler way
-    fn next(&mut self) -> Option<Result<WordToken<'a>, ExpandErr>> {
+    fn next(&mut self) -> Option<WordToken<'a>> {
+        if self.read == self.data.len() { return None }
+
+        let mut iterator = self.data.bytes().skip(self.read);
         let mut start = self.read;
-        let mut open_brace_id = 0;
 
-        if self.flags & WHITESPACE == WHITESPACE {
-            self.flags &= 255 ^ WHITESPACE;
-            collect_whitespaces(&mut self.read, start, self.data).map(Ok)
-        } else {
-            let mut break_char = None;
-            let mut backslash = false;
-            let mut levels = 0;
-            self.flags &= 255 ^ (BRACES + TILDE + VARIABLES + PREV_WAS_VAR + OPEN_BRACE);
-            for character in self.data.bytes().skip(self.read) {
-                if backslash {
-                    backslash = false;
-                    if character == b'$' { self.flags |= VARIABLES; }
-                } else if character == b'\\' {
-                    backslash = true;
-                    self.flags &= 255 ^ PREV_WAS_VAR;
-                } else if character == b'\'' && self.flags & DOUBLE_QUOTE == 0 && break_char.is_none() {
-                    if start != self.read {
-                        let return_value = collect_at_single_quote(self.flags, start, self.read, self.data);
+        loop {
+            if let Some(character) = iterator.next() {
+                match character {
+                    b'\'' if self.flags & DQUOTE == 0 => {
+                        start += 1;
                         self.read += 1;
-                        self.flags ^= SINGLE_QUOTE;
-                        return Some(Ok(return_value));
-                    }
-                    start += 1;
-                    self.flags ^= SINGLE_QUOTE
-                } else if character == b'"' && self.flags & SINGLE_QUOTE != SINGLE_QUOTE && break_char.is_none() {
-                    if start != self.read {
-                        let return_value = collect_at_double_quote(self.flags, start, self.read, self.data);
+                        self.flags ^= SQUOTE;
+                    },
+                    b'"' if self.flags & SQUOTE == 0 => {
+                        start += 1;
                         self.read += 1;
-                        self.flags ^= DOUBLE_QUOTE;
-                        return Some(Ok(return_value));
+                        self.flags ^= DQUOTE;
                     }
-                    start += 1;
-                    self.flags ^= DOUBLE_QUOTE;
-                } else if character == b'{' && self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 {
-                    if self.flags & PREV_WAS_VAR != PREV_WAS_VAR && break_char.is_none() { self.flags |= BRACES; }
-                    if self.flags & OPEN_BRACE == OPEN_BRACE { return Some(Err(ExpandErr::InnerBracesNotImplemented)); }
-                    open_brace_id = self.read;
-                    self.flags |= OPEN_BRACE;
-                } else if character == b'}' && self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 {
-                    if self.flags & OPEN_BRACE != OPEN_BRACE { return Some(Err(ExpandErr::UnmatchedBraces(self.read))); }
-                    self.flags &= 255 ^ OPEN_BRACE;
-                } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && character == b'(' && self.flags & PREV_WAS_VAR == PREV_WAS_VAR {
-                    break_char = Some(b')');
-                    levels += 1;
-                    self.flags &= 255 ^ PREV_WAS_VAR;
-                } else if self.flags & SINGLE_QUOTE != SINGLE_QUOTE && character == b'$' {
-                    self.flags |= VARIABLES + PREV_WAS_VAR;
-                } else if self.flags & (SINGLE_QUOTE + DOUBLE_QUOTE) == 0 && character == b'~' && start == self.read {
-                    self.flags |= TILDE;
-                    self.flags &= 255 ^ PREV_WAS_VAR;
-                } else if character == b' ' && break_char.is_none() {
-                    self.flags |= WHITESPACE;
-                    return if self.flags & BRACES == BRACES {
-                        Some(Ok(WordToken::Brace(&self.data[start..self.read], self.flags & VARIABLES == VARIABLES)))
-                    } else if self.flags & VARIABLES == VARIABLES {
-                        Some(Ok(WordToken::Variable(&self.data[start..self.read], self.flags & DOUBLE_QUOTE == DOUBLE_QUOTE)))
-                    } else if self.flags & TILDE == TILDE {
-                        Some(Ok(WordToken::Tilde(&self.data[start..self.read])))
-                    } else {
-                        Some(Ok(WordToken::Normal(&self.data[start..self.read])))
-                    };
-                } else if break_char == Some(character) {
-                    levels -= 1;
-                    if levels == 0 { break_char = None; }
-                    // break_char = None;
-                } else {
-                    self.flags &= 255 ^ PREV_WAS_VAR;
+                    b' ' if self.flags & (SQUOTE + DQUOTE) == 0 => {
+                        return Some(self.whitespaces(&mut iterator));
+                    }
+                    b'~' if self.flags & (SQUOTE + DQUOTE) == 0 => {
+                        self.read += 1;
+                        return Some(self.tilde(&mut iterator));
+                    },
+                    b'{' if self.flags & (SQUOTE + DQUOTE) == 0 => {
+                        self.read += 1;
+                        return Some(self.braces(&mut iterator));
+                    },
+                    b'$' if self.flags & SQUOTE == 0 => {
+                        match iterator.next() {
+                            Some(b'(') => {
+                                self.read += 2;
+                                return Some(self.process(&mut iterator));
+                            },
+                            Some(b'{') => {
+                                self.read += 2;
+                                return Some(self.braced_variable(&mut iterator));
+                            }
+                            _ => {
+                                self.read += 1;
+                                return Some(self.variable(&mut iterator));
+                            }
+                        }
+                    }
+                    _ => { self.read += 1; break },
                 }
-                self.read += 1;
+            } else {
+                return None
             }
-
-            collect_at_end(self.flags, start, self.read, open_brace_id, self.data)
         }
-    }
-}
 
-fn collect_whitespaces<'a>(read: &mut usize, start: usize, data: &'a str) -> Option<WordToken<'a>> {
-    for character in data.bytes().skip(*read) {
-        if character != b' ' {
-            return Some(WordToken::Normal(&data[start..*read]));
+        while let Some(character) = iterator.next() {
+            match character {
+                _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
+                b'\\'                             => self.flags ^= BACKSL,
+                b'\'' if self.flags & DQUOTE == 0 => {
+                    self.flags ^= SQUOTE;
+                    let output = &self.data[start..self.read];
+                    self.read += 1;
+                    return Some(WordToken::Normal(output));
+                },
+                b'"' if self.flags & SQUOTE == 0 => {
+                    self.flags ^= DQUOTE;
+                    let output = &self.data[start..self.read];
+                    self.read += 1;
+                    return Some(WordToken::Normal(output));
+                },
+                b' ' | b'{' if self.flags & (SQUOTE + DQUOTE) == 0 => {
+                    return Some(WordToken::Normal(&self.data[start..self.read]));
+                },
+                b'$' | b'@' if self.flags & SQUOTE == 0 => {
+                    return Some(WordToken::Normal(&self.data[start..self.read]));
+                },
+                _ => (),
+            }
+            self.read += 1;
         }
-        *read += 1;
-    }
 
-    if start != *read { Some(WordToken::Normal(&data[start..*read])) } else { None }
-}
-
-fn collect_at_single_quote(flags: u8, start: usize, end: usize, data: &str) -> WordToken {
-    if flags & SINGLE_QUOTE == SINGLE_QUOTE {
-        WordToken::Normal(&data[start..end])
-    } else if flags & BRACES == BRACES {
-        WordToken::Brace(&data[start..end], flags & VARIABLES == VARIABLES)
-    } else if flags & VARIABLES == VARIABLES {
-        WordToken::Variable(&data[start..end], flags & DOUBLE_QUOTE == DOUBLE_QUOTE)
-    } else if flags & TILDE == TILDE {
-        WordToken::Tilde(&data[start..end])
-    } else {
-        WordToken::Normal(&data[start..end])
-    }
-}
-
-fn collect_at_double_quote(flags: u8, start: usize, end: usize, data: &str) -> WordToken {
-    if flags & SINGLE_QUOTE == SINGLE_QUOTE {
-        if flags & VARIABLES == VARIABLES {
-            WordToken::Variable(&data[start..end], flags & DOUBLE_QUOTE == DOUBLE_QUOTE)
+        if start == self.read {
+            None
         } else {
-            WordToken::Normal(&data[start..end])
+            Some(WordToken::Normal(&self.data[start..]))
         }
-    } else if flags & BRACES == BRACES {
-        WordToken::Brace(&data[start..end], flags & VARIABLES == VARIABLES)
-    } else if flags & VARIABLES == VARIABLES {
-        WordToken::Variable(&data[start..end], flags & DOUBLE_QUOTE == DOUBLE_QUOTE)
-    } else if flags & TILDE == TILDE {
-        WordToken::Tilde(&data[start..end])
-    } else {
-        WordToken::Normal(&data[start..end])
     }
 }
 
-fn collect_at_end(flags: u8, start: usize, end: usize, open_brace_id: usize, data: &str)
-    -> Option<Result<WordToken, ExpandErr>>
-{
-    if flags & OPEN_BRACE == OPEN_BRACE {
-        Some(Err(ExpandErr::UnmatchedBraces(open_brace_id)))
-    } else if start == end {
-        None
-    } else if flags & BRACES == BRACES {
-        Some(Ok(WordToken::Brace(&data[start..end], flags & VARIABLES == VARIABLES)))
-    } else if flags & VARIABLES == VARIABLES {
-        Some(Ok(WordToken::Variable(&data[start..end], flags & DOUBLE_QUOTE == DOUBLE_QUOTE)))
-    } else if flags & TILDE == TILDE {
-        Some(Ok(WordToken::Tilde(&data[start..end])))
-    } else {
-        Some(Ok(WordToken::Normal(&data[start..end])))
-    }
-}
+// TODO: Write More Tests
 
 #[cfg(test)]
 mod tests {
@@ -188,7 +282,6 @@ mod tests {
     fn compare(input: &str, expected: Vec<WordToken>) {
         let mut correct = 0;
         for (actual, expected) in WordIterator::new(input).zip(expected.iter()) {
-            let actual = actual.expect(&format!("Expected {:?}", *expected));
             assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
             correct += 1;
         }
@@ -196,21 +289,14 @@ mod tests {
     }
 
     #[test]
-    fn test_malformed_brace_input() {
-        assert_eq!(WordIterator::new("AB{CD").next(), Some(Err(ExpandErr::UnmatchedBraces(2))));
-        assert_eq!(WordIterator::new("AB{{}").next(), Some(Err(ExpandErr::InnerBracesNotImplemented)));
-        assert_eq!(WordIterator::new("AB}CD").next(), Some(Err(ExpandErr::UnmatchedBraces(2))));
-    }
-
-    #[test]
     fn words_process_recursion() {
         let input = "echo $(echo $(echo one)) $(echo one $(echo two) three)";
         let expected = vec![
             WordToken::Normal("echo"),
-            WordToken::Normal(" "),
-            WordToken::Variable("$(echo $(echo one))", false),
-            WordToken::Normal(" "),
-            WordToken::Variable("$(echo one $(echo two) three)", false),
+            WordToken::Whitespace(" "),
+            WordToken::Process("echo $(echo one)", false),
+            WordToken::Whitespace(" "),
+            WordToken::Process("echo one $(echo two) three", false),
         ];
         compare(input, expected);
     }
@@ -220,37 +306,38 @@ mod tests {
         let input = "echo $(git branch | rg '[*]' | awk '{print $2}')";
         let expected = vec![
             WordToken::Normal("echo"),
-            WordToken::Normal(" "),
-            WordToken::Variable("$(git branch | rg '[*]' | awk '{print $2}')", false),
+            WordToken::Whitespace(" "),
+            WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", false),
         ];
         compare(input, expected);
 
         let input = "echo $(git branch | rg \"[*]\" | awk '{print $2}')";
         let expected = vec![
             WordToken::Normal("echo"),
-            WordToken::Normal(" "),
-            WordToken::Variable("$(git branch | rg \"[*]\" | awk '{print $2}')", false),
+            WordToken::Whitespace(" "),
+            WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", false),
         ];
         compare(input, expected);
     }
 
     #[test]
     fn test_words() {
-        let input = "echo $ABC ${ABC} one{$ABC,$ABC} ~ $(echo foo) \"$(seq 1 100)\"";
+        let input = "echo $ABC \"${ABC}\" one{$ABC,$ABC} ~ $(echo foo) \"$(seq 1 100)\"";
         let expected = vec![
             WordToken::Normal("echo"),
-            WordToken::Normal(" "),
-            WordToken::Variable("$ABC", false),
-            WordToken::Normal(" "),
-            WordToken::Variable("${ABC}", false),
-            WordToken::Normal(" "),
-            WordToken::Brace("one{$ABC,$ABC}", true),
-            WordToken::Normal(" "),
+            WordToken::Whitespace(" "),
+            WordToken::Variable("ABC", false),
+            WordToken::Whitespace(" "),
+            WordToken::Variable("ABC", true),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("one"),
+            WordToken::Brace(vec!["$ABC", "$ABC"]),
+            WordToken::Whitespace(" "),
             WordToken::Tilde("~"),
-            WordToken::Normal(" "),
-            WordToken::Variable("$(echo foo)", false),
-            WordToken::Normal(" "),
-            WordToken::Variable("$(seq 1 100)", true)
+            WordToken::Whitespace(" "),
+            WordToken::Process("echo foo", false),
+            WordToken::Whitespace(" "),
+            WordToken::Process("seq 1 100", true)
         ];
         compare(input, expected);
     }

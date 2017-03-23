@@ -8,7 +8,6 @@ pub use self::flow::FlowLogic;
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::iter;
 use std::io::{self, Read, Write};
 use std::env;
 use std::mem;
@@ -24,7 +23,6 @@ use flow_control::{FlowControl, Function, Statement};
 use variables::Variables;
 use status::*;
 use pipe::execute_pipeline;
-use parser::shell_expand::ExpandErr;
 use parser::{expand_string, StatementSplitter, check_statement, QuoteTerminator};
 use parser::peg::Pipeline;
 
@@ -276,22 +274,7 @@ impl<'a> Shell<'a> {
     pub fn prompt(&self) -> String {
         if self.flow_control.level == 0 {
             let prompt_var = self.variables.get_var_or_empty("PROMPT");
-            match expand_string(&prompt_var, &self.variables, &self.directory_stack) {
-                Ok(expanded_string) => expanded_string,
-                Err(ExpandErr::UnmatchedBraces(position)) => {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: expand error: unmatched braces\n{}\n{}^",
-                        prompt_var, iter::repeat("-").take(position).collect::<String>());
-                    String::from("ERROR: ")
-                },
-                Err(ExpandErr::InnerBracesNotImplemented) => {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = stderr.write_all(b"ion: expand error: inner braces not yet implemented\n");
-                    String::from("ERROR: ")
-                }
-            }
+            expand_string(&prompt_var, &self.variables, &self.directory_stack).join(" ")
         } else {
             "    ".repeat(self.flow_control.level as usize)
         }
