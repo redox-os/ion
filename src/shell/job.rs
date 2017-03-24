@@ -33,7 +33,7 @@ impl Job {
         {
             let mut iterator = self.args.drain(..);
             expanded.push(iterator.next().unwrap());
-            for arg in iterator.flat_map(|argument| expand_string(&argument, variables, dir_stack)) {
+            for arg in iterator.flat_map(|argument| expand_string(&argument, variables, dir_stack, false)) {
                 if arg.contains(|chr| chr == '?' || chr == '*' || chr == '[') {
                     if let Ok(glob) = glob(&arg) {
                         for path in glob.filter_map(Result::ok) {

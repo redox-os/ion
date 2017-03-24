@@ -16,7 +16,9 @@ pub use self::statements::{StatementSplitter, StatementError, check_statement};
 pub use self::quotes::QuoteTerminator;
 
 /// Takes an argument string as input and expands it.
-pub fn expand_string<'a>(original: &'a str, vars: &Variables, dir_stack: &DirectoryStack) -> Vec<String> {
+pub fn expand_string<'a>(original: &'a str, vars: &Variables, dir_stack: &DirectoryStack,
+    reverse_quoting: bool) -> Vec<String>
+{
     let expanders = ExpanderFunctions {
         tilde: &|tilde: &str| vars.tilde_expansion(tilde, dir_stack),
         variable: &|variable: &str, quoted: bool| {
@@ -24,5 +26,5 @@ pub fn expand_string<'a>(original: &'a str, vars: &Variables, dir_stack: &Direct
         },
         command: &|command: &str, quoted: bool| vars.command_expansion(command, quoted),
     };
-    shell_expand::expand_string(original, &expanders)
+    shell_expand::expand_string(original, &expanders, reverse_quoting)
 }

@@ -12,7 +12,7 @@ pub enum ForExpression {
 impl ForExpression {
     pub fn new(expression: &[String], dir_stack: &DirectoryStack, variables: &Variables) -> ForExpression {
         let mut output: Vec<String> = expression.iter()
-            .flat_map(|expression| expand_string(expression, variables, dir_stack))
+            .flat_map(|expression| expand_string(expression, variables, dir_stack, true))
             .collect();
 
         if output.len() == 1 {

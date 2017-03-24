@@ -16,7 +16,7 @@ pub struct ExpanderFunctions<'f> {
 
 /// Performs shell expansions to an input string, efficiently returning the final expanded form.
 /// Shells must provide their own batteries for expanding tilde and variable words.
-pub fn expand_string(original: &str, expand_func: &ExpanderFunctions) -> Vec<String> {
+pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_quoting: bool) -> Vec<String> {
     let mut expanded_words = Vec::new();
     let mut output = String::new();
     let mut token_buffer = Vec::new();
@@ -43,7 +43,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions) -> Vec<Str
                         tokens.push(BraceToken::Expander);
                         let mut temp = Vec::new();
                         for node in nodes.into_iter() {
-                            for word in expand_string(node, expand_func) {
+                            for word in expand_string(node, expand_func, reverse_quoting) {
                                 temp.push(word);
                             }
                         }
@@ -56,6 +56,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions) -> Vec<Str
                         None               => text,
                     }),
                     WordToken::Process(command, quoted) => {
+                        let quoted = if reverse_quoting { !quoted } else { quoted };
                         let mut expanded = String::with_capacity(command.len());
                         for token in CommandExpander::new(&command) {
                             match token {
@@ -73,6 +74,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions) -> Vec<Str
                         }
                     },
                     WordToken::Variable(text, quoted) => {
+                        let quoted = if reverse_quoting { !quoted } else { quoted };
                         current.push_str(match (expand_func.variable)(text, quoted) {
                             Some(ref var) => var,
                             None          => ""
@@ -100,6 +102,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions) -> Vec<Str
                         None               => text,
                     }),
                     WordToken::Process(command, quoted) => {
+                        let quoted = if reverse_quoting { !quoted } else { quoted };
                         let mut expanded = String::with_capacity(command.len());
                         for token in CommandExpander::new(&command) {
                             match token {
@@ -117,6 +120,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions) -> Vec<Str
                         }
                     },
                     WordToken::Variable(text, quoted) => {
+                        let quoted = if reverse_quoting { !quoted } else { quoted };
                         output.push_str(match (expand_func.variable)(text, quoted) {
                             Some(ref var) => var,
                             None          => ""
@@ -231,6 +235,6 @@ fn expand_variable_within_braces() {
         variable: &|variable: &str, _| if variable == "A" { Some("1".to_owned()) } else { None },
         command:  &|_, _| None
     };
-    let expanded = expand_string(line, &functions);
+    let expanded = expand_string(line, &functions, false);
     assert_eq!(&expected, &expanded);
 }
