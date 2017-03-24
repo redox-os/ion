@@ -6,11 +6,14 @@ const SQUOTE: u8 = 1;
 const DQUOTE: u8 = 2;
 const BACKSL: u8 = 4;
 const COMM_1: u8 = 8;
+const VBRACE: u8 = 16;
 
 #[derive(Debug, PartialEq)]
 pub enum StatementError {
     InvalidCharacter(char, usize),
-    UnterminatedSubshell
+    UnterminatedSubshell,
+    UnterminatedBracedVar,
+    UnterminatedBrace,
 }
 
 pub fn check_statement(statement: Result<&str, StatementError>) -> Option<Statement> {
@@ -26,6 +29,12 @@ pub fn check_statement(statement: Result<&str, StatementError>) -> Option<Statem
                 },
                 StatementError::UnterminatedSubshell => {
                     let _ = writeln!(stderr.lock(), "ion: syntax error: unterminated subshell");
+                },
+                StatementError::UnterminatedBrace => {
+                    let _ = writeln!(stderr.lock(), "ion: syntax error: unterminated brace");
+                },
+                StatementError::UnterminatedBracedVar => {
+                    let _ = writeln!(stderr.lock(), "ion: syntax error: unterminated braced var");
                 }
             }
             None
@@ -38,12 +47,12 @@ pub struct StatementSplitter<'a> {
     read:  usize,
     flags: u8,
     process_level: u8,
-    // brace_level: u8,
+    brace_level: u8,
 }
 
 impl<'a> StatementSplitter<'a> {
     pub fn new(data: &'a str) -> StatementSplitter<'a> {
-        StatementSplitter { data: data, read: 0, flags: 0, process_level: 0 }
+        StatementSplitter { data: data, read: 0, flags: 0, process_level: 0, brace_level: 0 }
     }
 }
 
@@ -55,11 +64,28 @@ impl<'a> Iterator for StatementSplitter<'a> {
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             match character {
+                0...47 | 58...64 | 91...94 | 96 | 123...127 if self.flags & VBRACE != 0 => {
+                    if error.is_none() {
+                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                    }
+                },
                 _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
                 b'\\'                             => self.flags ^= BACKSL,
                 b'\'' if self.flags & DQUOTE == 0 => self.flags ^= SQUOTE,
                 b'"'  if self.flags & SQUOTE == 0 => self.flags ^= DQUOTE,
                 b'$'  if self.flags & SQUOTE == 0 => { self.flags |= COMM_1; continue },
+                b'{'  if self.flags & COMM_1 != 0 => self.flags |= VBRACE,
+                b'{'  if self.flags & (SQUOTE + DQUOTE) == 0 => self.brace_level += 1,
+                b'}'  if self.flags & (SQUOTE + DQUOTE) == 0 => {
+                    if self.brace_level == 0 {
+                        if error.is_none() {
+                            error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                        }
+                    } else {
+                        self.brace_level -= 1;
+                    }
+                },
+                b'}'  if self.flags & VBRACE != 0 => self.flags ^= VBRACE,
                 b'('  if self.flags & COMM_1 == 0 => {
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
@@ -99,7 +125,9 @@ impl<'a> Iterator for StatementSplitter<'a> {
             self.read = self.data.len();
             match error {
                 Some(error) => Some(Err(error)),
-                None if self.process_level != 0 => Some(Err(StatementError::UnterminatedSubshell)),
+                None if self.process_level != 0  => Some(Err(StatementError::UnterminatedSubshell)),
+                None if self.flags & VBRACE != 0 => Some(Err(StatementError::UnterminatedBracedVar)),
+                None if self.brace_level != 0    => Some(Err(StatementError::UnterminatedBrace)),
                 None => Some(Ok(self.data[start..].trim()))
             }
         }
