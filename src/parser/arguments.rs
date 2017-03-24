@@ -1,6 +1,7 @@
 const DOUBLE: u8 = 1;
 const SINGLE: u8 = 2;
 const BACK:   u8 = 4;
+const COMM:   u8 = 8;
 
 // TODO: Handle Processes
 
@@ -27,21 +28,22 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
     type Item = String;
 
     fn next(&mut self) -> Option<String> {
+        let mut level = 0;
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             match character {
-                _ if self.flags & BACK != 0 => {
-                    self.buffer.push(character);
-                    self.flags ^= BACK;
-                },
+                _ if self.flags & BACK != 0 => self.flags ^= BACK,
+                b'\\'                       => self.flags ^= BACK,
+                b'$'  if self.flags & SINGLE == 0 => { self.flags |= COMM; self.buffer.push(character); continue },
+                b'('  if self.flags & SINGLE == 0 && self.flags & COMM != 0 => level += 1,
+                b')'  if self.flags & SINGLE == 0 => level -= 1,
                 b'"'  if self.flags & SINGLE == 0 => self.flags ^= DOUBLE,
                 b'\'' if self.flags & DOUBLE == 0 => self.flags ^= SINGLE,
-                b' '  if !self.buffer.is_empty() & (self.flags & (SINGLE + DOUBLE) == 0) => break,
-                b'\\' if (self.flags & (SINGLE + DOUBLE) == 0) => self.flags ^= BACK,
-                _ => {
-                    self.buffer.push(character);
-                }
+                b' '  if !self.buffer.is_empty() && (self.flags & (SINGLE + DOUBLE) == 0) && level == 0 => break,
+                _ => ()
             }
+            self.buffer.push(character);
+            self.flags &= 255 ^ COMM;
         }
 
         if self.buffer.is_empty() {
@@ -52,27 +54,5 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
             self.buffer.clear();
             Some(unsafe { String::from_utf8_unchecked(output) })
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_split_args() {
-        use std::str;
-
-        let argument = ArgumentSplitter::new("ffmpeg -i \"file with spaces\" \"output with spaces\"");
-        let expected = vec!["ffmpeg", "-i", "file with spaces", "output with spaces"];
-        let argument = argument.collect::<Vec<String>>();
-        let argument = argument.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
-        assert_eq!(argument, expected);
-
-        let argument = ArgumentSplitter::new("one\\ two\\\\ a\\\'b\\\"c");
-        let expected = vec!["one two\\", "a\'b\"c"];
-        let argument = argument.collect::<Vec<String>>();
-        let argument = argument.iter().map(AsRef::as_ref).collect::<Vec<&str>>();
-        assert_eq!(argument, expected);
     }
 }
