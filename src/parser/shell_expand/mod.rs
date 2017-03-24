@@ -38,11 +38,6 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
             for word in token_buffer.drain(..) {
                 match word {
                     WordToken::Brace(nodes) => {
-                        if !current.is_empty() {
-                            tokens.push(BraceToken::Normal(current.clone()));
-                            current.clear();
-                        }
-                        tokens.push(BraceToken::Expander);
                         let mut temp = Vec::new();
                         for word in nodes.into_iter()
                             .flat_map(|node| expand_string(node, expand_func, reverse_quoting))
@@ -54,7 +49,17 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                                 None => temp.push(word),
                             }
                         }
-                        expanders.push(temp);
+
+                        if temp.len() > 0 {
+                            if !current.is_empty() {
+                                tokens.push(BraceToken::Normal(current.clone()));
+                                current.clear();
+                            }
+                            tokens.push(BraceToken::Expander);
+                            expanders.push(temp);
+                        } else {
+                            current.push_str("{}");
+                        }
                     },
                     WordToken::Normal(text) => current.push_str(text),
                     WordToken::Whitespace(_) => unreachable!(),
@@ -90,12 +95,17 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                 }
             }
 
-            if !current.is_empty() {
-                tokens.push(BraceToken::Normal(current));
-            }
 
-            for word in braces::expand_braces(tokens, expanders) {
-                expanded_words.push(word);
+
+            if expanders.len() == 0 {
+                expanded_words.push(current);
+            } else {
+                if !current.is_empty() {
+                    tokens.push(BraceToken::Normal(current));
+                }
+                for word in braces::expand_braces(tokens, expanders) {
+                    expanded_words.push(word);
+                }
             }
         } else {
             for word in token_buffer.drain(..) {
