@@ -2,10 +2,12 @@ extern crate permutate;
 
 mod braces;
 mod process;
+mod ranges;
 mod words;
 
 use self::braces::BraceToken;
 use self::process::{CommandExpander, CommandToken};
+use self::ranges::parse_range;
 use self::words::{WordIterator, WordToken};
 
 pub struct ExpanderFunctions<'f> {
@@ -42,9 +44,14 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                         }
                         tokens.push(BraceToken::Expander);
                         let mut temp = Vec::new();
-                        for node in nodes.into_iter() {
-                            for word in expand_string(node, expand_func, reverse_quoting) {
-                                temp.push(word);
+                        for word in nodes.into_iter()
+                            .flat_map(|node| expand_string(node, expand_func, reverse_quoting))
+                        {
+                            match parse_range(&word) {
+                                Some(elements) => for word in elements {
+                                    temp.push(word)
+                                },
+                                None => temp.push(word),
                             }
                         }
                         expanders.push(temp);
