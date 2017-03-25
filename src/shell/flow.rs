@@ -7,6 +7,8 @@ use flow_control::{ElseIf, Function, Statement, collect_loops, collect_if};
 use parser::{ForExpression, StatementSplitter, check_statement};
 use parser::peg::Pipeline;
 
+use glob::glob;
+
 pub trait FlowLogic {
     fn on_command(&mut self, command_string: &str);
     fn execute_toplevel<I>(&mut self, iterator: &mut I, statement: Statement) -> Result<(), &'static str>
@@ -172,29 +174,37 @@ impl<'a> FlowLogic for Shell<'a> {
     }
 
     fn execute_for(&mut self, variable: &str, values: &[String], statements: Vec<Statement>) {
+        fn glob_expand(arg: &str) -> Vec<String> {
+            let mut expanded = Vec::new();
+            if arg.contains(|chr| chr == '?' || chr == '*' || chr == '[') {
+                if let Ok(glob) = glob(&arg) {
+                    for path in glob.filter_map(Result::ok) {
+                        expanded.push(path.to_string_lossy().into_owned());
+                    }
+                }
+                expanded
+            } else {
+                vec![arg.to_owned()]
+            }
+        }
+
         match ForExpression::new(values, &self.directory_stack, &self.variables) {
             ForExpression::Multiple(values) => {
-                for value in &values {
-                    if value != "_" { self.variables.set_var(variable, value); }
-                    if self.execute_statements(statements.clone()) {
-                        break
-                    }
+                for value in values.iter().flat_map(|x| glob_expand(x.as_str())) {
+                    if value != "_" { self.variables.set_var(variable, &value); }
+                    if self.execute_statements(statements.clone()) { break }
                 }
             },
             ForExpression::Normal(values) => {
-                for value in values.lines() {
+                for value in values.lines().flat_map(glob_expand) {
                     if value != "_" { self.variables.set_var(variable, &value); }
-                    if self.execute_statements(statements.clone()) {
-                        break
-                    }
+                    if self.execute_statements(statements.clone()) { break }
                 }
             },
             ForExpression::Range(start, end) => {
                 for value in (start..end).map(|x| x.to_string()) {
                     if value != "_" { self.variables.set_var(variable, &value); }
-                    if self.execute_statements(statements.clone()) {
-                        break
-                    }
+                    if self.execute_statements(statements.clone()) { break }
                 }
             }
         }
