@@ -3,12 +3,14 @@
 This module handles all of the parsing logic within the Ion shell. The following is the strategy currently in use:
 
 1. Parse supplied commands into individual statements using the `StatementSplitter`.
-2. Map each individual statement to their equivalent `Statement` enum using the peg parser.
-3. Later expand shell expressions where required using the `expand_string()` function.
+2. Print error if statement contains a syntax error, otherwise pass valid statement on.
+3. Map each individual statement to their equivalent `Statement` enum using the peg parser.
+4. Later expand shell expressions where required using the `expand_string()` function.
 
 ## Parsing Statements
 
-First, inputs received by the shell should be parsed with the `StatementSplitter` in the `statements` module. A statement is any command that is separated by a `;`.
+First, inputs received by the shell should be parsed with the `StatementSplitter` in the `statements` module. A statement is any command that is separated by a `;`. Syntax errors are also detected in the `StatementSplitter`, where if an error is found, that statement will be skipped,
+and an error message will be printed.
 
 Given the following command:
 
@@ -60,7 +62,6 @@ For loops within Ion work uniquely compared to other shells, in that not only do
 
 ### Shell Expansion
 
-This is one of the most important pieces of the parsing puzzle outside of the basic grammar. The purpose of the `shell_expand` module is to supply a generic expansion library that performs all shell expansions throughout the shell.
-
-- The `ForExpression` parser uses the `shell_expand` module to expand the supplied expression before evaluating it.
-- Pipelines are also expanded before
+The purpose of the `shell_expand` module is to supply a generic expansion library that performs all shell expansions
+throughout the shell. It reduces statements into a set of primitive words, and applies specific expansion rules
+accordingly.

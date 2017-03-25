@@ -1,11 +1,36 @@
 # Ion Shell
-Ion is the underlying library for shells and command execution in
-Redox, as well as the default shell.
 
 [![Build Status](https://travis-ci.org/redox-os/ion.svg)](https://travis-ci.org/redox-os/ion)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Coverage Status](https://coveralls.io/repos/redox-os/ion/badge.svg?branch=master&service=github)](https://coveralls.io/github/redox-os/ion?branch=master)
 [![crates.io](http://meritbadge.herokuapp.com/ion-shell)](https://crates.io/crates/ion-shell)
+
+Ion is a shell for UNIX platforms, and is the default shell in Redox. It is still a work in progress, but much of the
+core functionality is complete. Features below:
+
+- [x] Shell Expansion
+- [x] Flow Control
+- [x] Aliases
+- [x] Variables
+- [x] Functions
+- [ ] Arrays
+- [ ] Maps
+- [x] For Loops
+- [ ] Foreach Loops
+- [x] While Loops
+- [x] If Conditionals
+- [x] Piping Stdout/Stderr
+- [x] Redirecting Stdout/Stderr
+- [x] && and || Conditionals
+- [x] Background Jobs
+- [ ] Background Jobs Control
+- [ ] Signal Handling
+- [ ] Autosuggestions
+- [ ] Syntax Highlighting
+- [x] Multiline Comments and Commands
+- [ ] Multiline Editing
+- [x] Tab Completion (Needs Improvements)
+- [ ] Unescape sequences like '\n' and '\t'
 
 ## Shell Syntax
 
@@ -192,12 +217,22 @@ end
 for _ in 1..10
    do_something
 end
+
+# Brace Ranges
+for a in {1..10}
+    echo $a
+end
+
+# Globbing
+for a in *
+    echo $a
+end
 ```
 
 ### Functions
 
 Functions in the Ion shell are defined with a name along with a set of variables. The function
-will check if the corrent number of arguments were supplied and execute if all arguments
+will check if the correct number of arguments were supplied and execute if all arguments
 were given.
 
 ```ion
@@ -223,8 +258,10 @@ end
 
 ### Brace Expansion
 
-It is possible to perform brace expansions within the Ion shell. Currently, only permutation braces are supported.
+Brace expansion is used to create permutations of a given input. In addition to simple permutations, Ion supports
+brace ranges and nested branches.
 
 ```ion
-echo abc{1,2,3}def{456,789,101112}
+echo abc{3..1}def{1..3,a..c}
+echo ghi{one{a,b,c},two{d,e,f}}
 ```
