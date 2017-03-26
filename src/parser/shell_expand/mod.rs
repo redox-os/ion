@@ -16,6 +16,52 @@ pub struct ExpanderFunctions<'f> {
     pub command:  &'f Fn(&str, bool) -> Option<String>
 }
 
+fn expand_process(current: &mut String, command: &str, quoted: bool,
+    expand_func: &ExpanderFunctions)
+{
+    let mut expanded = String::with_capacity(command.len());
+    for token in CommandExpander::new(command) {
+        match token {
+            CommandToken::Normal(string) => expanded.push_str(string),
+            CommandToken::Variable(var) => {
+                if let Some(result) = (expand_func.variable)(var, quoted) {
+                    expanded.push_str(&result);
+                }
+            }
+        }
+    }
+
+    if let Some(result) = (expand_func.command)(&expanded, quoted) {
+        current.push_str(&result);
+    }
+}
+
+fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
+    tokens: &mut Vec<BraceToken>, nodes: Vec<&str>, expand_func: &ExpanderFunctions,
+    reverse_quoting: bool)
+{
+    let mut temp = Vec::new();
+    for word in nodes.into_iter()
+        .flat_map(|node| expand_string(node, expand_func, reverse_quoting))
+    {
+        match parse_range(&word) {
+            Some(elements) => for word in elements { temp.push(word) },
+            None           => temp.push(word),
+        }
+    }
+
+    if !temp.is_empty() {
+        if !current.is_empty() {
+            tokens.push(BraceToken::Normal(current.clone()));
+            current.clear();
+        }
+        tokens.push(BraceToken::Expander);
+        expanders.push(temp);
+    } else {
+        current.push_str("{}");
+    }
+}
+
 /// Performs shell expansions to an input string, efficiently returning the final expanded form.
 /// Shells must provide their own batteries for expanding tilde and variable words.
 pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_quoting: bool) -> Vec<String> {
@@ -37,30 +83,8 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
 
             for word in token_buffer.drain(..) {
                 match word {
-                    WordToken::Brace(nodes) => {
-                        let mut temp = Vec::new();
-                        for word in nodes.into_iter()
-                            .flat_map(|node| expand_string(node, expand_func, reverse_quoting))
-                        {
-                            match parse_range(&word) {
-                                Some(elements) => for word in elements {
-                                    temp.push(word)
-                                },
-                                None => temp.push(word),
-                            }
-                        }
-
-                        if temp.len() > 0 {
-                            if !current.is_empty() {
-                                tokens.push(BraceToken::Normal(current.clone()));
-                                current.clear();
-                            }
-                            tokens.push(BraceToken::Expander);
-                            expanders.push(temp);
-                        } else {
-                            current.push_str("{}");
-                        }
-                    },
+                    WordToken::Brace(nodes) =>
+                        expand_brace(&mut current, &mut expanders, &mut tokens, nodes, expand_func, reverse_quoting),
                     WordToken::Normal(text) => current.push_str(text),
                     WordToken::Whitespace(_) => unreachable!(),
                     WordToken::Tilde(text) => current.push_str(match (expand_func.tilde)(text) {
@@ -69,21 +93,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                     }),
                     WordToken::Process(command, quoted) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
-                        let mut expanded = String::with_capacity(command.len());
-                        for token in CommandExpander::new(&command) {
-                            match token {
-                                CommandToken::Normal(string) => expanded.push_str(string),
-                                CommandToken::Variable(var) => {
-                                    if let Some(result) = (expand_func.variable)(var, quoted) {
-                                        expanded.push_str(&result);
-                                    }
-                                }
-                            }
-                        }
-
-                        if let Some(result) = (expand_func.command)(&expanded, quoted) {
-                            current.push_str(&result);
-                        }
+                        expand_process(&mut current, command, quoted, expand_func);
                     },
                     WordToken::Variable(text, quoted) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
@@ -95,15 +105,13 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                 }
             }
 
-
-
-            if expanders.len() == 0 {
+            if expanders.is_empty() {
                 expanded_words.push(current);
             } else {
                 if !current.is_empty() {
                     tokens.push(BraceToken::Normal(current));
                 }
-                for word in braces::expand_braces(tokens, expanders) {
+                for word in braces::expand_braces(&tokens, expanders) {
                     expanded_words.push(word);
                 }
             }
@@ -120,21 +128,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                     }),
                     WordToken::Process(command, quoted) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
-                        let mut expanded = String::with_capacity(command.len());
-                        for token in CommandExpander::new(&command) {
-                            match token {
-                                CommandToken::Normal(string) => expanded.push_str(string),
-                                CommandToken::Variable(var) => {
-                                    if let Some(result) = (expand_func.variable)(var, quoted) {
-                                        expanded.push_str(&result);
-                                    }
-                                }
-                            }
-                        }
-
-                        if let Some(result) = (expand_func.command)(&expanded, quoted) {
-                            output.push_str(&result);
-                        }
+                        expand_process(&mut output, command, quoted, expand_func);
                     },
                     WordToken::Variable(text, quoted) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };

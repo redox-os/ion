@@ -14,23 +14,28 @@ core functionality is complete. Features below:
 - [x] Variables
 - [x] Functions
 - [ ] Arrays
+- [ ] Array Process Expressions
 - [ ] Maps
+- [x] Process Expressions
 - [x] For Loops
 - [ ] Foreach Loops
 - [x] While Loops
 - [x] If Conditionals
 - [x] Piping Stdout/Stderr
 - [x] Redirecting Stdout/Stderr
+- [ ] Piping Builtins & Functions
 - [x] && and || Conditionals
 - [x] Background Jobs
 - [ ] Background Jobs Control
 - [ ] Signal Handling
-- [ ] Autosuggestions
+- [ ] Autosuggestions (90%)
 - [ ] Syntax Highlighting
 - [x] Multiline Comments and Commands
 - [ ] Multiline Editing
 - [x] Tab Completion (Needs Improvements)
 - [ ] Unescape sequences like '\n' and '\t'
+- [ ] Builtin Plugins
+- [ ] Prompt Plugins
 
 ## Shell Syntax
 

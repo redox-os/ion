@@ -2,7 +2,11 @@
 
 This directory contains the source code of Ion's builtin commands and documentation for their usage.
 
-## Variables
+## source.rs
+
+Contains the source command
+
+## variables.rs
 
 The **variables.rs** module contains commands relating to setting and removing aliases, variables, and exports. The shell stores aliases and variables within two separate `BTreeMap` structures inside the same `Variables` structure, which is contained within the `Shell` structure.
 
@@ -27,8 +31,7 @@ unalias ls
 The `let` command sets a variable to the value of the expression that follows. These variables are stored as local values within the shell, so other processes many not access these values.
 
 ```ion
-// TODO: Ion Shell does not yet implement stderr redirection.
-let git_branch = $(git rev-parse --abbrev-ref HEAD 2> /dev/null)
+let git_branch = $(git rev-parse --abbrev-ref HEAD ^> /dev/null)
 ```
 
 If the command is executed without any arguments, it will simply list all available variables.

@@ -177,7 +177,7 @@ impl<'a> FlowLogic for Shell<'a> {
         fn glob_expand(arg: &str) -> Vec<String> {
             let mut expanded = Vec::new();
             if arg.contains(|chr| chr == '?' || chr == '*' || chr == '[') {
-                if let Ok(glob) = glob(&arg) {
+                if let Ok(glob) = glob(arg) {
                     for path in glob.filter_map(Result::ok) {
                         expanded.push(path.to_string_lossy().into_owned());
                     }

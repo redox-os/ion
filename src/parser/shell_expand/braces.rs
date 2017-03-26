@@ -4,17 +4,17 @@ use super::permutate::Permutator;
 /// A token primitive for the `expand_braces` function.
 pub enum BraceToken { Normal(String), Expander }
 
-pub fn expand_braces(tokens: Vec<BraceToken>, mut expanders: Vec<Vec<String>>) -> Vec<String> {
+pub fn expand_braces(tokens: &[BraceToken], mut expanders: Vec<Vec<String>>) -> Vec<String> {
     if expanders.len() > 1 {
         let tmp: Vec<Vec<&str>> = expanders.iter()
             .map(|list| list.iter().map(AsRef::as_ref).collect::<Vec<&str>>())
             .collect();
         let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
-        multiple_brace_expand(&vector_of_arrays[..], &tokens)
+        multiple_brace_expand(&vector_of_arrays[..], tokens)
     } else if expanders.len() == 1 {
         let elements = expanders.drain(..).next().expect("there should be at least one value");
         let elements: Vec<&str> = elements.iter().map(AsRef::as_ref).collect();
-        single_brace_expand(&elements, &tokens)
+        single_brace_expand(&elements, tokens)
     } else {
         Vec::new()
     }

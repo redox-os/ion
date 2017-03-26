@@ -95,9 +95,9 @@ impl<'a> WordIterator<'a> {
         while let Some(character) = iterator.next() {
             match character {
                 // If found, this is not a `Variable` but an `ArrayToString`
-                b'(' => {
-                    unimplemented!()
-                },
+                // b'(' => {
+                //     unimplemented!()
+                // },
                 // Only alphanumerical and underscores are allowed in variable names
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {
                     return WordToken::Variable(&self.data[start..self.read], self.flags & DQUOTE != 0);
