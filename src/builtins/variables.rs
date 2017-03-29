@@ -1,11 +1,13 @@
-use std::collections::BTreeMap;
+// TODO: Move into grammar
+
+use std::collections::HashMap;
 use std::env;
 use std::io::{self, Write};
 
 use status::*;
 use variables::Variables;
 
-fn print_list(list: &BTreeMap<String, String>) {
+fn print_list(list: &HashMap<String, String>) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 
@@ -161,51 +163,6 @@ pub fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     SUCCESS
 }
 
-/// The `let` command will set a variable within the shell. This variable is only accessible by
-/// the shell that created the variable, and other programs may not access it.
-pub fn let_<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
-    where I::Item: AsRef<str>
-{
-    match parse_assignment(args) {
-        Binding::InvalidKey(key) => {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
-            return FAILURE;
-        },
-        Binding::KeyValue(key, value) => { vars.variables.insert(key, value); },
-        Binding::ListEntries => print_list(&vars.variables),
-        Binding::KeyOnly(key) => {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: please provide value for variable '{}'", key);
-            return FAILURE;
-        },
-        Binding::Math(key, operator, increment) => {
-            let value = vars.get_var_or_empty(&key);
-            let _ = match value.parse::<f32>() {
-                Ok(old_value) => match operator {
-                    Operator::Plus     => vars.variables.insert(key, (old_value + increment).to_string()),
-                    Operator::Minus    => vars.variables.insert(key, (old_value - increment).to_string()),
-                    Operator::Multiply => vars.variables.insert(key, (old_value * increment).to_string()),
-                    Operator::Divide   => vars.variables.insert(key, (old_value / increment).to_string()),
-                },
-                Err(_) => {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: original value, {}, is not a number", value);
-                    return FAILURE;
-                }
-            };
-        },
-        Binding::MathInvalid(value) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "ion: supplied value, {}, is not a number", value);
-            return FAILURE;
-        }
-    }
-    SUCCESS
-}
-
 /// Dropping a variable will erase it from the shell.
 pub fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     where I::Item: AsRef<str>
@@ -291,28 +248,29 @@ mod test {
         DirectoryStack::new().unwrap()
     }
 
-    #[test]
-    fn let_and_expand_a_variable() {
-        let mut variables = Variables::default();
-        let dir_stack = new_dir_stack();
-        let_(&mut variables, vec!["let", "FOO", "=", "BAR"]);
-        let expanded = expand_string("$FOO", &variables, &dir_stack, false).join("");
-        assert_eq!("BAR", &expanded);
-    }
-
-    #[test]
-    fn let_fails_if_no_value() {
-        let mut variables = Variables::default();
-        let return_status = let_(&mut variables, vec!["let", "FOO"]);
-        assert_eq!(FAILURE, return_status);
-    }
-
-    #[test]
-    fn let_checks_variable_name() {
-        let mut variables = Variables::default();
-        let return_status = let_(&mut variables, vec!["let", ",;!:", "=", "FOO"]);
-        assert_eq!(FAILURE, return_status);
-    }
+    // TODO: Rewrite tests now that let is part of the grammar.
+    // #[test]
+    // fn let_and_expand_a_variable() {
+    //     let mut variables = Variables::default();
+    //     let dir_stack = new_dir_stack();
+    //     let_(&mut variables, vec!["let", "FOO", "=", "BAR"]);
+    //     let expanded = expand_string("$FOO", &variables, &dir_stack, false).join("");
+    //     assert_eq!("BAR", &expanded);
+    // }
+    //
+    // #[test]
+    // fn let_fails_if_no_value() {
+    //     let mut variables = Variables::default();
+    //     let return_status = let_(&mut variables, vec!["let", "FOO"]);
+    //     assert_eq!(FAILURE, return_status);
+    // }
+    //
+    // #[test]
+    // fn let_checks_variable_name() {
+    //     let mut variables = Variables::default();
+    //     let return_status = let_(&mut variables, vec!["let", ",;!:", "=", "FOO"]);
+    //     assert_eq!(FAILURE, return_status);
+    // }
 
     #[test]
     fn drop_deletes_variable() {

@@ -1,7 +1,7 @@
 pub mod source;
 pub mod variables;
 
-use self::variables::{alias, drop_alias, let_, drop_variable, export_variable};
+use self::variables::{alias, drop_alias, drop_variable, export_variable};
 use self::source::source;
 
 use std::collections::HashMap;
@@ -123,15 +123,6 @@ impl Builtin {
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 export_variable(&mut shell.variables, args)
                             }
-                        });
-
-        commands.insert("let",
-                        Builtin {
-                            name: "let",
-                            help: "View, set or unset variables",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
-                                let_(&mut shell.variables, args)
-                            },
                         });
 
         commands.insert("read",

@@ -1,3 +1,4 @@
+mod assignments;
 mod history;
 mod job;
 mod flow;

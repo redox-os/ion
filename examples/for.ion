@@ -9,3 +9,7 @@ end
 for i in 1 2 3 4 5
   echo $i
 end
+
+for i in @[echo 1 2 3 4 5]
+  echo $i
+end

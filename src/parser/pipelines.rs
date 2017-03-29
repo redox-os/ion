@@ -1,3 +1,5 @@
+#![allow(eq_op)] // Required as a macro sets this clippy warning off.
+
 // TODO:
 // - Implement Herestrings
 // - Implement Heredocs
@@ -340,13 +342,11 @@ mod tests {
 
     #[test]
     fn quoted_process() {
-        if let Statement::Pipeline(pipeline) = parse("let A = \"$(seq 1 10)\"") {
+        if let Statement::Pipeline(pipeline) = parse("echo \"$(seq 1 10)\"") {
             let jobs = pipeline.jobs;
-            assert_eq!("let", jobs[0].args[0]);
-            assert_eq!("A", jobs[0].args[1]);
-            assert_eq!("=", jobs[0].args[2]);
-            assert_eq!("\"$(seq 1 10)\"", jobs[0].args[3]);
-            assert_eq!(4, jobs[0].args.len());
+            assert_eq!("echo", jobs[0].args[0]);
+            assert_eq!("\"$(seq 1 10)\"", jobs[0].args[1]);
+            assert_eq!(2, jobs[0].args.len());
         } else {
             assert!(false);
         }
@@ -354,13 +354,11 @@ mod tests {
 
     #[test]
     fn process() {
-        if let Statement::Pipeline(pipeline) = parse("let A = $(seq 1 10)") {
+        if let Statement::Pipeline(pipeline) = parse("echo $(seq 1 10)") {
             let jobs = pipeline.jobs;
-            assert_eq!("let", jobs[0].args[0]);
-            assert_eq!("A", jobs[0].args[1]);
-            assert_eq!("=", jobs[0].args[2]);
-            assert_eq!("$(seq 1 10)", jobs[0].args[3]);
-            assert_eq!(4, jobs[0].args.len());
+            assert_eq!("echo", jobs[0].args[0]);
+            assert_eq!("$(seq 1 10)", jobs[0].args[1]);
+            assert_eq!(2, jobs[0].args.len());
         } else {
             assert!(false);
         }

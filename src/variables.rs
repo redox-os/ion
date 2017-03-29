@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::env;
-use std::fmt;
 use std::path::PathBuf;
 use std::process;
 
@@ -9,13 +8,14 @@ use liner::Context;
 use status::{SUCCESS, FAILURE};
 
 pub struct Variables {
-    pub variables: BTreeMap<String, String>,
-    pub aliases: BTreeMap<String, String>
+    pub arrays:    HashMap<String, Vec<String>>,
+    pub variables: HashMap<String, String>,
+    pub aliases:   HashMap<String, String>
 }
 
 impl Default for Variables {
     fn default() -> Variables {
-        let mut map = BTreeMap::new();
+        let mut map = HashMap::new();
         map.insert("DIRECTORY_STACK_SIZE".to_string(), "1000".to_string());
         map.insert("HISTORY_SIZE".into(), "1000".into());
         map.insert("HISTORY_FILE_ENABLED".into(), "0".into());
@@ -33,16 +33,7 @@ impl Default for Variables {
 
         // Initialize the HOME variable
         env::home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| env::set_var("HOME", path.to_str().unwrap_or("?")));
-        Variables { variables: map, aliases: BTreeMap::new() }
-    }
-}
-
-impl fmt::Display for Variables {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (key, value) in &self.variables {
-            try!(writeln!(f, "{}={}", key, value));
-        }
-        Ok(())
+        Variables { arrays: HashMap::new(), variables: map, aliases: HashMap::new() }
     }
 }
 
@@ -68,6 +59,20 @@ impl Variables {
                 self.variables.insert(name.to_string(), value.to_string());
             }
         }
+    }
+
+    pub fn set_array(&mut self, name: &str, value: Vec<String>) {
+        if !name.is_empty() {
+            if value.is_empty() {
+                self.arrays.remove(&name.to_string());
+            } else {
+                self.arrays.insert(name.to_string(), value);
+            }
+        }
+    }
+
+    pub fn get_array(&self, name: &str) -> Option<&Vec<String>> {
+        self.arrays.get(name)
     }
 
     pub fn get_var(&self, name: &str) -> Option<String> {

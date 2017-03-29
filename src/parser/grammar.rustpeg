@@ -1,10 +1,10 @@
 use parser::{pipelines, ArgumentSplitter};
-use flow_control::Statement;
-use flow_control::ElseIf;
+use flow_control::{ElseIf, Statement};
 
 #[pub]
 parse_ -> Statement
-      = if_
+      = let_
+      / if_
       / else_if_
       / else_
       / for_
@@ -13,6 +13,12 @@ parse_ -> Statement
       / end_
       / break_
       / pipelines
+
+#[pub]
+let_ -> Statement
+    = whitespace* "let" whitespace? value:$(.*) {
+        Statement::Let { expression: value.to_string() }
+    }
 
 #[pub]
 break_ -> Statement
@@ -71,7 +77,7 @@ fn_ -> Statement
     }
 
 _name -> String
-      = n:$([A-z]+) { n.to_string() }
+      = n:$([A-z0-9_]+) { n.to_string() }
 
 _args -> Vec<String>
       = _arg ** " "

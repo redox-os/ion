@@ -11,12 +11,15 @@ core functionality is complete. Features below:
 - [x] Shell Expansion
 - [x] Flow Control
 - [x] Aliases
-- [x] Variables
+- [x] Variables (**$variable**)
 - [x] Functions
-- [ ] Arrays
-- [ ] Array Process Expressions
+- [x] Arrays (**@array**)
+- [ ] Array Expressions (**[]**)
+- [x] Array-based Command Substitution (**$()**)
+- [x] String-based Command Substitution (**@[]**)
+- [ ] String-to-Array Methods (**@split(var, ' ')**)
+- [ ] Array-to-String Methods (**$join(array, ', ')**)
 - [ ] Maps
-- [x] Process Expressions
 - [x] For Loops
 - [ ] Foreach Loops
 - [x] While Loops
@@ -24,7 +27,7 @@ core functionality is complete. Features below:
 - [x] Piping Stdout/Stderr
 - [x] Redirecting Stdout/Stderr
 - [ ] Piping Builtins & Functions
-- [x] && and || Conditionals
+- [x] **&&** and **||** Conditionals
 - [x] Background Jobs
 - [ ] Background Jobs Control
 - [ ] Signal Handling
@@ -33,7 +36,7 @@ core functionality is complete. Features below:
 - [x] Multiline Comments and Commands
 - [ ] Multiline Editing
 - [x] Tab Completion (Needs Improvements)
-- [ ] Unescape sequences like '\n' and '\t'
+- [ ] Unescape specific character combinations, such as '\n' and '\t'
 - [ ] Builtin Plugins
 - [ ] Prompt Plugins
 
@@ -49,6 +52,19 @@ let git_branch = $(git rev-parse --abbrev-ref HEAD ^> /dev/null)
 ```
 
 If the command is executed without any arguments, it will simply list all available variables.
+
+### Using Variables
+
+Variables may be called with ith **$** sigil, where the value that follows may be a local or global value.
+They may also be optionally be defined using a braced syntax, which is useful in the event that you need the value
+integrated alongside other characters that do not terminate the variable parsing.
+
+```ion
+let a = one
+let b = two
+echo $A:$B
+echo ${A}s and ${B}s
+```
 
 ### Dropping Variables
 
@@ -77,7 +93,8 @@ echo $a
 
 ### Export
 
-The `export` command works similarly to the `let` command, but instead of defining a local variable, it defines a global variable that other processes can access.
+The `export` command works similarly to the `let` command, but instead of defining a local variable, it defines a
+global variable that other processes can access.
 
 ```ion
 export PATH = "~/.cargo/bin:${PATH}"
@@ -114,6 +131,67 @@ The `unalias` command performs the reverse of `alias` in that it drops the value
 
 ```ion
 unalias ls
+```
+
+### Brace Expansion
+
+Brace expansions are used to create permutations of a given input. In addition to simple permutations, Ion supports
+brace ranges and nested branches.
+
+```ion
+echo abc{3..1}def{1..3,a..c}
+echo ghi{one{a,b,c},two{d,e,f}}
+```
+
+### Defining Arrays
+
+Arrays can be create with the let keyword when the supplied expression evaluates to a vector of values:
+
+#### Array Syntax ( Not Implemented Yet )
+
+The basic syntax for creating an array of values is to wrap the values inbetween **[]** characters. The syntax within
+will be evaluated into a flat-mapped vector, and the result can therefor be stored as an array.
+
+```ion
+let array = [ one two 'three four' ]
+```
+
+#### Braces Create Arrays
+
+Brace expansions actually create a vector of values under the hood, and thus they can be used to create an array.
+
+```ion
+let braced_array = {down,up}vote
+```
+
+#### Array-based Command Substitution
+
+Whereas the standard command substitution syntax will create a single string from the output, this variant will create
+a whitespace-delimited vector of values from the output of the command.
+
+```ion
+let word_split_process = @[echo one two three]
+```
+
+### Using Arrays
+
+Arrays may be called with the **@** sigil, which works identical to the variable syntax:
+
+```ion
+echo @braced_array
+echo @{braced_array}
+```
+
+Arrays may also be spliced when an index or index range is supplied:
+
+```ion
+# Slicing not yet implemented
+echo @array[0]
+echo @array[0..3]
+
+let i = 1
+echo @array[$i]
+echo @array[$i+1]
 ```
 
 ### Commands
@@ -195,7 +273,8 @@ end
 
 For loops, on the other hand, will take a variable followed by a list of values or a range expression, and
 iterate through all contained statements until all values have been exhausted. If the variable is `_`, it
-will be ignored.
+will be ignored. Take note that quoting rules are reversed for for loops, and values from string-based command
+substitutions are split by lines.
 
 ```ion
 # Obtaining Values From a Subshell
@@ -234,6 +313,29 @@ for a in *
 end
 ```
 
+### Command Substitution
+
+Command substitution allows the user to execute commands within a subshell, and have the data written to standard
+output used as the substitution for the expansion. There are two methods of performing command substitution: string and
+array-based command substitution. String-based command substitutions are the standard, and they are created by wrapping
+the external command between **$(** and **)**. Array-based command substitution is denoted by wrapping the command
+between **@[** and **]**. The first merely captures the result as a single string, precisely as it was written, while
+the second splits the data recieved into words delimited by whitespaces.
+
+Try comparing the following:
+
+```ion
+for i in $(echo 1 2 3)
+    echo $i
+end
+```
+
+```ion
+for i in @[echo 1 2 3]
+    echo $i
+end
+```
+
 ### Functions
 
 Functions in the Ion shell are defined with a name along with a set of variables. The function
@@ -259,14 +361,4 @@ end
 for i in 1..20
     fib $i
 end
-```
-
-### Brace Expansion
-
-Brace expansion is used to create permutations of a given input. In addition to simple permutations, Ion supports
-brace ranges and nested branches.
-
-```ion
-echo abc{3..1}def{1..3,a..c}
-echo ghi{one{a,b,c},two{d,e,f}}
 ```

@@ -9,17 +9,26 @@ const BACKSL: u8 = 1;
 const SQUOTE: u8 = 2;
 const DQUOTE: u8 = 4;
 
-#[derive(Debug, PartialEq)]
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum Index {
+    // TODO: Ranged and ID
+    All
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum WordToken<'a> {
     Normal(&'a str),
     Whitespace(&'a str),
     Tilde(&'a str),
     Brace(Vec<&'a str>),
+    // Array(Vec<&str>, bool, Index)
     Variable(&'a str, bool),
-    // ArrayToString(&'a str, &'a str, &'a str, bool),
-    // Array(&'a str, bool),
-    // StringToArray(&'a str, &'a str, &'a str, bool),
+    ArrayVariable(&'a str, bool, Index),
+    ArrayProcess(&'a str, bool, Index),
     Process(&'a str, bool),
+    // ArrayToString(&'a str, &'a str, &'a str, bool),
+    // StringToArray(&'a str, &'a str, &'a str, bool),
 }
 
 pub struct WordIterator<'a> {
@@ -110,6 +119,28 @@ impl<'a> WordIterator<'a> {
         WordToken::Variable(&self.data[start..], self.flags & DQUOTE != 0)
     }
 
+    /// Contains the logic for parsing array variable syntax
+    fn array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        self.read += 1;
+        while let Some(character) = iterator.next() {
+            match character {
+                // TODO: Detect Index
+                // TODO: ArrayFunction
+                // Only alphanumerical and underscores are allowed in variable names
+                0...47 | 58...64 | 91...94 | 96 | 123...127 => {
+                    return WordToken::Variable(&self.data[start..self.read], self.flags & DQUOTE != 0);
+                },
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        WordToken::ArrayVariable(&self.data[start..], self.flags & DQUOTE != 0, Index::All)
+    }
+
     /// Contains the logic for parsing subshell syntax.
     fn process<I>(&mut self, iterator: &mut I) -> WordToken<'a>
         where I: Iterator<Item = u8>
@@ -143,6 +174,42 @@ impl<'a> WordIterator<'a> {
 
         // The validator at the frontend should catch unterminated processes.
         panic!("ion: fatal error with syntax validation: unterminated process");
+    }
+
+    /// Contains the logic for parsing array subshell syntax.
+    fn array_process<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        let mut level = 0;
+        while let Some(character) = iterator.next() {
+            match character {
+                _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
+                b'\\'                             => self.flags ^= BACKSL,
+                b'\'' if self.flags & DQUOTE == 0 => self.flags ^= SQUOTE,
+                b'"'  if self.flags & SQUOTE == 0 => self.flags ^= DQUOTE,
+                b'@'  if self.flags & SQUOTE == 0 => {
+                    if self.data.as_bytes()[self.read+1] == b'[' {
+                        level += 1;
+                    }
+                },
+                b']' if self.flags & SQUOTE == 0 => {
+                    if level == 0 {
+                        // TODO: Detect Index
+                        let output = &self.data[start..self.read];
+                        self.read += 1;
+                        return WordToken::ArrayProcess(output, self.flags & DQUOTE != 0, Index::All);
+                    } else {
+                        level -= 1;
+                    }
+                }
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        // The validator at the frontend should catch unterminated processes.
+        panic!("ion: fatal error with syntax validation: unterminated array process");
     }
 
     /// Contains the grammar for parsing brace expansion syntax
@@ -215,6 +282,22 @@ impl<'a> Iterator for WordIterator<'a> {
                         self.read += 1;
                         return Some(self.braces(&mut iterator));
                     },
+                    b'@' if self.flags & SQUOTE == 0 => {
+                        match iterator.next() {
+                            Some(b'[') => {
+                                self.read += 2;
+                                return Some(self.array_process(&mut iterator));
+                            },
+                            // Some(b'{') => {
+                            //     self.read += 2;
+                            //     return Some(self.braced_variable(&mut iterator));
+                            // }
+                            _ => {
+                                self.read += 1;
+                                return Some(self.array_variable(&mut iterator));
+                            }
+                        }
+                    }
                     b'$' if self.flags & SQUOTE == 0 => {
                         match iterator.next() {
                             Some(b'(') => {
