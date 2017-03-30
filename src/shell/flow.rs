@@ -11,13 +11,24 @@ use super::assignments::let_assignment;
 use glob::glob;
 
 pub trait FlowLogic {
+    /// Receives a command and attempts to execute the contents.
     fn on_command(&mut self, command_string: &str);
+
+    /// The highest layer of the flow control handling which branches into lower blocks when found.
     fn execute_toplevel<I>(&mut self, iterator: &mut I, statement: Statement) -> Result<(), &'static str>
         where I: Iterator<Item = Statement>;
+
+    /// Executes all of the statements within a while block until a certain condition is met.
     fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>);
+
+    /// Executes all of the statements within a for block for each value specified in the range.
     fn execute_for(&mut self, variable: &str, values: &[String], statements: Vec<Statement>);
+
+    /// Conditionally executes branches of statements according to evaluated expressions
     fn execute_if(&mut self, expression: Pipeline, success: Vec<Statement>,
         else_if: Vec<ElseIf>, failure: Vec<Statement>) -> bool;
+
+    /// Simply executes all supplied statemnts.
     fn execute_statements(&mut self, statements: Vec<Statement>) -> bool;
 }
 
@@ -265,7 +276,7 @@ impl<'a> FlowLogic for Shell<'a> {
             Statement::For { variable, values, mut statements } => {
                 self.flow_control.level += 1;
 
-                // Collect all of the statements contained within the while block.
+                // Collect all of the statements contained within the for block.
                 collect_loops(iterator, &mut statements, &mut self.flow_control.level);
 
                 if self.flow_control.level == 0 {

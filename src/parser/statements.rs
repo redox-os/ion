@@ -47,6 +47,7 @@ pub struct StatementSplitter<'a> {
     data:  &'a str,
     read:  usize,
     flags: u8,
+    array_level: u8,
     array_process_level: u8,
     process_level: u8,
     brace_level: u8,
@@ -58,6 +59,7 @@ impl<'a> StatementSplitter<'a> {
             data: data,
             read: 0,
             flags: 0,
+            array_level: 0,
             array_process_level: 0,
             process_level: 0,
             brace_level: 0
@@ -112,11 +114,13 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'[' if self.flags & COMM_2 != 0 && self.flags & SQUOTE == 0 => {
                     self.array_process_level += 1;
                 },
-                b']' if self.array_process_level == 0 && self.flags & SQUOTE == 0 => {
+                b'[' if self.flags & SQUOTE == 0 => self.array_level += 1,
+                b']' if self.array_process_level == 0 && self.array_level == 0 && self.flags & SQUOTE == 0 => {
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
+                b']' if self.flags & SQUOTE == 0 && self.array_level != 0 => self.array_level -= 1,
                 b']' if self.flags & SQUOTE == 0 => self.array_process_level -= 1,
                 b'(' if self.flags & COMM_1 != 0 && self.flags & SQUOTE == 0 => {
                     self.process_level += 1;
@@ -152,7 +156,9 @@ impl<'a> Iterator for StatementSplitter<'a> {
             self.read = self.data.len();
             match error {
                 Some(error) => Some(Err(error)),
-                None if self.process_level != 0 || self.array_process_level != 0 => {
+                None if self.process_level != 0 || self.array_process_level != 0 ||
+                    self.array_level != 0 =>
+                {
                     Some(Err(StatementError::UnterminatedSubshell))
                 },
                 None if self.flags & VBRACE != 0 => Some(Err(StatementError::UnterminatedBracedVar)),

@@ -27,7 +27,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
     type Item = String;
 
     fn next(&mut self) -> Option<String> {
-        let (mut level, mut array_level) = (0, 0);
+        let (mut level, mut array_level, mut array_process_level) = (0, 0, 0);
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             match character {
@@ -45,13 +45,16 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                     self.buffer.push(character);
                     continue
                 },
-                b'['  if self.flags & SINGLE == 0 && self.flags & COMM_2 != 0 => array_level += 1,
-                b']'  if self.flags & SINGLE == 0 => array_level -= 1,
-                b'('  if self.flags & SINGLE == 0 && self.flags & COMM_2 != 0 => array_level += 1,
+                b'['  if self.flags & SINGLE == 0 && self.flags & COMM_2 != 0 => array_process_level += 1,
+                b'['  if self.flags & SINGLE == 0 => array_level += 1,
+                b']'  if self.flags & SINGLE == 0 && array_level != 0 => array_level -= 1,
+                b']'  if self.flags & SINGLE == 0 => array_process_level -= 1,
+                b'('  if self.flags & SINGLE == 0 && self.flags & COMM_1 != 0 => level += 1,
                 b')'  if self.flags & SINGLE == 0 => level -= 1,
                 b'"'  if self.flags & SINGLE == 0 => self.flags ^= DOUBLE,
                 b'\'' if self.flags & DOUBLE == 0 => self.flags ^= SINGLE,
-                b' '  if !self.buffer.is_empty() && (self.flags & (SINGLE + DOUBLE) == 0) && level == 0 && array_level == 0 => break,
+                b' '  if !self.buffer.is_empty() && (self.flags & (SINGLE + DOUBLE) == 0)
+                    && level == 0 && array_level == 0 && array_process_level == 0 => break,
                 _ => ()
             }
             self.buffer.push(character);

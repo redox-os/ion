@@ -65,6 +65,11 @@ fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
     }
 }
 
+fn expand_array(elements: &[&str], expand_func: &ExpanderFunctions) -> Vec<String> {
+    elements.iter().flat_map(|element| expand_string(element, expand_func, false))
+        .collect()
+}
+
 #[allow(cyclomatic_complexity)]
 /// Performs shell expansions to an input string, efficiently returning the final expanded form.
 /// Shells must provide their own batteries for expanding tilde and variable words.
@@ -87,6 +92,12 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
 
             for word in token_buffer.drain(..) {
                 match word {
+                    WordToken::Array(elements, index) => {
+                        let expanded = match index {
+                            Index::All => expand_array(&elements, expand_func)
+                        };
+                        current.push_str(&expanded.join(" "));
+                    },
                     WordToken::ArrayVariable(array, _, index) => {
                         if let Some(array) = (expand_func.array)(array, index) {
                             current.push_str(&array.join(" "));
@@ -133,10 +144,15 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                     expanded_words.push(word);
                 }
             }
-            
+
             return expanded_words
         } else if token_buffer.len() == 1 {
             match token_buffer[0].clone() {
+                WordToken::Array(elements, index) => {
+                    return match index {
+                        Index::All => expand_array(&elements, expand_func)
+                    };
+                },
                 WordToken::ArrayVariable(array, quoted, index) => {
                     return match (expand_func.array)(array, index) {
                         Some(ref array) if quoted => vec![array.join(" ")],
@@ -159,6 +175,12 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
 
         for word in token_buffer.drain(..) {
             match word {
+                WordToken::Array(elements, index) => {
+                    let expanded = match index {
+                        Index::All => expand_array(&elements, expand_func)
+                    };
+                    output.push_str(&expanded.join(" "));
+                },
                 WordToken::ArrayVariable(array, _, index) => {
                     if let Some(array) = (expand_func.array)(array, index) {
                         output.push_str(&array.join(" "));

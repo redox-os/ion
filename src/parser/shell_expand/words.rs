@@ -22,7 +22,7 @@ pub enum WordToken<'a> {
     Whitespace(&'a str),
     Tilde(&'a str),
     Brace(Vec<&'a str>),
-    // Array(Vec<&str>, bool, Index)
+    Array(Vec<&'a str>, Index),
     Variable(&'a str, bool),
     ArrayVariable(&'a str, bool, Index),
     ArrayProcess(&'a str, bool, Index),
@@ -131,7 +131,7 @@ impl<'a> WordIterator<'a> {
                 // TODO: ArrayFunction
                 // Only alphanumerical and underscores are allowed in variable names
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {
-                    return WordToken::Variable(&self.data[start..self.read], self.flags & DQUOTE != 0);
+                    return WordToken::ArrayVariable(&self.data[start..self.read], self.flags & DQUOTE != 0, Index::All);
                 },
                 _ => (),
             }
@@ -247,6 +247,51 @@ impl<'a> WordIterator<'a> {
 
         panic!("ion: fatal error with syntax validation: unterminated brace")
     }
+
+    /// Contains the grammar for parsing array expression syntax
+    fn array<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let mut start = self.read;
+        let mut level = 0;
+        let mut whitespace = false;
+        let mut elements = Vec::new();
+        while let Some(character) = iterator.next() {
+            match character {
+                _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
+                b'\\'                             => self.flags ^= BACKSL,
+                b'\'' if self.flags & DQUOTE == 0 => self.flags ^= SQUOTE,
+                b'"'  if self.flags & SQUOTE == 0 => self.flags ^= DQUOTE,
+                b' '  if self.flags & (SQUOTE + DQUOTE) == 0 && level == 0 => {
+                    if whitespace {
+                        self.read += 1;
+                        start = self.read;
+                    } else {
+                        elements.push(&self.data[start..self.read]);
+                        start = self.read + 1;
+                        self.read += 1;
+                        whitespace = true;
+                    }
+                    continue
+                },
+                b'[' if self.flags & (SQUOTE + DQUOTE) == 0 => level += 1,
+                b']' if self.flags & (SQUOTE + DQUOTE) == 0 => {
+                    if level == 0 {
+                        elements.push(&self.data[start..self.read]);
+                        self.read += 1;
+                        return WordToken::Array(elements, Index::All);
+                    } else {
+                        level -= 1;
+                    }
+
+                },
+                _ => whitespace = false
+            }
+            self.read += 1;
+        }
+
+        panic!("ion: fatal error with syntax validation: unterminated array expression")
+    }
 }
 
 impl<'a> Iterator for WordIterator<'a> {
@@ -281,6 +326,10 @@ impl<'a> Iterator for WordIterator<'a> {
                     b'{' if self.flags & (SQUOTE + DQUOTE) == 0 => {
                         self.read += 1;
                         return Some(self.braces(&mut iterator));
+                    },
+                    b'[' if self.flags & SQUOTE == 0 => {
+                        self.read += 1;
+                        return Some(self.array(&mut iterator));
                     },
                     b'@' if self.flags & SQUOTE == 0 => {
                         match iterator.next() {
@@ -340,7 +389,7 @@ impl<'a> Iterator for WordIterator<'a> {
                 b' ' | b'{' if self.flags & (SQUOTE + DQUOTE) == 0 => {
                     return Some(WordToken::Normal(&self.data[start..self.read]));
                 },
-                b'$' | b'@' if self.flags & SQUOTE == 0 => {
+                b'$' | b'@' | b'[' if self.flags & SQUOTE == 0 => {
                     return Some(WordToken::Normal(&self.data[start..self.read]));
                 },
                 _ => (),

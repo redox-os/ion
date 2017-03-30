@@ -14,11 +14,12 @@ core functionality is complete. Features below:
 - [x] Variables (**$variable**)
 - [x] Functions
 - [x] Arrays (**@array**)
-- [ ] Array Expressions (**[]**)
-- [x] Array-based Command Substitution (**$()**)
-- [x] String-based Command Substitution (**@[]**)
+- [x] Array Expressions (**[]**)
+- [x] Array-based Command Substitution (**@[]**)
+- [x] String-based Command Substitution (**$()**)
 - [ ] String-to-Array Methods (**@split(var, ' ')**)
 - [ ] Array-to-String Methods (**$join(array, ', ')**)
+- [ ] Array Splicing
 - [ ] Maps
 - [x] For Loops
 - [ ] Foreach Loops
@@ -36,6 +37,7 @@ core functionality is complete. Features below:
 - [x] Multiline Comments and Commands
 - [ ] Multiline Editing
 - [x] Tab Completion (Needs Improvements)
+- [ ] Syntax for Color Handling
 - [ ] Unescape specific character combinations, such as '\n' and '\t'
 - [ ] Builtin Plugins
 - [ ] Prompt Plugins
@@ -147,13 +149,20 @@ echo ghi{one{a,b,c},two{d,e,f}}
 
 Arrays can be create with the let keyword when the supplied expression evaluates to a vector of values:
 
-#### Array Syntax ( Not Implemented Yet )
+#### Array Syntax
 
 The basic syntax for creating an array of values is to wrap the values inbetween **[]** characters. The syntax within
 will be evaluated into a flat-mapped vector, and the result can therefor be stored as an array.
 
 ```ion
 let array = [ one two 'three four' ]
+```
+
+One particular use case for arrays is setting command arguments
+
+```ion
+let lsflags = [ -l -a ]
+ls @lsflags
 ```
 
 #### Braces Create Arrays
