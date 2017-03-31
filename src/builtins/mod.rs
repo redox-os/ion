@@ -1,7 +1,9 @@
 pub mod source;
 pub mod variables;
+pub mod functions;
 
 use self::variables::{alias, drop_alias, drop_variable, export_variable};
+use self::functions::fn_;
 use self::source::source;
 
 use std::collections::HashMap;
@@ -123,6 +125,15 @@ impl Builtin {
                             main: box |args: &[String], shell: &mut Shell| -> i32 {
                                 export_variable(&mut shell.variables, args)
                             }
+                        });
+
+        commands.insert("fn",
+                        Builtin {
+                            name: "fn",
+                            help: "Print list of functions",
+                            main: box |_: &[String], shell: &mut Shell| -> i32 {
+                                fn_(&mut shell.functions)
+                            },
                         });
 
         commands.insert("read",

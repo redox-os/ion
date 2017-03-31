@@ -35,7 +35,7 @@ pub struct Shell<'a> {
     pub variables: Variables,
     flow_control: FlowControl,
     pub directory_stack: DirectoryStack,
-    functions: HashMap<String, Function>,
+    pub functions: HashMap<String, Function>,
     pub previous_status: i32,
 }
 
