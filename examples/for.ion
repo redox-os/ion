@@ -1,15 +1,23 @@
 for i in 1..6
-  echo $i
+    echo $i
 end
 
 for i in 1...5
-  echo $i
+    echo $i
 end
 
 for i in 1 2 3 4 5
-  echo $i
+    echo $i
 end
 
 for i in @[echo 1 2 3 4 5]
-  echo $i
+    echo $i
+end
+
+for i in [1 2 3 4 5]
+    echo $i
+end
+
+for i in 1{A{1,2},B{1,2}}
+    echo $i
 end

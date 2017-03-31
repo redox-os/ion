@@ -1,0 +1,26 @@
+let array = [1  [2 3]  4 [5 6]]
+for i in @array
+    echo $i
+end
+
+for i in [1  [2 3]  4 [5 6]]
+    echo $i
+end
+
+let array_process = @[echo a  b c d    e]
+for i in @array_process
+    echo $i
+end
+
+for i in @[echo a  b c d    e]
+    echo $i
+end
+
+let new_array = [@array @array_process]
+for i in @new_array
+    echo $i
+end
+
+echo @array
+echo @array_process
+echo @new_array
