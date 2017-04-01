@@ -10,7 +10,7 @@ use self::process::{CommandExpander, CommandToken};
 use self::ranges::parse_range;
 use self::words::{WordIterator, WordToken};
 
-pub use self::words::Index;
+pub use self::words::{Index, IndexPosition};
 
 pub struct ExpanderFunctions<'f> {
     pub tilde:    &'f Fn(&str) -> Option<String>,
@@ -65,7 +65,7 @@ fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
     }
 }
 
-fn expand_array(elements: &[&str], expand_func: &ExpanderFunctions) -> Vec<String> {
+fn array_expand(elements: &[&str], expand_func: &ExpanderFunctions) -> Vec<String> {
     elements.iter()
         .flat_map(|element| expand_string(element, expand_func, false))
         .collect()
@@ -75,6 +75,17 @@ fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, id: usize) -> S
     elements.iter()
         .flat_map(|element| expand_string(element, expand_func, false))
         .nth(id).unwrap_or_default()
+}
+
+fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: usize, end: IndexPosition) -> Vec<String> {
+    match end {
+        IndexPosition::CatchAll => elements.iter()
+            .flat_map(|element| expand_string(element, expand_func, false))
+            .skip(start).collect(),
+        IndexPosition::ID(end) => elements.iter()
+            .flat_map(|element| expand_string(element, expand_func, false))
+            .skip(start).take(end-start).collect()
+    }
 }
 
 #[allow(cyclomatic_complexity)]
@@ -101,14 +112,19 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                 match word {
                     WordToken::Array(elements, index) => {
                         match index {
+                            Index::None => (),
                             Index::All => {
-                                let expanded = expand_array(&elements, expand_func);
+                                let expanded = array_expand(&elements, expand_func);
                                 current.push_str(&expanded.join(" "));
                             },
                             Index::ID(id) => {
                                 let expanded = array_nth(&elements, expand_func, id);
                                 current.push_str(&expanded);
                             },
+                            Index::Range(start, end) => {
+                                let expanded = array_range(&elements, expand_func, start, end);
+                                current.push_str(&expanded.join(" "));
+                            }
                         };
                     },
                     WordToken::ArrayVariable(array, _, index) => {
@@ -119,13 +135,29 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                     WordToken::ArrayProcess(command, quoted, index) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
                         match index {
+                            Index::None => (),
                             Index::All => {
-                                expand_process(&mut current, command, quoted, expand_func);
+                                let mut temp = String::new();
+                                expand_process(&mut temp, command, quoted, expand_func);
+                                let temp = temp.split_whitespace().collect::<Vec<&str>>();
+                                current.push_str(&temp.join(" "));
                             },
                             Index::ID(id) => {
                                 let mut temp = String::new();
                                 expand_process(&mut temp, command, quoted, expand_func);
                                 current.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
+                            },
+                            Index::Range(start, end) => {
+                                let mut temp = String::new();
+                                expand_process(&mut temp, command, quoted, expand_func);
+                                let temp = match end {
+                                    IndexPosition::ID(end) => temp.split_whitespace()
+                                        .skip(start).take(end-start)
+                                        .collect::<Vec<&str>>(),
+                                    IndexPosition::CatchAll => temp.split_whitespace()
+                                        .skip(start).collect::<Vec<&str>>()
+                                };
+                                current.push_str(&temp.join(" "));
                             }
                         }
                     },
@@ -167,8 +199,10 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
             match token_buffer[0].clone() {
                 WordToken::Array(elements, index) => {
                     return match index {
-                        Index::All    => expand_array(&elements, expand_func),
+                        Index::None   => Vec::new(),
+                        Index::All    => array_expand(&elements, expand_func),
                         Index::ID(id) => vec![array_nth(&elements, expand_func, id)],
+                        Index::Range(start, end) => array_range(&elements, expand_func, start, end),
                     };
                 },
                 WordToken::ArrayVariable(array, quoted, index) => {
@@ -181,6 +215,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                 WordToken::ArrayProcess(command, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
                     match index {
+                        Index::None => return Vec::new(),
                         Index::All => {
                             expand_process(&mut output, command, quoted, expand_func);
                             return output.split_whitespace().map(String::from).collect::<Vec<String>>();
@@ -189,6 +224,15 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                             expand_process(&mut output, command, quoted, expand_func);
                             return vec![output.split_whitespace().nth(id).unwrap_or_default().to_owned()];
                         }
+                        Index::Range(start, end) => {
+                            expand_process(&mut output, command, quoted, expand_func);
+                            return match end {
+                                IndexPosition::ID(end) => output.split_whitespace().map(String::from)
+                                    .skip(start).take(end-start).collect::<Vec<String>>(),
+                                IndexPosition::CatchAll => output.split_whitespace().map(String::from)
+                                    .skip(start).collect::<Vec<String>>()
+                            }
+                        },
                     }
                 }
                 _ => ()
@@ -199,13 +243,18 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
             match word {
                 WordToken::Array(elements, index) => {
                     match index {
-                        Index::All    => {
-                            let expanded = expand_array(&elements, expand_func);
+                        Index::None => (),
+                        Index::All => {
+                            let expanded = array_expand(&elements, expand_func);
                             output.push_str(&expanded.join(" "));
                         },
                         Index::ID(id) => {
                             let expanded = array_nth(&elements, expand_func, id);
                             output.push_str(&expanded);
+                        },
+                        Index::Range(start, end) => {
+                            let expanded = array_range(&elements, expand_func, start, end);
+                            output.push_str(&expanded.join(" "));
                         },
                     };
                 },
@@ -217,14 +266,30 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                 WordToken::ArrayProcess(command, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
                     match index {
+                        Index::None => (),
                         Index::All => {
-                            expand_process(&mut output, command, quoted, expand_func);
+                            let mut temp = String::new();
+                            expand_process(&mut temp, command, quoted, expand_func);
+                            let temp = temp.split_whitespace().collect::<Vec<&str>>();
+                            output.push_str(&temp.join(" "));
                         },
                         Index::ID(id) => {
                             let mut temp = String::new();
                             expand_process(&mut temp, command, quoted, expand_func);
                             output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
-                        }
+                        },
+                        Index::Range(start, end) => {
+                            let mut temp = String::new();
+                            expand_process(&mut temp, command, quoted, expand_func);
+                            let temp = match end {
+                                IndexPosition::ID(end) => temp.split_whitespace()
+                                    .skip(start).take(end-start)
+                                    .collect::<Vec<&str>>(),
+                                IndexPosition::CatchAll => temp.split_whitespace()
+                                    .skip(start).collect::<Vec<&str>>()
+                            };
+                            output.push_str(&temp.join(" "));
+                        },
                     }
                 },
                 WordToken::Brace(_) => unreachable!(),

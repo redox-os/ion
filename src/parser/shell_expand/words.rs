@@ -1,4 +1,6 @@
+use std::io::{self, Write};
 use std::str::FromStr;
+use super::ranges::parse_index_range;
 
 // Bit Twiddling Guide:
 // var & FLAG != 0 checks if FLAG is enabled
@@ -16,7 +18,15 @@ const DQUOTE: u8 = 4;
 pub enum Index {
     // TODO: Ranged and ID
     All,
+    None,
     ID(usize),
+    Range(usize, IndexPosition),
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum IndexPosition {
+    ID(usize),
+    CatchAll
 }
 
 pub enum IndexError {
@@ -26,11 +36,22 @@ pub enum IndexError {
 impl FromStr for Index {
     type Err = IndexError;
     fn from_str(data: &str) -> Result<Index, IndexError> {
+        if ".." == data {
+            return Ok(Index::All)
+        }
+
         if let Ok(index) = data.parse::<usize>() {
             return Ok(Index::ID(index))
         }
 
-        Ok(Index::All)
+        if let Some((start, end)) = parse_index_range(data) {
+            return Ok(Index::Range(start, end))
+        }
+
+        let stderr = io::stderr();
+        let _ = writeln!(stderr.lock(), "ion: supplied index, '{}', for array is invalid", data);
+
+        Err(IndexError::Invalid)
     }
 }
 
@@ -146,7 +167,7 @@ impl<'a> WordIterator<'a> {
             if let b']' = character {
                 let index = match self.data[start..self.read].parse::<Index>() {
                     Ok(index) => index,
-                    Err(_)    => Index::All
+                    Err(_)    => Index::None
                 };
                 self.read += 1;
                 return index

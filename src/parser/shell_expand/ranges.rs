@@ -1,3 +1,5 @@
+use super::words::IndexPosition;
+
 pub fn parse_range(input: &str) -> Option<Vec<String>> {
     let mut bytes_iterator = input.bytes().enumerate();
     while let Some((id, byte)) = bytes_iterator.next() {
@@ -47,6 +49,70 @@ pub fn parse_range(input: &str) -> Option<Vec<String>> {
                         }).collect())
                     } else {
                         Some(vec![first.to_owned()])
+                    }
+                } else {
+                    break
+                }
+            },
+            _ => break
+        }
+    }
+
+    None
+}
+
+pub fn parse_index_range(input: &str) -> Option<(usize, IndexPosition)> {
+    let mut bytes_iterator = input.bytes().enumerate();
+    while let Some((id, byte)) = bytes_iterator.next() {
+        match byte {
+            b'0'...b'9' => continue,
+            b'.' => {
+                let first = &input[..id];
+
+                let mut dots = 1;
+                while let Some((_, byte)) = bytes_iterator.next() {
+                    if byte == b'.' { dots += 1 } else { break }
+                }
+
+                let inclusive = match dots {
+                    2 => false,
+                    3 => true,
+                    _ => break
+                };
+
+                let end = &input[id+dots..];
+
+                if first.is_empty() {
+                    return if end.is_empty() {
+                        None
+                    } else {
+                        match end.parse::<usize>() {
+                            Ok(end) => Some((0, IndexPosition::ID(end))),
+                            Err(_)  => None
+                        }
+                    }
+                } else if end.is_empty() {
+                    return match first.parse::<usize>() {
+                        Ok(start) => Some((start, IndexPosition::CatchAll)),
+                        Err(_)    => None
+                    }
+                }
+
+                if let Ok(start) = first.parse::<usize>() {
+                    if let Ok(end) = end.parse::<usize>() {
+                        return if inclusive {
+                            if end < start {
+                                None
+                            } else if end == start {
+                                Some((start, IndexPosition::ID(start+1)))
+                            } else {
+                                Some((start, IndexPosition::ID(end+1)))
+                            }
+                        } else if end <= start {
+                            None
+                        } else {
+                            Some((start, IndexPosition::ID(end)))
+                        }
                     }
                 } else {
                     break

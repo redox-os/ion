@@ -47,3 +47,12 @@ echo [ 1 2 3 ][2]
 echo @[echo 1 2 3][0]
 echo @[echo 1 2 3][1]
 echo @[echo 1 2 3][2]
+
+# Slice by Range
+
+let array = [ 1 2 3 4 5 ]
+echo @array[0..1]
+echo @array[0...1]
+echo @array[..3]
+echo @array[3..]
+echo @array[..]
