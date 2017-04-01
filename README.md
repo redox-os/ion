@@ -17,9 +17,9 @@ core functionality is complete. Features below:
 - [x] Array Expressions (**[]**)
 - [x] Array-based Command Substitution (**@[]**)
 - [x] String-based Command Substitution (**$()**)
-- [ ] String-to-Array Methods (**@split(var, ' ')**)
-- [ ] Array-to-String Methods (**$join(array, ', ')**)
-- [ ] Array Splicing
+- [ ] Array Methods (**@split(var, ' ')**)
+- [ ] String Methods (**$join(array, ', ')**)
+- [x] Array Splicing
 - [ ] Maps
 - [x] For Loops
 - [ ] Foreach Loops
@@ -191,16 +191,38 @@ echo @braced_array
 echo @{braced_array}
 ```
 
-Arrays may also be spliced when an index or index range is supplied:
+Arrays may also be sliced when an index or index range is supplied:
+
+#### Slice by Index
+
+Slicing by an index will take a string from an array:
 
 ```ion
-# Slicing not yet implemented
+let array = [ 1 2 3 ]
 echo @array[0]
-echo @array[0..3]
+echo @array[1]
+echo @array[2]
 
-let i = 1
-echo @array[$i]
-echo @array[$i+1]
+echo [ 1 2 3 ][0]
+echo [ 1 2 3 ][1]
+echo [ 1 2 3 ][2]
+
+echo @[echo 1 2 3][0]
+echo @[echo 1 2 3][1]
+echo @[echo 1 2 3][2]
+```
+
+#### Slice by Range
+
+Slicing by range will take a subsection of an array as a new array:
+
+```ion
+let array = [ 1 2 3 4 5 ]
+echo @array[0..1]
+echo @array[0...1]
+echo @array[..3]
+echo @array[3..]
+echo @array[..]
 ```
 
 ### Commands

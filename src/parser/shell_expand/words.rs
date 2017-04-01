@@ -16,7 +16,6 @@ const DQUOTE: u8 = 4;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Index {
-    // TODO: Ranged and ID
     All,
     None,
     ID(usize),
