@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 // Bit Twiddling Guide:
 // var & FLAG != 0 checks if FLAG is enabled
 // var & FLAG == 0 checks if FLAG is disabled
@@ -13,7 +15,23 @@ const DQUOTE: u8 = 4;
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Index {
     // TODO: Ranged and ID
-    All
+    All,
+    ID(usize),
+}
+
+pub enum IndexError {
+    Invalid
+}
+
+impl FromStr for Index {
+    type Err = IndexError;
+    fn from_str(data: &str) -> Result<Index, IndexError> {
+        if let Ok(index) = data.parse::<usize>() {
+            return Ok(Index::ID(index))
+        }
+
+        Ok(Index::All)
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -119,6 +137,26 @@ impl<'a> WordIterator<'a> {
         WordToken::Variable(&self.data[start..], self.flags & DQUOTE != 0)
     }
 
+    fn read_index<I>(&mut self, iterator: &mut I) -> Index
+        where I: Iterator<Item = u8>
+    {
+        self.read += 1;
+        let start = self.read;
+        while let Some(character) = iterator.next() {
+            if let b']' = character {
+                let index = match self.data[start..self.read].parse::<Index>() {
+                    Ok(index) => index,
+                    Err(_)    => Index::All
+                };
+                self.read += 1;
+                return index
+            }
+            self.read += 1;
+        }
+
+        panic!()
+    }
+
     /// Contains the logic for parsing array variable syntax
     fn array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
         where I: Iterator<Item = u8>
@@ -127,8 +165,14 @@ impl<'a> WordIterator<'a> {
         self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
-                // TODO: Detect Index
                 // TODO: ArrayFunction
+                b'[' => {
+                    return WordToken::ArrayVariable (
+                        &self.data[start..self.read],
+                        self.flags & DQUOTE != 0,
+                        self.read_index(iterator)
+                    );
+                },
                 // Only alphanumerical and underscores are allowed in variable names
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {
                     return WordToken::ArrayVariable(&self.data[start..self.read], self.flags & DQUOTE != 0, Index::All);
@@ -195,10 +239,22 @@ impl<'a> WordIterator<'a> {
                 },
                 b']' if self.flags & SQUOTE == 0 => {
                     if level == 0 {
-                        // TODO: Detect Index
-                        let output = &self.data[start..self.read];
+                        let array_process_contents = &self.data[start..self.read];
                         self.read += 1;
-                        return WordToken::ArrayProcess(output, self.flags & DQUOTE != 0, Index::All);
+                        return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                            let _ = iterator.next();
+                            WordToken::ArrayProcess (
+                                array_process_contents,
+                                self.flags & DQUOTE != 0,
+                                self.read_index(iterator)
+                            )
+                        } else {
+                            WordToken::ArrayProcess (
+                                array_process_contents,
+                                self.flags & DQUOTE != 0,
+                                Index::All
+                            )
+                        }
                     } else {
                         level -= 1;
                     }
@@ -279,7 +335,14 @@ impl<'a> WordIterator<'a> {
                     if level == 0 {
                         elements.push(&self.data[start..self.read]);
                         self.read += 1;
-                        return WordToken::Array(elements, Index::All);
+
+                        return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                            let _ = iterator.next();
+                            WordToken::Array(elements, self.read_index(iterator))
+                        } else {
+                            WordToken::Array(elements, Index::All)
+
+                        }
                     } else {
                         level -= 1;
                     }

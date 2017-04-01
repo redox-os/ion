@@ -49,7 +49,8 @@ pub fn let_assignment<'a>(original: &'a str, vars: &mut Variables, dir_stack: &D
             array: &|array: &str, index: Index| {
                 match vars.get_array(array) {
                     Some(array) => match index {
-                            Index::All => Some(array.to_owned())
+                            Index::All => Some(array.to_owned()),
+                            Index::ID(id) => array.get(id).map(|x| vec![x.to_owned()])
                     },
                     None => None
                 }

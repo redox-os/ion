@@ -25,7 +25,8 @@ pub fn expand_string<'a>(original: &'a str, vars: &Variables, dir_stack: &Direct
         array: &|array: &str, index: Index| {
             match vars.get_array(array) {
                 Some(array) => match index {
-                        Index::All => Some(array.to_owned())
+                        Index::All    => Some(array.to_owned()),
+                        Index::ID(id) => array.get(id).map(|x| vec![x.to_owned()])
                 },
                 None => None
             }

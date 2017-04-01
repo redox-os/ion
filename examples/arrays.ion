@@ -1,3 +1,5 @@
+# Standard Arrays
+
 let array = [1  [2 3]  4 [5 6]]
 for i in @array
     echo $i
@@ -6,6 +8,8 @@ end
 for i in [1  [2 3]  4 [5 6]]
     echo $i
 end
+
+# Array Command Substitution
 
 let array_process = @[echo a  b c d    e]
 for i in @array_process
@@ -16,11 +20,30 @@ for i in @[echo a  b c d    e]
     echo $i
 end
 
+# Array Concatenation
+
 let new_array = [@array @array_process]
 for i in @new_array
     echo $i
 end
 
+# As Command Arguments
+
 echo @array
 echo @array_process
 echo @new_array
+
+# Slice by ID
+
+let array = [ 1 2 3 ]
+echo @array[0]
+echo @array[1]
+echo @array[2]
+
+echo [ 1 2 3 ][0]
+echo [ 1 2 3 ][1]
+echo [ 1 2 3 ][2]
+
+echo @[echo 1 2 3][0]
+echo @[echo 1 2 3][1]
+echo @[echo 1 2 3][2]
