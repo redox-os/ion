@@ -124,3 +124,78 @@ pub fn parse_index_range(input: &str) -> Option<(usize, IndexPosition)> {
 
     None
 }
+
+
+#[test]
+fn index_ranges() {
+    assert_eq!(Some((0, IndexPosition::ID(3))), parse_index_range("0..3"));
+    assert_eq!(Some((0, IndexPosition::ID(3))), parse_index_range("0...2"));
+    assert_eq!(None, parse_index_range("0..A"));
+}
+
+#[test]
+fn range_expand() {
+    assert_eq!(None, parse_range("abc"));
+
+    let actual = parse_range("-3..3");
+    let expected = Some(vec![
+        "-3".to_owned(),
+        "-2".to_owned(),
+        "-1".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "2".to_owned(),
+        "3".to_owned(),
+    ]);
+
+    assert_eq!(actual, expected);
+
+    let actual = parse_range("3..-3");
+    let expected = Some(vec![
+        "3".to_owned(),
+        "2".to_owned(),
+        "1".to_owned(),
+        "0".to_owned(),
+        "-1".to_owned(),
+        "-2".to_owned(),
+        "-3".to_owned(),
+    ]);
+
+    assert_eq!(actual, expected);
+
+    let actual = parse_range("a..c");
+    let expected = Some(vec![
+        "a".to_owned(),
+        "b".to_owned(),
+        "c".to_owned(),
+    ]);
+
+    assert_eq!(actual, expected);
+
+    let actual = parse_range("c..a");
+    let expected = Some(vec![
+        "c".to_owned(),
+        "b".to_owned(),
+        "a".to_owned()
+    ]);
+
+    assert_eq!(actual, expected);
+
+    let actual = parse_range("A..C");
+    let expected = Some(vec![
+        "A".to_owned(),
+        "B".to_owned(),
+        "C".to_owned(),
+    ]);
+
+    assert_eq!(actual, expected);
+
+    let actual = parse_range("C..A");
+    let expected = Some(vec![
+        "C".to_owned(),
+        "B".to_owned(),
+        "A".to_owned()
+    ]);
+
+    assert_eq!(actual, expected);
+}

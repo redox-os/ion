@@ -1,3 +1,5 @@
+// TODO: Also Expand Arrays
+
 /// Bit flags used by `VariableIterator`'s and `CommandExpander`'s flags fields.
 const BACK:       u8 = 1;
 const VAR_FOUND:  u8 = 2;

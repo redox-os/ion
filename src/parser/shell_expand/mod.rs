@@ -320,106 +320,72 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
     expanded_words
 }
 
-// TODO: Fix these tests and write more
 // TODO: Write Nested Brace Tests
-//
-// #[test]
-// fn expand_variable_normal_variable() {
-//     let input = "$A:NOT:$B";
-//     let expected = "FOO:NOT:BAR";
-//     let expanded = expand_string(input, |_| None, |var, _| {
-//         if var == "A" { Some("FOO".to_owned()) } else if var == "B" { Some("BAR".to_owned()) } else { None }
-//     }, |_, _| None).unwrap();
-//     assert_eq!(expected, &expanded);
-// }
-//
-// #[test]
-// fn expand_long_braces() {
-//     let line = "The pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
-//     let expected = "The prodigal programmer processed prototype procedures proficiently proving prospective projections";
-//     let expanded = expand_string(line, |_| None, |_, _| None, |_, _| None).unwrap();
-//     assert_eq!(expected, &expanded);
-// }
-//
-// #[test]
-// fn expand_several_braces() {
-//     let line = "The {barb,veget}arian eat{ers,ing} appl{esauce,ied} am{ple,ounts} of eff{ort,ectively}";
-//     let expected = "The barbarian vegetarian eaters eating applesauce applied ample amounts of effort effectively";
-//     let expanded = expand_string(line, |_| None, |_, _| None, |_, _| None).unwrap();
-//     assert_eq!(expected, &expanded);
-// }
-//
-// #[test]
-// fn expand_several_variables() {
-//     let expand_var = |var: &str, _| match var {
-//         "FOO" => Some("BAR".to_owned()),
-//         "X"   => Some("Y".to_owned()),
-//         _     => None,
-//     };
-//     let expanded = expand_string("variables: $FOO $X", |_| None, expand_var, |_, _| None).unwrap();
-//     assert_eq!("variables: BAR Y", &expanded);
-// }
-//
-// #[test]
-// fn expand_variable_braces() {
-//     let expand_var = |var: &str, _| if var == "FOO" { Some("BAR".to_owned()) } else { None };
-//     let expanded = expand_string("FOO$FOO", |_| None, expand_var, |_, _| None).unwrap();
-//     assert_eq!("FOOBAR", &expanded);
-//
-//     let expand_var = |var: &str, _| if var == "FOO" { Some("BAR".to_owned()) } else { None };
-//     let expanded = expand_string(" FOO$FOO ", |_| None, expand_var, |_, _| None).unwrap();
-//     assert_eq!(" FOOBAR ", &expanded);
-// }
-//
-// #[test]
-// fn expand_variables_with_colons() {
-//     let expand_var = |var: &str, _| match var {
-//         "FOO" => Some("FOO".to_owned()),
-//         "BAR" => Some("BAR".to_owned()),
-//         _     => None,
-//     };
-//     let expanded = expand_string("$FOO:$BAR", |_| None, expand_var, |_, _| None).unwrap();
-//     assert_eq!("FOO:BAR", &expanded);
-// }
-//
-// #[test]
-// fn expand_multiple_variables() {
-//     let expand_var = |var: &str, _| match var {
-//         "A" => Some("test".to_owned()),
-//         "B" => Some("ing".to_owned()),
-//         "C" => Some("1 2 3".to_owned()),
-//         _   => None,
-//     };
-//     let expanded = expand_string("${A}${B}...${C}", |_| None, expand_var, |_, _| None).unwrap();
-//     assert_eq!("testing...1 2 3", &expanded);
-// }
-//
-// #[test]
-// fn escape_with_backslash() {
-//     let expanded = expand_string("\\$FOO\\$FOO \\$FOO", |_| None, |_, _| None, |_, _| None).unwrap();
-//     assert_eq!("$FOO$FOO $FOO", &expanded);
-// }
-//
-// #[test]
-// fn expand_variable_alongside_braces() {
-//     let line = "$A{1,2}";
-//     let expected = "11 12";
-//     let expanded = expand_string(line, |_| None, |variable, _| {
-//         if variable == "A" { Some("1".to_owned()) } else { None }
-//     }, |_, _| None).unwrap();
-//     assert_eq!(expected, &expanded);
-// }
 
-#[test]
-fn expand_variable_within_braces() {
-    let line = "1{$A,2}";
-    let expected = vec!["11".to_owned(), "12".to_owned()];
-    let functions = ExpanderFunctions {
-        tilde:    &|_| None,
-        array:    &|_, _| None,
-        variable: &|variable: &str, _| if variable == "A" { Some("1".to_owned()) } else { None },
-        command:  &|_, _| None
-    };
-    let expanded = expand_string(line, &functions, false);
-    assert_eq!(&expected, &expanded);
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    macro_rules! functions {
+        () => {
+            ExpanderFunctions {
+                tilde:    &|_| None,
+                array:    &|_, _| None,
+                variable: &|variable: &str, _| match variable {
+                    "A" => Some("1".to_owned()),
+                    "B" => Some("test".to_owned()),
+                    "C" => Some("ing".to_owned()),
+                    "D" => Some("1 2 3".to_owned()),
+                    "FOO" => Some("FOO".to_owned()),
+                    "BAR" => Some("BAR".to_owned()),
+                    _   => None
+                },
+                command:  &|_, _| None
+            }
+        }
+    }
+
+    #[test]
+    fn expand_variable_normal_variable() {
+        let input = "$FOO:NOT:$BAR";
+        let expected = "FOO:NOT:BAR";
+        let expanded = expand_string(input, &functions!(), false);
+        assert_eq!(vec![expected.to_owned()], expanded);
+    }
+
+    #[test]
+    fn expand_braces() {
+        let line = "pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
+        let expected = "prodigal programmer processed prototype procedures proficiently proving prospective projections";
+        let expanded = expand_string(line, &functions!(), false);
+        assert_eq!(expected.split_whitespace().map(|x| x.to_owned()).collect::<Vec<String>>(), expanded);
+    }
+
+    #[test]
+    fn expand_variables_with_colons() {
+        let expanded = expand_string("$FOO:$BAR", &functions!(), false);
+        assert_eq!(vec!["FOO:BAR".to_owned()], expanded);
+    }
+
+    #[test]
+    fn expand_multiple_variables() {
+        let expanded = expand_string("${B}${C}...${D}", &functions!(), false);
+        assert_eq!(vec!["testing...1 2 3".to_owned()], expanded);
+    }
+
+    #[test]
+    fn expand_variable_alongside_braces() {
+        let line = "$A{1,2}";
+        let expected = vec!["11".to_owned(), "12".to_owned()];
+        let expanded = expand_string(line, &functions!(), false);
+        assert_eq!(expected, expanded);
+    }
+
+    #[test]
+    fn expand_variable_within_braces() {
+        let line = "1{$A,2}";
+        let expected = vec!["11".to_owned(), "12".to_owned()];
+        let expanded = expand_string(line, &functions!(), false);
+        assert_eq!(&expected, &expanded);
+    }
 }

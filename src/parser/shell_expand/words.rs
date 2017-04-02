@@ -330,7 +330,7 @@ impl<'a> WordIterator<'a> {
     {
         let mut start = self.read;
         let mut level = 0;
-        let mut whitespace = false;
+        let mut whitespace = true;
         let mut elements = Vec::new();
         while let Some(character) = iterator.next() {
             match character {
@@ -389,6 +389,13 @@ impl<'a> Iterator for WordIterator<'a> {
         loop {
             if let Some(character) = iterator.next() {
                 match character {
+                    _ if self.flags & BACKSL != 0 => { self.read += 1; break },
+                    b'\\' => {
+                        start += 1;
+                        self.read += 1;
+                        self.flags ^= BACKSL;
+                        break
+                    }
                     b'\'' if self.flags & DQUOTE == 0 => {
                         start += 1;
                         self.read += 1;
@@ -455,8 +462,13 @@ impl<'a> Iterator for WordIterator<'a> {
 
         while let Some(character) = iterator.next() {
             match character {
-                _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
-                b'\\'                             => self.flags ^= BACKSL,
+                _ if self.flags & BACKSL != 0 => self.flags ^= BACKSL,
+                b'\\' => {
+                    self.flags ^= BACKSL;
+                    let output = &self.data[start..self.read];
+                    self.read += 1;
+                    return Some(WordToken::Normal(output));
+                },
                 b'\'' if self.flags & DQUOTE == 0 => {
                     self.flags ^= SQUOTE;
                     let output = &self.data[start..self.read];
@@ -488,8 +500,6 @@ impl<'a> Iterator for WordIterator<'a> {
     }
 }
 
-// TODO: Write More Tests
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -504,7 +514,71 @@ mod tests {
     }
 
     #[test]
-    fn words_process_recursion() {
+    fn escape_with_backslash() {
+        let input = "\\$FOO\\$BAR \\$FOO";
+        let expected = vec![
+            WordToken::Normal("$FOO"),
+            WordToken::Normal("$BAR"),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("$FOO")
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn array_expressions() {
+        let input = "[ one two [three four]] [[one two] three four][0]";
+        let first = vec![ "one", "two", "[three four]"];
+        let second = vec![ "[one two]", "three", "four"];
+        let expected = vec![
+            WordToken::Array(first, Index::All),
+            WordToken::Whitespace(" "),
+            WordToken::Array(second, Index::ID(0)),
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn array_variables() {
+        let input = "@array @array[0]";
+        let expected = vec![
+            WordToken::ArrayVariable("array", false, Index::All),
+            WordToken::Whitespace(" "),
+            WordToken::ArrayVariable("array", false, Index::ID(0)),
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn array_processes() {
+        let input = "@[echo one two three] @[echo one two three][0]";
+        let expected = vec![
+            WordToken::ArrayProcess("echo one two three", false, Index::All),
+            WordToken::Whitespace(" "),
+            WordToken::ArrayProcess("echo one two three", false, Index::ID(0)),
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn indexes() {
+        let input = "@array[0..3] @array[0...3] @array[abc] @array[..3] @array[3..]";
+        let expected = vec![
+            WordToken::ArrayVariable("array", false, Index::Range(0, IndexPosition::ID(3))),
+            WordToken::Whitespace(" "),
+            WordToken::ArrayVariable("array", false, Index::Range(0, IndexPosition::ID(4))),
+            WordToken::Whitespace(" "),
+            WordToken::ArrayVariable("array", false, Index::None),
+            WordToken::Whitespace(" "),
+            WordToken::ArrayVariable("array", false, Index::Range(0, IndexPosition::ID(3))),
+            WordToken::Whitespace(" "),
+            WordToken::ArrayVariable("array", false, Index::Range(3, IndexPosition::CatchAll)),
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn nested_processes() {
         let input = "echo $(echo $(echo one)) $(echo one $(echo two) three)";
         let expected = vec![
             WordToken::Normal("echo"),
