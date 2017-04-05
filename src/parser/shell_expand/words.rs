@@ -65,7 +65,7 @@ pub enum WordToken<'a> {
     ArrayVariable(&'a str, bool, Index),
     ArrayProcess(&'a str, bool, Index),
     Process(&'a str, bool),
-    // ArrayToString(&'a str, &'a str, &'a str, bool),
+    StringMethod(&'a str, &'a str, &'a str),
     // StringToArray(&'a str, &'a str, &'a str, bool),
 }
 
@@ -137,14 +137,33 @@ impl<'a> WordIterator<'a> {
     fn variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
         where I: Iterator<Item = u8>
     {
-        let start = self.read;
+        let mut start = self.read;
         self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
-                // If found, this is not a `Variable` but an `ArrayToString`
-                // b'(' => {
-                //     unimplemented!()
-                // },
+                b'(' => {
+                    let method = &self.data[start..self.read];
+                    self.read += 1;
+                    start = self.read;
+                    while let Some(character) = iterator.next() {
+                        if character == b',' {
+                            let variable = &self.data[start..self.read];
+                            self.read += 1;
+                            start = self.read;
+                            while let Some(character) = iterator.next() {
+                                if character == b')' {
+                                    let pattern = &self.data[start..self.read].trim();
+                                    self.read += 1;
+                                    return WordToken::StringMethod(method, variable, pattern)
+                                }
+                                self.read += 1;
+                            }
+                        }
+                        self.read += 1;
+                    }
+
+                    panic!("ion: fatal error with syntax validation parsing: unterminated method");
+                }
                 // Only alphanumerical and underscores are allowed in variable names
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {
                     return WordToken::Variable(&self.data[start..self.read], self.flags & DQUOTE != 0);
@@ -186,6 +205,9 @@ impl<'a> WordIterator<'a> {
         while let Some(character) = iterator.next() {
             match character {
                 // TODO: ArrayFunction
+                // b'(' => {
+                //     let variable =
+                // }
                 b'[' => {
                     return WordToken::ArrayVariable (
                         &self.data[start..self.read],
@@ -511,6 +533,17 @@ mod tests {
             correct += 1;
         }
         assert_eq!(expected.len(), correct);
+    }
+
+    #[test]
+    fn string_method() {
+        let input = "$join(array, 'pattern') $join(array, 'pattern')";
+        let expected = vec![
+            WordToken::StringMethod("join", "array", "'pattern'"),
+            WordToken::Whitespace(" "),
+            WordToken::StringMethod("join", "array", "'pattern'")
+        ];
+        compare(input, expected);
     }
 
     #[test]

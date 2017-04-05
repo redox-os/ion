@@ -1,7 +1,7 @@
 #![allow(eq_op)] // Required as a macro sets this clippy warning off.
 
 // TODO:
-// - Rewrite this module
+// - Rewrite this module like the shell_expand::words module
 // - Implement Herestrings
 // - Implement Heredocs
 // - Fix the cyclomatic complexity issue
@@ -14,11 +14,15 @@ const SINGLE_QUOTE:  u8 = 2;
 const DOUBLE_QUOTE:  u8 = 4;
 const WHITESPACE:    u8 = 8;
 const ARRAY_PROCESS: u8 = 16;
+const METHOD:        u8 = 32;
 const PROCESS_ONE:   u8 = 64;
 const PROCESS_TWO:   u8 = 128;
 
+const ARRAY:         u8 = 1;
+const VARIABLE:      u8 = 2;
+
 // Only valid if `SINGLE_QUOTE` and `DOUBLE_QUOTE` are not enabled
-const PROCESS_VAL:  u8 = 255 ^ (BACKSLASH + WHITESPACE + 32);
+const PROCESS_VAL:  u8 = 255 ^ (BACKSLASH + WHITESPACE + METHOD);
 
 // Determines if the character is not quoted and isn't process matched. `flags & IS_VALID` returns 0 if true
 const IS_VALID: u8 = 255 ^ (BACKSLASH + WHITESPACE);
@@ -51,6 +55,7 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
     let mut args_iter = args.bytes().peekable();
     let (mut index, mut arg_start) = (0, 0);
     let mut flags = 0u8; // (backslash, single_quote, double_quote, x, x, x, process_one, process_two)
+    let mut flags_ext = 0u8;
 
     let mut arguments: Vec<String> = Vec::new();
 
@@ -118,10 +123,14 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                         b'\\'                              => flags ^= BACKSLASH,
                         b'@'                               => {
                             flags |= ARRAY_PROCESS;
+                            flags_ext |= ARRAY;
                             index += 1;
                             continue
                         },
-                        b'$' if flags & PROCESS_VAL == 0   => flags |= PROCESS_ONE,
+                        b'$' if flags & PROCESS_VAL == 0   => {
+                            flags |= PROCESS_ONE;
+                            flags_ext |= VARIABLE;
+                        },
                         b'[' if flags & ARRAY_PROCESS != 0 => array_process_levels += 1,
                         b'['                               => array_levels += 1,
                         b']' if array_levels != 0          => array_levels -= 1,
@@ -131,6 +140,13 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                             flags |= PROCESS_TWO;
                             levels += 1;
                         },
+                        b'(' if flags_ext & (VARIABLE + ARRAY) != 0 => {
+                            flags |= METHOD;
+                            flags_ext &= 255 ^ (VARIABLE + ARRAY);
+                        },
+                        b')' if levels == 0 && flags & METHOD != 0 && flags & SINGLE_QUOTE == 0 => {
+                            flags &= 255 ^ METHOD;
+                        }
                         b')' if flags & PROCESS_VAL == PROCESS_TWO => {
                             levels -= 0;
                             if levels == 0 { flags &= 255 ^ PROCESS_TWO; }
@@ -342,6 +358,16 @@ mod tests {
             };
 
             assert_eq!(Some(expected), pipeline.stdout);
+        }
+    }
+
+    #[test]
+    fn methods() {
+        if let Statement::Pipeline(pipeline) = parse("echo @split(var, ', ') $join(array, ',')") {
+            let jobs = pipeline.jobs;
+            assert_eq!("echo", jobs[0].args[0]);
+            assert_eq!("@split(var, ', ')", jobs[0].args[1]);
+            assert_eq!("$join(array, ',')", jobs[0].args[2]);
         }
     }
 

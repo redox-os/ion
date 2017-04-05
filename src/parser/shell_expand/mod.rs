@@ -12,6 +12,8 @@ use self::words::{WordIterator, WordToken};
 
 pub use self::words::{Index, IndexPosition};
 
+use std::io::{self, Write};
+
 pub struct ExpanderFunctions<'f> {
     pub tilde:    &'f Fn(&str) -> Option<String>,
     pub array:    &'f Fn(&str, Index) -> Option<Vec<String>>,
@@ -161,6 +163,19 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                             }
                         }
                     },
+                    WordToken::StringMethod(method, variable, pattern) => {
+                        let pattern = &expand_string(pattern, expand_func, false).join(" ");
+                        match method {
+                            "join" => if let Some(array) = (expand_func.array)(variable, Index::All) {
+                                current.push_str(&array.join(pattern));
+                            },
+                            _ => {
+                                let stderr = io::stderr();
+                                let mut stderr = stderr.lock();
+                                let _ = writeln!(stderr, "ion: invalid string method: {}", method);
+                            }
+                        }
+                    },
                     WordToken::Brace(nodes) =>
                         expand_brace(&mut current, &mut expanders, &mut tokens, nodes, expand_func, reverse_quoting),
                     WordToken::Normal(text) => current.push_str(text),
@@ -290,6 +305,19 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                             };
                             output.push_str(&temp.join(" "));
                         },
+                    }
+                },
+                WordToken::StringMethod(method, variable, pattern) => {
+                    let pattern = &expand_string(pattern, expand_func, false).join(" ");
+                    match method {
+                        "join" => if let Some(array) = (expand_func.array)(variable, Index::All) {
+                            output.push_str(&array.join(pattern));
+                        },
+                        _ => {
+                            let stderr = io::stderr();
+                            let mut stderr = stderr.lock();
+                            let _ = writeln!(stderr, "ion: invalid string method: {}", method);
+                        }
                     }
                 },
                 WordToken::Brace(_) => unreachable!(),
