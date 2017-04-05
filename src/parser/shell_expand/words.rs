@@ -66,7 +66,7 @@ pub enum WordToken<'a> {
     ArrayProcess(&'a str, bool, Index),
     Process(&'a str, bool),
     StringMethod(&'a str, &'a str, &'a str),
-    // StringToArray(&'a str, &'a str, &'a str, bool),
+    ArrayMethod(&'a str, &'a str, &'a str),
 }
 
 pub struct WordIterator<'a> {
@@ -200,14 +200,33 @@ impl<'a> WordIterator<'a> {
     fn array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
         where I: Iterator<Item = u8>
     {
-        let start = self.read;
+        let mut start = self.read;
         self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
-                // TODO: ArrayFunction
-                // b'(' => {
-                //     let variable =
-                // }
+                b'(' => {
+                    let method = &self.data[start..self.read];
+                    self.read += 1;
+                    start = self.read;
+                    while let Some(character) = iterator.next() {
+                        if character == b',' {
+                            let variable = &self.data[start..self.read];
+                            self.read += 1;
+                            start = self.read;
+                            while let Some(character) = iterator.next() {
+                                if character == b')' {
+                                    let pattern = &self.data[start..self.read].trim();
+                                    self.read += 1;
+                                    return WordToken::ArrayMethod(method, variable, pattern)
+                                }
+                                self.read += 1;
+                            }
+                        }
+                        self.read += 1;
+                    }
+
+                    panic!("ion: fatal error with syntax validation parsing: unterminated method");
+                },
                 b'[' => {
                     return WordToken::ArrayVariable (
                         &self.data[start..self.read],

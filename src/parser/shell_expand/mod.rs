@@ -163,6 +163,19 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                             }
                         }
                     },
+                    WordToken::ArrayMethod(method, variable, pattern) => {
+                        let pattern = &expand_string(pattern, expand_func, false).join(" ");
+                        match method {
+                            "split" => if let Some(variable) = (expand_func.variable)(variable, false) {
+                                current.push_str(&variable.split(pattern).collect::<Vec<&str>>().join(" "));
+                            },
+                            _ => {
+                                let stderr = io::stderr();
+                                let mut stderr = stderr.lock();
+                                let _ = writeln!(stderr, "ion: invalid array method: {}", method);
+                            }
+                        }
+                    },
                     WordToken::StringMethod(method, variable, pattern) => {
                         let pattern = &expand_string(pattern, expand_func, false).join(" ");
                         match method {
@@ -249,7 +262,21 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                             }
                         },
                     }
-                }
+                },
+                WordToken::ArrayMethod(method, variable, pattern) => {
+                    let pattern = &expand_string(pattern, expand_func, false).join(" ");
+                    match method {
+                        "split" => if let Some(variable) = (expand_func.variable)(variable, false) {
+                            return variable.split(pattern).map(String::from).collect::<Vec<String>>();
+                        },
+                        _ => {
+                            let stderr = io::stderr();
+                            let mut stderr = stderr.lock();
+                            let _ = writeln!(stderr, "ion: invalid array method: {}", method);
+                            return Vec::new();
+                        }
+                    }
+                },
                 _ => ()
             }
         }
@@ -305,6 +332,19 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                             };
                             output.push_str(&temp.join(" "));
                         },
+                    }
+                },
+                WordToken::ArrayMethod(method, variable, pattern) => {
+                    let pattern = &expand_string(pattern, expand_func, false).join(" ");
+                    match method {
+                        "split" => if let Some(variable) = (expand_func.variable)(variable, false) {
+                            output.push_str(&variable.split(pattern).collect::<Vec<&str>>().join(" "));
+                        },
+                        _ => {
+                            let stderr = io::stderr();
+                            let mut stderr = stderr.lock();
+                            let _ = writeln!(stderr, "ion: invalid array method: {}", method);
+                        }
                     }
                 },
                 WordToken::StringMethod(method, variable, pattern) => {
