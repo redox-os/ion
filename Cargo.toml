@@ -12,6 +12,7 @@ authors = [
   "Michael Gattozzi <mgattozzi@gmail.com>",
   "Łukasz Niemier <lukasz@niemier.pl>",
 ]
+build = "build.rs"
 
 [[bin]]
 name = "ion"
@@ -24,3 +25,7 @@ permutate = "0.2"
 
 [target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
 users = "0.5.1"
+
+[build-dependencies]
+ansi_term = "0.9"
+version_check = "0.1"
