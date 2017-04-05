@@ -19,7 +19,7 @@ name = "ion"
 
 [dependencies]
 glob = "0.2"
-liner = { git = "https://github.com/redox-os/liner/", branch = "redox" }
+liner = "0.1.4"
 peg-syntax-ext = "0.4"
 permutate = "0.2"
 
