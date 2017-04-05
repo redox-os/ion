@@ -161,8 +161,10 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                                 arg_start += 1;
                             }
                         },
-                        b'|' if flags & IS_VALID == 0 => job_found!(RedirectFrom::Stdout, true),
-                        b'&' if flags & IS_VALID == 0 => {
+                        b'|' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                            && array_process_levels == 0 => job_found!(RedirectFrom::Stdout, true),
+                        b'&' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                            && array_process_levels == 0 => {
                             match args_iter.peek() {
                                 Some(&b'>') => {
                                     let _ = args_iter.next();
@@ -171,7 +173,8 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                                 _ => job_found!(RedirectFrom::Stdout, false)
                             }
                         },
-                        b'^' if flags & IS_VALID == 0 => {
+                        b'^' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                            && array_process_levels == 0 => {
                             match args_iter.peek() {
                                 Some(&b'>') => {
                                     let _ = args_iter.next();
@@ -184,8 +187,10 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                                 _ => ()
                             }
                         },
-                        b'>' if flags & IS_VALID == 0 => redir_found!(RedirMode::Stdout(RedirectFrom::Stdout)),
-                        b'<' if flags & IS_VALID == 0 => redir_found!(RedirMode::Stdin),
+                        b'>' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                            && array_process_levels == 0 => redir_found!(RedirMode::Stdout(RedirectFrom::Stdout)),
+                        b'<' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                            && array_process_levels == 0 => redir_found!(RedirMode::Stdin),
                         _ => (),
                     }
                     flags_ext &= 255 ^ (VAR_CHAR_FOUND + ARRAY_CHAR_FOUND);
@@ -505,11 +510,11 @@ mod tests {
 
     #[test]
     fn double_quoting() {
-        if let Statement::Pipeline(pipeline) = parse("echo \"Hello World\" \"From Rust\"") {
+        if let Statement::Pipeline(pipeline) = parse("echo \"a > 10\" \"a < 10\"") {
             let jobs = pipeline.jobs;
+            assert_eq!("\"a > 10\"", jobs[0].args[1]);
+            assert_eq!("\"a < 10\"", jobs[0].args[2]);
             assert_eq!(3, jobs[0].args.len());
-            assert_eq!("\"Hello World\"", jobs[0].args[1]);
-            assert_eq!("\"From Rust\"", jobs[0].args[2]);
         } else {
             assert!(false)
         }
