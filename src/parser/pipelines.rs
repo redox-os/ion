@@ -12,20 +12,16 @@ use shell::{Job, JobKind};
 const BACKSLASH:     u8 = 1;
 const SINGLE_QUOTE:  u8 = 2;
 const DOUBLE_QUOTE:  u8 = 4;
-const WHITESPACE:    u8 = 8;
-const ARRAY_PROCESS: u8 = 16;
-const METHOD:        u8 = 32;
-const PROCESS_ONE:   u8 = 64;
+const ARRAY_PROCESS: u8 = 8;
+const METHOD:        u8 = 16;
 const PROCESS_TWO:   u8 = 128;
 
-const ARRAY:         u8 = 1;
-const VARIABLE:      u8 = 2;
+const ARRAY:            u8 = 1;
+const VARIABLE:         u8 = 2;
+const ARRAY_CHAR_FOUND: u8 = 4;
+const VAR_CHAR_FOUND:   u8 = 8;
 
-// Only valid if `SINGLE_QUOTE` and `DOUBLE_QUOTE` are not enabled
-const PROCESS_VAL:  u8 = 255 ^ (BACKSLASH + WHITESPACE + METHOD);
-
-// Determines if the character is not quoted and isn't process matched. `flags & IS_VALID` returns 0 if true
-const IS_VALID: u8 = 255 ^ (BACKSLASH + WHITESPACE);
+const IS_VALID: u8 = SINGLE_QUOTE + METHOD + PROCESS_TWO + ARRAY_PROCESS;
 
 #[derive(PartialEq)]
 enum RedirMode { False, Stdin, Stdout(RedirectFrom), StdoutAppend(RedirectFrom) }
@@ -119,24 +115,26 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
             RedirMode::False => {
                 while let Some(character) = args_iter.next() {
                     match character {
-                        _ if flags & BACKSLASH != 0        => flags ^= BACKSLASH,
-                        b'\\'                              => flags ^= BACKSLASH,
-                        b'@'                               => {
-                            flags |= ARRAY_PROCESS;
-                            flags_ext |= ARRAY;
+                        _ if flags & BACKSLASH != 0  => flags ^= BACKSLASH,
+                        b'\\'                        => flags ^= BACKSLASH,
+                        b'@'                         => {
+                            flags_ext |= ARRAY + ARRAY_CHAR_FOUND;
                             index += 1;
                             continue
                         },
-                        b'$' if flags & PROCESS_VAL == 0   => {
-                            flags |= PROCESS_ONE;
-                            flags_ext |= VARIABLE;
+                        b'$' if flags & IS_VALID == 0 => {
+                            flags_ext |= VARIABLE + VAR_CHAR_FOUND;
+                            index += 1;
+                            continue
                         },
-                        b'[' if flags & ARRAY_PROCESS != 0 => array_process_levels += 1,
+                        b'[' if flags_ext & ARRAY_CHAR_FOUND != 0 => {
+                            array_process_levels += 1;
+                            flags |= ARRAY_PROCESS;
+                        },
                         b'['                               => array_levels += 1,
                         b']' if array_levels != 0          => array_levels -= 1,
                         b']'                               => array_process_levels -= 1,
-                        b'(' if flags & PROCESS_VAL == PROCESS_ONE => {
-                            flags ^= PROCESS_ONE;
+                        b'(' if flags_ext & VAR_CHAR_FOUND != 0 => {
                             flags |= PROCESS_TWO;
                             levels += 1;
                         },
@@ -147,13 +145,13 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                         b')' if levels == 0 && flags & METHOD != 0 && flags & SINGLE_QUOTE == 0 => {
                             flags &= 255 ^ METHOD;
                         }
-                        b')' if flags & PROCESS_VAL == PROCESS_TWO => {
+                        b')' if flags & PROCESS_TWO != 0 => {
                             levels -= 0;
                             if levels == 0 { flags &= 255 ^ PROCESS_TWO; }
                         },
                         b'\'' => flags ^= SINGLE_QUOTE,
                         b'"'  => flags ^= DOUBLE_QUOTE,
-                        b' ' | b'\t' if (flags & IS_VALID == 0) && array_levels == 0
+                        b' ' | b'\t' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
                             && array_process_levels == 0 =>
                         {
                             if arg_start != index {
@@ -163,8 +161,8 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                                 arg_start += 1;
                             }
                         },
-                        b'|' if (flags & (255 ^ BACKSLASH) == 0) => job_found!(RedirectFrom::Stdout, true),
-                        b'&' if (flags & (255 ^ BACKSLASH) == 0) => {
+                        b'|' if flags & IS_VALID == 0 => job_found!(RedirectFrom::Stdout, true),
+                        b'&' if flags & IS_VALID == 0 => {
                             match args_iter.peek() {
                                 Some(&b'>') => {
                                     let _ = args_iter.next();
@@ -173,7 +171,7 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                                 _ => job_found!(RedirectFrom::Stdout, false)
                             }
                         },
-                        b'^' if (flags & IS_VALID == 0) => {
+                        b'^' if flags & IS_VALID == 0 => {
                             match args_iter.peek() {
                                 Some(&b'>') => {
                                     let _ = args_iter.next();
@@ -186,12 +184,11 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                                 _ => ()
                             }
                         },
-                        b'>' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdout(RedirectFrom::Stdout)),
-                        b'<' if (flags & IS_VALID == 0) => redir_found!(RedirMode::Stdin),
-                        _   if (flags >> 6 != 2)        => flags &= 255 ^ (PROCESS_ONE + PROCESS_TWO),
+                        b'>' if flags & IS_VALID == 0 => redir_found!(RedirMode::Stdout(RedirectFrom::Stdout)),
+                        b'<' if flags & IS_VALID == 0 => redir_found!(RedirMode::Stdin),
                         _ => (),
                     }
-                    flags &= 255 ^ ARRAY_PROCESS;
+                    flags_ext &= 255 ^ (VAR_CHAR_FOUND + ARRAY_CHAR_FOUND);
                     index += 1;
                 }
                 break 'outer
@@ -358,6 +355,8 @@ mod tests {
             };
 
             assert_eq!(Some(expected), pipeline.stdout);
+        } else {
+            assert!(false);
         }
     }
 
@@ -368,15 +367,30 @@ mod tests {
             assert_eq!("echo", jobs[0].args[0]);
             assert_eq!("@split(var, ', ')", jobs[0].args[1]);
             assert_eq!("$join(array, ',')", jobs[0].args[2]);
+        } else {
+            assert!(false);
         }
     }
 
     #[test]
-    fn subshells_within_subshells() {
+    fn nested_process() {
         if let Statement::Pipeline(pipeline) = parse("echo $(echo one $(echo two) three)") {
             let jobs = pipeline.jobs;
             assert_eq!("echo", jobs[0].args[0]);
             assert_eq!("$(echo one $(echo two) three)", jobs[0].args[1]);
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn nested_array_process() {
+        if let Statement::Pipeline(pipeline) = parse("echo @[echo one @[echo two] three]") {
+            let jobs = pipeline.jobs;
+            assert_eq!("echo", jobs[0].args[0]);
+            assert_eq!("@[echo one @[echo two] three]", jobs[0].args[1]);
+        } else {
+            assert!(false);
         }
     }
 
@@ -394,10 +408,22 @@ mod tests {
 
     #[test]
     fn process() {
-        if let Statement::Pipeline(pipeline) = parse("echo $(seq 1 10)") {
+        if let Statement::Pipeline(pipeline) = parse("echo $(seq 1 10 | head -1)") {
             let jobs = pipeline.jobs;
             assert_eq!("echo", jobs[0].args[0]);
-            assert_eq!("$(seq 1 10)", jobs[0].args[1]);
+            assert_eq!("$(seq 1 10 | head -1)", jobs[0].args[1]);
+            assert_eq!(2, jobs[0].args.len());
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn array_process() {
+        if let Statement::Pipeline(pipeline) = parse("echo @[seq 1 10 | head -1]") {
+            let jobs = pipeline.jobs;
+            assert_eq!("echo", jobs[0].args[0]);
+            assert_eq!("@[seq 1 10 | head -1]", jobs[0].args[1]);
             assert_eq!(2, jobs[0].args.len());
         } else {
             assert!(false);
@@ -562,6 +588,8 @@ mod tests {
             assert_eq!(JobKind::And, jobs[0].kind);
             assert_eq!(vec![String::from("echo"), String::from("one")], jobs[0].args);
             assert_eq!(vec![String::from("echo"), String::from("two")], jobs[1].args);
+        } else {
+            assert!(false);
         }
     }
 
@@ -570,6 +598,8 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo one || echo two") {
             let jobs = pipeline.jobs;
             assert_eq!(JobKind::Or, jobs[0].kind);
+        } else {
+            assert!(false);
         }
     }
 
