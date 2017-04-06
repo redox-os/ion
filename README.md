@@ -17,8 +17,8 @@ core functionality is complete. Features below:
 - [x] Array Expressions (**[]**)
 - [x] Array-based Command Substitution (**@[]**)
 - [x] String-based Command Substitution (**$()**)
-- [ ] Array Methods (**@split(var, ' ')**)
-- [ ] String Methods (**$join(array, ', ')**)
+- [x] Array Methods (**@split(var, ' ')**)
+- [x] String Methods (**$join(array, ', ')**)
 - [x] Array Splicing
 - [ ] Maps
 - [x] For Loops
@@ -57,8 +57,8 @@ If the command is executed without any arguments, it will simply list all availa
 
 ### Using Variables
 
-Variables may be called with ith **$** sigil, where the value that follows may be a local or global value.
-They may also be optionally be defined using a braced syntax, which is useful in the event that you need the value
+Variables may be called with the **$** sigil, where the value that follows may be a local or global value.
+They may also be optionally defined using a braced syntax, which is useful in the event that you need the value
 integrated alongside other characters that do not terminate the variable parsing.
 
 ```ion
@@ -223,6 +223,24 @@ echo @array[0...1]
 echo @array[..3]
 echo @array[3..]
 echo @array[..]
+```
+
+### Methods
+
+There are two types of methods -- string-based and array-based methods. The type that a method returns is denoted
+by the sigil that is used to invoke the method. Currently, there are only two supported methods: **$join()** and
+**@split**.
+
+```ion
+let results = [ 1 2 3 4 5]
+echo $join(results) @join # Both of these effectively do the same thing
+echo $join(results, ', ') # You may provide a custom pattern instead
+
+let line = "one  two  three  four  five"
+echo @split(line) # Splits a line by whitespace
+
+let row = "one,two,three,four,five"
+echo @split(row, ',') # Splits by commas
 ```
 
 ### Commands

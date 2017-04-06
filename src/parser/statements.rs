@@ -1,4 +1,6 @@
-// TODO: Rewrite this in the same style as shell_expand::words.
+// TODO: 
+// - Rewrite this in the same style as shell_expand::words.
+// - Validate syntax in methods
 
 use std::u16;
 use std::io::{self, Write};

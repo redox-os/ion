@@ -1,3 +1,5 @@
+// TODO: Handle Runtime Errors
+
 extern crate permutate;
 
 mod braces;

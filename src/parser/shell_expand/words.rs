@@ -158,6 +158,11 @@ impl<'a> WordIterator<'a> {
                                 }
                                 self.read += 1;
                             }
+                        } else if character == b')' {
+                            // If no pattern is supplied, the default is a space.
+                            let variable = &self.data[start..self.read];
+                            self.read += 1;
+                            return WordToken::StringMethod(method, variable, " ");
                         }
                         self.read += 1;
                     }
@@ -221,6 +226,11 @@ impl<'a> WordIterator<'a> {
                                 }
                                 self.read += 1;
                             }
+                        } else if character == b')' {
+                            // If no pattern is supplied, the default is a space.
+                            let variable = &self.data[start..self.read];
+                            self.read += 1;
+                            return WordToken::ArrayMethod(method, variable, " ");
                         }
                         self.read += 1;
                     }

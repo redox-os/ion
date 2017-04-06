@@ -1,0 +1,7 @@
+let array = [ one two three four ]
+let space_string = $join(array)
+let comma_string = $join(array, ', ')
+echo $space_string
+echo $comma_string
+echo @split(space_string)
+echo @split(comma_string, ', ')
