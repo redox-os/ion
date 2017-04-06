@@ -66,7 +66,7 @@ pub enum WordToken<'a> {
     ArrayProcess(&'a str, bool, Index),
     Process(&'a str, bool),
     StringMethod(&'a str, &'a str, &'a str),
-    ArrayMethod(&'a str, &'a str, &'a str),
+    ArrayMethod(&'a str, &'a str, &'a str, Index),
 }
 
 pub struct WordIterator<'a> {
@@ -222,7 +222,12 @@ impl<'a> WordIterator<'a> {
                                 if character == b')' {
                                     let pattern = &self.data[start..self.read].trim();
                                     self.read += 1;
-                                    return WordToken::ArrayMethod(method, variable, pattern)
+                                    return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                                        let _ = iterator.next();
+                                        WordToken::ArrayMethod(method, variable, pattern, self.read_index(iterator))
+                                    } else {
+                                        WordToken::ArrayMethod(method, variable, pattern, Index::All)
+                                    }
                                 }
                                 self.read += 1;
                             }
@@ -230,7 +235,13 @@ impl<'a> WordIterator<'a> {
                             // If no pattern is supplied, the default is a space.
                             let variable = &self.data[start..self.read];
                             self.read += 1;
-                            return WordToken::ArrayMethod(method, variable, " ");
+
+                            return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                                let _ = iterator.next();
+                                WordToken::ArrayMethod(method, variable, " ", self.read_index(iterator))
+                            } else {
+                                WordToken::ArrayMethod(method, variable, " ", Index::All)
+                            }
                         }
                         self.read += 1;
                     }

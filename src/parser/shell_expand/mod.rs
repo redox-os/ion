@@ -165,11 +165,39 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                             }
                         }
                     },
-                    WordToken::ArrayMethod(method, variable, pattern) => {
+                    WordToken::ArrayMethod(method, variable, pattern, index) => {
                         let pattern = &expand_string(pattern, expand_func, false).join(" ");
                         match method {
                             "split" => if let Some(variable) = (expand_func.variable)(variable, false) {
-                                current.push_str(&variable.split(pattern).collect::<Vec<&str>>().join(" "));
+                                match index {
+                                    Index::All => current.push_str (
+                                        &variable.split(pattern)
+                                            .collect::<Vec<&str>>()
+                                            .join(" ")
+                                    ),
+                                    Index::None => (),
+                                    Index::ID(id) => current.push_str (
+                                        variable.split(pattern)
+                                            .nth(id)
+                                            .unwrap_or_default()
+                                    ),
+                                    Index::Range(start, end) => {
+                                        let range = match end {
+                                            IndexPosition::ID(end) => {
+                                                variable.split(pattern).skip(start)
+                                                    .take(end-start)
+                                                    .collect::<Vec<&str>>()
+                                                    .join(" ")
+                                            },
+                                            IndexPosition::CatchAll => {
+                                                variable.split(pattern).skip(start)
+                                                    .collect::<Vec<&str>>()
+                                                    .join(" ")
+                                            }
+                                        };
+                                        current.push_str(&range);
+                                    }
+                                }
                             },
                             _ => {
                                 let stderr = io::stderr();
@@ -265,11 +293,34 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                         },
                     }
                 },
-                WordToken::ArrayMethod(method, variable, pattern) => {
+                WordToken::ArrayMethod(method, variable, pattern, index) => {
                     let pattern = &expand_string(pattern, expand_func, false).join(" ");
                     match method {
                         "split" => if let Some(variable) = (expand_func.variable)(variable, false) {
-                            return variable.split(pattern).map(String::from).collect::<Vec<String>>();
+                            return match index {
+                                Index::All => variable.split(pattern)
+                                    .map(String::from)
+                                    .collect::<Vec<String>>(),
+                                Index::None => vec![String::new()],
+                                Index::ID(id) => vec![variable.split(pattern)
+                                    .nth(id).map(String::from)
+                                    .unwrap_or_default()],
+                                Index::Range(start, end) => {
+                                    match end {
+                                        IndexPosition::ID(end) => {
+                                            variable.split(pattern).skip(start)
+                                                .take(end-start)
+                                                .map(String::from)
+                                                .collect::<Vec<String>>()
+                                        },
+                                        IndexPosition::CatchAll => {
+                                            variable.split(pattern).skip(start)
+                                                .map(String::from)
+                                                .collect::<Vec<String>>()
+                                        }
+                                    }
+                                }
+                            }
                         },
                         _ => {
                             let stderr = io::stderr();
@@ -336,11 +387,39 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                         },
                     }
                 },
-                WordToken::ArrayMethod(method, variable, pattern) => {
+                WordToken::ArrayMethod(method, variable, pattern, index) => {
                     let pattern = &expand_string(pattern, expand_func, false).join(" ");
                     match method {
                         "split" => if let Some(variable) = (expand_func.variable)(variable, false) {
-                            output.push_str(&variable.split(pattern).collect::<Vec<&str>>().join(" "));
+                            match index {
+                                Index::All => output.push_str (
+                                    &variable.split(pattern)
+                                        .collect::<Vec<&str>>()
+                                        .join(" ")
+                                ),
+                                Index::None => (),
+                                Index::ID(id) => output.push_str (
+                                    variable.split(pattern)
+                                        .nth(id)
+                                        .unwrap_or_default()
+                                ),
+                                Index::Range(start, end) => {
+                                    let range = match end {
+                                        IndexPosition::ID(end) => {
+                                            variable.split(pattern).skip(start)
+                                                .take(end-start)
+                                                .collect::<Vec<&str>>()
+                                                .join(" ")
+                                        },
+                                        IndexPosition::CatchAll => {
+                                            variable.split(pattern).skip(start)
+                                                .collect::<Vec<&str>>()
+                                                .join(" ")
+                                        }
+                                    };
+                                    output.push_str(&range);
+                                }
+                            }
                         },
                         _ => {
                             let stderr = io::stderr();
