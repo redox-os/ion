@@ -12,6 +12,7 @@ core functionality is complete. Features below:
 - [x] Flow Control
 - [x] Aliases
 - [x] Variables (**$variable**)
+- [x] Substrings for Variables
 - [x] Functions
 - [x] Arrays (**@array**)
 - [x] Array Expressions (**[]**)
@@ -66,6 +67,22 @@ let a = one
 let b = two
 echo $A:$B
 echo ${A}s and ${B}s
+```
+
+### Substrings
+
+Ion natively supports splitting supplied strings by graphemes using the same slicing sytax for arrays:
+
+```ion
+$ let string = "one two three"
+$ echo $string[0]
+o
+$ echo $string[..3]
+one
+$ echo $string[4..7]
+two
+$ echo $string[8..]
+three
 ```
 
 ### Dropping Variables

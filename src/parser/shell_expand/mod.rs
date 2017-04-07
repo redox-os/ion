@@ -1,6 +1,8 @@
 // TODO: Handle Runtime Errors
-
 extern crate permutate;
+extern crate unicode_segmentation;
+use self::unicode_segmentation::UnicodeSegmentation;
+
 
 mod braces;
 mod process;
@@ -193,12 +195,35 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                         let quoted = if reverse_quoting { !quoted } else { quoted };
                         expand_process(&mut current, command, quoted, expand_func);
                     },
-                    WordToken::Variable(text, quoted) => {
+                    WordToken::Variable(text, quoted, index) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
-                        current.push_str(match (expand_func.variable)(text, quoted) {
-                            Some(ref var) => var,
-                            None          => ""
-                        });
+                        let expanded = match (expand_func.variable)(text, quoted) {
+                            Some(var) => var,
+                            None      => continue
+                        };
+
+                        match index {
+                            Index::None => (),
+                            Index::All => current.push_str(&expanded),
+                            Index::ID(id) => {
+                                if let Some(character) = UnicodeSegmentation::graphemes(expanded.as_str(), true).nth(id) {
+                                    current.push_str(character);
+                                }
+                            },
+                            Index::Range(start, IndexPosition::ID(end)) => {
+                                let substring = UnicodeSegmentation::graphemes(expanded.as_str(), true)
+                                    .skip(start).take(end-start)
+                                    .collect::<Vec<&str>>().join("");
+
+                                current.push_str(&substring);
+                            },
+                            Index::Range(start, IndexPosition::CatchAll) => {
+                                let substring = UnicodeSegmentation::graphemes(expanded.as_str(), true)
+                                    .skip(start).collect::<Vec<&str>>().join("");
+
+                                current.push_str(&substring);
+                            }
+                        }
                     },
                 }
             }
@@ -343,12 +368,35 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                     Some(ref expanded) => expanded,
                     None               => text,
                 }),
-                WordToken::Variable(text, quoted) => {
+                WordToken::Variable(text, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
-                    output.push_str(match (expand_func.variable)(text, quoted) {
-                        Some(ref var) => var,
-                        None          => ""
-                    });
+                    let expanded = match (expand_func.variable)(text, quoted) {
+                        Some(var) => var,
+                        None          => continue
+                    };
+
+                    match index {
+                        Index::None => (),
+                        Index::All => output.push_str(&expanded),
+                        Index::ID(id) => {
+                            if let Some(character) = UnicodeSegmentation::graphemes(expanded.as_str(), true).nth(id) {
+                                output.push_str(character);
+                            }
+                        },
+                        Index::Range(start, IndexPosition::ID(end)) => {
+                            let substring = UnicodeSegmentation::graphemes(expanded.as_str(), true)
+                                .skip(start).take(end-start)
+                                .collect::<Vec<&str>>().join("");
+
+                            output.push_str(&substring);
+                        },
+                        Index::Range(start, IndexPosition::CatchAll) => {
+                            let substring = UnicodeSegmentation::graphemes(expanded.as_str(), true)
+                                .skip(start).collect::<Vec<&str>>().join("");
+
+                            output.push_str(&substring);
+                        }
+                    }
                 },
             }
         }

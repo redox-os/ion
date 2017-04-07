@@ -79,20 +79,19 @@ impl<'a> ArrayMethod<'a> {
                             .nth(id)
                             .unwrap_or_default()
                     ),
-                    Index::Range(start, end) => {
-                        let range = match end {
-                            IndexPosition::ID(end) => {
-                                variable.split(pattern).skip(start)
-                                    .take(end-start)
-                                    .collect::<Vec<&str>>()
-                                    .join(" ")
-                            },
-                            IndexPosition::CatchAll => {
-                                variable.split(pattern).skip(start)
-                                    .collect::<Vec<&str>>()
-                                    .join(" ")
-                            }
-                        };
+                    Index::Range(start, IndexPosition::ID(end)) => {
+                        let range = variable.split(pattern).skip(start)
+                            .take(end-start)
+                            .collect::<Vec<&str>>()
+                            .join(" ");
+
+                        current.push_str(&range);
+                    },
+                    Index::Range(start, IndexPosition::CatchAll) => {
+                        let range = variable.split(pattern).skip(start)
+                            .collect::<Vec<&str>>()
+                            .join(" ");
+
                         current.push_str(&range);
                     }
                 }
@@ -117,20 +116,16 @@ impl<'a> ArrayMethod<'a> {
                     Index::ID(id) => vec![variable.split(pattern)
                         .nth(id).map(String::from)
                         .unwrap_or_default()],
-                    Index::Range(start, end) => {
-                        match end {
-                            IndexPosition::ID(end) => {
-                                variable.split(pattern).skip(start)
-                                    .take(end-start)
-                                    .map(String::from)
-                                    .collect::<Vec<String>>()
-                            },
-                            IndexPosition::CatchAll => {
-                                variable.split(pattern).skip(start)
-                                    .map(String::from)
-                                    .collect::<Vec<String>>()
-                            }
-                        }
+                    Index::Range(start, IndexPosition::CatchAll) => {
+                        variable.split(pattern).skip(start)
+                            .map(String::from)
+                            .collect::<Vec<String>>()
+                    },
+                    Index::Range(start, IndexPosition::ID(end)) => {
+                        variable.split(pattern).skip(start)
+                            .take(end-start)
+                            .map(String::from)
+                            .collect::<Vec<String>>()
                     }
                 }
             },
@@ -152,7 +147,7 @@ pub enum WordToken<'a> {
     Tilde(&'a str),
     Brace(Vec<&'a str>),
     Array(Vec<&'a str>, Index),
-    Variable(&'a str, bool),
+    Variable(&'a str, bool, Index),
     ArrayVariable(&'a str, bool, Index),
     ArrayProcess(&'a str, bool, Index),
     Process(&'a str, bool),
@@ -215,7 +210,7 @@ impl<'a> WordIterator<'a> {
             if character == b'}' {
                 let output = &self.data[start..self.read];
                 self.read += 1;
-                return WordToken::Variable(output, self.flags & DQUOTE != 0);
+                return WordToken::Variable(output, self.flags & DQUOTE != 0, Index::All);
             }
             self.read += 1;
         }
@@ -262,14 +257,20 @@ impl<'a> WordIterator<'a> {
                 }
                 // Only alphanumerical and underscores are allowed in variable names
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {
-                    return WordToken::Variable(&self.data[start..self.read], self.flags & DQUOTE != 0);
+                    let variable = &self.data[start..self.read];
+
+                    return if character == b'[' {
+                        WordToken::Variable(variable, self.flags & DQUOTE != 0, self.read_index(iterator))
+                    } else {
+                        WordToken::Variable(variable, self.flags & DQUOTE != 0, Index::All)
+                    };
                 },
                 _ => (),
             }
             self.read += 1;
         }
 
-        WordToken::Variable(&self.data[start..], self.flags & DQUOTE != 0)
+        WordToken::Variable(&self.data[start..], self.flags & DQUOTE != 0, Index::All)
     }
 
     fn read_index<I>(&mut self, iterator: &mut I) -> Index
@@ -799,9 +800,9 @@ mod tests {
         let expected = vec![
             WordToken::Normal("echo"),
             WordToken::Whitespace(" "),
-            WordToken::Variable("ABC", false),
+            WordToken::Variable("ABC", false, Index::All),
             WordToken::Whitespace(" "),
-            WordToken::Variable("ABC", true),
+            WordToken::Variable("ABC", true, Index::All),
             WordToken::Whitespace(" "),
             WordToken::Normal("one"),
             WordToken::Brace(vec!["$ABC", "$ABC"]),
