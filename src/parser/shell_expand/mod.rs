@@ -165,46 +165,8 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                             }
                         }
                     },
-                    WordToken::ArrayMethod(method, variable, pattern, index) => {
-                        let pattern = &expand_string(pattern, expand_func, false).join(" ");
-                        match method {
-                            "split" => if let Some(variable) = (expand_func.variable)(variable, false) {
-                                match index {
-                                    Index::All => current.push_str (
-                                        &variable.split(pattern)
-                                            .collect::<Vec<&str>>()
-                                            .join(" ")
-                                    ),
-                                    Index::None => (),
-                                    Index::ID(id) => current.push_str (
-                                        variable.split(pattern)
-                                            .nth(id)
-                                            .unwrap_or_default()
-                                    ),
-                                    Index::Range(start, end) => {
-                                        let range = match end {
-                                            IndexPosition::ID(end) => {
-                                                variable.split(pattern).skip(start)
-                                                    .take(end-start)
-                                                    .collect::<Vec<&str>>()
-                                                    .join(" ")
-                                            },
-                                            IndexPosition::CatchAll => {
-                                                variable.split(pattern).skip(start)
-                                                    .collect::<Vec<&str>>()
-                                                    .join(" ")
-                                            }
-                                        };
-                                        current.push_str(&range);
-                                    }
-                                }
-                            },
-                            _ => {
-                                let stderr = io::stderr();
-                                let mut stderr = stderr.lock();
-                                let _ = writeln!(stderr, "ion: invalid array method: {}", method);
-                            }
-                        }
+                    WordToken::ArrayMethod(array_method) => {
+                        array_method.handle(&mut current, expand_func);
                     },
                     WordToken::StringMethod(method, variable, pattern) => {
                         let pattern = &expand_string(pattern, expand_func, false).join(" ");
@@ -293,42 +255,8 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                         },
                     }
                 },
-                WordToken::ArrayMethod(method, variable, pattern, index) => {
-                    let pattern = &expand_string(pattern, expand_func, false).join(" ");
-                    match method {
-                        "split" => if let Some(variable) = (expand_func.variable)(variable, false) {
-                            return match index {
-                                Index::All => variable.split(pattern)
-                                    .map(String::from)
-                                    .collect::<Vec<String>>(),
-                                Index::None => vec![String::new()],
-                                Index::ID(id) => vec![variable.split(pattern)
-                                    .nth(id).map(String::from)
-                                    .unwrap_or_default()],
-                                Index::Range(start, end) => {
-                                    match end {
-                                        IndexPosition::ID(end) => {
-                                            variable.split(pattern).skip(start)
-                                                .take(end-start)
-                                                .map(String::from)
-                                                .collect::<Vec<String>>()
-                                        },
-                                        IndexPosition::CatchAll => {
-                                            variable.split(pattern).skip(start)
-                                                .map(String::from)
-                                                .collect::<Vec<String>>()
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        _ => {
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "ion: invalid array method: {}", method);
-                            return Vec::new();
-                        }
-                    }
+                WordToken::ArrayMethod(array_method) => {
+                    return array_method.handle_as_array(expand_func);
                 },
                 _ => ()
             }
@@ -387,46 +315,8 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                         },
                     }
                 },
-                WordToken::ArrayMethod(method, variable, pattern, index) => {
-                    let pattern = &expand_string(pattern, expand_func, false).join(" ");
-                    match method {
-                        "split" => if let Some(variable) = (expand_func.variable)(variable, false) {
-                            match index {
-                                Index::All => output.push_str (
-                                    &variable.split(pattern)
-                                        .collect::<Vec<&str>>()
-                                        .join(" ")
-                                ),
-                                Index::None => (),
-                                Index::ID(id) => output.push_str (
-                                    variable.split(pattern)
-                                        .nth(id)
-                                        .unwrap_or_default()
-                                ),
-                                Index::Range(start, end) => {
-                                    let range = match end {
-                                        IndexPosition::ID(end) => {
-                                            variable.split(pattern).skip(start)
-                                                .take(end-start)
-                                                .collect::<Vec<&str>>()
-                                                .join(" ")
-                                        },
-                                        IndexPosition::CatchAll => {
-                                            variable.split(pattern).skip(start)
-                                                .collect::<Vec<&str>>()
-                                                .join(" ")
-                                        }
-                                    };
-                                    output.push_str(&range);
-                                }
-                            }
-                        },
-                        _ => {
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "ion: invalid array method: {}", method);
-                        }
-                    }
+                WordToken::ArrayMethod(array_method) => {
+                    array_method.handle(&mut output, expand_func);
                 },
                 WordToken::StringMethod(method, variable, pattern) => {
                     let pattern = &expand_string(pattern, expand_func, false).join(" ");

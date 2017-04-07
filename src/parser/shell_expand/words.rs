@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use std::str::FromStr;
+use super::{ExpanderFunctions, expand_string};
 use super::ranges::parse_index_range;
 
 // Bit Twiddling Guide:
@@ -12,7 +13,6 @@ use super::ranges::parse_index_range;
 const BACKSL: u8 = 1;
 const SQUOTE: u8 = 2;
 const DQUOTE: u8 = 4;
-
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Index {
@@ -55,6 +55,97 @@ impl FromStr for Index {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct ArrayMethod<'a> {
+    method: &'a str,
+    variable: &'a str,
+    pattern: &'a str,
+    index: Index
+}
+
+impl<'a> ArrayMethod<'a> {
+    pub fn handle(self, current: &mut String, expand_func: &ExpanderFunctions) {
+        let pattern = &expand_string(self.pattern, expand_func, false).join(" ");
+        match self.method {
+            "split" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
+                match self.index {
+                    Index::All => current.push_str (
+                        &variable.split(pattern)
+                            .collect::<Vec<&str>>()
+                            .join(" ")
+                    ),
+                    Index::None => (),
+                    Index::ID(id) => current.push_str (
+                        variable.split(pattern)
+                            .nth(id)
+                            .unwrap_or_default()
+                    ),
+                    Index::Range(start, end) => {
+                        let range = match end {
+                            IndexPosition::ID(end) => {
+                                variable.split(pattern).skip(start)
+                                    .take(end-start)
+                                    .collect::<Vec<&str>>()
+                                    .join(" ")
+                            },
+                            IndexPosition::CatchAll => {
+                                variable.split(pattern).skip(start)
+                                    .collect::<Vec<&str>>()
+                                    .join(" ")
+                            }
+                        };
+                        current.push_str(&range);
+                    }
+                }
+            },
+            _ => {
+                let stderr = io::stderr();
+                let mut stderr = stderr.lock();
+                let _ = writeln!(stderr, "ion: invalid array method: {}", self.method);
+            }
+        }
+    }
+
+    pub fn handle_as_array(self, expand_func: &ExpanderFunctions) -> Vec<String> {
+        let pattern = &expand_string(self.pattern, expand_func, false).join(" ");
+        match self.method {
+            "split" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
+                return match self.index {
+                    Index::All => variable.split(pattern)
+                        .map(String::from)
+                        .collect::<Vec<String>>(),
+                    Index::None => vec!["".to_owned()],
+                    Index::ID(id) => vec![variable.split(pattern)
+                        .nth(id).map(String::from)
+                        .unwrap_or_default()],
+                    Index::Range(start, end) => {
+                        match end {
+                            IndexPosition::ID(end) => {
+                                variable.split(pattern).skip(start)
+                                    .take(end-start)
+                                    .map(String::from)
+                                    .collect::<Vec<String>>()
+                            },
+                            IndexPosition::CatchAll => {
+                                variable.split(pattern).skip(start)
+                                    .map(String::from)
+                                    .collect::<Vec<String>>()
+                            }
+                        }
+                    }
+                }
+            },
+            _ => {
+                let stderr = io::stderr();
+                let mut stderr = stderr.lock();
+                let _ = writeln!(stderr, "ion: invalid array method: {}", self.method);
+            }
+        }
+
+        vec!["".to_owned()]
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum WordToken<'a> {
     Normal(&'a str),
     Whitespace(&'a str),
@@ -66,7 +157,7 @@ pub enum WordToken<'a> {
     ArrayProcess(&'a str, bool, Index),
     Process(&'a str, bool),
     StringMethod(&'a str, &'a str, &'a str),
-    ArrayMethod(&'a str, &'a str, &'a str, Index),
+    ArrayMethod(ArrayMethod<'a>),
 }
 
 pub struct WordIterator<'a> {
@@ -224,9 +315,19 @@ impl<'a> WordIterator<'a> {
                                     self.read += 1;
                                     return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                         let _ = iterator.next();
-                                        WordToken::ArrayMethod(method, variable, pattern, self.read_index(iterator))
+                                        WordToken::ArrayMethod(ArrayMethod {
+                                            method: method,
+                                            variable: variable,
+                                            pattern: pattern,
+                                            index: self.read_index(iterator)
+                                        })
                                     } else {
-                                        WordToken::ArrayMethod(method, variable, pattern, Index::All)
+                                        WordToken::ArrayMethod(ArrayMethod {
+                                            method: method,
+                                            variable: variable,
+                                            pattern: pattern,
+                                            index: Index::All
+                                        })
                                     }
                                 }
                                 self.read += 1;
@@ -238,9 +339,19 @@ impl<'a> WordIterator<'a> {
 
                             return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                 let _ = iterator.next();
-                                WordToken::ArrayMethod(method, variable, " ", self.read_index(iterator))
+                                WordToken::ArrayMethod(ArrayMethod {
+                                    method: method,
+                                    variable: variable,
+                                    pattern: " ",
+                                    index: self.read_index(iterator)
+                                })
                             } else {
-                                WordToken::ArrayMethod(method, variable, " ", Index::All)
+                                WordToken::ArrayMethod(ArrayMethod {
+                                    method: method,
+                                    variable: variable,
+                                    pattern: " ",
+                                    index: Index::All
+                                })
                             }
                         }
                         self.read += 1;
