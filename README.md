@@ -69,9 +69,9 @@ echo $A:$B
 echo ${A}s and ${B}s
 ```
 
-### Substrings
+### Substrings from Variables
 
-Ion natively supports splitting supplied strings by graphemes using the same slicing sytax for arrays:
+Ion natively supports splitting supplied strings by graphemes using the same slicing syntax for arrays:
 
 ```ion
 $ let string = "one two three"
@@ -260,6 +260,19 @@ let row = "one,two,three,four,five"
 echo @split(row, ',') # Splits by commas
 ```
 
+### Substring Slicing on String Methods
+
+```ion
+echo $join(array)[3..6]
+```
+
+### Array Slicing on Array Methods
+
+```ion
+let cpu_model = $(grep "model name" /proc/cpuinfo | head -1)
+echo @split(cpu_model)[3..5]
+```
+
 ### Commands
 
 Commands may be written line by line or altogether on the same line with semicolons separating them.
@@ -400,6 +413,22 @@ end
 for i in @[echo 1 2 3]
     echo $i
 end
+```
+
+### Slicing String-Based Command Substitutions
+
+You may slice the string returned to obtain its substring:
+
+```ion
+echo $(echo one two three)[..3]
+```
+
+### Slicing Array-Based Command Substitutions
+
+You may slice the array returned to obtained a specific set of elements:
+
+```ion
+echo @[grep "model name" /proc/cpuinfo | head -1][3..5]
 ```
 
 ### Functions
