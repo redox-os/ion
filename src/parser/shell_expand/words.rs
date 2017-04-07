@@ -758,9 +758,9 @@ mod tests {
     fn string_method() {
         let input = "$join(array, 'pattern') $join(array, 'pattern')";
         let expected = vec![
-            WordToken::StringMethod("join", "array", "'pattern'"),
+            WordToken::StringMethod("join", "array", "'pattern'", Index::All),
             WordToken::Whitespace(" "),
-            WordToken::StringMethod("join", "array", "'pattern'")
+            WordToken::StringMethod("join", "array", "'pattern'", Index::All)
         ];
         compare(input, expected);
     }
