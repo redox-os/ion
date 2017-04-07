@@ -71,18 +71,21 @@ fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
     }
 }
 
+#[inline(always)]
 fn array_expand(elements: &[&str], expand_func: &ExpanderFunctions) -> Vec<String> {
     elements.iter()
         .flat_map(|element| expand_string(element, expand_func, false))
         .collect()
 }
 
+#[inline(always)]
 fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, id: usize) -> String {
     elements.iter()
         .flat_map(|element| expand_string(element, expand_func, false))
         .nth(id).unwrap_or_default()
 }
 
+#[inline(always)]
 fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: usize, end: IndexPosition) -> Vec<String> {
     match end {
         IndexPosition::CatchAll => elements.iter()
@@ -91,6 +94,32 @@ fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: usize,
         IndexPosition::ID(end) => elements.iter()
             .flat_map(|element| expand_string(element, expand_func, false))
             .skip(start).take(end-start).collect()
+    }
+}
+
+#[inline(always)]
+fn slice_string(output: &mut String, expanded: &str, index: Index) {
+    match index {
+        Index::None => (),
+        Index::All => output.push_str(&expanded),
+        Index::ID(id) => {
+            if let Some(character) = UnicodeSegmentation::graphemes(expanded, true).nth(id) {
+                output.push_str(character);
+            }
+        },
+        Index::Range(start, IndexPosition::ID(end)) => {
+            let substring = UnicodeSegmentation::graphemes(expanded, true)
+                .skip(start).take(end-start)
+                .collect::<Vec<&str>>().join("");
+
+            output.push_str(&substring);
+        },
+        Index::Range(start, IndexPosition::CatchAll) => {
+            let substring = UnicodeSegmentation::graphemes(expanded, true)
+                .skip(start).collect::<Vec<&str>>().join("");
+
+            output.push_str(&substring);
+        }
     }
 }
 
@@ -170,11 +199,11 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                     WordToken::ArrayMethod(array_method) => {
                         array_method.handle(&mut current, expand_func);
                     },
-                    WordToken::StringMethod(method, variable, pattern) => {
+                    WordToken::StringMethod(method, variable, pattern, index) => {
                         let pattern = &expand_string(pattern, expand_func, false).join(" ");
                         match method {
                             "join" => if let Some(array) = (expand_func.array)(variable, Index::All) {
-                                current.push_str(&array.join(pattern));
+                                slice_string(&mut current, &array.join(pattern), index);
                             },
                             _ => {
                                 let stderr = io::stderr();
@@ -202,28 +231,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                             None      => continue
                         };
 
-                        match index {
-                            Index::None => (),
-                            Index::All => current.push_str(&expanded),
-                            Index::ID(id) => {
-                                if let Some(character) = UnicodeSegmentation::graphemes(expanded.as_str(), true).nth(id) {
-                                    current.push_str(character);
-                                }
-                            },
-                            Index::Range(start, IndexPosition::ID(end)) => {
-                                let substring = UnicodeSegmentation::graphemes(expanded.as_str(), true)
-                                    .skip(start).take(end-start)
-                                    .collect::<Vec<&str>>().join("");
-
-                                current.push_str(&substring);
-                            },
-                            Index::Range(start, IndexPosition::CatchAll) => {
-                                let substring = UnicodeSegmentation::graphemes(expanded.as_str(), true)
-                                    .skip(start).collect::<Vec<&str>>().join("");
-
-                                current.push_str(&substring);
-                            }
-                        }
+                        slice_string(&mut current, &expanded, index);
                     },
                 }
             }
@@ -343,11 +351,11 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                 WordToken::ArrayMethod(array_method) => {
                     array_method.handle(&mut output, expand_func);
                 },
-                WordToken::StringMethod(method, variable, pattern) => {
+                WordToken::StringMethod(method, variable, pattern, index) => {
                     let pattern = &expand_string(pattern, expand_func, false).join(" ");
                     match method {
                         "join" => if let Some(array) = (expand_func.array)(variable, Index::All) {
-                            output.push_str(&array.join(pattern));
+                            slice_string(&mut output, &array.join(pattern), index);
                         },
                         _ => {
                             let stderr = io::stderr();
@@ -375,28 +383,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                         None          => continue
                     };
 
-                    match index {
-                        Index::None => (),
-                        Index::All => output.push_str(&expanded),
-                        Index::ID(id) => {
-                            if let Some(character) = UnicodeSegmentation::graphemes(expanded.as_str(), true).nth(id) {
-                                output.push_str(character);
-                            }
-                        },
-                        Index::Range(start, IndexPosition::ID(end)) => {
-                            let substring = UnicodeSegmentation::graphemes(expanded.as_str(), true)
-                                .skip(start).take(end-start)
-                                .collect::<Vec<&str>>().join("");
-
-                            output.push_str(&substring);
-                        },
-                        Index::Range(start, IndexPosition::CatchAll) => {
-                            let substring = UnicodeSegmentation::graphemes(expanded.as_str(), true)
-                                .skip(start).collect::<Vec<&str>>().join("");
-
-                            output.push_str(&substring);
-                        }
-                    }
+                    slice_string(&mut output, &expanded, index);
                 },
             }
         }

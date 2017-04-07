@@ -151,7 +151,7 @@ pub enum WordToken<'a> {
     ArrayVariable(&'a str, bool, Index),
     ArrayProcess(&'a str, bool, Index),
     Process(&'a str, bool),
-    StringMethod(&'a str, &'a str, &'a str),
+    StringMethod(&'a str, &'a str, &'a str, Index),
     ArrayMethod(ArrayMethod<'a>),
 }
 
@@ -240,7 +240,13 @@ impl<'a> WordIterator<'a> {
                                 if character == b')' {
                                     let pattern = &self.data[start..self.read].trim();
                                     self.read += 1;
-                                    return WordToken::StringMethod(method, variable, pattern)
+
+                                    return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                                        let _ = iterator.next();
+                                        WordToken::StringMethod(method, variable, pattern, self.read_index(iterator))
+                                    } else {
+                                        WordToken::StringMethod(method, variable, pattern, Index::All)
+                                    };
                                 }
                                 self.read += 1;
                             }
@@ -248,7 +254,13 @@ impl<'a> WordIterator<'a> {
                             // If no pattern is supplied, the default is a space.
                             let variable = &self.data[start..self.read];
                             self.read += 1;
-                            return WordToken::StringMethod(method, variable, " ");
+
+                            return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                                let _ = iterator.next();
+                                WordToken::StringMethod(method, variable, " ", self.read_index(iterator))
+                            } else {
+                                WordToken::StringMethod(method, variable, " ", Index::All)
+                            };
                         }
                         self.read += 1;
                     }
