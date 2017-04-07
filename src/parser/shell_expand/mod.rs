@@ -26,7 +26,7 @@ pub struct ExpanderFunctions<'f> {
 }
 
 fn expand_process(current: &mut String, command: &str, quoted: bool,
-    expand_func: &ExpanderFunctions)
+    index: Index, expand_func: &ExpanderFunctions)
 {
     let mut expanded = String::with_capacity(command.len());
     for token in CommandExpander::new(command) {
@@ -41,7 +41,7 @@ fn expand_process(current: &mut String, command: &str, quoted: bool,
     }
 
     if let Some(result) = (expand_func.command)(&expanded, quoted) {
-        current.push_str(&result);
+        slice_string(current, &result, index);
     }
 }
 
@@ -173,18 +173,18 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                             Index::None => (),
                             Index::All => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, expand_func);
+                                expand_process(&mut temp, command, quoted, Index::All, expand_func);
                                 let temp = temp.split_whitespace().collect::<Vec<&str>>();
                                 current.push_str(&temp.join(" "));
                             },
                             Index::ID(id) => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, expand_func);
+                                expand_process(&mut temp, command, quoted, Index::All, expand_func);
                                 current.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
                             },
                             Index::Range(start, end) => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, expand_func);
+                                expand_process(&mut temp, command, quoted, Index::All, expand_func);
                                 let temp = match end {
                                     IndexPosition::ID(end) => temp.split_whitespace()
                                         .skip(start).take(end-start)
@@ -220,9 +220,9 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                         Some(ref expanded) => expanded,
                         None               => text,
                     }),
-                    WordToken::Process(command, quoted) => {
+                    WordToken::Process(command, quoted, index) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
-                        expand_process(&mut current, command, quoted, expand_func);
+                        expand_process(&mut current, command, quoted, index, expand_func);
                     },
                     WordToken::Variable(text, quoted, index) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
@@ -270,15 +270,15 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                     match index {
                         Index::None => return Vec::new(),
                         Index::All => {
-                            expand_process(&mut output, command, quoted, expand_func);
+                            expand_process(&mut output, command, quoted, Index::All, expand_func);
                             return output.split_whitespace().map(String::from).collect::<Vec<String>>();
                         },
                         Index::ID(id) => {
-                            expand_process(&mut output, command, quoted, expand_func);
+                            expand_process(&mut output, command, quoted, Index::All, expand_func);
                             return vec![output.split_whitespace().nth(id).unwrap_or_default().to_owned()];
                         }
                         Index::Range(start, end) => {
-                            expand_process(&mut output, command, quoted, expand_func);
+                            expand_process(&mut output, command, quoted, Index::All, expand_func);
                             return match end {
                                 IndexPosition::ID(end) => output.split_whitespace().map(String::from)
                                     .skip(start).take(end-start).collect::<Vec<String>>(),
@@ -325,18 +325,18 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                         Index::None => (),
                         Index::All => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, expand_func);
+                            expand_process(&mut temp, command, quoted, Index::All, expand_func);
                             let temp = temp.split_whitespace().collect::<Vec<&str>>();
                             output.push_str(&temp.join(" "));
                         },
                         Index::ID(id) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, expand_func);
+                            expand_process(&mut temp, command, quoted, Index::All, expand_func);
                             output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
                         },
                         Index::Range(start, end) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, expand_func);
+                            expand_process(&mut temp, command, quoted, Index::All, expand_func);
                             let temp = match end {
                                 IndexPosition::ID(end) => temp.split_whitespace()
                                     .skip(start).take(end-start)
@@ -368,9 +368,9 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
                 WordToken::Normal(text) | WordToken::Whitespace(text) => {
                     output.push_str(text);
                 },
-                WordToken::Process(command, quoted) => {
+                WordToken::Process(command, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
-                    expand_process(&mut output, command, quoted, expand_func);
+                    expand_process(&mut output, command, quoted, index, expand_func);
                 }
                 WordToken::Tilde(text) => output.push_str(match (expand_func.tilde)(text) {
                     Some(ref expanded) => expanded,

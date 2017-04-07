@@ -205,7 +205,7 @@ pub enum WordToken<'a> {
     Variable(&'a str, bool, Index),
     ArrayVariable(&'a str, bool, Index),
     ArrayProcess(&'a str, bool, Index),
-    Process(&'a str, bool),
+    Process(&'a str, bool, Index),
     StringMethod(&'a str, &'a str, &'a str, Index),
     ArrayMethod(ArrayMethod<'a>),
 }
@@ -467,7 +467,20 @@ impl<'a> WordIterator<'a> {
                     if level == 0 {
                         let output = &self.data[start..self.read];
                         self.read += 1;
-                        return WordToken::Process(output, self.flags & DQUOTE != 0);
+                        return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                            let _ = iterator.next();
+                            WordToken::Process(
+                                output,
+                                self.flags & DQUOTE != 0,
+                                self.read_index(iterator)
+                            )
+                        } else {
+                            WordToken::Process(
+                                output,
+                                self.flags & DQUOTE != 0,
+                                Index::All
+                            )
+                        }
                     } else {
                         level -= 1;
                     }
@@ -835,9 +848,9 @@ mod tests {
         let expected = vec![
             WordToken::Normal("echo"),
             WordToken::Whitespace(" "),
-            WordToken::Process("echo $(echo one)", false),
+            WordToken::Process("echo $(echo one)", false, Index::All),
             WordToken::Whitespace(" "),
-            WordToken::Process("echo one $(echo two) three", false),
+            WordToken::Process("echo one $(echo two) three", false, Index::All),
         ];
         compare(input, expected);
     }
@@ -848,7 +861,7 @@ mod tests {
         let expected = vec![
             WordToken::Normal("echo"),
             WordToken::Whitespace(" "),
-            WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", false),
+            WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", false, Index::All),
         ];
         compare(input, expected);
 
@@ -856,7 +869,7 @@ mod tests {
         let expected = vec![
             WordToken::Normal("echo"),
             WordToken::Whitespace(" "),
-            WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", false),
+            WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", false, Index::All),
         ];
         compare(input, expected);
     }
@@ -876,9 +889,9 @@ mod tests {
             WordToken::Whitespace(" "),
             WordToken::Tilde("~"),
             WordToken::Whitespace(" "),
-            WordToken::Process("echo foo", false),
+            WordToken::Process("echo foo", false, Index::All),
             WordToken::Whitespace(" "),
-            WordToken::Process("seq 1 100", true)
+            WordToken::Process("seq 1 100", true, Index::All)
         ];
         compare(input, expected);
     }
