@@ -14,6 +14,7 @@ use super::ranges::parse_index_range;
 const BACKSL: u8 = 1;
 const SQUOTE: u8 = 2;
 const DQUOTE: u8 = 4;
+const EXPAND_PROCESSES: u8 = 8;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Index {
@@ -217,8 +218,9 @@ pub struct WordIterator<'a> {
 }
 
 impl<'a> WordIterator<'a> {
-    pub fn new(data: &'a str) -> WordIterator<'a> {
-        WordIterator { data: data, read: 0, flags: 0 }
+    pub fn new(data: &'a str, expand_processes: bool) -> WordIterator<'a> {
+        let flags = if expand_processes { EXPAND_PROCESSES } else { 0 };
+        WordIterator { data: data, read: 0, flags: flags }
     }
 
     // Contains the grammar for collecting whitespace characters
@@ -679,7 +681,11 @@ impl<'a> Iterator for WordIterator<'a> {
                         match iterator.next() {
                             Some(b'[') => {
                                 self.read += 2;
-                                return Some(self.array_process(&mut iterator));
+                                return if self.flags & EXPAND_PROCESSES != 0 {
+                                    Some(self.array_process(&mut iterator))
+                                } else {
+                                    Some(WordToken::Normal(&self.data[start..self.read]))
+                                }
                             },
                             // Some(b'{') => {
                             //     self.read += 2;
@@ -695,7 +701,11 @@ impl<'a> Iterator for WordIterator<'a> {
                         match iterator.next() {
                             Some(b'(') => {
                                 self.read += 2;
-                                return Some(self.process(&mut iterator));
+                                return if self.flags & EXPAND_PROCESSES != 0 {
+                                    Some(self.process(&mut iterator))
+                                } else {
+                                    Some(WordToken::Normal(&self.data[start..self.read]))
+                                }
                             },
                             Some(b'{') => {
                                 self.read += 2;
@@ -760,7 +770,7 @@ mod tests {
 
     fn compare(input: &str, expected: Vec<WordToken>) {
         let mut correct = 0;
-        for (actual, expected) in WordIterator::new(input).zip(expected.iter()) {
+        for (actual, expected) in WordIterator::new(input, true).zip(expected.iter()) {
             assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
             correct += 1;
         }
