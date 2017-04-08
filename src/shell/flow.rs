@@ -10,6 +10,12 @@ use super::assignments::let_assignment;
 
 use glob::glob;
 
+pub enum Condition {
+    Continue,
+    Break,
+    NoOp
+}
+
 pub trait FlowLogic {
     /// Receives a command and attempts to execute the contents.
     fn on_command(&mut self, command_string: &str);
@@ -26,10 +32,10 @@ pub trait FlowLogic {
 
     /// Conditionally executes branches of statements according to evaluated expressions
     fn execute_if(&mut self, expression: Pipeline, success: Vec<Statement>,
-        else_if: Vec<ElseIf>, failure: Vec<Statement>) -> bool;
+        else_if: Vec<ElseIf>, failure: Vec<Statement>) -> Condition;
 
     /// Simply executes all supplied statemnts.
-    fn execute_statements(&mut self, statements: Vec<Statement>) -> bool;
+    fn execute_statements(&mut self, statements: Vec<Statement>) -> Condition;
 }
 
 impl<'a> FlowLogic for Shell<'a> {
@@ -94,7 +100,7 @@ impl<'a> FlowLogic for Shell<'a> {
                 mem::swap(&mut self.flow_control.current_statement, &mut replacement);
 
                 match replacement {
-                    Statement::Let{ expression } => {
+                    Statement::Let { expression } => {
                         self.previous_status = let_assignment(&expression, &mut self.variables, &self.directory_stack);
                     },
                     Statement::While { expression, statements } => {
@@ -131,11 +137,11 @@ impl<'a> FlowLogic for Shell<'a> {
         }
     }
 
-    fn execute_statements(&mut self, mut statements: Vec<Statement>) -> bool {
+    fn execute_statements(&mut self, mut statements: Vec<Statement>) -> Condition {
         let mut iterator = statements.drain(..);
         while let Some(statement) = iterator.next() {
             match statement {
-                Statement::Let{ expression } => {
+                Statement::Let { expression } => {
                     self.previous_status = let_assignment(&expression, &mut self.variables, &self.directory_stack);
                 },
                 Statement::While { expression, mut statements } => {
@@ -151,16 +157,20 @@ impl<'a> FlowLogic for Shell<'a> {
                 Statement::If { expression, mut success, mut else_if, mut failure } => {
                     self.flow_control.level += 1;
                     if let Err(why) = collect_if(&mut iterator, &mut success, &mut else_if,
-                        &mut failure, &mut self.flow_control.level, 0) {
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "{}", why);
-                            self.flow_control.level = 0;
-                            self.flow_control.current_if_mode = 0;
-                            return true
-                        }
-                    if self.execute_if(expression, success, else_if, failure) {
-                        return true
+                        &mut failure, &mut self.flow_control.level, 0)
+                    {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "{}", why);
+                        self.flow_control.level = 0;
+                        self.flow_control.current_if_mode = 0;
+                        return Condition::Break
+                    }
+
+                    match self.execute_if(expression, success, else_if, failure) {
+                        Condition::Break    => return Condition::Break,
+                        Condition::Continue => return Condition::Continue,
+                        Condition::NoOp     => ()
                     }
                 },
                 Statement::Function { name, args, mut statements } => {
@@ -173,19 +183,18 @@ impl<'a> FlowLogic for Shell<'a> {
                     });
                 },
                 Statement::Pipeline(mut pipeline) => { self.run_pipeline(&mut pipeline, false); },
-                Statement::Break => {
-                    return true
-                }
+                Statement::Break => { return Condition::Break }
+                Statement::Continue => { return Condition::Continue }
                 _ => {}
             }
         }
-        false
+        Condition::NoOp
     }
 
     fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) {
         while self.run_pipeline(&mut expression.clone(), false) == Some(SUCCESS) {
             // Cloning is needed so the statement can be re-iterated again if needed.
-            if self.execute_statements(statements.clone()) {
+            if let Condition::Break = self.execute_statements(statements.clone()) {
                 break
             }
         }
@@ -206,35 +215,51 @@ impl<'a> FlowLogic for Shell<'a> {
             }
         }
 
+        let ignore_variable = variable == "_";
         match ForExpression::new(values, &self.directory_stack, &self.variables) {
+            ForExpression::Multiple(ref values) if ignore_variable => {
+                for _ in values.iter().flat_map(|x| glob_expand(x.as_str())) {
+                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
+                }
+            },
             ForExpression::Multiple(values) => {
                 for value in values.iter().flat_map(|x| glob_expand(x.as_str())) {
-                    if value != "_" { self.variables.set_var(variable, &value); }
-                    if self.execute_statements(statements.clone()) { break }
+                    self.variables.set_var(variable, &value);
+                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
+                }
+            },
+            ForExpression::Normal(ref values) if ignore_variable => {
+                for _ in values.lines().flat_map(glob_expand) {
+                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
                 }
             },
             ForExpression::Normal(values) => {
                 for value in values.lines().flat_map(glob_expand) {
-                    if value != "_" { self.variables.set_var(variable, &value); }
-                    if self.execute_statements(statements.clone()) { break }
+                    self.variables.set_var(variable, &value);
+                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
                 }
             },
+            ForExpression::Range(start, end) if ignore_variable => {
+                for _ in start..end {
+                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
+                }
+            }
             ForExpression::Range(start, end) => {
                 for value in (start..end).map(|x| x.to_string()) {
-                    if value != "_" { self.variables.set_var(variable, &value); }
-                    if self.execute_statements(statements.clone()) { break }
+                    self.variables.set_var(variable, &value);
+                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
                 }
             }
         }
     }
 
     fn execute_if(&mut self, mut expression: Pipeline, success: Vec<Statement>,
-        mut else_if: Vec<ElseIf>, failure: Vec<Statement>) -> bool
+        else_if: Vec<ElseIf>, failure: Vec<Statement>) -> Condition
     {
         match self.run_pipeline(&mut expression, false) {
             Some(SUCCESS) => self.execute_statements(success),
             _             => {
-                for mut elseif in else_if.drain(..) {
+                for mut elseif in else_if.into_iter() {
                     if self.run_pipeline(&mut elseif.expression, false) == Some(SUCCESS) {
                         return self.execute_statements(elseif.success);
                     }
@@ -249,7 +274,7 @@ impl<'a> FlowLogic for Shell<'a> {
     {
         match statement {
             // Execute a Let Statement
-            Statement::Let{ expression } => {
+            Statement::Let { expression } => {
                 self.previous_status = let_assignment(&expression, &mut self.variables, &self.directory_stack);
             },
             // Collect the statements for the while loop, and if the loop is complete,

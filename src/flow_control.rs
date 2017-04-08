@@ -45,6 +45,7 @@ pub enum Statement {
     Else,
     End,
     Break,
+    Continue,
     Pipeline(Pipeline),
     Default
 }

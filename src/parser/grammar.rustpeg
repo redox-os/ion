@@ -12,6 +12,7 @@ parse_ -> Statement
       / fn_
       / end_
       / break_
+      / continue_
       / pipelines
 
 #[pub]
@@ -22,9 +23,11 @@ let_ -> Statement
 
 #[pub]
 break_ -> Statement
-    = whitespace* "break" {
-        Statement::Break
-    }
+    = whitespace* "break" { Statement::Break }
+
+#[pub]
+continue_ -> Statement
+    = whitespace* "continue" { Statement::Continue }
 
 #[pub]
 if_ -> Statement
