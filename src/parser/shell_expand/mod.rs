@@ -67,21 +67,18 @@ fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
     }
 }
 
-#[inline(always)]
 fn array_expand(elements: &[&str], expand_func: &ExpanderFunctions) -> Vec<String> {
     elements.iter()
         .flat_map(|element| expand_string(element, expand_func, false))
         .collect()
 }
 
-#[inline(always)]
 fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, id: usize) -> String {
     elements.iter()
         .flat_map(|element| expand_string(element, expand_func, false))
         .nth(id).unwrap_or_default()
 }
 
-#[inline(always)]
 fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: usize, end: IndexPosition) -> Vec<String> {
     match end {
         IndexPosition::CatchAll => elements.iter()
@@ -93,11 +90,10 @@ fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: usize,
     }
 }
 
-#[inline(always)]
 fn slice_string(output: &mut String, expanded: &str, index: Index) {
     match index {
         Index::None => (),
-        Index::All => output.push_str(&expanded),
+        Index::All => output.push_str(expanded),
         Index::ID(id) => {
             if let Some(character) = UnicodeSegmentation::graphemes(expanded, true).nth(id) {
                 output.push_str(character);

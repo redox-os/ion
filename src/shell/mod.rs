@@ -145,7 +145,7 @@ impl<'a> Shell<'a> {
     pub fn terminate_quotes(&mut self, command: String) -> String {
         let mut buffer = QuoteTerminator::new(command);
         self.flow_control.level += 1;
-        while !buffer.is_terminated() {
+        while !buffer.check_termination() {
             loop {
                 if let Some(command) = self.readln() {
                     buffer.append(command);
@@ -175,7 +175,7 @@ impl<'a> Shell<'a> {
                                     let mut lines = command_list.lines().map(|x| x.to_owned());
                                     while let Some(command) = lines.next() {
                                         let mut buffer = QuoteTerminator::new(command);
-                                        while !buffer.is_terminated() {
+                                        while !buffer.check_termination() {
                                             loop {
                                                 if let Some(command) = lines.next() {
                                                     buffer.append(command);

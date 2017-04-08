@@ -259,7 +259,7 @@ impl<'a> FlowLogic for Shell<'a> {
         match self.run_pipeline(&mut expression, false) {
             Some(SUCCESS) => self.execute_statements(success),
             _             => {
-                for mut elseif in else_if.into_iter() {
+                for mut elseif in else_if {
                     if self.run_pipeline(&mut elseif.expression, false) == Some(SUCCESS) {
                         return self.execute_statements(elseif.success);
                     }

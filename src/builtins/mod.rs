@@ -10,7 +10,8 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 use std::process;
 
-use shell::{Shell, ShellHistory};
+use parser::QuoteTerminator;
+use shell::{Shell, FlowLogic, ShellHistory};
 use status::*;
 
 /// Structure which represents a Terminal's command.
@@ -155,6 +156,25 @@ impl Builtin {
                         });
 
         /* Misc */
+        commands.insert("eval",
+            Builtin {
+                name: "eval",
+                help: "evaluates the evaluated expression",
+                main: box |args: &[String], shell: &mut Shell| -> i32 {
+                    let evaluated_command = args[1..].join(" ");
+                    let mut buffer = QuoteTerminator::new(evaluated_command);
+                    if buffer.check_termination() {
+                        shell.on_command(&buffer.consume());
+                        shell.previous_status
+                    } else {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: supplied eval expression was not terminted");
+                        FAILURE
+                    }
+                },
+            });
+
         commands.insert("exit",
                 Builtin {
                     name: "exit",

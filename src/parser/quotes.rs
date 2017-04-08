@@ -18,7 +18,7 @@ impl QuoteTerminator {
         self.buffer.push_str(if self.flags & TRIM != 0 { input.trim() } else { &input });
     }
 
-    pub fn is_terminated(&mut self) -> bool {
+    pub fn check_termination(&mut self) -> bool {
         for character in self.buffer.bytes().skip(self.read) {
             self.read += 1;
             match character {

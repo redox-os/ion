@@ -11,12 +11,12 @@ pub enum ForExpression {
 
 impl ForExpression {
     pub fn new(expression: &[String], dir_stack: &DirectoryStack, variables: &Variables) -> ForExpression {
-        let mut output: Vec<String> = expression.iter()
+        let output: Vec<String> = expression.iter()
             .flat_map(|expression| expand_string(expression, variables, dir_stack, true))
             .collect();
 
         if output.len() == 1 {
-            let output = output.drain(..).next().unwrap();
+            let output = output.into_iter().next().unwrap();
             {
                 let mut bytes_iterator = output.bytes().enumerate();
                 while let Some((id, byte)) = bytes_iterator.next() {
