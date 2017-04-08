@@ -23,6 +23,23 @@ pub struct ExpanderFunctions<'f> {
     pub command:  &'f Fn(&str, bool) -> Option<String>
 }
 
+fn escape(arg: &str) -> String {
+    let mut output = String::new();
+    let mut chars = arg.chars();
+
+    while let Some(character) = chars.next() {
+        output.push(character);
+        if character == ' ' {
+            break
+        }
+    }
+
+    output.push('\"');
+    output.push_str(&chars.collect::<String>());
+    output.push('\"');
+    output
+}
+
 fn expand_process(current: &mut String, command: &str, quoted: bool,
     index: Index, expand_func: &ExpanderFunctions)
 {

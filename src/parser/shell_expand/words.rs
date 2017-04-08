@@ -650,17 +650,26 @@ impl<'a> Iterator for WordIterator<'a> {
                         start += 1;
                         self.read += 1;
                         self.flags ^= BACKSL;
+                        if self.flags & EXPAND_PROCESSES == 0 {
+                            return Some(WordToken::Normal("\\"));
+                        }
                         break
                     }
                     b'\'' if self.flags & DQUOTE == 0 => {
                         start += 1;
                         self.read += 1;
                         self.flags ^= SQUOTE;
+                        if self.flags & EXPAND_PROCESSES == 0 {
+                            return Some(WordToken::Normal("'"));
+                        }
                     },
                     b'"' if self.flags & SQUOTE == 0 => {
                         start += 1;
                         self.read += 1;
                         self.flags ^= DQUOTE;
+                        if self.flags & EXPAND_PROCESSES == 0 {
+                            return Some(WordToken::Normal("\""));
+                        }
                     }
                     b' ' if self.flags & (SQUOTE + DQUOTE) == 0 => {
                         return Some(self.whitespaces(&mut iterator));
@@ -729,19 +738,22 @@ impl<'a> Iterator for WordIterator<'a> {
                 _ if self.flags & BACKSL != 0 => self.flags ^= BACKSL,
                 b'\\' => {
                     self.flags ^= BACKSL;
-                    let output = &self.data[start..self.read];
+                    let end = if self.flags & EXPAND_PROCESSES == 0 { self.read+1 } else { self.read };
+                    let output = &self.data[start..end];
                     self.read += 1;
                     return Some(WordToken::Normal(output));
                 },
                 b'\'' if self.flags & DQUOTE == 0 => {
                     self.flags ^= SQUOTE;
-                    let output = &self.data[start..self.read];
+                    let end = if self.flags & EXPAND_PROCESSES == 0 { self.read+1 } else { self.read };
+                    let output = &self.data[start..end];
                     self.read += 1;
                     return Some(WordToken::Normal(output));
                 },
                 b'"' if self.flags & SQUOTE == 0 => {
                     self.flags ^= DQUOTE;
-                    let output = &self.data[start..self.read];
+                    let end = if self.flags & EXPAND_PROCESSES == 0 { self.read+1 } else { self.read };
+                    let output = &self.data[start..end];
                     self.read += 1;
                     return Some(WordToken::Normal(output));
                 },
