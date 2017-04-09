@@ -1,0 +1,22 @@
+#!/usr/bin/ion
+
+# This script will print the current RX and TX statistics of each
+# network interface on Linux, minus the loopback interface.
+
+for interface in /sys/class/net/*
+    let name = @split(interface, '/')[4]
+
+    if test $name = "lo"
+        continue
+    end
+
+    let tx = $(cat $interface/statistics/tx_bytes)
+    let rx = $(cat $interface/statistics/rx_bytes)
+    let tx /= 1048576
+    let rx /= 1048576
+
+    echo "$name
+    RX: $rx MiB
+    TX: $tx MiB
+    "
+end

@@ -1,0 +1,1 @@
+echo $(echo "one   two    three"    "four 'five' six")

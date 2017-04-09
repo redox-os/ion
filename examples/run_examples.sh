@@ -7,6 +7,7 @@ TAGFAIL=$RED'[FAIL]'$NC
 TAGPASS=$GREEN'[PASS]'$NC
 
 EXAMPLES_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR=$(dirname $(cargo locate-project | awk -F\" '{print $4}'))
 
 EXIT_VAL=0
 
@@ -22,7 +23,8 @@ function check_return_value {
     EXPECTED_OUTPUT_FILE=$(echo $1 | sed 's/\.ion/\.out/')
 
     # Run script and redirect stdout into tmp file
-    cargo run $1 1> $EXAMPLES_DIR/tmp.out 2> /dev/null
+    $PROJECT_DIR/target/debug/ion $1 1> $EXAMPLES_DIR/tmp.out 2> /dev/null
+
     # Compare real and expected output
     cmp --silent $EXAMPLES_DIR/tmp.out $EXPECTED_OUTPUT_FILE
     local RET=$?
@@ -39,6 +41,9 @@ function check_return_value {
         return 0;
     fi
 }
+
+# Build debug binary
+cargo build
 
 # Iterate over every Ion script in examples directory
 for i in $EXAMPLES_DIR/*.ion; do
