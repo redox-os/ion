@@ -9,6 +9,7 @@ extern crate liner;
 #[cfg(all(unix, not(target_os = "redox")))]
 extern crate users as users_unix;
 
+#[macro_use] mod parser;
 pub mod completer;
 pub mod pipe;
 pub mod directory_stack;
@@ -17,7 +18,6 @@ pub mod variables;
 pub mod status;
 pub mod flow_control;
 mod builtins;
-mod parser;
 mod shell;
 
 use std::io::{stderr, Write, ErrorKind};

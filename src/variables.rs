@@ -222,7 +222,7 @@ fn get_user_home(_username: &str) -> Option<String> {
 mod tests {
     use super::*;
     use directory_stack::DirectoryStack;
-    use parser::expand_string;
+    use parser::{expand_string, ExpanderFunctions, Index, IndexEnd};
 
     fn new_dir_stack() -> DirectoryStack {
         DirectoryStack::new().unwrap()
@@ -230,8 +230,9 @@ mod tests {
 
     #[test]
     fn undefined_variable_expands_to_empty_string() {
+
         let variables = Variables::default();
-        let expanded = expand_string("$FOO", &variables, &new_dir_stack(), false).join("");
+        let expanded = expand_string("$FOO", &get_expanders!(&variables, &new_dir_stack()), false).join("");
         assert_eq!("", &expanded);
     }
 
@@ -239,7 +240,7 @@ mod tests {
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
-        let expanded = expand_string("$FOO", &variables, &new_dir_stack(), false).join("");
+        let expanded = expand_string("$FOO", &get_expanders!(&variables, &new_dir_stack()), false).join("");
         assert_eq!("BAR", &expanded);
     }
 }

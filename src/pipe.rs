@@ -87,13 +87,15 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                         let _ = thread::spawn(move || {
                             // TODO: Implement proper backgrounding support
                             let status = wait_on_child(child);
-                            println!("ion: background task completed: {}", status);
+                            let stderr = io::stderr();
+                            let mut stderr = stderr.lock();
+                            let _ = writeln!(stderr, "ion: background task completed: {}", status);
                         });
                     },
                     Err(_) => {
                         let stderr = io::stderr();
                         let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(&command));
+                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
                     }
                 }
             },
@@ -102,8 +104,7 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
 
                 // Initialize the first job
                 let _ = match from {
-                    RedirectFrom::Both => command.stderr(Stdio::piped()), // TODO: Fix this
-                    RedirectFrom::Stderr => command.stderr(Stdio::piped()),
+                    RedirectFrom::Both | RedirectFrom::Stderr => command.stderr(Stdio::piped()), // TODO: Fix this
                     RedirectFrom::Stdout => command.stdout(Stdio::piped()),
                 };
 
@@ -111,7 +112,7 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                 if child.is_none() {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(&command));
+                    let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
                 }
                 children.push(child);
 
@@ -119,8 +120,7 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                 while let Some(&mut (ref mut command, kind)) = commands.next() {
                     if let JobKind::Pipe(from) = kind {
                         let _ = match from {
-                            RedirectFrom::Both => command.stderr(Stdio::piped()), // TODO: Fix this
-                            RedirectFrom::Stderr => command.stderr(Stdio::piped()),
+                            RedirectFrom::Both | RedirectFrom::Stderr => command.stderr(Stdio::piped()), // TODO: Fix this
                             RedirectFrom::Stdout => command.stdout(Stdio::piped()),
                         };
                     }
@@ -149,7 +149,7 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                     if child.is_none() {
                         let stderr = io::stderr();
                         let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(&command));
+                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
                     }
                     children.push(child);
 
@@ -178,7 +178,7 @@ fn execute_command(command: &mut Command) -> i32 {
         Err(_) => {
             let stderr = io::stderr();
             let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(&command));
+            let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
             FAILURE
         }
     }

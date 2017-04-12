@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use variables::Variables;
 use directory_stack::DirectoryStack;
 use parser::assignments::{self, Binding, Operator, Value};
-use parser::{ExpanderFunctions, Index, IndexPosition};
+use parser::{ExpanderFunctions, Index, IndexEnd};
 use status::*;
 
 fn print_vars(list: &HashMap<String, String>) {
@@ -54,9 +54,9 @@ pub fn let_assignment<'a>(original: &'a str, vars: &mut Variables, dir_stack: &D
                             Index::ID(id) => array.get(id).map(|x| vec![x.to_owned()]),
                             Index::Range(start, end) => {
                                 let array = match end {
-                                    IndexPosition::CatchAll => array.iter().skip(start)
+                                    IndexEnd::CatchAll => array.iter().skip(start)
                                         .map(|x| x.to_owned()).collect::<Vec<String>>(),
-                                    IndexPosition::ID(end) => array.iter().skip(start).take(end-start)
+                                    IndexEnd::ID(end) => array.iter().skip(start).take(end-start)
                                         .map(|x| x.to_owned()).collect::<Vec<String>>()
                                 };
                                 if array.is_empty() { None } else { Some(array) }

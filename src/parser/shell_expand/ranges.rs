@@ -1,4 +1,4 @@
-use super::words::IndexPosition;
+use super::words::IndexEnd;
 
 pub fn parse_range(input: &str) -> Option<Vec<String>> {
     let mut bytes_iterator = input.bytes().enumerate();
@@ -61,7 +61,7 @@ pub fn parse_range(input: &str) -> Option<Vec<String>> {
     None
 }
 
-pub fn parse_index_range(input: &str) -> Option<(usize, IndexPosition)> {
+pub fn parse_index_range(input: &str) -> Option<(usize, IndexEnd)> {
     let mut bytes_iterator = input.bytes().enumerate();
     while let Some((id, byte)) = bytes_iterator.next() {
         match byte {
@@ -87,13 +87,13 @@ pub fn parse_index_range(input: &str) -> Option<(usize, IndexPosition)> {
                         None
                     } else {
                         match end.parse::<usize>() {
-                            Ok(end) => Some((0, IndexPosition::ID(end))),
+                            Ok(end) => Some((0, IndexEnd::ID(end))),
                             Err(_)  => None
                         }
                     }
                 } else if end.is_empty() {
                     return match first.parse::<usize>() {
-                        Ok(start) => Some((start, IndexPosition::CatchAll)),
+                        Ok(start) => Some((start, IndexEnd::CatchAll)),
                         Err(_)    => None
                     }
                 }
@@ -104,14 +104,14 @@ pub fn parse_index_range(input: &str) -> Option<(usize, IndexPosition)> {
                             if end < start {
                                 None
                             } else if end == start {
-                                Some((start, IndexPosition::ID(start+1)))
+                                Some((start, IndexEnd::ID(start+1)))
                             } else {
-                                Some((start, IndexPosition::ID(end+1)))
+                                Some((start, IndexEnd::ID(end+1)))
                             }
                         } else if end <= start {
                             None
                         } else {
-                            Some((start, IndexPosition::ID(end)))
+                            Some((start, IndexEnd::ID(end)))
                         }
                     }
                 } else {
@@ -128,8 +128,8 @@ pub fn parse_index_range(input: &str) -> Option<(usize, IndexPosition)> {
 
 #[test]
 fn index_ranges() {
-    assert_eq!(Some((0, IndexPosition::ID(3))), parse_index_range("0..3"));
-    assert_eq!(Some((0, IndexPosition::ID(3))), parse_index_range("0...2"));
+    assert_eq!(Some((0, IndexEnd::ID(3))), parse_index_range("0..3"));
+    assert_eq!(Some((0, IndexEnd::ID(3))), parse_index_range("0...2"));
     assert_eq!(None, parse_index_range("0..A"));
 }
 

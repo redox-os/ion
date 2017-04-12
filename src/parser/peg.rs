@@ -5,7 +5,7 @@ use self::grammar::parse_;
 use directory_stack::DirectoryStack;
 use shell::Job;
 use variables::Variables;
-use parser::expand_string;
+use parser::{expand_string, ExpanderFunctions, Index, IndexEnd};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RedirectFrom { Stdout, Stderr, Both}
@@ -35,16 +35,17 @@ impl Pipeline {
     }
 
     pub fn expand(&mut self, variables: &Variables, dir_stack: &DirectoryStack) {
+        let expanders = get_expanders!(variables, dir_stack);
         for job in &mut self.jobs {
-            job.expand(variables, dir_stack);
+            job.expand(&expanders);
         }
 
         if let Some(stdin) = self.stdin.iter_mut().next() {
-            stdin.file = expand_string(stdin.file.as_str(), variables, dir_stack, false).join(" ");
+            stdin.file = expand_string(stdin.file.as_str(), &expanders, false).join(" ");
         }
 
         if let Some(stdout) = self.stdout.iter_mut().next() {
-            stdout.file = expand_string(stdout.file.as_str(), variables, dir_stack, false).join(" ");
+            stdout.file = expand_string(stdout.file.as_str(), &expanders, false).join(" ");
         }
     }
 }

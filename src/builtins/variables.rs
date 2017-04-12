@@ -240,7 +240,7 @@ pub fn export_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
 #[cfg(test)]
 mod test {
     use super::*;
-    use parser::expand_string;
+    use parser::{expand_string, ExpanderFunctions, Index, IndexEnd};
     use status::{FAILURE, SUCCESS};
     use directory_stack::DirectoryStack;
 
@@ -278,7 +278,7 @@ mod test {
         variables.set_var("FOO", "BAR");
         let return_status = drop_variable(&mut variables, vec!["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = expand_string("$FOO", &variables, &new_dir_stack(), false).join("");
+        let expanded = expand_string("$FOO", &get_expanders!(&variables, &new_dir_stack()), false).join("");
         assert_eq!("", expanded);
     }
 

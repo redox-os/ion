@@ -12,7 +12,7 @@ use self::braces::BraceToken;
 use self::ranges::parse_range;
 use self::words::{WordIterator, WordToken};
 
-pub use self::words::{Index, IndexPosition};
+pub use self::words::{Index, IndexEnd};
 
 use std::io::{self, Write};
 
@@ -79,12 +79,12 @@ fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, id: usize) -> S
         .nth(id).unwrap_or_default()
 }
 
-fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: usize, end: IndexPosition) -> Vec<String> {
+fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: usize, end: IndexEnd) -> Vec<String> {
     match end {
-        IndexPosition::CatchAll => elements.iter()
+        IndexEnd::CatchAll => elements.iter()
             .flat_map(|element| expand_string(element, expand_func, false))
             .skip(start).collect(),
-        IndexPosition::ID(end) => elements.iter()
+        IndexEnd::ID(end) => elements.iter()
             .flat_map(|element| expand_string(element, expand_func, false))
             .skip(start).take(end-start).collect()
     }
@@ -99,14 +99,14 @@ fn slice_string(output: &mut String, expanded: &str, index: Index) {
                 output.push_str(character);
             }
         },
-        Index::Range(start, IndexPosition::ID(end)) => {
+        Index::Range(start, IndexEnd::ID(end)) => {
             let substring = UnicodeSegmentation::graphemes(expanded, true)
                 .skip(start).take(end-start)
                 .collect::<Vec<&str>>().join("");
 
             output.push_str(&substring);
         },
-        Index::Range(start, IndexPosition::CatchAll) => {
+        Index::Range(start, IndexEnd::CatchAll) => {
             let substring = UnicodeSegmentation::graphemes(expanded, true)
                 .skip(start).collect::<Vec<&str>>().join("");
 
@@ -184,10 +184,10 @@ fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFunctio
                                 let mut temp = String::new();
                                 expand_process(&mut temp, command, quoted, Index::All, expand_func);
                                 let temp = match end {
-                                    IndexPosition::ID(end) => temp.split_whitespace()
+                                    IndexEnd::ID(end) => temp.split_whitespace()
                                         .skip(start).take(end-start)
                                         .collect::<Vec<&str>>(),
-                                    IndexPosition::CatchAll => temp.split_whitespace()
+                                    IndexEnd::CatchAll => temp.split_whitespace()
                                         .skip(start).collect::<Vec<&str>>()
                                 };
                                 output.push_str(&temp.join(" "));
@@ -278,9 +278,9 @@ fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFunctio
                         Index::Range(start, end) => {
                             expand_process(&mut output, command, quoted, Index::All, expand_func);
                             return match end {
-                                IndexPosition::ID(end) => output.split_whitespace().map(String::from)
+                                IndexEnd::ID(end) => output.split_whitespace().map(String::from)
                                     .skip(start).take(end-start).collect::<Vec<String>>(),
-                                IndexPosition::CatchAll => output.split_whitespace().map(String::from)
+                                IndexEnd::CatchAll => output.split_whitespace().map(String::from)
                                     .skip(start).collect::<Vec<String>>()
                             }
                         },
@@ -336,10 +336,10 @@ fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFunctio
                             let mut temp = String::new();
                             expand_process(&mut temp, command, quoted, Index::All, expand_func);
                             let temp = match end {
-                                IndexPosition::ID(end) => temp.split_whitespace()
+                                IndexEnd::ID(end) => temp.split_whitespace()
                                     .skip(start).take(end-start)
                                     .collect::<Vec<&str>>(),
-                                IndexPosition::CatchAll => temp.split_whitespace()
+                                IndexEnd::CatchAll => temp.split_whitespace()
                                     .skip(start).collect::<Vec<&str>>()
                             };
                             output.push_str(&temp.join(" "));

@@ -21,11 +21,11 @@ pub enum Index {
     All,
     None,
     ID(usize),
-    Range(usize, IndexPosition),
+    Range(usize, IndexEnd),
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub enum IndexPosition {
+pub enum IndexEnd {
     ID(usize),
     CatchAll
 }
@@ -96,7 +96,7 @@ impl<'a> ArrayMethod<'a> {
                             .nth(id)
                             .unwrap_or_default()
                     ),
-                    (Pattern::StringPattern(pattern), Index::Range(start, IndexPosition::ID(end))) => {
+                    (Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::ID(end))) => {
                         let range = variable.split(&expand_string(pattern, expand_func, false).join(" "))
                             .skip(start).take(end-start)
                             .collect::<Vec<&str>>()
@@ -104,7 +104,7 @@ impl<'a> ArrayMethod<'a> {
 
                         current.push_str(&range);
                     },
-                    (Pattern::Whitespace, Index::Range(start, IndexPosition::ID(end))) => {
+                    (Pattern::Whitespace, Index::Range(start, IndexEnd::ID(end))) => {
                         let range = variable.split(char::is_whitespace)
                             .skip(start).take(end-start)
                             .collect::<Vec<&str>>()
@@ -112,7 +112,7 @@ impl<'a> ArrayMethod<'a> {
 
                         current.push_str(&range);
                     },
-                    (Pattern::StringPattern(pattern), Index::Range(start, IndexPosition::CatchAll)) => {
+                    (Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::CatchAll)) => {
                         let range = variable.split(&expand_string(pattern, expand_func, false).join(" "))
                             .skip(start)
                             .collect::<Vec<&str>>()
@@ -120,7 +120,7 @@ impl<'a> ArrayMethod<'a> {
 
                         current.push_str(&range);
                     }
-                    (Pattern::Whitespace, Index::Range(start, IndexPosition::CatchAll)) => {
+                    (Pattern::Whitespace, Index::Range(start, IndexEnd::CatchAll)) => {
                         let range = variable.split(char::is_whitespace)
                             .skip(start)
                             .collect::<Vec<&str>>()
@@ -159,25 +159,25 @@ impl<'a> ArrayMethod<'a> {
                         .split(char::is_whitespace)
                         .nth(id).map(String::from)
                         .unwrap_or_default()],
-                    (Pattern::StringPattern(pattern), Index::Range(start, IndexPosition::CatchAll)) => {
+                    (Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::CatchAll)) => {
                         variable.split(&expand_string(pattern, expand_func, false).join(" "))
                             .skip(start)
                             .map(String::from)
                             .collect::<Vec<String>>()
                     },
-                    (Pattern::Whitespace, Index::Range(start, IndexPosition::CatchAll)) => {
+                    (Pattern::Whitespace, Index::Range(start, IndexEnd::CatchAll)) => {
                         variable.split(char::is_whitespace)
                             .skip(start)
                             .map(String::from)
                             .collect::<Vec<String>>()
                     },
-                    (Pattern::StringPattern(pattern), Index::Range(start, IndexPosition::ID(end))) => {
+                    (Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::ID(end))) => {
                         variable.split(&expand_string(pattern, expand_func, false).join(" ")).skip(start)
                             .take(end-start)
                             .map(String::from)
                             .collect::<Vec<String>>()
                     },
-                    (Pattern::Whitespace, Index::Range(start, IndexPosition::ID(end))) => {
+                    (Pattern::Whitespace, Index::Range(start, IndexEnd::ID(end))) => {
                         variable.split(char::is_whitespace).skip(start)
                             .take(end-start)
                             .map(String::from)
@@ -851,15 +851,15 @@ mod tests {
     fn indexes() {
         let input = "@array[0..3] @array[0...3] @array[abc] @array[..3] @array[3..]";
         let expected = vec![
-            WordToken::ArrayVariable("array", false, Index::Range(0, IndexPosition::ID(3))),
+            WordToken::ArrayVariable("array", false, Index::Range(0, IndexEnd::ID(3))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(0, IndexPosition::ID(4))),
+            WordToken::ArrayVariable("array", false, Index::Range(0, IndexEnd::ID(4))),
             WordToken::Whitespace(" "),
             WordToken::ArrayVariable("array", false, Index::None),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(0, IndexPosition::ID(3))),
+            WordToken::ArrayVariable("array", false, Index::Range(0, IndexEnd::ID(3))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(3, IndexPosition::CatchAll)),
+            WordToken::ArrayVariable("array", false, Index::Range(3, IndexEnd::CatchAll)),
         ];
         compare(input, expected);
     }
