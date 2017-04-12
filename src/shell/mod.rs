@@ -174,10 +174,9 @@ impl<'a> Shell<'a> {
                     let _ = writeln!(stderr, "ion: -c requires an argument");
                 }
             } else {
-                self.variables.set_var("0", &path);
-                for (i, arg) in args.enumerate() {
-                    self.variables.set_var(&format!("{}", i + 1), &arg);
-                }
+                let mut array = vec![ path.clone() ];
+                for arg in args { array.push(arg); }
+                self.variables.set_array("args", array);
 
                 match File::open(&path) {
                     Ok(mut file) => {

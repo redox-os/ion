@@ -1,5 +1,5 @@
 #!/usr/bin/ion
 
-## Prints the model name of the CPU
+# Prints the model name of the CPU
 
 echo @[grep 'model name' /proc/cpuinfo | head -1][3..5]
