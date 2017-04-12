@@ -158,52 +158,63 @@ impl<'a> Shell<'a> {
     }
 
     pub fn execute(&mut self) {
-        let mut dash_c = false;
-        for arg in env::args().skip(1) {
-            if arg == "-c" {
-                dash_c = true;
-            } else {
-                if dash_c {
+        let mut args = env::args().skip(1);
+
+        if let Some(path) = args.next() {
+            if path == "-c" {
+                if let Some(arg) = args.next() {
+                    for (i, arg) in args.enumerate() {
+                        self.variables.set_var(&format!("{}", i), &arg);
+                    }
+
                     self.on_command(&arg);
                 } else {
-                    match File::open(&arg) {
-                        Ok(mut file) => {
-                            let capacity = file.metadata().ok().map_or(0, |x| x.len());
-                            let mut command_list = String::with_capacity(capacity as usize);
-                            match file.read_to_string(&mut command_list) {
-                                Ok(_) => {
-                                    let mut lines = command_list.lines().map(|x| x.to_owned());
-                                    while let Some(command) = lines.next() {
-                                        let mut buffer = QuoteTerminator::new(command);
-                                        while !buffer.check_termination() {
-                                            loop {
-                                                if let Some(command) = lines.next() {
-                                                    buffer.append(command);
-                                                    break
-                                                }
-                                            }
-                                        }
-                                        self.on_command(&buffer.consume());
-                                    }
-                                },
-                                Err(err) => {
-                                    let stderr = io::stderr();
-                                    let mut stderr = stderr.lock();
-                                    let _ = writeln!(stderr, "ion: failed to read {}: {}", arg, err);
-                                }
-                            }
-                        },
-                        Err(err) => {
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "ion: failed to open {}: {}", arg, err);
-                        }
-                    }
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: -c requires an argument");
+                }
+            } else {
+                self.variables.set_var("0", &path);
+                for (i, arg) in args.enumerate() {
+                    self.variables.set_var(&format!("{}", i + 1), &arg);
                 }
 
-                // Exit with the previous command's exit status.
-                process::exit(self.previous_status);
+                match File::open(&path) {
+                    Ok(mut file) => {
+                        let capacity = file.metadata().ok().map_or(0, |x| x.len());
+                        let mut command_list = String::with_capacity(capacity as usize);
+                        match file.read_to_string(&mut command_list) {
+                            Ok(_) => {
+                                let mut lines = command_list.lines().map(|x| x.to_owned());
+                                while let Some(command) = lines.next() {
+                                    let mut buffer = QuoteTerminator::new(command);
+                                    while !buffer.check_termination() {
+                                        loop {
+                                            if let Some(command) = lines.next() {
+                                                buffer.append(command);
+                                                break
+                                            }
+                                        }
+                                    }
+                                    self.on_command(&buffer.consume());
+                                }
+                            },
+                            Err(err) => {
+                                let stderr = io::stderr();
+                                let mut stderr = stderr.lock();
+                                let _ = writeln!(stderr, "ion: failed to read {}: {}", path, err);
+                            }
+                        }
+                    },
+                    Err(err) => {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: failed to open {}: {}", path, err);
+                    }
+                }
             }
+
+            process::exit(self.previous_status);
         }
 
         while let Some(command) = self.readln() {
