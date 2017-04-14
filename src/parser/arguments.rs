@@ -9,7 +9,6 @@ const METHOD: u8 = 128;
 
 /// An efficient `Iterator` structure for splitting arguments
 pub struct ArgumentSplitter<'a> {
-    buffer:       Vec<u8>,
     data:         &'a str,
     read:         usize,
     flags:        u8,
@@ -18,7 +17,6 @@ pub struct ArgumentSplitter<'a> {
 impl<'a> ArgumentSplitter<'a> {
     pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
         ArgumentSplitter {
-            buffer:       Vec::with_capacity(32),
             data:         data,
             read:         0,
             flags:        0,
@@ -27,25 +25,29 @@ impl<'a> ArgumentSplitter<'a> {
 }
 
 impl<'a> Iterator for ArgumentSplitter<'a> {
-    type Item = String;
+    type Item = &'a str;
 
-    fn next(&mut self) -> Option<String> {
+    fn next(&mut self) -> Option<&'a str> {
+        while let Some(&b' ') = self.data.as_bytes().get(self.read) {
+            self.read += 1;
+        }
+        let start = self.read;
+
         let (mut level, mut array_level, mut array_process_level) = (0, 0, 0);
         for character in self.data.bytes().skip(self.read) {
-            self.read += 1;
             match character {
                 _ if self.flags & BACK != 0 => self.flags ^= BACK,
                 b'\\'                       => self.flags ^= BACK,
                 b'@' if self.flags & SINGLE == 0 => {
                     self.flags &= 255 ^ COMM_1;
                     self.flags |= COMM_2 + ARRAY;
-                    self.buffer.push(character);
+                    self.read += 1;
                     continue
                 },
                 b'$' if self.flags & SINGLE == 0 => {
                     self.flags &= 255 ^ COMM_2;
                     self.flags |= COMM_1 + VARIAB;
-                    self.buffer.push(character);
+                    self.read += 1;
                     continue
                 },
                 b'['  if self.flags & SINGLE == 0 && self.flags & COMM_2 != 0 => array_process_level += 1,
@@ -63,21 +65,18 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b')'  if self.flags & SINGLE == 0 => level -= 1,
                 b'"'  if self.flags & SINGLE == 0 => self.flags ^= DOUBLE,
                 b'\'' if self.flags & DOUBLE == 0 => self.flags ^= SINGLE,
-                b' '  if !self.buffer.is_empty() && (self.flags & (SINGLE + DOUBLE + METHOD) == 0)
+                b' '  if self.flags & (SINGLE + DOUBLE + METHOD) == 0
                     && level == 0 && array_level == 0 && array_process_level == 0 => break,
                 _ => ()
             }
-            self.buffer.push(character);
+            self.read += 1;
             self.flags &= 255 ^ (COMM_1 + COMM_2);
         }
 
-        if self.buffer.is_empty() {
+        if start == self.read {
             None
         } else {
-            let mut output = self.buffer.clone();
-            output.shrink_to_fit();
-            self.buffer.clear();
-            Some(unsafe { String::from_utf8_unchecked(output) })
+            Some(&self.data[start..self.read])
         }
     }
 }
@@ -87,9 +86,9 @@ mod tests {
     use super::*;
 
     fn compare(input: &str, expected: Vec<&str>) {
-        let arguments = ArgumentSplitter::new(input).collect::<Vec<String>>();
-        for (&left, right) in expected.iter().zip(arguments.iter()) {
-            assert_eq!(left, right.as_str());
+        let arguments = ArgumentSplitter::new(input).collect::<Vec<&str>>();
+        for (left, right) in expected.iter().zip(arguments.iter()) {
+            assert_eq!(left, right);
         }
         assert_eq!(expected.len(), arguments.len());
     }

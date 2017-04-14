@@ -93,7 +93,7 @@ for_ -> Statement
     = whitespace* "for" whitespace? n:_name whitespace? "in" whitespace? expr:$(.*) {
         Statement::For {
             variable: n.to_string(),
-            values: ArgumentSplitter::new(expr).collect(),
+            values: ArgumentSplitter::new(expr).map(String::from).collect(),
             statements: Vec::new(),
         }
     }

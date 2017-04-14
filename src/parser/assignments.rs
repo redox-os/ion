@@ -38,7 +38,7 @@ fn parse_expression(expression: &str, shell_funcs: &ExpanderFunctions) -> Value 
         Expression::Arithmetic => unimplemented!(),
         // Expands the supplied expression normally
         Expression::Regular => {
-            let arguments: Vec<String> = ArgumentSplitter::new(expression).collect();
+            let arguments: Vec<&str> = ArgumentSplitter::new(expression).collect();
 
             if arguments.len() == 1 {
                 // If a single argument has been passed, it will be expanded and checked to determine
