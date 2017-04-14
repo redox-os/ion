@@ -10,7 +10,7 @@ mod words;
 
 use self::braces::BraceToken;
 use self::ranges::parse_range;
-use self::words::{WordIterator, WordToken};
+pub use self::words::{WordIterator, WordToken};
 
 pub use self::words::{Index, IndexEnd};
 
@@ -130,7 +130,7 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
 }
 
 #[allow(cyclomatic_complexity)]
-fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFunctions,
+pub fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFunctions,
     reverse_quoting: bool, contains_brace: bool) -> Vec<String>
 {
     let mut output = String::new();

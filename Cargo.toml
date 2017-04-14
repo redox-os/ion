@@ -18,6 +18,7 @@ build = "build.rs"
 name = "ion"
 
 [dependencies]
+fnv = "1.0"
 glob = "0.2"
 liner = "0.1.4"
 peg-syntax-ext = "0.4"
@@ -30,3 +31,8 @@ users = "0.5.1"
 [build-dependencies]
 ansi_term = "0.9"
 version_check = "0.1"
+
+[profile.release]
+# debug = true
+# rustflags = [ "-C", "target-cpu=native"]
+# lto = true

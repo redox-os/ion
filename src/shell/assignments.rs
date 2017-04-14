@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 use std::io::{self, Write};
 
 use variables::Variables;
@@ -7,7 +7,7 @@ use parser::assignments::{self, Binding, Operator, Value};
 use parser::{ExpanderFunctions, Index, IndexEnd};
 use status::*;
 
-fn print_vars(list: &HashMap<String, String>) {
+fn print_vars(list: &FnvHashMap<String, String>) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 
@@ -20,7 +20,7 @@ fn print_vars(list: &HashMap<String, String>) {
     }
 }
 
-fn print_arrays(list: &HashMap<String, Vec<String>>) {
+fn print_arrays(list: &FnvHashMap<String, Vec<String>>) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 

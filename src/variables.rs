@@ -1,5 +1,5 @@
 // TODO: Move into shell module
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 use std::env;
 use std::path::PathBuf;
 use std::process;
@@ -9,14 +9,14 @@ use liner::Context;
 use status::{SUCCESS, FAILURE};
 
 pub struct Variables {
-    pub arrays:    HashMap<String, Vec<String>>,
-    pub variables: HashMap<String, String>,
-    pub aliases:   HashMap<String, String>
+    pub arrays:    FnvHashMap<String, Vec<String>>,
+    pub variables: FnvHashMap<String, String>,
+    pub aliases:   FnvHashMap<String, String>
 }
 
 impl Default for Variables {
     fn default() -> Variables {
-        let mut map = HashMap::new();
+        let mut map = FnvHashMap::with_capacity_and_hasher(64, Default::default());
         map.insert("DIRECTORY_STACK_SIZE".to_string(), "1000".to_string());
         map.insert("HISTORY_SIZE".into(), "1000".into());
         map.insert("HISTORY_FILE_ENABLED".into(), "0".into());
@@ -36,7 +36,7 @@ impl Default for Variables {
 
         // Initialize the HOME variable
         env::home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| env::set_var("HOME", path.to_str().unwrap_or("?")));
-        Variables { arrays: HashMap::new(), variables: map, aliases: HashMap::new() }
+        Variables { arrays: FnvHashMap::with_capacity_and_hasher(64, Default::default()), variables: map, aliases: FnvHashMap::with_capacity_and_hasher(64, Default::default()) }
     }
 }
 

@@ -7,7 +7,7 @@ pub use self::history::ShellHistory;
 pub use self::job::{Job, JobKind};
 pub use self::flow::FlowLogic;
 
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::env;
@@ -30,25 +30,25 @@ use parser::peg::Pipeline;
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
 pub struct Shell<'a> {
-    pub builtins: &'a HashMap<&'static str, Builtin>,
+    pub builtins: &'a FnvHashMap<&'static str, Builtin>,
     pub context: Context,
     pub variables: Variables,
     flow_control: FlowControl,
     pub directory_stack: DirectoryStack,
-    pub functions: HashMap<String, Function>,
+    pub functions: FnvHashMap<String, Function>,
     pub previous_status: i32,
 }
 
 impl<'a> Shell<'a> {
     /// Panics if DirectoryStack construction fails
-    pub fn new(builtins: &'a HashMap<&'static str, Builtin>) -> Shell<'a> {
+    pub fn new(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
         Shell {
             builtins: builtins,
             context: Context::new(),
             variables: Variables::default(),
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new().expect(""),
-            functions: HashMap::default(),
+            functions: FnvHashMap::default(),
             previous_status: 0,
         }
     }
@@ -336,7 +336,9 @@ impl<'a> Shell<'a> {
             // Branch else if -> input == shell function and set the exit_status
             } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
                 if pipeline.jobs[0].args.len() - 1 == function.args.len() {
-                    let mut variables_backup: HashMap<&str, Option<String>> = HashMap::new();
+                    let mut variables_backup: FnvHashMap<&str, Option<String>> = FnvHashMap::with_capacity_and_hasher (
+                        64, Default::default()
+                    );
                     for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
                         variables_backup.insert(name, self.variables.get_var(name));
                         self.variables.set_var(name, value);

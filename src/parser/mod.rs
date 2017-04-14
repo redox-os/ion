@@ -39,7 +39,7 @@ pub mod shell_expand;
 mod statements;
 mod quotes;
 
-pub use self::shell_expand::{Index, IndexEnd, ExpanderFunctions, expand_string};
+pub use self::shell_expand::{Index, IndexEnd, ExpanderFunctions, expand_string, expand_tokens, WordToken, WordIterator};
 pub use self::arguments::ArgumentSplitter;
 pub use self::loops::for_grammar::ForExpression;
 pub use self::statements::{StatementSplitter, StatementError, check_statement};

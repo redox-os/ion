@@ -6,7 +6,7 @@ use self::variables::{alias, drop_alias, drop_variable, export_variable};
 use self::functions::fn_;
 use self::source::source;
 
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 use std::io::{self, Write};
 use std::process;
 
@@ -35,8 +35,8 @@ pub struct Builtin {
 
 impl Builtin {
     /// Return the map from command names to commands
-    pub fn map() -> HashMap<&'static str, Self> {
-        let mut commands: HashMap<&str, Self> = HashMap::new();
+    pub fn map() -> FnvHashMap<&'static str, Self> {
+        let mut commands: FnvHashMap<&str, Self> = FnvHashMap::with_capacity_and_hasher(32, Default::default());
 
         /* Directories */
         commands.insert("cd",
@@ -230,7 +230,7 @@ impl Builtin {
                             },
                         });
 
-        let command_helper: HashMap<&'static str, &'static str> = commands.iter()
+        let command_helper: FnvHashMap<&'static str, &'static str> = commands.iter()
                                                                           .map(|(k, v)| {
                                                                               (*k, v.help)
                                                                           })

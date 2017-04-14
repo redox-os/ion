@@ -3,6 +3,12 @@
 #![feature(box_syntax)]
 #![feature(plugin)]
 #![plugin(peg_syntax_ext)]
+
+// For a performance boost on Linux
+// #![feature(alloc_system)]
+// extern crate alloc_system;
+
+extern crate fnv;
 extern crate glob;
 extern crate liner;
 

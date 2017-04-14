@@ -1,9 +1,9 @@
 use flow_control::{Function};
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 use status::*;
 use std::io::{self, Write};
 
-fn print_functions(functions: &HashMap<String, Function>) {
+fn print_functions(functions: &FnvHashMap<String, Function>) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 
@@ -13,7 +13,7 @@ fn print_functions(functions: &HashMap<String, Function>) {
     }
 }
 
-pub fn fn_(functions: &mut HashMap<String, Function>) -> i32
+pub fn fn_(functions: &mut FnvHashMap<String, Function>) -> i32
 {
     print_functions(functions);
     SUCCESS

@@ -1,13 +1,13 @@
 // TODO: Move into grammar
 
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 use std::env;
 use std::io::{self, Write};
 
 use status::*;
 use variables::Variables;
 
-fn print_list(list: &HashMap<String, String>) {
+fn print_list(list: &FnvHashMap<String, String>) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 
