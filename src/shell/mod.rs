@@ -297,8 +297,6 @@ impl<'a> Shell<'a> {
     /// To avoid infinite recursion when using aliases, the noalias boolean will be set the true
     /// if an alias branch was executed.
     fn run_pipeline(&mut self, pipeline: &mut Pipeline, noalias: bool) -> Option<i32> {
-        pipeline.expand(&self.variables, &self.directory_stack);
-
         let command_start_time = SystemTime::now();
 
         let mut exit_status = None;
@@ -329,36 +327,48 @@ impl<'a> Shell<'a> {
         }
 
         if !branched {
+            pipeline.expand(&self.variables, &self.directory_stack);
             // Branch if -> input == shell command i.e. echo
             exit_status = if let Some(command) = builtins.get(pipeline.jobs[0].command.as_str()) {
                 // Run the 'main' of the command and set exit_status
-                Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
+                if pipeline.jobs.len() == 1 {
+                    Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
+                } else {
+                    Some(execute_pipeline(pipeline))
+                }
             // Branch else if -> input == shell function and set the exit_status
             } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
-                if pipeline.jobs[0].args.len() - 1 == function.args.len() {
-                    let mut variables_backup: FnvHashMap<&str, Option<String>> = FnvHashMap::with_capacity_and_hasher (
-                        64, Default::default()
-                    );
-                    for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
-                        variables_backup.insert(name, self.variables.get_var(name));
-                        self.variables.set_var(name, value);
-                    }
-
-                    self.execute_statements(function.statements);
-
-                    for (name, value_option) in &variables_backup {
-                        match *value_option {
-                            Some(ref value) => self.variables.set_var(name, value),
-                            None => {self.variables.unset_var(name);},
+                if pipeline.jobs.len() == 1 {
+                    if pipeline.jobs[0].args.len() - 1 == function.args.len() {
+                        let mut variables_backup: FnvHashMap<&str, Option<String>> = FnvHashMap::with_capacity_and_hasher (
+                            64, Default::default()
+                        );
+                        for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
+                            variables_backup.insert(name, self.variables.get_var(name));
+                            self.variables.set_var(name, value);
                         }
+
+                        self.execute_statements(function.statements);
+
+                        for (name, value_option) in &variables_backup {
+                            match *value_option {
+                                Some(ref value) => self.variables.set_var(name, value),
+                                None => {self.variables.unset_var(name);},
+                            }
+                        }
+                        None
+                    } else {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "This function takes {} arguments, but you provided {}",
+                            function.args.len(), pipeline.jobs[0].args.len()-1);
+                        Some(NO_SUCH_COMMAND) // not sure if this is the right error code
                     }
-                    None
                 } else {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "This function takes {} arguments, but you provided {}",
-                        function.args.len(), pipeline.jobs[0].args.len()-1);
-                    Some(NO_SUCH_COMMAND) // not sure if this is the right error code
+                    let _ = writeln!(stderr, "Function pipelining is not implemented yet");
+                    Some(FAILURE)
                 }
             // If not a shell command or a shell function execute the pipeline and set the exit_status
             } else {
