@@ -29,7 +29,7 @@ pub fn execute_pipeline(pipeline: &mut Pipeline) -> i32 {
     if let Some(ref stdout) = pipeline.stdout {
         if let Some(mut command) = piped_commands.last_mut() {
             let file = if stdout.append {
-                OpenOptions::new().write(true).append(true).open(&stdout.file)
+                OpenOptions::new().create(true).write(true).append(true).open(&stdout.file)
             } else {
                 File::create(&stdout.file)
             };
