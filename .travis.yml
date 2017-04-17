@@ -2,6 +2,19 @@ language: rust
 rust:
   - nightly
 sudo: false
+before_script:
+  - TARGETDIR="formatted/"
+  - mkdir $TARGETDIR
+  - for file in "find . -type f"
+  - do test "$file" != "$TARGETDIR" && cp "$file" "$TARGETDIR/"
+  - done
+  - cd formatted/
+  - cargo fmt
+  - cd ../
+script:
+  - cargo clean
+  - cargo build --release
+  - diff --brief -r . formatted/
 notifications:
   email: false
 script:
