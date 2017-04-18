@@ -43,7 +43,7 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
     let mut stdout = stdout.lock();
 
     if parser.found("help") {
-        stdout.write(MAN_PAGE.as_bytes())?;
+        stdout.write_all(MAN_PAGE.as_bytes())?;
         stdout.flush()?;
         return Ok(());
     }
@@ -53,7 +53,7 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
         if first {
             first = false;
         } else if !parser.found("no-spaces") {
-            stdout.write(&[b' '])?;
+            stdout.write_all(&[b' '])?;
         }
 
         if parser.found("escape") {
@@ -61,16 +61,16 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
             for &byte in arg {
                 match byte {
                     b'\\' if check => {
-                        stdout.write(&[byte])?;
+                        stdout.write_all(&[byte])?;
                         check = false;
                     },
                     b'\\' => check = true,
                     b'a' if check => {
-                        stdout.write(&[7u8])?; // bell
+                        stdout.write_all(&[7u8])?; // bell
                         check = false;
                     },
                     b'b' if check => {
-                        stdout.write(&[8u8])?; // backspace
+                        stdout.write_all(&[8u8])?; // backspace
                         check = false;
                     },
                     b'c' if check => {
@@ -78,43 +78,43 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
                         return Ok(());
                     },
                     b'e' if check => {
-                        stdout.write(&[27u8])?; // escape
+                        stdout.write_all(&[27u8])?; // escape
                         check = false;
                     },
                     b'f' if check => {
-                        stdout.write(&[12u8])?; // form feed
+                        stdout.write_all(&[12u8])?; // form feed
                         check = false;
                     },
                     b'n' if check => {
-                        stdout.write(&[b'\n'])?; // newline
+                        stdout.write_all(&[b'\n'])?; // newline
                         check = false;
                     },
                     b'r' if check => {
-                        stdout.write(&[b'\r'])?;
+                        stdout.write_all(&[b'\r'])?;
                         check = false;
                     },
                     b't' if check => {
-                        stdout.write(&[b'\t'])?;
+                        stdout.write_all(&[b'\t'])?;
                         check = false;
                     },
                     b'v' if check => {
-                        stdout.write(&[11u8])?; // vertical tab
+                        stdout.write_all(&[11u8])?; // vertical tab
                         check = false;
                     },
                     _ if check => {
-                        stdout.write(&[b'\\', byte])?;
+                        stdout.write_all(&[b'\\', byte])?;
                         check = false;
                     },
-                    _ => { stdout.write(&[byte])?; }
+                    _ => { stdout.write_all(&[byte])?; }
                 }
             }
         } else {
-            stdout.write(arg)?;
+            stdout.write_all(arg)?;
         }
     }
 
     if !parser.found("no-newline") {
-        stdout.write(&[b'\n'])?;
+        stdout.write_all(&[b'\n'])?;
     }
 
     stdout.flush()?;
