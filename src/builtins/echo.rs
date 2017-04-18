@@ -1,10 +1,7 @@
 extern crate coreutils;
-extern crate extra;
 
-use status::*;
-use std::io::{self, Write, stderr};
+use std::io::{self, Write};
 use self::coreutils::ArgParser;
-use self::extra::option::OptionalExt;
 
 const MAN_PAGE: &'static str = /* @MANSTART{echo} */ r#"
 NAME
@@ -34,7 +31,7 @@ OPTIONS
         \v  vertical tab (VT)
 "#; /* @MANEND */
 
-pub fn echo(args: &[String]) -> i32 {
+pub fn echo(args: &[String]) -> Result<(), io::Error> {
     let mut parser = ArgParser::new(4)
         .add_flag(&["e", "escape"])
         .add_flag(&["n", "no-newline"])
@@ -44,12 +41,11 @@ pub fn echo(args: &[String]) -> i32 {
 
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    let mut stderr = stderr();
 
     if parser.found("help") {
-        stdout.write(MAN_PAGE.as_bytes()).try(&mut stderr);
-        stdout.flush().try(&mut stderr);
-        return SUCCESS;
+        stdout.write(MAN_PAGE.as_bytes())?;
+        stdout.flush()?;
+        return Ok(());
     }
 
     let mut first = true;
@@ -57,7 +53,7 @@ pub fn echo(args: &[String]) -> i32 {
         if first {
             first = false;
         } else if !parser.found("no-spaces") {
-            stdout.write(&[b' ']).try(&mut stderr);
+            stdout.write(&[b' '])?;
         }
 
         if parser.found("escape") {
@@ -65,60 +61,63 @@ pub fn echo(args: &[String]) -> i32 {
             for &byte in arg {
                 match byte {
                     b'\\' if check => {
-                        stdout.write(&[byte]).try(&mut stderr);
+                        stdout.write(&[byte])?;
                         check = false;
                     },
                     b'\\' => check = true,
                     b'a' if check => {
-                        stdout.write(&[7u8]).try(&mut stderr); // bell
+                        stdout.write(&[7u8])?; // bell
                         check = false;
                     },
                     b'b' if check => {
-                        stdout.write(&[8u8]).try(&mut stderr); // backspace
+                        stdout.write(&[8u8])?; // backspace
                         check = false;
                     },
                     b'c' if check => {
-                        return SUCCESS;
+                        stdout.flush()?;
+                        return Ok(());
                     },
                     b'e' if check => {
-                        stdout.write(&[27u8]).try(&mut stderr); // escape
+                        stdout.write(&[27u8])?; // escape
                         check = false;
                     },
                     b'f' if check => {
-                        stdout.write(&[12u8]).try(&mut stderr); // form feed
+                        stdout.write(&[12u8])?; // form feed
                         check = false;
                     },
                     b'n' if check => {
-                        stdout.write(&[b'\n']).try(&mut stderr); // newline
+                        stdout.write(&[b'\n'])?; // newline
                         check = false;
                     },
                     b'r' if check => {
-                        stdout.write(&[b'\r']).try(&mut stderr);
+                        stdout.write(&[b'\r'])?;
                         check = false;
                     },
                     b't' if check => {
-                        stdout.write(&[b'\t']).try(&mut stderr);
+                        stdout.write(&[b'\t'])?;
                         check = false;
                     },
                     b'v' if check => {
-                        stdout.write(&[11u8]).try(&mut stderr); // vertical tab
+                        stdout.write(&[11u8])?; // vertical tab
                         check = false;
                     },
                     _ if check => {
-                        stdout.write(&[b'\\', byte]).try(&mut stderr);
+                        stdout.write(&[b'\\', byte])?;
                         check = false;
                     },
-                    _ => { stdout.write(&[byte]).try(&mut stderr); }
+                    _ => { stdout.write(&[byte])?; }
                 }
             }
         } else {
-            stdout.write(arg).try(&mut stderr);
+            stdout.write(arg)?;
         }
     }
 
     if !parser.found("no-newline") {
-        stdout.write(&[b'\n']).try(&mut stderr);
+        stdout.write(&[b'\n'])?;
     }
 
-    SUCCESS
+    stdout.flush()?;
+
+    Ok(())
 }

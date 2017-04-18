@@ -162,16 +162,17 @@ impl<'a> Shell<'a> {
 
         if let Some(path) = args.next() {
             if path == "-c" {
-                if let Some(arg) = args.next() {
-                    for (i, arg) in args.enumerate() {
-                        self.variables.set_var(&format!("{}", i), &arg);
+                if let Some(mut arg) = args.next() {
+                    for argument in args {
+                        arg.push(' ');
+                        arg.push_str(&argument);
                     }
-
                     self.on_command(&arg);
                 } else {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();
                     let _ = writeln!(stderr, "ion: -c requires an argument");
+                    process::exit(FAILURE);
                 }
             } else {
                 let mut array = vec![ path.clone() ];

@@ -24,7 +24,6 @@ liner = "0.1.4"
 peg-syntax-ext = "0.4"
 permutate = "0.2"
 unicode-segmentation = "1.1"
-extra = { git = "https://github.com/redox-os/libextra.git" }
 coreutils = { git = "https://github.com/redox-os/coreutils" }
 
 [target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
