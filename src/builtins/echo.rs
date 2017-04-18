@@ -1,6 +1,6 @@
 extern crate coreutils;
 
-use std::io::{self, Write};
+use std::io::{self, Write, BufWriter};
 use self::coreutils::ArgParser;
 
 const MAN_PAGE: &'static str = /* @MANSTART{echo} */ r#"
@@ -39,12 +39,11 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
         .add_flag(&["h", "help"]);
     parser.parse(args.iter().cloned());
 
-    let stdout = io::stdout();
-    let mut stdout = stdout.lock();
+    let mut buffer: BufWriter<Box<Write>> = BufWriter::new(Box::new(io::stdout()));
 
     if parser.found("help") {
-        stdout.write_all(MAN_PAGE.as_bytes())?;
-        stdout.flush()?;
+        buffer.write_all(MAN_PAGE.as_bytes())?;
+        buffer.flush()?;
         return Ok(());
     }
 
@@ -53,7 +52,7 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
         if first {
             first = false;
         } else if !parser.found("no-spaces") {
-            stdout.write_all(&[b' '])?;
+            buffer.write_all(&[b' '])?;
         }
 
         if parser.found("escape") {
@@ -61,63 +60,63 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
             for &byte in arg {
                 match byte {
                     b'\\' if check => {
-                        stdout.write_all(&[byte])?;
+                        buffer.write_all(&[byte])?;
                         check = false;
                     },
                     b'\\' => check = true,
                     b'a' if check => {
-                        stdout.write_all(&[7u8])?; // bell
+                        buffer.write_all(&[7u8])?; // bell
                         check = false;
                     },
                     b'b' if check => {
-                        stdout.write_all(&[8u8])?; // backspace
+                        buffer.write_all(&[8u8])?; // backspace
                         check = false;
                     },
                     b'c' if check => {
-                        stdout.flush()?;
+                        buffer.flush()?;
                         return Ok(());
                     },
                     b'e' if check => {
-                        stdout.write_all(&[27u8])?; // escape
+                        buffer.write_all(&[27u8])?; // escape
                         check = false;
                     },
                     b'f' if check => {
-                        stdout.write_all(&[12u8])?; // form feed
+                        buffer.write_all(&[12u8])?; // form feed
                         check = false;
                     },
                     b'n' if check => {
-                        stdout.write_all(&[b'\n'])?; // newline
+                        buffer.write_all(&[b'\n'])?; // newline
                         check = false;
                     },
                     b'r' if check => {
-                        stdout.write_all(&[b'\r'])?;
+                        buffer.write_all(&[b'\r'])?;
                         check = false;
                     },
                     b't' if check => {
-                        stdout.write_all(&[b'\t'])?;
+                        buffer.write_all(&[b'\t'])?;
                         check = false;
                     },
                     b'v' if check => {
-                        stdout.write_all(&[11u8])?; // vertical tab
+                        buffer.write_all(&[11u8])?; // vertical tab
                         check = false;
                     },
                     _ if check => {
-                        stdout.write_all(&[b'\\', byte])?;
+                        buffer.write_all(&[b'\\', byte])?;
                         check = false;
                     },
-                    _ => { stdout.write_all(&[byte])?; }
+                    _ => { buffer.write_all(&[byte])?; }
                 }
             }
         } else {
-            stdout.write_all(arg)?;
+            buffer.write_all(arg)?;
         }
     }
 
     if !parser.found("no-newline") {
-        stdout.write_all(&[b'\n'])?;
+        buffer.write_all(&[b'\n'])?;
     }
 
-    stdout.flush()?;
+    buffer.flush()?;
 
     Ok(())
 }
