@@ -1,10 +1,12 @@
 pub mod source;
 pub mod variables;
 pub mod functions;
+pub mod echo;
 
 use self::variables::{alias, drop_alias, drop_variable, export_variable};
 use self::functions::fn_;
 use self::source::source;
+use self::echo::echo;
 
 use fnv::FnvHashMap;
 use std::io::{self, Write};
@@ -210,6 +212,15 @@ impl Builtin {
                                 }
 
                             },
+                        });
+
+        commands.insert("echo",
+                        Builtin {
+                            name: "echo",
+                            help: "Display a line of text",
+                            main: box |args: &[String], _: &mut Shell| -> i32 {
+                                echo(args)
+                            }
                         });
 
         commands.insert("true",
