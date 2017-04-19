@@ -1,5 +1,10 @@
 use std::io::{self, Write, BufWriter};
 
+const HELP: u8 = 1;
+const ESCAPE: u8 = 2;
+const NO_NEWLINE: u8 = 3;
+const NO_SPACES: u8 = 4;
+
 const MAN_PAGE: &'static str = /* @MANSTART{echo} */ r#"
 NAME
     echo - display a line of text
@@ -29,32 +34,38 @@ OPTIONS
 "#; /* @MANEND */
 
 pub fn echo(args: &[String]) -> Result<(), io::Error> {
-    let mut arguments: Vec<&str> = vec![];
+    let mut flags = 0u8;
     let mut data: Vec<&str> = vec![];
 
     for arg in args {
-        if arg == "--help" {
-            arguments.push("help");
-        } else if arg.starts_with("-") {
-            let arg = &arg[1..];
-            for argopt in arg.chars() {
-                match argopt {
-                    'e' => arguments.push("escape"),
-                    'n' => arguments.push("no-newline"),
-                    's' => arguments.push("no-spaces"),
-                    'h' => arguments.push("help"),
-                    _ => (),
+        match arg.as_str() {
+            "--help" => flags |= HELP,
+            "--escape" => flags |= ESCAPE,
+            "--no-newline" => flags |= NO_NEWLINE,
+            "--no-spaces" => flags |= NO_SPACES,
+            _ => {
+                if arg.starts_with("-") {
+                    let arg = &arg[1..];
+                    for argopt in arg.chars() {
+                        match argopt {
+                            'e' => flags |= ESCAPE,
+                            'n' => flags |= NO_NEWLINE,
+                            's' => flags |= NO_SPACES,
+                            'h' => flags |= HELP,
+                            _ => (),
+                        }
+                    }
+                } else {
+                    data.push(arg);
                 }
             }
-        } else {
-            data.push(arg);
         }
     }
 
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
 
-    if arguments.contains(&"help") {
+    if (flags & HELP) != 0 {
         buffer.write_all(MAN_PAGE.as_bytes())?;
         buffer.flush()?;
         return Ok(());
@@ -64,11 +75,11 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
     for arg in data[1..].iter().map(|x| x.as_bytes()) {
         if first {
             first = false;
-        } else if !arguments.contains(&"no-spaces") {
+        } else if (flags & NO_SPACES) == 0 {
             buffer.write_all(&[b' '])?;
         }
 
-        if arguments.contains(&"escape") {
+        if (flags & ESCAPE) != 0 {
             let mut check = false;
             for &byte in arg {
                 match byte {
@@ -125,7 +136,7 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
         }
     }
 
-    if !arguments.contains(&"no-newline") {
+    if (flags & NO_NEWLINE) == 0 {
         buffer.write_all(&[b'\n'])?;
     }
 
