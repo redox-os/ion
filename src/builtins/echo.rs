@@ -2,8 +2,8 @@ use std::io::{self, Write, BufWriter};
 
 const HELP: u8 = 1;
 const ESCAPE: u8 = 2;
-const NO_NEWLINE: u8 = 3;
-const NO_SPACES: u8 = 4;
+const NO_NEWLINE: u8 = 4;
+const NO_SPACES: u8 = 8;
 
 const MAN_PAGE: &'static str = /* @MANSTART{echo} */ r#"
 NAME
