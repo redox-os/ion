@@ -1,14 +1,17 @@
 pub mod source;
 pub mod variables;
 pub mod functions;
+pub mod echo;
 
 use self::variables::{alias, drop_alias, drop_variable, export_variable};
 use self::functions::fn_;
 use self::source::source;
+use self::echo::echo;
 
 use fnv::FnvHashMap;
 use std::io::{self, Write};
 use std::process;
+use std::error::Error;
 
 use parser::QuoteTerminator;
 use shell::{Shell, FlowLogic, ShellHistory};
@@ -210,6 +213,23 @@ impl Builtin {
                                 }
 
                             },
+                        });
+
+        commands.insert("echo",
+                        Builtin {
+                            name: "echo",
+                            help: "Display a line of text",
+                            main: box |args: &[String], _: &mut Shell| -> i32 {
+                                match echo(args) {
+                                    Ok(()) => SUCCESS,
+                                    Err(why) => {
+                                        let stderr = io::stderr();
+                                        let mut stderr = stderr.lock();
+                                        let _ = stderr.write_all(why.description().as_bytes());
+                                        FAILURE
+                                    }
+                                }
+                            }
                         });
 
         commands.insert("true",

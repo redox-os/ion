@@ -79,7 +79,7 @@ enum CommandType {
 impl<'a> From<&'a str> for CommandType {
     fn from(command: &'a str) -> CommandType {
         match command {
-            "help" | "history" => CommandType::Builtin,
+            "help" | "history" | "echo" => CommandType::Builtin,
             _ => CommandType::External
         }
     }
