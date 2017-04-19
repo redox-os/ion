@@ -71,13 +71,17 @@ end_ -> Statement
 
 #[pub]
 fn_ -> Statement
-    = whitespace* "fn " n:_name whitespace* args:_args whitespace* {
+    = whitespace* "fn " n:_name whitespace* args:_args whitespace* description:_description? {
         Statement::Function {
+            description: description.unwrap_or("".to_string()),
             name: n.to_string(),
             args: args,
             statements: Vec::new(),
         }
     }
+
+_description -> String
+      = "--" whitespace* description:$([^\r\n]*) { description.to_string() } 
 
 _name -> String
       = n:$([A-z0-9_]+) { n.to_string() }
