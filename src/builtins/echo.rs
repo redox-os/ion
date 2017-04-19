@@ -1,7 +1,4 @@
-extern crate coreutils;
-
 use std::io::{self, Write, BufWriter};
-use self::coreutils::ArgParser;
 
 const MAN_PAGE: &'static str = /* @MANSTART{echo} */ r#"
 NAME
@@ -32,30 +29,46 @@ OPTIONS
 "#; /* @MANEND */
 
 pub fn echo(args: &[String]) -> Result<(), io::Error> {
-    let mut parser = ArgParser::new(4)
-        .add_flag(&["e", "escape"])
-        .add_flag(&["n", "no-newline"])
-        .add_flag(&["s", "no-spaces"])
-        .add_flag(&["h", "help"]);
-    parser.parse(args.iter().cloned());
+    let mut arguments: Vec<&str> = vec![];
+    let mut data: Vec<&str> = vec![];
 
-    let mut buffer: BufWriter<Box<Write>> = BufWriter::new(Box::new(io::stdout()));
+    for arg in args {
+        if arg == "--help" {
+            arguments.push("help");
+        } else if arg.starts_with("-") {
+            let arg = &arg[1..];
+            for argopt in arg.chars() {
+                match argopt {
+                    'e' => arguments.push("escape"),
+                    'n' => arguments.push("no-newline"),
+                    's' => arguments.push("no-spaces"),
+                    'h' => arguments.push("help"),
+                    _ => (),
+                }
+            }
+        } else {
+            data.push(arg);
+        }
+    }
 
-    if parser.found("help") {
+    let stdout = io::stdout();
+    let mut buffer = BufWriter::new(stdout.lock());
+
+    if arguments.contains(&"help") {
         buffer.write_all(MAN_PAGE.as_bytes())?;
         buffer.flush()?;
         return Ok(());
     }
 
     let mut first = true;
-    for arg in parser.args.iter().map(|x| x.as_bytes()) {
+    for arg in data[1..].iter().map(|x| x.as_bytes()) {
         if first {
             first = false;
-        } else if !parser.found("no-spaces") {
+        } else if !arguments.contains(&"no-spaces") {
             buffer.write_all(&[b' '])?;
         }
 
-        if parser.found("escape") {
+        if arguments.contains(&"escape") {
             let mut check = false;
             for &byte in arg {
                 match byte {
@@ -112,7 +125,7 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
         }
     }
 
-    if !parser.found("no-newline") {
+    if !arguments.contains(&"no-newline") {
         buffer.write_all(&[b'\n'])?;
     }
 
