@@ -30,6 +30,7 @@ pub enum Statement {
     ElseIf(ElseIf),
     Function {
         name: String,
+        description: String,
         args: Vec<String>,
         statements: Vec<Statement>
     },
@@ -68,6 +69,7 @@ impl Default for FlowControl {
 
 #[derive(Clone)]
 pub struct Function {
+    pub description: String,
     pub name: String,
     pub args: Vec<String>,
     pub statements: Vec<Statement>

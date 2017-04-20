@@ -1,4 +1,4 @@
-// TODO: 
+// TODO:
 // - Rewrite this in the same style as shell_expand::words.
 // - Validate syntax in methods
 
@@ -120,7 +120,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 },
                 b'}'  if self.flags & VBRACE != 0 => self.flags ^= VBRACE,
                 b'('  if self.flags & (COMM_1 + VARIAB + ARRAY) == 0 => {
-                    if error.is_none() {
+                    if error.is_none() && self.flags & (SQUOTE + DQUOTE) == 0 {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
@@ -147,7 +147,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.flags ^= METHOD;
                 },
                 b')' if self.process_level == 0 && self.array_level == 0 && self.flags & SQUOTE == 0 => {
-                    if error.is_none() {
+                    if error.is_none() && self.flags & (SQUOTE + DQUOTE) == 0 {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },

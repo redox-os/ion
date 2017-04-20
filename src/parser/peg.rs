@@ -184,9 +184,10 @@ else
         // Default case where spaced normally
         let parsed_if = fn_("fn bob").unwrap();
         let correct_parse = Statement::Function{
-            name:       "bob".to_string(),
-            args:       vec!(),
-            statements: vec!()
+            description: "".to_string(),
+            name:        "bob".to_string(),
+            args:        vec!(),
+            statements:  vec!()
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -201,9 +202,10 @@ else
         // Default case where spaced normally
         let parsed_if = fn_("fn bob a b").unwrap();
         let correct_parse = Statement::Function{
-            name:       "bob".to_owned(),
-            args:       vec!("a".to_owned(), "b".to_owned()),
-            statements: vec!()
+            description: "".to_string(),
+            name:        "bob".to_owned(),
+            args:        vec!("a".to_owned(), "b".to_owned()),
+            statements:  vec!()
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -213,6 +215,19 @@ else
 
         // Leading spaces after final value
         let parsed_if = fn_("         fn bob a b").unwrap();
+        assert_eq!(correct_parse, parsed_if);
+
+        let parsed_if = fn_("fn bob a b --bob is a nice function").unwrap();
+        let correct_parse = Statement::Function{
+            description: "bob is a nice function".to_string(),
+            name:        "bob".to_owned(),
+            args:        vec!("a".to_owned(), "b".to_owned()),
+            statements:  vec!()
+        };
+        assert_eq!(correct_parse, parsed_if);
+        let parsed_if = fn_("fn bob a b --          bob is a nice function").unwrap();
+        assert_eq!(correct_parse, parsed_if);
+        let parsed_if = fn_("fn bob a b      --bob is a nice function").unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 }

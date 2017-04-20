@@ -1,8 +1,10 @@
 pub mod source;
 pub mod variables;
 pub mod functions;
-pub mod echo;
-pub mod test;
+
+mod test;
+mod echo;
+mod calc;
 
 use self::variables::{alias, drop_alias, drop_variable, export_variable};
 use self::functions::fn_;
@@ -246,6 +248,18 @@ impl Builtin {
                                         let stderr = io::stderr();
                                         let mut stderr = stderr.lock();
                                         let _ = stderr.write_all(why.as_bytes());
+
+        commands.insert("calc",
+                        Builtin {
+                            name: "calc",
+                            help: "Calculate a mathematical expression",
+                            main: box |args: &[String], _: &mut Shell| -> i32 {
+                                match calc::calc(&args[1..]) {
+                                    Ok(()) => SUCCESS,
+                                    Err(why) => {
+                                        let stderr = io::stderr();
+                                        let mut stderr = stderr.lock();
+                                        let _ = writeln!(stderr, "{}", why);
                                         FAILURE
                                     }
                                 }

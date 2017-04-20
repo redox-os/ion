@@ -109,11 +109,12 @@ impl<'a> FlowLogic for Shell<'a> {
                     Statement::For { variable, values, statements } => {
                         self.execute_for(&variable, &values, statements);
                     },
-                    Statement::Function { name, args, statements } => {
+                    Statement::Function { name, args, statements, description } => {
                         self.functions.insert(name.clone(), Function {
                             name:       name,
                             args:       args,
-                            statements: statements
+                            statements: statements,
+                            description: description,
                         });
                     },
                     Statement::If { expression, success, else_if, failure } => {
@@ -173,13 +174,14 @@ impl<'a> FlowLogic for Shell<'a> {
                         Condition::NoOp     => ()
                     }
                 },
-                Statement::Function { name, args, mut statements } => {
+                Statement::Function { name, args, mut statements, description } => {
                     self.flow_control.level += 1;
                     collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
                     self.functions.insert(name.clone(), Function {
-                        name:       name,
-                        args:       args,
-                        statements: statements
+                        description: description,
+                        name:        name,
+                        args:        args,
+                        statements:  statements
                     });
                 },
                 Statement::Pipeline(mut pipeline) => { self.run_pipeline(&mut pipeline, false); },
@@ -343,7 +345,7 @@ impl<'a> FlowLogic for Shell<'a> {
             },
             // Collect the statements needed by the function and add the function to the
             // list of functions if it is complete.
-            Statement::Function { name, args, mut statements } => {
+            Statement::Function { name, args, mut statements, description } => {
                 self.flow_control.level += 1;
 
                 // The same logic that applies to loops, also applies here.
@@ -352,16 +354,18 @@ impl<'a> FlowLogic for Shell<'a> {
                 if self.flow_control.level == 0 {
                     // All blocks were read, thus we can add it to the list
                     self.functions.insert(name.clone(), Function {
-                        name:       name,
-                        args:       args,
-                        statements: statements
+                        description: description,
+                        name:        name,
+                        args:        args,
+                        statements:  statements
                     });
                 } else {
                     // Store the partial function declaration in memory.
                     self.flow_control.current_statement = Statement::Function {
-                        name:       name,
-                        args:       args,
-                        statements: statements
+                        description: description,
+                        name:        name,
+                        args:        args,
+                        statements:  statements
                     }
                 }
             },
