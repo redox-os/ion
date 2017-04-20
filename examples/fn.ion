@@ -1,10 +1,10 @@
-fn test a b c
+fn first_test a b c
   echo $a
   echo $b
   echo $c
 end
 
-test hello world goodbye
+first_test hello world goodbye
 
 fn another_test
     for i in 1..10

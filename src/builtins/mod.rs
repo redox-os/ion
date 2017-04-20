@@ -1,6 +1,8 @@
 pub mod source;
 pub mod variables;
 pub mod functions;
+
+mod test;
 mod echo;
 mod calc;
 
@@ -8,6 +10,7 @@ use self::variables::{alias, drop_alias, drop_variable, export_variable};
 use self::functions::fn_;
 use self::source::source;
 use self::echo::echo;
+use self::test::test;
 
 use fnv::FnvHashMap;
 use std::io::{self, Write};
@@ -227,6 +230,24 @@ impl Builtin {
                                         let stderr = io::stderr();
                                         let mut stderr = stderr.lock();
                                         let _ = stderr.write_all(why.description().as_bytes());
+                                        FAILURE
+                                    }
+                                }
+                            }
+                        });
+
+        commands.insert("test",
+                        Builtin {
+                            name: "test",
+                            help: "Performs tests on files and text",
+                            main: box |args: &[String], _: &mut Shell| -> i32 {
+                                match test(args) {
+                                    Ok(true) => SUCCESS,
+                                    Ok(false) => FAILURE,
+                                    Err(why) => {
+                                        let stderr = io::stderr();
+                                        let mut stderr = stderr.lock();
+                                        let _ = stderr.write_all(why.as_bytes());
                                         FAILURE
                                     }
                                 }
