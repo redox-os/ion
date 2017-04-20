@@ -122,15 +122,8 @@ pub fn test(args: &[String]) -> Result<bool, String> {
 fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLock>) -> Result<bool, String> {
     if let Some(arg) = arguments.first() {
         if arg.as_str() == "--help" {
-            match buffer.write_all(MAN_PAGE.as_bytes()) {
-                Err(why) => return Err(String::from(why.description())),
-                _ => {}
-            }
-
-            match buffer.flush() {
-                Err(why) => return Err(String::from(why.description())),
-                _ => {}
-            }
+            buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| x.description().to_owned())?;
+            buffer.flush().map_err(|x| x.description().to_owned())?;
 
             return Ok(true);
         }
@@ -150,12 +143,8 @@ fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLoc
                 // If there is no operator, check if the first argument is non-zero
                 arguments.get(1).map_or(Ok(string_is_nonzero(&arg)), |operator| {
                     // If there is no right hand argument, a condition was expected
-                    match arguments.get(2) {
-                        Some(right_arg) => evaluate_expression(arg.as_str(), operator.as_str(), right_arg.as_str()),
-                        None => {
-                            Err(String::from("parse error: condition expected"))
-                        }
-                    }
+                    let right_arg = arguments.get(2).ok_or(String::from("parse error: condition expected"))?;
+                    evaluate_expression(arg.as_str(), operator.as_str(), right_arg.as_str())
                 })
             },
         };
