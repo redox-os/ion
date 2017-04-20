@@ -111,7 +111,7 @@ AUTHOR
     Written by Michael Murphy.
 "#; /* @MANEND */
 
-pub fn test(args: &[String]) -> Result<bool, &'static str> {
+pub fn test(args: &[String]) -> Result<bool, String> {
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
     
@@ -119,16 +119,16 @@ pub fn test(args: &[String]) -> Result<bool, &'static str> {
     evaluate_arguments(arguments, &mut buffer)
 }
 
-fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLock>) -> Result<bool, &'static str> {
+fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLock>) -> Result<bool, String> {
     if let Some(arg) = arguments.first() {
         if arg.as_str() == "--help" {
             match buffer.write_all(MAN_PAGE.as_bytes()) {
-                Err(why) => return Err(why.description()),
+                Err(why) => return Err(String::from(why.description())),
                 _ => {}
             }
 
             match buffer.flush() {
-                Err(why) => return Err(why.description()),
+                Err(why) => return Err(String::from(why.description())),
                 _ => {}
             }
 
@@ -153,7 +153,7 @@ fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLoc
                     match arguments.get(2) {
                         Some(right_arg) => evaluate_expression(arg.as_str(), operator.as_str(), right_arg.as_str()),
                         None => {
-                            Err("parse error: condition expected")
+                            Err(String::from("parse error: condition expected"))
                         }
                     }
                 })
@@ -164,7 +164,7 @@ fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLoc
     }
 }
 
-fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool, &'static str> {
+fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool, String> {
     match operator {
         "=" | "==" => Ok(evaluate_bool(first == second)),
         "!="       => Ok(evaluate_bool(first != second)),
@@ -181,7 +181,7 @@ fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool
                 "-lt" => Ok(evaluate_bool(left < right)),
                 "-ne" => Ok(evaluate_bool(left != right)),
                 _     => {
-                    Err(format!("unknowne condition: {:?}", operator).as_str())
+                    Err(format!("unknowne condition: {:?}", operator))
                 }
             }
         }
@@ -224,12 +224,12 @@ fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
 }
 
 /// Attempt to parse a &str as a usize.
-fn parse_integers(left: &str, right: &str) -> Result<(Option<usize>, Option<usize>), &'static str> {
-    let mut parse_integer = |input: &str| -> Result<Option<usize>, &str> {
+fn parse_integers(left: &str, right: &str) -> Result<(Option<usize>, Option<usize>), String> {
+    let parse_integer = |input: &str| -> Result<Option<usize>, String> {
         match input.parse::<usize>().map_err(|_| {
-            format!("integer expression expected: {:?}", input).as_str()
+            format!("integer expression expected: {:?}", input)
         }) {
-            Err(why) => Err(why),
+            Err(why) => Err(String::from(why)),
             Ok(res) => Ok(Some(res)),
         }
     };
@@ -393,48 +393,47 @@ fn test_strings() {
 #[test]
 fn test_integers_arguments() {
     let stdout = io::stdout();
-    let mut stderr = io::stderr();
     let mut buffer = BufWriter::new(stdout.lock());
 
     // Equal To
     assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-eq"), String::from("10")],
-        &mut buffer, &mut stderr), true);
+        &mut buffer), Ok(true));
     assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-eq"), String::from("5")],
-        &mut buffer, &mut stderr), false);
+        &mut buffer), Ok(false));
 
     // Greater Than or Equal To
     assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-ge"), String::from("10")],
-        &mut buffer, &mut stderr), true);
+        &mut buffer), Ok(true));
     assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-ge"), String::from("5")],
-        &mut buffer, &mut stderr), true);
+        &mut buffer), Ok(true));
     assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-ge"), String::from("10")],
-        &mut buffer, &mut stderr), false);
+        &mut buffer), Ok(false));
 
     // Less Than or Equal To
     assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-le"), String::from("5")],
-        &mut buffer, &mut stderr), true);
+        &mut buffer), Ok(true));
     assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-le"), String::from("10")],
-        &mut buffer, &mut stderr), true);
+        &mut buffer), Ok(true));
     assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-le"), String::from("5")],
-        &mut buffer, &mut stderr), false);
+        &mut buffer), Ok(false));
 
     // Less Than
     assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-lt"), String::from("10")],
-        &mut buffer, &mut stderr), true);
+        &mut buffer), Ok(true));
     assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-lt"), String::from("5")],
-        &mut buffer, &mut stderr), false);
+        &mut buffer), Ok(false));
 
     // Greater Than
     assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-gt"), String::from("5")],
-        &mut buffer, &mut stderr), true);
+        &mut buffer), Ok(true));
     assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-gt"), String::from("10")],
-        &mut buffer, &mut stderr), false);
+        &mut buffer), Ok(false));
 
     // Not Equal To
     assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-ne"), String::from("5")],
-        &mut buffer, &mut stderr), true);
+        &mut buffer), Ok(true));
     assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-ne"), String::from("5")],
-        &mut buffer, &mut stderr), false);
+        &mut buffer), Ok(false));
 }
 
 #[test]
