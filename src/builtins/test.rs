@@ -1,11 +1,9 @@
-extern crate extra;
-
 use std::io::{self, Write, BufWriter};
 use std::fs;
 use std::path::Path;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::time::SystemTime;
-use self::extra::option::OptionalExt;
+use std::error::Error;
 
 const MAN_PAGE: &'static str = /* @MANSTART{test} */ r#"
 NAME
@@ -113,76 +111,77 @@ AUTHOR
     Written by Michael Murphy.
 "#; /* @MANEND */
 
-pub fn test(args: &[String]) -> bool {
+pub fn test(args: &[String]) -> Result<bool, &'static str> {
     let stdout = io::stdout();
-    let mut stderr = io::stderr();
     let mut buffer = BufWriter::new(stdout.lock());
     
     let arguments = &args[1..];
-    evaluate_arguments(arguments, &mut buffer, &mut stderr)
+    evaluate_arguments(arguments, &mut buffer)
 }
 
-fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLock>, stderr: &mut io::Stderr) -> bool {
+fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLock>) -> Result<bool, &'static str> {
     if let Some(arg) = arguments.first() {
         if arg.as_str() == "--help" {
-            buffer.write_all(MAN_PAGE.as_bytes()).try(stderr);
-            buffer.flush().try(stderr);
-            return true;
+            match buffer.write_all(MAN_PAGE.as_bytes()) {
+                Err(why) => return Err(why.description()),
+                _ => {}
+            }
+
+            match buffer.flush() {
+                Err(why) => return Err(why.description()),
+                _ => {}
+            }
+
+            return Ok(true);
         }
         let mut characters = arg.chars().take(2);
         return match characters.next().unwrap() {
             '-' => {
                 // If no flag was given, return `SUCCESS`
-                characters.next().map_or(true, |flag| {
+                characters.next().map_or(Ok(true), |flag| {
                     // If no argument was given, return `SUCCESS`
-                    arguments.get(1).map_or(true, |argument| {
+                    arguments.get(1).map_or(Ok(true), |argument| {
                         // match the correct function to the associated flag
-                        match_flag_argument(flag, argument.as_str())
+                        Ok(match_flag_argument(flag, argument.as_str()))
                     })
                 })
             },
             _   => {
                 // If there is no operator, check if the first argument is non-zero
-                arguments.get(1).map_or(string_is_nonzero(&arg), |operator| {
+                arguments.get(1).map_or(Ok(string_is_nonzero(&arg)), |operator| {
                     // If there is no right hand argument, a condition was expected
                     match arguments.get(2) {
-                        Some(right_arg) => evaluate_expression(arg.as_str(), operator.as_str(), right_arg.as_str(), stderr),
+                        Some(right_arg) => evaluate_expression(arg.as_str(), operator.as_str(), right_arg.as_str()),
                         None => {
-                            stderr.write_all(b"parse error: condition expected\n").try(stderr);
-                            stderr.flush().try(stderr);
-                            false
+                            Err("parse error: condition expected")
                         }
                     }
                 })
             },
         };
     } else {
-        return false;
+        return Ok(false);
     }
 }
 
-fn evaluate_expression(first: &str, operator: &str, second: &str, stderr: &mut io::Stderr) -> bool {
+fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool, &'static str> {
     match operator {
-        "=" | "==" => evaluate_bool(first == second),
-        "!="       => evaluate_bool(first != second),
-        "-ef"      => files_have_same_device_and_inode_numbers(first, second),
-        "-nt"      => file_is_newer_than(first, second),
-        "-ot"      => file_is_newer_than(second, first),
+        "=" | "==" => Ok(evaluate_bool(first == second)),
+        "!="       => Ok(evaluate_bool(first != second)),
+        "-ef"      => Ok(files_have_same_device_and_inode_numbers(first, second)),
+        "-nt"      => Ok(file_is_newer_than(first, second)),
+        "-ot"      => Ok(file_is_newer_than(second, first)),
         _          => {
-            let (left, right) = parse_integers(first, second, stderr);
+            let (left, right) = parse_integers(first, second)?;
             match operator {
-                "-eq" => evaluate_bool(left == right),
-                "-ge" => evaluate_bool(left >= right),
-                "-gt" => evaluate_bool(left > right),
-                "-le" => evaluate_bool(left <= right),
-                "-lt" => evaluate_bool(left < right),
-                "-ne" => evaluate_bool(left != right),
+                "-eq" => Ok(evaluate_bool(left == right)),
+                "-ge" => Ok(evaluate_bool(left >= right)),
+                "-gt" => Ok(evaluate_bool(left > right)),
+                "-le" => Ok(evaluate_bool(left <= right)),
+                "-lt" => Ok(evaluate_bool(left < right)),
+                "-ne" => Ok(evaluate_bool(left != right)),
                 _     => {
-                    stderr.write_all(b"unknown condition: ").try(stderr);
-                    stderr.write_all(operator.as_bytes()).try(stderr);
-                    stderr.write_all(&[b'\n']).try(stderr);
-                    stderr.flush().try(stderr);
-                    false
+                    Err(format!("unknowne condition: {:?}", operator).as_str())
                 }
             }
         }
@@ -225,16 +224,22 @@ fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
 }
 
 /// Attempt to parse a &str as a usize.
-fn parse_integers(left: &str, right: &str, stderr: &mut io::Stderr) -> (Option<usize>, Option<usize>) {
-    let mut parse_integer = |input: &str| -> Option<usize> {
-        input.parse::<usize>().map_err(|_| {
-            stderr.write_all(b"integer expression expected: ").try(stderr);
-            stderr.write_all(input.as_bytes()).try(stderr);
-            stderr.write_all(&[b'\n']).try(stderr);
-            stderr.flush().try(stderr);
-        }).ok()
+fn parse_integers(left: &str, right: &str) -> Result<(Option<usize>, Option<usize>), &'static str> {
+    let mut parse_integer = |input: &str| -> Result<Option<usize>, &str> {
+        match input.parse::<usize>().map_err(|_| {
+            format!("integer expression expected: {:?}", input).as_str()
+        }) {
+            Err(why) => Err(why),
+            Ok(res) => Ok(Some(res)),
+        }
     };
-    (parse_integer(left), parse_integer(right))
+
+    match (parse_integer(left), parse_integer(right)) {
+        (Err(left), Err(_)) => Err(left),
+        (Ok(_), Err(right)) => Err(right),
+        (Err(left), Ok(_)) => Err(left),
+        (Ok(left), Ok(right)) => Ok((left, right)),
+    }
 }
 
 /// Matches flag arguments to their respective functionaity when the `-` character is detected.

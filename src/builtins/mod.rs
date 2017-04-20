@@ -239,10 +239,15 @@ impl Builtin {
                             name: "test",
                             help: "Performs tests on files and text",
                             main: box |args: &[String], _: &mut Shell| -> i32 {
-                                if test(args) {
-                                    SUCCESS
-                                } else {
-                                    FAILURE
+                                match test(args) {
+                                    Ok(true) => SUCCESS,
+                                    Ok(false) => FAILURE,
+                                    Err(why) => {
+                                        let stderr = io::stderr();
+                                        let mut stderr = stderr.lock();
+                                        let _ = stderr.write_all(why.as_bytes());
+                                        FAILURE
+                                    }
                                 }
                             }
                         });
