@@ -248,6 +248,11 @@ impl Builtin {
                                         let stderr = io::stderr();
                                         let mut stderr = stderr.lock();
                                         let _ = stderr.write_all(why.as_bytes());
+                                        FAILURE
+                                    }
+                                }
+                            }
+                        });
 
         commands.insert("calc",
                         Builtin {
