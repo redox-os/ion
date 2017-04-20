@@ -44,7 +44,7 @@ pub fn echo(args: &[String]) -> Result<(), io::Error> {
             "--no-newline" => flags |= NO_NEWLINE,
             "--no-spaces" => flags |= NO_SPACES,
             _ => {
-                if arg.starts_with("-") {
+                if arg.starts_with('-') {
                     let arg = &arg[1..];
                     for argopt in arg.chars() {
                         match argopt {

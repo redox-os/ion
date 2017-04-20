@@ -8,7 +8,7 @@ fn print_functions(functions: &FnvHashMap<String, Function>) {
     let stdout = &mut stdout.lock();
     let _ = writeln!(stdout, "# Functions");
     for fn_name in functions.keys() {
-        let ref description = functions.get(fn_name).unwrap().description;
+        let description = &functions.get(fn_name).unwrap().description;
         if description.len() >= 1 {
             let _ = writeln!(stdout, "    {} -- {}", fn_name, description);
         } else {
