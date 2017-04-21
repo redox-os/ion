@@ -71,32 +71,32 @@ pub struct ArrayMethod<'a> {
 }
 
 impl<'a> ArrayMethod<'a> {
-    pub fn handle(self, current: &mut String, expand_func: &ExpanderFunctions) {
+    pub fn handle(&self, current: &mut String, expand_func: &ExpanderFunctions) {
         match self.method {
             "split" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
-                match (self.pattern, self.index) {
-                    (Pattern::StringPattern(pattern), Index::All) => current.push_str (
+                match (&self.pattern, self.index) {
+                    (&Pattern::StringPattern(pattern), Index::All) => current.push_str (
                         &variable.split(&expand_string(pattern, expand_func, false).join(" "))
                             .collect::<Vec<&str>>()
                             .join(" ")
                     ),
-                    (Pattern::Whitespace, Index::All) => current.push_str (
+                    (&Pattern::Whitespace, Index::All) => current.push_str (
                         &variable.split(char::is_whitespace)
                             .collect::<Vec<&str>>()
                             .join(" ")
                     ),
                     (_, Index::None) => (),
-                    (Pattern::StringPattern(pattern), Index::ID(id)) => current.push_str (
+                    (&Pattern::StringPattern(pattern), Index::ID(id)) => current.push_str (
                         variable.split(&expand_string(pattern, expand_func, false).join(" "))
                             .nth(id)
                             .unwrap_or_default()
                     ),
-                    (Pattern::Whitespace, Index::ID(id)) => current.push_str (
+                    (&Pattern::Whitespace, Index::ID(id)) => current.push_str (
                         variable.split(char::is_whitespace)
                             .nth(id)
                             .unwrap_or_default()
                     ),
-                    (Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::ID(end))) => {
+                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::ID(end))) => {
                         let range = variable.split(&expand_string(pattern, expand_func, false).join(" "))
                             .skip(start).take(end-start)
                             .collect::<Vec<&str>>()
@@ -104,7 +104,7 @@ impl<'a> ArrayMethod<'a> {
 
                         current.push_str(&range);
                     },
-                    (Pattern::Whitespace, Index::Range(start, IndexEnd::ID(end))) => {
+                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::ID(end))) => {
                         let range = variable.split(char::is_whitespace)
                             .skip(start).take(end-start)
                             .collect::<Vec<&str>>()
@@ -112,7 +112,7 @@ impl<'a> ArrayMethod<'a> {
 
                         current.push_str(&range);
                     },
-                    (Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::CatchAll)) => {
+                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::CatchAll)) => {
                         let range = variable.split(&expand_string(pattern, expand_func, false).join(" "))
                             .skip(start)
                             .collect::<Vec<&str>>()
@@ -120,7 +120,7 @@ impl<'a> ArrayMethod<'a> {
 
                         current.push_str(&range);
                     }
-                    (Pattern::Whitespace, Index::Range(start, IndexEnd::CatchAll)) => {
+                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::CatchAll)) => {
                         let range = variable.split(char::is_whitespace)
                             .skip(start)
                             .collect::<Vec<&str>>()
@@ -138,46 +138,46 @@ impl<'a> ArrayMethod<'a> {
         }
     }
 
-    pub fn handle_as_array(self, expand_func: &ExpanderFunctions) -> Vec<String> {
+    pub fn handle_as_array(&self, expand_func: &ExpanderFunctions) -> Vec<String> {
         match self.method {
             "split" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
-                return match (self.pattern, self.index) {
+                return match (&self.pattern, self.index) {
                     (_, Index::None) => vec!["".to_owned()],
-                    (Pattern::StringPattern(pattern), Index::All) => variable
+                    (&Pattern::StringPattern(pattern), Index::All) => variable
                         .split(&expand_string(pattern, expand_func, false).join(" "))
                         .map(String::from)
                         .collect::<Vec<String>>(),
-                    (Pattern::Whitespace, Index::All) => variable
+                    (&Pattern::Whitespace, Index::All) => variable
                         .split(char::is_whitespace)
                         .map(String::from)
                         .collect::<Vec<String>>(),
-                    (Pattern::StringPattern(pattern), Index::ID(id)) => vec![variable
+                    (&Pattern::StringPattern(pattern), Index::ID(id)) => vec![variable
                         .split(&expand_string(pattern, expand_func, false).join(" "))
                         .nth(id).map(String::from)
                         .unwrap_or_default()],
-                    (Pattern::Whitespace, Index::ID(id)) => vec![variable
+                    (&Pattern::Whitespace, Index::ID(id)) => vec![variable
                         .split(char::is_whitespace)
                         .nth(id).map(String::from)
                         .unwrap_or_default()],
-                    (Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::CatchAll)) => {
+                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::CatchAll)) => {
                         variable.split(&expand_string(pattern, expand_func, false).join(" "))
                             .skip(start)
                             .map(String::from)
                             .collect::<Vec<String>>()
                     },
-                    (Pattern::Whitespace, Index::Range(start, IndexEnd::CatchAll)) => {
+                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::CatchAll)) => {
                         variable.split(char::is_whitespace)
                             .skip(start)
                             .map(String::from)
                             .collect::<Vec<String>>()
                     },
-                    (Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::ID(end))) => {
+                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::ID(end))) => {
                         variable.split(&expand_string(pattern, expand_func, false).join(" ")).skip(start)
                             .take(end-start)
                             .map(String::from)
                             .collect::<Vec<String>>()
                     },
-                    (Pattern::Whitespace, Index::Range(start, IndexEnd::ID(end))) => {
+                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::ID(end))) => {
                         variable.split(char::is_whitespace).skip(start)
                             .take(end-start)
                             .map(String::from)

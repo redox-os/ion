@@ -31,36 +31,27 @@ enum Expression {
 }
 
 fn parse_expression(expression: &str, shell_funcs: &ExpanderFunctions) -> Value {
-    let kind = Expression::Regular;
+    let arguments: Vec<&str> = ArgumentSplitter::new(expression).collect();
 
-    match kind {
-        // TODO: Determine if the expression is an arithmetic expression or not
-        Expression::Arithmetic => unimplemented!(),
-        // Expands the supplied expression normally
-        Expression::Regular => {
-            let arguments: Vec<&str> = ArgumentSplitter::new(expression).collect();
-
-            if arguments.len() == 1 {
-                // If a single argument has been passed, it will be expanded and checked to determine
-                // whether or not the expression is an array or a string.
-                let mut expanded = expand_string(expression, shell_funcs, false);
-                if expanded.len() == 1 {
-                    // Grab the inner value and return it as a String.
-                    Value::String(expanded.drain(..).next().unwrap())
-                } else {
-                    // Return the expanded values as an Array.
-                    Value::Array(expanded)
-                }
-            } else {
-                // If multiple arguments have been passed, they will be collapsed into a single string.
-                // IE: `[ one two three ] four` is equivalent to `one two three four`
-                let arguments: Vec<String> = arguments.iter()
-                    .flat_map(|expression| expand_string(expression, shell_funcs, false))
-                    .collect();
-
-                Value::String(arguments.join(" "))
-            }
+    if arguments.len() == 1 {
+        // If a single argument has been passed, it will be expanded and checked to determine
+        // whether or not the expression is an array or a string.
+        let expanded = expand_string(expression, shell_funcs, false);
+        if expanded.len() == 1 {
+            // Grab the inner value and return it as a String.
+            Value::String(expanded[0].clone())
+        } else {
+            // Return the expanded values as an Array.
+            Value::Array(expanded)
         }
+    } else {
+        // If multiple arguments have been passed, they will be collapsed into a single string.
+        // IE: `[ one two three ] four` is equivalent to `one two three four`
+        let arguments: Vec<String> = arguments.iter()
+            .flat_map(|expression| expand_string(expression, shell_funcs, false))
+            .collect();
+
+        Value::String(arguments.join(" "))
     }
 }
 

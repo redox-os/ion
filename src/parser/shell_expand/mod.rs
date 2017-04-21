@@ -34,7 +34,7 @@ fn expand_process(current: &mut String, command: &str, quoted: bool,
         tokens.push(token);
     }
 
-    let expanded = expand_tokens(tokens, expand_func, false, contains_brace).join(" ");
+    let expanded = expand_tokens(&tokens, expand_func, false, contains_brace).join(" ");
 
     if let Some(result) = (expand_func.command)(&expanded, quoted) {
         slice_string(current, &result, index);
@@ -42,7 +42,7 @@ fn expand_process(current: &mut String, command: &str, quoted: bool,
 }
 
 fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
-    tokens: &mut Vec<BraceToken>, nodes: Vec<&str>, expand_func: &ExpanderFunctions,
+    tokens: &mut Vec<BraceToken>, nodes: &[&str], expand_func: &ExpanderFunctions,
     reverse_quoting: bool)
 {
     let mut temp = Vec::new();
@@ -126,11 +126,11 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
         token_buffer.push(word);
     }
 
-    expand_tokens(token_buffer, expand_func, reverse_quoting, contains_brace)
+    expand_tokens(&token_buffer, expand_func, reverse_quoting, contains_brace)
 }
 
 #[allow(cyclomatic_complexity)]
-pub fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFunctions,
+pub fn expand_tokens(token_buffer: &[WordToken], expand_func: &ExpanderFunctions,
     reverse_quoting: bool, contains_brace: bool) -> Vec<String>
 {
     let mut output = String::new();
@@ -141,21 +141,21 @@ pub fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFun
             let mut tokens: Vec<BraceToken> = Vec::new();
             let mut expanders: Vec<Vec<String>> = Vec::new();
 
-            for word in token_buffer.drain(..) {
-                match word {
-                    WordToken::Array(elements, index) => {
+            for word in token_buffer {
+                match *word {
+                    WordToken::Array(ref elements, index) => {
                         match index {
                             Index::None => (),
                             Index::All => {
-                                let expanded = array_expand(&elements, expand_func);
+                                let expanded = array_expand(elements, expand_func);
                                 output.push_str(&expanded.join(" "));
                             },
                             Index::ID(id) => {
-                                let expanded = array_nth(&elements, expand_func, id);
+                                let expanded = array_nth(elements, expand_func, id);
                                 output.push_str(&expanded);
                             },
                             Index::Range(start, end) => {
-                                let expanded = array_range(&elements, expand_func, start, end);
+                                let expanded = array_range(elements, expand_func, start, end);
                                 output.push_str(&expanded.join(" "));
                             }
                         };
@@ -194,7 +194,7 @@ pub fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFun
                             }
                         }
                     },
-                    WordToken::ArrayMethod(array_method) => {
+                    WordToken::ArrayMethod(ref array_method) => {
                         array_method.handle(&mut output, expand_func);
                     },
                     WordToken::StringMethod(method, variable, pattern, index) => {
@@ -210,7 +210,7 @@ pub fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFun
                             }
                         }
                     },
-                    WordToken::Brace(nodes) =>
+                    WordToken::Brace(ref nodes) =>
                         expand_brace(&mut output, &mut expanders, &mut tokens, nodes, expand_func, reverse_quoting),
                     WordToken::Normal(text) => output.push_str(text),
                     WordToken::Whitespace(_) => unreachable!(),
@@ -247,13 +247,13 @@ pub fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFun
 
             return expanded_words
         } else if token_buffer.len() == 1 {
-            match token_buffer[0].clone() {
-                WordToken::Array(elements, index) => {
+            match token_buffer[0] {
+                WordToken::Array(ref elements, index) => {
                     return match index {
                         Index::None   => Vec::new(),
-                        Index::All    => array_expand(&elements, expand_func),
-                        Index::ID(id) => vec![array_nth(&elements, expand_func, id)],
-                        Index::Range(start, end) => array_range(&elements, expand_func, start, end),
+                        Index::All    => array_expand(elements, expand_func),
+                        Index::ID(id) => vec![array_nth(elements, expand_func, id)],
+                        Index::Range(start, end) => array_range(elements, expand_func, start, end),
                     };
                 },
                 WordToken::ArrayVariable(array, quoted, index) => {
@@ -286,28 +286,28 @@ pub fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFun
                         },
                     }
                 },
-                WordToken::ArrayMethod(array_method) => {
+                WordToken::ArrayMethod(ref array_method) => {
                     return array_method.handle_as_array(expand_func);
                 },
                 _ => ()
             }
         }
 
-        for word in token_buffer.drain(..) {
-            match word {
-                WordToken::Array(elements, index) => {
+        for word in token_buffer {
+            match *word {
+                WordToken::Array(ref elements, index) => {
                     match index {
                         Index::None => (),
                         Index::All => {
-                            let expanded = array_expand(&elements, expand_func);
+                            let expanded = array_expand(elements, expand_func);
                             output.push_str(&expanded.join(" "));
                         },
                         Index::ID(id) => {
-                            let expanded = array_nth(&elements, expand_func, id);
+                            let expanded = array_nth(elements, expand_func, id);
                             output.push_str(&expanded);
                         },
                         Index::Range(start, end) => {
-                            let expanded = array_range(&elements, expand_func, start, end);
+                            let expanded = array_range(elements, expand_func, start, end);
                             output.push_str(&expanded.join(" "));
                         },
                     };
@@ -346,7 +346,7 @@ pub fn expand_tokens(mut token_buffer: Vec<WordToken>, expand_func: &ExpanderFun
                         },
                     }
                 },
-                WordToken::ArrayMethod(array_method) => {
+                WordToken::ArrayMethod(ref array_method) => {
                     array_method.handle(&mut output, expand_func);
                 },
                 WordToken::StringMethod(method, variable, pattern, index) => {
