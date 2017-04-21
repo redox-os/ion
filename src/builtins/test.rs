@@ -114,7 +114,7 @@ AUTHOR
 pub fn test(args: &[String]) -> Result<bool, String> {
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
-    
+
     let arguments = &args[1..];
     evaluate_arguments(arguments, &mut buffer)
 }
@@ -141,9 +141,9 @@ fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLoc
             },
             _   => {
                 // If there is no operator, check if the first argument is non-zero
-                arguments.get(1).map_or(Ok(string_is_nonzero(&arg)), |operator| {
+                arguments.get(1).map_or(Ok(string_is_nonzero(arg)), |operator| {
                     // If there is no right hand argument, a condition was expected
-                    let right_arg = arguments.get(2).ok_or(String::from("parse error: condition expected"))?;
+                    let right_arg = arguments.get(2).ok_or_else(|| String::from("parse error: condition expected"))?;
                     evaluate_expression(arg.as_str(), operator.as_str(), right_arg.as_str())
                 })
             },
@@ -155,22 +155,22 @@ fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLoc
 
 fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool, String> {
     match operator {
-        "=" | "==" => Ok(evaluate_bool(first == second)),
-        "!="       => Ok(evaluate_bool(first != second)),
+        "=" | "==" => Ok(first == second),
+        "!="       => Ok(first != second),
         "-ef"      => Ok(files_have_same_device_and_inode_numbers(first, second)),
         "-nt"      => Ok(file_is_newer_than(first, second)),
         "-ot"      => Ok(file_is_newer_than(second, first)),
         _          => {
             let (left, right) = parse_integers(first, second)?;
             match operator {
-                "-eq" => Ok(evaluate_bool(left == right)),
-                "-ge" => Ok(evaluate_bool(left >= right)),
-                "-gt" => Ok(evaluate_bool(left > right)),
-                "-le" => Ok(evaluate_bool(left <= right)),
-                "-lt" => Ok(evaluate_bool(left < right)),
-                "-ne" => Ok(evaluate_bool(left != right)),
+                "-eq" => Ok(left == right),
+                "-ge" => Ok(left >= right),
+                "-gt" => Ok(left > right),
+                "-le" => Ok(left <= right),
+                "-lt" => Ok(left < right),
+                "-ne" => Ok(left != right),
                 _     => {
-                    Err(format!("unknowne condition: {:?}", operator))
+                    Err(format!("test: unknown condition: {:?}", operator))
                 }
             }
         }
@@ -185,7 +185,7 @@ fn files_have_same_device_and_inode_numbers(first: &str, second: &str) -> bool {
         // Obtain the device and inode of the second file or return FAILED
         get_dev_and_inode(second).map_or(false, |right| {
             // Compare the device and inodes of the first and second files
-            evaluate_bool(left == right)
+            left == right
         })
     })
 }
@@ -202,7 +202,7 @@ fn file_is_newer_than(first: &str, second: &str) -> bool {
         // Obtain the modified file time of the second file or return FAILED
         get_modified_file_time(second).map_or(false, |right| {
             // If the first file is newer than the right file, return SUCCESS
-            evaluate_bool(left > right)
+            left > right
         })
     })
 }
@@ -216,19 +216,17 @@ fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
 fn parse_integers(left: &str, right: &str) -> Result<(Option<usize>, Option<usize>), String> {
     let parse_integer = |input: &str| -> Result<Option<usize>, String> {
         match input.parse::<usize>().map_err(|_| {
-            format!("integer expression expected: {:?}", input)
+            format!("test: integer expression expected: {:?}", input)
         }) {
             Err(why) => Err(String::from(why)),
             Ok(res) => Ok(Some(res)),
         }
     };
 
-    match (parse_integer(left), parse_integer(right)) {
-        (Err(left), Err(_)) => Err(left),
-        (Ok(_), Err(right)) => Err(right),
-        (Err(left), Ok(_)) => Err(left),
-        (Ok(left), Ok(right)) => Ok((left, right)),
-    }
+    parse_integer(left).and_then(|left| match parse_integer(right){
+        Ok(right) => Ok((left, right)),
+        Err(why) => Err(why)
+    })
 }
 
 /// Matches flag arguments to their respective functionaity when the `-` character is detected.
@@ -260,7 +258,7 @@ fn match_flag_argument(flag: char, argument: &str) -> bool {
 
 /// Exits SUCCESS if the file size is greather than zero.
 fn file_size_is_greater_than_zero(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| evaluate_bool(metadata.len() > 0))
+    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.len() > 0)
 }
 
 /// Exits SUCCESS if the file has read permissions. This function is rather low level because
@@ -276,8 +274,8 @@ fn file_has_read_permission(filepath: &str) -> bool {
     fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
         // If the mode is equal to any of the above, return `SUCCESS`
         .map_or(false, |mode| {
-            if mode & USER_BIT == USER_BIT || mode & GROUP_BIT == GROUP_BIT ||
-                mode & GUEST_BIT == GUEST_BIT { true } else { false }
+            mode & USER_BIT == USER_BIT || mode & GROUP_BIT == GROUP_BIT ||
+                mode & GUEST_BIT == GUEST_BIT
         })
 }
 
@@ -294,8 +292,8 @@ fn file_has_write_permission(filepath: &str) -> bool {
     fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
         // If the mode is equal to any of the above, return `SUCCESS`
         .map_or(false, |mode| {
-            if mode & USER_BIT == USER_BIT || mode & GROUP_BIT == GROUP_BIT ||
-                mode & GUEST_BIT == GUEST_BIT { true } else { false }
+            mode & USER_BIT == USER_BIT || mode & GROUP_BIT == GROUP_BIT ||
+                mode & GUEST_BIT == GUEST_BIT
         })
 }
 
@@ -312,64 +310,61 @@ fn file_has_execute_permission(filepath: &str) -> bool {
     fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
         // If the mode is equal to any of the above, return `SUCCESS`
         .map_or(false, |mode| {
-            if mode & USER_BIT == USER_BIT || mode & GROUP_BIT == GROUP_BIT ||
-                mode & GUEST_BIT == GUEST_BIT { true } else { false }
+            mode & USER_BIT == USER_BIT || mode & GROUP_BIT == GROUP_BIT ||
+                mode & GUEST_BIT == GUEST_BIT
         })
 }
 
 /// Exits SUCCESS if the file argument is a socket
 fn file_is_socket(filepath: &str) -> bool {
     fs::metadata(filepath).ok()
-        .map_or(false, |metadata| evaluate_bool(metadata.file_type().is_socket()))
+        .map_or(false, |metadata| metadata.file_type().is_socket())
 }
 
 /// Exits SUCCESS if the file argument is a block device
 fn file_is_block_device(filepath: &str) -> bool {
     fs::metadata(filepath).ok()
-        .map_or(false, |metadata| evaluate_bool(metadata.file_type().is_block_device()))
+        .map_or(false, |metadata| metadata.file_type().is_block_device())
 }
 
 /// Exits SUCCESS if the file argument is a character device
 fn file_is_character_device(filepath: &str) -> bool {
     fs::metadata(filepath).ok()
-        .map_or(false, |metadata| evaluate_bool(metadata.file_type().is_char_device()))
+        .map_or(false, |metadata| metadata.file_type().is_char_device())
 }
 
 /// Exits SUCCESS if the file exists
 fn file_exists(filepath: &str) -> bool {
-    evaluate_bool(Path::new(filepath).exists())
+    Path::new(filepath).exists()
 }
 
 /// Exits SUCCESS if the file is a regular file
 fn file_is_regular(filepath: &str) -> bool {
     fs::metadata(filepath).ok()
-        .map_or(false, |metadata| evaluate_bool(metadata.file_type().is_file()))
+        .map_or(false, |metadata| metadata.file_type().is_file())
 }
 
 /// Exits SUCCESS if the file is a directory
 fn file_is_directory(filepath: &str) -> bool {
     fs::metadata(filepath).ok()
-        .map_or(false, |metadata| evaluate_bool(metadata.file_type().is_dir()))
+        .map_or(false, |metadata| metadata.file_type().is_dir())
 }
 
 /// Exits SUCCESS if the file is a symbolic link
 fn file_is_symlink(filepath: &str) -> bool {
     fs::symlink_metadata(filepath).ok()
-        .map_or(false, |metadata| evaluate_bool(metadata.file_type().is_symlink()))
+        .map_or(false, |metadata| metadata.file_type().is_symlink())
 }
 
 /// Exits SUCCESS if the string is not empty
 fn string_is_nonzero(string: &str) -> bool {
-    evaluate_bool(!string.is_empty())
+    !string.is_empty()
 }
 
 /// Exits SUCCESS if the string is empty
 fn string_is_zero(string: &str) -> bool {
-    evaluate_bool(string.is_empty())
+    string.is_empty()
 }
-
-/// Convert a boolean to it's respective exit code.
-fn evaluate_bool(input_is_true: bool) -> bool { if input_is_true { true } else { false } }
 
 #[test]
 fn test_strings() {
