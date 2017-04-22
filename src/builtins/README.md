@@ -2,86 +2,30 @@
 
 This directory contains the source code of Ion's builtin commands and documentation for their usage.
 
+## calc.rs
+
+Source code for the calc command, which allows for basic command-line f32-based arithmetic.
+
+## echo.rs
+
+Source code for the echo command, included for performance reasons.
+
+## functions.rs
+
+Functions for printing a list of function when the fn keyword is called by itself.
+
 ## source.rs
 
-Contains the source command
+The source command evaluates a supplied script.
+
+## test.rs
+
+Source code for the test command, which is also included for performance reasons.
+
+## time.rs
+
+Source code for the time command, which is used to evaluate the time spent running an external process.
 
 ## variables.rs
 
-The **variables.rs** module contains commands relating to setting and removing aliases, variables, and exports. The shell stores aliases and variables within two separate `BTreeMap` structures inside the same `Variables` structure, which is contained within the `Shell` structure.
-
-### Alias
-
-The `alias` command is used to set an alias for running other commands under a different name. The most common usages of the `alias` keyword are to shorten the keystrokes required to run a command and it's specific arguments, and to rename a command to something more familiar.
-
-```ion
-alias ls = 'ls --color'
-```
-
-If the command is executed without any arguments, it will simply list all available aliases.
-
-The `unalias` command performs the reverse of `alias` in that it drops the value from existence.
-
-```ion
-unalias ls
-```
-
-### Let
-
-The `let` command sets a variable to the value of the expression that follows. These variables are stored as local values within the shell, so other processes many not access these values.
-
-```ion
-let git_branch = $(git rev-parse --abbrev-ref HEAD ^> /dev/null)
-```
-
-If the command is executed without any arguments, it will simply list all available variables.
-
-#### Dropping variables
-
-To drop a value from the shell, the `drop` keyword may be used:
-
-```ion
-drop git_branch
-```
-
-#### Arithmetic
-
-The `let` command also supports basic arithmetic.
-
-```ion
-let a = 1
-echo $a
-let a += 4
-echo $a
-let a *= 10
-echo $a
-let a /= 2
-echo $a
-let a -= 5
-echo $a
-```
-
-### Export
-
-The `export` command works similarly to the `let` command, but instead of defining a local variable, it defines a global variable that other processes can access.
-
-```sh
-export PATH = "~/.cargo/bin:${PATH}"
-```
-
-#### Arithmetic
-
-The `export` command also supports basic arithmetic.
-
-```ion
-export a = 1
-echo $a
-export a += 4
-echo $a
-export a *= 10
-echo $a
-export a /= 2
-echo $a
-export a -= 5
-echo $a
-```
+The **variables.rs** module contains commands relating to setting and removing aliases, variables, and exports.

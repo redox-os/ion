@@ -5,15 +5,22 @@
 [![Coverage Status](https://coveralls.io/repos/redox-os/ion/badge.svg?branch=master&service=github)](https://coveralls.io/github/redox-os/ion?branch=master)
 [![crates.io](http://meritbadge.herokuapp.com/ion-shell)](https://crates.io/crates/ion-shell)
 
-Ion is a shell for UNIX platforms, and is the default shell in Redox. It is still a work in progress, but much of the
-core functionality is complete. Features below:
+Ion is a shell for UNIX platforms, and is the default shell in Redox. It is still a work in progress, but much of the core functionality is complete. It is also currently significantly faster than Bash, and even Dash, making it the fastest system shell to date.
 
-- [x] Shell Expansion
+# Completed Features
+
+- [x] Variable Expansions
+- [x] Brace Expansions
+- [x] Process Expansions
 - [x] Flow Control
+- [x] For Loops
+- [x] While Loops
+- [x] If Conditionals
+- [x] Functions
+- [x] Executing Scripts with an @args Array
 - [x] Aliases
 - [x] Variables (**$variable**)
-- [x] Substrings for Variables
-- [x] Functions
+- [x] Substring Slicing of Variables
 - [x] Arrays (**@array**)
 - [x] Array Expressions (**[]**)
 - [x] Array-based Command Substitution (**@[]**)
@@ -21,27 +28,33 @@ core functionality is complete. Features below:
 - [x] Array Methods (**@split(var, ' ')**)
 - [x] String Methods (**$join(array, ', ')**)
 - [x] Array Splicing
-- [ ] Maps
-- [x] For Loops
-- [ ] Foreach Loops
-- [x] While Loops
-- [x] If Conditionals
 - [x] Piping Stdout/Stderr
 - [x] Redirecting Stdout/Stderr
-- [ ] Piping Builtins & Functions
+- [x] Piping Builtins
 - [x] **&&** and **||** Conditionals
 - [x] Background Jobs
-- [ ] Background Jobs Control
+- [x] Multiline Comments and Commands
+- [x] Tab Completion (Needs Improvements)
+
+## Unimplemented Features
+
+Currently, the most important missing feature is support for signal handling, which is not well supported by in Rust at this time due to the lack of developed signal handling crates, and Redox not having support for signal handling.
+
 - [ ] Signal Handling
+- [ ] Multiline Editing
+- [ ] XDG App Dirs
+- [ ] Background Jobs Control
 - [ ] Autosuggestions (90%)
 - [ ] Syntax Highlighting
-- [x] Multiline Comments and Commands
-- [ ] Multiline Editing
-- [x] Tab Completion (Needs Improvements)
+- [ ] Piping Functions
+- [ ] Maps
+- [ ] Lists?
+- [ ] Foreach Loops
 - [ ] Syntax for Color Handling
-- [ ] Unescape specific character combinations, such as '\n' and '\t'
 - [ ] Builtin Plugins
 - [ ] Prompt Plugins
+- [ ] Syntax Plugins
+
 
 ## Shell Syntax
 
@@ -456,4 +469,32 @@ end
 for i in 1..20
     fib $i
 end
+```
+
+
+### Executing Scripts with Array Arguments
+
+Arguments supplied to a script are stored in the `@args` array.
+
+#### Command executed
+
+```ion
+script.ion one two three
+```
+
+#### Script Contents
+
+```ion
+for argument in @args
+    echo $argument
+end
+```
+
+#### Output
+
+```
+script.ion
+one
+two
+three
 ```

@@ -38,24 +38,6 @@ The PEG parser will read a supplied statement and determine what kind of stateme
 
 The `pipelines` module is closely related to our `peg` module, in that for a handful of scenarios, such as when parsing `while`, `if`, and regular statements, the `pipelines` module provides a parser that parses pipelines, redirections, and conditional operators in commands, such as the following:
 
-##### Pipelines Example
-
-```ion
-git remote show local | egrep 'tracked|new' | grep -v master | awk '{print $1}'
-```
-
-##### Conditionals Example
-
-```ion
-test -e .git && echo $PWD contains .git directory || echo $PWD does not contain a .git directory
-```
-
-##### Redirection Example
-
-```ion
-cargo build > build.log
-```
-
 #### Loops Module
 
 For loops within Ion work uniquely compared to other shells, in that not only does the `ForExpression` parser parse/expand the supplied expression, but it checks if the expanded expression is either an inclusive or exclusive range, then returns the appropriate `ForExpression`.
