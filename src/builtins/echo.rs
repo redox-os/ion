@@ -5,13 +5,15 @@ const ESCAPE: u8 = 2;
 const NO_NEWLINE: u8 = 4;
 const NO_SPACES: u8 = 8;
 
-const MAN_PAGE: &'static str = /* @MANSTART{echo} */ r#"
-NAME
+const MAN_PAGE: &'static str = /* @MANSTART{echo} */ r#"NAME
     echo - display a line of text
+
 SYNOPSIS
     echo [ -h | --help ] [-e] [-n] [-s] [STRING]...
+
 DESCRIPTION
     Print the STRING(s) to standard output.
+
 OPTIONS
     -e
         enable the interpretation of backslash escapes
@@ -19,6 +21,7 @@ OPTIONS
         do not output the trailing newline
     -s
         do not separate arguments with spaces
+
     Escape Sequences
         When the -e argument is used, the following sequences will be interpreted:
         \\  backslash

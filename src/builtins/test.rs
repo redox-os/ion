@@ -5,8 +5,7 @@ use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::time::SystemTime;
 use std::error::Error;
 
-const MAN_PAGE: &'static str = /* @MANSTART{test} */ r#"
-NAME
+const MAN_PAGE: &'static str = /* @MANSTART{test} */ r#"NAME
     test - perform tests on files and text
 
 SYNOPSIS

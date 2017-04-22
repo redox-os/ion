@@ -3,6 +3,7 @@ pub mod variables;
 pub mod functions;
 
 mod test;
+mod time;
 mod echo;
 mod calc;
 
@@ -247,7 +248,7 @@ impl Builtin {
                                     Err(why) => {
                                         let stderr = io::stderr();
                                         let mut stderr = stderr.lock();
-                                        let _ = stderr.write_all(why.as_bytes());
+                                        let _ = writeln!(stderr, "{}", why);
                                         FAILURE
                                     }
                                 }
@@ -260,6 +261,23 @@ impl Builtin {
                             help: "Calculate a mathematical expression",
                             main: box |args: &[String], _: &mut Shell| -> i32 {
                                 match calc::calc(&args[1..]) {
+                                    Ok(()) => SUCCESS,
+                                    Err(why) => {
+                                        let stderr = io::stderr();
+                                        let mut stderr = stderr.lock();
+                                        let _ = writeln!(stderr, "{}", why);
+                                        FAILURE
+                                    }
+                                }
+                            }
+                        });
+
+        commands.insert("time",
+                        Builtin {
+                            name: "time",
+                            help: "Measures the time to execute an external command",
+                            main: box |args: &[String], _: &mut Shell| -> i32 {
+                                match time::time(&args[1..]) {
                                     Ok(()) => SUCCESS,
                                     Err(why) => {
                                         let stderr = io::stderr();
