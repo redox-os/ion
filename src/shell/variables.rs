@@ -1,12 +1,11 @@
-// TODO: Move into shell module
 use fnv::FnvHashMap;
 use std::env;
 use std::path::PathBuf;
 use std::process;
 
-use directory_stack::DirectoryStack;
+use super::directory_stack::DirectoryStack;
 use liner::Context;
-use status::{SUCCESS, FAILURE};
+use super::status::{SUCCESS, FAILURE};
 
 pub struct Variables {
     pub arrays:    FnvHashMap<String, Vec<String>>,
@@ -21,9 +20,7 @@ impl Default for Variables {
         map.insert("HISTORY_SIZE".into(), "1000".into());
         map.insert("HISTORY_FILE_ENABLED".into(), "0".into());
         map.insert("HISTORY_FILE_SIZE".into(), "1000".into());
-        // TODO: Handle Colors
         map.insert("PROMPT".into(), "\x1B\']\'0;${USER}: ${PWD}\x07\x1B\'[\'0m\x1B\'[\'1;38;5;85m${USER}\x1B\'[\'37m:\x1B\'[\'38;5;75m${PWD}\x1B\'[\'37m#\x1B\'[\'0m ".into());
-        // map.insert("PROMPT".into(), "${USER}:${PWD}# ".into());
 
         // Initialize the HISTORY_FILE variable
         env::home_dir().map(|mut home_path: PathBuf| {
@@ -221,7 +218,7 @@ fn get_user_home(_username: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use directory_stack::DirectoryStack;
+    use shell::directory_stack::DirectoryStack;
     use parser::{expand_string, ExpanderFunctions, Index, IndexEnd};
 
     fn new_dir_stack() -> DirectoryStack {

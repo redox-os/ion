@@ -1,11 +1,11 @@
 use fnv::FnvHashMap;
 use std::io::{self, Write};
 
-use variables::Variables;
-use directory_stack::DirectoryStack;
+use super::variables::Variables;
+use super::directory_stack::DirectoryStack;
 use parser::assignments::{self, Binding, Operator, Value};
 use parser::{ExpanderFunctions, Index, IndexEnd};
-use status::*;
+use super::status::*;
 
 fn print_vars(list: &FnvHashMap<String, String>) {
     let stdout = io::stdout();

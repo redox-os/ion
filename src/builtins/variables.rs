@@ -4,8 +4,8 @@ use fnv::FnvHashMap;
 use std::env;
 use std::io::{self, Write};
 
-use status::*;
-use variables::Variables;
+use shell::status::*;
+use shell::variables::Variables;
 
 fn print_list(list: &FnvHashMap<String, String>) {
     let stdout = io::stdout();
@@ -241,8 +241,8 @@ pub fn export_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
 mod test {
     use super::*;
     use parser::{expand_string, ExpanderFunctions, Index, IndexEnd};
-    use status::{FAILURE, SUCCESS};
-    use directory_stack::DirectoryStack;
+    use shell::status::{FAILURE, SUCCESS};
+    use shell::directory_stack::DirectoryStack;
 
     fn new_dir_stack() -> DirectoryStack {
         DirectoryStack::new().unwrap()

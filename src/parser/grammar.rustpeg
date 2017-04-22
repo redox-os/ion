@@ -1,5 +1,5 @@
 use parser::{pipelines, ArgumentSplitter};
-use flow_control::{ElseIf, Statement};
+use shell::flow_control::{ElseIf, Statement};
 
 #[pub]
 parse_ -> Statement
@@ -81,7 +81,7 @@ fn_ -> Statement
     }
 
 _description -> String
-      = "--" whitespace* description:$([^\r\n]*) { description.to_string() } 
+      = "--" whitespace* description:$([^\r\n]*) { description.to_string() }
 
 _name -> String
       = n:$([A-z0-9_]+) { n.to_string() }

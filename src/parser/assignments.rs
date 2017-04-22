@@ -1,6 +1,6 @@
 use super::arguments::ArgumentSplitter;
 use super::shell_expand::{expand_string, ExpanderFunctions};
-use variables::Variables;
+use shell::variables::Variables;
 
 // TODO: Have the expand_string function return the `Value` type.
 pub enum Value {

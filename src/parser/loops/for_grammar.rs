@@ -1,5 +1,5 @@
-use directory_stack::DirectoryStack;
-use variables::Variables;
+use shell::directory_stack::DirectoryStack;
+use shell::variables::Variables;
 use parser::{expand_string, ExpanderFunctions, Index, IndexEnd};
 
 #[derive(Debug, PartialEq)]

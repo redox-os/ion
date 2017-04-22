@@ -20,7 +20,7 @@ use std::error::Error;
 
 use parser::QuoteTerminator;
 use shell::{Shell, FlowLogic, ShellHistory};
-use status::*;
+use shell::status::*;
 
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the

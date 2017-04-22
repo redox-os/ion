@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::env::{set_current_dir, current_dir, home_dir};
 use std::path::PathBuf;
-use variables::Variables;
+use super::variables::Variables;
 use super::status::SUCCESS;
 
 pub struct DirectoryStack {

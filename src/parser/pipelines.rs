@@ -341,7 +341,7 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
 
 #[cfg(test)]
 mod tests {
-    use flow_control::Statement;
+    use shell::flow_control::Statement;
     use parser::peg::{parse, RedirectFrom, Redirection};
     use shell::JobKind;
 

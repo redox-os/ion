@@ -1,7 +1,13 @@
 mod assignments;
+mod completer;
+pub mod directory_stack;
+pub mod flow_control;
+mod flow;
 mod history;
 mod job;
-mod flow;
+mod pipe;
+pub mod status;
+pub mod variables;
 
 pub use self::history::ShellHistory;
 pub use self::job::{Job, JobKind};
@@ -18,12 +24,12 @@ use std::time::SystemTime;
 use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter, BasicCompleter};
 
 use builtins::*;
-use completer::MultiCompleter;
-use directory_stack::DirectoryStack;
-use flow_control::{FlowControl, Function, Statement};
-use variables::Variables;
-use status::*;
-use pipe::execute_pipeline;
+use self::completer::MultiCompleter;
+use self::directory_stack::DirectoryStack;
+use self::flow_control::{FlowControl, Function, Statement};
+use self::variables::Variables;
+use self::status::*;
+use self::pipe::execute_pipeline;
 use parser::{expand_string, StatementSplitter, check_statement, QuoteTerminator, ExpanderFunctions, Index, IndexEnd};
 use parser::peg::Pipeline;
 

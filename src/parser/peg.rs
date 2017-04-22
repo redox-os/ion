@@ -1,10 +1,10 @@
 use std::io::{stderr, Write};
 
-use flow_control::Statement;
+use shell::flow_control::Statement;
 use self::grammar::parse_;
-use directory_stack::DirectoryStack;
+use shell::directory_stack::DirectoryStack;
 use shell::Job;
-use variables::Variables;
+use shell::variables::Variables;
 use parser::{expand_string, ExpanderFunctions, Index, IndexEnd};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -67,7 +67,7 @@ peg_file! grammar("grammar.rustpeg");
 mod tests {
     use super::grammar::*;
     use super::*;
-    use flow_control::Statement;
+    use shell::flow_control::Statement;
     use shell::JobKind;
 
     #[test]

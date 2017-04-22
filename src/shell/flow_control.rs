@@ -6,21 +6,11 @@ pub struct ElseIf {
     pub success:    Vec<Statement>
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub enum AssignmentOperator {
-    Equal,
-    Add,
-    Subtract,
-    Divide,
-    Multiply
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let {
         expression: String,
     },
-    PrintVars,
     If {
         expression: Pipeline,
         success: Vec<Statement>,

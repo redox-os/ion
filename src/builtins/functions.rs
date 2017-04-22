@@ -1,6 +1,6 @@
-use flow_control::{Function};
+use shell::flow_control::Function;
 use fnv::FnvHashMap;
-use status::*;
+use shell::status::*;
 use std::io::{self, Write};
 
 fn print_functions(functions: &FnvHashMap<String, Function>) {

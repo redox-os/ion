@@ -265,17 +265,14 @@ fn file_size_is_greater_than_zero(filepath: &str) -> bool {
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective read bits.
 fn file_has_read_permission(filepath: &str) -> bool {
-    const USER_BIT:  u32 = 0b100000000;
-    const GROUP_BIT: u32 = 0b100000;
-    const GUEST_BIT: u32 = 0b100;
+    const USER:  u32 = 0b100000000;
+    const GROUP: u32 = 0b100000;
+    const GUEST: u32 = 0b100;
 
     // Collect the mode of permissions for the file
     fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
         // If the mode is equal to any of the above, return `SUCCESS`
-        .map_or(false, |mode| {
-            mode & USER_BIT == USER_BIT || mode & GROUP_BIT == GROUP_BIT ||
-                mode & GUEST_BIT == GUEST_BIT
-        })
+        .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
 }
 
 /// Exits SUCCESS if the file has write permissions. This function is rather low level because
@@ -283,17 +280,14 @@ fn file_has_read_permission(filepath: &str) -> bool {
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective write bits.
 fn file_has_write_permission(filepath: &str) -> bool {
-    const USER_BIT:  u32 = 0b10000000;
-    const GROUP_BIT: u32 = 0b10000;
-    const GUEST_BIT: u32 = 0b10;
+    const USER:  u32 = 0b10000000;
+    const GROUP: u32 = 0b10000;
+    const GUEST: u32 = 0b10;
 
     // Collect the mode of permissions for the file
     fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
         // If the mode is equal to any of the above, return `SUCCESS`
-        .map_or(false, |mode| {
-            mode & USER_BIT == USER_BIT || mode & GROUP_BIT == GROUP_BIT ||
-                mode & GUEST_BIT == GUEST_BIT
-        })
+        .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
 }
 
 /// Exits SUCCESS if the file has execute permissions. This function is rather low level because
@@ -301,17 +295,14 @@ fn file_has_write_permission(filepath: &str) -> bool {
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective execute bits.
 fn file_has_execute_permission(filepath: &str) -> bool {
-    const USER_BIT:  u32 = 0b1000000;
-    const GROUP_BIT: u32 = 0b1000;
-    const GUEST_BIT: u32 = 0b1;
+    const USER:  u32 = 0b1000000;
+    const GROUP: u32 = 0b1000;
+    const GUEST: u32 = 0b1;
 
     // Collect the mode of permissions for the file
     fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
         // If the mode is equal to any of the above, return `SUCCESS`
-        .map_or(false, |mode| {
-            mode & USER_BIT == USER_BIT || mode & GROUP_BIT == GROUP_BIT ||
-                mode & GUEST_BIT == GUEST_BIT
-        })
+        .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
 }
 
 /// Exits SUCCESS if the file argument is a socket

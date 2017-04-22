@@ -5,7 +5,7 @@ use std::fs::{File, OpenOptions};
 use std::thread;
 
 use shell::JobKind;
-use status::*;
+use super::status::*;
 use parser::peg::{Pipeline, RedirectFrom};
 
 pub fn execute_pipeline(pipeline: &mut Pipeline) -> i32 {

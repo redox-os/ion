@@ -4,7 +4,7 @@
 
 use std::u16;
 use std::io::{self, Write};
-use flow_control::Statement;
+use shell::flow_control::Statement;
 use super::peg::parse;
 
 const SQUOTE: u16 = 1;

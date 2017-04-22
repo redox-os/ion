@@ -6,6 +6,7 @@ pub struct MultiCompleter<A, B> where A: Completer, B: Completer {
     a: Vec<A>,
     b: B
 }
+
 impl<A, B> MultiCompleter<A, B> where A: Completer, B: Completer {
     pub fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> {
         MultiCompleter {
@@ -14,6 +15,7 @@ impl<A, B> MultiCompleter<A, B> where A: Completer, B: Completer {
         }
     }
 }
+
 impl<A, B> Completer for MultiCompleter<A, B> where A: Completer, B: Completer {
     fn completions(&self, start: &str) -> Vec<String> {
         let mut completions = self.b.completions(start);

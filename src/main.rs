@@ -16,13 +16,6 @@ extern crate liner;
 extern crate users as users_unix;
 
 #[macro_use] mod parser;
-pub mod completer;
-pub mod pipe;
-pub mod directory_stack;
-pub mod to_num;
-pub mod variables;
-pub mod status;
-pub mod flow_control;
 mod builtins;
 mod shell;
 

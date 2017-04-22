@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use status::*;
+use super::status::*;
 use super::Shell;
 
 /// Contains all history-related functionality for the `Shell`.

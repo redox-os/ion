@@ -1,9 +1,9 @@
 use std::io::{self, Write};
 use std::mem;
-use status::*;
+use super::status::*;
 use super::Shell;
 
-use flow_control::{ElseIf, Function, Statement, collect_loops, collect_if};
+use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_if};
 use parser::{ForExpression, StatementSplitter, check_statement};
 use parser::peg::Pipeline;
 use super::assignments::let_assignment;
