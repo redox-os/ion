@@ -1,21 +1,15 @@
-use super::arguments::ArgumentSplitter;
-use super::shell_expand::{expand_string, ExpanderFunctions};
 use shell::variables::Variables;
 
-// TODO: Have the expand_string function return the `Value` type.
-pub enum Value {
-    String(String),
-    Array(Vec<String>)
-}
-
+#[derive(Debug, PartialEq, Clone)]
 pub enum Binding {
     InvalidKey(String),
     ListEntries,
     KeyOnly(String),
-    KeyValue(String, Value),
-    Math(String, Operator, Value),
+    KeyValue(String, String),
+    Math(String, Operator, String),
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub enum Operator {
     Add,
     Subtract,
@@ -24,39 +18,8 @@ pub enum Operator {
     Exponent,
 }
 
-#[allow(dead_code)]
-enum Expression {
-    Arithmetic,
-    Regular
-}
-
-fn parse_expression(expression: &str, shell_funcs: &ExpanderFunctions) -> Value {
-    let arguments: Vec<&str> = ArgumentSplitter::new(expression).collect();
-
-    if arguments.len() == 1 {
-        // If a single argument has been passed, it will be expanded and checked to determine
-        // whether or not the expression is an array or a string.
-        let expanded = expand_string(expression, shell_funcs, false);
-        if expanded.len() == 1 {
-            // Grab the inner value and return it as a String.
-            Value::String(expanded[0].clone())
-        } else {
-            // Return the expanded values as an Array.
-            Value::Array(expanded)
-        }
-    } else {
-        // If multiple arguments have been passed, they will be collapsed into a single string.
-        // IE: `[ one two three ] four` is equivalent to `one two three four`
-        let arguments: Vec<String> = arguments.iter()
-            .flat_map(|expression| expand_string(expression, shell_funcs, false))
-            .collect();
-
-        Value::String(arguments.join(" "))
-    }
-}
-
 /// Parses let bindings, `let VAR = KEY`, returning the result as a `(key, value)` tuple.
-pub fn parse_assignment(arguments: &str, shell_funcs: &ExpanderFunctions) -> Binding {
+pub fn parse_assignment(arguments: &str) -> Binding {
     // Create a character iterator from the arguments.
     let mut char_iter = arguments.chars();
 
@@ -119,8 +82,8 @@ pub fn parse_assignment(arguments: &str, shell_funcs: &ExpanderFunctions) -> Bin
             Binding::InvalidKey(key)
         } else {
             match operator {
-                Some(operator) => Binding::Math(key, operator, parse_expression(&value, shell_funcs)),
-                None => Binding::KeyValue(key, parse_expression(&value, shell_funcs))
+                Some(operator) => Binding::Math(key, operator, value),
+                None => Binding::KeyValue(key, value)
             }
         }
     }

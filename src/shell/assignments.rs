@@ -3,9 +3,20 @@ use std::io::{self, Write};
 
 use super::variables::Variables;
 use super::directory_stack::DirectoryStack;
-use parser::assignments::{self, Binding, Operator, Value};
-use parser::{ExpanderFunctions, Index, IndexEnd};
+use parser::assignments::{Binding, Operator};
+use parser::{ExpanderFunctions, Index, IndexEnd, ArgumentSplitter, expand_string};
 use super::status::*;
+
+pub enum Value {
+    String(String),
+    Array(Vec<String>)
+}
+
+enum Action {
+    UpdateString(String, String),
+    UpdateArray(String, Vec<String>),
+    NoOp
+}
 
 fn print_vars(list: &FnvHashMap<String, String>) {
     let stdout = io::stdout();
@@ -42,8 +53,8 @@ fn print_arrays(list: &FnvHashMap<String, Vec<String>>) {
     }
 }
 
-pub fn let_assignment<'a>(original: &'a str, vars: &mut Variables, dir_stack: &DirectoryStack) -> i32 {
-    let binding = {
+pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &DirectoryStack) -> i32 {
+    let action = {
         let expanders = ExpanderFunctions {
             tilde: &|tilde: &str| vars.tilde_expansion(tilde, dir_stack),
             array: &|array: &str, index: Index| {
@@ -75,51 +86,91 @@ pub fn let_assignment<'a>(original: &'a str, vars: &mut Variables, dir_stack: &D
             command: &|command: &str, quoted: bool| vars.command_expansion(command, quoted),
         };
 
-        assignments::parse_assignment(original, &expanders)
+
+
+        match binding {
+            Binding::InvalidKey(key) => {
+                let stderr = io::stderr();
+                let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
+                return FAILURE;
+            },
+            Binding::KeyValue(key, value) => match parse_expression(&value, &expanders) {
+                Value::String(value) => Action::UpdateString(key, value),
+                Value::Array(array)  => Action::UpdateArray(key, array)
+            },
+            Binding::KeyOnly(key) => {
+                let stderr = io::stderr();
+                let _ = writeln!(&mut stderr.lock(), "ion: please provide value for variable '{}'", key);
+                return FAILURE;
+            },
+            Binding::ListEntries => {
+                print_vars(&vars.variables);
+                print_arrays(&vars.arrays);
+                Action::NoOp
+            },
+            Binding::Math(key, operator, value) => {
+                match parse_expression(&value, &expanders) {
+                    Value::String(ref value) => {
+                        let left = match vars.get_var(&key).and_then(|x| x.parse::<f32>().ok()) {
+                            Some(left) => left,
+                            None => return FAILURE,
+                        };
+
+                        let right = match value.parse::<f32>().ok() {
+                            Some(right) => right,
+                            None => return FAILURE
+                        };
+
+                        let result = match operator {
+                            Operator::Add      => left + right,
+                            Operator::Subtract => left - right,
+                            Operator::Divide   => left / right,
+                            Operator::Multiply => left * right,
+                            Operator::Exponent => f32::powf(left, right)
+                        };
+
+                        Action::UpdateString(key, result.to_string())
+                    },
+                    Value::Array(_) => {
+                        let stderr = io::stderr();
+                        let _ = writeln!(stderr.lock(), "ion: array math not supported yet");
+                        return FAILURE
+                    }
+                }
+            },
+        }
     };
 
-    match binding {
-        Binding::InvalidKey(key) => {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
-            return FAILURE;
-        },
-        Binding::KeyValue(key, Value::String(value)) => vars.set_var(&key, &value),
-        Binding::KeyValue(key, Value::Array(array))  => vars.set_array(&key, array),
-        Binding::KeyOnly(key) => {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: please provide value for variable '{}'", key);
-            return FAILURE;
-        },
-        Binding::ListEntries => {
-            print_vars(&vars.variables);
-            print_arrays(&vars.arrays);
-        },
-        Binding::Math(key, operator, Value::String(value)) => {
-            let left = match vars.get_var(&key).and_then(|x| x.parse::<f32>().ok()) {
-                Some(left) => left,
-                None => return FAILURE,
-            };
-
-            let right = match value.parse::<f32>().ok() {
-                Some(right) => right,
-                None => return FAILURE
-            };
-
-            let result = match operator {
-                Operator::Add      => left + right,
-                Operator::Subtract => left - right,
-                Operator::Divide   => left / right,
-                Operator::Multiply => left * right,
-                Operator::Exponent => f32::powf(left, right)
-            };
-
-            vars.set_var(&key, &result.to_string());
-        },
-        Binding::Math(_, _, Value::Array(_)) => {
-            unimplemented!();
-        }
-    }
+    match action {
+        Action::UpdateArray(key, array) => vars.set_array(&key, array),
+        Action::UpdateString(key, string) => vars.set_var(&key, &string),
+        Action::NoOp => ()
+    };
 
     SUCCESS
+}
+
+fn parse_expression(expression: &str, shell_funcs: &ExpanderFunctions) -> Value {
+    let arguments: Vec<&str> = ArgumentSplitter::new(expression).collect();
+
+    if arguments.len() == 1 {
+        // If a single argument has been passed, it will be expanded and checked to determine
+        // whether or not the expression is an array or a string.
+        let expanded = expand_string(expression, shell_funcs, false);
+        if expanded.len() == 1 {
+            // Grab the inner value and return it as a String.
+            Value::String(expanded[0].clone())
+        } else {
+            // Return the expanded values as an Array.
+            Value::Array(expanded)
+        }
+    } else {
+        // If multiple arguments have been passed, they will be collapsed into a single string.
+        // IE: `[ one two three ] four` is equivalent to `one two three four`
+        let arguments: Vec<String> = arguments.iter()
+            .flat_map(|expression| expand_string(expression, shell_funcs, false))
+            .collect();
+
+        Value::String(arguments.join(" "))
+    }
 }

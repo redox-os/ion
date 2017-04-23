@@ -1,4 +1,5 @@
 use parser::peg::Pipeline;
+use parser::assignments::Binding;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ElseIf {
@@ -9,7 +10,7 @@ pub struct ElseIf {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let {
-        expression: String,
+        expression: Binding,
     },
     If {
         expression: Pipeline,

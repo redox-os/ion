@@ -1,3 +1,4 @@
+use parser::assignments::parse_assignment;
 use parser::{pipelines, ArgumentSplitter};
 use shell::flow_control::{ElseIf, Statement};
 
@@ -18,7 +19,7 @@ parse_ -> Statement
 #[pub]
 let_ -> Statement
     = whitespace* "let" whitespace? value:$(.*) {
-        Statement::Let { expression: value.to_string() }
+        Statement::Let { expression: parse_assignment(value) }
     }
 
 #[pub]
