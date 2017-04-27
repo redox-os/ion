@@ -85,6 +85,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
     fn next(&mut self) -> Option<Result<&'a str, StatementError>> {
         let start = self.read;
         let mut first_arg_found = false;
+        let mut else_found = false;
+        let mut else_pos = 0;
         let mut error = None;
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
@@ -167,11 +169,24 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         None        => Some(Ok(output))
                     };
                 },
+                b' ' if else_found => {
+                    let output = &self.data[else_pos..self.read-1].trim();
+                    if !output.is_empty() {
+                        if "if" != *output {
+                            self.read = else_pos;
+                            return Some(Ok("else"));
+                        }
+                    }
+                    else_found = false;
+                }
                 b' ' if !first_arg_found => {
                     let output = &self.data[start..self.read-1].trim();
                     if !output.is_empty() {
                         match *output {
-                            "else" => return Some(Ok(output)),
+                            "else" => {
+                                else_found = true;
+                                else_pos = self.read;
+                            },
                             _ => first_arg_found = true
                         }
                     }
