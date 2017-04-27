@@ -1,8 +1,9 @@
+use std::process;
 use std::io::{self, Write};
 use std::mem;
 use super::status::*;
 use super::Shell;
-
+use super::flags::*;
 use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_if};
 use parser::{ForExpression, StatementSplitter, check_statement};
 use parser::peg::Pipeline;
@@ -184,7 +185,12 @@ impl<'a> FlowLogic for Shell<'a> {
                         statements:  statements
                     });
                 },
-                Statement::Pipeline(mut pipeline) => { self.run_pipeline(&mut pipeline, false); },
+                Statement::Pipeline(mut pipeline)  => {
+                    self.run_pipeline(&mut pipeline, false);
+                    if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
+                        process::exit(self.previous_status);
+                    }
+                },
                 Statement::Break => { return Condition::Break }
                 Statement::Continue => { return Condition::Continue }
                 _ => {}
@@ -370,7 +376,12 @@ impl<'a> FlowLogic for Shell<'a> {
                 }
             },
             // Simply executes a provided pipeline, immediately.
-            Statement::Pipeline(mut pipeline) => { self.run_pipeline(&mut pipeline, false); },
+            Statement::Pipeline(mut pipeline)  => {
+                self.run_pipeline(&mut pipeline, false);
+                if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
+                    process::exit(self.previous_status);
+                }
+            },
             // At this level, else and else if keywords are forbidden.
             Statement::ElseIf{..} | Statement::Else => {
                 let stderr = io::stderr();

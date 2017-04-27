@@ -6,6 +6,7 @@ mod test;
 mod time;
 mod echo;
 mod calc;
+mod set;
 
 use self::variables::{alias, drop_alias, drop_variable, export_variable};
 use self::functions::fn_;
@@ -164,6 +165,15 @@ impl Builtin {
                         });
 
         /* Misc */
+        commands.insert("set",
+            Builtin {
+                name: "set",
+                help: "Set or unset values of shell options and positional parameters.",
+                main: box |args: &[String], shell: &mut Shell| -> i32 {
+                    set::set(args, shell)
+                },
+            });
+
         commands.insert("eval",
             Builtin {
                 name: "eval",

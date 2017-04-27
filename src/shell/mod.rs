@@ -1,6 +1,7 @@
 mod assignments;
 mod completer;
 pub mod directory_stack;
+pub mod flags;
 pub mod flow_control;
 mod flow;
 mod history;
@@ -43,6 +44,7 @@ pub struct Shell<'a> {
     pub directory_stack: DirectoryStack,
     pub functions: FnvHashMap<String, Function>,
     pub previous_status: i32,
+    pub flags: u8,
 }
 
 impl<'a> Shell<'a> {
@@ -56,6 +58,7 @@ impl<'a> Shell<'a> {
             directory_stack: DirectoryStack::new().expect(""),
             functions: FnvHashMap::default(),
             previous_status: 0,
+            flags: 0,
         }
     }
     fn readln(&mut self) -> Option<String> {
@@ -223,6 +226,7 @@ impl<'a> Shell<'a> {
             process::exit(self.previous_status);
         }
 
+        self.variables.set_array("args", vec![env::args().next().unwrap()]);
         while let Some(command) = self.readln() {
             if ! command.is_empty() {
                 let command = self.terminate_quotes(command);
