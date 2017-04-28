@@ -320,6 +320,7 @@ impl<'a> Shell<'a> {
                 // Append arguments supplied by the current job to the alias.
                 alias += " ";
                 for argument in pipeline.jobs[0].args.iter().skip(1) {
+                    alias += " ";
                     alias += argument;
                 }
 
