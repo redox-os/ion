@@ -64,11 +64,11 @@ else_if_ -> Statement
 
 #[pub]
 else_ -> Statement
-    = whitespace* "else" whitespace*  { Statement::Else}
+    = whitespace* "else" whitespace*  { Statement::Else }
 
 #[pub]
 end_ -> Statement
-    = whitespace* "end" whitespace* { Statement ::End}
+    = whitespace* "end" whitespace* { Statement ::End }
 
 #[pub]
 fn_ -> Statement
@@ -118,10 +118,9 @@ while_ -> Statement
         }
     }
 
-#[pub]
-pipelines -> Statement
+pub pipelines -> Statement
     = (unused* newline)* [#] .* { Statement::Default }
-    / [ \n\t\r]* _pipelines
+    / [ \n\t\r]* pipeline:_pipelines { pipeline }
     / (unused*) ** newline { Statement::Default }
 
 
