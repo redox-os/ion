@@ -18,12 +18,12 @@ OPTIONS
         display this help and exit
 "#;
 
-pub fn time(args: &[String]) -> Result<(), String> {
+pub fn time(args: &[&str]) -> Result<(), String> {
     let stdout = stdout();
     let mut stdout = stdout.lock();
 
     for arg in args {
-        if arg.as_str() == "-h" || arg == "--help" {
+        if *arg == "-h" || *arg == "--help" {
             return match stdout.write_all(MAN_PAGE.as_bytes()).and_then(|_| stdout.flush()) {
                 Ok(_)    => Ok(()),
                 Err(err) => Err(err.description().to_owned())

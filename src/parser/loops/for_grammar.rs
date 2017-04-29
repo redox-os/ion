@@ -1,17 +1,18 @@
 use shell::directory_stack::DirectoryStack;
 use shell::variables::Variables;
+use types::Value;
 use parser::{expand_string, ExpanderFunctions, Index, IndexEnd};
 
 #[derive(Debug, PartialEq)]
 pub enum ForExpression {
-    Multiple(Vec<String>),
-    Normal(String),
+    Multiple(Vec<Value>),
+    Normal(Value),
     Range(usize, usize)
 }
 
 impl ForExpression {
     pub fn new(expression: &[String], dir_stack: &DirectoryStack, variables: &Variables) -> ForExpression {
-        let output: Vec<String> = expression.iter()
+        let output: Vec<_> = expression.iter()
             .flat_map(|expression| expand_string(expression, &get_expanders!(variables, dir_stack), true))
             .collect();
 

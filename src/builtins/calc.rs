@@ -11,6 +11,7 @@ pub enum Token {
     Exponent,
     OpenParen,
     CloseParen,
+    // TODO: Don't pass around a string when we can pass around a number
     Number(String),
 }
 
@@ -287,7 +288,7 @@ fn eval(input: &str) -> Result<String, CalcError> {
     tokenize(input).and_then(|x| parse(&x))
 }
 
-pub fn calc(args: &[String]) -> Result<(), String> {
+pub fn calc(args: &[&str]) -> Result<(), String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     if !args.is_empty() {

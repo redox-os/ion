@@ -21,10 +21,14 @@ use std::env;
 use std::mem;
 use std::process;
 use std::time::SystemTime;
+use std::iter::FromIterator;
+use smallvec::SmallVec;
 
 use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter, BasicCompleter};
 
 use builtins::*;
+use types::*;
+use smallstring::SmallString;
 use self::completer::MultiCompleter;
 use self::directory_stack::DirectoryStack;
 use self::flow_control::{FlowControl, Function, Statement};
@@ -42,7 +46,7 @@ pub struct Shell<'a> {
     pub variables: Variables,
     flow_control: FlowControl,
     pub directory_stack: DirectoryStack,
-    pub functions: FnvHashMap<String, Function>,
+    pub functions: FnvHashMap<Identifier, Function>,
     pub previous_status: i32,
     pub flags: u8,
 }
@@ -70,9 +74,9 @@ impl<'a> Shell<'a> {
         // Collects the current list of values from history for completion.
         let history = &self.context.history.buffers.iter()
             // Map each underlying `liner::Buffer` into a `String`.
-            .map(|x| x.chars().cloned().collect::<String>())
+            .map(|x| x.chars().cloned().collect())
             // Collect each result into a vector to avoid borrowing issues.
-            .collect::<Vec<String>>();
+            .collect::<Vec<SmallString>>();
 
         let line = self.context.read_line(prompt, &mut move |Event { editor, kind }| {
             if let EventKind::BeforeComplete = kind {
@@ -118,7 +122,7 @@ impl<'a> Shell<'a> {
                     // in the creation of a custom completer.
                     let words = builtins.iter()
                         // Add built-in commands to the completer's definitions.
-                        .map(|(&s, _)| String::from(s))
+                        .map(|(&s, _)| Identifier::from(s))
                         // Add the history list to the completer's definitions.
                         .chain(history.iter().cloned())
                         // Add the aliases to the completer's definitions.
@@ -126,7 +130,9 @@ impl<'a> Shell<'a> {
                         // Add the list of available functions to the completer's definitions.
                         .chain(funcs.keys().cloned())
                         // Add the list of available variables to the completer's definitions.
-                        .chain(vars.get_vars().into_iter().map(|s| format!("${}", s)))
+                        // TODO: We should make it free to do String->SmallString
+                        //       and mostly free to go back (free if allocated)
+                        .chain(vars.get_vars().into_iter().map(|s| format!("${}", s).into()))
                         .collect();
 
                     // Initialize a new completer from the definitions collected.
@@ -167,6 +173,8 @@ impl<'a> Shell<'a> {
     }
 
     pub fn execute(&mut self) {
+        use std::iter;
+
         let mut args = env::args().skip(1);
 
         if let Some(path) = args.next() {
@@ -184,8 +192,10 @@ impl<'a> Shell<'a> {
                     process::exit(FAILURE);
                 }
             } else {
-                let mut array = vec![ path.clone() ];
-                for arg in args { array.push(arg); }
+                let mut array = SmallVec::from_iter(
+                    Some(path.clone().into())
+                );
+                for arg in args { array.push(arg.into()); }
                 self.variables.set_array("args", array);
 
                 match File::open(&path) {
@@ -226,7 +236,10 @@ impl<'a> Shell<'a> {
             process::exit(self.previous_status);
         }
 
-        self.variables.set_array("args", vec![env::args().next().unwrap()]);
+        self.variables.set_array(
+            "args",
+            iter::once(env::args().next().unwrap()).collect(),
+        );
         while let Some(command) = self.readln() {
             if ! command.is_empty() {
                 let command = self.terminate_quotes(command);
@@ -260,7 +273,7 @@ impl<'a> Shell<'a> {
         // been updated.
         env::current_dir().ok().map_or_else(|| env::set_var("PWD", "?"), |path| {
             let pwd = self.variables.get_var_or_empty("PWD");
-            let pwd = pwd.as_str();
+            let pwd: &str = &pwd;
             let current_dir = path.to_str().unwrap_or("?");
             if pwd != current_dir {
                 env::set_var("OLDPWD", pwd);
@@ -315,7 +328,10 @@ impl<'a> Shell<'a> {
         let builtins = self.builtins;
 
         if !noalias {
-            if let Some(mut alias) = self.variables.aliases.get(pipeline.jobs[0].command.as_str()).cloned() {
+            if let Some(mut alias) = {
+                let key: &str = pipeline.jobs[0].command.as_ref();
+                self.variables.aliases.get(key).cloned()
+            } {
                 branched = true;
                 // Append arguments supplied by the current job to the alias.
                 alias += " ";
@@ -341,18 +357,27 @@ impl<'a> Shell<'a> {
         if !branched {
             pipeline.expand(&self.variables, &self.directory_stack);
             // Branch if -> input == shell command i.e. echo
-            exit_status = if let Some(command) = builtins.get(pipeline.jobs[0].command.as_str()) {
+            
+            exit_status = if let Some(command) = {
+                let key: &str = pipeline.jobs[0].command.as_ref();
+                builtins.get(key)
+            } {
                 // Run the 'main' of the command and set exit_status
                 if pipeline.jobs.len() == 1 {
-                    Some((*command.main)(pipeline.jobs[0].args.as_slice(), self))
+                    let borrowed = &pipeline.jobs[0].args;
+                    let small: SmallVec<[&str; 4]> = borrowed.iter()
+                        .map(|x| x as &str)
+                        .collect();
+                    Some((*command.main)(&small, self))
                 } else {
                     Some(execute_pipeline(pipeline))
                 }
             // Branch else if -> input == shell function and set the exit_status
-            } else if let Some(function) = self.functions.get(pipeline.jobs[0].command.as_str()).cloned() {
+            } else if let Some(function) = self.functions.get(&pipeline.jobs[0].command).cloned() {
                 if pipeline.jobs.len() == 1 {
                     if pipeline.jobs[0].args.len() - 1 == function.args.len() {
-                        let mut variables_backup: FnvHashMap<&str, Option<String>> = FnvHashMap::with_capacity_and_hasher (
+                        let mut variables_backup: FnvHashMap<&str, Option<Value>> =
+                            FnvHashMap::with_capacity_and_hasher (
                             64, Default::default()
                         );
                         for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {

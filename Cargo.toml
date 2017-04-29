@@ -24,6 +24,8 @@ liner = "0.1.4"
 peg-syntax-ext = "0.4"
 permutate = "0.2"
 unicode-segmentation = "1.1"
+smallvec = "0.3.3"
+smallstring = { path = "src/smallstring" }
 
 [target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
 users = "0.5.1"

@@ -2,8 +2,9 @@ use shell::flow_control::Function;
 use fnv::FnvHashMap;
 use shell::status::*;
 use std::io::{self, Write};
+use types::Identifier;
 
-fn print_functions(functions: &FnvHashMap<String, Function>) {
+fn print_functions(functions: &FnvHashMap<Identifier, Function>) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
     let _ = writeln!(stdout, "# Functions");
@@ -17,7 +18,7 @@ fn print_functions(functions: &FnvHashMap<String, Function>) {
     }
 }
 
-pub fn fn_(functions: &mut FnvHashMap<String, Function>) -> i32
+pub fn fn_(functions: &mut FnvHashMap<Identifier, Function>) -> i32
 {
     print_functions(functions);
     SUCCESS

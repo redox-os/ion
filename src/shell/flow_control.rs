@@ -1,3 +1,4 @@
+use types::Identifier;
 use parser::peg::Pipeline;
 use parser::assignments::Binding;
 
@@ -20,13 +21,13 @@ pub enum Statement {
     },
     ElseIf(ElseIf),
     Function {
-        name: String,
+        name: Identifier,
         description: String,
         args: Vec<String>,
         statements: Vec<Statement>
     },
     For {
-        variable: String,
+        variable: Identifier,
         values: Vec<String>,
         statements: Vec<Statement>
     },
@@ -61,7 +62,7 @@ impl Default for FlowControl {
 #[derive(Clone)]
 pub struct Function {
     pub description: String,
-    pub name: String,
+    pub name: Identifier,
     pub args: Vec<String>,
     pub statements: Vec<Statement>
 }

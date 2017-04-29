@@ -31,7 +31,7 @@ use shell::status::*;
 /// let my_command = Builtin {
 ///     name: "my_command",
 ///     help: "Describe what my_command does followed by a newline showing usage",
-///     main: box|args: &[String], &mut Shell| -> i32 {
+///     main: box|args: &[&str], &mut Shell| -> i32 {
 ///         println!("Say 'hello' to my command! :-D");
 ///     }
 /// }
@@ -39,20 +39,21 @@ use shell::status::*;
 pub struct Builtin {
     pub name: &'static str,
     pub help: &'static str,
-    pub main: Box<Fn(&[String], &mut Shell) -> i32>,
+    pub main: Box<Fn(&[&str], &mut Shell) -> i32>,
 }
 
 impl Builtin {
     /// Return the map from command names to commands
     pub fn map() -> FnvHashMap<&'static str, Self> {
-        let mut commands: FnvHashMap<&str, Self> = FnvHashMap::with_capacity_and_hasher(32, Default::default());
+        let mut commands: FnvHashMap<&str, Self> =
+            FnvHashMap::with_capacity_and_hasher(32, Default::default());
 
         /* Directories */
         commands.insert("cd",
                         Builtin {
                             name: "cd",
                             help: "Change the current directory\n    cd <path>",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 match shell.directory_stack.cd(args, &shell.variables) {
                                     Ok(()) => SUCCESS,
                                     Err(why) => {
@@ -69,7 +70,7 @@ impl Builtin {
                         Builtin {
                             name: "dirs",
                             help: "Display the current directory stack",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 shell.directory_stack.dirs(args)
                             },
                         });
@@ -78,7 +79,7 @@ impl Builtin {
                         Builtin {
                             name: "pushd",
                             help: "Push a directory to the stack",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 match shell.directory_stack.pushd(args, &shell.variables) {
                                     Ok(()) => SUCCESS,
                                     Err(why) => {
@@ -95,7 +96,7 @@ impl Builtin {
                         Builtin {
                             name: "popd",
                             help: "Pop a directory from the stack",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 match shell.directory_stack.popd(args) {
                                     Ok(()) => SUCCESS,
                                     Err(why) => {
@@ -113,7 +114,7 @@ impl Builtin {
                         Builtin {
                             name: "alias",
                             help: "View, set or unset aliases",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 alias(&mut shell.variables, args)
                             },
                         });
@@ -122,7 +123,7 @@ impl Builtin {
                         Builtin {
                             name: "drop",
                             help: "Delete an alias",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 drop_alias(&mut shell.variables, args)
                             },
                         });
@@ -132,7 +133,7 @@ impl Builtin {
                         Builtin {
                             name: "export",
                             help: "Set an environment variable",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 export_variable(&mut shell.variables, args)
                             }
                         });
@@ -141,7 +142,7 @@ impl Builtin {
                         Builtin {
                             name: "fn",
                             help: "Print list of functions",
-                            main: box |_: &[String], shell: &mut Shell| -> i32 {
+                            main: box |_: &[&str], shell: &mut Shell| -> i32 {
                                 fn_(&mut shell.functions)
                             },
                         });
@@ -150,7 +151,7 @@ impl Builtin {
                         Builtin {
                             name: "read",
                             help: "Read some variables\n    read <variable>",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 shell.variables.read(args)
                             },
                         });
@@ -159,7 +160,7 @@ impl Builtin {
                         Builtin {
                             name: "drop",
                             help: "Delete a variable",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 drop_variable(&mut shell.variables, args)
                             },
                         });
@@ -169,7 +170,7 @@ impl Builtin {
             Builtin {
                 name: "set",
                 help: "Set or unset values of shell options and positional parameters.",
-                main: box |args: &[String], shell: &mut Shell| -> i32 {
+                main: box |args: &[&str], shell: &mut Shell| -> i32 {
                     set::set(args, shell)
                 },
             });
@@ -178,7 +179,7 @@ impl Builtin {
             Builtin {
                 name: "eval",
                 help: "evaluates the evaluated expression",
-                main: box |args: &[String], shell: &mut Shell| -> i32 {
+                main: box |args: &[&str], shell: &mut Shell| -> i32 {
                     let evaluated_command = args[1..].join(" ");
                     let mut buffer = QuoteTerminator::new(evaluated_command);
                     if buffer.check_termination() {
@@ -197,7 +198,7 @@ impl Builtin {
                 Builtin {
                     name: "exit",
                     help: "To exit the curent session",
-                    main: box |args: &[String], shell: &mut Shell| -> i32 {
+                    main: box |args: &[&str], shell: &mut Shell| -> i32 {
                         process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
                             .unwrap_or(shell.previous_status))
                     },
@@ -207,7 +208,7 @@ impl Builtin {
                         Builtin {
                             name: "history",
                             help: "Display a log of all commands previously executed",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 shell.print_history(args)
                             },
                         });
@@ -216,7 +217,7 @@ impl Builtin {
                         Builtin {
                             name: "source",
                             help: "Evaluate the file following the command or re-initialize the init file",
-                            main: box |args: &[String], shell: &mut Shell| -> i32 {
+                            main: box |args: &[&str], shell: &mut Shell| -> i32 {
                                 match source(shell, args) {
                                     Ok(()) => SUCCESS,
                                     Err(why) => {
@@ -234,7 +235,7 @@ impl Builtin {
                         Builtin {
                             name: "echo",
                             help: "Display a line of text",
-                            main: box |args: &[String], _: &mut Shell| -> i32 {
+                            main: box |args: &[&str], _: &mut Shell| -> i32 {
                                 match echo(args) {
                                     Ok(()) => SUCCESS,
                                     Err(why) => {
@@ -251,7 +252,7 @@ impl Builtin {
                         Builtin {
                             name: "test",
                             help: "Performs tests on files and text",
-                            main: box |args: &[String], _: &mut Shell| -> i32 {
+                            main: box |args: &[&str], _: &mut Shell| -> i32 {
                                 match test(args) {
                                     Ok(true) => SUCCESS,
                                     Ok(false) => FAILURE,
@@ -269,7 +270,7 @@ impl Builtin {
                         Builtin {
                             name: "calc",
                             help: "Calculate a mathematical expression",
-                            main: box |args: &[String], _: &mut Shell| -> i32 {
+                            main: box |args: &[&str], _: &mut Shell| -> i32 {
                                 match calc::calc(&args[1..]) {
                                     Ok(()) => SUCCESS,
                                     Err(why) => {
@@ -286,7 +287,7 @@ impl Builtin {
                         Builtin {
                             name: "time",
                             help: "Measures the time to execute an external command",
-                            main: box |args: &[String], _: &mut Shell| -> i32 {
+                            main: box |args: &[&str], _: &mut Shell| -> i32 {
                                 match time::time(&args[1..]) {
                                     Ok(()) => SUCCESS,
                                     Err(why) => {
@@ -303,7 +304,7 @@ impl Builtin {
                         Builtin {
                             name: "true",
                             help: "Do nothing, successfully",
-                            main: box |_: &[String], _: &mut Shell| -> i32 {
+                            main: box |_: &[&str], _: &mut Shell| -> i32 {
                                 SUCCESS
                             },
                         });
@@ -312,7 +313,7 @@ impl Builtin {
                         Builtin {
                             name: "false",
                             help: "Do nothing, unsuccessfully",
-                            main: box |_: &[String], _: &mut Shell| -> i32 {
+                            main: box |_: &[&str], _: &mut Shell| -> i32 {
                                 FAILURE
                             },
                         });
@@ -328,12 +329,12 @@ impl Builtin {
                             name: "help",
                             help: "Display helpful information about a given command, or list \
                                    commands if none specified\n    help <command>",
-                            main: box move |args: &[String], _: &mut Shell| -> i32 {
+                            main: box move |args: &[&str], _: &mut Shell| -> i32 {
                                 let stdout = io::stdout();
                                 let mut stdout = stdout.lock();
                                 if let Some(command) = args.get(1) {
-                                    if command_helper.contains_key(command.as_str()) {
-                                        if let Some(help) = command_helper.get(command.as_str()) {
+                                    if command_helper.contains_key(command) {
+                                        if let Some(help) = command_helper.get(command) {
                                             let _ = stdout.write_all(help.as_bytes());
                                             let _ = stdout.write_all(b"\n");
                                         }

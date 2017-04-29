@@ -6,17 +6,28 @@ use std::process;
 use super::directory_stack::DirectoryStack;
 use liner::Context;
 use super::status::{SUCCESS, FAILURE};
+use types::{
+    ArrayVariableContext,
+    VariableContext,
+    Identifier,
+    Value,
+    Array,
+};
 
+#[derive(Debug)]
 pub struct Variables {
-    pub arrays:    FnvHashMap<String, Vec<String>>,
-    pub variables: FnvHashMap<String, String>,
-    pub aliases:   FnvHashMap<String, String>
+    pub arrays:    ArrayVariableContext,
+    pub variables: VariableContext,
+    pub aliases:   VariableContext,
 }
 
 impl Default for Variables {
     fn default() -> Variables {
-        let mut map = FnvHashMap::with_capacity_and_hasher(64, Default::default());
-        map.insert("DIRECTORY_STACK_SIZE".to_string(), "1000".to_string());
+        let mut map = FnvHashMap::with_capacity_and_hasher(
+            64,
+            Default::default(),
+        );
+        map.insert("DIRECTORY_STACK_SIZE".into(), "1000".into());
         map.insert("HISTORY_SIZE".into(), "1000".into());
         map.insert("HISTORY_FILE_ENABLED".into(), "0".into());
         map.insert("HISTORY_FILE_SIZE".into(), "1000".into());
@@ -33,7 +44,17 @@ impl Default for Variables {
 
         // Initialize the HOME variable
         env::home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| env::set_var("HOME", path.to_str().unwrap_or("?")));
-        Variables { arrays: FnvHashMap::with_capacity_and_hasher(64, Default::default()), variables: map, aliases: FnvHashMap::with_capacity_and_hasher(64, Default::default()) }
+        Variables {
+            arrays: FnvHashMap::with_capacity_and_hasher(
+                64,
+                Default::default(),
+            ),
+            variables: map,
+            aliases: FnvHashMap::with_capacity_and_hasher(
+                64,
+                Default::default(),
+            )
+        }
     }
 }
 
@@ -54,41 +75,47 @@ impl Variables {
     pub fn set_var(&mut self, name: &str, value: &str) {
         if !name.is_empty() {
             if value.is_empty() {
-                self.variables.remove(&name.to_string());
+                self.variables.remove(name);
             } else {
-                self.variables.insert(name.to_string(), value.to_string());
+                self.variables.insert(
+                    name.into(),
+                    value.into(),
+                );
             }
         }
     }
 
-    pub fn set_array(&mut self, name: &str, value: Vec<String>) {
+    pub fn set_array(&mut self, name: &str, value: Array) {
         if !name.is_empty() {
             if value.is_empty() {
-                self.arrays.remove(&name.to_string());
+                self.arrays.remove(name);
             } else {
-                self.arrays.insert(name.to_string(), value);
+                self.arrays.insert(name.into(), value);
             }
         }
     }
 
-    pub fn get_array(&self, name: &str) -> Option<&Vec<String>> {
+    pub fn get_array(&self, name: &str) -> Option<&Array> {
         self.arrays.get(name)
     }
 
-    pub fn get_var(&self, name: &str) -> Option<String> {
-        self.variables.get(name).cloned().or_else(|| env::var(name).ok())
+    pub fn get_var(&self, name: &str) -> Option<Value> {
+        self.variables.get(name).cloned()
+            .or_else(|| env::var(name).map(Into::into).ok())
     }
 
-    pub fn get_var_or_empty(&self, name: &str) -> String {
+    pub fn get_var_or_empty(&self, name: &str) -> Value {
         self.get_var(name).unwrap_or_default()
     }
 
-    pub fn unset_var(&mut self, name: &str) -> Option<String> {
+    pub fn unset_var(&mut self, name: &str) -> Option<Value> {
         self.variables.remove(name)
     }
 
-    pub fn get_vars(&self) -> Vec<String> {
-        self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k)).collect()
+    pub fn get_vars(&self) -> Vec<Identifier> {
+        self.variables.keys().cloned()
+            .chain(env::vars().map(|(k, _)| k.into()))
+            .collect()
     }
 
     pub fn is_valid_variable_character(c: char) -> bool {
@@ -175,7 +202,9 @@ impl Variables {
         None
     }
 
-    pub fn command_expansion(&self, command: &str, quoted: bool) -> Option<String> {
+    pub fn command_expansion(&self, command: &str, quoted: bool) -> Option<Value> {
+        use ascii_helpers::AsciiReplace;
+
         if let Ok(exe) = env::current_exe() {
             if let Ok(output) = process::Command::new(exe).arg("-c").arg(command).output() {
                 if let Ok(mut stdout) = String::from_utf8(output.stdout) {
@@ -183,7 +212,11 @@ impl Variables {
                         stdout.pop();
                     }
 
-                    return if quoted { Some(stdout) } else { Some(stdout.replace("\n", " ")) };
+                    return if quoted {
+                        Some(stdout.into())
+                    } else {
+                        Some(stdout.ascii_replace('\n', ' ').into())
+                    };
                 }
             }
         }
@@ -237,7 +270,11 @@ mod tests {
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
-        let expanded = expand_string("$FOO", &get_expanders!(&variables, &new_dir_stack()), false).join("");
+        let expanded = expand_string(
+            "$FOO",
+            &get_expanders!(&variables, &new_dir_stack()),
+            false
+        ).join("");
         assert_eq!("BAR", &expanded);
     }
 }

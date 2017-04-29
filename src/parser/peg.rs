@@ -130,7 +130,12 @@ else
         let correct_parse = Statement::If {
             expression: Pipeline::new(
                 vec!(Job::new(
-                    vec!("test".to_owned(), "1".to_owned(), "-eq".to_owned(), "2".to_owned()), JobKind::Last)
+                    vec![
+                        "test".to_owned(),
+                        "1".to_owned(),
+                        "-eq".to_owned(),
+                        "2".to_owned(),
+                    ].into_iter().collect(), JobKind::Last)
                 ), None, None),
             success: vec!(),
             else_if: vec!(),
@@ -184,10 +189,10 @@ else
         // Default case where spaced normally
         let parsed_if = fn_("fn bob").unwrap();
         let correct_parse = Statement::Function{
-            description: "".to_string(),
-            name:        "bob".to_string(),
-            args:        vec!(),
-            statements:  vec!()
+            description: "".into(),
+            name:        "bob".into(),
+            args:        Default::default(),
+            statements:  Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -202,10 +207,10 @@ else
         // Default case where spaced normally
         let parsed_if = fn_("fn bob a b").unwrap();
         let correct_parse = Statement::Function{
-            description: "".to_string(),
-            name:        "bob".to_owned(),
-            args:        vec!("a".to_owned(), "b".to_owned()),
-            statements:  vec!()
+            description: "".into(),
+            name:        "bob".into(),
+            args:        vec!["a".to_owned(), "b".to_owned()],
+            statements:  Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -220,7 +225,7 @@ else
         let parsed_if = fn_("fn bob a b --bob is a nice function").unwrap();
         let correct_parse = Statement::Function{
             description: "bob is a nice function".to_string(),
-            name:        "bob".to_owned(),
+            name:        "bob".into(),
             args:        vec!("a".to_owned(), "b".to_owned()),
             statements:  vec!()
         };

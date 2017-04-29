@@ -5,7 +5,7 @@ use super::Shell;
 /// Contains all history-related functionality for the `Shell`.
 pub trait ShellHistory {
     /// Prints the commands contained within the history buffers to standard output.
-    fn print_history(&self, _arguments: &[String]) -> i32;
+    fn print_history(&self, _arguments: &[&str]) -> i32;
 
     /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if it
     /// is set otherwise to a default value (1000).
@@ -21,7 +21,7 @@ pub trait ShellHistory {
 }
 
 impl<'a> ShellHistory for Shell<'a> {
-    fn print_history(&self, _arguments: &[String]) -> i32 {
+    fn print_history(&self, _arguments: &[&str]) -> i32 {
         let mut buffer = Vec::with_capacity(8*1024);
         for command in &self.context.history.buffers {
             let _ = writeln!(buffer, "{}", command);
@@ -40,9 +40,9 @@ impl<'a> ShellHistory for Shell<'a> {
 
         self.context.history.set_max_size(max_history_size);
 
-        if self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") == "1" {
+        if &*self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") == "1" {
             let file_name = self.variables.get_var("HISTORY_FILE");
-            self.context.history.set_file_name(file_name);
+            self.context.history.set_file_name(file_name.map(|f| f.into()));
 
             let max_history_file_size = self.variables
                 .get_var_or_empty("HISTORY_FILE_SIZE")

@@ -1,12 +1,20 @@
 use shell::variables::Variables;
+use types::{Identifier, Value as VString, Array};
+
+#[derive(Debug, PartialEq, Clone)]
+// TODO: Have the expand_string function return the `Value` type.
+pub enum Value {
+    String(VString),
+    Array(Array)
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Binding {
-    InvalidKey(String),
+    InvalidKey(Identifier),
     ListEntries,
-    KeyOnly(String),
-    KeyValue(String, String),
-    Math(String, Operator, String),
+    KeyOnly(Identifier),
+    KeyValue(Identifier, VString),
+    Math(Identifier, Operator, VString),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -16,6 +24,12 @@ pub enum Operator {
     Divide,
     Multiply,
     Exponent,
+}
+
+#[allow(dead_code)]
+enum Expression {
+    Arithmetic,
+    Regular
 }
 
 /// Parses let bindings, `let VAR = KEY`, returning the result as a `(key, value)` tuple.
@@ -75,15 +89,15 @@ pub fn parse_assignment(arguments: &str) -> Binding {
     if !found_key && key.is_empty() {
         Binding::ListEntries
     } else {
-        let value = char_iter.skip_while(|&x| x == ' ').collect::<String>();
+        let value = char_iter.skip_while(|&x| x == ' ').collect::<VString>();
         if value.is_empty() {
-            Binding::KeyOnly(key)
+            Binding::KeyOnly(key.into())
         } else if !Variables::is_valid_variable_name(&key) {
-            Binding::InvalidKey(key)
+            Binding::InvalidKey(key.into())
         } else {
             match operator {
-                Some(operator) => Binding::Math(key, operator, value),
-                None => Binding::KeyValue(key, value)
+                Some(operator) => Binding::Math(key.into(), operator, value),
+                None => Binding::KeyValue(key.into(), value)
             }
         }
     }

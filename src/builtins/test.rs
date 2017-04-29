@@ -4,6 +4,7 @@ use std::path::Path;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::time::SystemTime;
 use std::error::Error;
+use smallstring::SmallString;
 
 const MAN_PAGE: &'static str = /* @MANSTART{test} */ r#"NAME
     test - perform tests on files and text
@@ -110,7 +111,7 @@ AUTHOR
     Written by Michael Murphy.
 "#; /* @MANEND */
 
-pub fn test(args: &[String]) -> Result<bool, String> {
+pub fn test(args: &[&str]) -> Result<bool, String> {
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
 
@@ -118,9 +119,9 @@ pub fn test(args: &[String]) -> Result<bool, String> {
     evaluate_arguments(arguments, &mut buffer)
 }
 
-fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLock>) -> Result<bool, String> {
+fn evaluate_arguments(arguments: &[&str], buffer: &mut BufWriter<io::StdoutLock>) -> Result<bool, String> {
     if let Some(arg) = arguments.first() {
-        if arg.as_str() == "--help" {
+        if *arg == "--help" {
             buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| x.description().to_owned())?;
             buffer.flush().map_err(|x| x.description().to_owned())?;
 
@@ -134,7 +135,7 @@ fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLoc
                     // If no argument was given, return `SUCCESS`
                     arguments.get(1).map_or(Ok(true), |argument| {
                         // match the correct function to the associated flag
-                        Ok(match_flag_argument(flag, argument.as_str()))
+                        Ok(match_flag_argument(flag, argument))
                     })
                 })
             },
@@ -142,8 +143,8 @@ fn evaluate_arguments(arguments: &[String], buffer: &mut BufWriter<io::StdoutLoc
                 // If there is no operator, check if the first argument is non-zero
                 arguments.get(1).map_or(Ok(string_is_nonzero(arg)), |operator| {
                     // If there is no right hand argument, a condition was expected
-                    let right_arg = arguments.get(2).ok_or_else(|| String::from("parse error: condition expected"))?;
-                    evaluate_expression(arg.as_str(), operator.as_str(), right_arg.as_str())
+                    let right_arg = arguments.get(2).ok_or_else(|| SmallString::from("parse error: condition expected"))?;
+                    evaluate_expression(arg, operator, right_arg)
                 })
             },
         };
@@ -370,43 +371,43 @@ fn test_integers_arguments() {
     let mut buffer = BufWriter::new(stdout.lock());
 
     // Equal To
-    assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-eq"), String::from("10")],
+    assert_eq!(evaluate_arguments(&["10", "-eq", "10"],
         &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-eq"), String::from("5")],
+    assert_eq!(evaluate_arguments(&["10", "-eq", "5"],
         &mut buffer), Ok(false));
 
     // Greater Than or Equal To
-    assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-ge"), String::from("10")],
+    assert_eq!(evaluate_arguments(&["10", "-ge", "10"],
         &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-ge"), String::from("5")],
+    assert_eq!(evaluate_arguments(&["10", "-ge", "5"],
         &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-ge"), String::from("10")],
+    assert_eq!(evaluate_arguments(&["5", "-ge", "10"],
         &mut buffer), Ok(false));
 
     // Less Than or Equal To
-    assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-le"), String::from("5")],
+    assert_eq!(evaluate_arguments(&["5", "-le", "5"],
         &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-le"), String::from("10")],
+    assert_eq!(evaluate_arguments(&["5", "-le", "10"],
         &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-le"), String::from("5")],
+    assert_eq!(evaluate_arguments(&["10", "-le", "5"],
         &mut buffer), Ok(false));
 
     // Less Than
-    assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-lt"), String::from("10")],
+    assert_eq!(evaluate_arguments(&["5", "-lt", "10"],
         &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-lt"), String::from("5")],
+    assert_eq!(evaluate_arguments(&["10", "-lt", "5"],
         &mut buffer), Ok(false));
 
     // Greater Than
-    assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-gt"), String::from("5")],
+    assert_eq!(evaluate_arguments(&["10", "-gt", "5"],
         &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-gt"), String::from("10")],
+    assert_eq!(evaluate_arguments(&["5", "-gt", "10"],
         &mut buffer), Ok(false));
 
     // Not Equal To
-    assert_eq!(evaluate_arguments(&[String::from("10"), String::from("-ne"), String::from("5")],
+    assert_eq!(evaluate_arguments(&["10", "-ne", "5"],
         &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&[String::from("5"), String::from("-ne"), String::from("5")],
+    assert_eq!(evaluate_arguments(&["5", "-ne", "5"],
         &mut buffer), Ok(false));
 }
 

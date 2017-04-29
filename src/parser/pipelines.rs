@@ -8,6 +8,7 @@
 
 use parser::peg::{Pipeline, Redirection, RedirectFrom};
 use shell::{Job, JobKind};
+use types::*;
 
 const BACKSLASH:     u8 = 1;
 const SINGLE_QUOTE:  u8 = 2;
@@ -53,7 +54,7 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
     let mut flags = 0u8; // (backslash, single_quote, double_quote, x, x, x, process_one, process_two)
     let mut flags_ext = 0u8;
 
-    let mut arguments: Vec<String> = Vec::new();
+    let mut arguments = Array::new();
 
     let (mut in_file, mut out_file) = (None, None);
     let mut mode = RedirMode::False;
@@ -97,11 +98,16 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                 if advance { let _ = args_iter.next(); }
 
                 if arguments.is_empty() {
-                    jobs.push(Job::new(vec![args[arg_start..index].to_owned()], kind));
+                    jobs.push(
+                        Job::new(
+                            Some(args[arg_start..index].into()).into_iter().collect(),
+                            kind
+                        )
+                    );
                 } else {
                     let byte_index = if $from == RedirectFrom::Stdout { index-1 } else { index-2 };
                     if args.as_bytes()[byte_index] != b' ' {
-                        arguments.push(args[arg_start..index].to_owned());
+                        arguments.push(args[arg_start..index].into());
                     }
                     jobs.push(Job::new(arguments.clone(), kind));
                     arguments.clear();
@@ -155,7 +161,9 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                             && array_process_levels == 0 =>
                         {
                             if arg_start != index {
-                                arguments.push(args[arg_start..index].to_owned());
+                                arguments.push(
+                                    args[arg_start..index].into()
+                                );
                                 arg_start = index + 1;
                             } else {
                                 arg_start += 1;
@@ -329,7 +337,7 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
     }
 
     if arg_start != index {
-        arguments.push(args[arg_start..].to_owned());
+        arguments.push(args[arg_start..].into());
     }
 
     if !arguments.is_empty() {
@@ -344,6 +352,7 @@ mod tests {
     use shell::flow_control::Statement;
     use parser::peg::{parse, RedirectFrom, Redirection};
     use shell::JobKind;
+    use types::*;
 
     #[test]
     fn stderr_redirection() {
@@ -591,8 +600,8 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo one && echo two") {
             let jobs = pipeline.jobs;
             assert_eq!(JobKind::And, jobs[0].kind);
-            assert_eq!(vec![String::from("echo"), String::from("one")], jobs[0].args);
-            assert_eq!(vec![String::from("echo"), String::from("two")], jobs[1].args);
+            assert_eq!(Array::from_vec(vec![String::from("echo"), String::from("one")]), jobs[0].args);
+            assert_eq!(Array::from_vec(vec![String::from("echo"), String::from("two")]), jobs[1].args);
         } else {
             assert!(false);
         }
