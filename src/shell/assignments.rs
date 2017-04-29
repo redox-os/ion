@@ -1,24 +1,33 @@
-use fnv::FnvHashMap;
 use std::io::{self, Write};
 
 use super::variables::Variables;
 use super::directory_stack::DirectoryStack;
-use parser::assignments::{Binding, Operator};
-use parser::{ExpanderFunctions, Index, IndexEnd, ArgumentSplitter, expand_string};
+use parser::assignments::{
+    Binding, Operator, Value
+};
+use parser::{
+    ExpanderFunctions,
+    Index,
+    IndexEnd,
+    ArgumentSplitter,
+    expand_string,
+};
+use types::{
+    Identifier,
+    Value as VString,
+    Array as VArray,
+    ArrayVariableContext,
+    VariableContext
+};
 use super::status::*;
 
-pub enum Value {
-    String(String),
-    Array(Vec<String>)
-}
-
 enum Action {
-    UpdateString(String, String),
-    UpdateArray(String, Vec<String>),
+    UpdateString(Identifier, VString),
+    UpdateArray(Identifier, VArray),
     NoOp
 }
 
-fn print_vars(list: &FnvHashMap<String, String>) {
+fn print_vars(list: &VariableContext) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 
@@ -31,7 +40,7 @@ fn print_vars(list: &FnvHashMap<String, String>) {
     }
 }
 
-fn print_arrays(list: &FnvHashMap<String, Vec<String>>) {
+fn print_arrays(list: &ArrayVariableContext) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 
@@ -60,27 +69,30 @@ pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &Direct
             array: &|array: &str, index: Index| {
                 match vars.get_array(array) {
                     Some(array) => match index {
-                            Index::None => None,
-                            Index::All => Some(array.to_owned()),
-                            Index::ID(id) => array.get(id).map(|x| vec![x.to_owned()]),
-                            Index::Range(start, end) => {
-                                let array = match end {
-                                    IndexEnd::CatchAll => array.iter().skip(start)
-                                        .map(|x| x.to_owned()).collect::<Vec<String>>(),
-                                    IndexEnd::ID(end) => array.iter().skip(start).take(end-start)
-                                        .map(|x| x.to_owned()).collect::<Vec<String>>()
-                                };
-                                if array.is_empty() { None } else { Some(array) }
-                            }
+                        Index::None => None,
+                        Index::All => Some(array.clone()),
+                        Index::ID(id) => array.get(id)
+                            .map(|x| Some(x.to_owned()).into_iter().collect()),
+                        Index::Range(start, end) => {
+                            let array: VArray = match end {
+                                IndexEnd::CatchAll => array.iter().skip(start)
+                                    .map(|x| x.to_owned()).collect(),
+                                IndexEnd::ID(end) => array.iter().skip(start).take(end-start)
+                                    .map(|x| x.to_owned()).collect()
+                            };
+                            if array.is_empty() { None } else { Some(array) }
+                        }
                     },
                     None => None
                 }
             },
             variable: &|variable: &str, quoted: bool| {
+                use ascii_helpers::AsciiReplace;
+
                 if quoted {
                     vars.get_var(variable)
                 } else {
-                    vars.get_var(variable).map(|x| x.replace("\n", " "))
+                    vars.get_var(variable).map(|x| x.ascii_replace('\n', ' ').into())
                 }
             },
             command: &|command: &str, quoted: bool| vars.command_expansion(command, quoted),

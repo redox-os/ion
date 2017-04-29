@@ -3,6 +3,7 @@ extern crate permutate;
 extern crate unicode_segmentation;
 use self::unicode_segmentation::UnicodeSegmentation;
 
+use types::Array;
 
 mod braces;
 mod ranges;
@@ -15,12 +16,13 @@ pub use self::words::{WordIterator, WordToken};
 pub use self::words::{Index, IndexEnd};
 
 use std::io::{self, Write};
+use types::*;
 
 pub struct ExpanderFunctions<'f> {
     pub tilde:    &'f Fn(&str) -> Option<String>,
-    pub array:    &'f Fn(&str, Index) -> Option<Vec<String>>,
-    pub variable: &'f Fn(&str, bool) -> Option<String>,
-    pub command:  &'f Fn(&str, bool) -> Option<String>
+    pub array:    &'f Fn(&str, Index) -> Option<Array>,
+    pub variable: &'f Fn(&str, bool) -> Option<Value>,
+    pub command:  &'f Fn(&str, bool) -> Option<Value>
 }
 
 fn expand_process(current: &mut String, command: &str, quoted: bool,
@@ -50,8 +52,8 @@ fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
         .flat_map(|node| expand_string(node, expand_func, reverse_quoting))
     {
         match parse_range(&word) {
-            Some(elements) => for word in elements { temp.push(word) },
-            None           => temp.push(word),
+            Some(elements) => for word in elements { temp.push(word.into()) },
+            None           => temp.push(word.into()),
         }
     }
 
@@ -67,19 +69,19 @@ fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
     }
 }
 
-fn array_expand(elements: &[&str], expand_func: &ExpanderFunctions) -> Vec<String> {
+fn array_expand(elements: &[&str], expand_func: &ExpanderFunctions) -> Array {
     elements.iter()
         .flat_map(|element| expand_string(element, expand_func, false))
         .collect()
 }
 
-fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, id: usize) -> String {
+fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, id: usize) -> Value {
     elements.iter()
         .flat_map(|element| expand_string(element, expand_func, false))
         .nth(id).unwrap_or_default()
 }
 
-fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: usize, end: IndexEnd) -> Vec<String> {
+fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: usize, end: IndexEnd) -> Array {
     match end {
         IndexEnd::CatchAll => elements.iter()
             .flat_map(|element| expand_string(element, expand_func, false))
@@ -117,7 +119,11 @@ fn slice_string(output: &mut String, expanded: &str, index: Index) {
 
 /// Performs shell expansions to an input string, efficiently returning the final expanded form.
 /// Shells must provide their own batteries for expanding tilde and variable words.
-pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_quoting: bool) -> Vec<String> {
+pub fn expand_string(
+    original: &str,
+    expand_func: &ExpanderFunctions,
+    reverse_quoting: bool
+) -> Array {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
 
@@ -126,15 +132,20 @@ pub fn expand_string(original: &str, expand_func: &ExpanderFunctions, reverse_qu
         token_buffer.push(word);
     }
 
-    expand_tokens(&token_buffer, expand_func, reverse_quoting, contains_brace)
+    expand_tokens(
+        &token_buffer,
+        expand_func,
+        reverse_quoting,
+        contains_brace
+    )
 }
 
 #[allow(cyclomatic_complexity)]
-pub fn expand_tokens(token_buffer: &[WordToken], expand_func: &ExpanderFunctions,
-    reverse_quoting: bool, contains_brace: bool) -> Vec<String>
+pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFunctions,
+    reverse_quoting: bool, contains_brace: bool) -> Array
 {
     let mut output = String::new();
-    let mut expanded_words = Vec::new();
+    let mut expanded_words = Array::new();
 
     if !token_buffer.is_empty() {
         if contains_brace {
@@ -235,53 +246,70 @@ pub fn expand_tokens(token_buffer: &[WordToken], expand_func: &ExpanderFunctions
             }
 
             if expanders.is_empty() {
-                expanded_words.push(output);
+                expanded_words.push(output.into());
             } else {
                 if !output.is_empty() {
                     tokens.push(BraceToken::Normal(output));
                 }
                 for word in braces::expand_braces(&tokens, expanders) {
-                    expanded_words.push(word);
+                    expanded_words.push(word.into());
                 }
             }
 
-            return expanded_words
+            return expanded_words;
         } else if token_buffer.len() == 1 {
             match token_buffer[0] {
                 WordToken::Array(ref elements, index) => {
                     return match index {
-                        Index::None   => Vec::new(),
+                        Index::None   => Array::new(),
                         Index::All    => array_expand(elements, expand_func),
-                        Index::ID(id) => vec![array_nth(elements, expand_func, id)],
+                        Index::ID(id) =>
+                            Some(array_nth(elements, expand_func, id))
+                                .into_iter().collect(),
                         Index::Range(start, end) => array_range(elements, expand_func, start, end),
                     };
                 },
                 WordToken::ArrayVariable(array, quoted, index) => {
                     return match (expand_func.array)(array, index) {
-                        Some(ref array) if quoted => vec![array.join(" ")],
+                        Some(ref array) if quoted =>
+                            Some(array.join(" ").into()).into_iter().collect(),
                         Some(array)               => array,
-                        None                      => Vec::new(),
+                        None                      => Array::new(),
                     };
                 },
                 WordToken::ArrayProcess(command, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
                     match index {
-                        Index::None => return Vec::new(),
+                        Index::None => return Array::new(),
                         Index::All => {
                             expand_process(&mut output, command, quoted, Index::All, expand_func);
-                            return output.split_whitespace().map(String::from).collect::<Vec<String>>();
+                            return output.split_whitespace()
+                                .map(From::from)
+                                .collect::<Array>();
                         },
                         Index::ID(id) => {
                             expand_process(&mut output, command, quoted, Index::All, expand_func);
-                            return vec![output.split_whitespace().nth(id).unwrap_or_default().to_owned()];
+                            return Some(
+                                output.split_whitespace().nth(id)
+                                    .unwrap_or_default()
+                                    .into()
+                            ).into_iter()
+                                .collect();
                         }
                         Index::Range(start, end) => {
                             expand_process(&mut output, command, quoted, Index::All, expand_func);
                             return match end {
-                                IndexEnd::ID(end) => output.split_whitespace().map(String::from)
-                                    .skip(start).take(end-start).collect::<Vec<String>>(),
-                                IndexEnd::CatchAll => output.split_whitespace().map(String::from)
-                                    .skip(start).collect::<Vec<String>>()
+                                IndexEnd::ID(end) => output
+                                    .split_whitespace()
+                                    .skip(start)
+                                    .take(end - start)
+                                    .map(From::from)
+                                    .collect::<Array>(),
+                                IndexEnd::CatchAll => output
+                                    .split_whitespace()
+                                    .skip(start)
+                                    .map(From::from)
+                                    .collect::<Array>()
                             }
                         },
                     }
@@ -386,7 +414,7 @@ pub fn expand_tokens(token_buffer: &[WordToken], expand_func: &ExpanderFunctions
             }
         }
 
-        expanded_words.push(output);
+        expanded_words.push(output.into());
     }
 
     expanded_words
@@ -422,7 +450,7 @@ mod test {
         let input = "$FOO:NOT:$BAR";
         let expected = "FOO:NOT:BAR";
         let expanded = expand_string(input, &functions!(), false);
-        assert_eq!(vec![expected.to_owned()], expanded);
+        assert_eq!(Array::from_vec(vec![expected.to_owned()]), expanded);
     }
 
     #[test]
@@ -430,25 +458,30 @@ mod test {
         let line = "pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
         let expected = "prodigal programmer processed prototype procedures proficiently proving prospective projections";
         let expanded = expand_string(line, &functions!(), false);
-        assert_eq!(expected.split_whitespace().map(|x| x.to_owned()).collect::<Vec<String>>(), expanded);
+        assert_eq!(
+            expected.split_whitespace()
+                .map(|x| x.to_owned())
+                .collect::<Array>(),
+            expanded
+        );
     }
 
     #[test]
     fn expand_variables_with_colons() {
         let expanded = expand_string("$FOO:$BAR", &functions!(), false);
-        assert_eq!(vec!["FOO:BAR".to_owned()], expanded);
+        assert_eq!(Array::from_vec(vec!["FOO:BAR".to_owned()]), expanded);
     }
 
     #[test]
     fn expand_multiple_variables() {
         let expanded = expand_string("${B}${C}...${D}", &functions!(), false);
-        assert_eq!(vec!["testing...1 2 3".to_owned()], expanded);
+        assert_eq!(Array::from_vec(vec!["testing...1 2 3".to_owned()]), expanded);
     }
 
     #[test]
     fn expand_variable_alongside_braces() {
         let line = "$A{1,2}";
-        let expected = vec!["11".to_owned(), "12".to_owned()];
+        let expected = Array::from_vec(vec!["11".to_owned(), "12".to_owned()]);
         let expanded = expand_string(line, &functions!(), false);
         assert_eq!(expected, expanded);
     }
@@ -456,7 +489,7 @@ mod test {
     #[test]
     fn expand_variable_within_braces() {
         let line = "1{$A,2}";
-        let expected = vec!["11".to_owned(), "12".to_owned()];
+        let expected = Array::from_vec(vec!["11".to_owned(), "12".to_owned()]);
         let expanded = expand_string(line, &functions!(), false);
         assert_eq!(&expected, &expanded);
     }

@@ -226,12 +226,12 @@ impl<'a> FlowLogic for Shell<'a> {
         let ignore_variable = variable == "_";
         match ForExpression::new(values, &self.directory_stack, &self.variables) {
             ForExpression::Multiple(ref values) if ignore_variable => {
-                for _ in values.iter().flat_map(|x| glob_expand(x.as_str())) {
+                for _ in values.iter().flat_map(|x| glob_expand(&x)) {
                     if let Condition::Break = self.execute_statements(statements.clone()) { break }
                 }
             },
             ForExpression::Multiple(values) => {
-                for value in values.iter().flat_map(|x| glob_expand(x.as_str())) {
+                for value in values.iter().flat_map(|x| glob_expand(&x)) {
                     self.variables.set_var(variable, &value);
                     if let Condition::Break = self.execute_statements(statements.clone()) { break }
                 }

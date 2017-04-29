@@ -36,12 +36,12 @@ OPTIONS
         \v  vertical tab (VT)
 "#; /* @MANEND */
 
-pub fn echo(args: &[String]) -> Result<(), io::Error> {
+pub fn echo(args: &[&str]) -> Result<(), io::Error> {
     let mut flags = 0u8;
     let mut data: Vec<&str> = vec![];
 
     for arg in args {
-        match arg.as_str() {
+        match *arg {
             "--help" => flags |= HELP,
             "--escape" => flags |= ESCAPE,
             "--no-newline" => flags |= NO_NEWLINE,

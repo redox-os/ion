@@ -3,7 +3,7 @@ use std::io::Read;
 use shell::{Shell, FlowLogic};
 
 /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
-pub fn source(shell: &mut Shell, arguments: &[String]) -> Result<(), String> {
+pub fn source(shell: &mut Shell, arguments: &[&str]) -> Result<(), String> {
     match arguments.get(1) {
         Some(argument) => {
             if let Ok(mut file) = File::open(&argument) {

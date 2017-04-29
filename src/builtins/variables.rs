@@ -1,13 +1,13 @@
 // TODO: Move into grammar
 
-use fnv::FnvHashMap;
 use std::env;
 use std::io::{self, Write};
 
+use types::*;
 use shell::status::*;
 use shell::variables::Variables;
 
-fn print_list(list: &FnvHashMap<String, String>) {
+fn print_list(list: &VariableContext) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 
@@ -20,12 +20,12 @@ fn print_list(list: &FnvHashMap<String, String>) {
 }
 
 enum Binding {
-    InvalidKey(String),
+    InvalidKey(Identifier),
     ListEntries,
-    KeyOnly(String),
-    KeyValue(String, String),
-    Math(String, Operator, f32),
-    MathInvalid(String)
+    KeyOnly(Identifier),
+    KeyValue(Identifier, Value),
+    Math(Identifier, Operator, f32),
+    MathInvalid(Value)
 }
 
 enum Operator {
@@ -36,14 +36,11 @@ enum Operator {
 }
 
 /// Parses let bindings, `let VAR = KEY`, returning the result as a `(key, value)` tuple.
-fn parse_assignment<I: IntoIterator>(args: I)
-    -> Binding where I::Item: AsRef<str>
-{
+fn parse_assignment<'a, S: AsRef<str> + 'a>(args: &[S]) -> Binding {
     // Write all the arguments into a single `String`
-    let arguments = args.into_iter().skip(1).fold(String::new(), |a, b| a + " " + b.as_ref());
-
-    // Create a character iterator from the arguments.
-    let mut char_iter = arguments.chars();
+    let mut char_iter = args.iter().skip(1)
+        .map(|arg| arg.as_ref().chars())
+        .flat_map(|chars| chars);
 
     // Find the key and advance the iterator until the equals operator is found.
     let mut key = "".to_owned();
@@ -93,10 +90,12 @@ fn parse_assignment<I: IntoIterator>(args: I)
         }
     }
 
+    let key: Identifier = key.into();
+
     if !found_key && key.is_empty() {
         Binding::ListEntries
     } else {
-        let value = char_iter.skip_while(|&x| x == ' ').collect::<String>();
+        let value: Value = char_iter.skip_while(|&x| x == ' ').collect();
         if value.is_empty() {
             Binding::KeyOnly(key)
         } else if !Variables::is_valid_variable_name(&key) {
@@ -117,9 +116,7 @@ fn parse_assignment<I: IntoIterator>(args: I)
 
 /// The `alias` command will define an alias for another command, and thus may be used as a
 /// command itself.
-pub fn alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
-    where I::Item: AsRef<str>
-{
+pub fn alias<'a, S: AsRef<str> + 'a>(vars: &mut Variables, args: &[S]) -> i32 {
     match parse_assignment(args) {
         Binding::InvalidKey(key) => {
             let stderr = io::stderr();
@@ -173,6 +170,7 @@ pub fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
         let _ = writeln!(&mut stderr.lock(), "ion: you must specify a variable name");
         return FAILURE;
     }
+
     for variable in args.iter().skip(1) {
         if vars.unset_var(variable.as_ref()).is_none() {
             let stderr = io::stderr();
@@ -180,14 +178,14 @@ pub fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
             return FAILURE;
         }
     }
+
     SUCCESS
 }
 
 
 /// Exporting a variable sets that variable as a global variable in the system.
 /// Global variables can be accessed by other programs running on the system.
-pub fn export_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
-    where I::Item: AsRef<str>
+pub fn export_variable<'a, S: AsRef<str> + 'a>(vars: &mut Variables, args: &[S]) -> i32
 {
     match parse_assignment(args) {
         Binding::InvalidKey(key) => {
@@ -206,7 +204,7 @@ pub fn export_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
             }
         },
         Binding::Math(key, operator, increment) => {
-            let value = vars.get_var(&key).unwrap_or_else(|| "".to_owned());
+            let value = vars.get_var(&key).unwrap_or_else(|| "".into());
             match value.parse::<f32>() {
                 Ok(old_value) => match operator {
                     Operator::Plus     => env::set_var(key, (old_value + increment).to_string()),

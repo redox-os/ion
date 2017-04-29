@@ -29,7 +29,7 @@ enum PositionalArgs {
 
 use self::PositionalArgs::*;
 
-pub fn set(args: &[String], shell: &mut Shell) -> i32 {
+pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     let mut args_iter = args.iter();
@@ -69,7 +69,12 @@ pub fn set(args: &[String], shell: &mut Shell) -> i32 {
         None => (),
         Some(kind) => {
             let command: String = shell.variables.get_array("args").unwrap()[0].to_owned();
-            let arguments: Vec<String> = iter::once(command).chain(args_iter.cloned()).collect();
+            // This used to take a `&[String]` but cloned them all, so although
+            // this is non-ideal and could probably be better done with `Rc`, it
+            // hasn't got any slower.
+            let arguments = iter::once(command)
+                .chain(args_iter.map(|i| i.to_string()))
+                .collect();
             match kind {
                 UnsetIfNone  => shell.variables.set_array("args", arguments),
                 RetainIfNone => if arguments.len() != 1 {

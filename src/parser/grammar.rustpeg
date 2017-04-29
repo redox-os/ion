@@ -74,30 +74,30 @@ end_ -> Statement
 fn_ -> Statement
     = whitespace* "fn " n:_name whitespace* args:_args whitespace* description:_description? {
         Statement::Function {
-            description: description.unwrap_or("".to_string()),
-            name: n.to_string(),
+            description: description.unwrap_or("".into()),
+            name: n.into(),
             args: args,
             statements: Vec::new(),
         }
     }
 
 _description -> String
-      = "--" whitespace* description:$([^\r\n]*) { description.to_string() }
+      = "--" whitespace* description:$([^\r\n]*) { description.into() }
 
 _name -> String
-      = n:$([A-z0-9_]+) { n.to_string() }
+      = n:$([A-z0-9_]+) { n.into() }
 
 _args -> Vec<String>
       = _arg ** " "
 
 _arg -> String
-     = n:$([A-z0-9]+) { n.to_string() }
+     = n:$([A-z0-9]+) { n.into() }
 
 #[pub]
 for_ -> Statement
     = whitespace* "for" whitespace? n:_name whitespace? "in" whitespace? expr:$(.*) {
         Statement::For {
-            variable: n.to_string(),
+            variable: n.into(),
             values: ArgumentSplitter::new(expr).map(String::from).collect(),
             statements: Vec::new(),
         }

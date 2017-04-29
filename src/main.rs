@@ -2,6 +2,7 @@
 #![allow(while_let_on_iterator)]
 #![feature(box_syntax)]
 #![feature(plugin)]
+#![feature(str_mut_extras)]
 #![plugin(peg_syntax_ext)]
 
 // For a performance boost on Linux
@@ -11,6 +12,8 @@
 extern crate fnv;
 extern crate glob;
 extern crate liner;
+extern crate smallvec;
+extern crate smallstring;
 
 #[cfg(all(unix, not(target_os = "redox")))]
 extern crate users as users_unix;
@@ -18,6 +21,8 @@ extern crate users as users_unix;
 #[macro_use] mod parser;
 mod builtins;
 mod shell;
+mod ascii_helpers;
+mod types;
 
 use std::io::{stderr, Write, ErrorKind};
 use builtins::Builtin;
