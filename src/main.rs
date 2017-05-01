@@ -1,6 +1,5 @@
 #![allow(unknown_lints)]
 #![allow(while_let_on_iterator)]
-#![feature(box_syntax)]
 #![feature(str_mut_extras)]
 
 // For a performance boost on Linux
