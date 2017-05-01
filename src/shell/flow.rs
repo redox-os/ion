@@ -186,7 +186,7 @@ impl<'a> FlowLogic for Shell<'a> {
                     });
                 },
                 Statement::Pipeline(mut pipeline)  => {
-                    self.run_pipeline(&mut pipeline, false);
+                    self.run_pipeline(&mut pipeline);
                     if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
                         process::exit(self.previous_status);
                     }
@@ -200,7 +200,7 @@ impl<'a> FlowLogic for Shell<'a> {
     }
 
     fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) {
-        while self.run_pipeline(&mut expression.clone(), false) == Some(SUCCESS) {
+        while self.run_pipeline(&mut expression.clone()) == Some(SUCCESS) {
             // Cloning is needed so the statement can be re-iterated again if needed.
             if let Condition::Break = self.execute_statements(statements.clone()) {
                 break
@@ -264,11 +264,11 @@ impl<'a> FlowLogic for Shell<'a> {
     fn execute_if(&mut self, mut expression: Pipeline, success: Vec<Statement>,
         else_if: Vec<ElseIf>, failure: Vec<Statement>) -> Condition
     {
-        match self.run_pipeline(&mut expression, false) {
+        match self.run_pipeline(&mut expression) {
             Some(SUCCESS) => self.execute_statements(success),
             _             => {
                 for mut elseif in else_if {
-                    if self.run_pipeline(&mut elseif.expression, false) == Some(SUCCESS) {
+                    if self.run_pipeline(&mut elseif.expression) == Some(SUCCESS) {
                         return self.execute_statements(elseif.success);
                     }
                 }
@@ -377,7 +377,7 @@ impl<'a> FlowLogic for Shell<'a> {
             },
             // Simply executes a provided pipeline, immediately.
             Statement::Pipeline(mut pipeline)  => {
-                self.run_pipeline(&mut pipeline, false);
+                self.run_pipeline(&mut pipeline);
                 if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
                     process::exit(self.previous_status);
                 }

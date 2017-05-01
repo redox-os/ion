@@ -31,11 +31,18 @@ use types::*;
 use smallstring::SmallString;
 use self::completer::MultiCompleter;
 use self::directory_stack::DirectoryStack;
-use self::flow_control::{FlowControl, Function, Statement};
+use self::flow_control::{FlowControl, Function};
 use self::variables::Variables;
 use self::status::*;
 use self::pipe::execute_pipeline;
-use parser::{expand_string, StatementSplitter, check_statement, QuoteTerminator, ExpanderFunctions, Index, IndexEnd};
+use parser::{
+    expand_string,
+    ArgumentSplitter,
+    QuoteTerminator,
+    ExpanderFunctions,
+    Index,
+    IndexEnd
+};
 use parser::peg::Pipeline;
 
 /// This struct will contain all of the data structures related to this
@@ -320,98 +327,79 @@ impl<'a> Shell<'a> {
     /// Executes a pipeline and returns the final exit status of the pipeline.
     /// To avoid infinite recursion when using aliases, the noalias boolean will be set the true
     /// if an alias branch was executed.
-    fn run_pipeline(&mut self, pipeline: &mut Pipeline, noalias: bool) -> Option<i32> {
+    fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
         let command_start_time = SystemTime::now();
-
-        let mut exit_status = None;
-        let mut branched = false;
         let builtins = self.builtins;
 
-        if !noalias {
-            if let Some(mut alias) = {
-                let key: &str = pipeline.jobs[0].command.as_ref();
-                self.variables.aliases.get(key).cloned()
+        // Expand any aliases found
+        for job_no in 0..pipeline.jobs.len() {
+            if let Some(alias) = {
+                let key: &str = pipeline.jobs[job_no].command.as_ref();
+                self.variables.aliases.get(key)
             } {
-                branched = true;
-                // Append arguments supplied by the current job to the alias.
-                alias += " ";
-                for argument in pipeline.jobs[0].args.iter().skip(1) {
-                    alias += " ";
-                    alias += argument;
-                }
-
-                for statement in StatementSplitter::new(&alias).filter_map(check_statement) {
-                    match statement {
-                        Statement::Pipeline(mut pipeline) => exit_status = self.run_pipeline(&mut pipeline, true),
-                        _ => {
-                            exit_status = Some(FAILURE);
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "ion: syntax error: alias only supports pipeline arguments");
-                        }
-                    }
-                }
+                let new_args = ArgumentSplitter::new(alias).map(String::from)
+                .chain(pipeline.jobs[job_no].args.drain().skip(1))
+                    .collect::<SmallVec<[String; 4]>>();
+                pipeline.jobs[job_no].args = new_args;
             }
         }
 
-        if !branched {
-            pipeline.expand(&self.variables, &self.directory_stack);
-            // Branch if -> input == shell command i.e. echo
-            
-            exit_status = if let Some(command) = {
-                let key: &str = pipeline.jobs[0].command.as_ref();
-                builtins.get(key)
-            } {
-                // Run the 'main' of the command and set exit_status
-                if pipeline.jobs.len() == 1 {
-                    let borrowed = &pipeline.jobs[0].args;
-                    let small: SmallVec<[&str; 4]> = borrowed.iter()
-                        .map(|x| x as &str)
-                        .collect();
-                    Some((*command.main)(&small, self))
-                } else {
-                    Some(execute_pipeline(pipeline))
-                }
-            // Branch else if -> input == shell function and set the exit_status
-            } else if let Some(function) = self.functions.get(&pipeline.jobs[0].command).cloned() {
-                if pipeline.jobs.len() == 1 {
-                    if pipeline.jobs[0].args.len() - 1 == function.args.len() {
-                        let mut variables_backup: FnvHashMap<&str, Option<Value>> =
-                            FnvHashMap::with_capacity_and_hasher (
-                            64, Default::default()
-                        );
-                        for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
-                            variables_backup.insert(name, self.variables.get_var(name));
-                            self.variables.set_var(name, value);
-                        }
+        pipeline.expand(&self.variables, &self.directory_stack);
+        // Branch if -> input == shell command i.e. echo
 
-                        self.execute_statements(function.statements);
-
-                        for (name, value_option) in &variables_backup {
-                            match *value_option {
-                                Some(ref value) => self.variables.set_var(name, value),
-                                None => {self.variables.unset_var(name);},
-                            }
-                        }
-                        None
-                    } else {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "This function takes {} arguments, but you provided {}",
-                            function.args.len(), pipeline.jobs[0].args.len()-1);
-                        Some(NO_SUCH_COMMAND) // not sure if this is the right error code
+        let exit_status = if let Some(command) = {
+            let key: &str = pipeline.jobs[0].command.as_ref();
+            builtins.get(key)
+        } {
+            // Run the 'main' of the command and set exit_status
+            if pipeline.jobs.len() == 1 {
+                let borrowed = &pipeline.jobs[0].args;
+                let small: SmallVec<[&str; 4]> = borrowed.iter()
+                    .map(|x| x as &str)
+                    .collect();
+                Some((*command.main)(&small, self))
+            } else {
+                Some(execute_pipeline(pipeline))
+            }
+        // Branch else if -> input == shell function and set the exit_status
+        } else if let Some(function) = self.functions.get(&pipeline.jobs[0].command).cloned() {
+            if pipeline.jobs.len() == 1 {
+                if pipeline.jobs[0].args.len() - 1 == function.args.len() {
+                    let mut variables_backup: FnvHashMap<&str, Option<Value>> =
+                        FnvHashMap::with_capacity_and_hasher (
+                        64, Default::default()
+                    );
+                    for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
+                        variables_backup.insert(name, self.variables.get_var(name));
+                        self.variables.set_var(name, value);
                     }
+
+                    self.execute_statements(function.statements);
+
+                    for (name, value_option) in &variables_backup {
+                        match *value_option {
+                            Some(ref value) => self.variables.set_var(name, value),
+                            None => {self.variables.unset_var(name);},
+                        }
+                    }
+                    None
                 } else {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "Function pipelining is not implemented yet");
-                    Some(FAILURE)
+                    let _ = writeln!(stderr, "This function takes {} arguments, but you provided {}",
+                        function.args.len(), pipeline.jobs[0].args.len()-1);
+                    Some(NO_SUCH_COMMAND) // not sure if this is the right error code
                 }
-            // If not a shell command or a shell function execute the pipeline and set the exit_status
             } else {
-                Some(execute_pipeline(pipeline))
-            };
-        }
+                let stderr = io::stderr();
+                let mut stderr = stderr.lock();
+                let _ = writeln!(stderr, "Function pipelining is not implemented yet");
+                Some(FAILURE)
+            }
+        // If not a shell command or a shell function execute the pipeline and set the exit_status
+        } else {
+            Some(execute_pipeline(pipeline))
+        };
 
         if let Ok(elapsed_time) = command_start_time.elapsed() {
             let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
