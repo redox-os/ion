@@ -30,6 +30,7 @@ fn main() {
     shell.evaluate_init_file();
 
     if "1" == shell.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {
+        shell.context.history.set_file_name(shell.variables.get_var("HISTORY_FILE"));
         match shell.context.history.load_history() {
             Ok(()) => {
                 // pass
