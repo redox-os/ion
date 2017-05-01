@@ -1,7 +1,7 @@
-#![feature(str_mut_extras)]
 extern crate smallvec;
 
 use std::str;
+use std::mem::transmute;
 use std::ffi::OsStr;
 use std::ops::Deref;
 use std::borrow::Borrow;
@@ -149,7 +149,8 @@ impl AsMut<str> for SmallString {
         // We only allow `buffer` to be created from an existing valid string,
         // so this is safe.
         unsafe {
-            str::from_utf8_unchecked_mut(self.buffer.as_mut())
+            transmute(self.buffer.as_mut())
+            // str::from_utf8_unchecked_mut(self.buffer.as_mut())
         }
     }
 }
