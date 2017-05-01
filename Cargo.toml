@@ -21,7 +21,6 @@ name = "ion"
 fnv = "1.0"
 glob = "0.2"
 liner = "0.1.4"
-peg-syntax-ext = "0.5"
 permutate = "0.2"
 unicode-segmentation = "1.1"
 smallvec = "0.3.3"
@@ -31,6 +30,7 @@ smallstring = { path = "src/smallstring" }
 users = "0.5.1"
 
 [build-dependencies]
+peg = "0.5"
 ansi_term = "0.9"
 version_check = "0.1"
 

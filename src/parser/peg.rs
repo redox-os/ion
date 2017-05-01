@@ -61,7 +61,9 @@ pub fn parse(code: &str) -> Statement {
 	}
 }
 
-peg_file! grammar("grammar.rustpeg");
+mod grammar {
+    include!(concat!(env!("OUT_DIR"), "/grammar.rs"));
+}
 
 #[cfg(test)]
 mod tests {

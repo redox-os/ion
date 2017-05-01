@@ -338,7 +338,7 @@ impl<'a> Shell<'a> {
                 self.variables.aliases.get(key)
             } {
                 let new_args = ArgumentSplitter::new(alias).map(String::from)
-                .chain(pipeline.jobs[job_no].args.drain().skip(1))
+                    .chain(pipeline.jobs[job_no].args.drain().skip(1))
                     .collect::<SmallVec<[String; 4]>>();
                 pipeline.jobs[job_no].args = new_args;
             }
@@ -401,14 +401,13 @@ impl<'a> Shell<'a> {
             Some(execute_pipeline(pipeline))
         };
 
-        if let Ok(elapsed_time) = command_start_time.elapsed() {
-            let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
-                                  elapsed_time.as_secs(), elapsed_time.subsec_nanos());
-
-            // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the pipline
-            // just executed to the the file and context histories. At the moment, this means
-            // record how long it took.
-            if "1" == self.variables.get_var_or_empty("RECORD_SUMMARY") {
+        // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the pipline
+        // just executed to the the file and context histories. At the moment, this means
+        // record how long it took.
+        if "1" == self.variables.get_var_or_empty("RECORD_SUMMARY") {
+            if let Ok(elapsed_time) = command_start_time.elapsed() {
+                let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
+                                      elapsed_time.as_secs(), elapsed_time.subsec_nanos());
                 self.context.history.push(summary.into()).unwrap_or_else(|err| {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();

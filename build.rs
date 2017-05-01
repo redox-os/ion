@@ -1,11 +1,12 @@
 extern crate ansi_term;
+extern crate peg;
 extern crate version_check;
 
 use ansi_term::Color::{Red, Yellow, Blue, White};
 use version_check::{is_nightly, is_min_version, is_min_date};
 
 // Specifies the minimum nightly version needed to compile Ion.
-const MIN_DATE: &'static str = "2017-03-30";
+const MIN_DATE: &'static str = "2017-04-28";
 const MIN_VERSION: &'static str = "1.18.0-nightly";
 
 // Convenience macro for writing to stderr.
@@ -61,4 +62,6 @@ fn main() {
             println!("cargo:warning={}", "Build may fail due to incompatible rustc version.");
         }
     }
+
+    peg::cargo_build("src/parser/grammar.rustpeg");
 }

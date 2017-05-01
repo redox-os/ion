@@ -1,9 +1,7 @@
 #![allow(unknown_lints)]
 #![allow(while_let_on_iterator)]
 #![feature(box_syntax)]
-#![feature(plugin)]
 #![feature(str_mut_extras)]
-#![plugin(peg_syntax_ext)]
 
 // For a performance boost on Linux
 // #![feature(alloc_system)]
