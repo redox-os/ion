@@ -41,7 +41,7 @@ pub trait FlowLogic {
 
 impl<'a> FlowLogic for Shell<'a> {
     fn on_command(&mut self, command_string: &str) {
-        let mut iterator = StatementSplitter::new(command_string).filter_map(check_statement);
+        let mut iterator = StatementSplitter::new(command_string).map(check_statement);
 
         // If the value is set to `0`, this means that we don't need to append to an existing
         // partial statement block in memory, but can read and execute new statements.
@@ -101,6 +101,7 @@ impl<'a> FlowLogic for Shell<'a> {
                 mem::swap(&mut self.flow_control.current_statement, &mut replacement);
 
                 match replacement {
+                    Statement::Error(number) => self.previous_status = number,
                     Statement::Let { expression } => {
                         self.previous_status = let_assignment(expression, &mut self.variables, &self.directory_stack);
                     },
@@ -143,6 +144,7 @@ impl<'a> FlowLogic for Shell<'a> {
         let mut iterator = statements.drain(..);
         while let Some(statement) = iterator.next() {
             match statement {
+                Statement::Error(number) => self.previous_status = number,
                 Statement::Let { expression } => {
                     self.previous_status = let_assignment(expression, &mut self.variables, &self.directory_stack);
                 },
@@ -281,6 +283,7 @@ impl<'a> FlowLogic for Shell<'a> {
         where I: Iterator<Item = Statement>
     {
         match statement {
+            Statement::Error(number) => self.previous_status = number,
             // Execute a Let Statement
             Statement::Let { expression } => {
                 self.previous_status = let_assignment(expression, &mut self.variables, &self.directory_stack);

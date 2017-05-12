@@ -19,20 +19,25 @@ const METHOD: u16 = 256;
 
 
 #[derive(Debug, PartialEq)]
-pub enum StatementError {
+pub enum StatementError<'a> {
+    IllegalCommandName(&'a str),
     InvalidCharacter(char, usize),
     UnterminatedSubshell,
     UnterminatedBracedVar,
     UnterminatedBrace,
     UnterminatedMethod,
+    ExpectedCommandButFound(&'static str)
 }
 
-pub fn check_statement(statement: Result<&str, StatementError>) -> Option<Statement> {
+pub fn check_statement<'a>(statement: Result<&str, StatementError<'a>>) -> Statement {
     match statement {
-        Ok(statement) => Some(parse(statement)),
+        Ok(statement) => parse(statement),
         Err(err) => {
             let stderr = io::stderr();
             match err {
+                StatementError::IllegalCommandName(command) => {
+                    let _ = writeln!(stderr.lock(), "ion: illegal command name: {}", command);
+                }
                 StatementError::InvalidCharacter(character, position) => {
                     let _ = writeln!(stderr.lock(),
                         "ion: syntax error: '{}' at position {} is out of place",
@@ -50,8 +55,11 @@ pub fn check_statement(statement: Result<&str, StatementError>) -> Option<Statem
                 StatementError::UnterminatedMethod => {
                     let _ = writeln!(stderr.lock(), "ion: syntax error: unterminated method");
                 }
+                StatementError::ExpectedCommandButFound(element) => {
+                    let _ = writeln!(stderr.lock(), "ion: expected command, but found {}", element);
+                }
             }
-            None
+            Statement::Error(-1)
         }
     }
 }
@@ -81,8 +89,8 @@ impl<'a> StatementSplitter<'a> {
 }
 
 impl<'a> Iterator for StatementSplitter<'a> {
-    type Item = Result<&'a str, StatementError>;
-    fn next(&mut self) -> Option<Result<&'a str, StatementError>> {
+    type Item = Result<&'a str, StatementError<'a>>;
+    fn next(&mut self) -> Option<Result<&'a str, StatementError<'a>>> {
         let start = self.read;
         let mut first_arg_found = false;
         let mut else_found = false;
@@ -209,8 +217,17 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 },
                 None if self.flags & METHOD != 0 => Some(Err(StatementError::UnterminatedMethod)),
                 None if self.flags & VBRACE != 0 => Some(Err(StatementError::UnterminatedBracedVar)),
-                None if self.brace_level != 0 => Some(Err(StatementError::UnterminatedBrace)),
-                None => Some(Ok(self.data[start..].trim()))
+                None if self.brace_level != 0    => Some(Err(StatementError::UnterminatedBrace)),
+                None => {
+                    let output = self.data[start..].trim();
+                    match output.as_bytes()[0] {
+                        b'>' | b'<' | b'^' => Some(Err(StatementError::ExpectedCommandButFound("redirection"))),
+                        b'|'               => Some(Err(StatementError::ExpectedCommandButFound("pipe"))),
+                        b'&'               => Some(Err(StatementError::ExpectedCommandButFound("&"))),
+                        b'*' | b'%' | b'?' | b'{' | b'}' => Some(Err(StatementError::IllegalCommandName(output))),
+                        _                                => Some(Ok(output))
+                    }
+                }
             }
         }
     }
@@ -225,6 +242,11 @@ fn syntax_errors() {
     assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 42)));
     assert_eq!(results[3], Err(StatementError::UnterminatedSubshell));
     assert_eq!(results.len(), 4);
+
+    let command = ">echo";
+    let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
+    assert_eq!(results[0], Err(StatementError::ExpectedCommandButFound("redirection")));
+    assert_eq!(results.len(), 1);
 }
 
 #[test]

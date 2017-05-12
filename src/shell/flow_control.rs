@@ -37,6 +37,7 @@ pub enum Statement {
     },
     Else,
     End,
+    Error(i32),
     Break,
     Continue,
     Pipeline(Pipeline),
