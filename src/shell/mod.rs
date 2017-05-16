@@ -340,6 +340,7 @@ impl<'a> Shell<'a> {
                 let new_args = ArgumentSplitter::new(alias).map(String::from)
                     .chain(pipeline.jobs[job_no].args.drain().skip(1))
                     .collect::<SmallVec<[String; 4]>>();
+                pipeline.jobs[job_no].command = new_args[0].clone().into();
                 pipeline.jobs[job_no].args = new_args;
             }
         }
