@@ -24,12 +24,12 @@ use std::time::SystemTime;
 use std::iter::FromIterator;
 use smallvec::SmallVec;
 
-use liner::{Context, CursorPosition, Event, EventKind, FilenameCompleter, BasicCompleter};
+use liner::{Context, CursorPosition, Event, EventKind, BasicCompleter};
 
 use builtins::*;
 use types::*;
 use smallstring::SmallString;
-use self::completer::MultiCompleter;
+use self::completer::{MultiCompleter, IonFileCompleter};
 use self::directory_stack::DirectoryStack;
 use self::flow_control::{FlowControl, Function};
 use self::variables::Variables;
@@ -105,7 +105,7 @@ impl<'a> Shell<'a> {
                 if filename {
                     if let Ok(current_dir) = env::current_dir() {
                         if let Some(url) = current_dir.to_str() {
-                            let completer = FilenameCompleter::new(Some(url));
+                            let completer = IonFileCompleter::new(Some(url));
                             mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                         }
                     }
@@ -116,13 +116,13 @@ impl<'a> Shell<'a> {
                         Ok(val) => {
                             if cfg!(unix) {
                                 // UNIX systems separate paths with the `:` character.
-                                val.split(':').map(|x| FilenameCompleter::new(Some(x))).collect::<Vec<_>>()
+                                val.split(':').map(|x| IonFileCompleter::new(Some(x))).collect::<Vec<_>>()
                             } else {
                                 // Redox and Windows use the `;` character to separate paths
-                                val.split(';').map(|x| FilenameCompleter::new(Some(x))).collect::<Vec<_>>()
+                                val.split(';').map(|x| IonFileCompleter::new(Some(x))).collect::<Vec<_>>()
                             }
                         },
-                        Err(_) => vec![FilenameCompleter::new(Some("/bin/"))],
+                        Err(_) => vec![IonFileCompleter::new(Some("/bin/"))],
                     };
 
                     // Creates a list of definitions from the shell environment that will be used

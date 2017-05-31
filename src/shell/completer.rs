@@ -1,4 +1,32 @@
-use liner::Completer;
+use liner::{Completer, FilenameCompleter};
+
+pub struct IonFileCompleter {
+    inner: FilenameCompleter
+}
+
+impl IonFileCompleter {
+    pub fn new(path: Option<&str>) -> IonFileCompleter {
+        IonFileCompleter { inner:  FilenameCompleter::new(path) }
+    }
+}
+
+impl Completer for IonFileCompleter {
+    fn completions(&self, start: &str) -> Vec<String> {
+        self.inner.completions(start).iter().map(|x| escape(x.as_str())).collect()
+    }
+}
+
+fn escape(input: &str) -> String {
+    let mut output = Vec::with_capacity(input.len());
+    for character in input.bytes() {
+        match character {
+            b'(' | b')' | b'[' | b']' => output.push(b'\\'),
+            _ => ()
+        }
+        output.push(character);
+    }
+    unsafe { String::from_utf8_unchecked(output) }
+}
 
 /// A completer that combines suggestions from multiple completers.
 #[derive(Clone, Eq, PartialEq)]
