@@ -655,7 +655,11 @@ impl<'a> Iterator for WordIterator<'a> {
         loop {
             if let Some(character) = iterator.next() {
                 match character {
-                    _ if self.flags & BACKSL != 0 => { self.read += 1; break },
+                    _ if self.flags & BACKSL != 0 => {
+                        self.read += 1;
+                        self.flags ^= BACKSL;
+                        break
+                    },
                     b'\\' => {
                         start += 1;
                         self.read += 1;
@@ -925,6 +929,21 @@ mod tests {
             WordToken::Process("echo foo", false, Index::All),
             WordToken::Whitespace(" "),
             WordToken::Process("seq 1 100", true, Index::All)
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn test_multiple_escapes() {
+        let input = "foo\\(\\) bar\\(\\)";
+        let expected = vec![
+            WordToken::Normal("foo"),
+            WordToken::Normal("("),
+            WordToken::Normal(")"),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("bar"),
+            WordToken::Normal("("),
+            WordToken::Normal(")"),
         ];
         compare(input, expected);
     }
