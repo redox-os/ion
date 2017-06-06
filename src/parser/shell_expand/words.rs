@@ -655,7 +655,11 @@ impl<'a> Iterator for WordIterator<'a> {
         loop {
             if let Some(character) = iterator.next() {
                 match character {
-                    _ if self.flags & BACKSL != 0 => { self.read += 1; break },
+                    _ if self.flags & BACKSL != 0 => {
+                        self.read += 1;
+                        self.flags ^= BACKSL;
+                        break
+                    },
                     b'\\' => {
                         start += 1;
                         self.read += 1;
