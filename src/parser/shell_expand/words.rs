@@ -932,4 +932,19 @@ mod tests {
         ];
         compare(input, expected);
     }
+
+    #[test]
+    fn test_multiple_escapes() {
+        let input = "foo\\(\\) bar\\(\\)";
+        let expected = vec![
+            WordToken::Normal("foo"),
+            WordToken::Normal("("),
+            WordToken::Normal(")"),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("bar"),
+            WordToken::Normal("("),
+            WordToken::Normal(")"),
+        ];
+        compare(input, expected);
+    }
 }
