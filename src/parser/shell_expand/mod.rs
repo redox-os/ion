@@ -8,7 +8,7 @@ use types::Array;
 mod braces;
 mod ranges;
 mod words;
-
+use glob::glob;
 use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub use self::words::{WordIterator, WordToken};
@@ -242,6 +242,14 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
 
                         slice_string(&mut output, &expanded, index);
                     },
+                    WordToken::Glob(text) => {
+                        let globbed = glob(text);
+                        if let Ok(var)=globbed{
+                            for path in var.filter_map(Result::ok) {
+                                output.push_str(&path.to_string_lossy());
+                            }
+                        }
+                    },
                 }
             }
 
@@ -411,6 +419,21 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
 
                     slice_string(&mut output, &expanded, index);
                 },
+                WordToken::Glob(text) => {
+                    //println!("Gotten into glob mod.rs, text:{}",text);
+                    let globbed = glob(text);
+                    if let Ok(var)=globbed{
+                        //println!("Entered if let");
+                        for path in var.filter_map(Result::ok) {
+                            /*println!("A path: {}",path.to_string_lossy());
+                            println!("Output: {}",output);*/
+                            output.push_str(&path.to_string_lossy());
+                        }
+                    }
+                    else{
+                        //println!("Globbing failed");
+                    }
+                }
             }
         }
 

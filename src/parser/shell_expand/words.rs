@@ -201,7 +201,7 @@ impl<'a> ArrayMethod<'a> {
             }
         }
 
-       
+
         Some("".into()).into_iter().collect()
     }
 }
@@ -219,6 +219,7 @@ pub enum WordToken<'a> {
     Process(&'a str, bool, Index),
     StringMethod(&'a str, &'a str, &'a str, Index),
     ArrayMethod(ArrayMethod<'a>),
+    Glob(&'a str),
 }
 
 pub struct WordIterator<'a> {
@@ -641,7 +642,28 @@ impl<'a> WordIterator<'a> {
 
         panic!("ion: fatal error with syntax validation: unterminated array expression")
     }
+    ///Contains the logic for parsing wild card characters
+    fn wildcard<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        //println!("Gotten into glob words.rs");
+        let start = self.read;
+        while let Some(character) = iterator.next() {
+            //println!("{}",character as char);
+            match character{
+                b' ' => {
+                    return WordToken::Glob(&self.data[start..self.read]);
+
+                },
+                _ => (),
+            }
+            self.read+=1;
+        }
+        self.read+=1;
+        return WordToken::Glob(&self.data[start..self.read]);
+    }
 }
+
 
 impl<'a> Iterator for WordIterator<'a> {
     type Item = WordToken<'a>;
@@ -739,7 +761,11 @@ impl<'a> Iterator for WordIterator<'a> {
                                 return Some(self.variable(&mut iterator));
                             }
                         }
-                    }
+                    },
+                    b'*'|b'?' => {
+                        //self.read+=1;
+                        return Some(self.wildcard(&mut iterator));
+                    },
                     _ => { self.read += 1; break },
                 }
             } else {
@@ -789,6 +815,7 @@ impl<'a> Iterator for WordIterator<'a> {
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests {
