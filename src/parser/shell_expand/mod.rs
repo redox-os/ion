@@ -13,7 +13,7 @@ use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub use self::words::{WordIterator, WordToken};
 
-pub use self::words::{Index, IndexEnd};
+pub use self::words::{Index, IndexStart, IndexEnd};
 
 use std::io::{self, Write};
 use types::*;
@@ -81,15 +81,13 @@ fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, id: usize) -> V
         .nth(id).unwrap_or_default()
 }
 
-fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: usize, end: IndexEnd) -> Array {
-    match end {
-        IndexEnd::CatchAll => elements.iter()
+fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: IndexStart, end: IndexEnd) -> Array {
+    let len = elements.len();
+    elements.iter()
             .flat_map(|element| expand_string(element, expand_func, false))
-            .skip(start).collect(),
-        IndexEnd::ID(end) => elements.iter()
-            .flat_map(|element| expand_string(element, expand_func, false))
-            .skip(start).take(end-start).collect()
-    }
+            .skip(start.resolve(len))
+            .take(end.diff(&start, len))
+            .collect()
 }
 
 fn slice_string(output: &mut String, expanded: &str, index: Index) {
@@ -101,19 +99,16 @@ fn slice_string(output: &mut String, expanded: &str, index: Index) {
                 output.push_str(character);
             }
         },
-        Index::Range(start, IndexEnd::ID(end)) => {
-            let substring = UnicodeSegmentation::graphemes(expanded, true)
-                .skip(start).take(end-start)
-                .collect::<Vec<&str>>().join("");
+        Index::Range(start, end) => {
+            let graphemes = UnicodeSegmentation::graphemes(expanded, true);
+            let len = graphemes.clone().count();
+            let substring = graphemes.skip(start.resolve(len))
+                                     .take(end.diff(&start, len))
+                                     .collect::<Vec<&str>>()
+                                     .join("");
 
             output.push_str(&substring);
         },
-        Index::Range(start, IndexEnd::CatchAll) => {
-            let substring = UnicodeSegmentation::graphemes(expanded, true)
-                .skip(start).collect::<Vec<&str>>().join("");
-
-            output.push_str(&substring);
-        }
     }
 }
 
@@ -194,13 +189,11 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                             Index::Range(start, end) => {
                                 let mut temp = String::new();
                                 expand_process(&mut temp, command, quoted, Index::All, expand_func);
-                                let temp = match end {
-                                    IndexEnd::ID(end) => temp.split_whitespace()
-                                        .skip(start).take(end-start)
-                                        .collect::<Vec<&str>>(),
-                                    IndexEnd::CatchAll => temp.split_whitespace()
-                                        .skip(start).collect::<Vec<&str>>()
-                                };
+                                let len = temp.split_whitespace().count();
+                                let temp = temp.split_whitespace()
+                                               .skip(start.resolve(len))
+                                               .take(end.diff(&start, len))
+                                               .collect::<Vec<&str>>();
                                 output.push_str(&temp.join(" "));
                             }
                         }
@@ -298,19 +291,12 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         }
                         Index::Range(start, end) => {
                             expand_process(&mut output, command, quoted, Index::All, expand_func);
-                            return match end {
-                                IndexEnd::ID(end) => output
-                                    .split_whitespace()
-                                    .skip(start)
-                                    .take(end - start)
-                                    .map(From::from)
-                                    .collect::<Array>(),
-                                IndexEnd::CatchAll => output
-                                    .split_whitespace()
-                                    .skip(start)
-                                    .map(From::from)
-                                    .collect::<Array>()
-                            }
+                            let len = output.split_whitespace().count();
+                            return output.split_whitespace()
+                                  .skip(start.resolve(len))
+                                  .take(end.diff(&start, len))
+                                  .map(From::from)
+                                  .collect::<Array>();
                         },
                     }
                 },
@@ -363,13 +349,11 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         Index::Range(start, end) => {
                             let mut temp = String::new();
                             expand_process(&mut temp, command, quoted, Index::All, expand_func);
-                            let temp = match end {
-                                IndexEnd::ID(end) => temp.split_whitespace()
-                                    .skip(start).take(end-start)
-                                    .collect::<Vec<&str>>(),
-                                IndexEnd::CatchAll => temp.split_whitespace()
-                                    .skip(start).collect::<Vec<&str>>()
-                            };
+                            let len = temp.split_whitespace().count();
+                            let temp = temp.split_whitespace()
+                                           .skip(start.resolve(len))
+                                           .take(end.diff(&start, len))
+                                           .collect::<Vec<&str>>();
                             output.push_str(&temp.join(" "));
                         },
                     }

@@ -1,6 +1,7 @@
 use std::io::{self, Write};
 use std::char;
 use std::str::FromStr;
+use std::cmp::max;
 use super::{ExpanderFunctions, expand_string};
 use super::ranges::parse_index_range;
 
@@ -23,13 +24,59 @@ pub enum Index {
     All,
     None,
     ID(usize),
-    Range(usize, IndexEnd),
+    Range(IndexStart, IndexEnd),
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum IndexStart {
+    FromStart(usize),
+    FromEnd(usize)
+}
+
+impl IndexStart {
+    pub fn new(input : isize) -> IndexStart {
+        if input < 0 {
+            IndexStart::FromEnd(input.abs() as usize)
+        } else {
+            IndexStart::FromStart(input.abs() as usize)
+        }
+    }
+    pub fn resolve(&self, size : usize) -> usize {
+        match *self {
+            IndexStart::FromStart(n) => n,
+            IndexStart::FromEnd(n) => size - n
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum IndexEnd {
     ID(usize),
+    FromEnd(usize),
     CatchAll
+}
+
+impl IndexEnd {
+
+    pub fn new(input : isize) -> IndexEnd {
+        if input < 0 {
+            IndexEnd::FromEnd(input.abs() as usize)
+        } else {
+            IndexEnd::ID(input.abs() as usize)
+        }
+    }
+
+    fn resolve(&self, size : usize) -> usize {
+        match *self {
+            IndexEnd::ID(n) => n,
+            IndexEnd::FromEnd(n) => if n > size { 0 } else {size - n},
+            IndexEnd::CatchAll => size
+        }
+    }
+
+    pub fn diff(&self, start : &IndexStart, size : usize) -> usize {
+        max(0, self.resolve(size) - start.resolve(size))
+    }
 }
 
 pub enum IndexError {
@@ -98,38 +145,27 @@ impl<'a> ArrayMethod<'a> {
                             .nth(id)
                             .unwrap_or_default()
                     ),
-                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::ID(end))) => {
-                        let range = variable.split(&expand_string(pattern, expand_func, false).join(" "))
-                            .skip(start).take(end-start)
+                    (&Pattern::StringPattern(pattern), Index::Range(start, end)) => {
+                        let expansion = expand_string(pattern, expand_func, false).join(" ");
+                        let iter = variable.split(&expansion);
+                        let len = iter.clone().count();
+                        let range = iter.skip(start.resolve(len))
+                                        .take(end.resolve(len) - start.resolve(len))
+                                        .collect::<Vec<&str>>()
+                                        .join(" ");
+
+                        current.push_str(&range);
+                    },
+                    (&Pattern::Whitespace, Index::Range(start, end)) => {
+                        let len = variable.split(char::is_whitespace).count();
+                        let range = variable.split(char::is_whitespace)
+                            .skip(start.resolve(len))
+                            .take(end.resolve(len) - start.resolve(len))
                             .collect::<Vec<&str>>()
                             .join(" ");
 
                         current.push_str(&range);
                     },
-                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::ID(end))) => {
-                        let range = variable.split(char::is_whitespace)
-                            .skip(start).take(end-start)
-                            .collect::<Vec<&str>>()
-                            .join(" ");
-
-                        current.push_str(&range);
-                    },
-                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::CatchAll)) => {
-                        let range = variable.split(&expand_string(pattern, expand_func, false).join(" "))
-                            .skip(start)
-                            .collect::<Vec<&str>>()
-                            .join(" ");
-
-                        current.push_str(&range);
-                    }
-                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::CatchAll)) => {
-                        let range = variable.split(char::is_whitespace)
-                            .skip(start)
-                            .collect::<Vec<&str>>()
-                            .join(" ");
-
-                        current.push_str(&range);
-                    }
                 }
             },
             _ => {
@@ -168,30 +204,23 @@ impl<'a> ArrayMethod<'a> {
                                 .nth(id).map(From::from)
                                 .unwrap_or_default()
                         ).into_iter().collect(),
-                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::CatchAll)) => {
-                        variable.split(&expand_string(pattern, expand_func, false).join(" "))
-                            .skip(start)
+                    (&Pattern::StringPattern(pattern), Index::Range(start, end)) => {
+                        let expansion = expand_string(pattern, expand_func, false).join(" ");
+                        let iter = variable.split(&expansion);
+                        let len = iter.clone().count();
+                        iter.skip(start.resolve(len))
+                            .take(end.resolve(len) - start.resolve(len))
                             .map(From::from)
                             .collect()
                     },
-                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::CatchAll)) => {
+                    (&Pattern::Whitespace, Index::Range(start, end)) => {
+                        let len = variable.split(char::is_whitespace).count();
                         variable.split(char::is_whitespace)
-                            .skip(start)
+                            .skip(start.resolve(len))
+                            .take(end.resolve(len) - start.resolve(len))
                             .map(From::from)
                             .collect()
                     },
-                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::ID(end))) => {
-                        variable.split(&expand_string(pattern, expand_func, false).join(" ")).skip(start)
-                            .take(end-start)
-                            .map(From::from)
-                            .collect()
-                    },
-                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::ID(end))) => {
-                        variable.split(char::is_whitespace).skip(start)
-                            .take(end-start)
-                            .map(From::from)
-                            .collect()
-                    }
                 }
             },
             _ => {
@@ -201,7 +230,7 @@ impl<'a> ArrayMethod<'a> {
             }
         }
 
-       
+
         Some("".into()).into_iter().collect()
     }
 }
@@ -866,15 +895,15 @@ mod tests {
     fn indexes() {
         let input = "@array[0..3] @array[0...3] @array[abc] @array[..3] @array[3..]";
         let expected = vec![
-            WordToken::ArrayVariable("array", false, Index::Range(0, IndexEnd::ID(3))),
+            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(3))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(0, IndexEnd::ID(4))),
+            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(4))),
             WordToken::Whitespace(" "),
             WordToken::ArrayVariable("array", false, Index::None),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(0, IndexEnd::ID(3))),
+            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(3))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(3, IndexEnd::CatchAll)),
+            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(3), IndexEnd::CatchAll)),
         ];
         compare(input, expected);
     }
@@ -947,4 +976,8 @@ mod tests {
         ];
         compare(input, expected);
     }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 960be93... Add negative range indexes
 }

@@ -8,7 +8,6 @@ use parser::assignments::{
 use parser::{
     ExpanderFunctions,
     Index,
-    IndexEnd,
     ArgumentSplitter,
     expand_string,
 };
@@ -74,12 +73,12 @@ pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &Direct
                         Index::ID(id) => array.get(id)
                             .map(|x| Some(x.to_owned()).into_iter().collect()),
                         Index::Range(start, end) => {
-                            let array: VArray = match end {
-                                IndexEnd::CatchAll => array.iter().skip(start)
-                                    .map(|x| x.to_owned()).collect(),
-                                IndexEnd::ID(end) => array.iter().skip(start).take(end-start)
-                                    .map(|x| x.to_owned()).collect()
-                            };
+                            let len = array.len();
+                            let array : VArray = array.iter()
+                                                      .skip(start.resolve(len))
+                                                      .take(end.diff(&start, len))
+                                                      .map(|x| x.to_owned())
+                                                      .collect();
                             if array.is_empty() { None } else { Some(array) }
                         }
                     },

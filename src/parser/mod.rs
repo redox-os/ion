@@ -15,12 +15,13 @@ macro_rules! get_expanders {
                             |x| Array::from_iter(Some(x.to_owned()))
                         ),
                         Index::Range(start, end) => {
-                            let array: Array = match end {
-                                IndexEnd::CatchAll => array.iter().skip(start)
-                                    .map(|x| x.to_owned()).collect::<_>(),
-                                IndexEnd::ID(end) => array.iter().skip(start).take(end-start)
-                                    .map(|x| x.to_owned()).collect::<_>()
-                            };
+                            let len = array.len();
+                            let array : Array =
+                                array.iter()
+                                     .skip(start.resolve(len))
+                                     .take(end.diff(&start, len))
+                                     .map(|x| x.to_owned())
+                                     .collect::<_>();
                             if array.is_empty() { None } else { Some(array) }
                         }
                     },
