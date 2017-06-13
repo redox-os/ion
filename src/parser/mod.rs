@@ -14,6 +14,9 @@ macro_rules! get_expanders {
                         Index::ID(id) => array.get(id).map(
                             |x| Array::from_iter(Some(x.to_owned()))
                         ),
+                        Index::FromEnd(idx) => array.get(array.len() - idx).map(
+                            |x| Array::from_iter(Some(x.to_owned()))
+                        ),
                         Index::Range(start, end) => {
                             let len = array.len();
                             let array : Array =

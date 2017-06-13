@@ -99,6 +99,13 @@ fn slice_string(output: &mut String, expanded: &str, index: Index) {
                 output.push_str(character);
             }
         },
+        Index::FromEnd(id) => {
+            let mut graphemes = UnicodeSegmentation::graphemes(expanded, true);
+            let len = graphemes.clone().count();
+            if let Some(character) = graphemes.nth(len - id) {
+                output.push_str(character);
+            }
+        }
         Index::Range(start, end) => {
             let graphemes = UnicodeSegmentation::graphemes(expanded, true);
             let len = graphemes.clone().count();
@@ -160,6 +167,12 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                                 let expanded = array_nth(elements, expand_func, id);
                                 output.push_str(&expanded);
                             },
+                            Index::FromEnd(id) => {
+                                let expanded = array_nth(elements,
+                                                         expand_func,
+                                                         elements.len() - id);
+                                output.push_str(&expanded);
+                            }
                             Index::Range(start, end) => {
                                 let expanded = array_range(elements, expand_func, start, end);
                                 output.push_str(&expanded.join(" "));
@@ -186,6 +199,14 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                                 expand_process(&mut temp, command, quoted, Index::All, expand_func);
                                 output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
                             },
+                            Index::FromEnd(id) => {
+                                let mut temp = String::new();
+                                expand_process(&mut temp, command, quoted, Index::All, expand_func);
+                                output.push_str(temp.split_whitespace()
+                                                    .rev()
+                                                    .nth(id - 1)
+                                                    .unwrap_or_default());
+                            }
                             Index::Range(start, end) => {
                                 let mut temp = String::new();
                                 expand_process(&mut temp, command, quoted, Index::All, expand_func);
@@ -259,6 +280,10 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         Index::ID(id) =>
                             Some(array_nth(elements, expand_func, id))
                                 .into_iter().collect(),
+                        Index::FromEnd(id) =>
+                            Some(array_nth(elements, expand_func, elements.len() - id))
+                                .into_iter()
+                                .collect(),
                         Index::Range(start, end) => array_range(elements, expand_func, start, end),
                     };
                 },
@@ -288,6 +313,17 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                                     .into()
                             ).into_iter()
                                 .collect();
+                        },
+                        Index::FromEnd(id) => {
+                            expand_process(&mut output, command, quoted, Index::All, expand_func);
+                            return Some(
+                                output.split_whitespace()
+                                      .rev()
+                                      .nth(id - 1)
+                                      .unwrap_or_default()
+                                      .into()
+                            ).into_iter()
+                             .collect();
                         }
                         Index::Range(start, end) => {
                             expand_process(&mut output, command, quoted, Index::All, expand_func);
@@ -320,6 +356,10 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                             let expanded = array_nth(elements, expand_func, id);
                             output.push_str(&expanded);
                         },
+                        Index::FromEnd(id) => {
+                            let expanded = array_nth(elements, expand_func, elements.len() - id);
+                            output.push_str(&expanded);
+                        }
                         Index::Range(start, end) => {
                             let expanded = array_range(elements, expand_func, start, end);
                             output.push_str(&expanded.join(" "));
@@ -345,6 +385,14 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                             let mut temp = String::new();
                             expand_process(&mut temp, command, quoted, Index::All, expand_func);
                             output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
+                        },
+                        Index::FromEnd(id) => {
+                            let mut temp = String::new();
+                            expand_process(&mut temp, command, quoted, Index::All, expand_func);
+                            output.push_str(temp.split_whitespace()
+                                                .rev()
+                                                .nth(id - 1)
+                                                .unwrap_or_default());
                         },
                         Index::Range(start, end) => {
                             let mut temp = String::new();

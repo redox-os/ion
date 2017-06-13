@@ -1,7 +1,6 @@
 use std::io::{self, Write};
 use std::char;
 use std::str::FromStr;
-use std::cmp::max;
 use super::{ExpanderFunctions, expand_string};
 use super::ranges::parse_index_range;
 
@@ -24,16 +23,24 @@ pub enum Index {
     All,
     None,
     ID(usize),
+    FromEnd(usize),
     Range(IndexStart, IndexEnd),
 }
 
+/// Index into an vector-like object
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum IndexStart {
+    /// Index starting from the beginning of the vector, where `FromStart(0)` is the first element
     FromStart(usize),
+    /// Index starting from the end of the vector, where `FromEnd(1)` is the last element.
+    /// `FromEnd(0)` is a reserved value
     FromEnd(usize)
 }
 
 impl IndexStart {
+
+    /// Construct a new input where negative values become `FromEnd` instances and positive
+    /// values or zero become FromStart instances
     pub fn new(input : isize) -> IndexStart {
         if input < 0 {
             IndexStart::FromEnd(input.abs() as usize)
@@ -41,6 +48,8 @@ impl IndexStart {
             IndexStart::FromStart(input.abs() as usize)
         }
     }
+
+    /// `index.resolve(n)` determines the "true" index given the length of a vector `n`
     pub fn resolve(&self, size : usize) -> usize {
         match *self {
             IndexStart::FromStart(n) => n,
@@ -58,6 +67,8 @@ pub enum IndexEnd {
 
 impl IndexEnd {
 
+    /// Construct a new input where negative values become `FromEnd` instances and positive
+    /// values or zero become FromStart instances
     pub fn new(input : isize) -> IndexEnd {
         if input < 0 {
             IndexEnd::FromEnd(input.abs() as usize)
@@ -66,6 +77,7 @@ impl IndexEnd {
         }
     }
 
+    /// `index.resolve(n)` determines the "true" index given the length of a vector `n`
     fn resolve(&self, size : usize) -> usize {
         match *self {
             IndexEnd::ID(n) => n,
@@ -74,8 +86,14 @@ impl IndexEnd {
         }
     }
 
+    /// Determine the number of values inbetween this index and an IndexStart instance as a range.
+    /// If this would result in a reversed range, return zero
     pub fn diff(&self, start : &IndexStart, size : usize) -> usize {
-        max(0, self.resolve(size) - start.resolve(size))
+        if self.resolve(size) < start.resolve(size) {
+            0
+        } else {
+            self.resolve(size) - start.resolve(size)
+        }
     }
 }
 
@@ -90,8 +108,12 @@ impl FromStr for Index {
             return Ok(Index::All)
         }
 
-        if let Ok(index) = data.parse::<usize>() {
-            return Ok(Index::ID(index))
+        if let Ok(index) = data.parse::<isize>() {
+            if index < 0 {
+                return Ok(Index::FromEnd(index.abs() as usize));
+            } else {
+                return Ok(Index::ID(index.abs() as usize));
+            }
         }
 
         if let Some((start, end)) = parse_index_range(data) {
@@ -143,6 +165,16 @@ impl<'a> ArrayMethod<'a> {
                     (&Pattern::Whitespace, Index::ID(id)) => current.push_str (
                         variable.split(char::is_whitespace)
                             .nth(id)
+                            .unwrap_or_default()
+                    ),
+                    (&Pattern::StringPattern(pattern), Index::FromEnd(id)) => current.push_str (
+                        variable.rsplit(&expand_string(pattern, expand_func, false).join(" "))
+                            .nth(id - 1)
+                            .unwrap_or_default()
+                    ),
+                    (&Pattern::Whitespace, Index::FromEnd(id)) => current.push_str (
+                        variable.rsplit(char::is_whitespace)
+                            .nth(id - 1)
                             .unwrap_or_default()
                     ),
                     (&Pattern::StringPattern(pattern), Index::Range(start, end)) => {
@@ -202,6 +234,21 @@ impl<'a> ArrayMethod<'a> {
                             variable
                                 .split(char::is_whitespace)
                                 .nth(id).map(From::from)
+                                .unwrap_or_default()
+                        ).into_iter().collect(),
+                    (&Pattern::StringPattern(pattern), Index::FromEnd(id)) =>
+                        Some(
+                            variable
+                                .rsplit(&expand_string(pattern, expand_func, false).join(" "))
+                                .nth(id - 1)
+                                .map(From::from)
+                                .unwrap_or_default()
+                        ).into_iter().collect(),
+                    (&Pattern::Whitespace, Index::FromEnd(id)) =>
+                        Some(
+                            variable
+                                .rsplit(char::is_whitespace)
+                                .nth(id - 1).map(From::from)
                                 .unwrap_or_default()
                         ).into_iter().collect(),
                     (&Pattern::StringPattern(pattern), Index::Range(start, end)) => {
