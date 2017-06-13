@@ -525,4 +525,17 @@ mod test {
         let expanded = expand_string(line, &functions!(), false);
         assert_eq!(&expected, &expanded);
     }
+
+    #[test]
+    fn array_indexing() {
+        let base = |idx : &str| format!("[1 2 3][{}]", idx);
+        let expander = functions!();
+        {
+            let expected = Array::from_vec(vec!["1".to_owned()]);
+            let idxs = vec!["-3", "0", "..-2"];
+            for idx in idxs {
+                assert_eq!(expected, expand_string(&base(idx), &expander, false));
+            }
+        }
+    }
 }

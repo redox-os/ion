@@ -121,7 +121,7 @@ pub fn parse_index_range(input: &str) -> Option<(IndexStart, IndexEnd)> {
 #[test]
 fn index_ranges() {
     assert_eq!(Some((IndexStart::new(0), IndexEnd::new(3))), parse_index_range("0..3"));
-    assert_eq!(Some((IndexStart::new(0), IndexEnd::new(3))), parse_index_range("0...2"));
+    assert_eq!(Some((IndexStart::new(0), IndexEnd::FromEnd(3))), parse_index_range("0...2"));
     assert_eq!(None, parse_index_range("0..A"));
 }
 
