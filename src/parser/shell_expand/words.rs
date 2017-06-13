@@ -1023,8 +1023,4 @@ mod tests {
         ];
         compare(input, expected);
     }
-<<<<<<< HEAD
-=======
-
->>>>>>> 960be93... Add negative range indexes
 }
