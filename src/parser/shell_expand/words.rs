@@ -117,7 +117,7 @@ impl FromStr for Index {
         }
 
         if let Some((start, end)) = parse_index_range(data) {
-            return Ok(Index::Range(start, end))
+            return Ok(Index::Range(start, end));
         }
 
         let stderr = io::stderr();
@@ -944,7 +944,7 @@ mod tests {
         let expected = vec![
             WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(3))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::FromEnd(4))),
+            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(4))),
             WordToken::Whitespace(" "),
             WordToken::ArrayVariable("array", false, Index::None),
             WordToken::Whitespace(" "),

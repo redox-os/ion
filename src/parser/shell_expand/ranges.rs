@@ -101,7 +101,7 @@ pub fn parse_index_range(input: &str) -> Option<(IndexStart, IndexEnd)> {
                 if let Ok(start) = first.parse::<isize>() {
                     if let Ok(end) = end.parse::<isize>() {
                         return if inclusive {
-                            Some((IndexStart::new(start), IndexEnd::FromEnd((end+1) as usize)))
+                            Some((IndexStart::new(start), IndexEnd::new(end+1)))
                         } else {
                             Some((IndexStart::new(start), IndexEnd::new(end)))
                         }
@@ -121,7 +121,9 @@ pub fn parse_index_range(input: &str) -> Option<(IndexStart, IndexEnd)> {
 #[test]
 fn index_ranges() {
     assert_eq!(Some((IndexStart::new(0), IndexEnd::new(3))), parse_index_range("0..3"));
-    assert_eq!(Some((IndexStart::new(0), IndexEnd::FromEnd(3))), parse_index_range("0...2"));
+    assert_eq!(Some((IndexStart::new(0), IndexEnd::new(3))), parse_index_range("0...2"));
+    assert_eq!(Some((IndexStart::new(2), IndexEnd::FromEnd(1))), parse_index_range("2...-2"));
+    assert_eq!(Some((IndexStart::new(0), IndexEnd::FromEnd(0))), parse_index_range("0...-1"));
     assert_eq!(None, parse_index_range("0..A"));
 }
 
