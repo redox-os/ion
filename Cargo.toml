@@ -20,7 +20,7 @@ name = "ion"
 [dependencies]
 fnv = "1.0"
 glob = "0.2"
-liner = "0.1.4"
+liner = "0.2.0"
 permutate = "0.2"
 unicode-segmentation = "1.1"
 smallvec = "0.3.3"
