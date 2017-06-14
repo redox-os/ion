@@ -9,7 +9,7 @@ use parser::{ForExpression, StatementSplitter, check_statement};
 use parser::peg::Pipeline;
 use super::assignments::let_assignment;
 
-use glob::glob;
+//use glob::glob;
 
 pub enum Condition {
     Continue,
@@ -211,7 +211,7 @@ impl<'a> FlowLogic for Shell<'a> {
     }
 
     fn execute_for(&mut self, variable: &str, values: &[String], statements: Vec<Statement>) {
-        fn glob_expand(arg: &str) -> Vec<String> {
+        /*fn glob_expand(arg: &str) -> Vec<String> {
             let mut expanded = Vec::new();
             if arg.contains(|chr| chr == '?' || chr == '*' || chr == '[') {
                 if let Ok(glob) = glob(arg) {
@@ -223,28 +223,28 @@ impl<'a> FlowLogic for Shell<'a> {
             } else {
                 vec![arg.to_owned()]
             }
-        }
+        }*/
 
         let ignore_variable = variable == "_";
         match ForExpression::new(values, &self.directory_stack, &self.variables) {
             ForExpression::Multiple(ref values) if ignore_variable => {
-                for _ in values.iter().flat_map(|x| glob_expand(&x)) {
+                for _ in values.iter()/*.flat_map(|x| glob_expand(&x))*/ {
                     if let Condition::Break = self.execute_statements(statements.clone()) { break }
                 }
             },
             ForExpression::Multiple(values) => {
-                for value in values.iter().flat_map(|x| glob_expand(&x)) {
+                for value in values.iter()/*.flat_map(|x| glob_expand(&x))*/ {
                     self.variables.set_var(variable, &value);
                     if let Condition::Break = self.execute_statements(statements.clone()) { break }
                 }
             },
             ForExpression::Normal(ref values) if ignore_variable => {
-                for _ in values.lines().flat_map(glob_expand) {
+                for _ in values.lines()/*.flat_map(glob_expand)*/ {
                     if let Condition::Break = self.execute_statements(statements.clone()) { break }
                 }
             },
             ForExpression::Normal(values) => {
-                for value in values.lines().flat_map(glob_expand) {
+                for value in values.lines()/*.flat_map(glob_expand)*/ {
                     self.variables.set_var(variable, &value);
                     if let Condition::Break = self.execute_statements(statements.clone()) { break }
                 }

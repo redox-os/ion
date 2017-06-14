@@ -8,7 +8,7 @@ use types::Array;
 mod braces;
 mod ranges;
 mod words;
-
+use glob::glob;
 use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub use self::words::{WordIterator, WordToken};
@@ -146,7 +146,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
 {
     let mut output = String::new();
     let mut expanded_words = Array::new();
-
+    let mut is_glob = false;
     if !token_buffer.is_empty() {
         if contains_brace {
             let mut tokens: Vec<BraceToken> = Vec::new();
@@ -223,7 +223,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     },
                     WordToken::Brace(ref nodes) =>
                         expand_brace(&mut output, &mut expanders, &mut tokens, nodes, expand_func, reverse_quoting),
-                    WordToken::Normal(text) => output.push_str(text),
+                    WordToken::Normal(text,false) => output.push_str(text),
                     WordToken::Whitespace(_) => unreachable!(),
                     WordToken::Tilde(text) => output.push_str(match (expand_func.tilde)(text) {
                         Some(ref expanded) => expanded,
@@ -241,6 +241,15 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         };
 
                         slice_string(&mut output, &expanded, index);
+                    },
+                    WordToken::Normal(text,true) => {
+                        //if this is a normal string that can be globbed, do it!
+                        let globbed = glob(text);
+                        if let Ok(var)=globbed{
+                            for path in var.filter_map(Result::ok) {
+                                expanded_words.push(path.to_string_lossy().into_owned());
+                            }
+                        }
                     },
                 }
             }
@@ -391,8 +400,19 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     }
                 },
                 WordToken::Brace(_) => unreachable!(),
-                WordToken::Normal(text) | WordToken::Whitespace(text) => {
+                WordToken::Normal(text,false) | WordToken::Whitespace(text) => {
                     output.push_str(text);
+                },
+                WordToken::Normal(text,true) => {
+                    //if this is a normal string that can be globbed, do it!
+                    let globbed = glob(text);
+                    if let Ok(var)=globbed{
+                        is_glob=true;
+                        for path in var.filter_map(Result::ok) {
+                            expanded_words.push(path.to_string_lossy().into_owned());
+
+                        }
+                    }
                 },
                 WordToken::Process(command, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
@@ -413,8 +433,10 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                 },
             }
         }
-
-        expanded_words.push(output.into());
+        //the is_glob variable can probably be removed, I'm not entirely sure if empty strings are valid in any case- maarten
+        if !(is_glob && output == "") {
+            expanded_words.push(output.into());
+        }
     }
 
     expanded_words
