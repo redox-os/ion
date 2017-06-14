@@ -72,8 +72,14 @@ pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &Direct
                         Index::All => Some(array.clone()),
                         Index::ID(id) => array.get(id)
                             .map(|x| Some(x.to_owned()).into_iter().collect()),
-                        Index::FromEnd(id) => array.get(array.len() - id)
-                            .map(|x| Some(x.to_owned()).into_iter().collect()),
+                        Index::FromEnd(id) => {
+                            if id > array.len() {
+                                None
+                            } else {
+                               array.get(array.len() - id)
+                                    .map(|x| Some(x.to_owned()).into_iter().collect())
+                            }
+                        },
                         Index::Range(start, end) => {
                             let len = array.len();
                             let array : VArray = array.iter()

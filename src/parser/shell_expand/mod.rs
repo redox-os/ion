@@ -280,10 +280,13 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         Index::ID(id) =>
                             Some(array_nth(elements, expand_func, id))
                                 .into_iter().collect(),
-                        Index::FromEnd(id) =>
-                            Some(array_nth(elements, expand_func, elements.len() - id))
-                                .into_iter()
-                                .collect(),
+                        Index::FromEnd(id) => {
+                            if id > elements.len() {
+                               Array::new()
+                            } else {
+                               Some(array_nth(elements, expand_func, elements.len() - id)) .into_iter().collect()
+                            }
+                        },
                         Index::Range(start, end) => array_range(elements, expand_func, start, end),
                     };
                 },
