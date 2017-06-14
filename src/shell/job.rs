@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use glob::glob;
+//use glob::glob;
 use parser::{expand_string, ExpanderFunctions};
 use parser::peg::RedirectFrom;
 use smallstring::SmallString;
@@ -37,10 +37,10 @@ impl Job {
             let mut iterator = self.args.drain();
             expanded.push(iterator.next().unwrap());
             for arg in iterator.flat_map(|argument| expand_string(&argument, expanders, false)) {
-                if arg.contains(|chr| chr == '?' || chr == '*' || chr == '[') {
+                /*if arg.contains(|chr| chr == '?' || chr == '*' || chr == '[') {
                     if let Ok(glob) = glob(&arg) {
                         use std::borrow::Cow;
-                        
+
                         for path in glob.filter_map(Result::ok) {
                             expanded.push(
                                 match path.to_string_lossy() {
@@ -51,7 +51,7 @@ impl Job {
                             continue
                         }
                     }
-                }
+                }*/
                 expanded.push(arg);
             }
         }
