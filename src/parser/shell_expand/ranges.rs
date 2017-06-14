@@ -101,7 +101,10 @@ pub fn parse_index_range(input: &str) -> Option<(IndexStart, IndexEnd)> {
                 if let Ok(start) = first.parse::<isize>() {
                     if let Ok(end) = end.parse::<isize>() {
                         return if inclusive {
-                            Some((IndexStart::new(start), IndexEnd::new(end+1)))
+                            let start = IndexStart::new(start);
+                            let end = if end == -1 { IndexEnd::FromEnd(0) } 
+                                      else { IndexEnd::new(end) };
+                            Some((start, end))
                         } else {
                             Some((IndexStart::new(start), IndexEnd::new(end)))
                         }
