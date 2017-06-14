@@ -244,9 +244,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     },
                     WordToken::Normal(text,true) => {
                         let globbed = glob(text);
-                        println!("Gotten into mod/247");
                         if let Ok(var)=globbed{
-                            println!("Gotten into mod/249");
                             for path in var.filter_map(Result::ok) {
                                 expanded_words.push(path.to_string_lossy().into_owned());
                             }
@@ -405,7 +403,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     output.push_str(text);
                 },
                 WordToken::Normal(text,true) => {
-                    let globbed = glob(text);
+                    let globbed = glob(text);                    
                     if let Ok(var)=globbed{
                         is_glob=true;
                         for path in var.filter_map(Result::ok) {

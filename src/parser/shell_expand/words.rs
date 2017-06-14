@@ -705,6 +705,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         let mut rewind = true;
                         let mut iter = iterator.clone();
                         while let Some(character) = iter.next() {
+                            moves+=1;
                             match character
                             {
                                 b'[' => {
@@ -714,23 +715,21 @@ impl<'a> Iterator for WordIterator<'a> {
                                     break;
                                 },
                                 b']' => {
-                                    if moves<=2 && square_bracket == 1 {
+                                    if moves<=3 && square_bracket == 1 {
                                     }
                                     else{
                                         rewind = false;
-                                        moves+=1;
                                         break;
                                     }
                                 }
                                 _=> (),
                             }
-                            moves+=1;
                         }
                         if rewind == false{
                             for _ in 0..moves {
                                 iterator.next();
                             }
-                            self.read+=moves;
+                            self.read+=moves+1;
                             glob = true;
                             break;
                         }
@@ -830,6 +829,7 @@ impl<'a> Iterator for WordIterator<'a> {
                     let mut rewind = true;
                     let mut iter = iterator.clone();
                     while let Some(character) = iter.next() {
+                        moves+=1;
                         match character
                         {
                             b'[' => {
@@ -839,24 +839,21 @@ impl<'a> Iterator for WordIterator<'a> {
                                 break;
                             },
                             b']' => {
-                                if moves<=2 && square_bracket == 1 {
-                                    break;
+                                if moves<=3 && square_bracket == 1 {
                                 }
                                 else{
-                                    moves+=1;
                                     rewind = false;
                                     break;
                                 }
                             }
                             _=> (),
                         }
-                        moves+=1;
                     }
                     if rewind == false{
                         for _ in 0..moves {
                             iterator.next();
                         }
-                        self.read+=moves;
+                        self.read+=moves+1;
                         glob = true;
                     }
                     else {
