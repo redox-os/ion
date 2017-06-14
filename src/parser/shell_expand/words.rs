@@ -975,7 +975,7 @@ mod tests {
     fn nested_processes() {
         let input = "echo $(echo $(echo one)) $(echo one $(echo two) three)";
         let expected = vec![
-            WordToken::Normal("echo"),
+            WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
             WordToken::Process("echo $(echo one)", false, Index::All),
             WordToken::Whitespace(" "),
@@ -1032,7 +1032,7 @@ mod tests {
             WordToken::Normal("foo",false),
             WordToken::Normal("(",false),
             WordToken::Normal(")",false),
-            WordToken::Whitespace(" ",false),
+            WordToken::Whitespace(" "),
             WordToken::Normal("bar",false),
             WordToken::Normal("(",false),
             WordToken::Normal(")",false),
