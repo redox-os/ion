@@ -1,0 +1,8 @@
+echo *argo.toml
+echo examples/br*.*
+echo [A-Z]argo.toml
+echo ?argo.toml
+echo Cargo.*
+echo Cargo?toml
+echo Cargo.[tqr]oml
+echo examples/[ef]*.ion
