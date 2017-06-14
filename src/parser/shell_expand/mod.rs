@@ -243,6 +243,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         slice_string(&mut output, &expanded, index);
                     },
                     WordToken::Normal(text,true) => {
+                        //if this is a normal string that can be globbed, do it!
                         let globbed = glob(text);
                         if let Ok(var)=globbed{
                             for path in var.filter_map(Result::ok) {
@@ -403,7 +404,8 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     output.push_str(text);
                 },
                 WordToken::Normal(text,true) => {
-                    let globbed = glob(text);                    
+                    //if this is a normal string that can be globbed, do it!
+                    let globbed = glob(text);
                     if let Ok(var)=globbed{
                         is_glob=true;
                         for path in var.filter_map(Result::ok) {

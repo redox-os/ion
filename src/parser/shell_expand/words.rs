@@ -700,6 +700,8 @@ impl<'a> Iterator for WordIterator<'a> {
                         return Some(self.braces(&mut iterator));
                     },
                     b'[' if self.flags & SQUOTE == 0 => {
+                        //we peek into the future of the iterator by copying it and checking if any illegal characters get found before we hit the next ]
+                        //there might be more illegal characters or less, I don't know
                         let mut moves = 0;
                         let mut square_bracket= 0;
                         let mut rewind = true;
@@ -715,6 +717,8 @@ impl<'a> Iterator for WordIterator<'a> {
                                     break;
                                 },
                                 b']' => {
+                                    //we ignore the glob if it's smaller than 3, because [a] is a valid wild card and array
+                                    //but the array meaning interpreted as a glob would actually be correct, whilst vice versa it wouldnt
                                     if moves<=3 && square_bracket == 1 {
                                     }
                                     else{
@@ -783,6 +787,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         }
                     },
                     b'*'|b'?' => {
+                        // if a word is not special, make sure you return the globbed variant at the end
                         self.read+=1;
                         glob=true; //warning is incorrect it does get read
                     },
@@ -839,6 +844,8 @@ impl<'a> Iterator for WordIterator<'a> {
                                 break;
                             },
                             b']' => {
+                                //we ignore the glob if it's smaller than 3, because [a] is a valid wild card and array
+                                //but the array meaning interpreted as a glob would actually be correct, whilst vice versa it wouldnt   
                                 if moves<=3 && square_bracket == 1 {
                                 }
                                 else{
@@ -861,6 +868,7 @@ impl<'a> Iterator for WordIterator<'a> {
                     }
                 },
                 b'*'|b'?' if self.flags & SQUOTE == 0 => {
+                    // if a word is not special, make sure you return the globbed variant at the end
                     self.read+=1;
                     glob=true; //warning is incorrect it does get read
                 },
