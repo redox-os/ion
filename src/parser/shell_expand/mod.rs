@@ -537,5 +537,12 @@ mod test {
                 assert_eq!(expected, expand_string(&base(idx), &expander, false));
             }
         }
+        {
+            let expected = Array::from_vec(vec!["2".to_owned(), "3".to_owned()]);
+            let idxs = vec!["1...2", "1...-1"];
+            for idx in idxs {
+                assert_eq!(expected, expand_string(&base(idx), &expander, false));
+            }
+        }
     }
 }
