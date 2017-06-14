@@ -875,7 +875,7 @@ impl<'a> Iterator for WordIterator<'a> {
         if start == self.read {
             None
         } else {
-            println!("Normal exit");
+            //println!("Normal exit");
             Some(WordToken::Normal(&self.data[start..],glob))
         }
     }
