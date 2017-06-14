@@ -547,5 +547,12 @@ mod test {
                 assert_eq!(expected, expand_string(&base(idx), &expander, false));
             }
         }
+        {
+            let expected = Array::new();
+            let idxs = vec!["-17", "4..-4"];
+            for idx in idxs {
+                assert_eq!(expected, expand_string(&base(idx), &expander, false));
+            }
+        }
     }
 }
