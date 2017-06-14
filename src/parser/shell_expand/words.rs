@@ -988,7 +988,7 @@ mod tests {
     fn words_process_with_quotes() {
         let input = "echo $(git branch | rg '[*]' | awk '{print $2}')";
         let expected = vec![
-            WordToken::Normal("echo"),
+            WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
             WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", false, Index::All),
         ];
@@ -996,7 +996,7 @@ mod tests {
 
         let input = "echo $(git branch | rg \"[*]\" | awk '{print $2}')";
         let expected = vec![
-            WordToken::Normal("echo"),
+            WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
             WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", false, Index::All),
         ];
@@ -1007,13 +1007,13 @@ mod tests {
     fn test_words() {
         let input = "echo $ABC \"${ABC}\" one{$ABC,$ABC} ~ $(echo foo) \"$(seq 1 100)\"";
         let expected = vec![
-            WordToken::Normal("echo"),
+            WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
             WordToken::Variable("ABC", false, Index::All),
             WordToken::Whitespace(" "),
             WordToken::Variable("ABC", true, Index::All),
             WordToken::Whitespace(" "),
-            WordToken::Normal("one"),
+            WordToken::Normal("one",false),
             WordToken::Brace(vec!["$ABC", "$ABC"]),
             WordToken::Whitespace(" "),
             WordToken::Tilde("~"),
@@ -1029,13 +1029,13 @@ mod tests {
     fn test_multiple_escapes() {
         let input = "foo\\(\\) bar\\(\\)";
         let expected = vec![
-            WordToken::Normal("foo"),
-            WordToken::Normal("("),
-            WordToken::Normal(")"),
-            WordToken::Whitespace(" "),
-            WordToken::Normal("bar"),
-            WordToken::Normal("("),
-            WordToken::Normal(")"),
+            WordToken::Normal("foo",false),
+            WordToken::Normal("(",false),
+            WordToken::Normal(")",false),
+            WordToken::Whitespace(" ",false),
+            WordToken::Normal("bar",false),
+            WordToken::Normal("(",false),
+            WordToken::Normal(")",false),
         ];
         compare(input, expected);
     }
