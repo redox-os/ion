@@ -208,7 +208,7 @@ impl<'a> ArrayMethod<'a> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum WordToken<'a> {
-    Normal(&'a str),
+    Normal(&'a str,bool),
     Whitespace(&'a str),
     Tilde(&'a str),
     Brace(Vec<&'a str>),
@@ -219,7 +219,7 @@ pub enum WordToken<'a> {
     Process(&'a str, bool, Index),
     StringMethod(&'a str, &'a str, &'a str, Index),
     ArrayMethod(ArrayMethod<'a>),
-    Glob(&'a str),
+    //Glob(&'a str),
 }
 
 pub struct WordIterator<'a> {
@@ -641,9 +641,9 @@ impl<'a> WordIterator<'a> {
         }
 
         panic!("ion: fatal error with syntax validation: unterminated array expression")
-    }
+    }}
     ///Contains the logic for parsing wild card characters
-    fn wildcard<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+    /*fn wildcard<I>(&mut self, iterator: &mut I) -> WordToken<'a>
         where I: Iterator<Item = u8>
     {
         //println!("Gotten into glob words.rs");
@@ -661,8 +661,8 @@ impl<'a> WordIterator<'a> {
         }
         self.read+=1;
         return WordToken::Glob(&self.data[start..self.read]);
-    }
-}
+    }*/
+//}
 
 
 impl<'a> Iterator for WordIterator<'a> {
@@ -687,7 +687,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         self.read += 1;
                         self.flags ^= BACKSL;
                         if self.flags & EXPAND_PROCESSES == 0 {
-                            return Some(WordToken::Normal("\\"));
+                            return Some(WordToken::Normal("\\",false));
                         }
                         break
                     }
@@ -696,7 +696,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         self.read += 1;
                         self.flags ^= SQUOTE;
                         if self.flags & EXPAND_PROCESSES == 0 {
-                            return Some(WordToken::Normal("'"));
+                            return Some(WordToken::Normal("'",false));
                         }
                     },
                     b'"' if self.flags & SQUOTE == 0 => {
@@ -704,7 +704,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         self.read += 1;
                         self.flags ^= DQUOTE;
                         if self.flags & EXPAND_PROCESSES == 0 {
-                            return Some(WordToken::Normal("\""));
+                            return Some(WordToken::Normal("\"",false));
                         }
                     }
                     b' ' if self.flags & (SQUOTE + DQUOTE) == 0 => {
@@ -729,7 +729,7 @@ impl<'a> Iterator for WordIterator<'a> {
                                 return if self.flags & EXPAND_PROCESSES != 0 {
                                     Some(self.array_process(&mut iterator))
                                 } else {
-                                    Some(WordToken::Normal(&self.data[start..self.read]))
+                                    Some(WordToken::Normal(&self.data[start..self.read],false))
                                 }
                             },
                             // Some(b'{') => {
@@ -749,7 +749,7 @@ impl<'a> Iterator for WordIterator<'a> {
                                 return if self.flags & EXPAND_PROCESSES != 0 {
                                     Some(self.process(&mut iterator))
                                 } else {
-                                    Some(WordToken::Normal(&self.data[start..self.read]))
+                                    Some(WordToken::Normal(&self.data[start..self.read],false))
                                 }
                             },
                             Some(b'{') => {
@@ -762,10 +762,10 @@ impl<'a> Iterator for WordIterator<'a> {
                             }
                         }
                     },
-                    b'*'|b'?' => {
+                    /*b'*'|b'?' => {
                         //self.read+=1;
                         return Some(self.wildcard(&mut iterator));
-                    },
+                    },*/
                     _ => { self.read += 1; break },
                 }
             } else {
@@ -774,6 +774,7 @@ impl<'a> Iterator for WordIterator<'a> {
         }
 
         while let Some(character) = iterator.next() {
+            let mut glob = false;
             match character {
                 _ if self.flags & BACKSL != 0 => self.flags ^= BACKSL,
                 b'\\' => {
@@ -781,27 +782,31 @@ impl<'a> Iterator for WordIterator<'a> {
                     let end = if self.flags & EXPAND_PROCESSES == 0 { self.read+1 } else { self.read };
                     let output = &self.data[start..end];
                     self.read += 1;
-                    return Some(WordToken::Normal(output));
+                    return Some(WordToken::Normal(output,glob));
                 },
                 b'\'' if self.flags & DQUOTE == 0 => {
                     self.flags ^= SQUOTE;
                     let end = if self.flags & EXPAND_PROCESSES == 0 { self.read+1 } else { self.read };
                     let output = &self.data[start..end];
                     self.read += 1;
-                    return Some(WordToken::Normal(output));
+                    return Some(WordToken::Normal(output,glob));
                 },
                 b'"' if self.flags & SQUOTE == 0 => {
                     self.flags ^= DQUOTE;
                     let end = if self.flags & EXPAND_PROCESSES == 0 { self.read+1 } else { self.read };
                     let output = &self.data[start..end];
                     self.read += 1;
-                    return Some(WordToken::Normal(output));
+                    return Some(WordToken::Normal(output,glob));
                 },
                 b' ' | b'{' if self.flags & (SQUOTE + DQUOTE) == 0 => {
-                    return Some(WordToken::Normal(&self.data[start..self.read]));
+                    return Some(WordToken::Normal(&self.data[start..self.read],glob));
                 },
                 b'$' | b'@' | b'[' if self.flags & SQUOTE == 0 => {
-                    return Some(WordToken::Normal(&self.data[start..self.read]));
+                    return Some(WordToken::Normal(&self.data[start..self.read],glob));
+                },
+                b'*'|b'?' => {
+                    self.read+=1;
+                    glob=true; //warning is incorrect it does get read
                 },
                 _ => (),
             }
@@ -811,7 +816,7 @@ impl<'a> Iterator for WordIterator<'a> {
         if start == self.read {
             None
         } else {
-            Some(WordToken::Normal(&self.data[start..]))
+            Some(WordToken::Normal(&self.data[start..],false))
         }
     }
 }
