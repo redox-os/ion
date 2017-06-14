@@ -911,10 +911,10 @@ mod tests {
         let input = "\\$FOO\\$BAR \\$FOO";
         let expected =
             vec![
-                WordToken::Normal("$FOO"),
-                WordToken::Normal("$BAR"),
+                WordToken::Normal("$FOO",false),
+                WordToken::Normal("$BAR",false),
                 WordToken::Whitespace(" "),
-                WordToken::Normal("$FOO")
+                WordToken::Normal("$FOO",false)
             ];
         compare(input, expected);
     }
