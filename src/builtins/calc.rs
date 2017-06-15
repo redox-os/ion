@@ -9,6 +9,8 @@ pub enum Token {
     Divide,
     Multiply,
     Exponent,
+    Square,
+    Cube,
     OpenParen,
     CloseParen,
     // TODO: Don't pass around a string when we can pass around a number
@@ -23,6 +25,8 @@ impl Token {
             Token::Divide     => "Divide",
             Token::Multiply   => "Multiply",
             Token::Exponent   => "Exponent",
+            Token::Square     => "Square",
+            Token::Cube       => "Cube",
             Token::OpenParen  => "OpenParen",
             Token::CloseParen => "CloseParen",
             Token::Number(_)  => "Number",
@@ -88,6 +92,8 @@ impl OperatorFunctions for char {
         self == '*' ||
         self == '/' ||
         self == '^' ||
+        self == '²' ||
+        self == '³' ||
         self == '(' ||
         self == ')'
     }
@@ -99,6 +105,8 @@ impl OperatorFunctions for char {
             '/' => Some(Token::Divide),
             '*' => Some(Token::Multiply),
             '^' => Some(Token::Exponent),
+            '²' => Some(Token::Square),
+            '³' => Some(Token::Cube),
             '(' => Some(Token::OpenParen),
             ')' => Some(Token::CloseParen),
             _   => None
@@ -225,7 +233,15 @@ pub fn f_expr(token_list: &[Token]) -> Result<IntermediateResult, CalcError> {
                 let f = try!(f_expr(&token_list[index+1..]));
                 g1.value = g1.value.powf(f.value);
                 g1.tokens_read += f.tokens_read + 1;
-            }
+            },
+            Token::Square => {
+                g1.value = g1.value*g1.value;
+                g1.tokens_read += 1;
+            },
+            Token::Cube => {
+                g1.value = g1.value*g1.value*g1.value;
+                g1.tokens_read += 1;
+            },
             Token::Number(ref n) => return Err(CalcError::UnexpectedToken(n.clone(),"operator")),
             _ => break,
         }
