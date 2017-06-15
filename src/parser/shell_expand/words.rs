@@ -93,15 +93,13 @@ impl Range {
     /// Returns the bounds of this range as a tuple containing:
     /// - The starting point of the range
     /// - The length of the range
-    /// This function is meant to be used in the following pattern:
-    /// ```rust,ignore
-    /// let iter = some_iterator();
-    /// let range = Range { ... };
-    /// let len = length_of_some_iterator();
-    /// if let Some((start, size)) = range.bounds(len) {
-    ///     let res = iter.skip(start).take(len);
-    ///     ...
-    /// }
+    /// ```
+    /// let vec = vec![0, 1, 2, 3, 4, 5, 6, 7, 8];
+    /// let range = Range::exclusive(Index::new(1), Index::new(5));
+    /// let (start, size) = range.bounds(vec.len()).unwrap();
+    /// let expected = vec![1, 2, 3, 4];
+    /// let selection = vec.iter().skip(start).take(size).collect::<Vec<_>>();
+    /// assert_eq!(expected, selection);
     /// ```
     pub fn bounds(&self, vector_length : usize) -> Option<(usize,usize)> {
         if let Some(start) = self.start.resolve(vector_length) {
