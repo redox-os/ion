@@ -781,7 +781,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         break
                     },
                     b'\\' => {
-                        start += 1;
+                        if self.flags & (DQUOTE + SQUOTE) == 0 { start += 1; }
                         self.read += 1;
                         self.flags ^= BACKSL;
                         if self.flags & EXPAND_PROCESSES == 0 {
@@ -880,7 +880,13 @@ impl<'a> Iterator for WordIterator<'a> {
                 _ if self.flags & BACKSL != 0 => self.flags ^= BACKSL,
                 b'\\' => {
                     self.flags ^= BACKSL;
-                    let end = if self.flags & EXPAND_PROCESSES == 0 { self.read+1 } else { self.read };
+                    let end = if self.flags & EXPAND_PROCESSES == 0 {
+                        if self.flags & (DQUOTE + SQUOTE) != 0 { self.read+2 } else { self.read+1 }
+                    } else if self.flags & (DQUOTE + SQUOTE) != 0 {
+                        self.read+1
+                    } else {
+                        self.read
+                    };
                     let output = &self.data[start..end];
                     self.read += 1;
                     return Some(WordToken::Normal(output,glob));
