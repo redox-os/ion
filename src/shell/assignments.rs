@@ -7,7 +7,7 @@ use parser::assignments::{
 };
 use parser::{
     ExpanderFunctions,
-    Index,
+    Select,
     ArgumentSplitter,
     expand_string,
 };
@@ -65,29 +65,31 @@ pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &Direct
     let action = {
         let expanders = ExpanderFunctions {
             tilde: &|tilde: &str| vars.tilde_expansion(tilde, dir_stack),
-            array: &|array: &str, index: Index| {
+            array: &|array: &str, selection: Select| {
                 match vars.get_array(array) {
-                    Some(array) => match index {
-                        Index::None => None,
-                        Index::All => Some(array.clone()),
-                        Index::ID(id) => array.get(id)
-                            .map(|x| Some(x.to_owned()).into_iter().collect()),
-                        Index::FromEnd(id) => {
-                            if id > array.len() {
-                                None
-                            } else {
-                               array.get(array.len() - id)
-                                    .map(|x| Some(x.to_owned()).into_iter().collect())
-                            }
+                    Some(array) => match selection {
+                        Select::None => None,
+                        Select::All => Some(array.clone()),
+                        Select::Index(id) => {
+                            id.resolve(array.len())
+                              .and_then(|n| array.get(n))
+                              .map(|x| Some(x.to_owned()).into_iter().collect())
                         },
-                        Index::Range(start, end) => {
-                            let len = array.len();
-                            let array : VArray = array.iter()
-                                                      .skip(start.resolve(len))
-                                                      .take(end.diff(&start, len))
-                                                      .map(|x| x.to_owned())
-                                                      .collect();
-                            if array.is_empty() { None } else { Some(array) }
+                        Select::Range(range) => {
+                            if let Some((start, length)) = range.bounds(array.len()) {
+                                let array: VArray = array.iter()
+                                                         .skip(start)
+                                                         .take(length)
+                                                         .map(|x| x.to_owned())
+                                                         .collect();
+                                if array.is_empty() {
+                                    None
+                                } else {
+                                    Some(array)
+                                }
+                            } else {
+                                None
+                            }
                         }
                     },
                     None => None

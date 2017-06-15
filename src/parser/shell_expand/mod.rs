@@ -11,22 +11,20 @@ mod words;
 use glob::glob;
 use self::braces::BraceToken;
 use self::ranges::parse_range;
-pub use self::words::{WordIterator, WordToken};
-
-pub use self::words::{Index, IndexStart, IndexEnd};
+pub use self::words::{WordIterator, WordToken, Select, Index, Range};
 
 use std::io::{self, Write};
 use types::*;
 
 pub struct ExpanderFunctions<'f> {
     pub tilde:    &'f Fn(&str) -> Option<String>,
-    pub array:    &'f Fn(&str, Index) -> Option<Array>,
+    pub array:    &'f Fn(&str, Select) -> Option<Array>,
     pub variable: &'f Fn(&str, bool) -> Option<Value>,
     pub command:  &'f Fn(&str, bool) -> Option<Value>
 }
 
 fn expand_process(current: &mut String, command: &str, quoted: bool,
-    index: Index, expand_func: &ExpanderFunctions)
+    selection: Select, expand_func: &ExpanderFunctions)
 {
     let mut tokens = Vec::new();
     let mut contains_brace = false;
@@ -39,7 +37,7 @@ fn expand_process(current: &mut String, command: &str, quoted: bool,
     let expanded = expand_tokens(&tokens, expand_func, false, contains_brace).join(" ");
 
     if let Some(result) = (expand_func.command)(&expanded, quoted) {
-        slice_string(current, &result, index);
+        slice_string(current, &result, selection);
     }
 }
 
@@ -81,40 +79,41 @@ fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, id: usize) -> V
         .nth(id).unwrap_or_default()
 }
 
-fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, start: IndexStart, end: IndexEnd) -> Array {
-    let len = elements.len();
-    elements.iter()
-            .flat_map(|element| expand_string(element, expand_func, false))
-            .skip(start.resolve(len))
-            .take(end.diff(&start, len))
-            .collect()
+fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, range : Range) -> Array {
+    if let Some((start, length)) = range.bounds(elements.len()) {
+       elements.iter()
+               .flat_map(|element| expand_string(element, expand_func, false))
+               .skip(start)
+               .take(length)
+               .collect()
+    } else {
+        Array::new()
+    }
 }
 
-fn slice_string(output: &mut String, expanded: &str, index: Index) {
-    match index {
-        Index::None => (),
-        Index::All => output.push_str(expanded),
-        Index::ID(id) => {
+fn slice_string(output: &mut String, expanded: &str, selection: Select) {
+    match selection {
+        Select::None => (),
+        Select::All => output.push_str(expanded),
+        Select::Index(Index::Forward(id)) => {
             if let Some(character) = UnicodeSegmentation::graphemes(expanded, true).nth(id) {
                 output.push_str(character);
             }
         },
-        Index::FromEnd(id) => {
-            let mut graphemes = UnicodeSegmentation::graphemes(expanded, true);
-            let len = graphemes.clone().count();
-            if let Some(character) = graphemes.nth(len - id) {
+        Select::Index(Index::Backward(id)) => {
+            if let Some(character) = UnicodeSegmentation::graphemes(expanded, true).rev().nth(id) {
                 output.push_str(character);
             }
         }
-        Index::Range(start, end) => {
+        Select::Range(range) => {
             let graphemes = UnicodeSegmentation::graphemes(expanded, true);
-            let len = graphemes.clone().count();
-            let substring = graphemes.skip(start.resolve(len))
-                                     .take(end.diff(&start, len))
-                                     .collect::<Vec<&str>>()
-                                     .join("");
-
-            output.push_str(&substring);
+            if let Some((start, length)) = range.bounds(graphemes.clone().count()) {
+                let substring = graphemes.skip(start)
+                                         .take(length)
+                                         .collect::<Vec<&str>>()
+                                         .join("");
+               output.push_str(&substring);
+            }
         },
     }
 }
@@ -158,23 +157,19 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                 match *word {
                     WordToken::Array(ref elements, index) => {
                         match index {
-                            Index::None => (),
-                            Index::All => {
+                            Select::None => (),
+                            Select::All => {
                                 let expanded = array_expand(elements, expand_func);
                                 output.push_str(&expanded.join(" "));
                             },
-                            Index::ID(id) => {
-                                let expanded = array_nth(elements, expand_func, id);
-                                output.push_str(&expanded);
+                            Select::Index(idx) => {
+                                if let Some(n) = idx.resolve(elements.len()) {
+                                    let expanded = array_nth(elements, expand_func, n);
+                                    output.push_str(&expanded);
+                                }
                             },
-                            Index::FromEnd(id) => {
-                                let expanded = array_nth(elements,
-                                                         expand_func,
-                                                         elements.len() - id);
-                                output.push_str(&expanded);
-                            }
-                            Index::Range(start, end) => {
-                                let expanded = array_range(elements, expand_func, start, end);
+                            Select::Range(range) => {
+                                let expanded = array_range(elements, expand_func, range);
                                 output.push_str(&expanded.join(" "));
                             }
                         };
@@ -187,34 +182,38 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     WordToken::ArrayProcess(command, quoted, index) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
                         match index {
-                            Index::None => (),
-                            Index::All => {
+                            Select::None => (),
+                            Select::All => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, Index::All, expand_func);
+                                expand_process(&mut temp, command, quoted, Select::All, expand_func);
                                 let temp = temp.split_whitespace().collect::<Vec<&str>>();
                                 output.push_str(&temp.join(" "));
                             },
-                            Index::ID(id) => {
+                            Select::Index(Index::Forward(id)) => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, Index::All, expand_func);
+                                expand_process(&mut temp, command, quoted, Select::All, expand_func);
                                 output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
                             },
-                            Index::FromEnd(id) => {
+                            Select::Index(Index::Backward(id)) => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, Index::All, expand_func);
+                                expand_process(&mut temp, command, quoted, Select::All, expand_func);
                                 output.push_str(temp.split_whitespace()
                                                     .rev()
-                                                    .nth(id - 1)
+                                                    .nth(id)
                                                     .unwrap_or_default());
                             }
-                            Index::Range(start, end) => {
+                            Select::Range(range) => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, Index::All, expand_func);
+                                expand_process(&mut temp, command, quoted, Select::All, expand_func);
                                 let len = temp.split_whitespace().count();
-                                let temp = temp.split_whitespace()
-                                               .skip(start.resolve(len))
-                                               .take(end.diff(&start, len))
-                                               .collect::<Vec<&str>>();
+                                let temp = if let Some((start, length)) = range.bounds(len) {
+                                     temp.split_whitespace()
+                                               .skip(start)
+                                               .take(length)
+                                               .collect::<Vec<&str>>()
+                                } else {
+                                    Vec::new()
+                                };
                                 output.push_str(&temp.join(" "));
                             }
                         }
@@ -225,7 +224,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     WordToken::StringMethod(method, variable, pattern, index) => {
                         let pattern = &expand_string(pattern, expand_func, false).join(" ");
                         match method {
-                            "join" => if let Some(array) = (expand_func.array)(variable, Index::All) {
+                            "join" => if let Some(array) = (expand_func.array)(variable, Select::All) {
                                 slice_string(&mut output, &array.join(pattern), index);
                             },
                             _ => {
@@ -284,19 +283,15 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
             match token_buffer[0] {
                 WordToken::Array(ref elements, index) => {
                     return match index {
-                        Index::None   => Array::new(),
-                        Index::All    => array_expand(elements, expand_func),
-                        Index::ID(id) =>
-                            Some(array_nth(elements, expand_func, id))
-                                .into_iter().collect(),
-                        Index::FromEnd(id) => {
-                            if id > elements.len() {
-                               Array::new()
-                            } else {
-                               Some(array_nth(elements, expand_func, elements.len() - id)) .into_iter().collect()
-                            }
+                        Select::None   => Array::new(),
+                        Select::All    => array_expand(elements, expand_func),
+                        Select::Index(idx) => {
+                            idx.resolve(elements.len())
+                               .map(|n| array_nth(elements, expand_func, n))
+                               .into_iter()
+                               .collect()
                         },
-                        Index::Range(start, end) => array_range(elements, expand_func, start, end),
+                        Select::Range(range) => array_range(elements, expand_func, range),
                     };
                 },
                 WordToken::ArrayVariable(array, quoted, index) => {
@@ -310,41 +305,42 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                 WordToken::ArrayProcess(command, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
                     match index {
-                        Index::None => return Array::new(),
-                        Index::All => {
-                            expand_process(&mut output, command, quoted, Index::All, expand_func);
+                        Select::None => return Array::new(),
+                        Select::All => {
+                            expand_process(&mut output, command, quoted, Select::All, expand_func);
                             return output.split_whitespace()
                                 .map(From::from)
                                 .collect::<Array>();
                         },
-                        Index::ID(id) => {
-                            expand_process(&mut output, command, quoted, Index::All, expand_func);
-                            return Some(
-                                output.split_whitespace().nth(id)
-                                    .unwrap_or_default()
-                                    .into()
-                            ).into_iter()
-                                .collect();
-                        },
-                        Index::FromEnd(id) => {
-                            expand_process(&mut output, command, quoted, Index::All, expand_func);
-                            return Some(
-                                output.split_whitespace()
-                                      .rev()
-                                      .nth(id - 1)
-                                      .unwrap_or_default()
-                                      .into()
-                            ).into_iter()
-                             .collect();
-                        }
-                        Index::Range(start, end) => {
-                            expand_process(&mut output, command, quoted, Index::All, expand_func);
-                            let len = output.split_whitespace().count();
+                        Select::Index(Index::Forward(id)) => {
+                            expand_process(&mut output, command, quoted, Select::All, expand_func);
                             return output.split_whitespace()
-                                  .skip(start.resolve(len))
-                                  .take(end.diff(&start, len))
-                                  .map(From::from)
-                                  .collect::<Array>();
+                                  .nth(id)
+                                  .map(Into::into)
+                                  .into_iter()
+                                  .collect();
+                        },
+                        Select::Index(Index::Backward(id)) => {
+                            expand_process(&mut output, command, quoted, Select::All, expand_func);
+                            return output.split_whitespace()
+                                  .rev()
+                                  .nth(id)
+                                  .map(Into::into)
+                                  .into_iter()
+                                  .collect();
+                        }
+                        Select::Range(range) => {
+                            expand_process(&mut output, command, quoted, Select::All, expand_func);
+                            if let Some((start, length)) = range.bounds(output.split_whitespace().count()) {
+                                return output.split_whitespace()
+                                             .skip(start)
+                                             .take(length)
+                                             .map(From::from)
+                                             .collect();
+
+                            } else {
+                                return Array::new();
+                            }
                         },
                     }
                 },
@@ -359,21 +355,18 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
             match *word {
                 WordToken::Array(ref elements, index) => {
                     match index {
-                        Index::None => (),
-                        Index::All => {
+                        Select::None => (),
+                        Select::All => {
                             let expanded = array_expand(elements, expand_func);
                             output.push_str(&expanded.join(" "));
                         },
-                        Index::ID(id) => {
-                            let expanded = array_nth(elements, expand_func, id);
-                            output.push_str(&expanded);
+                        Select::Index(id) => {
+                            id.resolve(elements.len())
+                              .map(|n| array_nth(elements, expand_func, n))
+                              .map(|expanded| output.push_str(&expanded));
                         },
-                        Index::FromEnd(id) => {
-                            let expanded = array_nth(elements, expand_func, elements.len() - id);
-                            output.push_str(&expanded);
-                        }
-                        Index::Range(start, end) => {
-                            let expanded = array_range(elements, expand_func, start, end);
+                        Select::Range(range) => {
+                            let expanded = array_range(elements, expand_func, range);
                             output.push_str(&expanded.join(" "));
                         },
                     };
@@ -386,35 +379,36 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                 WordToken::ArrayProcess(command, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
                     match index {
-                        Index::None => (),
-                        Index::All => {
+                        Select::None => (),
+                        Select::All => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, Index::All, expand_func);
+                            expand_process(&mut temp, command, quoted, Select::All, expand_func);
                             let temp = temp.split_whitespace().collect::<Vec<&str>>();
                             output.push_str(&temp.join(" "));
                         },
-                        Index::ID(id) => {
+                        Select::Index(Index::Forward(id)) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, Index::All, expand_func);
+                            expand_process(&mut temp, command, quoted, Select::All, expand_func);
                             output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
                         },
-                        Index::FromEnd(id) => {
+                        Select::Index(Index::Backward(id)) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, Index::All, expand_func);
+                            expand_process(&mut temp, command, quoted, Select::All, expand_func);
                             output.push_str(temp.split_whitespace()
                                                 .rev()
-                                                .nth(id - 1)
+                                                .nth(id)
                                                 .unwrap_or_default());
                         },
-                        Index::Range(start, end) => {
+                        Select::Range(range) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, Index::All, expand_func);
-                            let len = temp.split_whitespace().count();
-                            let temp = temp.split_whitespace()
-                                           .skip(start.resolve(len))
-                                           .take(end.diff(&start, len))
-                                           .collect::<Vec<&str>>();
-                            output.push_str(&temp.join(" "));
+                            expand_process(&mut temp, command, quoted, Select::All, expand_func);
+                            if let Some((start, length)) = range.bounds(temp.split_whitespace().count()) {
+                                let temp = temp.split_whitespace()
+                                               .skip(start)
+                                               .take(length)
+                                               .collect::<Vec<_>>();
+                                output.push_str(&temp.join(" "))
+                            }
                         },
                     }
                 },
@@ -424,7 +418,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                 WordToken::StringMethod(method, variable, pattern, index) => {
                     let pattern = &expand_string(pattern, expand_func, false).join(" ");
                     match method {
-                        "join" => if let Some(array) = (expand_func.array)(variable, Index::All) {
+                        "join" => if let Some(array) = (expand_func.array)(variable, Select::All) {
                             slice_string(&mut output, &array.join(pattern), index);
                         },
                         _ => {

@@ -40,7 +40,7 @@ use parser::{
     ArgumentSplitter,
     QuoteTerminator,
     ExpanderFunctions,
-    Index,
+    Select,
 };
 use parser::peg::Pipeline;
 

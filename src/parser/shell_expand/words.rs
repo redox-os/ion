@@ -18,112 +18,146 @@ const SQUOTE: u8 = 2;
 const DQUOTE: u8 = 4;
 const EXPAND_PROCESSES: u8 = 8;
 
+/// Index into a vector-like object
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Index {
-    All,
+    /// Index starting from the beginning of the vector, where `Forward(0)`
+    /// is the first element
+    Forward(usize),
+    /// Index starting from the end of the vector, where `Backward(0)` is the
+    /// last element. `
+    Backward(usize)
+}
+
+impl Index {
+
+    /// Construct an index using the following convetions:
+    /// - A positive value `n` represents `Forward(n)`
+    /// - A negative value `-n` reprents `Backwards(n - 1)` such that:
+    /// ```
+    /// assert_eq!(Index::new(-1), Index::Backward(0))
+    /// ```
+    pub fn new(input : isize) -> Index {
+        if input < 0 {
+            Index::Backward((input.abs() as usize) - 1)
+        } else {
+            Index::Forward(input.abs() as usize)
+        }
+    }
+
+    pub fn resolve(&self, vector_length : usize) -> Option<usize> {
+        match *self {
+            Index::Forward(n) => Some(n),
+            Index::Backward(n) => {
+                if n >= vector_length {
+                    None
+                } else {
+                   Some(vector_length - (n + 1))
+                }
+            }
+        }
+    }
+
+}
+
+/// A range of values in a vector-like object
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct Range {
+    /// Starting index
+    start : Index,
+    /// Ending index
+    end : Index,
+    /// Is this range inclusive? If false, this object represents a half-open
+    /// range of [start, end), otherwise [start, end]
+    inclusive: bool,
+}
+
+impl Range {
+
+    pub fn to(end : Index) -> Range {
+        Range {start : Index::new(0), end, inclusive : false}
+    }
+
+    pub fn from(start : Index) -> Range {
+        Range {start , end : Index::new(-1), inclusive : true}
+    }
+
+    pub fn inclusive(start : Index, end : Index) -> Range {
+        Range {start, end, inclusive : true}
+    }
+
+    pub fn exclusive(start : Index, end : Index) -> Range {
+        Range {start, end, inclusive : false}
+    }
+
+    /// Returns the bounds of this range as a tuple containing:
+    /// - The starting point of the range
+    /// - The length of the range
+    /// This function is meant to be used in the following pattern:
+    /// ```rust,ignore
+    /// let iter = some_iterator();
+    /// let range = Range { ... };
+    /// let len = length_of_some_iterator();
+    /// if let Some((start, size)) = range.bounds(len) {
+    ///     let res = iter.skip(start).take(len);
+    ///     ...
+    /// }
+    /// ```
+    pub fn bounds(&self, vector_length : usize) -> Option<(usize,usize)> {
+        if let Some(start) = self.start.resolve(vector_length) {
+            if let Some(end) = self.end.resolve(vector_length) {
+                if end < start {
+                    None
+                } else if self.inclusive {
+                    Some((start, end - start + 1))
+                } else {
+                    Some((start, end - start))
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
+/// Represents a filter on a vector-like object
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum Select {
+    /// Select no elements
     None,
-    ID(usize),
-    FromEnd(usize),
-    Range(IndexStart, IndexEnd),
+    /// Select all elements
+    All,
+    /// Select a single element based on its index
+    Index(Index),
+    /// Select a range of elements
+    Range(Range)
 }
 
-/// Index into an vector-like object
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub enum IndexStart {
-    /// Index starting from the beginning of the vector, where `FromStart(0)` is the first element
-    FromStart(usize),
-    /// Index starting from the end of the vector, where `FromEnd(1)` is the last element.
-    /// `FromEnd(0)` is a reserved value
-    FromEnd(usize)
-}
-
-impl IndexStart {
-
-    /// Construct a new input where negative values become `FromEnd` instances and positive
-    /// values or zero become FromStart instances
-    pub fn new(input : isize) -> IndexStart {
-        if input < 0 {
-            IndexStart::FromEnd(input.abs() as usize)
-        } else {
-            IndexStart::FromStart(input.abs() as usize)
-        }
-    }
-
-    /// `index.resolve(n)` determines the "true" index given the length of a vector `n`
-    pub fn resolve(&self, size : usize) -> usize {
-        match *self {
-            IndexStart::FromStart(n) => n,
-            IndexStart::FromEnd(n) => size - n
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub enum IndexEnd {
-    ID(usize),
-    FromEnd(usize),
-    CatchAll
-}
-
-impl IndexEnd {
-
-    /// Construct a new input where negative values become `FromEnd` instances and positive
-    /// values or zero become FromStart instances
-    pub fn new(input : isize) -> IndexEnd {
-        if input < 0 {
-            IndexEnd::FromEnd(input.abs() as usize)
-        } else {
-            IndexEnd::ID(input.abs() as usize)
-        }
-    }
-
-    /// `index.resolve(n)` determines the "true" index given the length of a vector `n`
-    fn resolve(&self, size : usize) -> usize {
-        match *self {
-            IndexEnd::ID(n) => n,
-            IndexEnd::FromEnd(n) => if n > size { 0 } else {size - n},
-            IndexEnd::CatchAll => size
-        }
-    }
-
-    /// Determine the number of values inbetween this index and an IndexStart instance as a range.
-    /// If this would result in a reversed range, return zero
-    pub fn diff(&self, start : &IndexStart, size : usize) -> usize {
-        if self.resolve(size) < start.resolve(size) {
-            0
-        } else {
-            self.resolve(size) - start.resolve(size)
-        }
-    }
-}
-
-pub enum IndexError {
+pub enum SelectError {
     Invalid
 }
 
-impl FromStr for Index {
-    type Err = IndexError;
-    fn from_str(data: &str) -> Result<Index, IndexError> {
+impl FromStr for Select {
+    type Err = SelectError;
+    fn from_str(data: &str) -> Result<Select, SelectError> {
         if ".." == data {
-            return Ok(Index::All)
+            return Ok(Select::All)
         }
 
         if let Ok(index) = data.parse::<isize>() {
-            if index < 0 {
-                return Ok(Index::FromEnd(index.abs() as usize));
-            } else {
-                return Ok(Index::ID(index.abs() as usize));
-            }
+            return Ok(Select::Index(Index::new(index)));
         }
 
-        if let Some((start, end)) = parse_index_range(data) {
-            return Ok(Index::Range(start, end));
+        if let Some(range) = parse_index_range(data) {
+            return Ok(Select::Range(range));
         }
 
         let stderr = io::stderr();
-        let _ = writeln!(stderr.lock(), "ion: supplied index, '{}', for array is invalid", data);
+        let _ = writeln!(stderr.lock(), "ion: supplied selector, '{}', for array is invalid", data);
 
-        Err(IndexError::Invalid)
+        Err(SelectError::Invalid)
     }
 }
 
@@ -138,65 +172,69 @@ pub struct ArrayMethod<'a> {
     method: &'a str,
     variable: &'a str,
     pattern: Pattern<'a>,
-    index: Index
+    selection: Select
 }
 
 impl<'a> ArrayMethod<'a> {
     pub fn handle(&self, current: &mut String, expand_func: &ExpanderFunctions) {
         match self.method {
             "split" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
-                match (&self.pattern, self.index) {
-                    (&Pattern::StringPattern(pattern), Index::All) => current.push_str (
+                match (&self.pattern, self.selection) {
+                    (&Pattern::StringPattern(pattern), Select::All) => current.push_str (
                         &variable.split(&expand_string(pattern, expand_func, false).join(" "))
                             .collect::<Vec<&str>>()
                             .join(" ")
                     ),
-                    (&Pattern::Whitespace, Index::All) => current.push_str (
+                    (&Pattern::Whitespace, Select::All) => current.push_str (
                         &variable.split(char::is_whitespace)
                             .collect::<Vec<&str>>()
                             .join(" ")
                     ),
-                    (_, Index::None) => (),
-                    (&Pattern::StringPattern(pattern), Index::ID(id)) => current.push_str (
-                        variable.split(&expand_string(pattern, expand_func, false).join(" "))
-                            .nth(id)
-                            .unwrap_or_default()
-                    ),
-                    (&Pattern::Whitespace, Index::ID(id)) => current.push_str (
+                    (_, Select::None) => (),
+                    (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => {
+                        current.push_str(
+                            variable.split(&expand_string(pattern, expand_func, false).join(" "))
+                                    .nth(id)
+                                    .unwrap_or_default())
+                    } ,
+                    (&Pattern::Whitespace, Select::Index(Index::Forward(id))) => current.push_str (
                         variable.split(char::is_whitespace)
                             .nth(id)
                             .unwrap_or_default()
                     ),
-                    (&Pattern::StringPattern(pattern), Index::FromEnd(id)) => current.push_str (
-                        variable.rsplit(&expand_string(pattern, expand_func, false).join(" "))
-                            .nth(id - 1)
-                            .unwrap_or_default()
-                    ),
-                    (&Pattern::Whitespace, Index::FromEnd(id)) => current.push_str (
+                    (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => {
+                        current.push_str(
+                            variable.rsplit(&expand_string(pattern, expand_func, false).join(" "))
+                                    .nth(id)
+                                    .unwrap_or_default())
+                    },
+                    (&Pattern::Whitespace, Select::Index(Index::Backward(id))) => current.push_str(
                         variable.rsplit(char::is_whitespace)
-                            .nth(id - 1)
-                            .unwrap_or_default()
+                                .nth(id)
+                                .unwrap_or_default()
                     ),
-                    (&Pattern::StringPattern(pattern), Index::Range(start, end)) => {
+                    (&Pattern::StringPattern(pattern), Select::Range(range)) => {
                         let expansion = expand_string(pattern, expand_func, false).join(" ");
                         let iter = variable.split(&expansion);
-                        let len = iter.clone().count();
-                        let range = iter.skip(start.resolve(len))
-                                        .take(end.resolve(len) - start.resolve(len))
-                                        .collect::<Vec<&str>>()
-                                        .join(" ");
-
-                        current.push_str(&range);
+                        if let Some((start, length)) = range.bounds(iter.clone().count()) {
+                            let range = iter.skip(start)
+                                            .take(length)
+                                            .collect::<Vec<_>>()
+                                            .join(" ");
+                            current.push_str(&range)
+                        }
                     },
-                    (&Pattern::Whitespace, Index::Range(start, end)) => {
+                    (&Pattern::Whitespace, Select::Range(range)) => {
                         let len = variable.split(char::is_whitespace).count();
-                        let range = variable.split(char::is_whitespace)
-                            .skip(start.resolve(len))
-                            .take(end.resolve(len) - start.resolve(len))
-                            .collect::<Vec<&str>>()
-                            .join(" ");
+                        if let Some((start, length)) = range.bounds(len) {
+                            let range = variable.split(char::is_whitespace)
+                                                .skip(start)
+                                                .take(length)
+                                                .collect::<Vec<&str>>()
+                                                .join(" ");
+                            current.push_str(&range);
+                        }
 
-                        current.push_str(&range);
                     },
                 }
             },
@@ -211,62 +249,63 @@ impl<'a> ArrayMethod<'a> {
     pub fn handle_as_array(&self, expand_func: &ExpanderFunctions) -> Array {
         match self.method {
             "split" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
-                return match (&self.pattern, self.index) {
-                    (_, Index::None) => Some("".into()).into_iter().collect(),
-                    (&Pattern::StringPattern(pattern), Index::All) => variable
+                return match (&self.pattern, self.selection) {
+                    (_, Select::None) => Some("".into()).into_iter().collect(),
+                    (&Pattern::StringPattern(pattern), Select::All) => variable
                         .split(&expand_string(pattern, expand_func, false).join(" "))
                         .map(From::from)
                         .collect(),
-                    (&Pattern::Whitespace, Index::All) => variable
+                    (&Pattern::Whitespace, Select::All) => variable
                         .split(char::is_whitespace)
                         .map(From::from)
                         .collect(),
-                    (&Pattern::StringPattern(pattern), Index::ID(id)) =>
-                        Some(
-                            variable
-                                .split(&expand_string(pattern, expand_func, false).join(" "))
-                                .nth(id)
-                                .map(From::from)
-                                .unwrap_or_default()
-                        ).into_iter().collect(),
-                    (&Pattern::Whitespace, Index::ID(id)) =>
-                        Some(
-                            variable
-                                .split(char::is_whitespace)
-                                .nth(id).map(From::from)
-                                .unwrap_or_default()
-                        ).into_iter().collect(),
-                    (&Pattern::StringPattern(pattern), Index::FromEnd(id)) =>
-                        Some(
-                            variable
-                                .rsplit(&expand_string(pattern, expand_func, false).join(" "))
-                                .nth(id - 1)
-                                .map(From::from)
-                                .unwrap_or_default()
-                        ).into_iter().collect(),
-                    (&Pattern::Whitespace, Index::FromEnd(id)) =>
-                        Some(
-                            variable
-                                .rsplit(char::is_whitespace)
-                                .nth(id - 1).map(From::from)
-                                .unwrap_or_default()
-                        ).into_iter().collect(),
-                    (&Pattern::StringPattern(pattern), Index::Range(start, end)) => {
+                    (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) =>
+                            variable.split(&expand_string(pattern, expand_func, false).join(" "))
+                                    .nth(id)
+                                    .map(From::from)
+                                    .into_iter()
+                                    .collect(),
+                    (&Pattern::Whitespace, Select::Index(Index::Forward(id))) =>
+                            variable.split(char::is_whitespace)
+                                    .nth(id)
+                                    .map(From::from)
+                                    .into_iter()
+                                    .collect(),
+                    (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) =>
+                            variable.rsplit(&expand_string(pattern, expand_func, false).join(" "))
+                                    .nth(id)
+                                    .map(From::from)
+                                    .into_iter()
+                                    .collect(),
+                    (&Pattern::Whitespace, Select::Index(Index::Backward(id))) =>
+                            variable.rsplit(char::is_whitespace)
+                                    .nth(id)
+                                    .map(From::from)
+                                    .into_iter()
+                                    .collect(),
+                    (&Pattern::StringPattern(pattern), Select::Range(range)) => {
                         let expansion = expand_string(pattern, expand_func, false).join(" ");
                         let iter = variable.split(&expansion);
-                        let len = iter.clone().count();
-                        iter.skip(start.resolve(len))
-                            .take(end.resolve(len) - start.resolve(len))
-                            .map(From::from)
-                            .collect()
+                        if let Some((start, length)) = range.bounds(iter.clone().count()) {
+                            iter.skip(start)
+                                .take(length)
+                                .map(From::from)
+                                .collect()
+                        } else {
+                            Array::new()
+                        }
                     },
-                    (&Pattern::Whitespace, Index::Range(start, end)) => {
+                    (&Pattern::Whitespace, Select::Range(range)) => {
                         let len = variable.split(char::is_whitespace).count();
-                        variable.split(char::is_whitespace)
-                            .skip(start.resolve(len))
-                            .take(end.resolve(len) - start.resolve(len))
-                            .map(From::from)
-                            .collect()
+                        if let Some((start, length)) = range.bounds(len) {
+                            variable.split(char::is_whitespace)
+                                    .skip(start)
+                                    .take(length)
+                                    .map(From::from)
+                                    .collect()
+                        } else {
+                            Array::new()
+                        }
                     },
                 }
             },
@@ -288,12 +327,12 @@ pub enum WordToken<'a> {
     Whitespace(&'a str),
     Tilde(&'a str),
     Brace(Vec<&'a str>),
-    Array(Vec<&'a str>, Index),
-    Variable(&'a str, bool, Index),
-    ArrayVariable(&'a str, bool, Index),
-    ArrayProcess(&'a str, bool, Index),
-    Process(&'a str, bool, Index),
-    StringMethod(&'a str, &'a str, &'a str, Index),
+    Array(Vec<&'a str>, Select),
+    Variable(&'a str, bool, Select),
+    ArrayVariable(&'a str, bool, Select),
+    ArrayProcess(&'a str, bool, Select),
+    Process(&'a str, bool, Select),
+    StringMethod(&'a str, &'a str, &'a str, Select),
     ArrayMethod(ArrayMethod<'a>),
     //Glob(&'a str),
 }
@@ -354,7 +393,7 @@ impl<'a> WordIterator<'a> {
             if character == b'}' {
                 let output = &self.data[start..self.read];
                 self.read += 1;
-                return WordToken::Variable(output, self.flags & DQUOTE != 0, Index::All);
+                return WordToken::Variable(output, self.flags & DQUOTE != 0, Select::All);
             }
             self.read += 1;
         }
@@ -387,9 +426,10 @@ impl<'a> WordIterator<'a> {
 
                                     return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                         let _ = iterator.next();
-                                        WordToken::StringMethod(method, variable, pattern, self.read_index(iterator))
+                                        WordToken::StringMethod(method, variable, pattern,
+                                                                self.read_selection(iterator))
                                     } else {
-                                        WordToken::StringMethod(method, variable, pattern, Index::All)
+                                        WordToken::StringMethod(method, variable, pattern, Select::All)
                                     };
                                 }
                                 self.read += 1;
@@ -401,9 +441,10 @@ impl<'a> WordIterator<'a> {
 
                             return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                 let _ = iterator.next();
-                                WordToken::StringMethod(method, variable, " ", self.read_index(iterator))
+                                WordToken::StringMethod(method, variable, " ",
+                                                        self.read_selection(iterator))
                             } else {
-                                WordToken::StringMethod(method, variable, " ", Index::All)
+                                WordToken::StringMethod(method, variable, " ", Select::All)
                             };
                         }
                         self.read += 1;
@@ -416,9 +457,10 @@ impl<'a> WordIterator<'a> {
                     let variable = &self.data[start..self.read];
 
                     return if character == b'[' {
-                        WordToken::Variable(variable, self.flags & DQUOTE != 0, self.read_index(iterator))
+                        WordToken::Variable(variable, self.flags & DQUOTE != 0,
+                                            self.read_selection(iterator))
                     } else {
-                        WordToken::Variable(variable, self.flags & DQUOTE != 0, Index::All)
+                        WordToken::Variable(variable, self.flags & DQUOTE != 0, Select::All)
                     };
                 },
                 _ => (),
@@ -426,22 +468,22 @@ impl<'a> WordIterator<'a> {
             self.read += 1;
         }
 
-        WordToken::Variable(&self.data[start..], self.flags & DQUOTE != 0, Index::All)
+        WordToken::Variable(&self.data[start..], self.flags & DQUOTE != 0, Select::All)
     }
 
-    fn read_index<I>(&mut self, iterator: &mut I) -> Index
+    fn read_selection<I>(&mut self, iterator: &mut I) -> Select
         where I: Iterator<Item = u8>
     {
         self.read += 1;
         let start = self.read;
         while let Some(character) = iterator.next() {
             if let b']' = character {
-                let index = match self.data[start..self.read].parse::<Index>() {
-                    Ok(index) => index,
-                    Err(_)    => Index::None
+                let selection = match self.data[start..self.read].parse::<Select>() {
+                    Ok(selection) => selection,
+                    Err(_)       => Select::None
                 };
                 self.read += 1;
-                return index
+                return selection
             }
             self.read += 1;
         }
@@ -473,17 +515,17 @@ impl<'a> WordIterator<'a> {
                                     return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                         let _ = iterator.next();
                                         WordToken::ArrayMethod(ArrayMethod {
-                                            method: method,
-                                            variable: variable,
+                                            method,
+                                            variable,
                                             pattern: Pattern::StringPattern(pattern),
-                                            index: self.read_index(iterator)
+                                            selection: self.read_selection(iterator)
                                         })
                                     } else {
                                         WordToken::ArrayMethod(ArrayMethod {
-                                            method: method,
-                                            variable: variable,
+                                            method,
+                                            variable,
                                             pattern: Pattern::StringPattern(pattern),
-                                            index: Index::All
+                                            selection: Select::All
                                         })
                                     }
                                 }
@@ -497,17 +539,17 @@ impl<'a> WordIterator<'a> {
                             return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                 let _ = iterator.next();
                                 WordToken::ArrayMethod(ArrayMethod {
-                                    method: method,
-                                    variable: variable,
+                                    method,
+                                    variable,
                                     pattern: Pattern::Whitespace,
-                                    index: self.read_index(iterator)
+                                    selection: self.read_selection(iterator)
                                 })
                             } else {
                                 WordToken::ArrayMethod(ArrayMethod {
-                                    method: method,
-                                    variable: variable,
+                                    method,
+                                    variable,
                                     pattern: Pattern::Whitespace,
-                                    index: Index::All
+                                    selection: Select::All
                                 })
                             }
                         }
@@ -520,19 +562,21 @@ impl<'a> WordIterator<'a> {
                     return WordToken::ArrayVariable (
                         &self.data[start..self.read],
                         self.flags & DQUOTE != 0,
-                        self.read_index(iterator)
+                        self.read_selection(iterator)
                     );
                 },
                 // Only alphanumerical and underscores are allowed in variable names
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {
-                    return WordToken::ArrayVariable(&self.data[start..self.read], self.flags & DQUOTE != 0, Index::All);
+                    return WordToken::ArrayVariable(&self.data[start..self.read],
+                                                    self.flags & DQUOTE != 0,
+                                                    Select::All);
                 },
                 _ => (),
             }
             self.read += 1;
         }
 
-        WordToken::ArrayVariable(&self.data[start..], self.flags & DQUOTE != 0, Index::All)
+        WordToken::ArrayVariable(&self.data[start..], self.flags & DQUOTE != 0, Select::All)
     }
 
     /// Contains the logic for parsing subshell syntax.
@@ -561,13 +605,13 @@ impl<'a> WordIterator<'a> {
                             WordToken::Process(
                                 output,
                                 self.flags & DQUOTE != 0,
-                                self.read_index(iterator)
+                                self.read_selection(iterator)
                             )
                         } else {
                             WordToken::Process(
                                 output,
                                 self.flags & DQUOTE != 0,
-                                Index::All
+                                Select::All
                             )
                         }
                     } else {
@@ -609,13 +653,13 @@ impl<'a> WordIterator<'a> {
                             WordToken::ArrayProcess (
                                 array_process_contents,
                                 self.flags & DQUOTE != 0,
-                                self.read_index(iterator)
+                                self.read_selection(iterator)
                             )
                         } else {
                             WordToken::ArrayProcess (
                                 array_process_contents,
                                 self.flags & DQUOTE != 0,
-                                Index::All
+                                Select::All
                             )
                         }
                     } else {
@@ -701,9 +745,9 @@ impl<'a> WordIterator<'a> {
 
                         return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                             let _ = iterator.next();
-                            WordToken::Array(elements, self.read_index(iterator))
+                            WordToken::Array(elements, self.read_selection(iterator))
                         } else {
-                            WordToken::Array(elements, Index::All)
+                            WordToken::Array(elements, Select::All)
 
                         }
                     } else {
@@ -949,9 +993,9 @@ mod tests {
     fn string_method() {
         let input = "$join(array, 'pattern') $join(array, 'pattern')";
         let expected = vec![
-            WordToken::StringMethod("join", "array", "'pattern'", Index::All),
+            WordToken::StringMethod("join", "array", "'pattern'", Select::All),
             WordToken::Whitespace(" "),
-            WordToken::StringMethod("join", "array", "'pattern'", Index::All)
+            WordToken::StringMethod("join", "array", "'pattern'", Select::All)
         ];
         compare(input, expected);
     }
@@ -975,9 +1019,9 @@ mod tests {
         let first = vec![ "one", "two", "[three four]"];
         let second = vec![ "[one two]", "three", "four"];
         let expected = vec![
-            WordToken::Array(first, Index::All),
+            WordToken::Array(first, Select::All),
             WordToken::Whitespace(" "),
-            WordToken::Array(second, Index::ID(0)),
+            WordToken::Array(second, Select::Index(Index::new(0))),
         ];
         compare(input, expected);
     }
@@ -986,9 +1030,9 @@ mod tests {
     fn array_variables() {
         let input = "@array @array[0]";
         let expected = vec![
-            WordToken::ArrayVariable("array", false, Index::All),
+            WordToken::ArrayVariable("array", false, Select::All),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::ID(0)),
+            WordToken::ArrayVariable("array", false, Select::Index(Index::new(0))),
         ];
         compare(input, expected);
     }
@@ -997,9 +1041,9 @@ mod tests {
     fn array_processes() {
         let input = "@[echo one two three] @[echo one two three][0]";
         let expected = vec![
-            WordToken::ArrayProcess("echo one two three", false, Index::All),
+            WordToken::ArrayProcess("echo one two three", false, Select::All),
             WordToken::Whitespace(" "),
-            WordToken::ArrayProcess("echo one two three", false, Index::ID(0)),
+            WordToken::ArrayProcess("echo one two three", false, Select::Index(Index::new(0)))
         ];
         compare(input, expected);
     }
@@ -1008,15 +1052,17 @@ mod tests {
     fn indexes() {
         let input = "@array[0..3] @array[0...3] @array[abc] @array[..3] @array[3..]";
         let expected = vec![
-            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(3))),
+            WordToken::ArrayVariable("array", false, Select::Range(Range::exclusive(Index::new(0),
+                                                                                    Index::new(3)))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(4))),
+            WordToken::ArrayVariable("array", false, Select::Range(Range::inclusive(Index::new(0),
+                                                                                    Index::new(3)))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::None),
+            WordToken::ArrayVariable("array", false, Select::None),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(3))),
+            WordToken::ArrayVariable("array", false, Select::Range(Range::to(Index::new(3)))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(3), IndexEnd::CatchAll)),
+            WordToken::ArrayVariable("array", false, Select::Range(Range::from(Index::new(3)))),
         ];
         compare(input, expected);
     }
@@ -1027,9 +1073,9 @@ mod tests {
         let expected = vec![
             WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
-            WordToken::Process("echo $(echo one)", false, Index::All),
+            WordToken::Process("echo $(echo one)", false, Select::All),
             WordToken::Whitespace(" "),
-            WordToken::Process("echo one $(echo two) three", false, Index::All),
+            WordToken::Process("echo one $(echo two) three", false, Select::All),
         ];
         compare(input, expected);
     }
@@ -1040,7 +1086,7 @@ mod tests {
         let expected = vec![
             WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
-            WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", false, Index::All),
+            WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", false, Select::All),
         ];
         compare(input, expected);
 
@@ -1048,7 +1094,7 @@ mod tests {
         let expected = vec![
             WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
-            WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", false, Index::All),
+            WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", false, Select::All),
         ];
         compare(input, expected);
     }
@@ -1059,18 +1105,18 @@ mod tests {
         let expected = vec![
             WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
-            WordToken::Variable("ABC", false, Index::All),
+            WordToken::Variable("ABC", false, Select::All),
             WordToken::Whitespace(" "),
-            WordToken::Variable("ABC", true, Index::All),
+            WordToken::Variable("ABC", true, Select::All),
             WordToken::Whitespace(" "),
             WordToken::Normal("one",false),
             WordToken::Brace(vec!["$ABC", "$ABC"]),
             WordToken::Whitespace(" "),
             WordToken::Tilde("~"),
             WordToken::Whitespace(" "),
-            WordToken::Process("echo foo", false, Index::All),
+            WordToken::Process("echo foo", false, Select::All),
             WordToken::Whitespace(" "),
-            WordToken::Process("seq 1 100", true, Index::All)
+            WordToken::Process("seq 1 100", true, Select::All)
         ];
         compare(input, expected);
     }

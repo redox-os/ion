@@ -252,7 +252,7 @@ fn get_user_home(_username: &str) -> Option<String> {
 mod tests {
     use super::*;
     use shell::directory_stack::DirectoryStack;
-    use parser::{expand_string, ExpanderFunctions, Index};
+    use parser::{expand_string, ExpanderFunctions, Select};
 
     fn new_dir_stack() -> DirectoryStack {
         DirectoryStack::new().unwrap()

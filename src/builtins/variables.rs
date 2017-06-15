@@ -238,7 +238,7 @@ pub fn export_variable<'a, S: AsRef<str> + 'a>(vars: &mut Variables, args: &[S])
 #[cfg(test)]
 mod test {
     use super::*;
-    use parser::{expand_string, ExpanderFunctions, Index};
+    use parser::{expand_string, ExpanderFunctions, Select};
     use shell::status::{FAILURE, SUCCESS};
     use shell::directory_stack::DirectoryStack;
 

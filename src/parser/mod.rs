@@ -3,34 +3,34 @@ macro_rules! get_expanders {
     ($vars:expr, $dir_stack:expr) => {
         ExpanderFunctions {
             tilde: &|tilde: &str| $vars.tilde_expansion(tilde, $dir_stack),
-            array: &|array: &str, index: Index| {
+            array: &|array: &str, selection : Select| {
                 use std::iter::FromIterator;
                 use $crate::types::*;
 
                 match $vars.get_array(array) {
-                    Some(array) => match index {
-                        Index::None   => None,
-                        Index::All    => Some(array.clone()),
-                        Index::ID(id) => array.get(id).map(
-                            |x| Array::from_iter(Some(x.to_owned()))
-                        ),
-                        Index::FromEnd(idx) => {
-                            if array.len() < idx {
-                                None
-                            } else {
-                                array.get(array.len() - idx)
-                                     .map(|x| Array::from_iter(Some(x.to_owned())))
-                            }
+                    Some(array) => match selection {
+                        Select::None  => None,
+                        Select::All   => Some(array.clone()),
+                        Select::Index(id) => {
+                            id.resolve(array.len())
+                              .and_then(|n| array.get(n))
+                              .map(|x| Array::from_iter(Some(x.to_owned())))
                         },
-                        Index::Range(start, end) => {
-                            let len = array.len();
-                            let array : Array =
-                                array.iter()
-                                     .skip(start.resolve(len))
-                                     .take(end.diff(&start, len))
+                        Select::Range(range) => {
+                            if let Some((start, length)) = range.bounds(array.len()) {
+                                let array = array.iter()
+                                     .skip(start)
+                                     .take(length)
                                      .map(|x| x.to_owned())
-                                     .collect::<_>();
-                            if array.is_empty() { None } else { Some(array) }
+                                     .collect::<Array>();
+                                if array.is_empty() {
+                                    None
+                                } else {
+                                    Some(array)
+                                }
+                            } else {
+                                None
+                            }
                         }
                     },
                     None => None
@@ -59,7 +59,7 @@ pub mod shell_expand;
 mod statements;
 mod quotes;
 
-pub use self::shell_expand::{Index, IndexEnd, ExpanderFunctions, expand_string, expand_tokens, WordToken, WordIterator};
+pub use self::shell_expand::{Select, Range, Index, ExpanderFunctions, expand_string, expand_tokens, WordToken, WordIterator};
 pub use self::arguments::ArgumentSplitter;
 pub use self::loops::for_grammar::ForExpression;
 pub use self::statements::{StatementSplitter, StatementError, check_statement};
