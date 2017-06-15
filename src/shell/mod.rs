@@ -41,7 +41,6 @@ use parser::{
     QuoteTerminator,
     ExpanderFunctions,
     Index,
-    IndexEnd
 };
 use parser::peg::Pipeline;
 
