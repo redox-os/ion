@@ -23,13 +23,78 @@ pub enum Index {
     All,
     None,
     ID(usize),
-    Range(usize, IndexEnd),
+    FromEnd(usize),
+    Range(IndexStart, IndexEnd),
+}
+
+/// Index into an vector-like object
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum IndexStart {
+    /// Index starting from the beginning of the vector, where `FromStart(0)` is the first element
+    FromStart(usize),
+    /// Index starting from the end of the vector, where `FromEnd(1)` is the last element.
+    /// `FromEnd(0)` is a reserved value
+    FromEnd(usize)
+}
+
+impl IndexStart {
+
+    /// Construct a new input where negative values become `FromEnd` instances and positive
+    /// values or zero become FromStart instances
+    pub fn new(input : isize) -> IndexStart {
+        if input < 0 {
+            IndexStart::FromEnd(input.abs() as usize)
+        } else {
+            IndexStart::FromStart(input.abs() as usize)
+        }
+    }
+
+    /// `index.resolve(n)` determines the "true" index given the length of a vector `n`
+    pub fn resolve(&self, size : usize) -> usize {
+        match *self {
+            IndexStart::FromStart(n) => n,
+            IndexStart::FromEnd(n) => size - n
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum IndexEnd {
     ID(usize),
+    FromEnd(usize),
     CatchAll
+}
+
+impl IndexEnd {
+
+    /// Construct a new input where negative values become `FromEnd` instances and positive
+    /// values or zero become FromStart instances
+    pub fn new(input : isize) -> IndexEnd {
+        if input < 0 {
+            IndexEnd::FromEnd(input.abs() as usize)
+        } else {
+            IndexEnd::ID(input.abs() as usize)
+        }
+    }
+
+    /// `index.resolve(n)` determines the "true" index given the length of a vector `n`
+    fn resolve(&self, size : usize) -> usize {
+        match *self {
+            IndexEnd::ID(n) => n,
+            IndexEnd::FromEnd(n) => if n > size { 0 } else {size - n},
+            IndexEnd::CatchAll => size
+        }
+    }
+
+    /// Determine the number of values inbetween this index and an IndexStart instance as a range.
+    /// If this would result in a reversed range, return zero
+    pub fn diff(&self, start : &IndexStart, size : usize) -> usize {
+        if self.resolve(size) < start.resolve(size) {
+            0
+        } else {
+            self.resolve(size) - start.resolve(size)
+        }
+    }
 }
 
 pub enum IndexError {
@@ -43,12 +108,16 @@ impl FromStr for Index {
             return Ok(Index::All)
         }
 
-        if let Ok(index) = data.parse::<usize>() {
-            return Ok(Index::ID(index))
+        if let Ok(index) = data.parse::<isize>() {
+            if index < 0 {
+                return Ok(Index::FromEnd(index.abs() as usize));
+            } else {
+                return Ok(Index::ID(index.abs() as usize));
+            }
         }
 
         if let Some((start, end)) = parse_index_range(data) {
-            return Ok(Index::Range(start, end))
+            return Ok(Index::Range(start, end));
         }
 
         let stderr = io::stderr();
@@ -98,38 +167,37 @@ impl<'a> ArrayMethod<'a> {
                             .nth(id)
                             .unwrap_or_default()
                     ),
-                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::ID(end))) => {
-                        let range = variable.split(&expand_string(pattern, expand_func, false).join(" "))
-                            .skip(start).take(end-start)
+                    (&Pattern::StringPattern(pattern), Index::FromEnd(id)) => current.push_str (
+                        variable.rsplit(&expand_string(pattern, expand_func, false).join(" "))
+                            .nth(id - 1)
+                            .unwrap_or_default()
+                    ),
+                    (&Pattern::Whitespace, Index::FromEnd(id)) => current.push_str (
+                        variable.rsplit(char::is_whitespace)
+                            .nth(id - 1)
+                            .unwrap_or_default()
+                    ),
+                    (&Pattern::StringPattern(pattern), Index::Range(start, end)) => {
+                        let expansion = expand_string(pattern, expand_func, false).join(" ");
+                        let iter = variable.split(&expansion);
+                        let len = iter.clone().count();
+                        let range = iter.skip(start.resolve(len))
+                                        .take(end.resolve(len) - start.resolve(len))
+                                        .collect::<Vec<&str>>()
+                                        .join(" ");
+
+                        current.push_str(&range);
+                    },
+                    (&Pattern::Whitespace, Index::Range(start, end)) => {
+                        let len = variable.split(char::is_whitespace).count();
+                        let range = variable.split(char::is_whitespace)
+                            .skip(start.resolve(len))
+                            .take(end.resolve(len) - start.resolve(len))
                             .collect::<Vec<&str>>()
                             .join(" ");
 
                         current.push_str(&range);
                     },
-                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::ID(end))) => {
-                        let range = variable.split(char::is_whitespace)
-                            .skip(start).take(end-start)
-                            .collect::<Vec<&str>>()
-                            .join(" ");
-
-                        current.push_str(&range);
-                    },
-                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::CatchAll)) => {
-                        let range = variable.split(&expand_string(pattern, expand_func, false).join(" "))
-                            .skip(start)
-                            .collect::<Vec<&str>>()
-                            .join(" ");
-
-                        current.push_str(&range);
-                    }
-                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::CatchAll)) => {
-                        let range = variable.split(char::is_whitespace)
-                            .skip(start)
-                            .collect::<Vec<&str>>()
-                            .join(" ");
-
-                        current.push_str(&range);
-                    }
                 }
             },
             _ => {
@@ -168,30 +236,38 @@ impl<'a> ArrayMethod<'a> {
                                 .nth(id).map(From::from)
                                 .unwrap_or_default()
                         ).into_iter().collect(),
-                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::CatchAll)) => {
-                        variable.split(&expand_string(pattern, expand_func, false).join(" "))
-                            .skip(start)
+                    (&Pattern::StringPattern(pattern), Index::FromEnd(id)) =>
+                        Some(
+                            variable
+                                .rsplit(&expand_string(pattern, expand_func, false).join(" "))
+                                .nth(id - 1)
+                                .map(From::from)
+                                .unwrap_or_default()
+                        ).into_iter().collect(),
+                    (&Pattern::Whitespace, Index::FromEnd(id)) =>
+                        Some(
+                            variable
+                                .rsplit(char::is_whitespace)
+                                .nth(id - 1).map(From::from)
+                                .unwrap_or_default()
+                        ).into_iter().collect(),
+                    (&Pattern::StringPattern(pattern), Index::Range(start, end)) => {
+                        let expansion = expand_string(pattern, expand_func, false).join(" ");
+                        let iter = variable.split(&expansion);
+                        let len = iter.clone().count();
+                        iter.skip(start.resolve(len))
+                            .take(end.resolve(len) - start.resolve(len))
                             .map(From::from)
                             .collect()
                     },
-                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::CatchAll)) => {
+                    (&Pattern::Whitespace, Index::Range(start, end)) => {
+                        let len = variable.split(char::is_whitespace).count();
                         variable.split(char::is_whitespace)
-                            .skip(start)
+                            .skip(start.resolve(len))
+                            .take(end.resolve(len) - start.resolve(len))
                             .map(From::from)
                             .collect()
                     },
-                    (&Pattern::StringPattern(pattern), Index::Range(start, IndexEnd::ID(end))) => {
-                        variable.split(&expand_string(pattern, expand_func, false).join(" ")).skip(start)
-                            .take(end-start)
-                            .map(From::from)
-                            .collect()
-                    },
-                    (&Pattern::Whitespace, Index::Range(start, IndexEnd::ID(end))) => {
-                        variable.split(char::is_whitespace).skip(start)
-                            .take(end-start)
-                            .map(From::from)
-                            .collect()
-                    }
                 }
             },
             _ => {
@@ -201,14 +277,14 @@ impl<'a> ArrayMethod<'a> {
             }
         }
 
-       
+
         Some("".into()).into_iter().collect()
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum WordToken<'a> {
-    Normal(&'a str),
+    Normal(&'a str,bool),
     Whitespace(&'a str),
     Tilde(&'a str),
     Brace(Vec<&'a str>),
@@ -219,6 +295,7 @@ pub enum WordToken<'a> {
     Process(&'a str, bool, Index),
     StringMethod(&'a str, &'a str, &'a str, Index),
     ArrayMethod(ArrayMethod<'a>),
+    //Glob(&'a str),
 }
 
 pub struct WordIterator<'a> {
@@ -641,7 +718,49 @@ impl<'a> WordIterator<'a> {
 
         panic!("ion: fatal error with syntax validation: unterminated array expression")
     }
+
+    fn glob_check<I>(&mut self, iterator: &mut I) -> bool
+        where I: Iterator<Item = u8> + Clone
+    {
+        // Clone the iterator and scan for illegal characters until the corresponding ] is
+        // discovered. If none are found, then it's a valid glob signature.
+        let mut moves = 0;
+        let mut glob = false;
+        let mut square_bracket = 0;
+        let mut iter = iterator.clone();
+        while let Some(character) = iter.next() {
+            moves+=1;
+            match character {
+                b'[' => {
+                    square_bracket += 1;
+                }
+                b' '| b'"' | b'\'' | b'$' | b'{' | b'}' => {
+                    break;
+                },
+                b']' => {
+                    // If the glob is less than three bytes in width, then it's empty and thus invalid.
+                    if !(moves<=3 && square_bracket == 1) {
+                        glob = true;
+                        break
+                    }
+                }
+                _=> (),
+            }
+        }
+
+        if glob {
+            for _ in 0..moves {
+                iterator.next();
+            }
+            self.read += moves+1;
+            true
+        } else {
+            self.read += 1;
+            false
+        }
+    }
 }
+
 
 impl<'a> Iterator for WordIterator<'a> {
     type Item = WordToken<'a>;
@@ -651,8 +770,9 @@ impl<'a> Iterator for WordIterator<'a> {
 
         let mut iterator = self.data.bytes().skip(self.read);
         let mut start = self.read;
-
+        let mut glob = false;
         loop {
+
             if let Some(character) = iterator.next() {
                 match character {
                     _ if self.flags & BACKSL != 0 => {
@@ -665,7 +785,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         self.read += 1;
                         self.flags ^= BACKSL;
                         if self.flags & EXPAND_PROCESSES == 0 {
-                            return Some(WordToken::Normal("\\"));
+                            return Some(WordToken::Normal("\\",glob));
                         }
                         break
                     }
@@ -674,7 +794,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         self.read += 1;
                         self.flags ^= SQUOTE;
                         if self.flags & EXPAND_PROCESSES == 0 {
-                            return Some(WordToken::Normal("'"));
+                            return Some(WordToken::Normal("'",glob));
                         }
                     },
                     b'"' if self.flags & SQUOTE == 0 => {
@@ -682,7 +802,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         self.read += 1;
                         self.flags ^= DQUOTE;
                         if self.flags & EXPAND_PROCESSES == 0 {
-                            return Some(WordToken::Normal("\""));
+                            return Some(WordToken::Normal("\"",glob));
                         }
                     }
                     b' ' if self.flags & (SQUOTE + DQUOTE) == 0 => {
@@ -697,8 +817,11 @@ impl<'a> Iterator for WordIterator<'a> {
                         return Some(self.braces(&mut iterator));
                     },
                     b'[' if self.flags & SQUOTE == 0 => {
-                        self.read += 1;
-                        return Some(self.array(&mut iterator));
+                        if self.glob_check(&mut iterator) {
+                            glob = true;
+                        } else {
+                            return Some(self.array(&mut iterator));
+                        }
                     },
                     b'@' if self.flags & SQUOTE == 0 => {
                         match iterator.next() {
@@ -707,7 +830,7 @@ impl<'a> Iterator for WordIterator<'a> {
                                 return if self.flags & EXPAND_PROCESSES != 0 {
                                     Some(self.array_process(&mut iterator))
                                 } else {
-                                    Some(WordToken::Normal(&self.data[start..self.read]))
+                                    Some(WordToken::Normal(&self.data[start..self.read],glob))
                                 }
                             },
                             // Some(b'{') => {
@@ -727,7 +850,7 @@ impl<'a> Iterator for WordIterator<'a> {
                                 return if self.flags & EXPAND_PROCESSES != 0 {
                                     Some(self.process(&mut iterator))
                                 } else {
-                                    Some(WordToken::Normal(&self.data[start..self.read]))
+                                    Some(WordToken::Normal(&self.data[start..self.read],glob))
                                 }
                             },
                             Some(b'{') => {
@@ -739,7 +862,12 @@ impl<'a> Iterator for WordIterator<'a> {
                                 return Some(self.variable(&mut iterator));
                             }
                         }
-                    }
+                    },
+                    b'*'|b'?' => {
+                        // if a word is not special, make sure you return the globbed variant at the end
+                        self.read+=1;
+                        glob=true; //warning is incorrect it does get read
+                    },
                     _ => { self.read += 1; break },
                 }
             } else {
@@ -755,27 +883,39 @@ impl<'a> Iterator for WordIterator<'a> {
                     let end = if self.flags & EXPAND_PROCESSES == 0 { self.read+1 } else { self.read };
                     let output = &self.data[start..end];
                     self.read += 1;
-                    return Some(WordToken::Normal(output));
+                    return Some(WordToken::Normal(output,glob));
                 },
                 b'\'' if self.flags & DQUOTE == 0 => {
                     self.flags ^= SQUOTE;
                     let end = if self.flags & EXPAND_PROCESSES == 0 { self.read+1 } else { self.read };
                     let output = &self.data[start..end];
                     self.read += 1;
-                    return Some(WordToken::Normal(output));
+                    return Some(WordToken::Normal(output,glob));
                 },
                 b'"' if self.flags & SQUOTE == 0 => {
                     self.flags ^= DQUOTE;
                     let end = if self.flags & EXPAND_PROCESSES == 0 { self.read+1 } else { self.read };
                     let output = &self.data[start..end];
                     self.read += 1;
-                    return Some(WordToken::Normal(output));
+                    return Some(WordToken::Normal(output,glob));
                 },
                 b' ' | b'{' if self.flags & (SQUOTE + DQUOTE) == 0 => {
-                    return Some(WordToken::Normal(&self.data[start..self.read]));
+                    return Some(WordToken::Normal(&self.data[start..self.read],glob));
                 },
-                b'$' | b'@' | b'[' if self.flags & SQUOTE == 0 => {
-                    return Some(WordToken::Normal(&self.data[start..self.read]));
+                b'$' | b'@' if self.flags & SQUOTE == 0 => {
+                    return Some(WordToken::Normal(&self.data[start..self.read],glob));
+                },
+                b'[' if self.flags & SQUOTE == 0 => {
+                    if self.glob_check(&mut iterator) {
+                        glob = true;
+                    } else {
+                        return Some(WordToken::Normal(&self.data[start..self.read],glob));
+                    }
+                },
+                b'*'|b'?' if self.flags & SQUOTE == 0 => {
+                    // if a word is not special, make sure you return the globbed variant at the end
+                    self.read += 1;
+                    glob = true; //warning is incorrect it does get read
                 },
                 _ => (),
             }
@@ -785,10 +925,12 @@ impl<'a> Iterator for WordIterator<'a> {
         if start == self.read {
             None
         } else {
-            Some(WordToken::Normal(&self.data[start..]))
+            //println!("Normal exit");
+            Some(WordToken::Normal(&self.data[start..],glob))
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -819,10 +961,10 @@ mod tests {
         let input = "\\$FOO\\$BAR \\$FOO";
         let expected =
             vec![
-                WordToken::Normal("$FOO"),
-                WordToken::Normal("$BAR"),
+                WordToken::Normal("$FOO",false),
+                WordToken::Normal("$BAR",false),
                 WordToken::Whitespace(" "),
-                WordToken::Normal("$FOO")
+                WordToken::Normal("$FOO",false)
             ];
         compare(input, expected);
     }
@@ -866,15 +1008,15 @@ mod tests {
     fn indexes() {
         let input = "@array[0..3] @array[0...3] @array[abc] @array[..3] @array[3..]";
         let expected = vec![
-            WordToken::ArrayVariable("array", false, Index::Range(0, IndexEnd::ID(3))),
+            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(3))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(0, IndexEnd::ID(4))),
+            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(4))),
             WordToken::Whitespace(" "),
             WordToken::ArrayVariable("array", false, Index::None),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(0, IndexEnd::ID(3))),
+            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(0), IndexEnd::new(3))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Index::Range(3, IndexEnd::CatchAll)),
+            WordToken::ArrayVariable("array", false, Index::Range(IndexStart::new(3), IndexEnd::CatchAll)),
         ];
         compare(input, expected);
     }
@@ -883,7 +1025,7 @@ mod tests {
     fn nested_processes() {
         let input = "echo $(echo $(echo one)) $(echo one $(echo two) three)";
         let expected = vec![
-            WordToken::Normal("echo"),
+            WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
             WordToken::Process("echo $(echo one)", false, Index::All),
             WordToken::Whitespace(" "),
@@ -896,7 +1038,7 @@ mod tests {
     fn words_process_with_quotes() {
         let input = "echo $(git branch | rg '[*]' | awk '{print $2}')";
         let expected = vec![
-            WordToken::Normal("echo"),
+            WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
             WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", false, Index::All),
         ];
@@ -904,7 +1046,7 @@ mod tests {
 
         let input = "echo $(git branch | rg \"[*]\" | awk '{print $2}')";
         let expected = vec![
-            WordToken::Normal("echo"),
+            WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
             WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", false, Index::All),
         ];
@@ -915,13 +1057,13 @@ mod tests {
     fn test_words() {
         let input = "echo $ABC \"${ABC}\" one{$ABC,$ABC} ~ $(echo foo) \"$(seq 1 100)\"";
         let expected = vec![
-            WordToken::Normal("echo"),
+            WordToken::Normal("echo",false),
             WordToken::Whitespace(" "),
             WordToken::Variable("ABC", false, Index::All),
             WordToken::Whitespace(" "),
             WordToken::Variable("ABC", true, Index::All),
             WordToken::Whitespace(" "),
-            WordToken::Normal("one"),
+            WordToken::Normal("one",false),
             WordToken::Brace(vec!["$ABC", "$ABC"]),
             WordToken::Whitespace(" "),
             WordToken::Tilde("~"),
@@ -937,13 +1079,13 @@ mod tests {
     fn test_multiple_escapes() {
         let input = "foo\\(\\) bar\\(\\)";
         let expected = vec![
-            WordToken::Normal("foo"),
-            WordToken::Normal("("),
-            WordToken::Normal(")"),
+            WordToken::Normal("foo",false),
+            WordToken::Normal("(",false),
+            WordToken::Normal(")",false),
             WordToken::Whitespace(" "),
-            WordToken::Normal("bar"),
-            WordToken::Normal("("),
-            WordToken::Normal(")"),
+            WordToken::Normal("bar",false),
+            WordToken::Normal("(",false),
+            WordToken::Normal(")",false),
         ];
         compare(input, expected);
     }

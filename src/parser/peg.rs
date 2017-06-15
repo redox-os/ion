@@ -5,7 +5,7 @@ use self::grammar::parse_;
 use shell::directory_stack::DirectoryStack;
 use shell::Job;
 use shell::variables::Variables;
-use parser::{expand_string, ExpanderFunctions, Index, IndexEnd};
+use parser::{expand_string, ExpanderFunctions, Index};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RedirectFrom { Stdout, Stderr, Both}

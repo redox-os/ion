@@ -1,7 +1,7 @@
 use shell::directory_stack::DirectoryStack;
 use shell::variables::Variables;
 use types::Value;
-use parser::{expand_string, ExpanderFunctions, Index, IndexEnd};
+use parser::{expand_string, ExpanderFunctions, Index};
 
 #[derive(Debug, PartialEq)]
 pub enum ForExpression {
