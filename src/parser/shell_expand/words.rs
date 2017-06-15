@@ -988,6 +988,17 @@ mod tests {
     }
 
     #[test]
+    fn ranges() {
+        let range1 = Range::exclusive(Index::new(1), Index::new(5));
+        assert_eq!(Some((1, 4)), range1.bounds(42));
+        assert_eq!(Some((1, 4)), range1.bounds(7));
+        let range2 = Range::inclusive(Index::new(2), Index::new(-4));
+        assert_eq!(Some((2, 5)), range2.bounds(10));
+        assert_eq!(None, range2.bounds(3));
+    }
+
+
+    #[test]
     fn string_method() {
         let input = "$join(array, 'pattern') $join(array, 'pattern')";
         let expected = vec![
