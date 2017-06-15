@@ -642,6 +642,47 @@ impl<'a> WordIterator<'a> {
 
         panic!("ion: fatal error with syntax validation: unterminated array expression")
     }
+
+    fn glob_check<I>(&mut self, iterator: &mut I) -> bool
+        where I: Iterator<Item = u8> + Clone
+    {
+        // Clone the iterator and scan for illegal characters until the corresponding ] is
+        // discovered. If none are found, then it's a valid glob signature.
+        let mut moves = 0;
+        let mut glob = false;
+        let mut square_bracket = 0;
+        let mut iter = iterator.clone();
+        while let Some(character) = iter.next() {
+            moves+=1;
+            match character {
+                b'[' => {
+                    square_bracket += 1;
+                }
+                b' '| b'"' | b'\'' | b'$' | b'{' | b'}' => {
+                    break;
+                },
+                b']' => {
+                    // If the glob is less than three bytes in width, then it's empty and thus invalid.
+                    if !(moves<=3 && square_bracket == 1) {
+                        glob = true;
+                        break
+                    }
+                }
+                _=> (),
+            }
+        }
+
+        if glob {
+            for _ in 0..moves {
+                iterator.next();
+            }
+            self.read += moves+1;
+            true
+        } else {
+            self.read += 1;
+            false
+        }
+    }
 }
 
 
@@ -700,52 +741,12 @@ impl<'a> Iterator for WordIterator<'a> {
                         return Some(self.braces(&mut iterator));
                     },
                     b'[' if self.flags & SQUOTE == 0 => {
-                        //we peek into the future of the iterator by copying it and checking if any illegal characters get found before we hit the next ]
-                        //there might be more illegal characters or less, I don't know
-                        let mut moves = 0;
-                        let mut square_bracket= 0;
-                        let mut rewind = true;
-                        let mut iter = iterator.clone();
-                        while let Some(character) = iter.next() {
-                            moves+=1;
-                            match character
-                            {
-                                b'[' => {
-                                    square_bracket+=1;
-                                }
-                                b' '| b'"' | b'\'' | b'$' | b'{' | b'}' => {
-                                    break;
-                                },
-                                b']' => {
-                                    //we ignore the glob if it's smaller than 3, because [a] is a valid wild card and array
-                                    //but the array meaning interpreted as a glob would actually be correct, whilst vice versa it wouldnt
-                                    if moves<=3 && square_bracket == 1 {
-                                    }
-                                    else{
-                                        rewind = false;
-                                        break;
-                                    }
-                                }
-                                _=> (),
-                            }
-                        }
-                        if rewind == false{
-                            for _ in 0..moves {
-                                iterator.next();
-                            }
-                            self.read+=moves+1;
+                        if self.glob_check(&mut iterator) {
                             glob = true;
-                            break;
-                        }
-                        else {
-                            self.read += 1;
+                        } else {
                             return Some(self.array(&mut iterator));
                         }
                     },
-                    /*b'[' if self.flags & SQUOTE == 0 => {
-                        self.read += 1;
-                        return Some(self.array(&mut iterator));
-                    },*/
                     b'@' if self.flags & SQUOTE == 0 => {
                         match iterator.next() {
                             Some(b'[') => {
@@ -825,52 +826,20 @@ impl<'a> Iterator for WordIterator<'a> {
                 b' ' | b'{' if self.flags & (SQUOTE + DQUOTE) == 0 => {
                     return Some(WordToken::Normal(&self.data[start..self.read],glob));
                 },
-                b'$' | b'@' /*| b'['*/ if self.flags & SQUOTE == 0 => {
+                b'$' | b'@' if self.flags & SQUOTE == 0 => {
                     return Some(WordToken::Normal(&self.data[start..self.read],glob));
                 },
                 b'[' if self.flags & SQUOTE == 0 => {
-                    let mut moves = 0;
-                    let mut square_bracket= 0;
-                    let mut rewind = true;
-                    let mut iter = iterator.clone();
-                    while let Some(character) = iter.next() {
-                        moves+=1;
-                        match character
-                        {
-                            b'[' => {
-                                square_bracket+=1;
-                            }
-                            b' '| b'"' | b'\'' | b'$' | b'{' | b'}' => {
-                                break;
-                            },
-                            b']' => {
-                                //we ignore the glob if it's smaller than 3, because [a] is a valid wild card and array
-                                //but the array meaning interpreted as a glob would actually be correct, whilst vice versa it wouldnt   
-                                if moves<=3 && square_bracket == 1 {
-                                }
-                                else{
-                                    rewind = false;
-                                    break;
-                                }
-                            }
-                            _=> (),
-                        }
-                    }
-                    if rewind == false{
-                        for _ in 0..moves {
-                            iterator.next();
-                        }
-                        self.read+=moves+1;
+                    if self.glob_check(&mut iterator) {
                         glob = true;
-                    }
-                    else {
+                    } else {
                         return Some(WordToken::Normal(&self.data[start..self.read],glob));
                     }
                 },
                 b'*'|b'?' if self.flags & SQUOTE == 0 => {
                     // if a word is not special, make sure you return the globbed variant at the end
-                    self.read+=1;
-                    glob=true; //warning is incorrect it does get read
+                    self.read += 1;
+                    glob = true; //warning is incorrect it does get read
                 },
                 _ => (),
             }
