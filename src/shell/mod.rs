@@ -138,7 +138,7 @@ impl<'a> Shell<'a> {
                         // Add the list of available variables to the completer's definitions.
                         // TODO: We should make it free to do String->SmallString
                         //       and mostly free to go back (free if allocated)
-                        .chain(vars.get_vars().into_iter().map(|s| format!("${}", s).into()))
+                        .chain(vars.get_vars().into_iter().map(|s| ["$", &s].concat().into()))
                         .collect();
 
                     // Initialize a new completer from the definitions collected.
@@ -157,7 +157,7 @@ impl<'a> Shell<'a> {
             Err(err) => {
                 let stderr = io::stderr();
                 let mut stderr = stderr.lock();
-                let _ = writeln!(stderr, "ion: {}", err);
+                let _ = writeln!(stderr, "ion: liner: {}", err);
                 None
             }
         }
@@ -352,7 +352,7 @@ impl<'a> Shell<'a> {
             builtins.get(key)
         } {
             // Run the 'main' of the command and set exit_status
-            if pipeline.jobs.len() == 1 {
+            if pipeline.jobs.len() == 1 && pipeline.stdin == None && pipeline.stdout == None {
                 let borrowed = &pipeline.jobs[0].args;
                 let small: SmallVec<[&str; 4]> = borrowed.iter()
                     .map(|x| x as &str)
