@@ -313,19 +313,19 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         Select::Index(Index::Forward(id)) => {
                             expand_process(&mut output, command, quoted, Select::All, expand_func);
                             return output.split_whitespace()
-                                  .nth(id)
-                                  .map(Into::into)
-                                  .into_iter()
-                                  .collect();
+                                         .nth(id)
+                                         .map(Into::into)
+                                         .into_iter()
+                                         .collect();
                         },
                         Select::Index(Index::Backward(id)) => {
                             expand_process(&mut output, command, quoted, Select::All, expand_func);
                             return output.split_whitespace()
-                                  .rev()
-                                  .nth(id)
-                                  .map(Into::into)
-                                  .into_iter()
-                                  .collect();
+                                         .rev()
+                                         .nth(id)
+                                         .map(Into::into)
+                                         .into_iter()
+                                         .collect();
                         }
                         Select::Range(range) => {
                             expand_process(&mut output, command, quoted, Select::All, expand_func);

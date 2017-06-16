@@ -185,8 +185,8 @@ impl<'a> ArrayMethod<'a> {
                     ),
                     (&Pattern::Whitespace, Select::All) => current.push_str (
                         &variable.split(char::is_whitespace)
-                            .collect::<Vec<&str>>()
-                            .join(" ")
+                                 .collect::<Vec<&str>>()
+                                 .join(" ")
                     ),
                     (_, Select::None) => (),
                     (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => {
@@ -197,8 +197,8 @@ impl<'a> ArrayMethod<'a> {
                     } ,
                     (&Pattern::Whitespace, Select::Index(Index::Forward(id))) => current.push_str (
                         variable.split(char::is_whitespace)
-                            .nth(id)
-                            .unwrap_or_default()
+                                .nth(id)
+                                .unwrap_or_default()
                     ),
                     (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => {
                         current.push_str(
