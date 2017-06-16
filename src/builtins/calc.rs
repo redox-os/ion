@@ -11,6 +11,13 @@ pub enum Token {
     Exponent,
     Square,
     Cube,
+    BitWiseAnd,
+    BitWiseOr,
+    //BitWiseXor,
+    BitWiseNot,
+    //BitWiseRShift,
+    //BitWiseLShift,
+    Modulo,
     OpenParen,
     CloseParen,
     // TODO: Don't pass around a string when we can pass around a number
@@ -27,6 +34,13 @@ impl Token {
             Token::Exponent   => "Exponent",
             Token::Square     => "Square",
             Token::Cube       => "Cube",
+            Token::BitWiseAnd => "And",
+            Token::BitWiseOr  => "Or",
+            //Token::BitWiseXor => "Xor",
+            Token::BitWiseNot => "Not",
+            //Token::BitWiseRShift => "RShift",
+            //Token::BitWiseLShift => "LShift",
+            Token::Modulo => "Modulo",
             Token::OpenParen  => "OpenParen",
             Token::CloseParen => "CloseParen",
             Token::Number(_)  => "Number",
@@ -94,6 +108,12 @@ impl OperatorFunctions for char {
         self == '^' ||
         self == '²' ||
         self == '³' ||
+        self == '&' ||
+        self == '|' ||
+        self == '~' ||
+        //self == '>' ||
+        //self == '<' ||
+        self == '%' ||
         self == '(' ||
         self == ')'
     }
@@ -107,6 +127,10 @@ impl OperatorFunctions for char {
             '^' => Some(Token::Exponent),
             '²' => Some(Token::Square),
             '³' => Some(Token::Cube),
+            '&' => Some(Token::BitWiseAnd),
+            '|' => Some(Token::BitWiseOr),
+            '~' => Some(Token::BitWiseNot),
+            '%' => Some(Token::Modulo),
             '(' => Some(Token::OpenParen),
             ')' => Some(Token::CloseParen),
             _   => None
@@ -168,6 +192,60 @@ fn consume_until_new_token(input: &[char]) -> String {
          .collect()
 }
 
+pub fn d_expr(token_list: &[Token]) -> Result<IntermediateResult, CalcError> {
+    let mut e1 = try!(e_expr(token_list));
+    let mut index = e1.tokens_read;
+
+    while index < token_list.len() {
+        match token_list[index] {
+            Token::BitWiseAnd => {
+                let e2 = try!(e_expr(&token_list[index+1..]));
+                if e1.value == e1.value.floor() && e2.value == e2.value.floor(){
+                    let mut int_f = e1.value.floor() as i64;
+                    let int_s = e2.value.floor() as i64;
+                    int_f &= int_s;
+                    e1.value = int_f as f64;
+                    e1.tokens_read += e2.tokens_read + 1;
+                }
+                else {
+                    //Obviously to lowercase isn't really what I want, but I don't really know how to get the string from the number, will check later -mgmoens
+                    return Err(CalcError::UnexpectedToken("Not a integer number!".to_lowercase(),"Not a integer number!"));
+                }
+            },
+            Token::BitWiseOr => {
+                let e2 = try!(e_expr(&token_list[index+1..]));
+                if e1.value == e1.value.floor() && e2.value == e2.value.floor(){
+                    let mut int_f = e1.value.floor() as i64;
+                    let int_s = e2.value.floor() as i64;
+                    int_f |= int_s;
+                    e1.value = int_f as f64;
+                    e1.tokens_read += e2.tokens_read + 1;
+                }
+                else {
+                    return Err(CalcError::UnexpectedToken("Not a integer number!".to_lowercase(),"Not a integer number!"));
+                }
+            },
+            Token::BitWiseNot => {
+                if e1.value == e1.value.floor() {
+                    let mut int_f = e1.value.floor() as i64;
+                    //magic number: bigest integer representable by f64 is 2^53, which is 0b1<<54 according to https://stackoverflow.com/questions/1848700/biggest-integer-that-can-be-stored-in-a-double
+                    // make a mask by shifting 11... between the sign bit and the number to effectively get a 55 bit signed number
+                    //let mask = 0b111111111 << 54;
+                    int_f = !(int_f);
+                    e1.value = int_f as f64;
+                    e1.tokens_read += 1;
+                }
+                else {
+                    return Err(CalcError::UnexpectedToken("Not a integer number!".to_lowercase(),"Not a integer number!"));
+                }
+            }
+            Token::Number(ref n) => return Err(CalcError::UnexpectedToken(n.clone(),"operator")),
+            _ => break,
+        };
+        index = e1.tokens_read;
+    }
+    Ok(e1)
+}
 // Addition and subtraction
 pub fn e_expr(token_list: &[Token]) -> Result<IntermediateResult, CalcError> {
     let mut t1 = try!(t_expr(token_list));
@@ -214,6 +292,15 @@ pub fn t_expr(token_list: &[Token]) -> Result<IntermediateResult, CalcError> {
                     f1.tokens_read += f2.tokens_read + 1;
                 }
             }
+            Token::Modulo => {
+                let f2 = try!(f_expr(&token_list[index+1..]));
+                if f2.value == 0.0{
+                    return Err(CalcError::DivideByZero);
+                } else {
+                    f1.value %= f2.value;
+                    f1.tokens_read += f2.tokens_read + 1;
+                }
+            }
             Token::Number(ref n) => return Err(CalcError::UnexpectedToken(n.clone(),"operator")),
             _ => break,
         }
@@ -224,7 +311,7 @@ pub fn t_expr(token_list: &[Token]) -> Result<IntermediateResult, CalcError> {
 
 // Exponentiation
 pub fn f_expr(token_list: &[Token]) -> Result<IntermediateResult, CalcError> {
-    let mut g1 = try!(g_expr(token_list));
+    let mut g1 = try!(g_expr(token_list)); //was g1
     let mut index = g1.tokens_read;
     let token_len = token_list.len();
     while index < token_len {
@@ -273,7 +360,7 @@ pub fn g_expr(token_list: &[Token]) -> Result<IntermediateResult, CalcError> {
                 }
             }
             Token::OpenParen => {
-                let expr = e_expr(&token_list[1..]);
+                let expr = d_expr(&token_list[1..]);
                 match expr {
                     Ok(ir) => {
                         let close_paren = ir.tokens_read + 1;
@@ -296,8 +383,9 @@ pub fn g_expr(token_list: &[Token]) -> Result<IntermediateResult, CalcError> {
     }
 }
 
+
 pub fn parse(tokens: &[Token]) -> Result<String, CalcError> {
-    e_expr(tokens).map(|answer| answer.value.to_string())
+    d_expr(tokens).map(|answer| answer.value.to_string())
 }
 
 fn eval(input: &str) -> Result<String, CalcError> {
