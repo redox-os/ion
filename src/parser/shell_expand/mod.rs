@@ -206,15 +206,13 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                                 let mut temp = String::new();
                                 expand_process(&mut temp, command, quoted, Select::All, expand_func);
                                 let len = temp.split_whitespace().count();
-                                let temp = if let Some((start, length)) = range.bounds(len) {
-                                     temp.split_whitespace()
-                                               .skip(start)
-                                               .take(length)
-                                               .collect::<Vec<&str>>()
-                                } else {
-                                    Vec::new()
-                                };
-                                output.push_str(&temp.join(" "));
+                                if let Some((start, length)) = range.bounds(len) {
+                                    let res = temp.split_whitespace()
+                                                  .skip(start)
+                                                  .take(length)
+                                                  .collect::<Vec<&str>>();
+                                    output.push_str(&res.join(" "));
+                                }
                             }
                         }
                     },
