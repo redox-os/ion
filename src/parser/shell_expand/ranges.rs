@@ -65,7 +65,7 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
     let mut bytes_iterator = input.bytes().enumerate();
     while let Some((id, byte)) = bytes_iterator.next() {
         match byte {
-            b'0'...b'9' => continue,
+            b'0'...b'9' | b'-' => continue,
             b'.' => {
                 let first = &input[..id];
 
