@@ -124,10 +124,14 @@ fn index_ranges() {
     let range2 = Range::inclusive(Index::Forward(0), Index::Forward(2));
     let range3 = Range::inclusive(Index::Forward(2), Index::Backward(1));
     let range4 = Range::inclusive(Index::Forward(0), Index::Backward(0));
+    let range5 = Range::exclusive(Index::Backward(2), Index::Backward(0));
+    let range6 = Range::from(Index::Backward(2));
     assert_eq!(Some(range1), parse_index_range("0..3"));
     assert_eq!(Some(range2), parse_index_range("0...2"));
     assert_eq!(Some(range3), parse_index_range("2...-2"));
     assert_eq!(Some(range4), parse_index_range("0...-1"));
+    assert_eq!(Some(range5), parse_index_range("-3..-1"));
+    assert_eq!(Some(range6), parse_index_range("-3.."));
     assert_eq!(None, parse_index_range("0..A"));
 }
 
