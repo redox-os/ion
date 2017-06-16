@@ -13,10 +13,10 @@ pub enum Token {
     Cube,
     BitWiseAnd,
     BitWiseOr,
-    //BitWiseXor,
+    BitWiseXor,
     BitWiseNot,
-    //BitWiseRShift,
-    //BitWiseLShift,
+    BitWiseRShift,
+    BitWiseLShift,
     Modulo,
     OpenParen,
     CloseParen,
@@ -36,10 +36,10 @@ impl Token {
             Token::Cube       => "Cube",
             Token::BitWiseAnd => "And",
             Token::BitWiseOr  => "Or",
-            //Token::BitWiseXor => "Xor",
+            Token::BitWiseXor => "Xor",
             Token::BitWiseNot => "Not",
-            //Token::BitWiseRShift => "RShift",
-            //Token::BitWiseLShift => "LShift",
+            Token::BitWiseRShift => "RShift",
+            Token::BitWiseLShift => "LShift",
             Token::Modulo => "Modulo",
             Token::OpenParen  => "OpenParen",
             Token::CloseParen => "CloseParen",
@@ -94,37 +94,70 @@ impl IntermediateResult {
     }
 }
 
-pub trait OperatorFunctions {
+enum OperatorState {
+    PotentiallyIncomplete,
+    Complete,
+    NotAnOperator
+}
+
+trait IsOperator {
     fn is_operator(self) -> bool;
+}
+
+impl IsOperator for char {
+    fn is_operator(self) -> bool {
+        match self {
+            '+' | '-' | '/' | '^' | '²' | '³' |
+            '&' | '|' | '~' | '>' | '%' | '(' |
+            ')' | '*' | '<' => true,
+            _ => false
+        }
+    }
+}
+
+trait CheckOperator {
+    fn check_operator(self) -> OperatorState;
+}
+
+impl CheckOperator for char {
+    fn check_operator(self) -> OperatorState {
+        match self {
+            '+' | '-' | '/' |
+            '^' | '²' | '³' |
+            '&' | '|' | '~' |
+            '%' | '(' | ')' => OperatorState::Complete,
+            '*' | '<' | '>' => OperatorState::PotentiallyIncomplete,
+            _ => OperatorState::NotAnOperator
+        }
+    }
+}
+
+pub trait OperatorMatch {
     fn operator_type(self) -> Option<Token>;
 }
 
-impl OperatorFunctions for char {
-    fn is_operator(self) -> bool {
-        self == '+' ||
-        self == '-' ||
-        self == '*' ||
-        self == '/' ||
-        self == '^' ||
-        self == '²' ||
-        self == '³' ||
-        self == '&' ||
-        self == '|' ||
-        self == '~' ||
-        //self == '>' ||
-        //self == '<' ||
-        self == '%' ||
-        self == '(' ||
-        self == ')'
+impl OperatorMatch for [char; 2] {
+    fn operator_type(self) -> Option<Token> {
+        if self == ['*', '*'] {
+            Some(Token::Exponent)
+        } else if self == ['<', '<'] {
+            Some(Token::BitWiseLShift)
+        } else if self == ['>', '>'] {
+            Some(Token::BitWiseRShift)
+        } else {
+            None
+        }
     }
+}
 
+impl OperatorMatch for char {
     fn operator_type(self) -> Option<Token> {
         match self {
             '+' => Some(Token::Plus),
             '-' => Some(Token::Minus),
             '/' => Some(Token::Divide),
             '*' => Some(Token::Multiply),
-            '^' => Some(Token::Exponent),
+            '^' => Some(Token::BitWiseXor),
             '²' => Some(Token::Square),
             '³' => Some(Token::Cube),
             '&' => Some(Token::BitWiseAnd),
@@ -152,14 +185,33 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CalcError> {
             let token_string = consume_number(&chars[current_pos..]);
             current_pos += token_string.len();
             tokens.push(Token::Number(token_string));
-        } else if c.is_operator() {
-            tokens.push(c.operator_type().ok_or_else(|| InvalidOperator(c))?);
-            current_pos += 1;
-        } else if c.is_whitespace() {
-            current_pos += 1;
         } else {
-            let token_string = consume_until_new_token(&chars[current_pos..]);
-            return Err(CalcError::UnrecognizedToken(token_string));
+            match c.check_operator() {
+                OperatorState::Complete => {
+                    tokens.push(c.operator_type().ok_or_else(|| InvalidOperator(c))?);
+                    current_pos += 1;
+                },
+                OperatorState::PotentiallyIncomplete => {
+                    match chars.get(current_pos+1) {
+                        Some(next_char) if next_char.is_operator() => {
+                            tokens.push([c, *next_char].operator_type().ok_or_else(|| InvalidOperator(c))?);
+                            current_pos += 2;
+                        }
+                        _ => {
+                            tokens.push(c.operator_type().ok_or_else(|| InvalidOperator(c))?);
+                            current_pos += 1;
+                        }
+                    }
+                },
+                OperatorState::NotAnOperator => {
+                    if c.is_whitespace() {
+                        current_pos += 1;
+                    } else {
+                        let token_string = consume_until_new_token(&chars[current_pos..]);
+                        return Err(CalcError::UnrecognizedToken(token_string));
+                    }
+                }
+            }
         }
     }
     Ok(tokens)
@@ -238,7 +290,46 @@ pub fn d_expr(token_list: &[Token]) -> Result<IntermediateResult, CalcError> {
                 else {
                     return Err(CalcError::UnexpectedToken("Not a integer number!".to_lowercase(),"Not a integer number!"));
                 }
-            }
+            },
+            Token::BitWiseXor => {
+                let e2 = try!(e_expr(&token_list[index+1..]));
+                if e1.value == e1.value.floor() && e2.value == e2.value.floor(){
+                    let mut int_f = e1.value.floor() as i64;
+                    let int_s = e2.value.floor() as i64;
+                    int_f ^= int_s;
+                    e1.value = int_f as f64;
+                    e1.tokens_read += e2.tokens_read + 1;
+                }
+                else {
+                    return Err(CalcError::UnexpectedToken("Not a integer number!".to_lowercase(),"Not a integer number!"));
+                }
+            },
+            Token::BitWiseLShift => {
+                let e2 = try!(e_expr(&token_list[index+1..]));
+                if e1.value == e1.value.floor() && e2.value == e2.value.floor(){
+                    let mut int_f = e1.value.floor() as i64;
+                    let int_s = e2.value.floor() as i64;
+                    int_f <<= int_s;
+                    e1.value = int_f as f64;
+                    e1.tokens_read += e2.tokens_read + 1;
+                }
+                else {
+                    return Err(CalcError::UnexpectedToken("Not a integer number!".to_lowercase(),"Not a integer number!"));
+                }
+            },
+            Token::BitWiseRShift => {
+                let e2 = try!(e_expr(&token_list[index+1..]));
+                if e1.value == e1.value.floor() && e2.value == e2.value.floor(){
+                    let mut int_f = e1.value.floor() as i64;
+                    let int_s = e2.value.floor() as i64;
+                    int_f >>= int_s;
+                    e1.value = int_f as f64;
+                    e1.tokens_read += e2.tokens_read + 1;
+                }
+                else {
+                    return Err(CalcError::UnexpectedToken("Not a integer number!".to_lowercase(),"Not a integer number!"));
+                }
+            },
             Token::Number(ref n) => return Err(CalcError::UnexpectedToken(n.clone(),"operator")),
             _ => break,
         };
