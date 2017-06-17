@@ -248,7 +248,7 @@ else
         let correct_parse = Statement::Function{
             description: "".into(),
             name:        "bob".into(),
-            args:        vec!["a".to_owned(), "b".to_owned()],
+            args:        vec![FunctionArgument::Untyped("a".to_owned()), FunctionArgument::Untyped("b".to_owned())],
             statements:  Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
@@ -265,7 +265,7 @@ else
         let correct_parse = Statement::Function{
             description: "bob is a nice function".to_string(),
             name:        "bob".into(),
-            args:        vec!("a".to_owned(), "b".to_owned()),
+            args:        vec!(FunctionArgument::Untyped("a".to_owned()), FunctionArgument::Untyped("b".to_owned())),
             statements:  vec!()
         };
         assert_eq!(correct_parse, parsed_if);
