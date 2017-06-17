@@ -77,8 +77,8 @@ They may also be optionally defined using a braced syntax, which is useful in th
 integrated alongside other characters that do not terminate the variable parsing.
 
 ```ion
-let a = one
-let b = two
+let A = one
+let B = two
 echo $A:$B
 echo ${A}s and ${B}s
 ```
