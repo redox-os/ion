@@ -20,6 +20,7 @@ pub enum Statement {
     Let {
         expression: Binding,
     },
+    Export(Binding),
     If {
         expression: Pipeline,
         success: Vec<Statement>,

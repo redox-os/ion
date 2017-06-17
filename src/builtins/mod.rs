@@ -8,7 +8,7 @@ mod echo;
 mod calc;
 mod set;
 
-use self::variables::{alias, drop_alias, drop_variable, export_variable};
+use self::variables::{alias, drop_alias, drop_variable};
 use self::functions::fn_;
 use self::source::source;
 use self::echo::echo;
@@ -129,15 +129,6 @@ impl Builtin {
                         });
 
         /* Variables */
-        commands.insert("export",
-                        Builtin {
-                            name: "export",
-                            help: "Set an environment variable",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                export_variable(&mut shell.variables, args)
-                            })
-                        });
-
         commands.insert("fn",
                         Builtin {
                             name: "fn",

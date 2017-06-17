@@ -7,7 +7,7 @@ use super::flags::*;
 use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_if};
 use parser::{ForExpression, StatementSplitter, check_statement};
 use parser::peg::Pipeline;
-use super::assignments::let_assignment;
+use super::assignments::{let_assignment, export_variable};
 
 //use glob::glob;
 
@@ -105,6 +105,9 @@ impl<'a> FlowLogic for Shell<'a> {
                     Statement::Let { expression } => {
                         self.previous_status = let_assignment(expression, &mut self.variables, &self.directory_stack);
                     },
+                    Statement::Export(expression) => {
+                        self.previous_status = export_variable(expression, &mut self.variables, &self.directory_stack);
+                    }
                     Statement::While { expression, statements } => {
                         self.execute_while(expression, statements);
                     },
@@ -148,6 +151,9 @@ impl<'a> FlowLogic for Shell<'a> {
                 Statement::Let { expression } => {
                     self.previous_status = let_assignment(expression, &mut self.variables, &self.directory_stack);
                 },
+                Statement::Export(expression) => {
+                    self.previous_status = export_variable(expression, &mut self.variables, &self.directory_stack);
+                }
                 Statement::While { expression, mut statements } => {
                     self.flow_control.level += 1;
                     collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
@@ -288,6 +294,9 @@ impl<'a> FlowLogic for Shell<'a> {
             Statement::Let { expression } => {
                 self.previous_status = let_assignment(expression, &mut self.variables, &self.directory_stack);
             },
+            Statement::Export(expression) => {
+               self.previous_status = export_variable(expression, &mut self.variables, &self.directory_stack);
+            }
             // Collect the statements for the while loop, and if the loop is complete,
             // execute the while loop with the provided expression.
             Statement::While { expression, mut statements } => {
