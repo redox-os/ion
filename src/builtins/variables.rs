@@ -1,6 +1,5 @@
 // TODO: Move into grammar
 
-use std::env;
 use std::io::{self, Write};
 
 use types::*;
@@ -182,58 +181,6 @@ pub fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     SUCCESS
 }
 
-
-/// Exporting a variable sets that variable as a global variable in the system.
-/// Global variables can be accessed by other programs running on the system.
-pub fn export_variable<'a, S: AsRef<str> + 'a>(vars: &mut Variables, args: &[S]) -> i32
-{
-    match parse_assignment(args) {
-        Binding::InvalidKey(key) => {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
-            return FAILURE
-        },
-        Binding::KeyValue(key, value) => env::set_var(key, value),
-        Binding::KeyOnly(key) => {
-            if let Some(local_value) = vars.get_var(&key) {
-                env::set_var(key, local_value);
-            } else {
-                let stderr = io::stderr();
-                let _ = writeln!(&mut stderr.lock(), "ion: unknown variable, '{}'", key);
-                return FAILURE;
-            }
-        },
-        Binding::Math(key, operator, increment) => {
-            let value = vars.get_var(&key).unwrap_or_else(|| "".into());
-            match value.parse::<f32>() {
-                Ok(old_value) => match operator {
-                    Operator::Plus     => env::set_var(key, (old_value + increment).to_string()),
-                    Operator::Minus    => env::set_var(key, (old_value - increment).to_string()),
-                    Operator::Multiply => env::set_var(key, (old_value * increment).to_string()),
-                    Operator::Divide   => env::set_var(key, (old_value / increment).to_string()),
-                },
-                Err(_) => {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: original value, {}, is not a number", value);
-                    return FAILURE;
-                }
-            }
-        },
-        Binding::MathInvalid(value) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "ion: supplied value, {}, is not a number", value);
-            return FAILURE;
-        },
-        _ => {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion usage: export KEY=VALUE");
-            return FAILURE;
-        }
-    }
-    SUCCESS
-}
 
 #[cfg(test)]
 mod test {

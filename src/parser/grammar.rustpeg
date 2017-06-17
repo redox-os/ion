@@ -5,6 +5,7 @@ use shell::flow_control::{ElseIf, Statement};
 #[pub]
 parse_ -> Statement
       = let_
+      / export_
       / if_
       / else_if_
       / else_
@@ -20,6 +21,12 @@ parse_ -> Statement
 let_ -> Statement
     = whitespace* "let" whitespace? value:$(.*) {
         Statement::Let { expression: parse_assignment(value) }
+    }
+
+#[pub]
+export_ -> Statement
+    = whitespace* "export" whitespace? value:$(.*) {
+        Statement::Export(parse_assignment(value))
     }
 
 #[pub]

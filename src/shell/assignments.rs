@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use std::env;
 
 use super::variables::Variables;
 use super::directory_stack::DirectoryStack;
@@ -63,51 +64,7 @@ fn print_arrays(list: &ArrayVariableContext) {
 
 pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &DirectoryStack) -> i32 {
     let action = {
-        let expanders = ExpanderFunctions {
-            tilde: &|tilde: &str| vars.tilde_expansion(tilde, dir_stack),
-            array: &|array: &str, selection: Select| {
-                match vars.get_array(array) {
-                    Some(array) => match selection {
-                        Select::None => None,
-                        Select::All => Some(array.clone()),
-                        Select::Index(id) => {
-                            id.resolve(array.len())
-                              .and_then(|n| array.get(n))
-                              .map(|x| Some(x.to_owned()).into_iter().collect())
-                        },
-                        Select::Range(range) => {
-                            if let Some((start, length)) = range.bounds(array.len()) {
-                                let array: VArray = array.iter()
-                                                         .skip(start)
-                                                         .take(length)
-                                                         .map(|x| x.to_owned())
-                                                         .collect();
-                                if array.is_empty() {
-                                    None
-                                } else {
-                                    Some(array)
-                                }
-                            } else {
-                                None
-                            }
-                        }
-                    },
-                    None => None
-                }
-            },
-            variable: &|variable: &str, quoted: bool| {
-                use ascii_helpers::AsciiReplace;
-
-                if quoted {
-                    vars.get_var(variable)
-                } else {
-                    vars.get_var(variable).map(|x| x.ascii_replace('\n', ' ').into())
-                }
-            },
-            command: &|command: &str, quoted: bool| vars.command_expansion(command, quoted),
-        };
-
-
+        let expanders = get_expanders!(vars, dir_stack);
 
         match binding {
             Binding::InvalidKey(key) => {
@@ -165,6 +122,74 @@ pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &Direct
     match action {
         Action::UpdateArray(key, array) => vars.set_array(&key, array),
         Action::UpdateString(key, string) => vars.set_var(&key, &string),
+        Action::NoOp => ()
+    };
+
+    SUCCESS
+}
+
+/// Exporting a variable sets that variable as a global variable in the system.
+/// Global variables can be accessed by other programs running on the system.
+pub fn export_variable(binding : Binding, vars: &mut Variables, dir_stack : &DirectoryStack) -> i32 {
+    let action = {
+        let expanders = get_expanders!(vars, dir_stack);
+
+        match binding {
+            Binding::InvalidKey(key) => {
+                let stderr = io::stderr();
+                let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
+                return FAILURE;
+            },
+            Binding::KeyValue(key, value) => match parse_expression(&value, &expanders) {
+                Value::String(value) => Action::UpdateString(key, value),
+                Value::Array(array)  => Action::UpdateArray(key, array)
+            },
+            Binding::KeyOnly(key) => {
+                let stderr = io::stderr();
+                let _ = writeln!(&mut stderr.lock(), "ion: please provide value for variable '{}'", key);
+                return FAILURE;
+            },
+            Binding::ListEntries => {
+                print_vars(&vars.variables);
+                print_arrays(&vars.arrays);
+                Action::NoOp
+            },
+            Binding::Math(key, operator, value) => {
+                match parse_expression(&value, &expanders) {
+                    Value::String(ref value) => {
+                        let left = match vars.get_var(&key).and_then(|x| x.parse::<f32>().ok()) {
+                            Some(left) => left,
+                            None => return FAILURE,
+                        };
+
+                        let right = match value.parse::<f32>().ok() {
+                            Some(right) => right,
+                            None => return FAILURE
+                        };
+
+                        let result = match operator {
+                            Operator::Add      => left + right,
+                            Operator::Subtract => left - right,
+                            Operator::Divide   => left / right,
+                            Operator::Multiply => left * right,
+                            Operator::Exponent => f32::powf(left, right)
+                        };
+
+                        Action::UpdateString(key, result.to_string())
+                    },
+                    Value::Array(_) => {
+                        let stderr = io::stderr();
+                        let _ = writeln!(stderr.lock(), "ion: array math not supported yet");
+                        return FAILURE
+                    }
+                }
+            },
+        }
+    };
+
+    match action {
+        Action::UpdateArray(key, array) => env::set_var(&key, array.join(" ")),
+        Action::UpdateString(key, string) => env::set_var(&key, string),
         Action::NoOp => ()
     };
 
