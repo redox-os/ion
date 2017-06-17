@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use std::error::Error;
+use std::iter::Peekable;
 use self::CalcError::*;
 
 #[derive(Debug, Clone)]
@@ -173,41 +174,35 @@ impl OperatorMatch for char {
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, CalcError> {
     let mut tokens = Vec::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
 
-    // TODO: Not this. Modify to use iterator
-    let chars: Vec<char> = input.chars().collect();
-
-    let input_length = chars.len();
-    let mut current_pos = 0;
-    while current_pos < input_length {
-        let c = chars[current_pos];
+    while let Some(&c) = chars.peek() {
         if c.is_digit(10) || c == '.' {
-            let token_string = consume_number(&chars[current_pos..]);
-            current_pos += token_string.len();
+            let token_string = consume_number(&mut chars);
             tokens.push(Token::Number(token_string));
         } else {
             match c.check_operator() {
                 OperatorState::Complete => {
                     tokens.push(c.operator_type().ok_or_else(|| InvalidOperator(c))?);
-                    current_pos += 1;
+                    chars.next();
                 },
                 OperatorState::PotentiallyIncomplete => {
-                    match chars.get(current_pos+1) {
-                        Some(next_char) if next_char.is_operator() => {
-                            tokens.push([c, *next_char].operator_type().ok_or_else(|| InvalidOperator(c))?);
-                            current_pos += 2;
+                    chars.next();
+                    match chars.peek() {
+                        Some(&next_char) if next_char.is_operator() => {
+                            tokens.push([c, next_char].operator_type().ok_or_else(|| InvalidOperator(c))?);
+                            chars.next();
                         }
                         _ => {
                             tokens.push(c.operator_type().ok_or_else(|| InvalidOperator(c))?);
-                            current_pos += 1;
                         }
                     }
                 },
                 OperatorState::NotAnOperator => {
                     if c.is_whitespace() {
-                        current_pos += 1;
+                        chars.next();
                     } else {
-                        let token_string = consume_until_new_token(&chars[current_pos..]);
+                        let token_string = consume_until_new_token(&mut chars);
                         return Err(CalcError::UnrecognizedToken(token_string));
                     }
                 }
@@ -217,10 +212,10 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CalcError> {
     Ok(tokens)
 }
 
-fn consume_number(input: &[char]) -> String {
-    let mut number = String::with_capacity(input.len());
+fn consume_number<I: Iterator<Item = char>>(input: &mut Peekable<I>) -> String {
+    let mut number = String::new();
     let mut has_decimal_point = false;
-    for &c in input {
+    while let Some(&c) = input.peek() {
         if c == '.' {
             if has_decimal_point {
                 break;
@@ -233,14 +228,13 @@ fn consume_number(input: &[char]) -> String {
         } else {
             break;
         }
+        input.next();
     }
     number
 }
 
-fn consume_until_new_token(input: &[char]) -> String {
-    input.iter()
-         .take_while(|c| !(c.is_whitespace() || c.is_operator() || c.is_digit(10)))
-         .cloned()
+fn consume_until_new_token<I: Iterator<Item = char>>(input: &mut I) -> String {
+    input.take_while(|c| !(c.is_whitespace() || c.is_operator() || c.is_digit(10)))
          .collect()
 }
 
