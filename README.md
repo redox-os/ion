@@ -17,6 +17,7 @@ Ion is a shell for UNIX platforms, and is the default shell in Redox. It is stil
 - [x] While Loops
 - [x] If Conditionals
 - [x] Functions
+- [x] Optionally-Typed Function Parameters
 - [x] Executing Scripts with an @args Array
 - [x] Aliases
 - [x] Variables (**$variable**)
@@ -36,6 +37,7 @@ Ion is a shell for UNIX platforms, and is the default shell in Redox. It is stil
 - [x] Multiline Comments and Commands
 - [x] Tab Completion (Needs Improvements)
 - [x] vi and emacs keybindings (`set -o (vi|emacs)`)
+- [x] Implicit cd
 
 ## Unimplemented Features
 

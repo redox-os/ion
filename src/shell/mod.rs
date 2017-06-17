@@ -19,6 +19,7 @@ use std::fs::File;
 use std::io::{self, ErrorKind, Read, Write};
 use std::env;
 use std::mem;
+use std::path::Path;
 use std::process;
 use std::time::SystemTime;
 use std::iter::FromIterator;
@@ -436,7 +437,12 @@ impl<'a> Shell<'a> {
                 let _ = writeln!(stderr, "ion: function pipelining is not implemented yet");
                 Some(FAILURE)
             }
-        // If not a shell command or a shell function execute the pipeline and set the exit_status
+        } else if Path::new(&pipeline.jobs[0].command).is_dir() {
+            // This branch implements implicit cd support.
+            let mut new_args: SmallVec<[&str; 4]> = SmallVec::new();
+            new_args.push("cd");
+            new_args.extend(pipeline.jobs[0].args.iter().map(|x| x as &str));
+            Some((*builtins.get("cd").unwrap().main)(&new_args, self))
         } else {
             Some(execute_pipeline(pipeline))
         };

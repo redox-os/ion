@@ -34,15 +34,14 @@ impl Job {
         let mut expanded = SmallVec::new();
         expanded.grow(self.args.len());
         {
-            let mut iterator = self.args.drain();
-            expanded.push(iterator.next().unwrap());
-            for arg in iterator.flat_map(|argument| expand_string(&argument, expanders, false)) {
-                
+            for arg in self.args.drain().flat_map(|argument| expand_string(&argument, expanders, false)) {
+
                 expanded.push(arg);
             }
         }
 
         self.args = expanded;
+        self.command = self.args[0].clone().into();
     }
 
     pub fn build_command(&mut self) -> Command {
