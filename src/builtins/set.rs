@@ -2,6 +2,7 @@ use std::iter;
 use std::io::{self, Write};
 use shell::flags::*;
 use shell::Shell;
+use liner::KeyBindings;
 
 const HELP: &'static str = r#"NAME
     set - Set or unset values of shell options and positional parameters.
@@ -31,7 +32,7 @@ use self::PositionalArgs::*;
 
 pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
     let stdout = io::stdout();
-    let mut stdout = stdout.lock();
+    let stderr = io::stderr();
     let mut args_iter = args.iter();
     let mut positionals = None;
 
@@ -39,6 +40,7 @@ pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
         if arg.starts_with("--") {
             if arg.len() == 2 { positionals = Some(UnsetIfNone); break }
             if &arg[2..] == "help" {
+                let mut stdout = stdout.lock();
                 let _ = stdout.write(HELP.as_bytes());
             } else {
                 return 0
@@ -48,6 +50,24 @@ pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
             for flag in arg.bytes().skip(1) {
                 match flag {
                     b'e' => shell.flags |= ERR_EXIT,
+                    b'o' => {
+                        match args_iter.next() {
+                            Some(&mode) if mode == "vi" => {
+                                shell.context.key_bindings = KeyBindings::Vi;
+                            },
+                            Some(&mode) if mode == "emacs" => {
+                                shell.context.key_bindings = KeyBindings::Emacs;
+                            }
+                            Some(_) => {
+                                let _ = stderr.lock().write_all(b"set: invalid keymap\n");
+                                return 0
+                            },
+                            None => {
+                                let _ = stderr.lock().write_all(b"set: no keymap given\n");
+                                return 0
+                            }
+                        }
+                    }
                     _ => {
                         return 0
                     }
