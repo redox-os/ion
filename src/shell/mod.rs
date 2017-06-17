@@ -31,7 +31,7 @@ use types::*;
 use smallstring::SmallString;
 use self::completer::{MultiCompleter, IonFileCompleter};
 use self::directory_stack::DirectoryStack;
-use self::flow_control::{FlowControl, Function};
+use self::flow_control::{FlowControl, Function, FunctionArgument, Type};
 use self::variables::Variables;
 use self::status::*;
 use self::pipe::execute_pipeline;
@@ -324,8 +324,6 @@ impl<'a> Shell<'a> {
         }
     }
 
-
-
     /// Executes a pipeline and returns the final exit status of the pipeline.
     /// To avoid infinite recursion when using aliases, the noalias boolean will be set the true
     /// if an alias branch was executed.
@@ -370,33 +368,72 @@ impl<'a> Shell<'a> {
                 if pipeline.jobs[0].args.len() - 1 == function.args.len() {
                     let mut variables_backup: FnvHashMap<&str, Option<Value>> =
                         FnvHashMap::with_capacity_and_hasher (
-                        64, Default::default()
-                    );
-                    for (name, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
+                            64, Default::default()
+                        );
+
+                    let mut bad_argument: Option<(&str, Type)> = None;
+                    for (name_arg, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
+                        let name: &str = match name_arg {
+                            &FunctionArgument::Typed(ref name, ref type_) => {
+                                match *type_ {
+                                    Type::Float if value.parse::<f64>().is_ok() => name.as_str(),
+                                    Type::Int if value.parse::<i64>().is_ok() => name.as_str(),
+                                    Type::Bool if value == "true" || value == "false" => name.as_str(),
+                                    _ => {
+                                        bad_argument = Some((value.as_str(), *type_));
+                                        break
+                                    }
+                                }
+                            },
+                            &FunctionArgument::Untyped(ref name) => name.as_str()
+                        };
                         variables_backup.insert(name, self.variables.get_var(name));
                         self.variables.set_var(name, value);
                     }
 
-                    self.execute_statements(function.statements);
+                    match bad_argument {
+                        Some((actual_value, expected_type)) => {
+                            for (name, value_option) in &variables_backup {
+                                match *value_option {
+                                    Some(ref value) => self.variables.set_var(name, value),
+                                    None => {self.variables.unset_var(name);},
+                                }
+                            }
 
-                    for (name, value_option) in &variables_backup {
-                        match *value_option {
-                            Some(ref value) => self.variables.set_var(name, value),
-                            None => {self.variables.unset_var(name);},
+                            let type_ = match expected_type {
+                                Type::Float => "Float",
+                                Type::Int   => "Int",
+                                Type::Bool  => "Bool"
+                            };
+
+                            let stderr = io::stderr();
+                            let mut stderr = stderr.lock();
+                            let _ = writeln!(stderr, "ion: function argument has invalid type: expected {}, found value \'{}\'", type_, actual_value);
+                            Some(FAILURE)
+                        }
+                        None => {
+                            self.execute_statements(function.statements);
+
+                            for (name, value_option) in &variables_backup {
+                                match *value_option {
+                                    Some(ref value) => self.variables.set_var(name, value),
+                                    None => {self.variables.unset_var(name);},
+                                }
+                            }
+                            None
                         }
                     }
-                    None
                 } else {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "This function takes {} arguments, but you provided {}",
+                    let _ = writeln!(stderr, "ion: function takes {} arguments, but you provided {}",
                         function.args.len(), pipeline.jobs[0].args.len()-1);
                     Some(NO_SUCH_COMMAND) // not sure if this is the right error code
                 }
             } else {
                 let stderr = io::stderr();
                 let mut stderr = stderr.lock();
-                let _ = writeln!(stderr, "Function pipelining is not implemented yet");
+                let _ = writeln!(stderr, "ion: function pipelining is not implemented yet");
                 Some(FAILURE)
             }
         // If not a shell command or a shell function execute the pipeline and set the exit_status

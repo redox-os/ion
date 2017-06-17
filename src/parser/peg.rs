@@ -1,6 +1,6 @@
 use std::io::{stderr, Write};
 
-use shell::flow_control::Statement;
+use shell::flow_control::{Statement, FunctionArgument, Type};
 use self::grammar::parse_;
 use shell::directory_stack::DirectoryStack;
 use shell::Job;
@@ -59,6 +59,43 @@ pub fn parse(code: &str) -> Statement {
 			Statement::Default
 		}
 	}
+}
+
+pub fn get_function_args(args: Vec<String>) -> Option<Vec<FunctionArgument>> {
+    let mut fn_args = Vec::with_capacity(args.len());
+    for argument in args.into_iter() {
+        let length = argument.len();
+        let argument = if argument.ends_with(":int") {
+            if length <= 4 { return None }
+            let arg = &argument[..length-4];
+            if arg.contains(':') { return None }
+            FunctionArgument::Typed (
+                arg.to_owned(),
+                Type::Int
+            )
+        } else if argument.ends_with(":float") {
+            if length <= 6 { return None }
+            let arg = &argument[..length-6];
+            if arg.contains(':') { return None }
+            FunctionArgument::Typed (
+                arg.to_owned(),
+                Type::Float
+            )
+        } else if argument.ends_with(":bool") {
+            if length <= 5 { return None }
+            let arg = &argument[..length-5];
+            if arg.contains(':') { return None }
+            FunctionArgument::Typed (
+                arg.to_owned(),
+                Type::Bool
+            )
+        } else {
+            FunctionArgument::Untyped(argument)
+        };
+        fn_args.push(argument);
+    }
+
+    Some(fn_args)
 }
 
 mod grammar {

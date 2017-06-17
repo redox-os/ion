@@ -8,6 +8,13 @@ pub struct ElseIf {
     pub success:    Vec<Statement>
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Type { Float, Int, Bool }
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum FunctionArgument { Typed(String, Type), Untyped(String) }
+
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let {
@@ -23,7 +30,7 @@ pub enum Statement {
     Function {
         name: Identifier,
         description: String,
-        args: Vec<String>,
+        args: Vec<FunctionArgument>,
         statements: Vec<Statement>
     },
     For {
@@ -47,7 +54,7 @@ pub enum Statement {
 pub struct FlowControl {
     pub level:             usize,
     pub current_statement: Statement,
-    pub current_if_mode:      u8 // { 0 = SUCCESS; 1 = FAILURE }
+    pub current_if_mode:   u8 // { 0 = SUCCESS; 1 = FAILURE }
 }
 
 impl Default for FlowControl {
@@ -64,13 +71,15 @@ impl Default for FlowControl {
 pub struct Function {
     pub description: String,
     pub name: Identifier,
-    pub args: Vec<String>,
+    pub args: Vec<FunctionArgument>,
     pub statements: Vec<Statement>
 }
 
-pub fn collect_loops<I>(iterator: &mut I, statements: &mut Vec<Statement>, level: &mut usize)
-    where I: Iterator<Item = Statement>
-{
+pub fn collect_loops <I: Iterator<Item = Statement>> (
+    iterator: &mut I,
+    statements: &mut Vec<Statement>,
+    level: &mut usize
+) {
     #[allow(while_let_on_iterator)]
     while let Some(statement) = iterator.next() {
         match statement {

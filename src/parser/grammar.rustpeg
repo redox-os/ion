@@ -1,5 +1,6 @@
 use parser::assignments::parse_assignment;
 use parser::{pipelines, ArgumentSplitter};
+use parser::peg::get_function_args;
 use shell::flow_control::{ElseIf, Statement};
 
 #[pub]
@@ -72,13 +73,13 @@ end_ -> Statement
 
 #[pub]
 fn_ -> Statement
-    = whitespace* "fn " n:_name whitespace* args:_args whitespace* description:_description? {
-        Statement::Function {
+    = whitespace* "fn " n:_name whitespace* args:_fn_args whitespace* description:_description? {?
+        get_function_args(args).map(|args| Statement::Function {
             description: description.unwrap_or("".into()),
             name: n.into(),
             args: args,
             statements: Vec::new(),
-        }
+        }).ok_or("ion: invalid function argument\n")
     }
 
 _description -> String
@@ -87,11 +88,17 @@ _description -> String
 _name -> String
       = n:$([A-z0-9_]+) { n.into() }
 
+_fn_args -> Vec<String>
+    = _fn_arg ** " "
+
 _args -> Vec<String>
       = _arg ** " "
 
 _arg -> String
-     = n:$([A-z0-9]+) { n.into() }
+     = n:$([A-z0-9_]+) { n.into() }
+
+_fn_arg -> String
+    = n:$([A-z0-9_:]+) { n.into()}
 
 #[pub]
 for_ -> Statement
