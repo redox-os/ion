@@ -24,7 +24,7 @@ use super::status::*;
 enum Action {
     UpdateString(Identifier, VString),
     UpdateArray(Identifier, VArray),
-    NoOp
+    List
 }
 
 fn print_vars(list: &VariableContext) {
@@ -82,11 +82,7 @@ fn parse_assignment(binding: Binding,
             let _ = writeln!(&mut stderr.lock(), "ion: please provide value for variable '{}'", key);
             Err(FAILURE)
         },
-        Binding::ListEntries => {
-            print_vars(&vars.variables);
-            print_arrays(&vars.arrays);
-            Ok(Action::NoOp)
-        },
+        Binding::ListEntries => Ok(Action::List),
         Binding::Math(key, operator, value) => {
             match parse_expression(&value, &expanders) {
                 Value::String(ref value) => {
@@ -124,7 +120,10 @@ pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &Direct
     match parse_assignment(binding, vars, dir_stack) {
         Ok(Action::UpdateArray(key, array)) => vars.set_array(&key, array),
         Ok(Action::UpdateString(key, string)) => vars.set_var(&key, &string),
-        Ok(Action::NoOp) => (),
+        Ok(Action::List) => {
+            print_vars(&vars.variables);
+            print_arrays(&vars.arrays);
+        }
         Err(code) => return code,
     };
 
@@ -137,7 +136,16 @@ pub fn export_variable(binding : Binding, vars: &mut Variables, dir_stack : &Dir
     match parse_assignment(binding, vars, dir_stack) {
         Ok(Action::UpdateArray(key, array)) => env::set_var(&key, array.join(" ")),
         Ok(Action::UpdateString(key, string)) => env::set_var(&key, string),
-        Ok(Action::NoOp) => (),
+        Ok(Action::List) => {
+            let stdout = io::stdout();
+            let stdout = &mut stdout.lock();
+            for (key, value) in env::vars() {
+                let _ = stdout.write(key.as_bytes())
+                    .and_then(|_| stdout.write_all(b"="))
+                    .and_then(|_| stdout.write_all(value.as_bytes()))
+                    .and_then(|_| stdout.write_all(b"\n"));
+            }
+        }
         Err(code) => return code
     };
 
