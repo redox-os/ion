@@ -1,4 +1,4 @@
-use super::words::{IndexStart, IndexEnd};
+use super::words::{Range, Index};
 
 pub fn parse_range(input: &str) -> Option<Vec<String>> {
     let mut bytes_iterator = input.bytes().enumerate();
@@ -61,11 +61,11 @@ pub fn parse_range(input: &str) -> Option<Vec<String>> {
     None
 }
 
-pub fn parse_index_range(input: &str) -> Option<(IndexStart, IndexEnd)> {
+pub fn parse_index_range(input: &str) -> Option<Range> {
     let mut bytes_iterator = input.bytes().enumerate();
     while let Some((id, byte)) = bytes_iterator.next() {
         match byte {
-            b'0'...b'9' => continue,
+            b'0'...b'9' | b'-' => continue,
             b'.' => {
                 let first = &input[..id];
 
@@ -87,27 +87,24 @@ pub fn parse_index_range(input: &str) -> Option<(IndexStart, IndexEnd)> {
                         None
                     } else {
                         match end.parse::<isize>() {
-                            Ok(end) => Some((IndexStart::new(0), IndexEnd::new(end))),
+                            Ok(end) => Some(Range::to(Index::new(end))),
                             Err(_)  => None
                         }
                     }
                 } else if end.is_empty() {
                     return match first.parse::<isize>() {
-                        Ok(start) => Some((IndexStart::new(start), IndexEnd::CatchAll)),
+                        Ok(start) => Some(Range::from(Index::new(start))),
                         Err(_)    => None
                     }
                 }
 
                 if let Ok(start) = first.parse::<isize>() {
                     if let Ok(end) = end.parse::<isize>() {
-                        return if inclusive {
-                            let start = IndexStart::new(start);
-                            let end = if end == -1 { IndexEnd::FromEnd(0) } 
-                                      else { IndexEnd::new(end + 1) };
-                            Some((start, end))
+                        return Some(if inclusive {
+                            Range::inclusive(Index::new(start), Index::new(end))
                         } else {
-                            Some((IndexStart::new(start), IndexEnd::new(end)))
-                        }
+                            Range::exclusive(Index::new(start), Index::new(end))
+                        });
                     }
                 } else {
                     break
@@ -123,11 +120,28 @@ pub fn parse_index_range(input: &str) -> Option<(IndexStart, IndexEnd)> {
 
 #[test]
 fn index_ranges() {
-    assert_eq!(Some((IndexStart::new(0), IndexEnd::new(3))), parse_index_range("0..3"));
-    assert_eq!(Some((IndexStart::new(0), IndexEnd::new(3))), parse_index_range("0...2"));
-    assert_eq!(Some((IndexStart::new(2), IndexEnd::FromEnd(1))), parse_index_range("2...-2"));
-    assert_eq!(Some((IndexStart::new(0), IndexEnd::FromEnd(0))), parse_index_range("0...-1"));
-    assert_eq!(None, parse_index_range("0..A"));
+    let valid_cases = vec![
+        (Range::exclusive(Index::Forward(0), Index::Forward(3)), "0..3"),
+        (Range::inclusive(Index::Forward(0), Index::Forward(2)), "0...2"),
+        (Range::inclusive(Index::Forward(2), Index::Backward(1)), "2...-2"),
+        (Range::inclusive(Index::Forward(0), Index::Backward(0)), "0...-1"),
+        (Range::exclusive(Index::Backward(2), Index::Backward(0)), "-3..-1"),
+        (Range::from(Index::Backward(2)), "-3.."),
+        (Range::to(Index::Forward(5)), "..5")
+    ];
+    
+    for (range, string) in valid_cases {
+        assert_eq!(Some(range), parse_index_range(string));
+    }
+
+    let invalid_cases = vec![
+        "0..A",
+        "3-3..42"
+    ];
+
+    for range in invalid_cases {
+        assert_eq!(None, parse_index_range(range))
+    }
 }
 
 #[test]
