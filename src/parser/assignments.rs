@@ -15,6 +15,7 @@ pub enum Binding {
     KeyOnly(Identifier),
     KeyValue(Identifier, VString),
     Math(Identifier, Operator, VString),
+    MultipleKeys(Vec<Identifier>, VString)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -39,6 +40,7 @@ pub fn parse_assignment(arguments: &str) -> Binding {
 
     // Find the key and advance the iterator until the equals operator is found.
     let mut key = "".to_owned();
+    let mut keys: Vec<Identifier> = Vec::new();
     let mut found_key = false;
     let mut operator = None;
 
@@ -56,7 +58,10 @@ pub fn parse_assignment(arguments: &str) -> Binding {
     while let Some(character) = char_iter.next() {
         match character {
             ' ' if key.is_empty() => (),
-            ' ' => found_key = true,
+            ' ' => {
+                keys.push(key.clone().into());
+                key.clear();
+            },
             '+' => {
                 match_operator!(Operator::Add);
                 break
@@ -78,6 +83,7 @@ pub fn parse_assignment(arguments: &str) -> Binding {
                 break
             },
             '=' => {
+                if !key.is_empty() { keys.push(key.into()); }
                 found_key = true;
                 break
             },
@@ -86,9 +92,19 @@ pub fn parse_assignment(arguments: &str) -> Binding {
         }
     }
 
-    if !found_key && key.is_empty() {
+    if !found_key {
+        Binding::ListEntries
+    } else if keys.len() > 1 {
+        for key in &keys {
+            if !Variables::is_valid_variable_name(&key) {
+                return Binding::InvalidKey(key.clone());
+            }
+        }
+        Binding::MultipleKeys(keys, char_iter.skip_while(|&x| x == ' ').collect::<VString>())
+    } else if keys.is_empty() {
         Binding::ListEntries
     } else {
+        let key = keys.drain(..).next().unwrap();
         let value = char_iter.skip_while(|&x| x == ' ').collect::<VString>();
         if value.is_empty() {
             Binding::KeyOnly(key.into())

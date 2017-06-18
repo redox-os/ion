@@ -21,6 +21,7 @@ Ion is a shell for UNIX platforms, and is the default shell in Redox. It is stil
 - [x] Executing Scripts with an @args Array
 - [x] Aliases
 - [x] Variables (**$variable**)
+- [x] Multiple Variable Assignments
 - [x] Substring Slicing of Variables
 - [x] Arrays (**@array**)
 - [x] Array Expressions (**[]**)
@@ -68,6 +69,14 @@ a similar action, only setting the variable globally as an environment variable 
 
 ```ion
 let git_branch = $(git rev-parse --abbrev-ref HEAD ^> /dev/null)
+```
+
+It is also possible to assign multiple variables at once, or swap variables.
+
+```ion
+let a b = 1 2
+let a b = [1 2]
+let a b = [$b $a]
 ```
 
 If the command is executed without any arguments, it will simply list all available variables.

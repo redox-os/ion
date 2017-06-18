@@ -1,0 +1,12 @@
+let a = 5
+echo $a
+let a b = [10 $a]
+echo $a
+echo $b
+let b a = [$a $b]
+echo $a
+echo $b
+let a b c = 1 2 3
+echo $a
+echo $b
+echo $c

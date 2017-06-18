@@ -2,8 +2,7 @@ fn fib n
     if test $n -le 1
         echo $n
     else
-        let output = 1
-        let previous = 1
+        let output previous = 1 1
         for _ in 2..$n
             let temp = $output
             let output += $previous

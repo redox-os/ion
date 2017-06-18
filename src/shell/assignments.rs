@@ -23,6 +23,7 @@ use super::status::*;
 
 enum Action {
     UpdateString(Identifier, VString),
+    UpdateStrings(Vec<Identifier>, VArray),
     UpdateArray(Identifier, VArray),
     List
 }
@@ -77,6 +78,14 @@ fn parse_assignment(binding: Binding,
             Value::String(value) => Ok(Action::UpdateString(key, value)),
             Value::Array(array)  => Ok(Action::UpdateArray(key, array))
         },
+        Binding::MultipleKeys(keys, value) => match parse_expression(&value, &expanders) {
+            Value::String(value) => {
+                let array = value.split_whitespace().map(String::from)
+                    .collect::<VArray>();
+                Ok(Action::UpdateStrings(keys, array))
+            },
+            Value::Array(array)  => Ok(Action::UpdateStrings(keys, array))
+        },
         Binding::KeyOnly(key) => {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: please provide value for variable '{}'", key);
@@ -120,6 +129,11 @@ pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &Direct
     match parse_assignment(binding, vars, dir_stack) {
         Ok(Action::UpdateArray(key, array)) => vars.set_array(&key, array),
         Ok(Action::UpdateString(key, string)) => vars.set_var(&key, &string),
+        Ok(Action::UpdateStrings(keys, array)) => {
+            for (key, value) in keys.iter().zip(array.iter()) {
+                vars.set_var(key, value);
+            }
+        },
         Ok(Action::List) => {
             print_vars(&vars.variables);
             print_arrays(&vars.arrays);
@@ -136,6 +150,11 @@ pub fn export_variable(binding : Binding, vars: &mut Variables, dir_stack : &Dir
     match parse_assignment(binding, vars, dir_stack) {
         Ok(Action::UpdateArray(key, array)) => env::set_var(&key, array.join(" ")),
         Ok(Action::UpdateString(key, string)) => env::set_var(&key, string),
+        Ok(Action::UpdateStrings(keys, array)) => {
+            for (key, value) in keys.iter().zip(array.iter()) {
+                env::set_var(key, value);
+            }
+        }
         Ok(Action::List) => {
             let stdout = io::stdout();
             let stdout = &mut stdout.lock();
