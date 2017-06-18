@@ -62,6 +62,19 @@ Currently, the most important missing feature is support for signal handling, wh
 
 ## Shell Syntax
 
+### Implicit Directory Changing
+
+Like the [Friendly Interactive Shell](https://fishshell.com/), Ion also supports implicitly executing the cd command when given
+a path, so long as that path begins with either `.`, `/`, or `~`; or ends with a `/`. This will thereby invoke
+the internal built-in cd command with that path as the argument.
+
+```ion
+~/Documents # cd ~/Documents
+..          # cd ..
+.config     # cd .config
+examples/   # cd examples/
+```
+
 ### Defining Variables
 
 The `let` keyword is utilized to create local variables within the shell. The `export` keyword performs

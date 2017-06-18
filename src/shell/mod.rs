@@ -437,7 +437,9 @@ impl<'a> Shell<'a> {
                 let _ = writeln!(stderr, "ion: function pipelining is not implemented yet");
                 Some(FAILURE)
             }
-        } else if Path::new(&pipeline.jobs[0].command).is_dir() {
+        } else if (pipeline.jobs[0].command.starts_with('.') || pipeline.jobs[0].command.starts_with('/') || pipeline.jobs[0].command.ends_with("/")) &&
+            Path::new(&pipeline.jobs[0].command).is_dir()
+        {
             // This branch implements implicit cd support.
             let mut new_args: SmallVec<[&str; 4]> = SmallVec::new();
             new_args.push("cd");
