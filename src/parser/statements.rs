@@ -119,7 +119,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.flags |= COMM_1 + VARIAB;
                     continue
                 },
-                b'{'  if self.flags & COMM_1 != 0 => self.flags |= VBRACE,
+                b'{'  if self.flags & (COMM_1 + COMM_2) != 0 => self.flags |= VBRACE,
                 b'{'  if self.flags & (SQUOTE + DQUOTE) == 0 => self.brace_level += 1,
                 b'}'  if self.flags & VBRACE != 0 => self.flags ^= VBRACE,
                 b'}'  if self.flags & (SQUOTE + DQUOTE) == 0 => {
