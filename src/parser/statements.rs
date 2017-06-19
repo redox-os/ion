@@ -99,7 +99,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             match character {
-                0...47 | 58...64 | 91...94 | 96 | 123...127 if self.flags & VBRACE != 0 => {
+                0...47 | 58...64 | 91...94 | 96 | 123...124 | 126...127 if self.flags & VBRACE != 0 => {
+                    // If we are just ending the braced section continue as normal
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
@@ -120,6 +121,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 },
                 b'{'  if self.flags & COMM_1 != 0 => self.flags |= VBRACE,
                 b'{'  if self.flags & (SQUOTE + DQUOTE) == 0 => self.brace_level += 1,
+                b'}'  if self.flags & VBRACE != 0 => self.flags ^= VBRACE,
                 b'}'  if self.flags & (SQUOTE + DQUOTE) == 0 => {
                     if self.brace_level == 0 {
                         if error.is_none() {
@@ -129,7 +131,6 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         self.brace_level -= 1;
                     }
                 },
-                b'}'  if self.flags & VBRACE != 0 => self.flags ^= VBRACE,
                 b'('  if self.flags & (COMM_1 + VARIAB + ARRAY) == 0 => {
                     if error.is_none() && self.flags & (SQUOTE + DQUOTE) == 0 {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
@@ -324,4 +325,12 @@ fn nested_array_process() {
     let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], Ok(command));
+}
+
+#[test]
+fn braced_variables() {
+    let command = "echo ${foo}bar ${bar}baz ${baz}quux";
+    let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results, vec![Ok(command)]);
 }
