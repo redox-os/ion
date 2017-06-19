@@ -73,6 +73,8 @@ impl<'a> Shell<'a> {
         }
     }
     fn readln(&mut self) -> Option<String> {
+        let vars_ptr = &self.variables as *const Variables;
+        let dirs_ptr = &self.directory_stack as *const DirectoryStack;
         let funcs = &self.functions;
         let vars = &self.variables;
         let builtins = self.builtins;
@@ -106,26 +108,11 @@ impl<'a> Shell<'a> {
                     if filename {
                         if let Ok(current_dir) = env::current_dir() {
                             if let Some(url) = current_dir.to_str() {
-                                let completer = IonFileCompleter::new(Some(url));
+                                let completer = IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr);
                                 mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                             }
                         }
                     } else {
-                        // Creates completers containing definitions from all directories listed
-                        // in the environment's **$PATH** variable.
-                        let file_completers = match env::var("PATH") {
-                            Ok(val) => {
-                                if cfg!(unix) {
-                                    // UNIX systems separate paths with the `:` character.
-                                    val.split(':').map(|x| IonFileCompleter::new(Some(x))).collect::<Vec<_>>()
-                                } else {
-                                    // Redox and Windows use the `;` character to separate paths
-                                    val.split(';').map(|x| IonFileCompleter::new(Some(x))).collect::<Vec<_>>()
-                                }
-                            },
-                            Err(_) => vec![IonFileCompleter::new(Some("/bin/"))],
-                        };
-
                         // Creates a list of definitions from the shell environment that will be used
                         // in the creation of a custom completer.
                         let words = builtins.iter()
@@ -145,6 +132,24 @@ impl<'a> Shell<'a> {
 
                         // Initialize a new completer from the definitions collected.
                         let custom_completer = BasicCompleter::new(words);
+
+                        // Creates completers containing definitions from all directories listed
+                        // in the environment's **$PATH** variable.
+                        let mut file_completers = if let Ok(val) = env::var("PATH") {
+                            val.split(if cfg!(unix) { ':' } else { ';' })
+                                .map(|s| IonFileCompleter::new(Some(s), dirs_ptr, vars_ptr))
+                                .collect()
+                        } else {
+                            vec![IonFileCompleter::new(Some("/bin/"), dirs_ptr, vars_ptr)]
+                        };
+
+                        // Also add files/directories in the current directory to the completion list.
+                        if let Ok(current_dir) = env::current_dir() {
+                            if let Some(url) = current_dir.to_str() {
+                                file_completers.push(IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr));
+                            }
+                        }
+
                         // Merge the collected definitions with the file path definitions.
                         let completer = MultiCompleter::new(file_completers, custom_completer);
 
@@ -156,7 +161,12 @@ impl<'a> Shell<'a> {
 
             match line {
                 Ok(line) => return Some(line),
+                // Handles Ctrl + C
                 Err(ref err) if err.kind() == ErrorKind::Interrupted => continue,
+                // Handles Ctrl + D
+                Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
+                    process::exit(self.previous_status)
+                },
                 Err(err) => {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();
