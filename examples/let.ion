@@ -10,3 +10,8 @@ let a b c = 1 2 3
 echo $a
 echo $b
 echo $c
+let a b c = ["one two" "three four" "five six"]
+let a b c = [$c $a $b]
+echo $a
+echo $b
+echo $c

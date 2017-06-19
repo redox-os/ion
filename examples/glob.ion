@@ -6,3 +6,11 @@ echo Cargo.*
 echo Cargo?toml
 echo Cargo.[tqr]oml
 echo examples/[ef]*.ion
+mkdir glob_test
+touch glob_test/{one,two,three}
+cd glob_test
+echo *
+echo *[wh]*
+echo [t]*
+cd ..
+rm glob_test -R
