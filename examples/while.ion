@@ -17,3 +17,16 @@ while test $a -lt 10
     end
     let a += 1
 end
+
+# Nested While Loops
+
+let outer_count = 1;
+while test $outer_count -lt 4
+    echo "outer loop #$outer_count"
+    let outer_count += 1
+    let inner_count = 1
+    while test $inner_count -lt 4
+        echo "    inner loop #$inner_count"
+        let inner_count += 1
+    end
+end

@@ -16,3 +16,15 @@ found 5
 7
 8
 9
+outer loop #1
+    inner loop #1
+    inner loop #2
+    inner loop #3
+outer loop #2
+    inner loop #1
+    inner loop #2
+    inner loop #3
+outer loop #3
+    inner loop #1
+    inner loop #2
+    inner loop #3
