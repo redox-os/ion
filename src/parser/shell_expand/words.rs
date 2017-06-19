@@ -577,6 +577,43 @@ impl<'a> WordIterator<'a> {
         WordToken::ArrayVariable(&self.data[start..], self.flags & DQUOTE != 0, Select::All)
     }
 
+    fn braced_array_variable<I>(&mut self, iterator : &mut I) -> WordToken<'a>
+        where I : Iterator<Item=u8>
+    {
+        let start = self.read;
+        //self.read += 1;
+        while let Some(character) = iterator.next() {
+            match character {
+                b'[' => {
+                    let result = WordToken::ArrayVariable (
+                        &self.data[start..self.read],
+                        self.flags & DQUOTE != 0,
+                        self.read_selection(iterator)
+                    );
+                    self.read += 1;
+                    if let Some(b'}') = iterator.next() {
+                        return result;
+                    }
+                    panic!("ion: fatal with syntax validation error: unterminated braced array expression");
+                },
+                b'}' => {
+                    let output = &self.data[start..self.read];
+                    self.read += 1;
+                    return WordToken::ArrayVariable(output, self.flags & DQUOTE != 0, Select::All);
+                }
+                // Only alphanumerical and underscores are allowed in variable names
+                0...47 | 58...64 | 91...94 | 96 | 123...127 => {
+                    return WordToken::ArrayVariable(&self.data[start..self.read],
+                                                    self.flags & DQUOTE != 0,
+                                                    Select::All);
+                },
+                _ => (),
+            }
+            self.read += 1;
+        }
+        WordToken::ArrayVariable(&self.data[start..], self.flags & DQUOTE != 0, Select::All)
+    }
+
     /// Contains the logic for parsing subshell syntax.
     fn process<I>(&mut self, iterator: &mut I) -> WordToken<'a>
         where I: Iterator<Item = u8>
@@ -875,10 +912,10 @@ impl<'a> Iterator for WordIterator<'a> {
                                     Some(WordToken::Normal(&self.data[start..self.read],glob))
                                 }
                             },
-                            // Some(b'{') => {
-                            //     self.read += 2;
-                            //     return Some(self.braced_variable(&mut iterator));
-                            // }
+                            Some(b'{') => {
+                                self.read += 2;
+                                return Some(self.braced_array_variable(&mut iterator));
+                            },
                             _ => {
                                 self.read += 1;
                                 return Some(self.array_variable(&mut iterator));
@@ -1043,11 +1080,13 @@ mod tests {
 
     #[test]
     fn array_variables() {
-        let input = "@array @array[0]";
+        let input = "@array @array[0] @{array[1..]}";
         let expected = vec![
             WordToken::ArrayVariable("array", false, Select::All),
             WordToken::Whitespace(" "),
             WordToken::ArrayVariable("array", false, Select::Index(Index::new(0))),
+            WordToken::Whitespace(" "),
+            WordToken::ArrayVariable("array", false, Select::Range(Range::from(Index::new(1))))
         ];
         compare(input, expected);
     }
