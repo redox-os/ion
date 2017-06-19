@@ -983,9 +983,20 @@ impl<'a> Iterator for WordIterator<'a> {
 mod tests {
     use super::*;
 
+    macro_rules! functions {
+        () => {
+            ExpanderFunctions {
+                tilde:    &|_| None,
+                array:    &|_, _| None,
+                variable: &|_, _| None,
+                command:  &|_, _| None
+            }
+        }
+    }
+
     fn compare(input: &str, expected: Vec<WordToken>) {
         let mut correct = 0;
-        for (actual, expected) in WordIterator::new(input, true).zip(expected.iter()) {
+        for (actual, expected) in WordIterator::new(input, true, &functions!()).zip(expected.iter()) {
             assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
             correct += 1;
         }
