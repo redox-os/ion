@@ -814,7 +814,6 @@ impl<'a> Iterator for WordIterator<'a> {
         let mut start = self.read;
         let mut glob = false;
         loop {
-
             if let Some(character) = iterator.next() {
                 match character {
                     _ if self.flags & BACKSL != 0 => {
@@ -905,10 +904,10 @@ impl<'a> Iterator for WordIterator<'a> {
                             }
                         }
                     },
-                    b'*'|b'?' => {
-                        // if a word is not special, make sure you return the globbed variant at the end
-                        self.read+=1;
-                        glob=true; //warning is incorrect it does get read
+                    b'*' | b'?' => {
+                        self.read += 1;
+                        glob = true;
+                        break
                     },
                     _ => { self.read += 1; break },
                 }
@@ -961,9 +960,8 @@ impl<'a> Iterator for WordIterator<'a> {
                     }
                 },
                 b'*'|b'?' if self.flags & SQUOTE == 0 => {
-                    // if a word is not special, make sure you return the globbed variant at the end
                     self.read += 1;
-                    glob = true; //warning is incorrect it does get read
+                    glob = true;
                 },
                 _ => (),
             }
@@ -973,7 +971,6 @@ impl<'a> Iterator for WordIterator<'a> {
         if start == self.read {
             None
         } else {
-            //println!("Normal exit");
             Some(WordToken::Normal(&self.data[start..],glob))
         }
     }
