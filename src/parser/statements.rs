@@ -329,7 +329,7 @@ fn nested_array_process() {
 
 #[test]
 fn braced_variables() {
-    let command = "echo ${foo}bar ${bar}baz ${baz}quux";
+    let command = "echo ${foo}bar ${bar}baz ${baz}quux @{zardoz}wibble";
     let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results, vec![Ok(command)]);
