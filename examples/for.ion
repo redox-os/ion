@@ -21,3 +21,15 @@ end
 for i in 1{A{1,2},B{1,2}}
     echo $i
 end
+
+mkdir for_test
+cd for_test
+touch "a b c"
+touch "d e f"
+touch "g"
+touch "h i"
+for file in *
+    echo $file
+end
+cd ..
+rm for_test -R
