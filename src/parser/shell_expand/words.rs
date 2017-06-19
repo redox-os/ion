@@ -339,12 +339,13 @@ pub struct WordIterator<'a> {
     data:          &'a str,
     read:          usize,
     flags:         u8,
+    expanders:     &'a ExpanderFunctions<'a>
 }
 
 impl<'a> WordIterator<'a> {
-    pub fn new(data: &'a str, expand_processes: bool) -> WordIterator<'a> {
+    pub fn new(data: &'a str, expand_processes: bool, expanders: &'a ExpanderFunctions) -> WordIterator<'a> {
         let flags = if expand_processes { EXPAND_PROCESSES } else { 0 };
-        WordIterator { data: data, read: 0, flags: flags }
+        WordIterator { data: data, read: 0, flags: flags, expanders: expanders }
     }
 
     // Contains the grammar for collecting whitespace characters
@@ -476,7 +477,8 @@ impl<'a> WordIterator<'a> {
         let start = self.read;
         while let Some(character) = iterator.next() {
             if let b']' = character {
-                let selection = match self.data[start..self.read].parse::<Select>() {
+                let value = expand_string(&self.data[start..self.read], self.expanders, false).join(" ");
+                let selection = match value.parse::<Select>() {
                     Ok(selection) => selection,
                     Err(_)       => Select::None
                 };

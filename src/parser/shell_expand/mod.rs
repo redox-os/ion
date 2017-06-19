@@ -29,7 +29,7 @@ fn expand_process(current: &mut String, command: &str, quoted: bool,
     let mut tokens = Vec::new();
     let mut contains_brace = false;
 
-    for token in WordIterator::new(command, false) {
+    for token in WordIterator::new(command, false, expand_func) {
         if let WordToken::Brace(_) = token { contains_brace = true; }
         tokens.push(token);
     }
@@ -128,7 +128,7 @@ pub fn expand_string(
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
 
-    for word in WordIterator::new(original, true) {
+    for word in WordIterator::new(original, true, expand_func) {
         if let WordToken::Brace(_) = word { contains_brace = true; }
         token_buffer.push(word);
     }
