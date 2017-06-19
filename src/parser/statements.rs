@@ -119,7 +119,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.flags |= COMM_1 + VARIAB;
                     continue
                 },
-                b'{'  if self.flags & COMM_1 != 0 => self.flags |= VBRACE,
+                b'{'  if self.flags & (COMM_1 + COMM_2) != 0 => self.flags |= VBRACE,
                 b'{'  if self.flags & (SQUOTE + DQUOTE) == 0 => self.brace_level += 1,
                 b'}'  if self.flags & VBRACE != 0 => self.flags ^= VBRACE,
                 b'}'  if self.flags & (SQUOTE + DQUOTE) == 0 => {
@@ -329,7 +329,7 @@ fn nested_array_process() {
 
 #[test]
 fn braced_variables() {
-    let command = "echo ${foo}bar ${bar}baz ${baz}quux";
+    let command = "echo ${foo}bar ${bar}baz ${baz}quux @{zardoz}wibble";
     let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results, vec![Ok(command)]);
