@@ -99,11 +99,9 @@ impl<'a> Iterator for StatementSplitter<'a> {
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             match character {
-                0...47 | 58...64 | 91...94 | 96 | 123...127 if self.flags & VBRACE != 0 => {
+                0...47 | 58...64 | 91...94 | 96 | 123...124 | 126...127 if self.flags & VBRACE != 0 => {
                     // If we are just ending the braced section continue as normal
-                    if character == b'}' {
-                        self.flags ^= VBRACE;
-                    } else if error.is_none() {
+                    if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
@@ -123,6 +121,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 },
                 b'{'  if self.flags & COMM_1 != 0 => self.flags |= VBRACE,
                 b'{'  if self.flags & (SQUOTE + DQUOTE) == 0 => self.brace_level += 1,
+                b'}'  if self.flags & VBRACE != 0 => self.flags ^= VBRACE,
                 b'}'  if self.flags & (SQUOTE + DQUOTE) == 0 => {
                     if self.brace_level == 0 {
                         if error.is_none() {
