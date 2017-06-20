@@ -9,12 +9,11 @@ use parser::{ForExpression, StatementSplitter, check_statement};
 use parser::peg::Pipeline;
 use super::assignments::{let_assignment, export_variable};
 
-//use glob::glob;
-
 pub enum Condition {
     Continue,
     Break,
-    NoOp
+    NoOp,
+    SigInt,
 }
 
 pub trait FlowLogic {
@@ -26,10 +25,10 @@ pub trait FlowLogic {
         where I: Iterator<Item = Statement>;
 
     /// Executes all of the statements within a while block until a certain condition is met.
-    fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>);
+    fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) -> Condition;
 
     /// Executes all of the statements within a for block for each value specified in the range.
-    fn execute_for(&mut self, variable: &str, values: &[String], statements: Vec<Statement>);
+    fn execute_for(&mut self, variable: &str, values: &[String], statements: Vec<Statement>) -> Condition;
 
     /// Conditionally executes branches of statements according to evaluated expressions
     fn execute_if(&mut self, expression: Pipeline, success: Vec<Statement>,
@@ -109,10 +108,14 @@ impl<'a> FlowLogic for Shell<'a> {
                         self.previous_status = export_variable(expression, &mut self.variables, &self.directory_stack);
                     }
                     Statement::While { expression, statements } => {
-                        self.execute_while(expression, statements);
+                        if let Condition::SigInt = self.execute_while(expression, statements) {
+                            return
+                        }
                     },
                     Statement::For { variable, values, statements } => {
-                        self.execute_for(&variable, &values, statements);
+                        if let Condition::SigInt = self.execute_for(&variable, &values, statements) {
+                            return
+                        }
                     },
                     Statement::Function { name, args, statements, description } => {
                         self.functions.insert(name.clone(), Function {
@@ -157,12 +160,16 @@ impl<'a> FlowLogic for Shell<'a> {
                 Statement::While { expression, mut statements } => {
                     self.flow_control.level += 1;
                     collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
-                    self.execute_while(expression, statements);
+                    if let Condition::SigInt = self.execute_while(expression, statements) {
+                        return Condition::SigInt;
+                    }
                 },
                 Statement::For { variable, values, mut statements } => {
                     self.flow_control.level += 1;
                     collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
-                    self.execute_for(&variable, &values, statements);
+                    if let Condition::SigInt = self.execute_for(&variable, &values, statements) {
+                        return Condition::SigInt;
+                    }
                 },
                 Statement::If { expression, mut success, mut else_if, mut failure } => {
                     self.flow_control.level += 1;
@@ -180,7 +187,8 @@ impl<'a> FlowLogic for Shell<'a> {
                     match self.execute_if(expression, success, else_if, failure) {
                         Condition::Break    => return Condition::Break,
                         Condition::Continue => return Condition::Continue,
-                        Condition::NoOp     => ()
+                        Condition::NoOp     => (),
+                        Condition::SigInt   => return Condition::SigInt,
                     }
                 },
                 Statement::Function { name, args, mut statements, description } => {
@@ -203,70 +211,96 @@ impl<'a> FlowLogic for Shell<'a> {
                 Statement::Continue => { return Condition::Continue }
                 _ => {}
             }
+            if let Ok(_) = self.sigint_handle.try_recv() {
+                return Condition::SigInt;
+            }
         }
         Condition::NoOp
     }
 
-    fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) {
+    fn execute_while (
+        &mut self,
+        expression: Pipeline,
+        statements: Vec<Statement>
+    ) -> Condition {
         while self.run_pipeline(&mut expression.clone()) == Some(SUCCESS) {
             // Cloning is needed so the statement can be re-iterated again if needed.
-            if let Condition::Break = self.execute_statements(statements.clone()) {
-                break
+            match self.execute_statements(statements.clone()) {
+                Condition::Break  => break,
+                Condition::SigInt => return Condition::SigInt,
+                _                 => ()
             }
         }
+        Condition::NoOp
     }
 
-    fn execute_for(&mut self, variable: &str, values: &[String], statements: Vec<Statement>) {
-        /*fn glob_expand(arg: &str) -> Vec<String> {
-            let mut expanded = Vec::new();
-            if arg.contains(|chr| chr == '?' || chr == '*' || chr == '[') {
-                if let Ok(glob) = glob(arg) {
-                    for path in glob.filter_map(Result::ok) {
-                        expanded.push(path.to_string_lossy().into_owned());
-                    }
-                }
-                expanded
-            } else {
-                vec![arg.to_owned()]
-            }
-        }*/
-
+    fn execute_for (
+        &mut self,
+        variable: &str,
+        values: &[String],
+        statements: Vec<Statement>
+    ) -> Condition {
         let ignore_variable = variable == "_";
         match ForExpression::new(values, &self.directory_stack, &self.variables) {
             ForExpression::Multiple(ref values) if ignore_variable => {
-                for _ in values.iter()/*.flat_map(|x| glob_expand(&x))*/ {
-                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
+                for _ in values.iter() {
+                    match self.execute_statements(statements.clone()) {
+                        Condition::Break  => break,
+                        Condition::SigInt => return Condition::SigInt,
+                        _                 => ()
+                    }
                 }
             },
             ForExpression::Multiple(values) => {
-                for value in values.iter()/*.flat_map(|x| glob_expand(&x))*/ {
+                for value in values.iter() {
                     self.variables.set_var(variable, &value);
-                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
+                    match self.execute_statements(statements.clone()) {
+                        Condition::Break  => break,
+                        Condition::SigInt => return Condition::SigInt,
+                        _                 => ()
+                    }
                 }
             },
             ForExpression::Normal(ref values) if ignore_variable => {
-                for _ in values.lines()/*.flat_map(glob_expand)*/ {
-                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
+                for _ in values.lines() {
+                    match self.execute_statements(statements.clone()) {
+                        Condition::Break  => break,
+                        Condition::SigInt => return Condition::SigInt,
+                        _                 => ()
+                    }
                 }
             },
             ForExpression::Normal(values) => {
-                for value in values.lines()/*.flat_map(glob_expand)*/ {
+                for value in values.lines() {
                     self.variables.set_var(variable, &value);
-                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
+                    match self.execute_statements(statements.clone()) {
+                        Condition::Break  => break,
+                        Condition::SigInt => return Condition::SigInt,
+                        _                 => ()
+                    }
                 }
             },
             ForExpression::Range(start, end) if ignore_variable => {
                 for _ in start..end {
-                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
+                    match self.execute_statements(statements.clone()) {
+                        Condition::Break  => break,
+                        Condition::SigInt => return Condition::SigInt,
+                        _                 => ()
+                    }
                 }
             }
             ForExpression::Range(start, end) => {
                 for value in (start..end).map(|x| x.to_string()) {
                     self.variables.set_var(variable, &value);
-                    if let Condition::Break = self.execute_statements(statements.clone()) { break }
+                    match self.execute_statements(statements.clone()) {
+                        Condition::Break  => break,
+                        Condition::SigInt => return Condition::SigInt,
+                        _                 => ()
+                    }
                 }
             }
         }
+        Condition::NoOp
     }
 
     fn execute_if(&mut self, mut expression: Pipeline, success: Vec<Statement>,
