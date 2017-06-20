@@ -5,3 +5,15 @@ echo $space_string
 echo $comma_string
 echo @split(space_string)
 echo @split(comma_string, ', ')
+
+let array = ["one two" "three four" "five six" "seven eight" "nine ten"]
+echo @len(array)
+for element in 0..@len(array)
+    echo @array[$element]
+end
+
+let string = "one 😉😉😉 two 😉😉😉 three 😉😉😉 four 😉😉😉 five"
+echo $len(string) $len_bytes(string)
+for grapheme in 0..$len(string)
+    echo $string[$grapheme]
+end

@@ -12,11 +12,13 @@ use glob::glob;
 use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub use self::words::{WordIterator, WordToken, Select, Index, Range};
+use shell::variables::Variables;
 
 use std::io::{self, Write};
 use types::*;
 
 pub struct ExpanderFunctions<'f> {
+    pub vars:     &'f Variables,
     pub tilde:    &'f Fn(&str) -> Option<String>,
     pub array:    &'f Fn(&str, Select) -> Option<Array>,
     pub variable: &'f Fn(&str, bool) -> Option<Value>,
@@ -225,6 +227,12 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                             "join" => if let Some(array) = (expand_func.array)(variable, Select::All) {
                                 slice_string(&mut output, &array.join(pattern), index);
                             },
+                            "len" => output.push_str(&UnicodeSegmentation::graphemes (
+                                expand_func.vars.get_var_or_empty(variable).as_str(), true
+                            ).count().to_string()),
+                            "len_bytes" => output.push_str(
+                                &expand_func.vars.get_var_or_empty(variable).len().to_string()
+                            ),
                             _ => {
                                 let stderr = io::stderr();
                                 let mut stderr = stderr.lock();
@@ -342,7 +350,14 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     }
                 },
                 WordToken::ArrayMethod(ref array_method) => {
-                    return array_method.handle_as_array(expand_func);
+
+                    return if array_method.returns_array() {
+                        array_method.handle_as_array(expand_func)
+                    } else {
+                        let mut output = String::new();
+                        array_method.handle(&mut output, expand_func);
+                        Array::from_vec(vec![output])
+                    };
                 },
                 _ => ()
             }
@@ -418,6 +433,12 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         "join" => if let Some(array) = (expand_func.array)(variable, Select::All) {
                             slice_string(&mut output, &array.join(pattern), index);
                         },
+                        "len" => output.push_str(&UnicodeSegmentation::graphemes (
+                            expand_func.vars.get_var_or_empty(variable).as_str(), true
+                        ).count().to_string()),
+                        "len_bytes" => output.push_str(
+                            &expand_func.vars.get_var_or_empty(variable).len().to_string()
+                        ),
                         _ => {
                             let stderr = io::stderr();
                             let mut stderr = stderr.lock();
@@ -476,6 +497,7 @@ mod test {
     macro_rules! functions {
         () => {
             ExpanderFunctions {
+                vars:     &Variables::default(),
                 tilde:    &|_| None,
                 array:    &|_, _| None,
                 variable: &|variable: &str, _| match variable {

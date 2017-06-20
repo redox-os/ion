@@ -179,8 +179,15 @@ pub struct ArrayMethod<'a> {
 }
 
 impl<'a> ArrayMethod<'a> {
+    pub fn returns_array(&self) -> bool {
+        self.method == "split"
+    }
     pub fn handle(&self, current: &mut String, expand_func: &ExpanderFunctions) {
         match self.method {
+            "len" => match expand_func.vars.get_array(self.variable) {
+                Some(array) => current.push_str(&array.len().to_string()),
+                None        => current.push_str("0")
+            },
             "split" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
                 match (&self.pattern, self.selection) {
                     (&Pattern::StringPattern(pattern), Select::All) => current.push_str (
@@ -1025,10 +1032,12 @@ impl<'a> Iterator for WordIterator<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shell::variables::Variables;
 
     macro_rules! functions {
         () => {
             ExpanderFunctions {
+                vars:     &Variables::default(),
                 tilde:    &|_| None,
                 array:    &|_, _| None,
                 variable: &|_, _| None,

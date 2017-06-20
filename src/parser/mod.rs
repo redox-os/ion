@@ -2,6 +2,7 @@
 macro_rules! get_expanders {
     ($vars:expr, $dir_stack:expr) => {
         ExpanderFunctions {
+            vars: $vars,
             tilde: &|tilde: &str| $vars.tilde_expansion(tilde, $dir_stack),
             array: &|array: &str, selection : Select| {
                 use std::iter::FromIterator;
