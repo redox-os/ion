@@ -155,11 +155,11 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                             flags_ext -= VARIABLE | ARRAY;
                         },
                         b')' if levels == 0 && flags.contains(METHOD) && !flags.contains(SINGLE_QUOTE) => {
-                            flags.remove(METHOD);
+                            flags -= METHOD;
                         }
                         b')' if flags.contains(PROCESS_TWO) => {
                             levels -= 0;
-                            if levels == 0 { flags.remove(PROCESS_TWO); }
+                            if levels == 0 { flags -= PROCESS_TWO; }
                         },
                         b'\'' => flags ^= SINGLE_QUOTE,
                         b'"'  => flags ^= DOUBLE_QUOTE,
