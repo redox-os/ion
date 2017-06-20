@@ -7,15 +7,19 @@ use std::io::{self, Write};
 use shell::flow_control::Statement;
 use super::peg::parse;
 
-const SQUOTE: u16 = 1;
-const DQUOTE: u16 = 2;
-const BACKSL: u16 = 4;
-const COMM_1: u16 = 8;
-const COMM_2: u16 = 16;
-const VBRACE: u16 = 32;
-const ARRAY:  u16 = 64;
-const VARIAB: u16 = 128;
-const METHOD: u16 = 256;
+bitflags! {
+    pub struct Flags : u16 {
+        const SQUOTE = 1;
+        const DQUOTE = 2;
+        const BACKSL = 4;
+        const COMM_1 = 8;
+        const COMM_2 = 16;
+        const VBRACE = 32;
+        const ARRAY  = 64;
+        const VARIAB = 128;
+        const METHOD = 256;
+    }
+}
 
 
 #[derive(Debug, PartialEq)]
@@ -67,7 +71,7 @@ pub fn check_statement<'a>(statement: Result<&str, StatementError<'a>>) -> State
 pub struct StatementSplitter<'a> {
     data:  &'a str,
     read:  usize,
-    flags: u16,
+    flags: Flags,
     array_level: u8,
     array_process_level: u8,
     process_level: u8,
@@ -79,7 +83,7 @@ impl<'a> StatementSplitter<'a> {
         StatementSplitter {
             data: data,
             read: 0,
-            flags: 0,
+            flags: Flags::empty(),
             array_level: 0,
             array_process_level: 0,
             process_level: 0,
@@ -99,36 +103,36 @@ impl<'a> Iterator for StatementSplitter<'a> {
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             match character {
-                0...47 | 58...64 | 91...94 | 96 | 123...124 | 126...127 if self.flags & VBRACE != 0 => {
+                0...47 | 58...64 | 91...94 | 96 | 123...124 | 126...127 if self.flags.contains(VBRACE) => {
                     // If we are just ending the braced section continue as normal
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
-                _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
-                b'\\'                             => self.flags ^= BACKSL,
-                b'\'' if self.flags & DQUOTE == 0 => {
-                    self.flags ^= SQUOTE;
-                    self.flags &= u16::MAX ^ (VARIAB + ARRAY);
+                _ if self.flags.contains(BACKSL)      => self.flags.toggle(BACKSL),
+                b'\\'                                 => self.flags.toggle(BACKSL),
+                b'\'' if !self.flags.contains(DQUOTE) => {
+                    self.flags.toggle(SQUOTE);
+                    self.flags -= VARIAB | ARRAY;
                 },
-                b'"'  if self.flags & SQUOTE == 0 => {
-                    self.flags ^= DQUOTE;
-                    self.flags &= u16::MAX ^ (VARIAB + ARRAY);
+                b'"'  if !self.flags.contains(SQUOTE) => {
+                    self.flags.toggle(DQUOTE);
+                    self.flags -= VARIAB | ARRAY;
                 },
-                b'@'  if self.flags & SQUOTE == 0 => {
-                    self.flags &= u16::MAX ^ COMM_1;
-                    self.flags |= COMM_2 + ARRAY;
+                b'@'  if !self.flags.contains(SQUOTE) => {
+                    self.flags -= COMM_1;
+                    self.flags |= COMM_2 | ARRAY;
                     continue
                 }
-                b'$'  if self.flags & SQUOTE == 0 => {
-                    self.flags &= u16::MAX ^ COMM_2;
-                    self.flags |= COMM_1 + VARIAB;
+                b'$' if !self.flags.contains(SQUOTE) => {
+                    self.flags -= COMM_2;
+                    self.flags |= COMM_1 | VARIAB;
                     continue
                 },
-                b'{'  if self.flags & (COMM_1 + COMM_2) != 0 => self.flags |= VBRACE,
-                b'{'  if self.flags & (SQUOTE + DQUOTE) == 0 => self.brace_level += 1,
-                b'}'  if self.flags & VBRACE != 0 => self.flags ^= VBRACE,
-                b'}'  if self.flags & (SQUOTE + DQUOTE) == 0 => {
+                b'{' if self.flags.intersects(COMM_1 | COMM_2) => self.flags |= VBRACE,
+                b'{' if !self.flags.intersects(SQUOTE | DQUOTE) => self.brace_level += 1,
+                b'}' if self.flags.contains(VBRACE) => self.flags.toggle(VBRACE),
+                b'}' if !self.flags.intersects(SQUOTE | DQUOTE) => {
                     if self.brace_level == 0 {
                         if error.is_none() {
                             error = Some(StatementError::InvalidCharacter(character as char, self.read))
@@ -137,46 +141,46 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         self.brace_level -= 1;
                     }
                 },
-                b'('  if self.flags & (COMM_1 + VARIAB + ARRAY) == 0 => {
-                    if error.is_none() && self.flags & (SQUOTE + DQUOTE) == 0 {
+                b'('  if !self.flags.intersects(COMM_1 | VARIAB | ARRAY) => {
+                    if error.is_none() && !self.flags.intersects(SQUOTE | DQUOTE) {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
-                b'(' if self.flags & COMM_1 != 0 => {
+                b'(' if self.flags.contains(COMM_1) => {
                     self.process_level += 1;
-                    self.flags &= u16::MAX ^ (VARIAB + ARRAY);
+                    self.flags -= VARIAB | ARRAY;
                 },
-                b'(' if self.flags & (VARIAB + ARRAY) != 0 => {
-                    self.flags &= u16::MAX ^ (VARIAB + ARRAY);
+                b'(' if self.flags.intersects(VARIAB | ARRAY) => {
+                    self.flags -= VARIAB | ARRAY;
                     self.flags |= METHOD;
                 },
-                b'[' if self.flags & COMM_2 != 0 => {
+                b'[' if self.flags.contains(COMM_2) => {
                     self.array_process_level += 1;
                 },
-                b'[' if self.flags & SQUOTE == 0 => self.array_level += 1,
-                b']' if self.array_process_level == 0 && self.array_level == 0 && self.flags & SQUOTE == 0 => {
+                b'[' if !self.flags.contains(SQUOTE) => self.array_level += 1,
+                b']' if self.array_process_level == 0 && self.array_level == 0 && !self.flags.contains(SQUOTE) => {
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
-                b']' if self.flags & SQUOTE == 0 && self.array_level != 0 => self.array_level -= 1,
-                b']' if self.flags & SQUOTE == 0 => self.array_process_level -= 1,
-                b')' if self.flags & SQUOTE == 0 && self.flags & METHOD != 0 => {
+                b']' if !self.flags.contains(SQUOTE) && self.array_level != 0 => self.array_level -= 1,
+                b']' if !self.flags.contains(SQUOTE) => self.array_process_level -= 1,
+                b')' if !self.flags.contains(SQUOTE) && self.flags.contains(METHOD) => {
                     self.flags ^= METHOD;
                 },
-                b')' if self.process_level == 0 && self.array_level == 0 && self.flags & SQUOTE == 0 => {
-                    if error.is_none() && self.flags & (SQUOTE + DQUOTE) == 0 {
+                b')' if self.process_level == 0 && self.array_level == 0 && !self.flags.contains(SQUOTE) => {
+                    if error.is_none() && !self.flags.intersects(SQUOTE | DQUOTE) {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
-                b')' if self.flags & SQUOTE == 0 => self.process_level -= 1,
-                b';'  if (self.flags & (SQUOTE + DQUOTE) == 0) && self.process_level == 0 && self.array_process_level == 0 => {
+                b')' if !self.flags.contains(SQUOTE) => self.process_level -= 1,
+                b';' if !self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0 && self.array_process_level == 0 => {
                     return match error {
                         Some(error) => Some(Err(error)),
                         None        => Some(Ok(self.data[start..self.read-1].trim()))
                     };
                 },
-                b'#' if self.flags & (SQUOTE + DQUOTE) == 0 && self.process_level == 0 && self.array_process_level == 0 => {
+                b'#' if !self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0 && self.array_process_level == 0 => {
                     let output = self.data[start..self.read-1].trim();
                     self.read = self.data.len();
                     return match error {
@@ -206,10 +210,10 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         }
                     }
                 }
-                0...47 | 58...64 | 91...94 | 96 | 123...127 => self.flags &= u16::MAX ^ (VARIAB + ARRAY),
+                0...47 | 58...64 | 91...94 | 96 | 123...127 => self.flags -= VARIAB | ARRAY,
                 _ => ()
             }
-            self.flags &= u16::MAX ^ (COMM_1 + COMM_2);
+            self.flags -= COMM_1 | COMM_2;
         }
 
         if start == self.read {
@@ -223,8 +227,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 {
                     Some(Err(StatementError::UnterminatedSubshell))
                 },
-                None if self.flags & METHOD != 0 => Some(Err(StatementError::UnterminatedMethod)),
-                None if self.flags & VBRACE != 0 => Some(Err(StatementError::UnterminatedBracedVar)),
+                None if self.flags.contains(METHOD) => Some(Err(StatementError::UnterminatedMethod)),
+                None if self.flags.contains(VBRACE) => Some(Err(StatementError::UnterminatedBracedVar)),
                 None if self.brace_level != 0    => Some(Err(StatementError::UnterminatedBrace)),
                 None => {
                     let output = self.data[start..].trim();

@@ -1,9 +1,14 @@
 use std::io::{self, Write, BufWriter};
 
-const HELP: u8 = 1;
-const ESCAPE: u8 = 2;
-const NO_NEWLINE: u8 = 4;
-const NO_SPACES: u8 = 8;
+bitflags! {
+    struct Flags : u8 {
+        const HELP = 1;
+        const ESCAPE = 2;
+        const NO_NEWLINE = 4;
+        const NO_SPACES = 8;
+    }
+}
+
 
 const MAN_PAGE: &'static str = /* @MANSTART{echo} */ r#"NAME
     echo - display a line of text
@@ -37,7 +42,7 @@ OPTIONS
 "#; /* @MANEND */
 
 pub fn echo(args: &[&str]) -> Result<(), io::Error> {
-    let mut flags = 0u8;
+    let mut flags = Flags::empty();
     let mut data: Vec<&str> = vec![];
 
     for arg in args {
@@ -68,7 +73,7 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
 
-    if (flags & HELP) != 0 {
+    if flags.contains(HELP) {
         buffer.write_all(MAN_PAGE.as_bytes())?;
         buffer.flush()?;
         return Ok(());
@@ -78,11 +83,11 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
     for arg in data[1..].iter().map(|x| x.as_bytes()) {
         if first {
             first = false;
-        } else if (flags & NO_SPACES) == 0 {
+        } else if !flags.contains(NO_SPACES) {
             buffer.write_all(&[b' '])?;
         }
 
-        if (flags & ESCAPE) != 0 {
+        if flags.contains(ESCAPE) {
             let mut check = false;
             for &byte in arg {
                 match byte {
@@ -139,7 +144,7 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
         }
     }
 
-    if (flags & NO_NEWLINE) == 0 {
+    if !flags.contains(NO_NEWLINE) {
         buffer.write_all(&[b'\n'])?;
     }
 

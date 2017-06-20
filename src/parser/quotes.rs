@@ -1,36 +1,41 @@
-const BACKSL: u8 = 1;
-const SQUOTE: u8 = 2;
-const DQUOTE: u8 = 4;
-const TRIM:   u8 = 8;
+bitflags! {
+    pub struct Flags : u8 {
+        const BACKSL = 1;
+        const SQUOTE = 2;
+        const DQUOTE = 4;
+        const TRIM   = 8;
+    }
+}
+
 
 pub struct QuoteTerminator {
     buffer: String,
     read:   usize,
-    flags:  u8,
+    flags:  Flags,
 }
 
 impl QuoteTerminator {
     pub fn new(input: String) -> QuoteTerminator {
-        QuoteTerminator { buffer: input, read: 0, flags: 0 }
+        QuoteTerminator { buffer: input, read: 0, flags: Flags::empty() }
     }
 
     pub fn append(&mut self, input: String) {
-        self.buffer.push_str(if self.flags & TRIM != 0 { input.trim() } else { &input });
+        self.buffer.push_str(if self.flags.contains(TRIM) { input.trim() } else { &input });
     }
 
     pub fn check_termination(&mut self) -> bool {
         for character in self.buffer.bytes().skip(self.read) {
             self.read += 1;
             match character {
-                _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
+                _ if self.flags.contains(BACKSL)  => self.flags ^= BACKSL,
                 b'\\'                             => self.flags ^= BACKSL,
-                b'\'' if self.flags & DQUOTE == 0 => self.flags ^= SQUOTE,
-                b'"'  if self.flags & SQUOTE == 0 => self.flags ^= DQUOTE,
+                b'\'' if !self.flags.intersects(DQUOTE) => self.flags ^= SQUOTE,
+                b'"'  if !self.flags.intersects(SQUOTE)  => self.flags ^= DQUOTE,
                 _ => (),
             }
         }
 
-        if self.flags & (SQUOTE + DQUOTE) != 0 {
+        if self.flags.intersects(SQUOTE | DQUOTE) {
             self.read += 1;
             self.buffer.push('\n');
             false
