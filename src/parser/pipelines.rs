@@ -131,9 +131,9 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
             RedirMode::False => {
                 while let Some(character) = args_iter.next() {
                     match character {
-                        _ if flags.contains(BACKSLASH) => flags.toggle(BACKSLASH),
-                        b'\\'                        => flags.toggle(BACKSLASH),
-                        b'@'                         => {
+                        _ if flags.contains(BACKSLASH) => flags ^= BACKSLASH,
+                        b'\\'                          => flags ^= BACKSLASH,
+                        b'@'                           => {
                             flags_ext |= ARRAY | ARRAY_CHAR_FOUND;
                             index += 1;
                             continue
