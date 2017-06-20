@@ -177,6 +177,25 @@ impl<'a> Shell<'a> {
         }
     }
 
+    pub fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, mut lines: I) {
+        while let Some(command) = lines.next() {
+            let mut buffer = QuoteTerminator::new(command);
+            while !buffer.check_termination() {
+                loop {
+                    if let Some(command) = lines.next() {
+                        buffer.append(command);
+                        break
+                    } else {
+                        let stderr = io::stderr();
+                        let _ = writeln!(stderr.lock(), "ion: unterminated quote in script");
+                        process::exit(FAILURE);
+                    }
+                }
+            }
+            self.on_command(&buffer.consume());
+        }
+    }
+
     pub fn terminate_quotes(&mut self, command: String) -> String {
         let mut buffer = QuoteTerminator::new(command);
         self.flow_control.level += 1;
@@ -190,6 +209,29 @@ impl<'a> Shell<'a> {
         }
         self.flow_control.level -= 1;
         buffer.consume()
+    }
+
+    pub fn execute_script<P: AsRef<Path>>(&mut self, path: P) {
+        let path = path.as_ref();
+        match File::open(path) {
+            Ok(mut file) => {
+                let capacity = file.metadata().ok().map_or(0, |x| x.len());
+                let mut command_list = String::with_capacity(capacity as usize);
+                match file.read_to_string(&mut command_list) {
+                    Ok(_) => self.terminate_script_quotes(command_list.lines().map(|x| x.to_owned())),
+                    Err(err) => {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: failed to read {:?}: {}", path, err);
+                    }
+                }
+            },
+            Err(err) => {
+                let stderr = io::stderr();
+                let mut stderr = stderr.lock();
+                let _ = writeln!(stderr, "ion: failed to open {:?}: {}", path, err);
+            }
+        }
     }
 
     pub fn execute(&mut self) {
@@ -217,40 +259,7 @@ impl<'a> Shell<'a> {
                 );
                 for arg in args { array.push(arg.into()); }
                 self.variables.set_array("args", array);
-
-                match File::open(&path) {
-                    Ok(mut file) => {
-                        let capacity = file.metadata().ok().map_or(0, |x| x.len());
-                        let mut command_list = String::with_capacity(capacity as usize);
-                        match file.read_to_string(&mut command_list) {
-                            Ok(_) => {
-                                let mut lines = command_list.lines().map(|x| x.to_owned());
-                                while let Some(command) = lines.next() {
-                                    let mut buffer = QuoteTerminator::new(command);
-                                    while !buffer.check_termination() {
-                                        loop {
-                                            if let Some(command) = lines.next() {
-                                                buffer.append(command);
-                                                break
-                                            }
-                                        }
-                                    }
-                                    self.on_command(&buffer.consume());
-                                }
-                            },
-                            Err(err) => {
-                                let stderr = io::stderr();
-                                let mut stderr = stderr.lock();
-                                let _ = writeln!(stderr, "ion: failed to read {}: {}", path, err);
-                            }
-                        }
-                    },
-                    Err(err) => {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: failed to open {}: {}", path, err);
-                    }
-                }
+                self.execute_script(&path);
             }
 
             process::exit(self.previous_status);
@@ -310,19 +319,7 @@ impl<'a> Shell<'a> {
             let _ = stderr.write_all(b"ion: could not get home directory");
         }, |mut source_file| {
             source_file.push(".ionrc");
-            if let Ok(mut file) = File::open(&source_file) {
-                let capacity = file.metadata().map(|x| x.len()).unwrap_or(0) as usize;
-                let mut command_list = String::with_capacity(capacity);
-                if let Err(message) = file.read_to_string(&mut command_list) {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: {}: failed to read {:?}", message, source_file);
-                } else {
-                    for command in command_list.lines() {
-                        self.on_command(command);
-                    }
-                }
-            }
+            self.execute_script(&source_file);
         });
     }
 
