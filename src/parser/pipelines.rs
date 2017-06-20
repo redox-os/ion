@@ -10,19 +10,25 @@ use parser::peg::{Pipeline, Redirection, RedirectFrom};
 use shell::{Job, JobKind};
 use types::*;
 
-const BACKSLASH:     u8 = 1;
-const SINGLE_QUOTE:  u8 = 2;
-const DOUBLE_QUOTE:  u8 = 4;
-const ARRAY_PROCESS: u8 = 8;
-const METHOD:        u8 = 16;
-const PROCESS_TWO:   u8 = 128;
+bitflags! {
+    pub struct Flags : u16 {
+        const BACKSLASH = 1;
+        const SINGLE_QUOTE = 2;
+        const DOUBLE_QUOTE = 4;
+        const ARRAY_PROCESS = 8;
+        const METHOD = 16;
+        const PROCESS_TWO = 32;
 
-const ARRAY:            u8 = 1;
-const VARIABLE:         u8 = 2;
-const ARRAY_CHAR_FOUND: u8 = 4;
-const VAR_CHAR_FOUND:   u8 = 8;
-
-const IS_VALID: u8 = SINGLE_QUOTE + METHOD + PROCESS_TWO + ARRAY_PROCESS;
+        const ARRAY = 64;
+        const VARIABLE = 128;
+        const ARRAY_CHAR_FOUND = 256;
+        const VAR_CHAR_FOUND = 512;
+        const IS_VALID = SINGLE_QUOTE.bits
+                       | METHOD.bits
+                       | PROCESS_TWO.bits
+                       | ARRAY_PROCESS.bits;
+    }
+}
 
 #[derive(PartialEq)]
 enum RedirMode { False, Stdin, Stdout(RedirectFrom), StdoutAppend(RedirectFrom) }
@@ -51,8 +57,8 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
     let mut jobs: Vec<Job> = Vec::new();
     let mut args_iter = args.bytes().peekable();
     let (mut index, mut arg_start) = (0, 0);
-    let mut flags = 0u8; // (backslash, single_quote, double_quote, x, x, x, process_one, process_two)
-    let mut flags_ext = 0u8;
+    let mut flags = Flags::empty(); // (backslash, single_quote, double_quote, x, x, x, process_one, process_two)
+    let mut flags_ext = Flags::empty();
 
     let mut arguments = Array::new();
 
@@ -121,43 +127,43 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
             RedirMode::False => {
                 while let Some(character) = args_iter.next() {
                     match character {
-                        _ if flags & BACKSLASH != 0  => flags ^= BACKSLASH,
-                        b'\\'                        => flags ^= BACKSLASH,
+                        _ if flags.contains(BACKSLASH) => flags.toggle(BACKSLASH),
+                        b'\\'                        => flags.toggle(BACKSLASH),
                         b'@'                         => {
-                            flags_ext |= ARRAY + ARRAY_CHAR_FOUND;
+                            flags_ext |= ARRAY | ARRAY_CHAR_FOUND;
                             index += 1;
                             continue
                         },
-                        b'$' if flags & IS_VALID == 0 => {
-                            flags_ext |= VARIABLE + VAR_CHAR_FOUND;
+                        b'$' if !flags.contains(IS_VALID) => {
+                            flags_ext |= VARIABLE | VAR_CHAR_FOUND;
                             index += 1;
                             continue
                         },
-                        b'[' if flags_ext & ARRAY_CHAR_FOUND != 0 => {
+                        b'[' if flags_ext.contains(ARRAY_CHAR_FOUND) => {
                             array_process_levels += 1;
                             flags |= ARRAY_PROCESS;
                         },
                         b'['                               => array_levels += 1,
                         b']' if array_levels != 0          => array_levels -= 1,
                         b']'                               => array_process_levels -= 1,
-                        b'(' if flags_ext & VAR_CHAR_FOUND != 0 => {
+                        b'(' if flags_ext.contains(VAR_CHAR_FOUND) => {
                             flags |= PROCESS_TWO;
                             levels += 1;
                         },
-                        b'(' if flags_ext & (VARIABLE + ARRAY) != 0 => {
+                        b'(' if flags_ext.intersects(VARIABLE | ARRAY) => {
                             flags |= METHOD;
-                            flags_ext &= 255 ^ (VARIABLE + ARRAY);
+                            flags_ext -= VARIABLE | ARRAY;
                         },
-                        b')' if levels == 0 && flags & METHOD != 0 && flags & SINGLE_QUOTE == 0 => {
-                            flags &= 255 ^ METHOD;
+                        b')' if levels == 0 && flags.contains(METHOD) && !flags.contains(SINGLE_QUOTE) => {
+                            flags.remove(METHOD);
                         }
-                        b')' if flags & PROCESS_TWO != 0 => {
+                        b')' if flags.contains(PROCESS_TWO) => {
                             levels -= 0;
-                            if levels == 0 { flags &= 255 ^ PROCESS_TWO; }
+                            if levels == 0 { flags.remove(PROCESS_TWO); }
                         },
                         b'\'' => flags ^= SINGLE_QUOTE,
                         b'"'  => flags ^= DOUBLE_QUOTE,
-                        b' ' | b'\t' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                        b' ' | b'\t' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
                             && array_process_levels == 0 =>
                         {
                             if arg_start != index {
@@ -169,9 +175,9 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                                 arg_start += 1;
                             }
                         },
-                        b'|' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                        b'|' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
                             && array_process_levels == 0 => job_found!(RedirectFrom::Stdout, true),
-                        b'&' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                        b'&' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
                             && array_process_levels == 0 => {
                             match args_iter.peek() {
                                 Some(&b'>') => {
@@ -181,7 +187,7 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                                 _ => job_found!(RedirectFrom::Stdout, false)
                             }
                         },
-                        b'^' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                        b'^' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
                             && array_process_levels == 0 => {
                             match args_iter.peek() {
                                 Some(&b'>') => {
@@ -195,13 +201,13 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                                 _ => ()
                             }
                         },
-                        b'>' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                        b'>' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
                             && array_process_levels == 0 => redir_found!(RedirMode::Stdout(RedirectFrom::Stdout)),
-                        b'<' if flags & (DOUBLE_QUOTE + IS_VALID) == 0 && array_levels == 0
+                        b'<' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
                             && array_process_levels == 0 => redir_found!(RedirMode::Stdin),
                         _ => (),
                     }
-                    flags_ext &= 255 ^ (VAR_CHAR_FOUND + ARRAY_CHAR_FOUND);
+                    flags_ext -= VAR_CHAR_FOUND | ARRAY_CHAR_FOUND;
                     index += 1;
                 }
                 break 'outer
@@ -229,7 +235,7 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                         }
                     } else {
                         match character {
-                            _ if flags & BACKSLASH != 0 => {
+                            _ if flags.contains(BACKSLASH) => {
                                 stdout_file.push(character);
                                 flags ^= BACKSLASH;
                             }
@@ -291,7 +297,7 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                         }
                     } else {
                         match character {
-                            _ if flags & BACKSLASH != 0 => {
+                            _ if flags.intersects(BACKSLASH) => {
                                 stdin_file.push(character);
                                 flags ^= BACKSLASH;
                             }
