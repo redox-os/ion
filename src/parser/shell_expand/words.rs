@@ -595,7 +595,7 @@ impl<'a> WordIterator<'a> {
                 b'[' => {
                     let result = WordToken::ArrayVariable (
                         &self.data[start..self.read],
-                        self.flags & DQUOTE != 0,
+                        self.flags.contains(DQUOTE),
                         self.read_selection(iterator)
                     );
                     self.read += 1;
@@ -612,14 +612,14 @@ impl<'a> WordIterator<'a> {
                 // Only alphanumerical and underscores are allowed in variable names
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {
                     return WordToken::ArrayVariable(&self.data[start..self.read],
-                                                    self.flags & DQUOTE != 0,
+                                                    self.flags.contains(DQUOTE),
                                                     Select::All);
                 },
                 _ => (),
             }
             self.read += 1;
         }
-        WordToken::ArrayVariable(&self.data[start..], self.flags & DQUOTE != 0, Select::All)
+        WordToken::ArrayVariable(&self.data[start..], self.flags.contains(DQUOTE), Select::All)
     }
 
     /// Contains the logic for parsing subshell syntax.
