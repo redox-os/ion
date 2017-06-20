@@ -27,6 +27,8 @@ permutate = "0.3"
 unicode-segmentation = "1.2"
 smallvec = "0.4"
 smallstring = "0.1"
+
+[target.'cfg(not(target_os = "redox"))'.dependencies]
 tokio-core = "0.1"
 tokio-signal = "0.1"
 
