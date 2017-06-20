@@ -147,9 +147,9 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                             array_process_levels += 1;
                             flags |= ARRAY_PROCESS;
                         },
-                        b'['                               => array_levels += 1,
-                        b']' if array_levels != 0          => array_levels -= 1,
-                        b']'                               => array_process_levels -= 1,
+                        b'['                      => array_levels += 1,
+                        b']' if array_levels != 0 => array_levels -= 1,
+                        b']'                      => array_process_levels -= 1,
                         b'(' if flags_ext.contains(VAR_CHAR_FOUND) => {
                             flags |= PROCESS_TWO;
                             levels += 1;
@@ -165,8 +165,8 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                             levels -= 0;
                             if levels == 0 { flags -= PROCESS_TWO; }
                         },
-                        b'\'' => flags ^= SINGLE_QUOTE,
-                        b'"'  => flags ^= DOUBLE_QUOTE,
+                        b'\'' => { flags ^= SINGLE_QUOTE; flags_ext -= VARIABLE | ARRAY; },
+                        b'"'  => { flags ^= DOUBLE_QUOTE; flags_ext -= VARIABLE | ARRAY; },
                         b' ' | b'\t' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
                             && array_process_levels == 0 =>
                         {
@@ -209,6 +209,7 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                             && array_process_levels == 0 => redir_found!(RedirMode::Stdout(RedirectFrom::Stdout)),
                         b'<' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
                             && array_process_levels == 0 => redir_found!(RedirMode::Stdin),
+                        0...47 | 58...64 | 91...94 | 96 | 123...127 => flags_ext -= VARIABLE | ARRAY,
                         _ => (),
                     }
                     flags_ext -= VAR_CHAR_FOUND | ARRAY_CHAR_FOUND;
@@ -718,4 +719,55 @@ mod tests {
             assert!(false);
         }
     }
+
+    #[test]
+    fn var_meets_quote() {
+        if let Statement::Pipeline(pipeline) = parse("echo $x '{()}' test") {
+            assert_eq!(1, pipeline.jobs.len());
+            assert_eq!("echo", &pipeline.clone().jobs[0].args[0]);
+            assert_eq!("$x", &pipeline.clone().jobs[0].args[1]);
+            assert_eq!("'{()}'", &pipeline.clone().jobs[0].args[2]);
+            assert_eq!("test", &pipeline.clone().jobs[0].args[3]);
+        } else {
+            assert!(false);
+        }
+
+        if let Statement::Pipeline(pipeline) = parse("echo $x'{()}' test") {
+            assert_eq!(1, pipeline.jobs.len());
+            assert_eq!("echo", &pipeline.clone().jobs[0].args[0]);
+            assert_eq!("$x'{()}'", &pipeline.clone().jobs[0].args[1]);
+            assert_eq!("test", &pipeline.clone().jobs[0].args[2]);
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn awk_tests() {
+        if let Statement::Pipeline(pipeline) = parse("awk -v x=$x '{ if (1) print $1 }' myfile") {
+            assert_eq!(1, pipeline.jobs.len());
+            assert_eq!("awk", &pipeline.clone().jobs[0].args[0]);
+            assert_eq!("-v", &pipeline.clone().jobs[0].args[1]);
+            assert_eq!("x=$x", &pipeline.clone().jobs[0].args[2]);
+            assert_eq!("'{ if (1) print $1 }'", &pipeline.clone().jobs[0].args[3]);
+            assert_eq!("myfile", &pipeline.clone().jobs[0].args[4]);
+        } else {
+            assert!(false);
+        }
+    }
+
+    // #[test]
+    // fn real_tests() {
+    //     // Real world scenarios where parsing has failed.
+    //     if let Statement::Pipeline(pipeline) = parse("awk -v x=$x '{ if (1) print $1 }' myfile") {
+    //         assert_eq!(1, pipeline.jobs.len());
+    //         assert_eq!("awk", &pipeline.clone().jobs[0].args[0]);
+    //         assert_eq!("-v", &pipeline.clone().jobs[0].args[1]);
+    //         assert_eq!("x=$x", &pipeline.clone().jobs[0].args[2]);
+    //         assert_eq!("'{ if (1) print $1 }'", &pipeline.clone().jobs[0].args[3]);
+    //         assert_eq!("myfile", &pipeline.clone().jobs[0].args[4]);
+    //     } {
+    //         assert!(false);
+    //     }
+    // }
 }
