@@ -37,32 +37,35 @@ use shell::Shell;
 use std::sync::mpsc;
 use std::thread;
 
+fn inner_main(sigint_rx : mpsc::Receiver<bool>) {
+   let builtins = Builtin::map();
+   let mut shell = Shell::new(&builtins, sigint_rx);
+   shell.evaluate_init_file();
+
+   if "1" == shell.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {
+       shell.context.history.set_file_name(shell.variables.get_var("HISTORY_FILE"));
+       match shell.context.history.load_history() {
+           Ok(()) => {
+               // pass
+           }
+           Err(ref err) if err.kind() == ErrorKind::NotFound => {
+               let history_filename = shell.variables.get_var_or_empty("HISTORY_FILE");
+               let _ = writeln!(stderr(), "ion: failed to find history file {}: {}", history_filename, err);
+           },
+           Err(err) => {
+               let _ = writeln!(stderr(), "ion: failed to load history: {}", err);
+           }
+       }
+   }
+   shell.execute();
+}
+
+
 #[cfg(not(target_os = "redox"))]
 fn main() {
     let (sigint_tx, sigint_rx) = mpsc::channel();
 
-    thread::spawn(move || {
-        let builtins = Builtin::map();
-        let mut shell = Shell::new(&builtins, sigint_rx);
-        shell.evaluate_init_file();
-
-        if "1" == shell.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {
-            shell.context.history.set_file_name(shell.variables.get_var("HISTORY_FILE"));
-            match shell.context.history.load_history() {
-                Ok(()) => {
-                    // pass
-                }
-                Err(ref err) if err.kind() == ErrorKind::NotFound => {
-                    let history_filename = shell.variables.get_var_or_empty("HISTORY_FILE");
-                    let _ = writeln!(stderr(), "ion: failed to find history file {}: {}", history_filename, err);
-                },
-                Err(err) => {
-                    let _ = writeln!(stderr(), "ion: failed to load history: {}", err);
-                }
-            }
-        }
-        shell.execute();
-    });
+    thread::spawn(move || inner_main(sigint_rx));
 
     let mut core = Core::new().unwrap();
     let handle = core.handle();
@@ -77,25 +80,6 @@ fn main() {
 
 #[cfg(target_os = "redox")]
 fn main() {
-    let builtins = Builtin::map();
-    let (sigint_tx, sigint_rx) = mpsc::channel();
-    let mut shell = Shell::new(&builtins, sigint_rx);
-    shell.evaluate_init_file();
-
-    if "1" == shell.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {
-        shell.context.history.set_file_name(shell.variables.get_var("HISTORY_FILE"));
-        match shell.context.history.load_history() {
-            Ok(()) => {
-                // pass
-            }
-            Err(ref err) if err.kind() == ErrorKind::NotFound => {
-                let history_filename = shell.variables.get_var_or_empty("HISTORY_FILE");
-                let _ = writeln!(stderr(), "ion: failed to find history file {}: {}", history_filename, err);
-            },
-            Err(err) => {
-                let _ = writeln!(stderr(), "ion: failed to load history: {}", err);
-            }
-        }
-    }
-    shell.execute();
+    let (_, sigint_rx) = mpsc::channel();
+    inner_main(sigint_rx);
 }
