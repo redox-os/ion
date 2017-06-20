@@ -232,6 +232,10 @@ impl<'a> Shell<'a> {
                                             if let Some(command) = lines.next() {
                                                 buffer.append(command);
                                                 break
+                                            } else {
+                                                let stderr = io::stderr();
+                                                let _ = writeln!(stderr.lock(), "ion: unterminated quote in script");
+                                                process::exit(FAILURE);
                                             }
                                         }
                                     }
@@ -318,8 +322,22 @@ impl<'a> Shell<'a> {
                     let mut stderr = stderr.lock();
                     let _ = writeln!(stderr, "ion: {}: failed to read {:?}", message, source_file);
                 } else {
-                    for command in command_list.lines() {
-                        self.on_command(command);
+                    let mut lines = command_list.lines().map(String::from);
+                    while let Some(command) = lines.next() {
+                        let mut buffer = QuoteTerminator::new(command);
+                        while !buffer.check_termination() {
+                            loop {
+                                if let Some(command) = lines.next() {
+                                    buffer.append(command);
+                                    break
+                                } else {
+                                    let stderr = io::stderr();
+                                    let _ = writeln!(stderr.lock(), "ion: unterminated quote in script");
+                                    process::exit(FAILURE);
+                                }
+                            }
+                        }
+                        self.on_command(&buffer.consume());
                     }
                 }
             }
