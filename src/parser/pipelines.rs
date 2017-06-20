@@ -11,22 +11,26 @@ use shell::{Job, JobKind};
 use types::*;
 
 bitflags! {
-    pub struct Flags : u16 {
+    pub struct NormalFlags : u8 {
         const BACKSLASH = 1;
         const SINGLE_QUOTE = 2;
         const DOUBLE_QUOTE = 4;
         const ARRAY_PROCESS = 8;
         const METHOD = 16;
         const PROCESS_TWO = 32;
-
-        const ARRAY = 64;
-        const VARIABLE = 128;
-        const ARRAY_CHAR_FOUND = 256;
-        const VAR_CHAR_FOUND = 512;
         const IS_VALID = SINGLE_QUOTE.bits
                        | METHOD.bits
                        | PROCESS_TWO.bits
                        | ARRAY_PROCESS.bits;
+    }
+}
+
+bitflags! {
+    pub struct VariableFlags : u8 {
+        const ARRAY = 1;
+        const VARIABLE = 2;
+        const ARRAY_CHAR_FOUND = 4;
+        const VAR_CHAR_FOUND = 8;
     }
 }
 
@@ -57,8 +61,8 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
     let mut jobs: Vec<Job> = Vec::new();
     let mut args_iter = args.bytes().peekable();
     let (mut index, mut arg_start) = (0, 0);
-    let mut flags = Flags::empty(); // (backslash, single_quote, double_quote, x, x, x, process_one, process_two)
-    let mut flags_ext = Flags::empty();
+    let mut flags = NormalFlags::empty(); // (backslash, single_quote, double_quote, x, x, x, process_one, process_two)
+    let mut flags_ext = VariableFlags::empty();
 
     let mut arguments = Array::new();
 
