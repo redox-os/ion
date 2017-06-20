@@ -111,8 +111,14 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 },
                 _ if self.flags.contains(BACKSL)      => self.flags.toggle(BACKSL),
                 b'\\'                                 => self.flags.toggle(BACKSL),
-                b'\'' if !self.flags.contains(DQUOTE) => self.flags.toggle(SQUOTE),
-                b'"'  if !self.flags.contains(SQUOTE) => self.flags.toggle(DQUOTE),
+                b'\'' if !self.flags.contains(DQUOTE) => {
+                    self.flags.toggle(SQUOTE);
+                    self.flags -= VARIAB | ARRAY;
+                },
+                b'"'  if !self.flags.contains(SQUOTE) => {
+                    self.flags.toggle(DQUOTE);
+                    self.flags -= VARIAB | ARRAY;
+                },
                 b'@'  if !self.flags.contains(SQUOTE) => {
                     self.flags -= COMM_1;
                     self.flags |= COMM_2 | ARRAY;
@@ -204,6 +210,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         }
                     }
                 }
+                0...47 | 58...64 | 91...94 | 96 | 123...127 => self.flags -= VARIAB | ARRAY,
                 _ => ()
             }
             self.flags -= COMM_1 | COMM_2;

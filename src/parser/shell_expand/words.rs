@@ -607,7 +607,7 @@ impl<'a> WordIterator<'a> {
                 b'}' => {
                     let output = &self.data[start..self.read];
                     self.read += 1;
-                    return WordToken::ArrayVariable(output, self.flags & DQUOTE != 0, Select::All);
+                    return WordToken::ArrayVariable(output, self.flags.contains(DQUOTE), Select::All);
                 }
                 // Only alphanumerical and underscores are allowed in variable names
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {

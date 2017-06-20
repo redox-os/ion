@@ -20,12 +20,15 @@ name = "ion"
 [dependencies]
 bitflags = "0.9.1"
 fnv = "1.0"
+futures = "0.1"
 glob = "0.2"
 liner = "0.2"
 permutate = "0.3"
 unicode-segmentation = "1.2"
 smallvec = "0.4"
 smallstring = "0.1"
+tokio-core = "0.1"
+tokio-signal = "0.1"
 
 [target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
 users = "0.5.1"
@@ -36,7 +39,7 @@ ansi_term = "0.9"
 version_check = "0.1"
 
 [profile.release]
-# debug = true
+debug = true
 # rustflags = [ "-C", "target-cpu=native"]
 lto = true
 panic = "abort"

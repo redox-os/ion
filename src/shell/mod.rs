@@ -23,6 +23,7 @@ use std::path::Path;
 use std::process;
 use std::time::SystemTime;
 use std::iter::FromIterator;
+use std::sync::mpsc::Receiver;
 use smallvec::SmallVec;
 
 use liner::{Context, CursorPosition, Event, EventKind, BasicCompleter};
@@ -56,11 +57,15 @@ pub struct Shell<'a> {
     pub functions: FnvHashMap<Identifier, Function>,
     pub previous_status: i32,
     pub flags: u8,
+    sigint_handle: Receiver<bool>,
 }
 
 impl<'a> Shell<'a> {
     /// Panics if DirectoryStack construction fails
-    pub fn new(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
+    pub fn new (
+        builtins: &'a FnvHashMap<&'static str, Builtin>,
+        ctrl_c: Receiver<bool>
+    ) -> Shell<'a> {
         Shell {
             builtins: builtins,
             context: Context::new(),
@@ -70,6 +75,7 @@ impl<'a> Shell<'a> {
             functions: FnvHashMap::default(),
             previous_status: 0,
             flags: 0,
+            sigint_handle: ctrl_c
         }
     }
     fn readln(&mut self) -> Option<String> {
