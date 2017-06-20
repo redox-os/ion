@@ -18,6 +18,7 @@ build = "build.rs"
 name = "ion"
 
 [dependencies]
+bitflags = "0.9.1"
 fnv = "1.0"
 glob = "0.2"
 liner = "0.2"
