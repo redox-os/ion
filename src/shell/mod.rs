@@ -14,7 +14,6 @@ pub use self::history::ShellHistory;
 pub use self::job::{Job, JobKind};
 pub use self::flow::FlowLogic;
 
-use fnv::FnvHashMap;
 use std::fs::File;
 use std::io::{self, ErrorKind, Read, Write};
 use std::env;
@@ -26,14 +25,14 @@ use std::iter::FromIterator;
 use std::sync::mpsc::Receiver;
 use smallvec::SmallVec;
 
-use liner::{Context, CursorPosition, Event, EventKind, BasicCompleter};
-
 use builtins::*;
+use fnv::FnvHashMap;
+use liner::{Context, CursorPosition, Event, EventKind, BasicCompleter};
 use types::*;
 use smallstring::SmallString;
 use self::completer::{MultiCompleter, IonFileCompleter};
 use self::directory_stack::DirectoryStack;
-use self::flow_control::{FlowControl, Function, FunctionArgument, Type};
+use self::flow_control::{FlowControl, Function, FunctionArgument, Statement, Type};
 use self::variables::Variables;
 use self::status::*;
 use self::pipe::execute_pipeline;
@@ -168,7 +167,7 @@ impl<'a> Shell<'a> {
             match line {
                 Ok(line) => return Some(line),
                 // Handles Ctrl + C
-                Err(ref err) if err.kind() == ErrorKind::Interrupted => continue,
+                Err(ref err) if err.kind() == ErrorKind::Interrupted => return None,
                 // Handles Ctrl + D
                 Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
                     process::exit(self.previous_status)
@@ -202,7 +201,7 @@ impl<'a> Shell<'a> {
         }
     }
 
-    pub fn terminate_quotes(&mut self, command: String) -> String {
+    pub fn terminate_quotes(&mut self, command: String) -> Result<String, ()> {
         let mut buffer = QuoteTerminator::new(command);
         self.flow_control.level += 1;
         while !buffer.check_termination() {
@@ -210,11 +209,13 @@ impl<'a> Shell<'a> {
                 if let Some(command) = self.readln() {
                     buffer.append(command);
                     break
+                } else {
+                    return Err(());
                 }
             }
         }
         self.flow_control.level -= 1;
-        buffer.consume()
+        Ok(buffer.consume())
     }
 
     pub fn execute_script<P: AsRef<Path>>(&mut self, path: P) {
@@ -275,29 +276,35 @@ impl<'a> Shell<'a> {
             "args",
             iter::once(env::args().next().unwrap()).collect(),
         );
-        while let Some(command) = self.readln() {
-            if ! command.is_empty() {
-                let command = self.terminate_quotes(command);
-                let command = command.trim();
+        loop {
+            if let Some(command) = self.readln() {
+                if ! command.is_empty() {
+                    if let Ok(command) = self.terminate_quotes(command) {
+                        // Parse and potentially execute the command.
+                        self.on_command(command.trim());
 
-                // Parse and potentially execute the command.
-                self.on_command(command);
-
-                // Mark the command in the context history if it was a success.
-                if self.previous_status != NO_SUCH_COMMAND || self.flow_control.level > 0 {
-                    self.set_context_history_from_vars();
-                    if let Err(err) = self.context.history.push(command.into()) {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: {}", err);
+                        // Mark the command in the context history if it was a success.
+                        if self.previous_status != NO_SUCH_COMMAND || self.flow_control.level > 0 {
+                            self.set_context_history_from_vars();
+                            if let Err(err) = self.context.history.push(command.into()) {
+                                let stderr = io::stderr();
+                                let mut stderr = stderr.lock();
+                                let _ = writeln!(stderr, "ion: {}", err);
+                            }
+                        }
+                    } else {
+                        self.flow_control.level = 0;
+                        self.flow_control.current_if_mode = 0;
+                        self.flow_control.current_statement = Statement::Default;
                     }
                 }
+                self.update_variables();
+            } else {
+                self.flow_control.level = 0;
+                self.flow_control.current_if_mode = 0;
+                self.flow_control.current_statement = Statement::Default;
             }
-            self.update_variables();
         }
-
-        // Exit with the previous command's exit status.
-        process::exit(self.previous_status);
     }
 
     /// This function updates variables that need to be kept consistent with each iteration
