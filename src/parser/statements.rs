@@ -107,8 +107,14 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 },
                 _ if self.flags & BACKSL != 0     => self.flags ^= BACKSL,
                 b'\\'                             => self.flags ^= BACKSL,
-                b'\'' if self.flags & DQUOTE == 0 => self.flags ^= SQUOTE,
-                b'"'  if self.flags & SQUOTE == 0 => self.flags ^= DQUOTE,
+                b'\'' if self.flags & DQUOTE == 0 => {
+                    self.flags ^= SQUOTE;
+                    self.flags &= u16::MAX ^ (VARIAB + ARRAY);
+                },
+                b'"'  if self.flags & SQUOTE == 0 => {
+                    self.flags ^= DQUOTE;
+                    self.flags &= u16::MAX ^ (VARIAB + ARRAY);
+                },
                 b'@'  if self.flags & SQUOTE == 0 => {
                     self.flags &= u16::MAX ^ COMM_1;
                     self.flags |= COMM_2 + ARRAY;
@@ -200,6 +206,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         }
                     }
                 }
+                0...47 | 58...64 | 91...94 | 96 | 123...127 => self.flags &= u16::MAX ^ (VARIAB + ARRAY),
                 _ => ()
             }
             self.flags &= u16::MAX ^ (COMM_1 + COMM_2);
