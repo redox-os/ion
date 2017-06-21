@@ -337,6 +337,7 @@ pub enum WordToken<'a> {
     Process(&'a str, bool, Select),
     StringMethod(&'a str, &'a str, &'a str, Select),
     ArrayMethod(ArrayMethod<'a>),
+    Arithmetic(&'a str)
     //Glob(&'a str),
 }
 
@@ -846,6 +847,30 @@ impl<'a> WordIterator<'a> {
             false
         }
     }
+
+    fn arithmetic_expression<I : Iterator<Item=u8>>(&mut self, iter : &mut I) -> WordToken<'a> {
+        let mut paren : i8 = 0;
+        let start = self.read;
+        while let Some(character) = iter.next() {
+            match character {
+                b'(' => paren += 1,
+                b')' => {
+                    if paren == 0 {
+                        // Skip the incoming ); we have validated this syntax so it should be OK
+                        let _ = iter.next();
+                        let output = &self.data[start..self.read];
+                        self.read += 2;
+                        return WordToken::Arithmetic(output)
+                    } else {
+                        paren -= 1;
+                    }
+                },
+                _ => ()
+            }
+            self.read += 1;
+        }
+        panic!("ion: fatal syntax error: unterminated arithmetic expression");
+    }
 }
 
 
@@ -933,7 +958,12 @@ impl<'a> Iterator for WordIterator<'a> {
                         match iterator.next() {
                             Some(b'(') => {
                                 self.read += 2;
-                                return if self.flags.contains(EXPAND_PROCESSES) {
+                                return if self.data.as_bytes()[self.read] == b'(' {
+                                    // Pop the incoming left paren
+                                    let _ = iterator.next();
+                                    self.read += 1;
+                                    Some(self.arithmetic_expression(&mut iterator))
+                                } else if self.flags.contains(EXPAND_PROCESSES) {
                                     Some(self.process(&mut iterator))
                                 } else {
                                     Some(WordToken::Normal(&self.data[start..self.read],glob))
