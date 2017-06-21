@@ -2,70 +2,94 @@
 
 [![Build Status](https://travis-ci.org/redox-os/ion.svg)](https://travis-ci.org/redox-os/ion)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Coverage Status](https://coveralls.io/repos/redox-os/ion/badge.svg?branch=master&service=github)](https://coveralls.io/github/redox-os/ion?branch=master)
 [![crates.io](http://meritbadge.herokuapp.com/ion-shell)](https://crates.io/crates/ion-shell)
+![LOC](https://tokei.rs/b1/github/redox-os/ion)
 
-Ion is a shell for UNIX platforms, and is the default shell in Redox. It is still a work in progress, but much of the core functionality is complete. It is also currently significantly faster than Bash, and even Dash, making it the fastest system shell to date.
+Ion is a modern system shell that is written entirely in Rust, features a simple (and powerful) syntax, and offers performance that exceeds the level of Dash. While it is developed alongside RedoxOS as the default shell for RedoxOS, it is equally-supported on UNIX platforms (Linux/Mac/BSDs), by which it is developed and tested from. Windows support could also easily be obtained, but we currently do not have any developers that use Windows. Ion's design is influenced by many other successful shells, which can be seen in it's borrowing of ideas from Bash, Fish, and Oil; whilst also offering some unique ideas of it's own. It is still a work in progress, but most of the core functionality is complete. It is also currently significantly faster than Dash, even though it contains many more features and abilities, making it the fastest system shell to date. Finally, as it is written in Rust, we can guarantee that our codebase offers a high degree of memory safety compared to Bash, Dash, Zsh, Fish and other shells that are written in unsafe languages. That means no chance for a shellshock-like vulnerability to arise.
 
-# Completed Features
+# Ion's Goals
 
-- [x] Variable Expansions
-- [x] Brace Expansions
-- [x] Process Expansions
+Syntax and feature decisions for Ion are made based upon three specific measurements: *"is the feature useful, is it simple to use, and will it's implementation be efficient to parse and execute?"*. The language should be efficient to parse, with zero room for ambiguities, and implemented in a zero-cost manner as much as possible. In addition, we believe that as a shell is effectively a string-based language, the shell should also have first class string-manipulation capabilities, in order to eliminate the need for external utilities. The `awk` command should not be required as often when writing Ion scripts, as many basic uses of it are incorporated into Ion's syntax in a manner that is simple to use and learn.
+
+## Ion Is Not POSIX
+
+While Ion's foundations are heavily influenced by POSIX shell syntax, it does offer some critical features and differentiations that you won't find in a POSIX shell. The similarities only exist because POSIX syntax already had some good ideas, but it also came with a number of bad design decisions that have lead to inflexibility, and so we have taken the good ideas and implemented even better ideas on top of them, and as a replacement to the bad parts. Hence, while syntax may look familiar, it is not, nor will it ever, be compliant with POSIX.
+
+In example, we have carried a lot of the same basic features such as strings (**$string**) and process expansions that return strings (**$(command args...)***), but we have also implemented support for first class arrays (**@array**) and array-based process expansions (**@[command args..]**), rather than compounding the string variables, and utilize the distinction between the two types to implement methods (**$join(array)**, **@split(string)**) and slicing (**$string[..5]**, **@array[..5]**). In addition, we implement better syntax for redirecting/piping stderr (**^>**, **^|**), and both stderr/stdout (**&>**, **&|**); as well as dropping the **do** keyword, and using the **end** keyword to end a block.
+
+# Features
+
+Below is an overview of features that Ion has either already implemented, or aims to implement in the future. If you have ideas for features that you would like to see on this list, then you are welcome to open an issue to describe the feature and what you would like to use it for / why you think it's useful.
+
+- [x] Expansions
+    - [x] String Expansions
+    - [x] Array Expansions
+    - [x] Glob Expansions
+    - [x] Brace Expansions
+        - [x] Ranges
+        - [x] Permutations
+        - [x] Nested Braces
+    - [x] Process Expansions
+        - [x] String-based Command Substitution (**$()**)
+        - [x] Array-based Command Substitution (**@[]**)
+    - [ ] Arithmetic Expansions
 - [x] Flow Control
-- [x] For Loops
-- [x] While Loops
-- [x] If Conditionals
+    - [x] For Loops
+    - [ ] Foreach Loops
+    - [x] While Loops
+    - [x] If Conditionals
+    - [ ] Match Statements
 - [x] Functions
-- [x] Optionally-Typed Function Parameters
-- [x] Executing Scripts with an @args Array
-- [x] Aliases
-- [x] Variables (**$variable**)
-- [x] Multiple Variable Assignments
-- [x] Substring Slicing of Variables
-- [x] Arrays (**@array**)
-- [x] Array Expressions (**[]**)
-- [x] Array-based Command Substitution (**@[]**)
-- [x] String-based Command Substitution (**$()**)
-- [x] Array Methods (**@split(var, ' ')**)
-- [x] String Methods (**$join(array, ', ')**)
-- [x] Array Splicing
-- [x] Piping Stdout/Stderr
-- [x] Redirecting Stdout/Stderr
-- [x] Piping Builtins
-- [x] **&&** and **||** Conditionals
-- [x] Background Jobs
-- [x] Multiline Comments and Commands
-- [x] Tab Completion (Needs Improvements)
-- [x] vi and emacs keybindings (`set -o (vi|emacs)`)
+    - [x] Optionally-typed Function Parameters
+- [x] Script Execution
+    - [x] Handling arguments w/ @args Array
+- [x] Mutables
+    - [x] Aliases
+    - [x] Strings (**$variable**)
+        - [x] Multiple Variable Assignments
+        - [ ] Optionally-typed Variable Assignments
+        - [x] Grapheme-based String Slicing
+        - [x] String Methods (**$join(array, ', ')**)
+            - [x] **$join(array)**
+            - [x] **$len(string)**
+            - [x] **$len_bytes(string)**
+    - [x] Arrays (**@array**)
+        - [x] Array Expressions (**[]**)
+        - [x] Array Slicing
+        - [x] Array Methods (**@split(var, ' ')**)
+            - [x] **@split(string)**
+            - [x] **@len(array)**
+    - [ ] HashMaps
+- [x] Line Editor (Provided by [Liner](https://github.com/MovingtoMars/liner))
+    - [x] Multiline Comments and Commands
+    - [ ] Multi-line Editing
+    - [x] Tab Completion
+    - [x] Auto-suggestions
+    - [x] History suggestions
+    - [x] vi and emacs keybindings (`set -o (vi|emacs)`)
+    - [ ] Syntax Highlighting
 - [x] Implicit cd
-
-## Unimplemented Features
-
-Currently, the most important missing feature is support for signal handling, which is not well supported by in Rust at this time due to the lack of developed signal handling crates, and Redox not having support for signal handling.
-
-- [ ] Signal Handling
-- [ ] Multiline Editing
-- [ ] XDG App Dirs
-- [ ] Background Jobs Control
-- [ ] Autosuggestions (90%)
-- [ ] Syntax Highlighting
+- [x] Signal Handling
+- [x] **&&** and **||** Conditionals
+- [x] Redirecting Stdout / Stderr
+- [ ] Redirecting Stdout & Stderr
+- [x] Piping Builtins
+- [x] Background Jobs
 - [ ] Piping Functions
-- [ ] Maps
-- [ ] Lists?
-- [ ] Foreach Loops
-- [ ] Syntax for Color Handling
-- [ ] Builtin Plugins
-- [ ] Prompt Plugins
-- [ ] Syntax Plugins
-
+- [ ] Redirecting Functions
+- [ ] Background Job Control
+- [ ] XDG App Dirs
+- [ ] Plugins Support
+    - [ ] Builtins
+    - [ ] Prompt
+    - [ ] Syntax
 
 ## Shell Syntax
 
 ### Implicit Directory Changing
 
 Like the [Friendly Interactive Shell](https://fishshell.com/), Ion also supports implicitly executing the cd command when given
-a path, so long as that path begins with either `.`, `/`, or `~`; or ends with a `/`. This will thereby invoke
+a path, so long as that path begins with either `.`/`/`/`~`, or ends with a `/`. This will thereby invoke
 the internal built-in cd command with that path as the argument.
 
 ```ion
