@@ -1042,7 +1042,6 @@ impl<'a> Iterator for WordIterator<'a> {
                     }
                 },
                 b'*'|b'?' if !self.flags.contains(SQUOTE) => {
-                    self.read += 1;
                     glob = true;
                 },
                 _ => (),
