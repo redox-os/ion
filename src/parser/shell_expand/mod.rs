@@ -612,4 +612,14 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn calc() {
+        let line = "$((A * A - (A + A)))";
+        let expected = Array::from_vec(vec!["-1".to_owned()]);
+        assert_eq!(expected, expand_string(line, &functions!(), false));
+        let line = "$((3 * 10 - 27))";
+        let expected = Array::from_vec(vec!["3".to_owned()]);
+        assert_eq!(expected, expand_string(line, &functions!(), false));
+    }
 }
