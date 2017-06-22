@@ -143,16 +143,15 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                             index += 1;
                             continue
                         },
-                        b'[' if flags_ext.contains(ARRAY_CHAR_FOUND) => {
-                            array_process_levels += 1;
-                            flags |= ARRAY_PROCESS;
-                        },
                         b'['                      => array_levels += 1,
                         b']' if array_levels != 0 => array_levels -= 1,
-                        b']'                      => array_process_levels -= 1,
                         b'(' if flags_ext.contains(VAR_CHAR_FOUND) => {
                             flags |= PROCESS_TWO;
                             levels += 1;
+                        },
+                        b'(' if flags_ext.contains(ARRAY_CHAR_FOUND) => {
+                            flags |= ARRAY_PROCESS;
+                            array_process_levels += 1;
                         },
                         b'(' if flags_ext.intersects(VARIABLE | ARRAY) => {
                             flags |= METHOD;
@@ -161,6 +160,7 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                         b')' if levels == 0 && flags.contains(METHOD) && !flags.contains(SINGLE_QUOTE) => {
                             flags -= METHOD;
                         }
+                        b')' if flags.contains(ARRAY_PROCESS) => array_process_levels -= 1,
                         b')' if flags.contains(PROCESS_TWO) => {
                             levels -= 0;
                             if levels == 0 { flags -= PROCESS_TWO; }
@@ -410,10 +410,10 @@ mod tests {
 
     #[test]
     fn nested_array_process() {
-        if let Statement::Pipeline(pipeline) = parse("echo @[echo one @[echo two] three]") {
+        if let Statement::Pipeline(pipeline) = parse("echo @(echo one @(echo two) three)") {
             let jobs = pipeline.jobs;
             assert_eq!("echo", jobs[0].args[0]);
-            assert_eq!("@[echo one @[echo two] three]", jobs[0].args[1]);
+            assert_eq!("@(echo one @(echo two) three)", jobs[0].args[1]);
         } else {
             assert!(false);
         }
@@ -445,10 +445,10 @@ mod tests {
 
     #[test]
     fn array_process() {
-        if let Statement::Pipeline(pipeline) = parse("echo @[seq 1 10 | head -1]") {
+        if let Statement::Pipeline(pipeline) = parse("echo @(seq 1 10 | head -1)") {
             let jobs = pipeline.jobs;
             assert_eq!("echo", jobs[0].args[0]);
-            assert_eq!("@[seq 1 10 | head -1]", jobs[0].args[1]);
+            assert_eq!("@(seq 1 10 | head -1)", jobs[0].args[1]);
             assert_eq!(2, jobs[0].args.len());
         } else {
             assert!(false);
@@ -755,19 +755,4 @@ mod tests {
             assert!(false);
         }
     }
-
-    // #[test]
-    // fn real_tests() {
-    //     // Real world scenarios where parsing has failed.
-    //     if let Statement::Pipeline(pipeline) = parse("awk -v x=$x '{ if (1) print $1 }' myfile") {
-    //         assert_eq!(1, pipeline.jobs.len());
-    //         assert_eq!("awk", &pipeline.clone().jobs[0].args[0]);
-    //         assert_eq!("-v", &pipeline.clone().jobs[0].args[1]);
-    //         assert_eq!("x=$x", &pipeline.clone().jobs[0].args[2]);
-    //         assert_eq!("'{ if (1) print $1 }'", &pipeline.clone().jobs[0].args[3]);
-    //         assert_eq!("myfile", &pipeline.clone().jobs[0].args[4]);
-    //     } {
-    //         assert!(false);
-    //     }
-    // }
 }

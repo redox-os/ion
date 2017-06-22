@@ -170,21 +170,20 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         self.process_level += 1;
                     }
                 },
+                b'(' if self.flags.contains(COMM_2) => {
+                    self.array_process_level += 1;
+                },
                 b'(' if self.flags.intersects(VARIAB | ARRAY) => {
                     self.flags -= VARIAB | ARRAY;
                     self.flags |= METHOD;
                 },
-                b'[' if self.flags.contains(COMM_2) => {
-                    self.array_process_level += 1;
-                },
                 b'[' if !self.flags.contains(SQUOTE) => self.array_level += 1,
-                b']' if self.array_process_level == 0 && self.array_level == 0 && !self.flags.contains(SQUOTE) => {
+                b']' if self.array_level == 0 && !self.flags.contains(SQUOTE) => {
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
                 b']' if !self.flags.contains(SQUOTE) && self.array_level != 0 => self.array_level -= 1,
-                b']' if !self.flags.contains(SQUOTE) => self.array_process_level -= 1,
                 b')' if self.flags.contains(MATHEXPR) => {
                     if self.math_paren_level == 0 {
                         if self.data.as_bytes().len() <= self.read {
@@ -207,12 +206,13 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b')' if !self.flags.contains(SQUOTE) && self.flags.contains(METHOD) => {
                     self.flags ^= METHOD;
                 },
-                b')' if self.process_level == 0 && self.array_level == 0 && !self.flags.contains(SQUOTE) => {
+                b')' if self.process_level == 0 && self.array_process_level == 0 && !self.flags.contains(SQUOTE) => {
                     if error.is_none() && !self.flags.intersects(SQUOTE | DQUOTE) {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
-                b')' if !self.flags.contains(SQUOTE) => self.process_level -= 1,
+                b')' if !self.flags.contains(SQUOTE) && self.process_level != 0 => self.process_level -= 1,
+                b')' if !self.flags.contains(SQUOTE) => self.array_process_level -= 1,
                 b';' if !self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0 && self.array_process_level == 0 => {
                     return match error {
                         Some(error) => Some(Err(error)),
@@ -325,9 +325,9 @@ fn processes() {
 
 #[test]
 fn array_processes() {
-    let command = "echo @[echo one; sleep 1]; echo @[echo one; sleep 1]";
+    let command = "echo @(echo one; sleep 1); echo @(echo one; sleep 1)";
     for statement in StatementSplitter::new(command) {
-        assert_eq!(statement, Ok("echo @[echo one; sleep 1]"));
+        assert_eq!(statement, Ok("echo @(echo one; sleep 1)"));
     }
 }
 
@@ -372,12 +372,12 @@ fn nested_process() {
 
 #[test]
 fn nested_array_process() {
-    let command = "echo @[echo one @[echo two] three]";
+    let command = "echo @(echo one @(echo two) three)";
     let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], Ok(command));
 
-    let command = "echo @[echo @[echo one; echo two]; echo two]";
+    let command = "echo @(echo @(echo one; echo two); echo two)";
     let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], Ok(command));

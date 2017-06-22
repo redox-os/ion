@@ -11,12 +11,12 @@ end
 
 # Array Command Substitution
 
-let array_process = @[echo a  b c d    e]
+let array_process = @(echo a  b c d    e)
 for i in @array_process
     echo $i
 end
 
-for i in @[echo a  b c d    e]
+for i in @(echo a  b c d    e)
     echo $i
 end
 
@@ -44,9 +44,9 @@ echo [ 1 2 3 ][0]
 echo [ 1 2 3 ][1]
 echo [ 1 2 3 ][2]
 
-echo @[echo 1 2 3][0]
-echo @[echo 1 2 3][1]
-echo @[echo 1 2 3][2]
+echo @(echo 1 2 3)[0]
+echo @(echo 1 2 3)[1]
+echo @(echo 1 2 3)[2]
 
 # Slice by Range
 

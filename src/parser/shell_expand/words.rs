@@ -691,11 +691,11 @@ impl<'a> WordIterator<'a> {
                 b'\'' if !self.flags.contains(DQUOTE) => self.flags ^= SQUOTE,
                 b'"'  if !self.flags.contains(SQUOTE) => self.flags ^= DQUOTE,
                 b'@'  if !self.flags.contains(SQUOTE) => {
-                    if self.data.as_bytes()[self.read+1] == b'[' {
+                    if self.data.as_bytes()[self.read+1] == b'(' {
                         level += 1;
                     }
                 },
-                b']' if !self.flags.contains(SQUOTE) => {
+                b')' if !self.flags.contains(SQUOTE) => {
                     if level == 0 {
                         let array_process_contents = &self.data[start..self.read];
                         self.read += 1;
@@ -943,7 +943,7 @@ impl<'a> Iterator for WordIterator<'a> {
                     },
                     b'@' if !self.flags.contains(SQUOTE) => {
                         match iterator.next() {
-                            Some(b'[') => {
+                            Some(b'(') => {
                                 self.read += 2;
                                 return if self.flags.contains(EXPAND_PROCESSES) {
                                     Some(self.array_process(&mut iterator))
@@ -1148,7 +1148,7 @@ mod tests {
 
     #[test]
     fn array_processes() {
-        let input = "@[echo one two three] @[echo one two three][0]";
+        let input = "@(echo one two three) @(echo one two three)[0]";
         let expected = vec![
             WordToken::ArrayProcess("echo one two three", false, Select::All),
             WordToken::Whitespace(" "),

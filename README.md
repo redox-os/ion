@@ -15,7 +15,7 @@ Syntax and feature decisions for Ion are made based upon three specific measurem
 
 While Ion's foundations are heavily influenced by POSIX shell syntax, it does offer some critical features and differentiations that you won't find in a POSIX shell. The similarities only exist because POSIX syntax already had some good ideas, but it also came with a number of bad design decisions that have lead to inflexibility, and so we have taken the good ideas and implemented even better ideas on top of them, and as a replacement to the bad parts. Hence, while syntax may look familiar, it is not, nor will it ever, be compliant with POSIX.
 
-In example, we have carried a lot of the same basic features such as strings (**$string**) and process expansions that return strings (**$(command args...)***), but we have also implemented support for first class arrays (**@array**) and array-based process expansions (**@[command args..]**), rather than compounding the string variables, and utilize the distinction between the two types to implement methods (**$join(array)**, **@split(string)**) and slicing (**$string[..5]**, **@array[..5]**). In addition, we implement better syntax for redirecting/piping stderr (**^>**, **^|**), and both stderr/stdout (**&>**, **&|**); as well as dropping the **do** keyword, and using the **end** keyword to end a block.
+In example, we have carried a lot of the same basic features such as strings (**$string**) and process expansions that return strings (**$(command args...)***), but we have also implemented support for first class arrays (**@array**) and array-based process expansions (**@(command args..)**), rather than compounding the string variables, and utilize the distinction between the two types to implement methods (**$join(array)**, **@split(string)**) and slicing (**$string[..5]**, **@array[..5]**). In addition, we implement better syntax for redirecting/piping stderr (**^>**, **^|**), and both stderr/stdout (**&>**, **&|**); as well as dropping the **do** keyword, and using the **end** keyword to end a block.
 
 # Features
 
@@ -31,7 +31,7 @@ Below is an overview of features that Ion has either already implemented, or aim
         - [x] Nested Braces
     - [x] Process Expansions
         - [x] String-based Command Substitution (**$()**)
-        - [x] Array-based Command Substitution (**@[]**)
+        - [x] Array-based Command Substitution (**@()**)
     - [ ] Arithmetic Expansions
 - [x] Flow Control
     - [x] For Loops
@@ -258,7 +258,7 @@ Whereas the standard command substitution syntax will create a single string fro
 a whitespace-delimited vector of values from the output of the command.
 
 ```ion
-let word_split_process = @[echo one two three]
+let word_split_process = @(echo one two three)
 ```
 
 ### Using Arrays
@@ -286,9 +286,9 @@ echo [ 1 2 3 ][0]
 echo [ 1 2 3 ][1]
 echo [ 1 2 3 ][2]
 
-echo @[echo 1 2 3][0]
-echo @[echo 1 2 3][1]
-echo @[echo 1 2 3][2]
+echo @(echo 1 2 3)[0]
+echo @(echo 1 2 3)[1]
+echo @(echo 1 2 3)[2]
 ```
 
 #### Slice by Range
@@ -460,7 +460,7 @@ Command substitution allows the user to execute commands within a subshell, and 
 output used as the substitution for the expansion. There are two methods of performing command substitution: string and
 array-based command substitution. String-based command substitutions are the standard, and they are created by wrapping
 the external command between **$(** and **)**. Array-based command substitution is denoted by wrapping the command
-between **@[** and **]**. The first merely captures the result as a single string, precisely as it was written, while
+between **@(** and **)**. The first merely captures the result as a single string, precisely as it was written, while
 the second splits the data recieved into words delimited by whitespaces.
 
 Try comparing the following:
@@ -472,7 +472,7 @@ end
 ```
 
 ```ion
-for i in @[echo 1 2 3]
+for i in @(echo 1 2 3)
     echo $i
 end
 ```
@@ -490,7 +490,7 @@ echo $(echo one two three)[..3]
 You may slice the array returned to obtained a specific set of elements:
 
 ```ion
-echo @[grep "model name" /proc/cpuinfo | head -1][3..5]
+echo @(grep "model name" /proc/cpuinfo | head -1)[3..5]
 ```
 
 ### Functions
