@@ -41,7 +41,7 @@ impl Job {
         }
 
         self.args = expanded;
-        self.command = self.args[0].clone().into();
+        self.command = self.args.first().map_or("".into(), |c| c.clone().into());
     }
 
     pub fn build_command(&mut self) -> Command {
