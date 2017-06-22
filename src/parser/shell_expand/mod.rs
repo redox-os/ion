@@ -614,7 +614,7 @@ mod test {
     }
 
     #[test]
-    fn calc() {
+    fn arith_expression() {
         let line = "$((A * A - (A + A)))";
         let expected = Array::from_vec(vec!["-1".to_owned()]);
         assert_eq!(expected, expand_string(line, &functions!(), false));
