@@ -66,7 +66,8 @@ fn escape(input: &str) -> String {
     let mut output = Vec::with_capacity(input.len());
     for character in input.bytes() {
         match character {
-            b'(' | b')' | b'[' | b']' | b'&' => output.push(b'\\'),
+            b'(' | b')' | b'[' | b']' | b'&' | b'$' |
+            b'@' | b'{' | b'}' | b'<' | b'>' | b';' => output.push(b'\\'),
             _ => ()
         }
         output.push(character);
