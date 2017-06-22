@@ -287,11 +287,11 @@ impl<'a> Iterator for StatementSplitter<'a> {
 
 #[test]
 fn syntax_errors() {
-    let command = "echo (echo one); echo $((echo one); echo ) two; echo $(echo one";
+    let command = "echo (echo one); echo $( (echo one); echo ) two; echo $(echo one";
     let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results[0], Err(StatementError::InvalidCharacter('(', 6)));
-    assert_eq!(results[1], Err(StatementError::InvalidCharacter('(', 25)));
-    assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 42)));
+    assert_eq!(results[1], Err(StatementError::InvalidCharacter('(', 26)));
+    assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 43)));
     assert_eq!(results[3], Err(StatementError::UnterminatedSubshell));
     assert_eq!(results.len(), 4);
 
