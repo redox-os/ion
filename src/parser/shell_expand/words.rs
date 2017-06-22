@@ -1255,4 +1255,15 @@ mod tests {
         compare(input, expected);
     }
 
+    #[test]
+    fn test_globbing() {
+        let input = "barbaz* bingcrosb*";
+        let expected = vec![
+            WordToken::Normal("barbaz*", true),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("bingcrosb*", true)
+        ];
+        compare(input, expected);
+    }
+
 }
