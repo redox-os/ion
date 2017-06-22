@@ -1042,7 +1042,6 @@ impl<'a> Iterator for WordIterator<'a> {
                     }
                 },
                 b'*'|b'?' if !self.flags.contains(SQUOTE) => {
-                    self.read += 1;
                     glob = true;
                 },
                 _ => (),
@@ -1252,6 +1251,17 @@ mod tests {
             WordToken::Normal("echo", false),
             WordToken::Whitespace(" "),
             WordToken::Arithmetic("foo bar baz bing 3 * 2"),
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn test_globbing() {
+        let input = "barbaz* bingcrosb*";
+        let expected = vec![
+            WordToken::Normal("barbaz*", true),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("bingcrosb*", true)
         ];
         compare(input, expected);
     }
