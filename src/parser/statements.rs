@@ -299,6 +299,11 @@ fn syntax_errors() {
     let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results[0], Err(StatementError::ExpectedCommandButFound("redirection")));
     assert_eq!(results.len(), 1);
+
+    let command = "echo $((foo bar baz)";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Err(StatementError::UnterminatedArithmetic));
+    assert_eq!(results.len(), 1);
 }
 
 #[test]
