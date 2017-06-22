@@ -1235,4 +1235,16 @@ mod tests {
         ];
         compare(input, expected);
     }
+
+    #[test]
+    fn test_arithmetic() {
+        let input = "echo $((foo bar baz bing 3 * 2))";
+        let expected = vec![
+            WordToken::Normal("echo", false),
+            WordToken::Whitespace(" "),
+            WordToken::Arithmetic("foo bar baz bing 3 * 2"),
+        ];
+        compare(input, expected);
+    }
+
 }
