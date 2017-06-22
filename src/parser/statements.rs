@@ -194,8 +194,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         } else {
                             let next_character = self.data.as_bytes()[self.read] as char;
                             if next_character == ')' {
-                            self.flags -= MATHEXPR;
-                            self.flags |= POST_MATHEXPR;
+                                self.flags -= MATHEXPR;
+                                self.flags |= POST_MATHEXPR;
                             } else if error.is_none() {
                                 error = Some(StatementError::InvalidCharacter(next_character, self.read));
                             }
