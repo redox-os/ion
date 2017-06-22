@@ -14,6 +14,8 @@ use self::ranges::parse_range;
 pub use self::words::{WordIterator, WordToken, Select, Index, Range};
 use shell::variables::Variables;
 
+use ::builtins::calc;
+
 use std::io::{self, Write};
 use types::*;
 
@@ -269,6 +271,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                             }
                         }
                     },
+                    WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, &expand_func),
                 }
             }
 
@@ -477,6 +480,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
 
                     slice_string(&mut output, &expanded, index);
                 },
+                WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
             }
         }
         //the is_glob variable can probably be removed, I'm not entirely sure if empty strings are valid in any case- maarten
@@ -486,6 +490,47 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
     }
 
     expanded_words
+}
+
+/// Expand a string inside an arithmetic expression, for example:
+/// ```ignore
+/// x * 5 + y => 22
+/// ```
+/// if `x=5` and `y=7`
+fn expand_arithmetic(output : &mut String , input : &str, expander : &ExpanderFunctions) {
+    let mut intermediate = String::with_capacity(input.as_bytes().len());
+    let mut varbuf = String::new();
+    let flush = |var : &mut String, out : &mut String| {
+        if ! var.is_empty() {
+            // We have reached the end of a potential variable, so we expand it and push
+            // it onto the result
+            let res = (expander.variable)(&var, false);
+            match res {
+                Some(v) => out.push_str(&v),
+                None => out.push_str(&var),
+            }
+            var.clear();
+        }
+    };
+    for c in input.bytes() {
+        match c {
+            48...57 | 65...90 | 95 | 97...122 => {
+                varbuf.push(c as char);
+            },
+            _ => {
+                flush(&mut varbuf, &mut intermediate);
+                intermediate.push(c as char);
+            }
+        }
+    }
+    flush(&mut varbuf, &mut intermediate);
+    match calc::eval(&intermediate) {
+        Ok(s) => output.push_str(&s),
+        Err(e) => {
+            let err_string : String = e.into();
+            output.push_str(&err_string);
+        }
+    }
 }
 
 // TODO: Write Nested Brace Tests
@@ -588,5 +633,15 @@ mod test {
                 assert_eq!(expected, expand_string(&base(idx), &expander, false));
             }
         }
+    }
+
+    #[test]
+    fn arith_expression() {
+        let line = "$((A * A - (A + A)))";
+        let expected = Array::from_vec(vec!["-1".to_owned()]);
+        assert_eq!(expected, expand_string(line, &functions!(), false));
+        let line = "$((3 * 10 - 27))";
+        let expected = Array::from_vec(vec!["3".to_owned()]);
+        assert_eq!(expected, expand_string(line, &functions!(), false));
     }
 }

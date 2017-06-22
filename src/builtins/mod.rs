@@ -1,11 +1,11 @@
 pub mod source;
 pub mod variables;
 pub mod functions;
+pub mod calc;
 
 mod test;
 mod time;
 mod echo;
-mod calc;
 mod set;
 
 use self::variables::{alias, drop_alias, drop_variable};

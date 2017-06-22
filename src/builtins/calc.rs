@@ -473,7 +473,7 @@ pub fn parse(tokens: &[Token]) -> Result<String, CalcError> {
     d_expr(tokens).map(|answer| answer.value.to_string())
 }
 
-fn eval(input: &str) -> Result<String, CalcError> {
+pub fn eval(input: &str) -> Result<String, CalcError> {
     tokenize(input).and_then(|x| parse(&x))
 }
 

@@ -18,6 +18,9 @@ bitflags! {
         const ARRAY  = 64;
         const VARIAB = 128;
         const METHOD = 256;
+        /// Set while parsing through an inline arithmetic expression, e.g. $((foo * bar / baz))
+        const MATHEXPR = 512;
+        const POST_MATHEXPR = 1024;
     }
 }
 
@@ -30,6 +33,7 @@ pub enum StatementError<'a> {
     UnterminatedBracedVar,
     UnterminatedBrace,
     UnterminatedMethod,
+    UnterminatedArithmetic,
     ExpectedCommandButFound(&'static str)
 }
 
@@ -59,6 +63,9 @@ pub fn check_statement<'a>(statement: Result<&str, StatementError<'a>>) -> State
                 StatementError::UnterminatedMethod => {
                     let _ = writeln!(stderr.lock(), "ion: syntax error: unterminated method");
                 }
+                StatementError::UnterminatedArithmetic => {
+                    let _ = writeln!(stderr.lock(), "ion: syntax error: unterminated arithmetic subexpression");
+                }
                 StatementError::ExpectedCommandButFound(element) => {
                     let _ = writeln!(stderr.lock(), "ion: expected command, but found {}", element);
                 }
@@ -76,6 +83,7 @@ pub struct StatementSplitter<'a> {
     array_process_level: u8,
     process_level: u8,
     brace_level: u8,
+    math_paren_level: i8,
 }
 
 impl<'a> StatementSplitter<'a> {
@@ -87,7 +95,8 @@ impl<'a> StatementSplitter<'a> {
             array_level: 0,
             array_process_level: 0,
             process_level: 0,
-            brace_level: 0
+            brace_level: 0,
+            math_paren_level: 0,
         }
     }
 }
@@ -103,6 +112,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
         for character in self.data.bytes().skip(self.read) {
             self.read += 1;
             match character {
+                _ if self.flags.contains(POST_MATHEXPR) => (),
                 0...47 | 58...64 | 91...94 | 96 | 123...124 | 126...127 if self.flags.contains(VBRACE) => {
                     // If we are just ending the braced section continue as normal
                     if error.is_none() {
@@ -141,14 +151,24 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         self.brace_level -= 1;
                     }
                 },
+                b'(' if self.flags.contains(MATHEXPR) => {
+                    self.math_paren_level += 1;
+                }
                 b'('  if !self.flags.intersects(COMM_1 | VARIAB | ARRAY) => {
                     if error.is_none() && !self.flags.intersects(SQUOTE | DQUOTE) {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
                 b'(' if self.flags.contains(COMM_1) => {
-                    self.process_level += 1;
                     self.flags -= VARIAB | ARRAY;
+                    if self.data.as_bytes()[self.read] == b'(' {
+                        self.flags -= COMM_1;
+                        self.flags |= MATHEXPR;
+                        // The next character will always be a left paren in this branch;
+                        self.math_paren_level = -1;
+                    } else {
+                        self.process_level += 1;
+                    }
                 },
                 b'(' if self.flags.intersects(VARIAB | ARRAY) => {
                     self.flags -= VARIAB | ARRAY;
@@ -165,6 +185,25 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 },
                 b']' if !self.flags.contains(SQUOTE) && self.array_level != 0 => self.array_level -= 1,
                 b']' if !self.flags.contains(SQUOTE) => self.array_process_level -= 1,
+                b')' if self.flags.contains(MATHEXPR) => {
+                    if self.math_paren_level == 0 {
+                        if self.data.as_bytes().len() <= self.read {
+                            if error.is_none() {
+                                error = Some(StatementError::UnterminatedArithmetic)
+                            }
+                        } else {
+                            let next_character = self.data.as_bytes()[self.read] as char;
+                            if next_character == ')' {
+                                self.flags -= MATHEXPR;
+                                self.flags |= POST_MATHEXPR;
+                            } else if error.is_none() {
+                                error = Some(StatementError::InvalidCharacter(next_character, self.read));
+                            }
+                        }
+                    } else {
+                        self.math_paren_level -= 1;
+                    }
+                },
                 b')' if !self.flags.contains(SQUOTE) && self.flags.contains(METHOD) => {
                     self.flags ^= METHOD;
                 },
@@ -230,6 +269,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 None if self.flags.contains(METHOD) => Some(Err(StatementError::UnterminatedMethod)),
                 None if self.flags.contains(VBRACE) => Some(Err(StatementError::UnterminatedBracedVar)),
                 None if self.brace_level != 0    => Some(Err(StatementError::UnterminatedBrace)),
+                None if self.flags.contains(MATHEXPR) => Some(Err(StatementError::UnterminatedArithmetic)),
                 None => {
                     let output = self.data[start..].trim();
                     match output.as_bytes()[0] {
@@ -247,17 +287,22 @@ impl<'a> Iterator for StatementSplitter<'a> {
 
 #[test]
 fn syntax_errors() {
-    let command = "echo (echo one); echo $((echo one); echo ) two; echo $(echo one";
+    let command = "echo (echo one); echo $( (echo one); echo ) two; echo $(echo one";
     let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results[0], Err(StatementError::InvalidCharacter('(', 6)));
-    assert_eq!(results[1], Err(StatementError::InvalidCharacter('(', 25)));
-    assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 42)));
+    assert_eq!(results[1], Err(StatementError::InvalidCharacter('(', 26)));
+    assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 43)));
     assert_eq!(results[3], Err(StatementError::UnterminatedSubshell));
     assert_eq!(results.len(), 4);
 
     let command = ">echo";
     let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
     assert_eq!(results[0], Err(StatementError::ExpectedCommandButFound("redirection")));
+    assert_eq!(results.len(), 1);
+
+    let command = "echo $((foo bar baz)";
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results[0], Err(StatementError::UnterminatedArithmetic));
     assert_eq!(results.len(), 1);
 }
 
