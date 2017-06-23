@@ -1,6 +1,10 @@
 use std::io::{self, Write};
 use std::char;
 use std::str::FromStr;
+use std::iter::{empty, FromIterator};
+
+use super::unicode_segmentation::UnicodeSegmentation;
+
 use super::{ExpanderFunctions, expand_string};
 use super::ranges::parse_index_range;
 
@@ -138,6 +142,36 @@ pub enum Select {
     Range(Range)
 }
 
+pub trait SelectWithSize {
+    type Item;
+    fn select<O>(&mut self, Select, usize) -> O where O : FromIterator<Self::Item>;
+}
+
+impl<I, T> SelectWithSize for I where I : Iterator<Item=T> {
+    type Item = T;
+    fn select<O>(&mut self, s : Select, size : usize) -> O where O : FromIterator<Self::Item> {
+        match s {
+            Select::None => empty().collect(),
+            Select::All => self.collect(),
+            Select::Index(idx) =>
+                idx.resolve(size)
+                   .and_then(|idx| self.nth(idx))
+                   .into_iter()
+                   .collect(),
+            Select::Range(range) => {
+                if let Some((start, length)) = range.bounds(size) {
+                    self.skip(start)
+                        .take(length)
+                        .collect()
+                } else {
+                    empty().collect()
+                }
+            }
+        }
+    }
+
+}
+
 pub enum SelectError {
     Invalid
 }
@@ -170,6 +204,7 @@ enum Pattern<'a> {
     Whitespace,
 }
 
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct ArrayMethod<'a> {
     method: &'a str,
@@ -179,9 +214,14 @@ pub struct ArrayMethod<'a> {
 }
 
 impl<'a> ArrayMethod<'a> {
+
     pub fn returns_array(&self) -> bool {
-        self.method == "split"
+        match self.method {
+            "split" | "chars" | "bytes" | "graphemes" => true,
+            _ => false
+        }
     }
+
     pub fn handle(&self, current: &mut String, expand_func: &ExpanderFunctions) {
         match self.method {
             "len" => match expand_func.vars.get_array(self.variable) {
@@ -318,6 +358,24 @@ impl<'a> ArrayMethod<'a> {
                         }
                     },
                 }
+            },
+            "graphemes" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
+                let graphemes = UnicodeSegmentation::graphemes(variable.as_str(), true);
+                let len = graphemes.clone().count();
+                return graphemes.map(From::from)
+                                .select(self.selection, len);
+            },
+            "bytes" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
+                let len = variable.as_bytes().len();
+                return variable.bytes()
+                               .map(|b| b.to_string())
+                               .select(self.selection, len);
+            },
+            "chars" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
+                let len = variable.chars().count();
+                return variable.chars()
+                               .map(|c| c.to_string())
+                               .select(self.selection, len);
             },
             _ => {
                 let stderr = io::stderr();
@@ -1264,6 +1322,51 @@ mod tests {
             WordToken::Normal("bingcrosb*", true)
         ];
         compare(input, expected);
+    }
+
+    macro_rules! functions_with_vars {
+        () => {
+            ExpanderFunctions {
+                vars:     &Variables::default(),
+                tilde:    &|_| None,
+                array:    &|_, _| None,
+                variable:  &|var : &str, _| match var {
+                    "pkmn1" => "Pokémon".to_owned().into(),
+                    "pkmn2" => "Poke\u{0301}mon".to_owned().into(),
+                    _ => None
+                },
+                command: &|_, _| None,
+            }
+        }
+    }
+
+    #[test]
+    fn array_methods() {
+        let expanders = functions_with_vars!();
+        let method = ArrayMethod {
+            method: "graphemes",
+            variable: "pkmn1",
+            pattern: Pattern::Whitespace,
+            selection: Select::Index(Index::Forward(3))
+        };
+        let expected = Array::from_vec(vec!["é".into()]);
+        assert_eq!(method.handle_as_array(&expanders), expected);
+        let method = ArrayMethod {
+            method: "chars",
+            variable: "pkmn2",
+            pattern: Pattern::Whitespace,
+            selection: Select::Index(Index::Forward(3))
+        };
+        let expected = Array::from_vec(vec!["e".into()]);
+        assert_eq!(method.handle_as_array(&expanders), expected);
+        let method = ArrayMethod {
+            method: "bytes",
+            variable: "pkmn2",
+            pattern: Pattern::Whitespace,
+            selection: Select::Index(Index::Forward(1))
+        };
+        let expected = Array::from_vec(vec!["111".into()]);
+        assert_eq!(method.handle_as_array(&expanders), expected);
     }
 
 }
