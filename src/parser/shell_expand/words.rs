@@ -1324,4 +1324,49 @@ mod tests {
         compare(input, expected);
     }
 
+    macro_rules! functions_with_vars {
+        () => {
+            ExpanderFunctions {
+                vars:     &Variables::default(),
+                tilde:    &|_| None,
+                array:    &|_, _| None,
+                variable:  &|var : &str, _| match var {
+                    "pkmn1" => "Pokémon".to_owned().into(),
+                    "pkmn2" => "Poke\u{0301}mon".to_owned().into(),
+                    _ => None
+                },
+                command: &|_, _| None,
+            }
+        }
+    }
+
+    #[test]
+    fn array_methods() {
+        let expanders = functions_with_vars!();
+        let method = ArrayMethod {
+            method: "graphemes",
+            variable: "pkmn1",
+            pattern: Pattern::Whitespace,
+            selection: Select::Index(Index::Forward(3))
+        };
+        let expected = Array::from_vec(vec!["é".into()]);
+        assert_eq!(method.handle_as_array(&expanders), expected);
+        let method = ArrayMethod {
+            method: "chars",
+            variable: "pkmn2",
+            pattern: Pattern::Whitespace,
+            selection: Select::Index(Index::Forward(3))
+        };
+        let expected = Array::from_vec(vec!["e".into()]);
+        assert_eq!(method.handle_as_array(&expanders), expected);
+        let method = ArrayMethod {
+            method: "bytes",
+            variable: "pkmn2",
+            pattern: Pattern::Whitespace,
+            selection: Select::Index(Index::Forward(1))
+        };
+        let expected = Array::from_vec(vec!["111".into()]);
+        assert_eq!(method.handle_as_array(&expanders), expected);
+    }
+
 }
