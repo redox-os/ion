@@ -5,15 +5,15 @@
 [![crates.io](http://meritbadge.herokuapp.com/ion-shell)](https://crates.io/crates/ion-shell)
 ![LOC](https://tokei.rs/b1/github/redox-os/ion)
 
-Ion is a modern system shell that is written entirely in Rust, features a simple (and powerful) syntax, and offers performance that exceeds the level of Dash. While it is developed alongside RedoxOS as the default shell for RedoxOS, it is equally-supported on UNIX platforms (Linux/Mac/BSDs), by which it is developed and tested from. Windows support could also easily be obtained, but we currently do not have any developers that use Windows. Ion's design is influenced by many other successful shells, which can be seen in it's borrowing of ideas from Bash, Fish, and Oil; whilst also offering some unique ideas of it's own. It is still a work in progress, but most of the core functionality is complete. It is also currently significantly faster than Dash, even though it contains many more features and abilities, making it the fastest system shell to date. Finally, as it is written in Rust, we can guarantee that our codebase offers a high degree of memory safety compared to Bash, Dash, Zsh, Fish and other shells that are written in unsafe languages. That means no chance for a shellshock-like vulnerability to arise.
+Ion is a modern system shell that is written entirely in Rust, features a simple (and powerful) syntax, and offers performance that exceeds the level of Dash. While it is developed alongside RedoxOS as the default shell for RedoxOS, it is equally supported on UNIX platforms (Linux/Mac/BSDs), on which it is developed and tested. Windows support could also easily be obtained, but we currently do not have any developers that use Windows. Ion's design is influenced by many other successful shells, which can be seen in its borrowing of ideas from Bash, Fish, and Oil; whilst also offering some unique ideas of its own. It is still a work in progress, but most of the core functionality is complete. It is also currently significantly faster than Dash, even though it contains many more features and abilities, making it the fastest system shell to date. Finally, as it is written in Rust, we can guarantee that our codebase offers a high degree of memory safety compared to Bash, Dash, Zsh, Fish and other shells that are written in unsafe languages. That means no chance for a shellshock-like vulnerability to arise.
 
 # Ion's Goals
 
-Syntax and feature decisions for Ion are made based upon three specific measurements: *"is the feature useful, is it simple to use, and will it's implementation be efficient to parse and execute?"*. The language should be efficient to parse, with zero room for ambiguities, and implemented in a zero-cost manner as much as possible. In addition, we believe that as a shell is effectively a string-based language, the shell should also have first class string-manipulation capabilities, in order to eliminate the need for external utilities. The `awk` command should not be required as often when writing Ion scripts, as many basic uses of it are incorporated into Ion's syntax in a manner that is simple to use and learn.
+Syntax and feature decisions for Ion are made based upon three specific measurements: *"is the feature useful, is it simple to use, and will its implementation be efficient to parse and execute?"*. The language should be efficient to parse, with zero room for ambiguities, and implemented in a zero-cost manner as much as possible. In addition, we believe that as a shell is effectively a string-based language, the shell should also have first-class string manipulation capabilities, in order to eliminate the need for external utilities. The `awk` command should not be required as often when writing Ion scripts, as many basic uses of it are incorporated into Ion's syntax in a manner that is simple to use and learn.
 
 ## Ion Is Not POSIX
 
-While Ion's foundations are heavily influenced by POSIX shell syntax, it does offer some critical features and differentiations that you won't find in a POSIX shell. The similarities only exist because POSIX syntax already had some good ideas, but it also came with a number of bad design decisions that have lead to inflexibility, and so we have taken the good ideas and implemented even better ideas on top of them, and as a replacement to the bad parts. Hence, while syntax may look familiar, it is not, nor will it ever, be compliant with POSIX.
+While Ion's foundations are heavily influenced by POSIX shell syntax, it does offer some critical features and differentiations that you won't find in a POSIX shell. The similarities only exist because POSIX syntax already had some good ideas, but it also came with a number of bad design decisions that have lead to inflexibility, and so we have taken the good ideas and implemented even better ideas on top of them, and as a replacement to the bad parts. Hence, while syntax may look familiar, it is not, nor will it ever be, compliant with POSIX.
 
 In example, we have carried a lot of the same basic features such as strings (**$string**) and process expansions that return strings (**$(command args...)***), but we have also implemented support for first class arrays (**@array**) and array-based process expansions (**@(command args..)**), rather than compounding the string variables, and utilize the distinction between the two types to implement methods (**$join(array)**, **@split(string)**) and slicing (**$string[..5]**, **@array[..5]**). In addition, we implement better syntax for redirecting/piping stderr (**^>**, **^|**), and both stderr/stdout (**&>**, **&|**); as well as dropping the **do** keyword, and using the **end** keyword to end a block.
 
@@ -200,7 +200,7 @@ echo $a
 
 ### Aliases
 
-The `alias` command is used to set an alias for running other commands under a different name. The most common usages of the `alias` keyword are to shorten the keystrokes required to run a command and it's specific arguments, and to rename a command to something more familiar.
+The `alias` command is used to set an alias for running other commands under a different name. The most common usages of the `alias` keyword are to shorten the keystrokes required to run a command and its specific arguments, and to rename a command to something more familiar.
 
 ```ion
 alias ls = 'exa'
@@ -230,8 +230,8 @@ Arrays can be create with the let keyword when the supplied expression evaluates
 
 #### Array Syntax
 
-The basic syntax for creating an array of values is to wrap the values inbetween **[]** characters. The syntax within
-will be evaluated into a flat-mapped vector, and the result can therefor be stored as an array.
+The basic syntax for creating an array of values is to wrap the values in between **[]** characters. The syntax within
+will be evaluated into a flat-mapped vector, and the result can therefore be stored as an array.
 
 ```ion
 let array = [ one two 'three four' ]
