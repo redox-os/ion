@@ -81,14 +81,10 @@ fn array_expand(elements : &[&str], expand_func: &ExpanderFunctions, selection :
 }
 
 fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, index: Index) -> Option<Value> {
+    let mut expanded = elements.iter().flat_map(|e| expand_string(e, expand_func, false));
     match index {
-        Index::Forward(n) => elements.iter()
-                                     .flat_map(|e| expand_string(e, expand_func, false))
-                                     .nth(n),
-        Index::Backward(n) => elements.iter()
-                                      .flat_map(|e| expand_string(e, expand_func, false))
-                                      .rev()
-                                      .nth(n)
+        Index::Forward(n) => expanded.nth(n),
+        Index::Backward(n) => expanded.rev().nth(n),
     }
 }
 
