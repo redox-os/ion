@@ -71,25 +71,33 @@ fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
     }
 }
 
-fn array_expand(elements: &[&str], expand_func: &ExpanderFunctions) -> Array {
-    elements.iter()
-        .flat_map(|element| expand_string(element, expand_func, false))
-        .collect()
+fn array_expand(elements : &[&str], expand_func: &ExpanderFunctions, selection : Select) -> Array {
+    match selection {
+        Select::None => Array::new(),
+        Select::All => elements.iter().flat_map(|e| expand_string(e, expand_func, false)).collect(),
+        Select::Index(index) => array_nth(elements, expand_func, index).into_iter().collect(),
+        Select::Range(range) => array_range(elements, expand_func, range),
+    }
 }
 
-fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, id: usize) -> Value {
-    elements.iter()
-        .flat_map(|element| expand_string(element, expand_func, false))
-        .nth(id).unwrap_or_default()
+fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, index: Index) -> Option<Value> {
+    let mut expanded = elements.iter().flat_map(|e| expand_string(e, expand_func, false));
+    match index {
+        Index::Forward(n) => expanded.nth(n),
+        Index::Backward(n) => expanded.rev().nth(n),
+    }
 }
 
 fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, range : Range) -> Array {
-    if let Some((start, length)) = range.bounds(elements.len()) {
-       elements.iter()
-               .flat_map(|element| expand_string(element, expand_func, false))
-               .skip(start)
-               .take(length)
-               .collect()
+    let expanded = elements.iter()
+                           .flat_map(|e| expand_string(e, expand_func, false))
+                           .collect::<Array>();
+    let len = expanded.len();
+    if let Some((start, length)) = range.bounds(len) {
+        expanded.into_iter()
+                .skip(start)
+                .take(length)
+                .collect()
     } else {
         Array::new()
     }
@@ -160,23 +168,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
             for word in token_buffer {
                 match *word {
                     WordToken::Array(ref elements, index) => {
-                        match index {
-                            Select::None => (),
-                            Select::All => {
-                                let expanded = array_expand(elements, expand_func);
-                                output.push_str(&expanded.join(" "));
-                            },
-                            Select::Index(idx) => {
-                                if let Some(n) = idx.resolve(elements.len()) {
-                                    let expanded = array_nth(elements, expand_func, n);
-                                    output.push_str(&expanded);
-                                }
-                            },
-                            Select::Range(range) => {
-                                let expanded = array_range(elements, expand_func, range);
-                                output.push_str(&expanded.join(" "));
-                            }
-                        };
+                        output.push_str(&array_expand(elements, expand_func, index).join(" "));
                     },
                     WordToken::ArrayVariable(array, _, index) => {
                         if let Some(array) = (expand_func.array)(array, index) {
@@ -290,17 +282,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
         } else if token_buffer.len() == 1 {
             match token_buffer[0] {
                 WordToken::Array(ref elements, index) => {
-                    return match index {
-                        Select::None   => Array::new(),
-                        Select::All    => array_expand(elements, expand_func),
-                        Select::Index(idx) => {
-                            idx.resolve(elements.len())
-                               .map(|n| array_nth(elements, expand_func, n))
-                               .into_iter()
-                               .collect()
-                        },
-                        Select::Range(range) => array_range(elements, expand_func, range),
-                    };
+                    return array_expand(elements, expand_func, index);
                 },
                 WordToken::ArrayVariable(array, quoted, index) => {
                     return match (expand_func.array)(array, index) {
@@ -369,22 +351,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
         for word in token_buffer {
             match *word {
                 WordToken::Array(ref elements, index) => {
-                    match index {
-                        Select::None => (),
-                        Select::All => {
-                            let expanded = array_expand(elements, expand_func);
-                            output.push_str(&expanded.join(" "));
-                        },
-                        Select::Index(id) => {
-                            id.resolve(elements.len())
-                              .map(|n| array_nth(elements, expand_func, n))
-                              .map(|expanded| output.push_str(&expanded));
-                        },
-                        Select::Range(range) => {
-                            let expanded = array_range(elements, expand_func, range);
-                            output.push_str(&expanded.join(" "));
-                        },
-                    };
+                    output.push_str(&array_expand(elements, expand_func, index).join(" "));
                 },
                 WordToken::ArrayVariable(array, _, index) => {
                     if let Some(array) = (expand_func.array)(array, index) {
@@ -632,6 +599,21 @@ mod test {
             for idx in idxs {
                 assert_eq!(expected, expand_string(&base(idx), &expander, false));
             }
+        }
+    }
+
+    #[test]
+    fn embedded_array_expansion() {
+        let line = |idx : &str| format!("[[foo bar] [baz bat] [bing crosby]][{}]", idx);
+        let expander = functions!();
+        let cases : Vec<(Vec<String>, &str)> = vec![
+            (vec!["foo".into()], "0"),
+            (vec!["baz".into()], "2"),
+            (vec!["bat".into()], "-3"),
+            (vec!["bar".into(), "baz".into(), "bat".into()], "1...3")
+        ];
+        for (expected, idx) in cases {
+            assert_eq!(Array::from_vec(expected), expand_string(&line(idx), &expander, false));
         }
     }
 
