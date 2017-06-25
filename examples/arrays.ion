@@ -11,7 +11,7 @@ end
 
 # Array Command Substitution
 
-let array_process = @(echo a  b c d    e)
+let array_process = [ @(echo a  b c d    e) ]
 for i in @array_process
     echo $i
 end
@@ -61,3 +61,9 @@ echo @array[..]
 for index in 0..3
   echo $(echo 😉😉😉)[$index]
 end
+
+# Convert Array to String
+
+let array = [ 1 2 3 4 5 ]
+let as_string = @array
+echo $as_string

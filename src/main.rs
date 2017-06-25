@@ -71,7 +71,6 @@ fn main() {
     let handle = core.handle();
     let ctrl_c = tokio_signal::ctrl_c(&handle).flatten_stream();
     let signal_handler = ctrl_c.for_each(|()| {
-        let _ = writeln!(stderr(), "ion: received SIGINT (Ctrl+C)");
         let _ = sigint_tx.send(true);
         Ok(())
     });

@@ -3,8 +3,8 @@ use std::char;
 use std::str::FromStr;
 use std::iter::{empty, FromIterator};
 
+use super::super::ArgumentSplitter;
 use super::unicode_segmentation::UnicodeSegmentation;
-
 use super::{ExpanderFunctions, expand_string};
 use super::ranges::parse_index_range;
 
@@ -824,32 +824,19 @@ impl<'a> WordIterator<'a> {
     fn array<I>(&mut self, iterator: &mut I) -> WordToken<'a>
         where I: Iterator<Item = u8>
     {
-        let mut start = self.read;
+        let start = self.read;
         let mut level = 0;
-        let mut whitespace = true;
-        let mut elements = Vec::new();
         while let Some(character) = iterator.next() {
             match character {
                 _ if self.flags.contains(BACKSL)      => self.flags ^= BACKSL,
                 b'\\'                                 => self.flags ^= BACKSL,
                 b'\'' if !self.flags.contains(DQUOTE) => self.flags ^= SQUOTE,
                 b'"'  if !self.flags.contains(SQUOTE) => self.flags ^= DQUOTE,
-                b' '  if !self.flags.intersects(SQUOTE | DQUOTE) && level == 0 => {
-                    if whitespace {
-                        self.read += 1;
-                        start = self.read;
-                    } else {
-                        elements.push(&self.data[start..self.read]);
-                        start = self.read + 1;
-                        self.read += 1;
-                        whitespace = true;
-                    }
-                    continue
-                },
                 b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => level += 1,
                 b']' if !self.flags.intersects(SQUOTE | DQUOTE) => {
                     if level == 0 {
-                        elements.push(&self.data[start..self.read]);
+                        let elements = ArgumentSplitter::new(&self.data[start..self.read])
+                            .collect::<Vec<&str>>();
                         self.read += 1;
 
                         return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
@@ -857,14 +844,12 @@ impl<'a> WordIterator<'a> {
                             WordToken::Array(elements, self.read_selection(iterator))
                         } else {
                             WordToken::Array(elements, Select::All)
-
                         }
                     } else {
                         level -= 1;
                     }
-
                 },
-                _ => whitespace = false
+                _ => ()
             }
             self.read += 1;
         }

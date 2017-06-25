@@ -63,10 +63,11 @@ fn print_arrays(list: &ArrayVariableContext) {
     }
 }
 
-fn parse_assignment(binding: Binding,
-                    vars: &mut Variables,
-                    dir_stack: &DirectoryStack) -> Result<Action, i32>
-{
+fn parse_assignment (
+    binding: Binding,
+    vars: &mut Variables,
+    dir_stack: &DirectoryStack
+) -> Result<Action, i32> {
     let expanders = get_expanders!(vars, dir_stack);
     match binding {
         Binding::InvalidKey(key) => {
@@ -76,7 +77,7 @@ fn parse_assignment(binding: Binding,
         },
         Binding::KeyValue(key, value) => match parse_expression(&value, &expanders) {
             Value::String(value) => Ok(Action::UpdateString(key, value)),
-            Value::Array(array)  => Ok(Action::UpdateArray(key, array))
+            Value::Array(array)  => Ok(Action::UpdateArray(key, array)),
         },
         Binding::MultipleKeys(keys, value) => match parse_expression(&value, &expanders) {
             Value::String(value) => {
@@ -171,19 +172,18 @@ pub fn export_variable(binding : Binding, vars: &mut Variables, dir_stack : &Dir
     SUCCESS
 }
 
-fn parse_expression(expression: &str, shell_funcs: &ExpanderFunctions) -> Value {
+fn parse_expression (
+    expression: &str,
+    shell_funcs: &ExpanderFunctions
+) -> Value {
     let arguments: Vec<&str> = ArgumentSplitter::new(expression).collect();
 
     if arguments.len() == 1 {
-        // If a single argument has been passed, it will be expanded and checked to determine
-        // whether or not the expression is an array or a string.
-        let expanded = expand_string(expression, shell_funcs, false);
-        if expanded.len() == 1 {
-            // Grab the inner value and return it as a String.
-            Value::String(expanded[0].clone())
+        let array = expand_string(expression, shell_funcs, false);
+        if expression.starts_with('[') && expression.ends_with(']') {
+            Value::Array(array)
         } else {
-            // Return the expanded values as an Array.
-            Value::Array(expanded)
+            Value::String(array.join(" "))
         }
     } else {
         // If multiple arguments have been passed, they will be collapsed into a single string.
