@@ -77,7 +77,7 @@ impl<'a> Shell<'a> {
             sigint_handle: ctrl_c
         }
     }
-
+    
     fn readln(&mut self) -> Option<String> {
         let vars_ptr = &self.variables as *const Variables;
         let dirs_ptr = &self.directory_stack as *const DirectoryStack;
