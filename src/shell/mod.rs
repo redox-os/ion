@@ -103,10 +103,13 @@ impl<'a> Shell<'a> {
                         CursorPosition::InSpace(None, _) => false,
                         CursorPosition::OnWordLeftEdge(index) => index >= 1,
                         CursorPosition::OnWordRightEdge(index) => {
-                            index >= 1 && !words.into_iter().nth(index).map(|(start, end)| {
-                                let buf = editor.current_buffer();
-                                buf.range(start, end).trim().starts_with('$')
-                            }).unwrap_or(false)
+                            words.into_iter()
+                                 .nth(index)
+                                 .map(|(start, end)|{
+                                    let filename = editor.current_buffer().range(start, end);
+                                    let file = Path::new(&filename);
+                                    file.exists() || file.parent().map(|p| p.exists()).unwrap_or(false)
+                                 }).unwrap_or(false)
                         }
                     };
 
