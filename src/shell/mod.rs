@@ -77,6 +77,7 @@ impl<'a> Shell<'a> {
             sigint_handle: ctrl_c
         }
     }
+
     fn readln(&mut self) -> Option<String> {
         let vars_ptr = &self.variables as *const Variables;
         let dirs_ptr = &self.directory_stack as *const DirectoryStack;
@@ -103,13 +104,17 @@ impl<'a> Shell<'a> {
                         CursorPosition::InSpace(None, _) => false,
                         CursorPosition::OnWordLeftEdge(index) => index >= 1,
                         CursorPosition::OnWordRightEdge(index) => {
-                            words.into_iter()
-                                 .nth(index)
-                                 .map(|(start, end)|{
+                            if let Some((start, end)) = words.into_iter().nth(index) {
+                                if let Ok(mut file) = env::current_dir() {
                                     let filename = editor.current_buffer().range(start, end);
-                                    let file = Path::new(&filename);
-                                    file.exists() || file.parent().map(|p| p.exists()).unwrap_or(false)
-                                 }).unwrap_or(false)
+                                    file.push(filename);
+                                    file.exists() || file.parent().map(Path::exists).unwrap_or(false)
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
                         }
                     };
 
