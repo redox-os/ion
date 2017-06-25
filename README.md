@@ -244,12 +244,27 @@ let lsflags = [ -l -a ]
 ls @lsflags
 ```
 
-#### Braces Create Arrays
+### Copying Arrays
+
+Do note, however, that arrays must always be explicitly created with **[]**.
+
+```ion
+let array = [ 1 2 3 ]
+let copy_of_array = [ @array ]
+```
+
+```ion
+let string = @array
+```
+
+When an array variable is passed by itself, it will coerced into a string.
+
+#### Braces Can Create Arrays
 
 Brace expansions actually create a vector of values under the hood, and thus they can be used to create an array.
 
 ```ion
-let braced_array = {down,up}vote
+let braced_array = [ ]{down,up}vote ]
 ```
 
 #### Array-based Command Substitution
@@ -258,7 +273,7 @@ Whereas the standard command substitution syntax will create a single string fro
 a whitespace-delimited vector of values from the output of the command.
 
 ```ion
-let word_split_process = @(echo one two three)
+let word_split_process = [ @(echo one two three) ]
 ```
 
 ### Using Arrays
@@ -311,7 +326,7 @@ by the sigil that is used to invoke the method. Currently, there are only two su
 **@split**.
 
 ```ion
-let results = [ 1 2 3 4 5]
+let results = [ 1 2 3 4 5 ]
 echo $join(results) @join # Both of these effectively do the same thing
 echo $join(results, ', ') # You may provide a custom pattern instead
 
