@@ -957,6 +957,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         if !self.flags.contains(EXPAND_PROCESSES) {
                             return Some(WordToken::Normal("'",glob));
                         }
+                        break;
                     },
                     b'"' if !self.flags.contains(SQUOTE) => {
                         start += 1;
@@ -965,6 +966,7 @@ impl<'a> Iterator for WordIterator<'a> {
                         if !self.flags.contains(EXPAND_PROCESSES) {
                             return Some(WordToken::Normal("\"",glob));
                         }
+                        break;
                     }
                     b' ' if !self.flags.intersects(DQUOTE | SQUOTE) => {
                         return Some(self.whitespaces(&mut iterator));
@@ -1305,6 +1307,23 @@ mod tests {
             WordToken::Normal("barbaz*", true),
             WordToken::Whitespace(" "),
             WordToken::Normal("bingcrosb*", true)
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn test_empty_strings() {
+        let input = "rename '' 0 a \"\"";
+        let expected = vec![
+            WordToken::Normal("rename", false),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("", false),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("0", false),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("a", false),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("", false)
         ];
         compare(input, expected);
     }
