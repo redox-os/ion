@@ -923,6 +923,9 @@ impl<'a> WordIterator<'a> {
     }
 }
 
+fn filter_empty<'a>(input : &'a str) -> Option<&'a str> {
+    if input == "" { None } else { Some(input) }
+}
 
 impl<'a> Iterator for WordIterator<'a> {
     type Item = WordToken<'a>;
@@ -962,11 +965,16 @@ impl<'a> Iterator for WordIterator<'a> {
                     b'"' if !self.flags.contains(SQUOTE) => {
                         start += 1;
                         self.read += 1;
-                        self.flags ^= DQUOTE;
+                        if self.flags.contains(DQUOTE) {
+                            self.flags -= DQUOTE;
+                            return self.next();
+                        }
+                        self.flags |= DQUOTE;
                         if !self.flags.contains(EXPAND_PROCESSES) {
                             return Some(WordToken::Normal("\"",glob));
+                        } else {
+                            break
                         }
-                        break;
                     }
                     b' ' if !self.flags.intersects(DQUOTE | SQUOTE) => {
                         return Some(self.whitespaces(&mut iterator));
@@ -1077,7 +1085,11 @@ impl<'a> Iterator for WordIterator<'a> {
                     return Some(WordToken::Normal(&self.data[start..self.read],glob));
                 },
                 b'$' | b'@' if !self.flags.contains(SQUOTE) => {
-                    return Some(WordToken::Normal(&self.data[start..self.read],glob));
+                    if let Some(s) = filter_empty(&self.data[start..self.read]) {
+                        return Some(WordToken::Normal(s, glob));
+                    } else {
+                        return self.next();
+                    };
                 },
                 b'[' if !self.flags.contains(SQUOTE) => {
                     if self.glob_check(&mut iterator) {
