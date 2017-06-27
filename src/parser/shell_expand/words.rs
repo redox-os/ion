@@ -923,7 +923,6 @@ impl<'a> WordIterator<'a> {
     }
 }
 
-
 impl<'a> Iterator for WordIterator<'a> {
     type Item = WordToken<'a>;
 
@@ -957,13 +956,20 @@ impl<'a> Iterator for WordIterator<'a> {
                         if !self.flags.contains(EXPAND_PROCESSES) {
                             return Some(WordToken::Normal("'",glob));
                         }
+                        break;
                     },
                     b'"' if !self.flags.contains(SQUOTE) => {
                         start += 1;
                         self.read += 1;
-                        self.flags ^= DQUOTE;
+                        if self.flags.contains(DQUOTE) {
+                            self.flags -= DQUOTE;
+                            return self.next();
+                        }
+                        self.flags |= DQUOTE;
                         if !self.flags.contains(EXPAND_PROCESSES) {
                             return Some(WordToken::Normal("\"",glob));
+                        } else {
+                            break
                         }
                     }
                     b' ' if !self.flags.intersects(DQUOTE | SQUOTE) => {
@@ -1075,7 +1081,12 @@ impl<'a> Iterator for WordIterator<'a> {
                     return Some(WordToken::Normal(&self.data[start..self.read],glob));
                 },
                 b'$' | b'@' if !self.flags.contains(SQUOTE) => {
-                    return Some(WordToken::Normal(&self.data[start..self.read],glob));
+                    let output = &self.data[start..self.read];
+                    if output != "" {
+                        return Some(WordToken::Normal(output, glob));
+                    } else {
+                        return self.next();
+                    };
                 },
                 b'[' if !self.flags.contains(SQUOTE) => {
                     if self.glob_check(&mut iterator) {
@@ -1305,6 +1316,23 @@ mod tests {
             WordToken::Normal("barbaz*", true),
             WordToken::Whitespace(" "),
             WordToken::Normal("bingcrosb*", true)
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn test_empty_strings() {
+        let input = "rename '' 0 a \"\"";
+        let expected = vec![
+            WordToken::Normal("rename", false),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("", false),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("0", false),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("a", false),
+            WordToken::Whitespace(" "),
+            WordToken::Normal("", false)
         ];
         compare(input, expected);
     }
