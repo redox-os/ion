@@ -923,10 +923,6 @@ impl<'a> WordIterator<'a> {
     }
 }
 
-fn filter_empty<'a>(input : &'a str) -> Option<&'a str> {
-    if input == "" { None } else { Some(input) }
-}
-
 impl<'a> Iterator for WordIterator<'a> {
     type Item = WordToken<'a>;
 
@@ -1085,8 +1081,9 @@ impl<'a> Iterator for WordIterator<'a> {
                     return Some(WordToken::Normal(&self.data[start..self.read],glob));
                 },
                 b'$' | b'@' if !self.flags.contains(SQUOTE) => {
-                    if let Some(s) = filter_empty(&self.data[start..self.read]) {
-                        return Some(WordToken::Normal(s, glob));
+                    let output = &self.data[start..self.read];
+                    if output != "" {
+                        return Some(WordToken::Normal(output, glob));
                     } else {
                         return self.next();
                     };
