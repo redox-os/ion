@@ -127,9 +127,8 @@ pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usi
                 if *level == 2 {
                     // When the control flow level equals two, this means we are inside the
                     // body of the match statement and should treat this as the new case of _this_
-                    // match. Otherwise we will
+                    // match. Otherwise we will just add it to the current case.
                     cases.push(case);
-                    continue;
                 } else {
                     add_to_case!(cases, Statement::Case(case));
                 }
