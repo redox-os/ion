@@ -247,8 +247,11 @@ impl<'a> FlowLogic for Shell<'a> {
                         self.flow_control.current_if_mode = 0;
                         return Condition::Break
                     }
-                    if let Condition::SigInt = self.execute_match(expression, cases) {
-                        return Condition::SigInt;
+                    match self.execute_match(expression, success, else_if, failure) {
+                        Condition::Break    => return Condition::Break,
+                        Condition::Continue => return Condition::Continue,
+                        Condition::NoOp     => (),
+                        Condition::SigInt   => return Condition::SigInt,
                     }
                 }
                 _ => {}
