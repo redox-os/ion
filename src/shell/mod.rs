@@ -18,7 +18,7 @@ use std::fs::File;
 use std::io::{self, ErrorKind, Read, Write};
 use std::env;
 use std::mem;
-use std::path::Path;
+use std::path::{PathBuf, Path};
 use std::process;
 use std::time::SystemTime;
 use std::iter::FromIterator;
@@ -77,7 +77,22 @@ impl<'a> Shell<'a> {
             sigint_handle: ctrl_c
         }
     }
-    
+
+    /// Infer if the given filename is actually a partial filename by determining if
+    /// the file exsits in the current directory, or if the parent of the file exists in the
+    /// current directory, and is not the directory itself
+    fn is_file_completion(current_dir : PathBuf, filename : String) -> bool {
+        let mut file = current_dir.clone();
+        file.push(filename);
+        if file.exists() {
+            true
+        } else if let Some(parent) = file.parent() {
+            parent.exists() && parent != current_dir
+        } else {
+            false
+        }
+    }
+
     fn readln(&mut self) -> Option<String> {
         let vars_ptr = &self.variables as *const Variables;
         let dirs_ptr = &self.directory_stack as *const DirectoryStack;
@@ -105,10 +120,9 @@ impl<'a> Shell<'a> {
                         CursorPosition::OnWordLeftEdge(index) => index >= 1,
                         CursorPosition::OnWordRightEdge(index) => {
                             if let Some((start, end)) = words.into_iter().nth(index) {
-                                if let Ok(mut file) = env::current_dir() {
+                                if let Ok(file) = env::current_dir() {
                                     let filename = editor.current_buffer().range(start, end);
-                                    file.push(filename);
-                                    file.exists() || file.parent().map(Path::exists).unwrap_or(false)
+                                    Shell::is_file_completion(file, filename)
                                 } else {
                                     false
                                 }
