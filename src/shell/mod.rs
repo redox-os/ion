@@ -78,6 +78,9 @@ impl<'a> Shell<'a> {
         }
     }
 
+    /// Infer if the given filename is actually a partial filename by determining if
+    /// the file exsits in the current directory, or if the parent of the file exists in the
+    /// current directory, and is not the directory itself
     fn is_file_completion(current_dir : PathBuf, filename : String) -> bool {
         let mut file = current_dir.clone();
         file.push(filename);
