@@ -119,10 +119,15 @@ for_ -> Statement
         }
     }
 
-strlit_ -> String = "\"" contents:$([^\"]*) "\"" { contents.into() }
+wildcard_ -> Option<String> = "_" { None }
+value_ -> Option<String> = "\"" contents:$([^\"]*) "\"" { Some(contents.into())}
+
+pattern_ -> Option<String> = value_ / wildcard_
 
 case_ -> Statement
-    = whitespace* "case" whitespace? s:strlit_ { Statement::Case(Case::new(s)) }
+    = whitespace* "case" whitespace? p:pattern_ {
+    Statement::Case(Case { value: p, statements: Vec::new() })
+  }
 
 #[pub]
 match_ -> Statement = whitespace* "match" whitespace? expression:$(.*) {

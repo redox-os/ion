@@ -138,6 +138,9 @@ impl<'a> FlowLogic for Shell<'a> {
                     },
                     Statement::If { expression, success, else_if, failure } => {
                         self.execute_if(expression, success, else_if, failure);
+                    },
+                    Statement::Match { expression, cases } => {
+                        self.execute_match(expression, cases);
                     }
                     _ => ()
                 }
@@ -162,8 +165,10 @@ impl<'a> FlowLogic for Shell<'a> {
                                   &get_expanders!(&self.variables, &self.directory_stack),
                                   false).join(" ");
         for case in cases {
-            if value == case.value {
-                return self.execute_statements(case.statements);
+            match case.value {
+                None => return self.execute_statements(case.statements),
+                Some(ref v) if *v == value => return self.execute_statements(case.statements),
+                Some(_) => (),
             }
         }
         return Condition::NoOp
@@ -477,6 +482,7 @@ impl<'a> FlowLogic for Shell<'a> {
                 let mut stderr = stderr.lock();
                 let _ = writeln!(stderr, "ion: syntax error: no block to end");
             },
+            // Collect all cases that are being used by a match construct
             Statement::Match {expression, mut cases} => {
                 self.flow_control.level += 1;
                 if let Err(why) = collect_cases(iterator, &mut cases, &mut self.flow_control.level) {

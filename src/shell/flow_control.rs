@@ -15,16 +15,30 @@ pub enum Type { Float, Int, Bool }
 pub enum FunctionArgument { Typed(String, Type), Untyped(String) }
 
 
+/// Represents a single branch in a match statement. For example, in the expression
+/// ```ignore
+/// match value
+///   ...
+///   case value
+///     statement0
+///     statement1
+///     ...
+///     statementN
+///   end
+/// end
+/// ```
+/// would be represented by the Case object:
+/// ```rust,ignore
+/// Case { value: Some(value), statements: vec![statement0, statement1, ... statementN]}
+/// ```
+/// The wildcard branch, a branch that matches any value, is represented as such:
+/// ```rust,ignore
+/// Case { value: None, ... }
+/// ```
 #[derive(Debug, PartialEq, Clone)]
 pub struct Case {
-    pub value: String,
+    pub value: Option<String>,
     pub statements: Vec<Statement>
-}
-
-impl Case {
-    pub fn new(value: String) -> Self {
-        Case {value, statements: Vec::new()}
-    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -93,42 +107,73 @@ pub struct Function {
     pub statements: Vec<Statement>
 }
 
+macro_rules! add_to_case {
+    ($cases:expr, $statement:expr) => {
+        match $cases.last_mut() {
+            // XXX: When does this actually happen? What syntax error is this???
+            None => return Err("ion: syntax error: encountered ... outside of `case ... end` block".into()),
+            Some(ref mut case) => case.statements.push($statement),
+        }
+    }
+}
+
 pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usize) -> Result<(), String>
     where I : Iterator<Item=Statement>
 {
     while let Some(statement) = iterator.next() {
         match statement {
-            Statement::Case(mut case) => {
+            Statement::Case(case) => {
                 *level += 1;
-                while let Some(stmt) = iterator.next() {
-                    match stmt {
-                        Statement::While { .. } |
-                        Statement::For { .. } |
-                        Statement::If { .. } |
-                        Statement::Match { .. } |
-                        Statement::Function { .. } |
-                        Statement::Case { .. } => *level += 1,
-                        Statement::End => {
-                            *level -= 1;
-                            if *level == 1 { break }
-                        }
-                        _ => (),
-                    }
-                    case.statements.push(stmt);
+                if *level == 2 {
+                    // When the control flow level equals two, this means we are inside the
+                    // body of the match statement and should treat this as the new case of _this_
+                    // match. Otherwise we will
+                    cases.push(case);
+                    continue;
+                } else {
+                    add_to_case!(cases, Statement::Case(case));
                 }
-                cases.push(case);
             },
             Statement::End => {
                 *level -= 1;
-                break
+                if *level == 0 {
+                    return Ok(());
+                }
+            }
+            Statement::While { .. } |
+            Statement::For { .. } |
+            Statement::If { .. } |
+            Statement::Match { .. } |
+            Statement::Function { .. } => {
+                if *level < 2 {
+                    // If the level is less than two, then this statement has appeared outside
+                    // of a block delimited by a case...end pair
+
+                    // XXX: This syntax error is very unhelpful as it does not tell us _what_ we
+                    // got. However if we include the full debug information its very noisy. We
+                    // should write a function that returns a short form version of what we found.
+                    return Err("ion: syntax error: expected end or case, got ...".into());
+                } else {
+                    // Otherwise it means we've hit a case statement for some other match construct
+                    *level += 1;
+                    add_to_case!(cases, statement);
+                }
             },
-            // XXX: This syntax error is very unhelpful as it does not tell us _what_ we got.
-            // However if we include the full debug information its very noisy. We should write
-            // a function that returns a short form version of what we found.
-            _ => return Err(format!("ion: syntax error: expected end or case, got ...")),
+            Statement::Default |
+            Statement::Else |
+            Statement::ElseIf { .. } |
+            Statement::Error(_) |
+            Statement::Export(_) |
+            Statement::Continue |
+            Statement::Let { .. } |
+            Statement::Pipeline(_) |
+            Statement::Break => {
+                // This is the default case with all of the other statements explicitly listed
+                add_to_case!(cases, statement);
+            },
         }
     }
-    Ok(())
+    return Ok(());
 }
 
 pub fn collect_loops <I: Iterator<Item = Statement>> (
