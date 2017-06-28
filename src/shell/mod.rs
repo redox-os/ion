@@ -119,15 +119,12 @@ impl<'a> Shell<'a> {
                         CursorPosition::InSpace(None, _) => false,
                         CursorPosition::OnWordLeftEdge(index) => index >= 1,
                         CursorPosition::OnWordRightEdge(index) => {
-                            if let Some((start, end)) = words.into_iter().nth(index) {
-                                if let Ok(file) = env::current_dir() {
+                            index > 0 || match (words.into_iter().nth(index), env::current_dir()) {
+                                (Some((start, end)), Ok(file)) => {
                                     let filename = editor.current_buffer().range(start, end);
                                     Shell::is_file_completion(file, filename)
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
+                                },
+                                _ => false,
                             }
                         }
                     };
