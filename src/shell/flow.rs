@@ -4,8 +4,8 @@ use std::mem;
 use super::status::*;
 use super::Shell;
 use super::flags::*;
-use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_if};
-use parser::{ForExpression, StatementSplitter, check_statement};
+use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_cases, collect_if, Case};
+use parser::{ForExpression, StatementSplitter, check_statement, expand_string, Select, ExpanderFunctions};
 use parser::peg::Pipeline;
 use super::assignments::{let_assignment, export_variable};
 
@@ -36,6 +36,10 @@ pub trait FlowLogic {
 
     /// Simply executes all supplied statemnts.
     fn execute_statements(&mut self, statements: Vec<Statement>) -> Condition;
+
+    /// Expand an expression and run a branch based on the value of the expanded expression
+    fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition;
+
 }
 
 impl<'a> FlowLogic for Shell<'a> {
@@ -79,7 +83,14 @@ impl<'a> FlowLogic for Shell<'a> {
                                 4
                             }
                         };
-                }
+                },
+                Statement::Match { ref mut cases, .. } => {
+                    if let Err(why) = collect_cases(&mut iterator, cases, &mut self.flow_control.level) {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "{}", why);
+                    }
+                },
                 _ => ()
             }
 
@@ -146,6 +157,18 @@ impl<'a> FlowLogic for Shell<'a> {
         }
     }
 
+    fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition {
+        let value = expand_string(&expression,
+                                  &get_expanders!(&self.variables, &self.directory_stack),
+                                  false).join(" ");
+        for case in cases {
+            if value == case.value {
+                return self.execute_statements(case.statements);
+            }
+        }
+        return Condition::NoOp
+    }
+
     fn execute_statements(&mut self, mut statements: Vec<Statement>) -> Condition {
         let mut iterator = statements.drain(..);
         while let Some(statement) = iterator.next() {
@@ -209,6 +232,20 @@ impl<'a> FlowLogic for Shell<'a> {
                 },
                 Statement::Break => { return Condition::Break }
                 Statement::Continue => { return Condition::Continue }
+                Statement::Match {expression, mut cases} => {
+                    self.flow_control.level += 1;
+                    if let Err(why) = collect_cases(&mut iterator, &mut cases, &mut self.flow_control.level) {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "{}", why);
+                        self.flow_control.level = 0;
+                        self.flow_control.current_if_mode = 0;
+                        return Condition::Break
+                    }
+                    if let Condition::SigInt = self.execute_match(expression, cases) {
+                        return Condition::SigInt;
+                    }
+                }
                 _ => {}
             }
             if let Ok(_) = self.sigint_handle.try_recv() {
@@ -440,6 +477,21 @@ impl<'a> FlowLogic for Shell<'a> {
                 let mut stderr = stderr.lock();
                 let _ = writeln!(stderr, "ion: syntax error: no block to end");
             },
+            Statement::Match {expression, mut cases} => {
+                self.flow_control.level += 1;
+                if let Err(why) = collect_cases(iterator, &mut cases, &mut self.flow_control.level) {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "{}", why);
+                }
+                if self.flow_control.level == 0 {
+                    // If all blocks were read we execute the statement
+                    self.execute_match(expression, cases);
+                } else {
+                    // Store the partial function declaration in memory.
+                    self.flow_control.current_statement = Statement::Match {expression, cases};
+                }
+            }
             _ => {}
         }
         Ok(())

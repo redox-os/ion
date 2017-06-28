@@ -1,7 +1,7 @@
 use parser::assignments::parse_assignment;
 use parser::{pipelines, ArgumentSplitter};
 use parser::peg::get_function_args;
-use shell::flow_control::{ElseIf, Statement};
+use shell::flow_control::*;
 
 #[pub]
 parse_ -> Statement
@@ -16,6 +16,8 @@ parse_ -> Statement
       / end_
       / break_
       / continue_
+      / match_
+      / case_
       / pipelines
 
 #[pub]
@@ -116,6 +118,19 @@ for_ -> Statement
             statements: Vec::new(),
         }
     }
+
+strlit_ -> String = "\"" contents:$([^\"]*) "\"" { contents.into() }
+
+case_ -> Statement
+    = whitespace* "case" whitespace? s:strlit_ { Statement::Case(Case::new(s)) }
+
+#[pub]
+match_ -> Statement = whitespace* "match" whitespace? expression:$(.*) {
+  Statement::Match {
+    expression: expression.into(),
+    cases: Vec::new()
+  }
+}
 
 #[pub]
 while_ -> Statement

@@ -16,10 +16,23 @@ pub enum FunctionArgument { Typed(String, Type), Untyped(String) }
 
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Case {
+    pub value: String,
+    pub statements: Vec<Statement>
+}
+
+impl Case {
+    pub fn new(value: String) -> Self {
+        Case {value, statements: Vec::new()}
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let {
         expression: Binding,
     },
+    Case(Case),
     Export(Binding),
     If {
         expression: Pipeline,
@@ -42,6 +55,10 @@ pub enum Statement {
     While {
         expression: Pipeline,
         statements: Vec<Statement>
+    },
+    Match {
+        expression: String,
+        cases : Vec<Case>
     },
     Else,
     End,
@@ -76,6 +93,44 @@ pub struct Function {
     pub statements: Vec<Statement>
 }
 
+pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usize) -> Result<(), String>
+    where I : Iterator<Item=Statement>
+{
+    while let Some(statement) = iterator.next() {
+        match statement {
+            Statement::Case(mut case) => {
+                *level += 1;
+                while let Some(stmt) = iterator.next() {
+                    match stmt {
+                        Statement::While { .. } |
+                        Statement::For { .. } |
+                        Statement::If { .. } |
+                        Statement::Match { .. } |
+                        Statement::Function { .. } |
+                        Statement::Case { .. } => *level += 1,
+                        Statement::End => {
+                            *level -= 1;
+                            if *level == 1 { break }
+                        }
+                        _ => (),
+                    }
+                    case.statements.push(stmt);
+                }
+                cases.push(case);
+            },
+            Statement::End => {
+                *level -= 1;
+                break
+            },
+            // XXX: This syntax error is very unhelpful as it does not tell us _what_ we got.
+            // However if we include the full debug information its very noisy. We should write
+            // a function that returns a short form version of what we found.
+            _ => return Err(format!("ion: syntax error: expected end or case, got ...")),
+        }
+    }
+    Ok(())
+}
+
 pub fn collect_loops <I: Iterator<Item = Statement>> (
     iterator: &mut I,
     statements: &mut Vec<Statement>,
@@ -85,7 +140,7 @@ pub fn collect_loops <I: Iterator<Item = Statement>> (
     while let Some(statement) = iterator.next() {
         match statement {
             Statement::While{..} | Statement::For{..} | Statement::If{..} |
-                Statement::Function{..} => *level += 1,
+                Statement::Function{..} | Statement::Match{..} | Statement::Case{..} => *level += 1,
             Statement::End if *level == 1 => { *level = 0; break },
             Statement::End => *level -= 1,
             _ => (),
@@ -103,7 +158,7 @@ pub fn collect_if<I>(iterator: &mut I, success: &mut Vec<Statement>, else_if: &m
     while let Some(statement) = iterator.next() {
         match statement {
             Statement::While{..} | Statement::For{..} | Statement::If{..} |
-                Statement::Function{..} => *level += 1,
+                Statement::Function{..} | Statement::Match{..} | Statement::Case{..} => *level += 1,
             Statement::ElseIf(ref elseif) if *level == 1 => {
                 if current_block == 1 {
                     return Err("ion: syntax error: else block already given");
