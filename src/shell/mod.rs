@@ -80,11 +80,14 @@ impl<'a> Shell<'a> {
 
     /// Infer if the given filename is actually a partial filename by determining if
     /// the file exsits in the current directory, or if the parent of the file exists in the
-    /// current directory, and is not the directory itself
+    /// current directory, and is not the directory itself.
+    /// Will return false if the given filename starts with a dollar sign, indicating a variable.
     fn is_file_completion(current_dir : PathBuf, filename : String) -> bool {
         let mut file = current_dir.clone();
         file.push(filename);
-        if file.exists() {
+        if filename.starts_with("$") {
+            true
+        } else if file.exists() {
             true
         } else if let Some(parent) = file.parent() {
             parent.exists() && parent != current_dir
