@@ -120,9 +120,9 @@ for_ -> Statement
     }
 
 wildcard_ -> Option<String> = "_" { None }
-value_ -> Option<String> = "\"" contents:$([^\"]*) "\"" { Some(contents.into())}
+value_ -> Option<String> = contents:$(.*) { Some(contents.into())}
 
-pattern_ -> Option<String> = value_ / wildcard_
+pattern_ -> Option<String> = wildcard_ / value_
 
 case_ -> Statement
     = whitespace* "case" whitespace? p:pattern_ {

@@ -83,6 +83,32 @@ pub enum Statement {
     Default
 }
 
+impl Statement {
+
+    pub fn short(&self) -> &'static str {
+        match *self {
+            Statement::Let { .. } => "Let { .. }",
+            Statement::Case(_) => "Case { .. }",
+            Statement::Export(_) => "Export { .. }",
+            Statement::If { .. } => "If { .. }",
+            Statement::ElseIf(_) => "ElseIf { .. }",
+            Statement::Function { .. } => "Function { .. }",
+            Statement::For { .. } => "For { .. }",
+            Statement::While { .. } => "While { .. }",
+            Statement::Match { .. } => "Match { .. }",
+            Statement::Else => "Else",
+            Statement::End => "End",
+            Statement::Error(_) => "Error { .. }",
+            Statement::Break => "Break",
+            Statement::Continue => "Continue",
+            Statement::Pipeline(_) => "Pipeline { .. }",
+            Statement::Default => "Default"
+
+        }
+    }
+
+}
+
 pub struct FlowControl {
     pub level:             usize,
     pub current_statement: Statement,
@@ -111,7 +137,9 @@ macro_rules! add_to_case {
     ($cases:expr, $statement:expr) => {
         match $cases.last_mut() {
             // XXX: When does this actually happen? What syntax error is this???
-            None => return Err("ion: syntax error: encountered ... outside of `case ... end` block".into()),
+            None => return Err(["ion: syntax error: encountered ",
+                                 $statement.short(),
+                                 " outside of `case ... end` block"].concat()),
             Some(ref mut case) => case.statements.push($statement),
         }
     }
@@ -151,7 +179,7 @@ pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usi
                     // XXX: This syntax error is very unhelpful as it does not tell us _what_ we
                     // got. However if we include the full debug information its very noisy. We
                     // should write a function that returns a short form version of what we found.
-                    return Err("ion: syntax error: expected end or case, got ...".into());
+                    return Err(["ion: syntax error: expected end or case, got ", statement.short()].concat());
                 } else {
                     // Otherwise it means we've hit a case statement for some other match construct
                     *level += 1;
