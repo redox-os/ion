@@ -8,6 +8,7 @@ use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_ca
 use parser::{ForExpression, StatementSplitter, check_statement, expand_string, Select, ExpanderFunctions};
 use parser::peg::Pipeline;
 use super::assignments::{let_assignment, export_variable};
+use types::Array;
 
 pub enum Condition {
     Continue,
@@ -161,17 +162,40 @@ impl<'a> FlowLogic for Shell<'a> {
     }
 
     fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition {
+        // Logic for determining if the LHS of a match-case construct (the value we are matching
+        // against) matches the RHS of a match-case construct (a value in a case statement). For
+        // example, checking to see if the value "foo" matches the pattern "bar" would be invoked
+        // like so :
+        // ```ignore
+        // matches("foo", "bar")
+        // ```
+        fn matches(lhs : &Array, rhs : &Array) -> bool {
+            for v in lhs {
+                if rhs.contains(&v) { return true; }
+            }
+            return false;
+        }
         let value = expand_string(&expression,
                                   &get_expanders!(&self.variables, &self.directory_stack),
-                                  false).join(" ");
+                                  false);
+        let mut condition = Condition::NoOp;
         for case in cases {
-            match case.value {
-                None => return self.execute_statements(case.statements),
-                Some(ref v) if *v == value => return self.execute_statements(case.statements),
+            let pattern = case.value.map(|v| {
+                expand_string(&v, &get_expanders!(&self.variables, &self.directory_stack), false)
+            });
+            match pattern {
+                None => {
+                    condition = self.execute_statements(case.statements);
+                    break;
+                }
+                Some(ref v) if matches(v, &value) => {
+                    condition = self.execute_statements(case.statements);
+                    break;
+                }
                 Some(_) => (),
             }
         }
-        return Condition::NoOp
+        condition
     }
 
     fn execute_statements(&mut self, mut statements: Vec<Statement>) -> Condition {
