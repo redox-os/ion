@@ -78,19 +78,25 @@ impl<'a> Shell<'a> {
         }
     }
 
-    /// Infer if the given filename is actually a partial filename by determining if
-    /// the file exsits in the current directory, or if the parent of the file exists in the
-    /// current directory, and is not the directory itself
-    fn is_file_completion(current_dir : PathBuf, filename : String) -> bool {
+    /// Infer if the given filename is actually a partial filename
+    fn complete_as_file(current_dir : PathBuf, filename : String, index : usize) -> bool {
+        let filename = filename.trim();
         let mut file = current_dir.clone();
-        file.push(filename);
-        if file.exists() {
-            true
-        } else if let Some(parent) = file.parent() {
-            parent.exists() && parent != current_dir
-        } else {
-            false
-        }
+        file.push(&filename);
+        // If the user explicitly requests a file through this syntax then complete as a file
+        if filename.trim().starts_with(".") { return true; }
+        // If the file starts with a dollar sign, it's a variable, not a file
+        if filename.trim().starts_with("$") { return false; }
+        // Once we are beyond the first string, assume its a file
+        if index > 0 { return true; }
+        // If we are referencing a file that exists then just complete to that file
+        if file.exists() { return true; }
+        // If we have a partial file inside an existing directory, e.g. /foo/b when /foo/bar
+        // exists, then treat it as file as long as `foo` isn't the current directory, otherwise
+        // this would apply to any string `foo`
+        if let Some(parent) = file.parent() { return parent.exists() && parent != current_dir; }
+        // By default assume its not a file
+        false
     }
 
     fn readln(&mut self) -> Option<String> {
@@ -119,15 +125,12 @@ impl<'a> Shell<'a> {
                         CursorPosition::InSpace(None, _) => false,
                         CursorPosition::OnWordLeftEdge(index) => index >= 1,
                         CursorPosition::OnWordRightEdge(index) => {
-                            if let Some((start, end)) = words.into_iter().nth(index) {
-                                if let Ok(file) = env::current_dir() {
+                            match (words.into_iter().nth(index), env::current_dir()) {
+                                (Some((start, end)), Ok(file)) => {
                                     let filename = editor.current_buffer().range(start, end);
-                                    Shell::is_file_completion(file, filename)
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
+                                    Shell::complete_as_file(file, filename, index)
+                                },
+                                _ => false,
                             }
                         }
                     };
