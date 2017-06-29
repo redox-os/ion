@@ -15,11 +15,38 @@ pub enum Type { Float, Int, Bool }
 pub enum FunctionArgument { Typed(String, Type), Untyped(String) }
 
 
+/// Represents a single branch in a match statement. For example, in the expression
+/// ```ignore
+/// match value
+///   ...
+///   case value
+///     statement0
+///     statement1
+///     ...
+///     statementN
+///   end
+/// end
+/// ```
+/// would be represented by the Case object:
+/// ```rust,ignore
+/// Case { value: Some(value), statements: vec![statement0, statement1, ... statementN]}
+/// ```
+/// The wildcard branch, a branch that matches any value, is represented as such:
+/// ```rust,ignore
+/// Case { value: None, ... }
+/// ```
+#[derive(Debug, PartialEq, Clone)]
+pub struct Case {
+    pub value: Option<String>,
+    pub statements: Vec<Statement>
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let {
         expression: Binding,
     },
+    Case(Case),
     Export(Binding),
     If {
         expression: Pipeline,
@@ -43,6 +70,10 @@ pub enum Statement {
         expression: Pipeline,
         statements: Vec<Statement>
     },
+    Match {
+        expression: String,
+        cases : Vec<Case>
+    },
     Else,
     End,
     Error(i32),
@@ -50,6 +81,32 @@ pub enum Statement {
     Continue,
     Pipeline(Pipeline),
     Default
+}
+
+impl Statement {
+
+    pub fn short(&self) -> &'static str {
+        match *self {
+            Statement::Let { .. } => "Let { .. }",
+            Statement::Case(_) => "Case { .. }",
+            Statement::Export(_) => "Export { .. }",
+            Statement::If { .. } => "If { .. }",
+            Statement::ElseIf(_) => "ElseIf { .. }",
+            Statement::Function { .. } => "Function { .. }",
+            Statement::For { .. } => "For { .. }",
+            Statement::While { .. } => "While { .. }",
+            Statement::Match { .. } => "Match { .. }",
+            Statement::Else => "Else",
+            Statement::End => "End",
+            Statement::Error(_) => "Error { .. }",
+            Statement::Break => "Break",
+            Statement::Continue => "Continue",
+            Statement::Pipeline(_) => "Pipeline { .. }",
+            Statement::Default => "Default"
+
+        }
+    }
+
 }
 
 pub struct FlowControl {
@@ -76,6 +133,72 @@ pub struct Function {
     pub statements: Vec<Statement>
 }
 
+macro_rules! add_to_case {
+    ($cases:expr, $statement:expr) => {
+        match $cases.last_mut() {
+            // XXX: When does this actually happen? What syntax error is this???
+            None => return Err(["ion: syntax error: encountered ",
+                                 $statement.short(),
+                                 " outside of `case ... end` block"].concat()),
+            Some(ref mut case) => case.statements.push($statement),
+        }
+    }
+}
+
+pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usize) -> Result<(), String>
+    where I : Iterator<Item=Statement>
+{
+    while let Some(statement) = iterator.next() {
+        match statement {
+            Statement::Case(case) => {
+                *level += 1;
+                if *level == 2 {
+                    // When the control flow level equals two, this means we are inside the
+                    // body of the match statement and should treat this as the new case of _this_
+                    // match. Otherwise we will just add it to the current case.
+                    cases.push(case);
+                } else {
+                    add_to_case!(cases, Statement::Case(case));
+                }
+            },
+            Statement::End => {
+                *level -= 1;
+                if *level == 0 {
+                    return Ok(());
+                }
+            }
+            Statement::While { .. } |
+            Statement::For { .. } |
+            Statement::If { .. } |
+            Statement::Match { .. } |
+            Statement::Function { .. } => {
+                if *level < 2 {
+                    // If the level is less than two, then this statement has appeared outside
+                    // of a block delimited by a case...end pair
+                    return Err(["ion: syntax error: expected end or case, got ", statement.short()].concat());
+                } else {
+                    // Otherwise it means we've hit a case statement for some other match construct
+                    *level += 1;
+                    add_to_case!(cases, statement);
+                }
+            },
+            Statement::Default |
+            Statement::Else |
+            Statement::ElseIf { .. } |
+            Statement::Error(_) |
+            Statement::Export(_) |
+            Statement::Continue |
+            Statement::Let { .. } |
+            Statement::Pipeline(_) |
+            Statement::Break => {
+                // This is the default case with all of the other statements explicitly listed
+                add_to_case!(cases, statement);
+            },
+        }
+    }
+    return Ok(());
+}
+
 pub fn collect_loops <I: Iterator<Item = Statement>> (
     iterator: &mut I,
     statements: &mut Vec<Statement>,
@@ -85,7 +208,7 @@ pub fn collect_loops <I: Iterator<Item = Statement>> (
     while let Some(statement) = iterator.next() {
         match statement {
             Statement::While{..} | Statement::For{..} | Statement::If{..} |
-                Statement::Function{..} => *level += 1,
+                Statement::Function{..} | Statement::Match{..} | Statement::Case{..} => *level += 1,
             Statement::End if *level == 1 => { *level = 0; break },
             Statement::End => *level -= 1,
             _ => (),
@@ -103,7 +226,7 @@ pub fn collect_if<I>(iterator: &mut I, success: &mut Vec<Statement>, else_if: &m
     while let Some(statement) = iterator.next() {
         match statement {
             Statement::While{..} | Statement::For{..} | Statement::If{..} |
-                Statement::Function{..} => *level += 1,
+                Statement::Function{..} | Statement::Match{..} | Statement::Case{..} => *level += 1,
             Statement::ElseIf(ref elseif) if *level == 1 => {
                 if current_block == 1 {
                     return Err("ion: syntax error: else block already given");

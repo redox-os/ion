@@ -4,10 +4,11 @@ use std::mem;
 use super::status::*;
 use super::Shell;
 use super::flags::*;
-use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_if};
-use parser::{ForExpression, StatementSplitter, check_statement};
+use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_cases, collect_if, Case};
+use parser::{ForExpression, StatementSplitter, check_statement, expand_string, Select, ExpanderFunctions};
 use parser::peg::Pipeline;
 use super::assignments::{let_assignment, export_variable};
+use types::Array;
 
 pub enum Condition {
     Continue,
@@ -36,6 +37,10 @@ pub trait FlowLogic {
 
     /// Simply executes all supplied statemnts.
     fn execute_statements(&mut self, statements: Vec<Statement>) -> Condition;
+
+    /// Expand an expression and run a branch based on the value of the expanded expression
+    fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition;
+
 }
 
 impl<'a> FlowLogic for Shell<'a> {
@@ -79,7 +84,14 @@ impl<'a> FlowLogic for Shell<'a> {
                                 4
                             }
                         };
-                }
+                },
+                Statement::Match { ref mut cases, .. } => {
+                    if let Err(why) = collect_cases(&mut iterator, cases, &mut self.flow_control.level) {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "{}", why);
+                    }
+                },
                 _ => ()
             }
 
@@ -127,6 +139,9 @@ impl<'a> FlowLogic for Shell<'a> {
                     },
                     Statement::If { expression, success, else_if, failure } => {
                         self.execute_if(expression, success, else_if, failure);
+                    },
+                    Statement::Match { expression, cases } => {
+                        self.execute_match(expression, cases);
                     }
                     _ => ()
                 }
@@ -144,6 +159,43 @@ impl<'a> FlowLogic for Shell<'a> {
                 }
             }
         }
+    }
+
+    fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition {
+        // Logic for determining if the LHS of a match-case construct (the value we are matching
+        // against) matches the RHS of a match-case construct (a value in a case statement). For
+        // example, checking to see if the value "foo" matches the pattern "bar" would be invoked
+        // like so :
+        // ```ignore
+        // matches("foo", "bar")
+        // ```
+        fn matches(lhs : &Array, rhs : &Array) -> bool {
+            for v in lhs {
+                if rhs.contains(&v) { return true; }
+            }
+            return false;
+        }
+        let value = expand_string(&expression,
+                                  &get_expanders!(&self.variables, &self.directory_stack),
+                                  false);
+        let mut condition = Condition::NoOp;
+        for case in cases {
+            let pattern = case.value.map(|v| {
+                expand_string(&v, &get_expanders!(&self.variables, &self.directory_stack), false)
+            });
+            match pattern {
+                None => {
+                    condition = self.execute_statements(case.statements);
+                    break;
+                }
+                Some(ref v) if matches(v, &value) => {
+                    condition = self.execute_statements(case.statements);
+                    break;
+                }
+                Some(_) => (),
+            }
+        }
+        condition
     }
 
     fn execute_statements(&mut self, mut statements: Vec<Statement>) -> Condition {
@@ -209,6 +261,23 @@ impl<'a> FlowLogic for Shell<'a> {
                 },
                 Statement::Break => { return Condition::Break }
                 Statement::Continue => { return Condition::Continue }
+                Statement::Match {expression, mut cases} => {
+                    self.flow_control.level += 1;
+                    if let Err(why) = collect_cases(&mut iterator, &mut cases, &mut self.flow_control.level) {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "{}", why);
+                        self.flow_control.level = 0;
+                        self.flow_control.current_if_mode = 0;
+                        return Condition::Break
+                    }
+                    match self.execute_match(expression, cases) {
+                        Condition::Break    => return Condition::Break,
+                        Condition::Continue => return Condition::Continue,
+                        Condition::NoOp     => (),
+                        Condition::SigInt   => return Condition::SigInt,
+                    }
+                }
                 _ => {}
             }
             if let Ok(_) = self.sigint_handle.try_recv() {
@@ -440,6 +509,22 @@ impl<'a> FlowLogic for Shell<'a> {
                 let mut stderr = stderr.lock();
                 let _ = writeln!(stderr, "ion: syntax error: no block to end");
             },
+            // Collect all cases that are being used by a match construct
+            Statement::Match {expression, mut cases} => {
+                self.flow_control.level += 1;
+                if let Err(why) = collect_cases(iterator, &mut cases, &mut self.flow_control.level) {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "{}", why);
+                }
+                if self.flow_control.level == 0 {
+                    // If all blocks were read we execute the statement
+                    self.execute_match(expression, cases);
+                } else {
+                    // Store the partial function declaration in memory.
+                    self.flow_control.current_statement = Statement::Match {expression, cases};
+                }
+            }
             _ => {}
         }
         Ok(())

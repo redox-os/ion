@@ -1,0 +1,59 @@
+for i in [1 2 3 4 5 6]
+  match $((i % 2))
+    case 0; echo "Even!"; end
+    case 1; echo "Odd!" ; end
+  end
+end
+
+let out1 = "/foo/bar/baz.tar.gz: application/x-gzip";
+let out2 = "/foo/bar/baz.quxx: application/quxx-archive";
+
+fn analyze output
+  match @split(output)[1]
+    case application/x-gzip; echo "Use tar -xzf"; end
+    case _ ; echo "Unknown file type"; end
+  end
+end
+
+analyze $out1
+analyze $out2
+
+fn wildcard input
+  match $input
+    case _; echo "WILDCARD!"; end
+    case huh; echo "U N R E A C H A B L E"; end
+  end
+end
+
+wildcard "FOOOOO"
+wildcard "huh"
+
+fn report usage
+  match $usage
+    case @(seq 0 25); echo "Plenty of space my guy"; end
+    case @(seq 26 50); echo "Almost half full (or half empty)"; end
+    case @(seq 51 75); echo "Getting close to full :O"; end
+    case @(seq 76 99); echo "Time for spring cleaning, almost full!"; end
+    case _; echo "How did you even do this..."; end
+  end
+end
+
+report 37
+report 55
+report 98
+report FOOOO
+
+fn animated filetype
+  match $filetype
+    case ["image/jpeg" "image/png"]
+      echo "Static :("
+    end
+    case "image/gif"
+      echo "Animated :D"
+    end
+  end
+end
+
+animated "image/jpeg"
+animated "image/png"
+animated "image/gif"
