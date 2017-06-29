@@ -175,10 +175,6 @@ pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usi
                 if *level < 2 {
                     // If the level is less than two, then this statement has appeared outside
                     // of a block delimited by a case...end pair
-
-                    // XXX: This syntax error is very unhelpful as it does not tell us _what_ we
-                    // got. However if we include the full debug information its very noisy. We
-                    // should write a function that returns a short form version of what we found.
                     return Err(["ion: syntax error: expected end or case, got ", statement.short()].concat());
                 } else {
                     // Otherwise it means we've hit a case statement for some other match construct
