@@ -11,6 +11,10 @@ PROJECT_DIR=$(dirname $(cargo locate-project | awk -F\" '{print $4}'))
 
 EXIT_VAL=0
 
+# Some of the examples assume that the working directory is the project root
+# and it never hurts to force consistency regardless
+cd $PROJECT_DIR
+
 function check_return_value {
 
     # Check number of parameters passed into the check function
