@@ -14,6 +14,8 @@ extern crate smallvec;
 extern crate smallstring;
 
 #[cfg(not(target_os = "redox"))] extern crate futures;
+#[cfg(not(target_os = "redox"))] extern crate libc;
+#[cfg(not(target_os = "redox"))] extern crate nix;
 #[cfg(not(target_os = "redox"))] extern crate tokio_core;
 #[cfg(not(target_os = "redox"))] extern crate tokio_signal;
 
@@ -33,11 +35,12 @@ use shell::Shell;
 
 #[cfg(not(target_os = "redox"))] use tokio_core::reactor::Core;
 #[cfg(not(target_os = "redox"))] use futures::{Future, Stream};
+#[cfg(not(target_os = "redox"))] use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 
 use std::sync::mpsc;
 use std::thread;
 
-fn inner_main(sigint_rx : mpsc::Receiver<bool>) {
+fn inner_main(sigint_rx : mpsc::Receiver<i32>) {
    let builtins = Builtin::map();
    let mut shell = Shell::new(&builtins, sigint_rx);
    shell.evaluate_init_file();
@@ -63,22 +66,27 @@ fn inner_main(sigint_rx : mpsc::Receiver<bool>) {
 
 #[cfg(not(target_os = "redox"))]
 fn main() {
-    let (sigint_tx, sigint_rx) = mpsc::channel();
+    let (signals_tx, signals_rx) = mpsc::channel();
 
-    thread::spawn(move || inner_main(sigint_rx));
+    thread::spawn(move || inner_main(signals_rx));
 
     let mut core = Core::new().unwrap();
     let handle = core.handle();
-    let ctrl_c = tokio_signal::ctrl_c(&handle).flatten_stream();
-    let signal_handler = ctrl_c.for_each(|()| {
-        let _ = sigint_tx.send(true);
+
+    // Create a stream that will select over SIGINT and SIGTERM signals.
+    let signal_stream = Signal::new(SIGINT, &handle).flatten_stream()
+        .select(Signal::new(SIGTERM, &handle).flatten_stream());
+
+    // Execute the event loop that will listen for and transmit received
+    // signals to the shell.
+    core.run(signal_stream.for_each(|signal| {
+        let _ = signals_tx.send(signal);
         Ok(())
-    });
-    core.run(signal_handler).unwrap();
+    })).unwrap();
 }
 
 #[cfg(target_os = "redox")]
 fn main() {
-    let (_, sigint_rx) = mpsc::channel();
-    inner_main(sigint_rx);
+    let (_, signals_rx) = mpsc::channel();
+    inner_main(signals_rx);
 }

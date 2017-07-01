@@ -6,7 +6,8 @@ use ansi_term::Color::{Red, Yellow, Blue, White};
 use version_check::is_min_version;
 
 // Specifies the minimum stable version needed to compile Ion.
-const MIN_VERSION: &'static str = "1.17.0";
+// NOTE: 1.18 is required due to the usage of `Child::try_wait()`.
+const MIN_VERSION: &'static str = "1.18.0";
 
 // Convenience macro for writing to stderr.
 macro_rules! printerr {

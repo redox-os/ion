@@ -3,66 +3,75 @@ use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
 use std::fs::{File, OpenOptions};
 use std::thread;
+use std::time::Duration;
 
-use shell::JobKind;
+use super::Shell;
+use super::JobKind;
 use super::status::*;
 use parser::peg::{Pipeline, RedirectFrom};
 
-pub fn execute_pipeline(pipeline: &mut Pipeline) -> i32 {
-    // Generate a list of commands from the given pipeline
-    let mut piped_commands: Vec<(Command, JobKind)> = pipeline.jobs
-        .drain(..).map(|mut job| (job.build_command(), job.kind)).collect();
+pub trait PipelineExecution {
+    fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32;
+}
 
-    if let Some(ref stdin) = pipeline.stdin {
-        if let Some(command) = piped_commands.first_mut() {
-            match File::open(&stdin.file) {
-                Ok(file) => unsafe { command.0.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
-                Err(err) => {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: failed to redirect stdin into {}: {}", stdin.file, err);
-                }
-            }
-        }
-    }
+impl<'a> PipelineExecution for Shell<'a> {
+    fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
+        // Generate a list of commands from the given pipeline
+        let mut piped_commands: Vec<(Command, JobKind)> = pipeline.jobs
+            .drain(..).map(|mut job| (job.build_command(), job.kind)).collect();
 
-    if let Some(ref stdout) = pipeline.stdout {
-        if let Some(mut command) = piped_commands.last_mut() {
-            let file = if stdout.append {
-                OpenOptions::new().create(true).write(true).append(true).open(&stdout.file)
-            } else {
-                File::create(&stdout.file)
-            };
-            match file {
-                Ok(f) => unsafe {
-                    match stdout.from {
-                        RedirectFrom::Both => {
-                            let fd = f.into_raw_fd();
-                            command.0.stderr(Stdio::from_raw_fd(fd));
-                            command.0.stdout(Stdio::from_raw_fd(fd));
-                        },
-                        RedirectFrom::Stderr => {
-                            command.0.stderr(Stdio::from_raw_fd(f.into_raw_fd()));
-                        },
-                        RedirectFrom::Stdout => {
-                            command.0.stdout(Stdio::from_raw_fd(f.into_raw_fd()));
-                        },
+        if let Some(ref stdin) = pipeline.stdin {
+            if let Some(command) = piped_commands.first_mut() {
+                match File::open(&stdin.file) {
+                    Ok(file) => unsafe { command.0.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
+                    Err(err) => {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: failed to redirect stdin into {}: {}", stdin.file, err);
                     }
-                },
-                Err(err) => {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: failed to redirect stdout into {}: {}", stdout.file, err);
                 }
             }
         }
-    }
 
-    pipe(&mut piped_commands)
+        if let Some(ref stdout) = pipeline.stdout {
+            if let Some(mut command) = piped_commands.last_mut() {
+                let file = if stdout.append {
+                    OpenOptions::new().create(true).write(true).append(true).open(&stdout.file)
+                } else {
+                    File::create(&stdout.file)
+                };
+                match file {
+                    Ok(f) => unsafe {
+                        match stdout.from {
+                            RedirectFrom::Both => {
+                                let fd = f.into_raw_fd();
+                                command.0.stderr(Stdio::from_raw_fd(fd));
+                                command.0.stdout(Stdio::from_raw_fd(fd));
+                            },
+                            RedirectFrom::Stderr => {
+                                command.0.stderr(Stdio::from_raw_fd(f.into_raw_fd()));
+                            },
+                            RedirectFrom::Stdout => {
+                                command.0.stdout(Stdio::from_raw_fd(f.into_raw_fd()));
+                            },
+                        }
+                    },
+                    Err(err) => {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: failed to redirect stdout into {}: {}", stdout.file, err);
+                    }
+                }
+            }
+        }
+
+        self.foreground.clear();
+        pipe(self, &mut piped_commands)
+    }
 }
 
 /// This function will panic if called with an empty slice
-pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
+fn pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
     let mut previous_status = SUCCESS;
     let mut previous_kind = JobKind::And;
     let mut commands = commands.iter_mut();
@@ -83,13 +92,35 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
         match kind {
             JobKind::Background => {
                 match command.spawn() {
-                    Ok(child) => {
+                    Ok(mut child) => {
+                        let pid = child.id();
+                        let processes = shell.background.clone();
                         let _ = thread::spawn(move || {
-                            // TODO: Implement proper backgrounding support
-                            let status = wait_on_child(child);
+                            {
+                                let mut processes = processes.lock().unwrap();
+                                let nprocesses = (*processes).len();
+                                (*processes).push(pid);
+
+                                let stderr = io::stderr();
+                                let _ = writeln!(stderr.lock(), "ion: background: [{}] {}", nprocesses+1, pid);
+                            }
+
+                            // Wait for the child to complete before removing it from the process list.
+                            let status = child.wait();
+
+                            // Notify the user that the background task has completed.
                             let stderr = io::stderr();
                             let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "ion: background task completed: {}", status);
+                            let _ = match status {
+                                Ok(status) => writeln!(stderr, "ion: background task completed: {}", status),
+                                Err(why)   => writeln!(stderr, "ion: background task errored: {}", why)
+                            };
+
+                            // Remove the process from the background processes list.
+                            let mut processes = processes.lock().unwrap();
+                            if let Some(id) = (*processes).iter().position(|&x| x == pid) {
+                                processes.remove(id);
+                            }
                         });
                     },
                     Err(_) => {
@@ -109,12 +140,18 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                 };
 
                 let child = command.spawn().ok();
-                if child.is_none() {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
+                match child {
+                    Some(child) => {
+                        shell.foreground.push(child.id());
+                        children.push(Some(child))
+                    },
+                    None => {
+                        children.push(None);
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
+                    }
                 }
-                children.push(child);
 
                 // Append other jobs until all piped jobs are running.
                 while let Some(&mut (ref mut command, kind)) = commands.next() {
@@ -146,12 +183,18 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                         }
                     }
                     let child = command.spawn().ok();
-                    if child.is_none() {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
+                    match child {
+                        Some(child) => {
+                            shell.foreground.push(child.id());
+                            children.push(Some(child));
+                        },
+                        None => {
+                            children.push(None);
+                            let stderr = io::stderr();
+                            let mut stderr = stderr.lock();
+                            let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
+                        }
                     }
-                    children.push(child);
 
                     if let JobKind::Pipe(next) = kind {
                         from = next;
@@ -161,10 +204,14 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
                         break
                     }
                 }
-                previous_status = wait(&mut children);
+                previous_status = wait(shell, &mut children);
+                if previous_status == TERMINATED {
+                    shell.foreground_send(15);
+                    return previous_status;
+                }
             }
             _ => {
-                previous_status = execute_command(command);
+                previous_status = execute_command(shell, command);
                 previous_kind = kind;
             }
         }
@@ -172,9 +219,9 @@ pub fn pipe(commands: &mut [(Command, JobKind)]) -> i32 {
     previous_status
 }
 
-fn execute_command(command: &mut Command) -> i32 {
+fn execute_command(shell: &mut Shell, command: &mut Command) -> i32 {
     match command.spawn() {
-        Ok(child) => wait_on_child(child),
+        Ok(child) => wait_on_child(shell, child),
         Err(_) => {
             let stderr = io::stderr();
             let mut stderr = stderr.lock();
@@ -184,52 +231,107 @@ fn execute_command(command: &mut Command) -> i32 {
     }
 }
 
-fn wait_on_child(mut child: Child) -> i32 {
-    match child.wait() {
-        Ok(status) => {
-            if let Some(code) = status.code() {
-                code
-            } else {
+fn wait_on_child(shell: &mut Shell, mut child: Child) -> i32 {
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if let Some(code) = status.code() {
+                    break code
+                } else {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = stderr.write_all(b"ion: child ended by signal\n");
+                    break TERMINATED
+                }
+            },
+            Ok(None) => {
+                if let Ok(signal) = shell.signals.try_recv() {
+                    if let Err(why) = child.kill() {
+                        let stderr = io::stderr();
+                        let _ = writeln!(stderr.lock(), "ion: unable to kill child: {}", why);
+                    }
+                    shell.foreground_send(signal);
+                    shell.handle_signal(signal);
+                    break TERMINATED
+                }
+                thread::sleep(Duration::from_millis(1));
+            },
+            Err(err) => {
                 let stderr = io::stderr();
                 let mut stderr = stderr.lock();
-                let _ = stderr.write_all(b"ion: child ended by signal\n");
-                TERMINATED
+                let _ = writeln!(stderr, "ion: failed to wait: {}", err);
+                break 100 // TODO what should we return here?
             }
-        }
-        Err(err) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "ion: failed to wait: {}", err);
-            100 // TODO what should we return here?
         }
     }
 }
 
 /// This function will panic if called with an empty vector
-fn wait(children: &mut Vec<Option<Child>>) -> i32 {
+fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
     let end = children.len() - 1;
     for child in children.drain(..end) {
         if let Some(mut child) = child {
-            let _ = child.wait();
+            let status = loop {
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        if let Some(code) = status.code() {
+                            break code
+                        } else {
+                            let stderr = io::stderr();
+                            let mut stderr = stderr.lock();
+                            let _ = stderr.write_all(b"ion: child ended by signal\n");
+                            break TERMINATED
+                        }
+                    },
+                    Ok(None) => {
+                        if let Ok(signal) = shell.signals.try_recv() {
+                            shell.foreground_send(signal);
+                            shell.handle_signal(signal);
+                            break TERMINATED
+                        }
+                        thread::sleep(Duration::from_millis(1));
+                    },
+                    Err(err) => {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: failed to wait: {}", err);
+                        break 100 // TODO what should we return here?
+                    }
+                }
+            };
+            if status == TERMINATED {
+                return status
+            }
         }
     }
+
     if let Some(mut child) = children.pop().unwrap() {
-        match child.wait() {
-            Ok(status) => {
-                if let Some(code) = status.code() {
-                    code
-                } else {
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    if let Some(code) = status.code() {
+                        break code
+                    } else {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = stderr.write_all(b"ion: child ended by signal\n");
+                        break TERMINATED
+                    }
+                },
+                Ok(None) => {
+                    if let Ok(signal) = shell.signals.try_recv() {
+                        shell.foreground_send(signal);
+                        shell.handle_signal(signal);
+                        break TERMINATED
+                    }
+                    thread::sleep(Duration::from_millis(1));
+                },
+                Err(err) => {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();
-                    let _ = stderr.write_all(b"ion: child ended by signal\n");
-                    TERMINATED
+                    let _ = writeln!(stderr, "ion: failed to wait: {}", err);
+                    break 100 // TODO what should we return here?
                 }
-            }
-            Err(err) => {
-                let stderr = io::stderr();
-                let mut stderr = stderr.lock();
-                let _ = writeln!(stderr, "ion: failed to wait: {}", err);
-                100 // TODO what should we return here?
             }
         }
     } else {

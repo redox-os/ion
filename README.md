@@ -99,6 +99,10 @@ the internal built-in cd command with that path as the argument.
 examples/   # cd examples/
 ```
 
+### Exiting the Shell
+
+The `exit` command will exit the shell, but unlike Bash, this will send a `SIGTERM` to any background tasks that are still active.
+
 ### Defining Variables
 
 The `let` keyword is utilized to create local variables within the shell. The `export` keyword performs

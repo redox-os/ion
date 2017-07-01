@@ -29,6 +29,8 @@ smallstring = "0.1"
 
 [target.'cfg(not(target_os = "redox"))'.dependencies]
 futures = "0.1"
+libc = "0.2"
+nix = "0.8"
 tokio-core = "0.1"
 tokio-signal = "0.1"
 

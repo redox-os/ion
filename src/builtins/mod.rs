@@ -23,6 +23,38 @@ use parser::QuoteTerminator;
 use shell::{Shell, FlowLogic, ShellHistory};
 use shell::status::*;
 
+#[cfg(target_os = "redox")]
+fn exit_builtin() -> Builtin {
+    Builtin {
+        name: "exit",
+        help: "To exit the curent session",
+        main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
+            process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
+                .unwrap_or(shell.previous_status))
+        }),
+    }
+}
+
+#[cfg(not(target_os = "redox"))]
+fn exit_builtin() -> Builtin {
+    Builtin {
+        name: "exit",
+        help: "To exit the curent session",
+        main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
+            use nix::sys::signal::{self, Signal as NixSignal};
+            use libc::pid_t;
+
+            // Kill all background tasks before exiting the shell.
+            for process in shell.background.lock().unwrap().iter() {
+                let _ = signal::kill(*process as pid_t, Some(NixSignal::SIGTERM));
+            }
+
+            process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
+                .unwrap_or(shell.previous_status))
+        }),
+    }
+}
+
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the
 /// functionnality associated to this one, with zero, one or several argument(s).
@@ -185,15 +217,8 @@ impl Builtin {
                 }),
             });
 
-        commands.insert("exit",
-                Builtin {
-                    name: "exit",
-                    help: "To exit the curent session",
-                    main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                        process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
-                            .unwrap_or(shell.previous_status))
-                    }),
-                });
+
+        commands.insert("exit", exit_builtin());
 
         commands.insert("history",
                         Builtin {

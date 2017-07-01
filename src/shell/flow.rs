@@ -280,7 +280,8 @@ impl<'a> FlowLogic for Shell<'a> {
                 }
                 _ => {}
             }
-            if let Ok(_) = self.sigint_handle.try_recv() {
+            if let Ok(signal) = self.signals.try_recv() {
+                self.handle_signal(signal);
                 return Condition::SigInt;
             }
         }

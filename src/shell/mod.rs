@@ -20,8 +20,10 @@ use std::env;
 use std::mem;
 use std::path::{PathBuf, Path};
 use std::process;
-use std::time::SystemTime;
+use std::thread;
+use std::time::{Duration, SystemTime};
 use std::iter::FromIterator;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
 use smallvec::SmallVec;
 
@@ -35,7 +37,7 @@ use self::directory_stack::DirectoryStack;
 use self::flow_control::{FlowControl, Function, FunctionArgument, Statement, Type};
 use self::variables::Variables;
 use self::status::*;
-use self::pipe::execute_pipeline;
+use self::pipe::PipelineExecution;
 use parser::{
     expand_string,
     ArgumentSplitter,
@@ -44,6 +46,10 @@ use parser::{
     Select,
 };
 use parser::peg::Pipeline;
+
+#[cfg(not(target_os = "redox"))] use nix::sys::signal;
+#[cfg(not(target_os = "redox"))] use nix::sys::signal::Signal as NixSignal;
+#[cfg(not(target_os = "redox"))] use libc::{c_int, pid_t};
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
@@ -56,14 +62,16 @@ pub struct Shell<'a> {
     pub functions: FnvHashMap<Identifier, Function>,
     pub previous_status: i32,
     pub flags: u8,
-    sigint_handle: Receiver<bool>,
+    signals: Receiver<i32>,
+    foreground: Vec<u32>,
+    pub background: Arc<Mutex<Vec<u32>>>,
 }
 
 impl<'a> Shell<'a> {
     /// Panics if DirectoryStack construction fails
     pub fn new (
         builtins: &'a FnvHashMap<&'static str, Builtin>,
-        ctrl_c: Receiver<bool>
+        signals: Receiver<i32>
     ) -> Shell<'a> {
         Shell {
             builtins: builtins,
@@ -74,9 +82,55 @@ impl<'a> Shell<'a> {
             functions: FnvHashMap::default(),
             previous_status: 0,
             flags: 0,
-            sigint_handle: ctrl_c
+            signals: signals,
+            foreground: Vec::new(),
+            background: Arc::new(Mutex::new(Vec::new())),
         }
     }
+
+    /// Returns true if any background processes are still alive.
+    fn background_processes_live(&self) -> bool {
+        !self.background.lock().unwrap().is_empty()
+    }
+
+    /// Waits until all background tasks have completed, and listens for signals in the event
+    /// that a signal is sent to kill the running tasks.
+    fn wait_for_background_tasks(&mut self) {
+        while self.background_processes_live() {
+            thread::sleep(Duration::from_millis(100));
+            if let Ok(signal) = self.signals.try_recv() {
+                self.background_send(signal);
+                process::exit(status::TERMINATED);
+            }
+        }
+    }
+
+    /// Send a kill signal to all running foreground tasks.
+    fn foreground_send(&self, signal: i32) {
+        for process in self.foreground.iter() {
+            let _ = signal::kill(*process as pid_t, NixSignal::from_c_int(signal as c_int).ok());
+        }
+    }
+
+    /// Send a kill signal to all running background tasks.
+    fn background_send(&self, signal: i32) {
+        for process in self.background.lock().unwrap().iter() {
+            let _ = signal::kill(*process as pid_t, NixSignal::from_c_int(signal as c_int).ok());
+        }
+    }
+
+    #[cfg(not(target_os = "redox"))]
+    /// If a SIGTERM is received, a SIGTERM will be sent to all background processes
+    /// before the shell terminates itself.
+    fn handle_signal(&self, signal: i32) {
+        if signal == 15 {
+            self.background_send(15);
+            process::exit(status::TERMINATED);
+        }
+    }
+
+    #[cfg(target_os = "redox")]
+    fn handle_signal(_: i32) {}
 
     /// Infer if the given filename is actually a partial filename
     fn complete_as_file(current_dir : PathBuf, filename : String, index : usize) -> bool {
@@ -99,6 +153,8 @@ impl<'a> Shell<'a> {
         false
     }
 
+    /// Ion's interface to Liner's `read_line` method, which handles everything related to
+    /// rendering, controlling, and getting input from the prompt.
     fn readln(&mut self) -> Option<String> {
         let vars_ptr = &self.variables as *const Variables;
         let dirs_ptr = &self.directory_stack as *const DirectoryStack;
@@ -294,10 +350,11 @@ impl<'a> Shell<'a> {
                 self.execute_script(&path);
             }
 
+            self.wait_for_background_tasks();
             process::exit(self.previous_status);
         }
 
-        self.variables.set_array(
+        self.variables.set_array (
             "args",
             iter::once(env::args().next().unwrap()).collect(),
         );
@@ -406,7 +463,7 @@ impl<'a> Shell<'a> {
                     .collect();
                 Some((*command.main)(&small, self))
             } else {
-                Some(execute_pipeline(pipeline))
+                Some(self.execute_pipeline(pipeline))
             }
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(function) = self.functions.get(&pipeline.jobs[0].command).cloned() {
@@ -491,7 +548,7 @@ impl<'a> Shell<'a> {
             new_args.extend(pipeline.jobs[0].args.iter().map(|x| x as &str));
             Some((*builtins.get("cd").unwrap().main)(&new_args, self))
         } else {
-            Some(execute_pipeline(pipeline))
+            Some(self.execute_pipeline(pipeline))
         };
 
         // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the pipline
