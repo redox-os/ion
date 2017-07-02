@@ -92,7 +92,7 @@ fn pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
         match kind {
             JobKind::Background => {
                 if let Err(_) = command.spawn()
-                    .map(|child| shell.send_child_to_background(child, ProcessState::Running, 2))
+                    .map(|child| shell.send_child_to_background(child, ProcessState::Running))
                 {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();
@@ -218,7 +218,7 @@ fn wait_on_child(shell: &mut Shell, mut child: Child) -> i32 {
                     if signal == libc::SIGTSTP {
                         shell.received_sigtstp = true;
                         shell.suspend(child.id());
-                        shell.send_child_to_background(child, ProcessState::Stopped, 1);
+                        shell.send_child_to_background(child, ProcessState::Stopped);
                         break SUCCESS
                     } else {
                         if let Err(why) = child.kill() {
@@ -264,7 +264,7 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                             if signal == libc::SIGTSTP {
                                 shell.received_sigtstp = true;
                                 shell.suspend(child.id());
-                                shell.send_child_to_background(child, ProcessState::Stopped, 1);
+                                shell.send_child_to_background(child, ProcessState::Stopped);
                                 break SUCCESS
                             }
                             shell.foreground_send(signal);
@@ -305,7 +305,7 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                         if signal == libc::SIGTSTP {
                             shell.received_sigtstp = true;
                             shell.suspend(child.id());
-                            shell.send_child_to_background(child, ProcessState::Stopped, 1);
+                            shell.send_child_to_background(child, ProcessState::Stopped);
                             break SUCCESS
                         }
                         shell.foreground_send(signal);

@@ -14,7 +14,7 @@ pub trait JobControl {
     fn handle_signal(&self, signal: i32);
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
-    fn send_child_to_background(&mut self, child: Child, state: ProcessState, offset: u32);
+    fn send_child_to_background(&mut self, child: Child, state: ProcessState);
 }
 
 #[derive(Clone)]
@@ -113,11 +113,8 @@ impl<'a> JobControl for Shell<'a> {
         // TODO: Redox doesn't support signals yet
     }
 
-    fn send_child_to_background(&mut self, mut child: Child, state: ProcessState, offset: u32) {
-        // NOTE: Why is this always off?
-        // command args + Ctrl + Z: off by 1
-        // commands args &: off by 2
-        let pid = child.id() + offset;
+    fn send_child_to_background(&mut self, mut child: Child, state: ProcessState) {
+        let pid = child.id();
         let processes = self.background.clone();
         let _ = spawn(move || {
             let njob;
