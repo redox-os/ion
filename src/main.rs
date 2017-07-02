@@ -73,10 +73,10 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    // Create a stream that will select over SIGINT and SIGTERM signals.
+    // Create a stream that will select over SIGINT, SIGTERM and SIGTSTP signals.
     let signal_stream = Signal::new(unix_signal::SIGINT, &handle).flatten_stream()
         .select(Signal::new(unix_signal::SIGTERM, &handle).flatten_stream())
-        .select(Signal::new(20i32, &handle).flatten_stream()); // SIGTSTP
+        .select(Signal::new(libc::SIGTSTP, &handle).flatten_stream());
 
     // Execute the event loop that will listen for and transmit received
     // signals to the shell.

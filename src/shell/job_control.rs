@@ -1,4 +1,4 @@
-#[cfg(not(target_os = "redox"))] use libc::{pid_t, c_int};
+#[cfg(not(target_os = "redox"))] use libc::{self, pid_t, c_int};
 #[cfg(not(target_os = "redox"))] use nix::sys::signal::{self, Signal as NixSignal};
 use std::fmt;
 use std::io::{stderr, Write};
@@ -59,6 +59,7 @@ impl<'a> JobControl for Shell<'a> {
         // TODO: Redox doesn't support signals yet.
     }
 
+    #[cfg(not(target_os = "redox"))]
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
     fn wait_for_background(&mut self) {
@@ -66,7 +67,7 @@ impl<'a> JobControl for Shell<'a> {
             for process in self.background.lock().unwrap().iter() {
                 if let ProcessState::Running = process.state {
                     if let Ok(signal) = self.signals.try_recv() {
-                        if signal != 20 {
+                        if signal != libc::SIGTSTP {
                             self.background_send(signal);
                             process::exit(TERMINATED);
                         }
@@ -77,6 +78,11 @@ impl<'a> JobControl for Shell<'a> {
             }
             break
         }
+    }
+
+    #[cfg(target_os = "redox")]
+    fn wait_for_background(&mut self) {
+        // TODO: Redox doesn't support signals yet.
     }
 
     #[cfg(not(target_os = "redox"))]
@@ -162,8 +168,8 @@ impl<'a> JobControl for Shell<'a> {
     /// If a SIGTERM is received, a SIGTERM will be sent to all background processes
     /// before the shell terminates itself.
     fn handle_signal(&self, signal: i32) {
-        if signal == 15 {
-            self.background_send(15);
+        if signal == libc::SIGTERM {
+            self.background_send(libc::SIGTERM);
             process::exit(TERMINATED);
         }
     }

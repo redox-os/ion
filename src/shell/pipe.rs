@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "redox"))] use libc;
 use std::io::{self, Write};
 use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
@@ -174,7 +175,7 @@ fn pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
                 }
                 previous_status = wait(shell, &mut children);
                 if previous_status == TERMINATED {
-                    shell.foreground_send(15);
+                    shell.foreground_send(libc::SIGTERM);
                     return previous_status;
                 }
             }
@@ -214,7 +215,7 @@ fn wait_on_child(shell: &mut Shell, mut child: Child) -> i32 {
             },
             Ok(None) => {
                 if let Ok(signal) = shell.signals.try_recv() {
-                    if signal == 20 {
+                    if signal == libc::SIGTSTP {
                         shell.received_sigtstp = true;
                         shell.suspend(child.id());
                         shell.send_child_to_background(child, ProcessState::Stopped, 1);
@@ -260,7 +261,7 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                     },
                     Ok(None) => {
                         if let Ok(signal) = shell.signals.try_recv() {
-                            if signal == 20 {
+                            if signal == libc::SIGTSTP {
                                 shell.received_sigtstp = true;
                                 shell.suspend(child.id());
                                 shell.send_child_to_background(child, ProcessState::Stopped, 1);
@@ -301,7 +302,7 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                 },
                 Ok(None) => {
                     if let Ok(signal) = shell.signals.try_recv() {
-                        if signal == 20 {
+                        if signal == libc::SIGTSTP {
                             shell.received_sigtstp = true;
                             shell.suspend(child.id());
                             shell.send_child_to_background(child, ProcessState::Stopped, 1);
