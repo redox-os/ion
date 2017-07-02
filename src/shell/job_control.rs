@@ -14,9 +14,10 @@ pub trait JobControl {
     fn handle_signal(&self, signal: i32);
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
-    fn send_child_to_background(&mut self, child: Child, state: ProcessState);
+    fn send_child_to_background(&mut self, child: Child, state: ProcessState, offset: u32);
 }
 
+#[derive(Clone)]
 /// Defines whether the background process is running or stopped.
 pub enum ProcessState {
     Running,
@@ -34,6 +35,7 @@ impl fmt::Display for ProcessState {
     }
 }
 
+#[derive(Clone)]
 /// A background process is a process that is attached to, but not directly managed
 /// by the shell. The shell will only retain information about the process, such
 /// as the process ID, state that the process is in, and the command that the
@@ -105,20 +107,35 @@ impl<'a> JobControl for Shell<'a> {
         // TODO: Redox doesn't support signals yet
     }
 
-    fn send_child_to_background(&mut self, mut child: Child, state: ProcessState) {
-        let pid = child.id();
+    fn send_child_to_background(&mut self, mut child: Child, state: ProcessState, offset: u32) {
+        // NOTE: Why is this always off?
+        // command args + Ctrl + Z: off by 1
+        // commands args &: off by 2
+        let pid = child.id() + offset;
         let processes = self.background.clone();
         let _ = spawn(move || {
             let njob;
             {
                 let mut processes = processes.lock().unwrap();
-                njob = (*processes).iter().position(|x| {
+                njob = match (*processes).iter().position(|x| {
                     if let ProcessState::Empty = x.state { true } else { false }
-                }).unwrap_or(processes.len());
-                (*processes).push(BackgroundProcess {
-                    pid: pid,
-                    state: state
-                });
+                }) {
+                    Some(id) => {
+                        (*processes)[id] = BackgroundProcess {
+                            pid: pid,
+                            state: state
+                        };
+                        id
+                    },
+                    None => {
+                        let njobs = (*processes).len();
+                        (*processes).push(BackgroundProcess {
+                            pid: pid,
+                            state: state
+                        });
+                        njobs
+                    }
+                };
 
                 let stderr = stderr();
                 let _ = writeln!(stderr.lock(), "ion: bg: [{}] {}", njob, pid);
@@ -137,11 +154,8 @@ impl<'a> JobControl for Shell<'a> {
 
             // Remove the process from the background processes list.
             let mut processes = processes.lock().unwrap();
-            for process in (*processes).iter_mut() {
-                if process.pid == pid {
-                    process.state = ProcessState::Empty;
-                }
-            }
+            let process = &mut processes.iter_mut().nth(njob).unwrap();
+            process.state = ProcessState::Empty;
         });
     }
 

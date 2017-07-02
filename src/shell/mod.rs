@@ -59,7 +59,7 @@ pub struct Shell<'a> {
     pub functions: FnvHashMap<Identifier, Function>,
     pub previous_status: i32,
     pub flags: u8,
-    signals: Receiver<i32>,
+    pub signals: Receiver<i32>,
     foreground: Vec<u32>,
     pub background: Arc<Mutex<Vec<BackgroundProcess>>>,
     pub received_sigtstp: bool,

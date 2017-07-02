@@ -248,6 +248,14 @@ impl Builtin {
             })
         });
 
+        commands.insert("fg", Builtin {
+            name: "fg",
+            help: "Resumes and sets a background process as the active process",
+            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
+                job_control::fg(shell, &args[1..])
+            })
+        });
+
         commands.insert("history",
                         Builtin {
                             name: "history",
