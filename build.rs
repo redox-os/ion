@@ -5,9 +5,10 @@ extern crate version_check;
 use ansi_term::Color::{Red, Yellow, Blue, White};
 use version_check::is_min_version;
 
-// Specifies the minimum stable version needed to compile Ion.
-// NOTE: 1.18 is required due to the usage of `Child::try_wait()`.
-const MIN_VERSION: &'static str = "1.18.0";
+// Specifies the minimum version needed to compile Ion.
+// NOTE: 1.19 is required due to the usage of `break` with values for
+// `loop` (RFC 1624, rust-lang/rust GitHub issue #37339).
+const MIN_VERSION: &'static str = "1.19.0";
 
 // Convenience macro for writing to stderr.
 macro_rules! printerr {
@@ -32,7 +33,7 @@ fn main() {
         Some((_, ref version_string)) => {
             printerr!("{} {}",
                       Red.bold().paint("Error:"),
-                      White.paint("Ion requires at least version 1.17.0 to build."));
+                      White.paint("Ion requires at least version 1.19.0 to build."));
             print_version_err(&*version_string);
             printerr!("{}{}{}",
                 Blue.paint("Use `"),
