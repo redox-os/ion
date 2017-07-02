@@ -4,9 +4,8 @@ use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
 use std::fs::{File, OpenOptions};
 use std::thread;
 use std::time::Duration;
-
-use super::Shell;
-use super::JobKind;
+use super::job_control::{JobControl, ProcessState};
+use super::{JobKind, Shell};
 use super::status::*;
 use parser::peg::{Pipeline, RedirectFrom};
 
@@ -91,43 +90,12 @@ fn pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
 
         match kind {
             JobKind::Background => {
-                match command.spawn() {
-                    Ok(mut child) => {
-                        let pid = child.id();
-                        let processes = shell.background.clone();
-                        let _ = thread::spawn(move || {
-                            {
-                                let mut processes = processes.lock().unwrap();
-                                let nprocesses = (*processes).len();
-                                (*processes).push(pid);
-
-                                let stderr = io::stderr();
-                                let _ = writeln!(stderr.lock(), "ion: background: [{}] {}", nprocesses+1, pid);
-                            }
-
-                            // Wait for the child to complete before removing it from the process list.
-                            let status = child.wait();
-
-                            // Notify the user that the background task has completed.
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = match status {
-                                Ok(status) => writeln!(stderr, "ion: background task completed: {}", status),
-                                Err(why)   => writeln!(stderr, "ion: background task errored: {}", why)
-                            };
-
-                            // Remove the process from the background processes list.
-                            let mut processes = processes.lock().unwrap();
-                            if let Some(id) = (*processes).iter().position(|&x| x == pid) {
-                                processes.remove(id);
-                            }
-                        });
-                    },
-                    Err(_) => {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
-                    }
+                if let Err(_) = command.spawn()
+                    .map(|child| shell.send_child_to_background(child, ProcessState::Running))
+                {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
                 }
             },
             JobKind::Pipe(mut from) => {
@@ -246,13 +214,20 @@ fn wait_on_child(shell: &mut Shell, mut child: Child) -> i32 {
             },
             Ok(None) => {
                 if let Ok(signal) = shell.signals.try_recv() {
-                    if let Err(why) = child.kill() {
-                        let stderr = io::stderr();
-                        let _ = writeln!(stderr.lock(), "ion: unable to kill child: {}", why);
+                    if signal == 20 {
+                        shell.received_sigtstp = true;
+                        shell.suspend(child.id());
+                        shell.send_child_to_background(child, ProcessState::Stopped);
+                        break SUCCESS
+                    } else {
+                        if let Err(why) = child.kill() {
+                            let stderr = io::stderr();
+                            let _ = writeln!(stderr.lock(), "ion: unable to kill child: {}", why);
+                        }
+                        shell.foreground_send(signal);
+                        shell.handle_signal(signal);
+                        break TERMINATED
                     }
-                    shell.foreground_send(signal);
-                    shell.handle_signal(signal);
-                    break TERMINATED
                 }
                 thread::sleep(Duration::from_millis(1));
             },
@@ -285,6 +260,12 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                     },
                     Ok(None) => {
                         if let Ok(signal) = shell.signals.try_recv() {
+                            if signal == 20 {
+                                shell.received_sigtstp = true;
+                                shell.suspend(child.id());
+                                shell.send_child_to_background(child, ProcessState::Stopped);
+                                break SUCCESS
+                            }
                             shell.foreground_send(signal);
                             shell.handle_signal(signal);
                             break TERMINATED
@@ -320,6 +301,12 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                 },
                 Ok(None) => {
                     if let Ok(signal) = shell.signals.try_recv() {
+                        if signal == 20 {
+                            shell.received_sigtstp = true;
+                            shell.suspend(child.id());
+                            shell.send_child_to_background(child, ProcessState::Stopped);
+                            break SUCCESS
+                        }
                         shell.foreground_send(signal);
                         shell.handle_signal(signal);
                         break TERMINATED

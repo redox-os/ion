@@ -35,7 +35,7 @@ use shell::Shell;
 
 #[cfg(not(target_os = "redox"))] use tokio_core::reactor::Core;
 #[cfg(not(target_os = "redox"))] use futures::{Future, Stream};
-#[cfg(not(target_os = "redox"))] use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
+#[cfg(not(target_os = "redox"))] use tokio_signal::unix::{self as unix_signal, Signal};
 
 use std::sync::mpsc;
 use std::thread;
@@ -74,8 +74,9 @@ fn main() {
     let handle = core.handle();
 
     // Create a stream that will select over SIGINT and SIGTERM signals.
-    let signal_stream = Signal::new(SIGINT, &handle).flatten_stream()
-        .select(Signal::new(SIGTERM, &handle).flatten_stream());
+    let signal_stream = Signal::new(unix_signal::SIGINT, &handle).flatten_stream()
+        .select(Signal::new(unix_signal::SIGTERM, &handle).flatten_stream())
+        .select(Signal::new(20i32, &handle).flatten_stream()); // SIGTSTP
 
     // Execute the event loop that will listen for and transmit received
     // signals to the shell.

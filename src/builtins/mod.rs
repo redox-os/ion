@@ -3,6 +3,7 @@ pub mod variables;
 pub mod functions;
 pub mod calc;
 
+mod job_control;
 mod test;
 mod time;
 mod echo;
@@ -20,6 +21,7 @@ use std::process;
 use std::error::Error;
 
 use parser::QuoteTerminator;
+use shell::job_control::JobControl;
 use shell::{Shell, FlowLogic, ShellHistory};
 use shell::status::*;
 
@@ -46,7 +48,7 @@ fn exit_builtin() -> Builtin {
 
             // Kill all background tasks before exiting the shell.
             for process in shell.background.lock().unwrap().iter() {
-                let _ = signal::kill(*process as pid_t, Some(NixSignal::SIGTERM));
+                let _ = signal::kill(process.pid as pid_t, Some(NixSignal::SIGTERM));
             }
 
             process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
@@ -219,6 +221,32 @@ impl Builtin {
 
 
         commands.insert("exit", exit_builtin());
+
+        commands.insert("wait", Builtin {
+            name: "wait",
+            help: "Waits until all running background processes have completed",
+            main: Box::new(|_: &[&str], shell: &mut Shell| -> i32 {
+                shell.wait_for_background();
+                SUCCESS
+            })
+        });
+
+        commands.insert("jobs", Builtin {
+            name: "jobs",
+            help: "Displays all jobs that are attached to the background",
+            main: Box::new(|_: &[&str], shell: &mut Shell| -> i32 {
+                job_control::jobs(shell);
+                SUCCESS
+            })
+        });
+
+        commands.insert("bg", Builtin {
+            name: "bg",
+            help: "Resumes a stopped background process",
+            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
+                job_control::bg(shell, &args[1..])
+            })
+        });
 
         commands.insert("history",
                         Builtin {

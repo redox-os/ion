@@ -4,6 +4,7 @@ use std::mem;
 use super::status::*;
 use super::Shell;
 use super::flags::*;
+use super::job_control::JobControl;
 use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_cases, collect_if, Case};
 use parser::{ForExpression, StatementSplitter, check_statement, expand_string, Select, ExpanderFunctions};
 use parser::peg::Pipeline;
@@ -45,6 +46,7 @@ pub trait FlowLogic {
 
 impl<'a> FlowLogic for Shell<'a> {
     fn on_command(&mut self, command_string: &str) {
+        self.received_sigtstp = false;
         let mut iterator = StatementSplitter::new(command_string).map(check_statement);
 
         // If the value is set to `0`, this means that we don't need to append to an existing
@@ -281,7 +283,12 @@ impl<'a> FlowLogic for Shell<'a> {
                 _ => {}
             }
             if let Ok(signal) = self.signals.try_recv() {
-                self.handle_signal(signal);
+                if signal != 20 {
+                    self.handle_signal(signal);
+                }
+                return Condition::SigInt;
+            } else if self.received_sigtstp {
+                self.received_sigtstp = false;
                 return Condition::SigInt;
             }
         }

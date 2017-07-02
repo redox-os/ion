@@ -5,6 +5,7 @@ pub mod flags;
 pub mod flow_control;
 mod flow;
 mod history;
+pub mod job_control;
 mod job;
 mod pipe;
 pub mod status;
@@ -20,8 +21,7 @@ use std::env;
 use std::mem;
 use std::path::{PathBuf, Path};
 use std::process;
-use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
@@ -35,6 +35,7 @@ use smallstring::SmallString;
 use self::completer::{MultiCompleter, IonFileCompleter};
 use self::directory_stack::DirectoryStack;
 use self::flow_control::{FlowControl, Function, FunctionArgument, Statement, Type};
+use self::job_control::{JobControl, BackgroundProcess};
 use self::variables::Variables;
 use self::status::*;
 use self::pipe::PipelineExecution;
@@ -46,10 +47,6 @@ use parser::{
     Select,
 };
 use parser::peg::Pipeline;
-
-#[cfg(not(target_os = "redox"))] use nix::sys::signal;
-#[cfg(not(target_os = "redox"))] use nix::sys::signal::Signal as NixSignal;
-#[cfg(not(target_os = "redox"))] use libc::{c_int, pid_t};
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
@@ -64,7 +61,8 @@ pub struct Shell<'a> {
     pub flags: u8,
     signals: Receiver<i32>,
     foreground: Vec<u32>,
-    pub background: Arc<Mutex<Vec<u32>>>,
+    pub background: Arc<Mutex<Vec<BackgroundProcess>>>,
+    pub received_sigtstp: bool,
 }
 
 impl<'a> Shell<'a> {
@@ -85,52 +83,9 @@ impl<'a> Shell<'a> {
             signals: signals,
             foreground: Vec::new(),
             background: Arc::new(Mutex::new(Vec::new())),
+            received_sigtstp: false,
         }
     }
-
-    /// Returns true if any background processes are still alive.
-    fn background_processes_live(&self) -> bool {
-        !self.background.lock().unwrap().is_empty()
-    }
-
-    /// Waits until all background tasks have completed, and listens for signals in the event
-    /// that a signal is sent to kill the running tasks.
-    fn wait_for_background_tasks(&mut self) {
-        while self.background_processes_live() {
-            thread::sleep(Duration::from_millis(100));
-            if let Ok(signal) = self.signals.try_recv() {
-                self.background_send(signal);
-                process::exit(status::TERMINATED);
-            }
-        }
-    }
-
-    /// Send a kill signal to all running foreground tasks.
-    fn foreground_send(&self, signal: i32) {
-        for process in self.foreground.iter() {
-            let _ = signal::kill(*process as pid_t, NixSignal::from_c_int(signal as c_int).ok());
-        }
-    }
-
-    /// Send a kill signal to all running background tasks.
-    fn background_send(&self, signal: i32) {
-        for process in self.background.lock().unwrap().iter() {
-            let _ = signal::kill(*process as pid_t, NixSignal::from_c_int(signal as c_int).ok());
-        }
-    }
-
-    #[cfg(not(target_os = "redox"))]
-    /// If a SIGTERM is received, a SIGTERM will be sent to all background processes
-    /// before the shell terminates itself.
-    fn handle_signal(&self, signal: i32) {
-        if signal == 15 {
-            self.background_send(15);
-            process::exit(status::TERMINATED);
-        }
-    }
-
-    #[cfg(target_os = "redox")]
-    fn handle_signal(_: i32) {}
 
     /// Infer if the given filename is actually a partial filename
     fn complete_as_file(current_dir : PathBuf, filename : String, index : usize) -> bool {
@@ -350,7 +305,7 @@ impl<'a> Shell<'a> {
                 self.execute_script(&path);
             }
 
-            self.wait_for_background_tasks();
+            self.wait_for_background();
             process::exit(self.previous_status);
         }
 
