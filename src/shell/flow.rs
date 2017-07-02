@@ -10,6 +10,8 @@ use parser::{ForExpression, StatementSplitter, check_statement, expand_string, S
 use parser::peg::Pipeline;
 use super::assignments::{let_assignment, export_variable};
 use types::Array;
+#[cfg(not(target_os = "redox"))]
+use libc;
 
 pub enum Condition {
     Continue,
@@ -283,7 +285,7 @@ impl<'a> FlowLogic for Shell<'a> {
                 _ => {}
             }
             if let Ok(signal) = self.signals.try_recv() {
-                if signal != 20 {
+                if cfg!(not(target_os = "redox")) && signal != libc::SIGTSTP {
                     self.handle_signal(signal);
                 }
                 return Condition::SigInt;

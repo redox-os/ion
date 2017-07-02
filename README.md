@@ -77,7 +77,7 @@ Below is an overview of features that Ion has either already implemented, or aim
 - [x] Background Jobs
 - [ ] Piping Functions
 - [ ] Redirecting Functions
-- [ ] Background Job Control
+- [x] Background Job Control
 - [ ] XDG App Dirs
 - [ ] Plugins Support
     - [ ] Builtins

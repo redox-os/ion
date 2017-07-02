@@ -5,7 +5,7 @@ use std::io::{stderr, Write};
 use std::thread::sleep;
 use std::time::Duration;
 #[cfg(not(target_os = "redox"))] use nix::sys::signal::{self, Signal};
-#[cfg(not(target_os = "redox"))] use libc::pid_t;
+#[cfg(not(target_os = "redox"))] use libc::{self, pid_t};
 
 /// Display a list of all jobs running in the background.
 pub fn jobs(shell: &mut Shell) {
@@ -19,22 +19,25 @@ pub fn jobs(shell: &mut Shell) {
     }
 }
 
+#[cfg(not(target_os = "redox"))]
 fn fg_listen(shell: &mut Shell, job: u32) {
     loop {
         sleep(Duration::from_millis(100));
         let job = &mut (*shell.background.lock().unwrap())[job as usize];
         if let ProcessState::Empty = job.state { break }
         if let Ok(signal) = shell.signals.try_recv() {
+            let stderr = stderr();
+            let _ = writeln!(stderr.lock(), "ion: fg_listen: signal {} ", signal);
             match signal {
-                20 => {
+                libc::SIGTSTP => {
                     let _ = signal::kill(job.pid as pid_t, Some(Signal::SIGTSTP));
                     job.state = ProcessState::Stopped;
                     break
                 },
-                15 => {
-                    shell.handle_signal(15);
+                libc::SIGTERM => {
+                    shell.handle_signal(libc::SIGTERM);
                 },
-                2 => {
+                libc::SIGINT => {
                     let _ = signal::kill(job.pid as pid_t, Some(Signal::SIGINT));
                     job.state = ProcessState::Empty;
                     break
