@@ -1,8 +1,12 @@
-#[cfg(not(target_os = "redox"))] use libc;
+#[cfg(all(unix, not(target_os = "redox")))] use libc;
+#[cfg(all(unix, not(target_os = "redox")))] use nix::unistd::{fork, ForkResult};
+#[cfg(all(unix, not(target_os = "redox")))] use nix::Error as NixError;
+#[cfg(target_os = "redox")] use std::error::Error;
 use std::io::{self, Write};
 use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
 use std::fs::{File, OpenOptions};
+use std::process::exit;
 use std::thread;
 use std::time::Duration;
 use super::job_control::{JobControl, ProcessState};
@@ -18,7 +22,9 @@ impl<'a> PipelineExecution for Shell<'a> {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
         // Generate a list of commands from the given pipeline
         let mut piped_commands: Vec<(Command, JobKind)> = pipeline.jobs
-            .drain(..).map(|mut job| (job.build_command(), job.kind)).collect();
+            .drain(..).map(|mut job| {
+                (job.build_command(), job.kind)
+            }).collect();
 
         if let Some(ref stdin) = pipeline.stdin {
             if let Some(command) = piped_commands.first_mut() {
@@ -66,7 +72,48 @@ impl<'a> PipelineExecution for Shell<'a> {
         }
 
         self.foreground.clear();
-        pipe(self, &mut piped_commands)
+        if piped_commands[piped_commands.len()-1].1 == JobKind::Background {
+            fork_pipe(self, &mut piped_commands)
+        } else {
+            pipe(self, &mut piped_commands)
+        }
+    }
+}
+
+enum Fork {
+    Parent(u32),
+    Child
+}
+
+#[cfg(target_os = "redox")]
+fn ion_fork() -> Result<Fork, Error> {
+    use redox_syscall::call::clone;
+    unsafe {
+        clone(0).map(|pid| if pid == 0 { Fork::Child } else { Fork::Parent(pid as u32)})?
+    }
+}
+
+#[cfg(all(unix, not(target_os = "redox")))]
+fn ion_fork() -> Result<Fork, NixError> {
+    match fork()? {
+        ForkResult::Parent{ child: pid }  => Ok(Fork::Parent(pid as u32)),
+        ForkResult::Child                 => Ok(Fork::Child)
+    }
+}
+
+fn fork_pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
+    match ion_fork() {
+        Ok(Fork::Parent(pid)) => {
+            shell.send_child_to_background(pid, ProcessState::Running);
+            SUCCESS
+        },
+        Ok(Fork::Child) => {
+            exit(pipe(shell, commands));
+        },
+        Err(why) => {
+            eprintln!("ion: background job: {}", why);
+            FAILURE
+        }
     }
 }
 
@@ -90,15 +137,6 @@ fn pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
         }
 
         match kind {
-            JobKind::Background => {
-                if let Err(_) = command.spawn()
-                    .map(|child| shell.send_child_to_background(child, ProcessState::Running))
-                {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
-                }
-            },
             JobKind::Pipe(mut from) => {
                 let mut children: Vec<Option<Child>> = Vec::new();
 
@@ -185,6 +223,7 @@ fn pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
             }
         }
     }
+
     previous_status
 }
 
@@ -217,8 +256,9 @@ fn wait_on_child(shell: &mut Shell, mut child: Child) -> i32 {
                 if let Ok(signal) = shell.signals.try_recv() {
                     if signal == libc::SIGTSTP {
                         shell.received_sigtstp = true;
-                        shell.suspend(child.id());
-                        shell.send_child_to_background(child, ProcessState::Stopped);
+                        let pid = child.id();
+                        shell.suspend(pid);
+                        shell.send_child_to_background(pid, ProcessState::Stopped);
                         break SUCCESS
                     } else {
                         if let Err(why) = child.kill() {
@@ -263,8 +303,9 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                         if let Ok(signal) = shell.signals.try_recv() {
                             if signal == libc::SIGTSTP {
                                 shell.received_sigtstp = true;
-                                shell.suspend(child.id());
-                                shell.send_child_to_background(child, ProcessState::Stopped);
+                                let pid = child.id();
+                                shell.suspend(pid);
+                                shell.send_child_to_background(pid, ProcessState::Stopped);
                                 break SUCCESS
                             }
                             shell.foreground_send(signal);
@@ -304,8 +345,9 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                     if let Ok(signal) = shell.signals.try_recv() {
                         if signal == libc::SIGTSTP {
                             shell.received_sigtstp = true;
-                            shell.suspend(child.id());
-                            shell.send_child_to_background(child, ProcessState::Stopped);
+                            let pid = child.id();
+                            shell.suspend(pid);
+                            shell.send_child_to_background(pid, ProcessState::Stopped);
                             break SUCCESS
                         }
                         shell.foreground_send(signal);

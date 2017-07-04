@@ -26,12 +26,9 @@ fn fg_listen(shell: &mut Shell, job: u32) {
         let job = &mut (*shell.background.lock().unwrap())[job as usize];
         if let ProcessState::Empty = job.state { break }
         if let Ok(signal) = shell.signals.try_recv() {
-            let stderr = stderr();
-            let _ = writeln!(stderr.lock(), "ion: fg_listen: signal {} ", signal);
             match signal {
                 libc::SIGTSTP => {
                     let _ = signal::kill(job.pid as pid_t, Some(Signal::SIGTSTP));
-                    job.state = ProcessState::Stopped;
                     break
                 },
                 libc::SIGTERM => {
@@ -39,7 +36,6 @@ fn fg_listen(shell: &mut Shell, job: u32) {
                 },
                 libc::SIGINT => {
                     let _ = signal::kill(job.pid as pid_t, Some(Signal::SIGINT));
-                    job.state = ProcessState::Empty;
                     break
                 },
                 _ => unimplemented!()
@@ -110,7 +106,6 @@ pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
                     },
                     ProcessState::Stopped => {
                         let _ = signal::kill(job.pid as pid_t, Some(Signal::SIGCONT));
-                        job.state = ProcessState::Running;
                         let _ = writeln!(stderr, "[{}] {} {}", njob, job.pid, job.state);
                     },
                     ProcessState::Empty => {
