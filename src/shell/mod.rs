@@ -27,6 +27,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
 use smallvec::SmallVec;
 
+use app_dirs::{AppDataType, AppInfo, app_root};
 use builtins::*;
 use fnv::FnvHashMap;
 use liner::{Context, CursorPosition, Event, EventKind, BasicCompleter};
@@ -363,14 +364,15 @@ impl<'a> Shell<'a> {
 
     /// Evaluates the source init file in the user's home directory.
     pub fn evaluate_init_file(&mut self) {
-        env::home_dir().map_or_else(|| {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(b"ion: could not get home directory");
-        }, |mut source_file| {
-            source_file.push(".ionrc");
-            self.execute_script(&source_file);
-        });
+        match app_root(AppDataType::UserConfig, &AppInfo{ name: "ion", author: "Redox OS Developers" }) {
+            Ok(mut source_file) => {
+                source_file.push("initrc");
+                self.execute_script(&source_file);
+            },
+            Err(_) => { // The error returned could be used for a possibly more descriptive error
+                eprintln!("ion: could not get home directory");
+            }
+        }
     }
 
     pub fn prompt(&self) -> String {

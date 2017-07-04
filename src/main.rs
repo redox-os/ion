@@ -5,6 +5,7 @@
 // #![feature(alloc_system)]
 // extern crate alloc_system;
 
+extern crate app_dirs;
 #[macro_use]
 extern crate bitflags;
 extern crate fnv;
