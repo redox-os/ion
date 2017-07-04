@@ -1,10 +1,10 @@
-#[cfg(not(target_os = "redox"))] use libc::{self, pid_t, c_int};
-#[cfg(not(target_os = "redox"))] use nix::sys::signal::{self, Signal as NixSignal};
+#[cfg(all(unix, not(target_os = "redox")))] use libc::{self, pid_t, c_int};
+#[cfg(all(unix, not(target_os = "redox")))] use nix::sys::signal::{self, Signal as NixSignal};
 use std::fmt;
-use std::io::{stderr, Write};
 use std::thread::{sleep, spawn};
 use std::time::Duration;
-use std::process::{self, Child};
+use std::process;
+use std::sync::{Arc, Mutex};
 use super::status::*;
 use super::Shell;
 
@@ -14,7 +14,7 @@ pub trait JobControl {
     fn handle_signal(&self, signal: i32);
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
-    fn send_child_to_background(&mut self, child: Child, state: ProcessState);
+    fn send_child_to_background(&mut self, child: u32, state: ProcessState);
 }
 
 #[derive(Clone)]
@@ -35,6 +35,76 @@ impl fmt::Display for ProcessState {
     }
 }
 
+#[cfg(target_os = "redox")]
+pub fn watch_pid(processes: Arc<Mutex<Vec<BackgroundProcess>>>, pid: u32) {
+    // TODO: Implement this using syscall::call::waitpid
+}
+
+#[cfg(all(unix, not(target_os = "redox")))]
+pub fn watch_pid (
+    processes: Arc<Mutex<Vec<BackgroundProcess>>>,
+    pid: u32,
+    njob: usize)
+{
+    use nix::sys::wait::{waitpid, WaitStatus};
+    loop {
+        match waitpid(pid as pid_t, None) {
+            Ok(WaitStatus::Exited(_, status)) => {
+                eprintln!("ion: background process ([{}] {}) exited with {}", njob, pid, status);
+                let mut processes = processes.lock().unwrap();
+                let process = &mut processes.iter_mut().nth(njob).unwrap();
+                process.state = ProcessState::Empty;
+                break
+            },
+            Ok(WaitStatus::Stopped(_, _)) => {
+                let mut processes = processes.lock().unwrap();
+                let process = &mut processes.iter_mut().nth(njob).unwrap();
+                process.state = ProcessState::Stopped;
+            },
+            Ok(WaitStatus::Continued(_)) => {
+                let mut processes = processes.lock().unwrap();
+                let process = &mut processes.iter_mut().nth(njob).unwrap();
+                process.state = ProcessState::Running;
+            },
+            Ok(_) => (),
+            Err(why) => {
+                eprintln!("ion: background process ([{}] {}) errored: {}", njob, pid, why);
+                let mut processes = processes.lock().unwrap();
+                let process = &mut processes.iter_mut().nth(njob).unwrap();
+                process.state = ProcessState::Empty;
+                break
+            }
+        }
+    }
+}
+
+pub fn add_to_background (
+    processes: Arc<Mutex<Vec<BackgroundProcess>>>,
+    pid: u32,
+    state: ProcessState
+) -> usize {
+    let mut processes = processes.lock().unwrap();
+    match (*processes).iter().position(|x| {
+        if let ProcessState::Empty = x.state { true } else { false }
+    }) {
+        Some(id) => {
+            (*processes)[id] = BackgroundProcess {
+                pid: pid,
+                state: state
+            };
+            id
+        },
+        None => {
+            let njobs = (*processes).len();
+            (*processes).push(BackgroundProcess {
+                pid: pid,
+                state: state
+            });
+            njobs
+        }
+    }
+}
+
 #[derive(Clone)]
 /// A background process is a process that is attached to, but not directly managed
 /// by the shell. The shell will only retain information about the process, such
@@ -48,7 +118,7 @@ pub struct BackgroundProcess {
 }
 
 impl<'a> JobControl for Shell<'a> {
-    #[cfg(not(target_os = "redox"))]
+    #[cfg(all(unix, not(target_os = "redox")))]
     /// Suspends a given process by it's process ID.
     fn suspend(&mut self, pid: u32) {
         let _ = signal::kill(pid as pid_t, Some(NixSignal::SIGTSTP));
@@ -59,7 +129,7 @@ impl<'a> JobControl for Shell<'a> {
         // TODO: Redox doesn't support signals yet.
     }
 
-    #[cfg(not(target_os = "redox"))]
+    #[cfg(all(unix, not(target_os = "redox")))]
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
     fn wait_for_background(&mut self) {
@@ -85,7 +155,7 @@ impl<'a> JobControl for Shell<'a> {
         // TODO: Redox doesn't support signals yet.
     }
 
-    #[cfg(not(target_os = "redox"))]
+    #[cfg(all(unix, not(target_os = "redox")))]
     /// Send a kill signal to all running foreground tasks.
     fn foreground_send(&self, signal: i32) {
         for process in self.foreground.iter() {
@@ -98,7 +168,7 @@ impl<'a> JobControl for Shell<'a> {
         // TODO: Redox doesn't support signals yet
     }
 
-    #[cfg(not(target_os = "redox"))]
+    #[cfg(all(unix, not(target_os = "redox")))]
     /// Send a kill signal to all running background tasks.
     fn background_send(&self, signal: i32) {
         for process in self.background.lock().unwrap().iter() {
@@ -113,52 +183,12 @@ impl<'a> JobControl for Shell<'a> {
         // TODO: Redox doesn't support signals yet
     }
 
-    fn send_child_to_background(&mut self, mut child: Child, state: ProcessState) {
-        let pid = child.id();
+    fn send_child_to_background(&mut self, pid: u32, state: ProcessState) {
         let processes = self.background.clone();
         let _ = spawn(move || {
-            let njob;
-            {
-                let mut processes = processes.lock().unwrap();
-                njob = match (*processes).iter().position(|x| {
-                    if let ProcessState::Empty = x.state { true } else { false }
-                }) {
-                    Some(id) => {
-                        (*processes)[id] = BackgroundProcess {
-                            pid: pid,
-                            state: state
-                        };
-                        id
-                    },
-                    None => {
-                        let njobs = (*processes).len();
-                        (*processes).push(BackgroundProcess {
-                            pid: pid,
-                            state: state
-                        });
-                        njobs
-                    }
-                };
-
-                let stderr = stderr();
-                let _ = writeln!(stderr.lock(), "ion: bg: [{}] {}", njob, pid);
-            }
-
-            // Wait for the child to complete before removing it from the process list.
-            let status = child.wait();
-
-            // Notify the user that the background task has completed.
-            let stderr = stderr();
-            let mut stderr = stderr.lock();
-            let _ = match status {
-                Ok(status) => writeln!(stderr, "ion: bg: [{}] {} completed: {}", njob, pid, status),
-                Err(why)   => writeln!(stderr, "ion: bg: [{}] {} errored: {}", njob, pid, why)
-            };
-
-            // Remove the process from the background processes list.
-            let mut processes = processes.lock().unwrap();
-            let process = &mut processes.iter_mut().nth(njob).unwrap();
-            process.state = ProcessState::Empty;
+            let njob = add_to_background(processes.clone(), pid, state);
+            eprintln!("ion: bg [{}] {}", njob, pid);
+            watch_pid(processes, pid, njob);
         });
     }
 

@@ -27,15 +27,16 @@ unicode-segmentation = "1.2"
 smallvec = "0.4"
 smallstring = "0.1"
 
-[target.'cfg(not(target_os = "redox"))'.dependencies]
+[target.'cfg(target_os = "redox")'.dependencies]
+redox_syscall = "0.1"
+
+[target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
+users = "0.5.1"
 futures = "0.1"
 libc = "0.2"
 nix = "0.8"
 tokio-core = "0.1"
 tokio-signal = "0.1"
-
-[target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
-users = "0.5.1"
 
 [build-dependencies]
 peg = "0.5"

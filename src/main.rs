@@ -13,14 +13,13 @@ extern crate liner;
 extern crate smallvec;
 extern crate smallstring;
 
-#[cfg(not(target_os = "redox"))] extern crate futures;
-#[cfg(not(target_os = "redox"))] extern crate libc;
-#[cfg(not(target_os = "redox"))] extern crate nix;
-#[cfg(not(target_os = "redox"))] extern crate tokio_core;
-#[cfg(not(target_os = "redox"))] extern crate tokio_signal;
-
-#[cfg(all(unix, not(target_os = "redox")))]
-extern crate users as users_unix;
+#[cfg(all(unix, not(target_os = "redox")))] extern crate futures;
+#[cfg(all(unix, not(target_os = "redox")))] extern crate libc;
+#[cfg(all(unix, not(target_os = "redox")))] extern crate nix;
+#[cfg(all(unix, not(target_os = "redox")))] extern crate tokio_core;
+#[cfg(all(unix, not(target_os = "redox")))] extern crate tokio_signal;
+#[cfg(all(unix, not(target_os = "redox")))] extern crate users as users_unix;
+#[cfg(target_os = "redox")] extern crate redox_syscall;
 
 #[macro_use] mod parser;
 mod builtins;
@@ -33,9 +32,9 @@ use std::io::{stderr, Write, ErrorKind};
 use builtins::Builtin;
 use shell::Shell;
 
-#[cfg(not(target_os = "redox"))] use tokio_core::reactor::Core;
-#[cfg(not(target_os = "redox"))] use futures::{Future, Stream};
-#[cfg(not(target_os = "redox"))] use tokio_signal::unix::{self as unix_signal, Signal};
+#[cfg(all(unix, not(target_os = "redox")))] use tokio_core::reactor::Core;
+#[cfg(all(unix, not(target_os = "redox")))] use futures::{Future, Stream};
+#[cfg(all(unix, not(target_os = "redox")))] use tokio_signal::unix::{self as unix_signal, Signal};
 
 use std::sync::mpsc;
 use std::thread;

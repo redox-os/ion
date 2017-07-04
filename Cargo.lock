@@ -12,6 +12,7 @@ dependencies = [
  "nix 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "peg 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "permutate 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "redox_syscall 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "smallstring 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "smallvec 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -190,6 +191,11 @@ version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "redox_syscall"
+version = "0.1.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "scoped-tls"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -335,6 +341,7 @@ dependencies = [
 "checksum peg 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)" = "36a474cba42744afe0f223e9d4263594b3387f172e512259c72d2011e477c4fb"
 "checksum permutate 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "53b7d5b19a715ffab38693a9dd44b067fdfa2b18eef65bd93562dfe507022fae"
 "checksum quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
+"checksum redox_syscall 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)" = "e4a357d14a12e90a37d658725df0e6468504750b5948b9710f83f94a0c5818e8"
 "checksum scoped-tls 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f417c22df063e9450888a7561788e9bd46d3bb3c1466435b4eccb903807f147d"
 "checksum slab 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "17b4fcaed89ab08ef143da37bc52adbcc04d4a69014f4c1208d6b51f0c47bc23"
 "checksum smallstring 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "30950abdb5b38f56a0e181ae56ed64a539b64fa77ea6325147203dc7faeb087f"
