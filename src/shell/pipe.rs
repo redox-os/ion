@@ -238,13 +238,14 @@ fn terminate_fg(shell: &mut Shell) {
 }
 
 #[cfg(all(unix, not(target_os = "redox")))]
-fn is_sigtstp(signal: i32) {
+fn is_sigtstp(signal: i32) -> bool {
     signal == libc::SIGTSTP
 }
 
 #[cfg(target_os = "redox")]
-fn is_sigtstp(_: i32) {
+fn is_sigtstp(_: i32) -> bool {
     // TODO: Redox does not support signals
+    false
 }
 
 fn execute_command(shell: &mut Shell, command: &mut Command) -> i32 {

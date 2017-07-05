@@ -10,7 +10,6 @@ use parser::{ForExpression, StatementSplitter, check_statement, expand_string, S
 use parser::peg::Pipeline;
 use super::assignments::{let_assignment, export_variable};
 use types::Array;
-#[cfg(all(unix, not(target_os = "redox")))] use libc;
 
 pub enum Condition {
     Continue,
