@@ -37,6 +37,7 @@ libc = "0.2"
 nix = "0.8"
 tokio-core = "0.1"
 tokio-signal = "0.1"
+os_pipe = "0.5.0"
 
 [build-dependencies]
 peg = "0.5"
