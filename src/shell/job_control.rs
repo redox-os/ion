@@ -36,7 +36,7 @@ impl fmt::Display for ProcessState {
 }
 
 #[cfg(target_os = "redox")]
-pub fn watch_pid(processes: Arc<Mutex<Vec<BackgroundProcess>>>, pid: u32) {
+pub fn watch_pid(processes: Arc<Mutex<Vec<BackgroundProcess>>>, pid: u32, njob: usize) {
     // TODO: Implement this using syscall::call::waitpid
 }
 
