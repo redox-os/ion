@@ -1,7 +1,7 @@
 #[cfg(all(unix, not(target_os = "redox")))] use libc;
 #[cfg(all(unix, not(target_os = "redox")))] use nix::unistd::{fork, ForkResult};
 #[cfg(all(unix, not(target_os = "redox")))] use nix::Error as NixError;
-#[cfg(target_os = "redox")] use std::error::Error;
+#[cfg(target_os = "redox")] use syscall;
 use std::io::{self, Write};
 use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
@@ -86,10 +86,12 @@ enum Fork {
 }
 
 #[cfg(target_os = "redox")]
-fn ion_fork() -> Result<Fork, Error> {
+fn ion_fork() -> syscall::error::Result<Fork> {
     use syscall::call::clone;
     unsafe {
-        clone(0).map(|pid| if pid == 0 { Fork::Child } else { Fork::Parent(pid as u32)})
+        syscall::call::clone(0).map(|pid| {
+             if pid == 0 { Fork::Child } else { Fork::Parent(pid as u32) }
+        })
     }
 }
 
@@ -322,7 +324,7 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                     },
                     Ok(None) => {
                         if let Ok(signal) = shell.signals.try_recv() {
-                            if signal == libc::SIGTSTP {
+                            if is_sigtstp(signal) {
                                 shell.received_sigtstp = true;
                                 let pid = child.id();
                                 shell.suspend(pid);
