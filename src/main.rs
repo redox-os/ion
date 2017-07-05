@@ -19,7 +19,7 @@ extern crate smallstring;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate tokio_core;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate tokio_signal;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate users as users_unix;
-#[cfg(target_os = "redox")] extern crate redox_syscall;
+#[cfg(target_os = "redox")] extern crate syscall;
 
 #[macro_use] mod parser;
 mod builtins;

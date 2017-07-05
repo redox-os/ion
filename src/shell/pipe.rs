@@ -87,7 +87,7 @@ enum Fork {
 
 #[cfg(target_os = "redox")]
 fn ion_fork() -> Result<Fork, Error> {
-    use redox_syscall::call::clone;
+    use syscall::call::clone;
     unsafe {
         clone(0).map(|pid| if pid == 0 { Fork::Child } else { Fork::Parent(pid as u32)})?
     }
