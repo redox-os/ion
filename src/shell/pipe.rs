@@ -52,17 +52,16 @@ mod xp {
 mod xp {
     use std::process::{Stdio, Command};
     use std::os::unix::io::{IntoRawFd, FromRawFd};
-    use std::io::Error;
     use std::fs::File;
     use parser::peg::{RedirectFrom};
-    use syscall::{call, flag};
+    use syscall::{call, flag, Error};
 
     pub unsafe fn handle_piping(parent: &mut Command,
                                 child: &mut Command,
                                 mode: RedirectFrom) -> Result<(), Error>
     {
         // Currently this is "unimplemented" in redox
-        let mut fds: [usize; 2] = [(-1) as usize, (-1) as usize];
+        let mut fds: [usize; 2] = [0; 2];
         call::pipe2(&mut fds, flag::O_CLOEXEC)?;
         let (reader, writer) = (fds[0], fds[1]);
         match mode {
