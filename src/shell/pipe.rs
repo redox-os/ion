@@ -25,6 +25,8 @@ mod crossplat {
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::process::{Stdio, Command};
 
+    /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
+    /// The content that is sent depends on `mode`
     pub unsafe fn create_pipe(parent: &mut Command,
                               child: &mut Command,
                               mode: RedirectFrom) -> Result<(), Error>
@@ -75,11 +77,14 @@ mod crossplat {
         fn from(data: syscall::Error) -> Error { Error::Sys(data) }
     }
 
+    /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
+    /// The content that is sent depends on `mode`
     pub unsafe fn create_pipe(parent: &mut Command,
                               child: &mut Command,
                               mode: RedirectFrom) -> Result<(), Error>
     {
-        // Currently this is "unimplemented" in redox
+        // XXX: Zero probably is a bad default for this, but `pipe2` will error if it fails, so
+        // one could reason that it isn't dangerous.
         let mut fds: [usize; 2] = [0; 2];
         syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)?;
         let (reader, writer) = (fds[0], fds[1]);
@@ -216,7 +221,7 @@ fn pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
     let mut previous_kind = JobKind::And;
     let mut commands = commands.into_iter().peekable();
     loop {
-        if let Some((mut parent, kind)) = commands.next() {
+        if let Some((mut parent, mut kind)) = commands.next() {
             // When an `&&` or `||` operator is utilized, execute commands based on the previous status.
             match previous_kind {
                 JobKind::And => if previous_status != SUCCESS {
@@ -260,28 +265,26 @@ fn pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
                         }};
                     }
 
-                    // Append other jobs until all piped jobs are running; this will run for at least
-                    // one iteration as we reach this point by matching against a peeked job with
-                    // kind == JobKind::Pipe(_)
-                    loop {
-                        if let Some((mut child, ckind)) = commands.next() {
-                            if let Err(e) = unsafe {
-                                crossplat::create_pipe(&mut parent, &mut child, mode)
-                            } {
-                                eprintln!("ion: failed to create pipe for redirection: {:?}", e);
-                            }
-                            spawn_proc!(&mut parent);
-                            remember.push(parent);
-                            if let JobKind::Pipe(m) = ckind {
-                                parent = child;
-                                mode = m;
-                            } else {
-                                spawn_proc!(&mut child);
-                                remember.push(child);
-                                break
-                            }
+                    // Append other jobs until all piped jobs are running
+                    while let Some((mut child, ckind)) = commands.next() {
+                        if let Err(e) = unsafe {
+                            crossplat::create_pipe(&mut parent, &mut child, mode)
+                        } {
+                            eprintln!("ion: failed to create pipe for redirection: {:?}", e);
+                        }
+                        spawn_proc!(&mut parent);
+                        remember.push(parent);
+                        if let JobKind::Pipe(m) = ckind {
+                            parent = child;
+                            mode = m;
                         } else {
-                            eprintln!("ion: expected command to pipe output of `{:?}` into", parent);
+                            // We set the kind to the last child kind that was processed. For
+                            // example, the pipeline `foo | bar | baz && zardoz` should have the
+                            // previous kind set to `And` after processing the initial pipeline
+                            kind = ckind;
+                            spawn_proc!(&mut child);
+                            remember.push(child);
+                            break
                         }
                     }
 
