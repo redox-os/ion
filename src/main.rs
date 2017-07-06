@@ -17,7 +17,6 @@ extern crate smallstring;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate futures;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate libc;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate nix;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate os_pipe;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate tokio_core;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate tokio_signal;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate users as users_unix;
