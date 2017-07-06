@@ -39,6 +39,9 @@ mod xp {
             RedirectFrom::Both => {
                 let temp_file = File::from_raw_fd(writer);
                 let clone = temp_file.try_clone()?;  // No short-circuit here!
+                // We want to make sure that the temp file we created no longer has ownership
+                // over the raw file descriptor otherwise it gets closed
+                temp_file.into_raw_fd();
                 parent.stdout(Stdio::from_raw_fd(writer));
                 parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
             }
@@ -89,6 +92,9 @@ mod xp {
             RedirectFrom::Both => {
                 let temp_file = File::from_raw_fd(writer);
                 let clone = temp_file.try_clone()?;
+                // We want to make sure that the temp file we created no longer has ownership
+                // over the raw file descriptor otherwise it gets closed
+                temp_file.into_raw_fd();
                 parent.stdout(Stdio::from_raw_fd(writer));
                 parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
             }
@@ -237,15 +243,17 @@ fn pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
 
                     macro_rules! spawn_proc {
                         ($cmd:expr) => {{
-                            let child = $cmd.spawn().ok();
+                            let child = $cmd.spawn();
                             match child {
-                                Some(child) => {
+                                Ok(child) => {
                                     shell.foreground.push(child.id());
                                     children.push(Some(child))
                                 },
-                                None => {
+                                Err(e) => {
                                     children.push(None);
-                                    eprintln!("ion: command not found: {}", get_command_name($cmd));
+                                    eprintln!("ion: failed to spawn `{}`: {}",
+                                              get_command_name($cmd),
+                                              e);
                                 }
                             }
                         }};
