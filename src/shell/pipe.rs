@@ -54,11 +54,11 @@ mod xp {
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::fs::File;
     use parser::peg::{RedirectFrom};
-    use syscall::{call, flag, Error};
+    use syscall::{call, flag};
 
     pub unsafe fn handle_piping(parent: &mut Command,
                                 child: &mut Command,
-                                mode: RedirectFrom) -> Result<(), Error>
+                                mode: RedirectFrom) -> Result<(), String>
     {
         // Currently this is "unimplemented" in redox
         let mut fds: [usize; 2] = [0; 2];
