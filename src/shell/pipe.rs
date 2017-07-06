@@ -17,35 +17,12 @@ use parser::peg::{Pipeline, RedirectFrom};
 /// The `xp` module contains components that are meant to be abstracted across different platforms
 #[cfg(not(target_os = "redox"))]
 mod xp {
-    // use os_pipe::{pipe, IntoStdio};
     use std::process::{Stdio, Command};
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::io::Error;
     use nix::{fcntl, unistd};
     use std::fs::File;
     use parser::peg::{RedirectFrom};
-
-    // pub unsafe fn handle_piping(parent: &mut Command,
-    //                             child: &mut Command,
-    //                             mode: RedirectFrom) -> Result<(), Error>
-    // {
-    //     let (reader, writer) = pipe()?;
-    //     match mode {
-    //         RedirectFrom::Stdout => {
-    //             parent.stdout(writer.into_stdio());
-    //         },
-    //         RedirectFrom::Stderr => {
-    //             parent.stderr(writer.into_stdio());
-    //         },
-    //         RedirectFrom::Both => {
-    //             let writer_clone = writer.try_clone()?;
-    //             parent.stdout(writer.into_stdio());
-    //             parent.stderr(writer_clone.into_stdio());
-    //         }
-    //     }
-    //     child.stdin(reader.into_stdio());
-    //     Ok(())
-    // }
 
     pub unsafe fn handle_piping(parent: &mut Command,
                                 child: &mut Command,
@@ -76,8 +53,6 @@ mod xp {
     use std::io::Error;
     use redox_syscall::{call, flag};
 
-    pub struct Handle;
-
     pub unsafe fn handle_piping(parent: &mut Command,
                                 child: &mut Command,
                                 mode: RedirectFrom) -> Result<(), Error>
@@ -95,7 +70,7 @@ mod xp {
             },
             RedirectFrom::Both => {
                 let temp_file = File::from_raw_fd(writer);
-                let clone = temp_file.try_clone()?;  // No short-circuit here!
+                let clone = temp_file.try_clone()?;
                 parent.stdout(Stdio::from_raw_fd(writer));
                 parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
             }
