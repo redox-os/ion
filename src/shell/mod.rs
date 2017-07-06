@@ -365,12 +365,19 @@ impl<'a> Shell<'a> {
     /// Evaluates the source init file in the user's home directory.
     pub fn evaluate_init_file(&mut self) {
         match app_root(AppDataType::UserConfig, &AppInfo{ name: "ion", author: "Redox OS Developers" }) {
-            Ok(mut source_file) => {
-                source_file.push("initrc");
-                self.execute_script(&source_file);
+            Ok(mut initrc) => {
+                initrc.push("initrc");
+                if initrc.exists() {
+                    self.execute_script(&initrc);
+                } else {
+                    eprintln!("ion: creating initrc file at {:?}", initrc);
+                    if let Err(why) = File::create(initrc) {
+                        eprintln!("ion: could not create initrc file: {}", why);
+                    }
+                }
             },
-            Err(_) => { // The error returned could be used for a possibly more descriptive error
-                eprintln!("ion: could not get home directory");
+            Err(why) => {
+                eprintln!("ion: unable to get config root: {}", why);
             }
         }
     }

@@ -37,6 +37,8 @@ use shell::Shell;
 #[cfg(all(unix, not(target_os = "redox")))] use futures::{Future, Stream};
 #[cfg(all(unix, not(target_os = "redox")))] use tokio_signal::unix::{self as unix_signal, Signal};
 
+use std::path::Path;
+use std::fs::File;
 use std::sync::mpsc;
 use std::thread;
 
@@ -46,7 +48,14 @@ fn inner_main(sigint_rx : mpsc::Receiver<i32>) {
    shell.evaluate_init_file();
 
    if "1" == shell.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {
-       shell.context.history.set_file_name(shell.variables.get_var("HISTORY_FILE"));
+       let path = shell.variables.get_var("HISTORY_FILE").expect("shell didn't set history_file");
+       shell.context.history.set_file_name(Some(path.clone()));
+       if !Path::new(path.as_str()).exists() {
+           eprintln!("ion: creating history file at \"{}\"", path);
+           if let Err(why) = File::create(path) {
+               eprintln!("ion: could not create history file: {}", why);
+           }
+       }
        match shell.context.history.load_history() {
            Ok(()) => {
                // pass
