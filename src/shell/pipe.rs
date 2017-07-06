@@ -14,19 +14,20 @@ use super::{JobKind, Shell};
 use super::status::*;
 use parser::peg::{Pipeline, RedirectFrom};
 
-/// The `xp` module contains components that are meant to be abstracted across different platforms
+/// The `crossplat` module contains components that are meant to be abstracted across
+/// different platforms
 #[cfg(not(target_os = "redox"))]
-mod xp {
-    use std::process::{Stdio, Command};
-    use std::os::unix::io::{IntoRawFd, FromRawFd};
-    use std::io::Error;
-    use std::fs::File;
-    use parser::peg::{RedirectFrom};
+mod crossplat {
     use nix::{fcntl, unistd};
+    use parser::peg::{RedirectFrom};
+    use std::fs::File;
+    use std::io::Error;
+    use std::os::unix::io::{IntoRawFd, FromRawFd};
+    use std::process::{Stdio, Command};
 
-    pub unsafe fn handle_piping(parent: &mut Command,
-                                child: &mut Command,
-                                mode: RedirectFrom) -> Result<(), Error>
+    pub unsafe fn create_pipe(parent: &mut Command,
+                              child: &mut Command,
+                              mode: RedirectFrom) -> Result<(), Error>
     {
         let (reader, writer) = unistd::pipe2(fcntl::O_CLOEXEC)?;
         match mode {
@@ -38,7 +39,7 @@ mod xp {
             },
             RedirectFrom::Both => {
                 let temp_file = File::from_raw_fd(writer);
-                let clone = temp_file.try_clone()?;  // No short-circuit here!
+                let clone = temp_file.try_clone()?;
                 // We want to make sure that the temp file we created no longer has ownership
                 // over the raw file descriptor otherwise it gets closed
                 temp_file.into_raw_fd();
@@ -52,7 +53,7 @@ mod xp {
 }
 
 #[cfg(target_os = "redox")]
-mod xp {
+mod crossplat {
     use parser::peg::{RedirectFrom};
     use std::fs::File;
     use std::io;
@@ -74,9 +75,9 @@ mod xp {
         fn from(data: syscall::Error) -> Error { Error::Sys(data) }
     }
 
-    pub unsafe fn handle_piping(parent: &mut Command,
-                                child: &mut Command,
-                                mode: RedirectFrom) -> Result<(), Error>
+    pub unsafe fn create_pipe(parent: &mut Command,
+                              child: &mut Command,
+                              mode: RedirectFrom) -> Result<(), Error>
     {
         // Currently this is "unimplemented" in redox
         let mut fds: [usize; 2] = [0; 2];
@@ -235,9 +236,9 @@ fn pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
                 JobKind::Pipe(mut mode) => {
 
                     // We need to remember the commands as they own the file descriptors that are
-                    // created by xp::handle_piping. We purposfully drop the pipes that are owned
-                    // by a given command in `wait` in order to close those pipes, sending EOF to
-                    // the next command
+                    // created by crossplat::create_pipe. We purposfully drop the pipes that are
+                    // owned by a given command in `wait` in order to close those pipes, sending
+                    // EOF to the next command
                     let mut remember = Vec::new();
                     let mut children: Vec<Option<Child>> = Vec::new();
 
@@ -264,7 +265,9 @@ fn pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
                     // kind == JobKind::Pipe(_)
                     loop {
                         if let Some((mut child, ckind)) = commands.next() {
-                            if let Err(e) = unsafe { xp::handle_piping(&mut parent, &mut child, mode)} {
+                            if let Err(e) = unsafe {
+                                crossplat::create_pipe(&mut parent, &mut child, mode)
+                            } {
                                 eprintln!("ion: failed to create pipe for redirection: {:?}", e);
                             }
                             spawn_proc!(&mut parent);
