@@ -50,12 +50,12 @@ mod xp {
 
 #[cfg(target_os = "redox")]
 mod xp {
-    use std::process::{Stdio, Command};
-    use std::os::unix::io::{IntoRawFd, FromRawFd};
+    use parser::peg::{RedirectFrom};
     use std::fs::File;
     use std::io;
-    use parser::peg::{RedirectFrom};
-    use syscall::{call, flag};
+    use std::os::unix::io::{IntoRawFd, FromRawFd};
+    use std::process::{Stdio, Command};
+    use syscall;
 
     #[derive(Debug)]
     pub enum Error {
@@ -77,7 +77,7 @@ mod xp {
     {
         // Currently this is "unimplemented" in redox
         let mut fds: [usize; 2] = [0; 2];
-        call::pipe2(&mut fds, flag::O_CLOEXEC)?;
+        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)?;
         let (reader, writer) = (fds[0], fds[1]);
         match mode {
             RedirectFrom::Stdout => {
