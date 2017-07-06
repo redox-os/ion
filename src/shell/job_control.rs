@@ -36,7 +36,7 @@ impl fmt::Display for ProcessState {
 }
 
 #[cfg(target_os = "redox")]
-pub fn watch_pid(processes: Arc<Mutex<Vec<BackgroundProcess>>>, pid: u32) {
+pub fn watch_pid(processes: Arc<Mutex<Vec<BackgroundProcess>>>, pid: u32, njob: usize) {
     // TODO: Implement this using syscall::call::waitpid
 }
 
@@ -194,10 +194,16 @@ impl<'a> JobControl for Shell<'a> {
 
     /// If a SIGTERM is received, a SIGTERM will be sent to all background processes
     /// before the shell terminates itself.
+    #[cfg(all(unix, not(target_os = "redox")))]
     fn handle_signal(&self, signal: i32) {
         if signal == libc::SIGTERM {
             self.background_send(libc::SIGTERM);
             process::exit(TERMINATED);
         }
+    }
+
+    #[cfg(target_os = "redox")]
+    fn handle_signal(&self, _: i32) {
+        // TODO: Redox doesn't support signals yet;
     }
 }

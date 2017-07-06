@@ -1,7 +1,7 @@
 #[cfg(all(unix, not(target_os = "redox")))] use libc;
 #[cfg(all(unix, not(target_os = "redox")))] use nix::unistd::{fork, ForkResult};
 #[cfg(all(unix, not(target_os = "redox")))] use nix::Error as NixError;
-#[cfg(target_os = "redox")] use std::error::Error;
+#[cfg(target_os = "redox")] use syscall;
 use std::io::{self, Write};
 use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
@@ -86,10 +86,12 @@ enum Fork {
 }
 
 #[cfg(target_os = "redox")]
-fn ion_fork() -> Result<Fork, Error> {
-    use redox_syscall::call::clone;
+fn ion_fork() -> syscall::error::Result<Fork> {
+    use syscall::call::clone;
     unsafe {
-        clone(0).map(|pid| if pid == 0 { Fork::Child } else { Fork::Parent(pid as u32)})?
+        syscall::call::clone(0).map(|pid| {
+             if pid == 0 { Fork::Child } else { Fork::Parent(pid as u32) }
+        })
     }
 }
 
@@ -213,7 +215,7 @@ fn pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
                 }
                 previous_status = wait(shell, &mut children);
                 if previous_status == TERMINATED {
-                    shell.foreground_send(libc::SIGTERM);
+                    terminate_fg(shell);
                     return previous_status;
                 }
             }
@@ -225,6 +227,27 @@ fn pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
     }
 
     previous_status
+}
+
+#[cfg(all(unix, not(target_os = "redox")))]
+fn terminate_fg(shell: &mut Shell) {
+    shell.foreground_send(libc::SIGTERM);
+}
+
+#[cfg(target_os = "redox")]
+fn terminate_fg(shell: &mut Shell) {
+    // TODO: Redox does not support signals
+}
+
+#[cfg(all(unix, not(target_os = "redox")))]
+fn is_sigtstp(signal: i32) -> bool {
+    signal == libc::SIGTSTP
+}
+
+#[cfg(target_os = "redox")]
+fn is_sigtstp(_: i32) -> bool {
+    // TODO: Redox does not support signals
+    false
 }
 
 fn execute_command(shell: &mut Shell, command: &mut Command) -> i32 {
@@ -254,7 +277,7 @@ fn wait_on_child(shell: &mut Shell, mut child: Child) -> i32 {
             },
             Ok(None) => {
                 if let Ok(signal) = shell.signals.try_recv() {
-                    if signal == libc::SIGTSTP {
+                    if is_sigtstp(signal) {
                         shell.received_sigtstp = true;
                         let pid = child.id();
                         shell.suspend(pid);
@@ -301,7 +324,7 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                     },
                     Ok(None) => {
                         if let Ok(signal) = shell.signals.try_recv() {
-                            if signal == libc::SIGTSTP {
+                            if is_sigtstp(signal) {
                                 shell.received_sigtstp = true;
                                 let pid = child.id();
                                 shell.suspend(pid);
@@ -343,7 +366,7 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
                 },
                 Ok(None) => {
                     if let Ok(signal) = shell.signals.try_recv() {
-                        if signal == libc::SIGTSTP {
+                        if is_sigtstp(signal) {
                             shell.received_sigtstp = true;
                             let pid = child.id();
                             shell.suspend(pid);
