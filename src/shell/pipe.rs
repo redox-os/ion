@@ -57,13 +57,14 @@ mod xp {
     use parser::peg::{RedirectFrom};
     use syscall::{call, flag};
 
+    #[derive(Debug)]
     pub enum Error {
-        IO(io::Error),
+        Io(io::Error),
         Sys(syscall::Error)
     }
 
     impl From<io::Error> for Error {
-        fn from(data: io::Error) -> Error { Error::IO(data) }
+        fn from(data: io::Error) -> Error { Error::Io(data) }
     }
 
     impl From<syscall::Error> for Error {
