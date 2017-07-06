@@ -53,12 +53,26 @@ mod xp {
     use std::process::{Stdio, Command};
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::fs::File;
+    use std::io;
     use parser::peg::{RedirectFrom};
     use syscall::{call, flag};
 
+    pub enum Error {
+        IO(io::Error),
+        Sys(syscall::Error)
+    }
+
+    impl From<io::Error> for Error {
+        fn from(data: io::Error) -> Error { Error::IO(data) }
+    }
+
+    impl From<syscall::Error> for Error {
+        fn from(data: syscall::Error) -> Error { Error::Sys(data) }
+    }
+
     pub unsafe fn handle_piping(parent: &mut Command,
                                 child: &mut Command,
-                                mode: RedirectFrom) -> Result<(), String>
+                                mode: RedirectFrom) -> Result<(), Error>
     {
         // Currently this is "unimplemented" in redox
         let mut fds: [usize; 2] = [0; 2];
