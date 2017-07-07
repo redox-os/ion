@@ -4,7 +4,7 @@
 #[cfg(target_os = "redox")] use syscall;
 use std::io::{self, Write};
 use std::process::{Stdio, Command, Child};
-use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
+use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::fs::{File, OpenOptions};
 use std::process::exit;
 use std::thread;
@@ -13,6 +13,102 @@ use super::job_control::{JobControl, ProcessState};
 use super::{JobKind, Shell};
 use super::status::*;
 use parser::peg::{Pipeline, RedirectFrom};
+
+/// The `crossplat` module contains components that are meant to be abstracted across
+/// different platforms
+#[cfg(not(target_os = "redox"))]
+mod crossplat {
+    use nix::{fcntl, unistd};
+    use parser::peg::{RedirectFrom};
+    use std::fs::File;
+    use std::io::Error;
+    use std::os::unix::io::{IntoRawFd, FromRawFd};
+    use std::process::{Stdio, Command};
+
+    /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
+    /// The content that is sent depends on `mode`
+    pub unsafe fn create_pipe(parent: &mut Command,
+                              child: &mut Command,
+                              mode: RedirectFrom) -> Result<(), Error>
+    {
+        let (reader, writer) = unistd::pipe2(fcntl::O_CLOEXEC)?;
+        match mode {
+            RedirectFrom::Stdout => {
+                parent.stdout(Stdio::from_raw_fd(writer));
+            },
+            RedirectFrom::Stderr => {
+                parent.stderr(Stdio::from_raw_fd(writer));
+            },
+            RedirectFrom::Both => {
+                let temp_file = File::from_raw_fd(writer);
+                let clone = temp_file.try_clone()?;
+                // We want to make sure that the temp file we created no longer has ownership
+                // over the raw file descriptor otherwise it gets closed
+                temp_file.into_raw_fd();
+                parent.stdout(Stdio::from_raw_fd(writer));
+                parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
+            }
+        }
+        child.stdin(Stdio::from_raw_fd(reader));
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "redox")]
+mod crossplat {
+    use parser::peg::{RedirectFrom};
+    use std::fs::File;
+    use std::io;
+    use std::os::unix::io::{IntoRawFd, FromRawFd};
+    use std::process::{Stdio, Command};
+    use syscall;
+
+    #[derive(Debug)]
+    pub enum Error {
+        Io(io::Error),
+        Sys(syscall::Error)
+    }
+
+    impl From<io::Error> for Error {
+        fn from(data: io::Error) -> Error { Error::Io(data) }
+    }
+
+    impl From<syscall::Error> for Error {
+        fn from(data: syscall::Error) -> Error { Error::Sys(data) }
+    }
+
+    /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
+    /// The content that is sent depends on `mode`
+    pub unsafe fn create_pipe(parent: &mut Command,
+                              child: &mut Command,
+                              mode: RedirectFrom) -> Result<(), Error>
+    {
+        // XXX: Zero probably is a bad default for this, but `pipe2` will error if it fails, so
+        // one could reason that it isn't dangerous.
+        let mut fds: [usize; 2] = [0; 2];
+        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)?;
+        let (reader, writer) = (fds[0], fds[1]);
+        match mode {
+            RedirectFrom::Stdout => {
+                parent.stdout(Stdio::from_raw_fd(writer));
+            },
+            RedirectFrom::Stderr => {
+                parent.stderr(Stdio::from_raw_fd(writer));
+            },
+            RedirectFrom::Both => {
+                let temp_file = File::from_raw_fd(writer);
+                let clone = temp_file.try_clone()?;
+                // We want to make sure that the temp file we created no longer has ownership
+                // over the raw file descriptor otherwise it gets closed
+                temp_file.into_raw_fd();
+                parent.stdout(Stdio::from_raw_fd(writer));
+                parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
+            }
+        }
+        child.stdin(Stdio::from_raw_fd(reader));
+        Ok(())
+    }
+}
 
 pub trait PipelineExecution {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32;
@@ -73,9 +169,9 @@ impl<'a> PipelineExecution for Shell<'a> {
 
         self.foreground.clear();
         if piped_commands[piped_commands.len()-1].1 == JobKind::Background {
-            fork_pipe(self, &mut piped_commands)
+            fork_pipe(self, piped_commands)
         } else {
-            pipe(self, &mut piped_commands)
+            pipe(self, piped_commands)
         }
     }
 }
@@ -103,7 +199,7 @@ fn ion_fork() -> Result<Fork, NixError> {
     }
 }
 
-fn fork_pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
+fn fork_pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
     match ion_fork() {
         Ok(Fork::Parent(pid)) => {
             shell.send_child_to_background(pid, ProcessState::Running);
@@ -120,112 +216,94 @@ fn fork_pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
 }
 
 /// This function will panic if called with an empty slice
-fn pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
+fn pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
     let mut previous_status = SUCCESS;
     let mut previous_kind = JobKind::And;
-    let mut commands = commands.iter_mut();
-    while let Some(&mut (ref mut command, kind)) = commands.next() {
-        // When an `&&` or `||` operator is utilized, execute commands based on the previous status.
-        match previous_kind {
-            JobKind::And => if previous_status != SUCCESS {
-                if let JobKind::Or = kind { previous_kind = kind }
-                continue
-            },
-            JobKind::Or => if previous_status == SUCCESS {
-                if let JobKind::And = kind { previous_kind = kind }
-                continue
-            },
-            _ => ()
-        }
+    let mut commands = commands.into_iter();
+    loop {
+        if let Some((mut parent, mut kind)) = commands.next() {
+            // When an `&&` or `||` operator is utilized, execute commands based on the previous status.
+            match previous_kind {
+                JobKind::And => if previous_status != SUCCESS {
+                    if let JobKind::Or = kind { previous_kind = kind }
+                    commands.next();
+                    continue
+                },
+                JobKind::Or => if previous_status == SUCCESS {
+                    if let JobKind::And = kind { previous_kind = kind }
+                    commands.next();
+                    continue
+                },
+                _ => ()
+            }
 
-        match kind {
-            JobKind::Pipe(mut from) => {
-                let mut children: Vec<Option<Child>> = Vec::new();
+            match kind {
+                JobKind::Pipe(mut mode) => {
 
-                // Initialize the first job
-                let _ = match from {
-                    RedirectFrom::Both | RedirectFrom::Stderr => command.stderr(Stdio::piped()), // TODO: Fix this
-                    RedirectFrom::Stdout => command.stdout(Stdio::piped()),
-                };
+                    // We need to remember the commands as they own the file descriptors that are
+                    // created by crossplat::create_pipe. We purposfully drop the pipes that are
+                    // owned by a given command in `wait` in order to close those pipes, sending
+                    // EOF to the next command
+                    let mut remember = Vec::new();
+                    let mut children: Vec<Option<Child>> = Vec::new();
 
-                let child = command.spawn().ok();
-                match child {
-                    Some(child) => {
-                        shell.foreground.push(child.id());
-                        children.push(Some(child))
-                    },
-                    None => {
-                        children.push(None);
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
-                    }
-                }
-
-                // Append other jobs until all piped jobs are running.
-                while let Some(&mut (ref mut command, kind)) = commands.next() {
-                    if let JobKind::Pipe(from) = kind {
-                        let _ = match from {
-                            RedirectFrom::Both | RedirectFrom::Stderr => command.stderr(Stdio::piped()), // TODO: Fix this
-                            RedirectFrom::Stdout => command.stdout(Stdio::piped()),
-                        };
-                    }
-                    if let Some(spawned) = children.last() {
-                        if let Some(ref child) = *spawned {
-                            unsafe {
-                                match from {
-                                    // TODO: Find a way to properly implement this.
-                                    RedirectFrom::Both => if let Some(ref stderr) = child.stderr {
-                                        command.stdin(Stdio::from_raw_fd(stderr.as_raw_fd()));
-                                    },
-                                    RedirectFrom::Stderr => if let Some(ref stderr) = child.stderr {
-                                        command.stdin(Stdio::from_raw_fd(stderr.as_raw_fd()));
-                                    },
-                                    RedirectFrom::Stdout => if let Some(ref stdout) = child.stdout {
-                                        command.stdin(Stdio::from_raw_fd(stdout.as_raw_fd()));
-                                    }
+                    macro_rules! spawn_proc {
+                        ($cmd:expr) => {{
+                            let child = $cmd.spawn();
+                            match child {
+                                Ok(child) => {
+                                    shell.foreground.push(child.id());
+                                    children.push(Some(child))
+                                },
+                                Err(e) => {
+                                    children.push(None);
+                                    eprintln!("ion: failed to spawn `{}`: {}",
+                                              get_command_name($cmd),
+                                              e);
                                 }
                             }
-                        } else {
-                            // The previous command failed to spawn
-                            command.stdin(Stdio::null());
-                        }
+                        }};
                     }
-                    let child = command.spawn().ok();
-                    match child {
-                        Some(child) => {
-                            shell.foreground.push(child.id());
-                            children.push(Some(child));
-                        },
-                        None => {
-                            children.push(None);
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
+
+                    // Append other jobs until all piped jobs are running
+                    while let Some((mut child, ckind)) = commands.next() {
+                        if let Err(e) = unsafe {
+                            crossplat::create_pipe(&mut parent, &mut child, mode)
+                        } {
+                            eprintln!("ion: failed to create pipe for redirection: {:?}", e);
+                        }
+                        spawn_proc!(&mut parent);
+                        remember.push(parent);
+                        if let JobKind::Pipe(m) = ckind {
+                            parent = child;
+                            mode = m;
+                        } else {
+                            // We set the kind to the last child kind that was processed. For
+                            // example, the pipeline `foo | bar | baz && zardoz` should have the
+                            // previous kind set to `And` after processing the initial pipeline
+                            kind = ckind;
+                            spawn_proc!(&mut child);
+                            remember.push(child);
+                            break
                         }
                     }
 
-                    if let JobKind::Pipe(next) = kind {
-                        from = next;
-                        continue
-                    } else {
-                        previous_kind = kind;
-                        break
+                    previous_kind = kind;
+                    previous_status = wait(shell, &mut children, remember);
+                    if previous_status == TERMINATED {
+                        terminate_fg(shell);
+                        return previous_status;
                     }
                 }
-                previous_status = wait(shell, &mut children);
-                if previous_status == TERMINATED {
-                    terminate_fg(shell);
-                    return previous_status;
+                _ => {
+                    previous_status = execute_command(shell, &mut parent);
+                    previous_kind = kind;
                 }
             }
-            _ => {
-                previous_status = execute_command(shell, command);
-                previous_kind = kind;
-            }
+        } else {
+            break
         }
     }
-
     previous_status
 }
 
@@ -306,10 +384,12 @@ fn wait_on_child(shell: &mut Shell, mut child: Child) -> i32 {
 }
 
 /// This function will panic if called with an empty vector
-fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
+fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>, commands: Vec<Command>) -> i32 {
     let end = children.len() - 1;
-    for child in children.drain(..end) {
-        if let Some(mut child) = child {
+    for entry in children.drain(..end).zip(commands.into_iter()) {
+        // _cmd is never used here, but it is important that it gets dropped at the end of this
+        // block in order to write EOF to the pipes that it owns.
+        if let (Some(mut child), _cmd) = entry {
             let status = loop {
                 match child.try_wait() {
                     Ok(Some(status)) => {
