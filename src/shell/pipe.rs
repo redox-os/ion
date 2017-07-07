@@ -219,7 +219,7 @@ fn fork_pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
 fn pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
     let mut previous_status = SUCCESS;
     let mut previous_kind = JobKind::And;
-    let mut commands = commands.into_iter().peekable();
+    let mut commands = commands.into_iter();
     loop {
         if let Some((mut parent, mut kind)) = commands.next() {
             // When an `&&` or `||` operator is utilized, execute commands based on the previous status.
