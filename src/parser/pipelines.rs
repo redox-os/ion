@@ -188,6 +188,10 @@ pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
                                     let _ = args_iter.next();
                                     redir_found!(RedirMode::Stdout(RedirectFrom::Both));
                                 },
+                                Some(&b'|') => {
+                                    let _ = args_iter.next();
+                                    job_found!(RedirectFrom::Both, true);
+                                },
                                 _ => job_found!(RedirectFrom::Stdout, false)
                             }
                         },

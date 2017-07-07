@@ -4,7 +4,7 @@
 #[cfg(target_os = "redox")] use syscall;
 use std::io::{self, Write};
 use std::process::{Stdio, Command, Child};
-use std::os::unix::io::{FromRawFd, AsRawFd, IntoRawFd};
+use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::os::unix::process::CommandExt;
 use std::fs::{File, OpenOptions};
 use std::process::exit;
@@ -13,86 +13,181 @@ use super::{JobKind, Shell};
 use super::status::*;
 use parser::peg::{Pipeline, RedirectFrom};
 
-/// The purpose of the signal handler is to ignore signals when it is active, and then continue
-/// listening to signals once the handler is dropped.
-struct SignalHandler;
+use self::crossplat::*;
 
-impl SignalHandler {
-    #[cfg(all(unix, not(target_os = "redox")))]
-    pub fn new() -> SignalHandler {
-        unsafe { let _ = libc::signal(libc::SIGTTOU, libc::SIG_IGN); }
-        SignalHandler
+/// The `crossplat` module contains components that are meant to be abstracted across
+/// different platforms
+#[cfg(not(target_os = "redox"))]
+mod crossplat {
+    use libc;
+    use nix::{fcntl, unistd};
+    use parser::peg::{RedirectFrom};
+    use std::fs::File;
+    use std::io::Error;
+    use std::os::unix::io::{IntoRawFd, FromRawFd};
+    use std::process::{Stdio, Command};
+
+    /// The purpose of the signal handler is to ignore signals when it is active, and then continue
+    /// listening to signals once the handler is dropped.
+    pub struct SignalHandler;
+
+    impl SignalHandler {
+        pub fn new() -> SignalHandler {
+            unsafe { let _ = libc::signal(libc::SIGTTOU, libc::SIG_IGN); }
+            SignalHandler
+        }
     }
 
-    #[cfg(target_os = "redox")]
-    pub fn new() -> SignalHandler {
+    impl Drop for SignalHandler {
+        fn drop(&mut self) {
+            unsafe { let _ = libc::signal(libc::SIGTTOU, libc::SIG_DFL); }
+        }
+    }
+
+    pub fn unmask_sigtstp() {
+        unsafe {
+            use libc::{sigset_t, SIG_UNBLOCK, SIGTSTP, sigemptyset, sigaddset, sigprocmask};
+            use std::mem;
+            use std::ptr;
+            let mut sigset = mem::uninitialized::<sigset_t>();
+            sigemptyset(&mut sigset as *mut sigset_t);
+            sigaddset(&mut sigset as *mut sigset_t, SIGTSTP);
+            sigprocmask(SIG_UNBLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
+        }
+    }
+
+    /// When given a process ID, that process will be assigned to a new process group.
+    pub fn create_process_group() {
+        let _ = unistd::setpgid(0, 0);
+    }
+
+    /// When given a process ID, that process's group will be assigned as the foreground process group.
+    pub fn set_foreground(pid: u32) {
+        let _ = unistd::tcsetpgrp(0, pid as i32);
+        let _ = unistd::tcsetpgrp(1, pid as i32);
+        let _ = unistd::tcsetpgrp(2, pid as i32);
+    }
+
+    pub fn get_pid() -> u32 {
+        unistd::getpid() as u32
+    }
+
+    /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
+    /// The content that is sent depends on `mode`
+    pub unsafe fn create_pipe(parent: &mut Command,
+                              child: &mut Command,
+                              mode: RedirectFrom) -> Result<(), Error>
+    {
+        let (reader, writer) = unistd::pipe2(fcntl::O_CLOEXEC)?;
+        match mode {
+            RedirectFrom::Stdout => {
+                parent.stdout(Stdio::from_raw_fd(writer));
+            },
+            RedirectFrom::Stderr => {
+                parent.stderr(Stdio::from_raw_fd(writer));
+            },
+            RedirectFrom::Both => {
+                let temp_file = File::from_raw_fd(writer);
+                let clone = temp_file.try_clone()?;
+                // We want to make sure that the temp file we created no longer has ownership
+                // over the raw file descriptor otherwise it gets closed
+                temp_file.into_raw_fd();
+                parent.stdout(Stdio::from_raw_fd(writer));
+                parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
+            }
+        }
+        child.stdin(Stdio::from_raw_fd(reader));
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "redox")]
+mod crossplat {
+    use parser::peg::{RedirectFrom};
+    use std::fs::File;
+    use std::io;
+    use std::os::unix::io::{IntoRawFd, FromRawFd};
+    use std::process::{Stdio, Command};
+    use syscall;
+
+    /// The purpose of the signal handler is to ignore signals when it is active, and then continue
+    /// listening to signals once the handler is dropped.
+    pub struct SignalHandler;
+
+    impl SignalHandler {
+        pub fn new() -> SignalHandler {
+            // TODO
+            SignalHandler
+        }
+    }
+
+    impl Drop for SignalHandler {
+        fn drop(&mut self) {
+            // TODO
+        }
+    }
+
+    pub fn unmask_sigtstp() {
         // TODO
-        SignalHandler
-    }
-}
-
-impl Drop for SignalHandler {
-    #[cfg(all(unix, not(target_os = "redox")))]
-    fn drop(&mut self) {
-        unsafe { let _ = libc::signal(libc::SIGTTOU, libc::SIG_DFL); }
     }
 
-    #[cfg(target_os = "redox")]
-    fn drop(&mut self) {
+    pub fn create_process_group() {
         // TODO
     }
-}
 
-#[cfg(all(unix, not(target_os = "redox")))]
-fn unmask_sigtstp() {
-    unsafe {
-        use libc::{sigset_t, SIG_UNBLOCK, SIGTSTP, sigemptyset, sigaddset, sigprocmask};
-        use std::mem;
-        use std::ptr;
-        let mut sigset = mem::uninitialized::<sigset_t>();
-        sigemptyset(&mut sigset as *mut sigset_t);
-        sigaddset(&mut sigset as *mut sigset_t, SIGTSTP);
-        sigprocmask(SIG_UNBLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
+    pub fn set_foreground(pid: u32) {
+        // TODO
     }
-}
 
-#[cfg(target_os = "redox")]
-fn unmask_sigtstp() {
-    // TODO
-}
+    pub fn get_pid() -> u32 {
+        // TODO
+    }
 
-#[cfg(all(unix, not(target_os = "redox")))]
-/// When given a process ID, that process will be assigned to a new process group.
-fn create_process_group() {
-    let _ = unistd::setpgid(0, 0);
-}
+    #[derive(Debug)]
+    pub enum Error {
+        Io(io::Error),
+        Sys(syscall::Error)
+    }
 
-#[cfg(target_os = "redox")]
-fn create_process_group() {
-    // TODO
-}
+    impl From<io::Error> for Error {
+        fn from(data: io::Error) -> Error { Error::Io(data) }
+    }
 
-#[cfg(all(unix, not(target_os = "redox")))]
-/// When given a process ID, that process's group will be assigned as the foreground process group.
-pub fn set_foreground(pid: u32) {
-    let _ = unistd::tcsetpgrp(0, pid as i32);
-    let _ = unistd::tcsetpgrp(1, pid as i32);
-    let _ = unistd::tcsetpgrp(2, pid as i32);
-}
+    impl From<syscall::Error> for Error {
+        fn from(data: syscall::Error) -> Error { Error::Sys(data) }
+    }
 
-#[cfg(target_os = "redox")]
-pub fn set_foreground(pid: u32) {
-    // TODO
-}
-
-#[cfg(all(unix, not(target_os = "redox")))]
-fn get_pid() -> u32 {
-    unistd::getpid() as u32
-}
-
-#[cfg(target_os = "redox")]
-fn get_pid() -> u32 {
-    // TODO
+    /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
+    /// The content that is sent depends on `mode`
+    pub unsafe fn create_pipe(parent: &mut Command,
+                              child: &mut Command,
+                              mode: RedirectFrom) -> Result<(), Error>
+    {
+        // XXX: Zero probably is a bad default for this, but `pipe2` will error if it fails, so
+        // one could reason that it isn't dangerous.
+        let mut fds: [usize; 2] = [0; 2];
+        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)?;
+        let (reader, writer) = (fds[0], fds[1]);
+        match mode {
+            RedirectFrom::Stdout => {
+                parent.stdout(Stdio::from_raw_fd(writer));
+            },
+            RedirectFrom::Stderr => {
+                parent.stderr(Stdio::from_raw_fd(writer));
+            },
+            RedirectFrom::Both => {
+                let temp_file = File::from_raw_fd(writer);
+                let clone = temp_file.try_clone()?;
+                // We want to make sure that the temp file we created no longer has ownership
+                // over the raw file descriptor otherwise it gets closed
+                temp_file.into_raw_fd();
+                parent.stdout(Stdio::from_raw_fd(writer));
+                parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
+            }
+        }
+        child.stdin(Stdio::from_raw_fd(reader));
+        Ok(())
+    }
 }
 
 pub trait PipelineExecution {
@@ -155,16 +250,14 @@ impl<'a> PipelineExecution for Shell<'a> {
         self.foreground.clear();
         // If the given pipeline is a background task, fork the shell.
         if piped_commands[piped_commands.len()-1].1 == JobKind::Background {
-            fork_pipe(self, &mut piped_commands)
+            fork_pipe(self, piped_commands)
         } else {
             // While active, the SIGTTOU signal will be ignored.
-            let sig_ignore = SignalHandler::new();
+            let _sig_ignore = SignalHandler::new();
             // Execute each command in the pipeline, giving each command the foreground.
-            let exit_status = pipe(self, &mut piped_commands, true);
+            let exit_status = pipe(self, piped_commands, true);
             // Set the shell as the foreground process again to regain the TTY.
             set_foreground(get_pid());
-            // Dropping this will un-ignore the SIGTTOU signal.
-            drop(sig_ignore);
             exit_status
         }
     }
@@ -193,7 +286,7 @@ fn ion_fork() -> Result<Fork, NixError> {
     }
 }
 
-fn fork_pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
+fn fork_pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
     match ion_fork() {
         Ok(Fork::Parent(pid)) => {
             shell.send_to_background(pid, ProcessState::Running);
@@ -212,122 +305,103 @@ fn fork_pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)]) -> i32 {
 }
 
 /// This function will panic if called with an empty slice
-fn pipe(shell: &mut Shell, commands: &mut [(Command, JobKind)], foreground: bool) -> i32 {
+fn pipe (
+    shell: &mut Shell,
+    commands: Vec<(Command, JobKind)>,
+    foreground: bool
+) -> i32 {
     let mut previous_status = SUCCESS;
     let mut previous_kind = JobKind::And;
-    let mut commands = commands.iter_mut();
-    while let Some(&mut (ref mut command, kind)) = commands.next() {
-        // When an `&&` or `||` operator is utilized, execute commands based on the previous status.
-        match previous_kind {
-            JobKind::And => if previous_status != SUCCESS {
-                if let JobKind::Or = kind { previous_kind = kind }
-                continue
-            },
-            JobKind::Or => if previous_status == SUCCESS {
-                if let JobKind::And = kind { previous_kind = kind }
-                continue
-            },
-            _ => ()
-        }
+    let mut commands = commands.into_iter();
+    loop {
+        if let Some((mut parent, mut kind)) = commands.next() {
+            // When an `&&` or `||` operator is utilized, execute commands based on the previous status.
+            match previous_kind {
+                JobKind::And => if previous_status != SUCCESS {
+                    if let JobKind::Or = kind { previous_kind = kind }
+                    commands.next();
+                    continue
+                },
+                JobKind::Or => if previous_status == SUCCESS {
+                    if let JobKind::And = kind { previous_kind = kind }
+                    commands.next();
+                    continue
+                },
+                _ => ()
+            }
 
-        match kind {
-            JobKind::Pipe(mut from) => {
-                let mut children: Vec<Option<Child>> = Vec::new();
+            match kind {
+                JobKind::Pipe(mut mode) => {
 
-                // Initialize the first job
-                let _ = match from {
-                    RedirectFrom::Both | RedirectFrom::Stderr => command.stderr(Stdio::piped()), // TODO: Fix this
-                    RedirectFrom::Stdout => command.stdout(Stdio::piped()),
-                };
+                    // We need to remember the commands as they own the file descriptors that are
+                    // created by crossplat::create_pipe. We purposfully drop the pipes that are
+                    // owned by a given command in `wait` in order to close those pipes, sending
+                    // EOF to the next command
+                    let mut remember = Vec::new();
+                    let mut children: Vec<Option<Child>> = Vec::new();
 
-                let child = command.before_exec(move || {
-                    unmask_sigtstp();
-                    create_process_group();
-                    Ok(())
-                }).spawn().ok();
-                match child {
-                    Some(child) => {
-                        if foreground { set_foreground(child.id()); }
-                        shell.foreground.push(child.id());
-                        children.push(Some(child))
-                    },
-                    None => {
-                        children.push(None);
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
-                    }
-                }
-
-                // Append other jobs until all piped jobs are running.
-                while let Some(&mut (ref mut command, kind)) = commands.next() {
-                    if let JobKind::Pipe(from) = kind {
-                        let _ = match from {
-                            RedirectFrom::Both | RedirectFrom::Stderr => command.stderr(Stdio::piped()), // TODO: Fix this
-                            RedirectFrom::Stdout => command.stdout(Stdio::piped()),
-                        };
-                    }
-                    if let Some(spawned) = children.last() {
-                        if let Some(ref child) = *spawned {
-                            unsafe {
-                                match from {
-                                    // TODO: Find a way to properly implement this.
-                                    RedirectFrom::Both => if let Some(ref stderr) = child.stderr {
-                                        command.stdin(Stdio::from_raw_fd(stderr.as_raw_fd()));
-                                    },
-                                    RedirectFrom::Stderr => if let Some(ref stderr) = child.stderr {
-                                        command.stdin(Stdio::from_raw_fd(stderr.as_raw_fd()));
-                                    },
-                                    RedirectFrom::Stdout => if let Some(ref stdout) = child.stdout {
-                                        command.stdin(Stdio::from_raw_fd(stdout.as_raw_fd()));
-                                    }
+                    macro_rules! spawn_proc {
+                        ($cmd:expr) => {{
+                            let child = $cmd.before_exec(move || {
+                                unmask_sigtstp();
+                                create_process_group();
+                                Ok(())
+                            }).spawn();
+                            match child {
+                                Ok(child) => {
+                                    if foreground { set_foreground(child.id()); }
+                                    shell.foreground.push(child.id());
+                                    children.push(Some(child))
+                                },
+                                Err(e) => {
+                                    children.push(None);
+                                    eprintln!("ion: failed to spawn `{}`: {}",
+                                              get_command_name($cmd),
+                                              e);
                                 }
                             }
-                        } else {
-                            // The previous command failed to spawn
-                            command.stdin(Stdio::null());
-                        }
+                        }};
                     }
-                    let child = command.before_exec(move || {
-                        unmask_sigtstp();
-                        create_process_group();
-                        Ok(())
-                    }).spawn().ok();
-                    match child {
-                        Some(child) => {
-                            if foreground { set_foreground(child.id()); }
-                            shell.foreground.push(child.id());
-                            children.push(Some(child));
-                        },
-                        None => {
-                            children.push(None);
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
+
+                    // Append other jobs until all piped jobs are running
+                    while let Some((mut child, ckind)) = commands.next() {
+                        if let Err(e) = unsafe {
+                            crossplat::create_pipe(&mut parent, &mut child, mode)
+                        } {
+                            eprintln!("ion: failed to create pipe for redirection: {:?}", e);
+                        }
+                        spawn_proc!(&mut parent);
+                        remember.push(parent);
+                        if let JobKind::Pipe(m) = ckind {
+                            parent = child;
+                            mode = m;
+                        } else {
+                            // We set the kind to the last child kind that was processed. For
+                            // example, the pipeline `foo | bar | baz && zardoz` should have the
+                            // previous kind set to `And` after processing the initial pipeline
+                            kind = ckind;
+                            spawn_proc!(&mut child);
+                            remember.push(child);
+                            break
                         }
                     }
 
-                    if let JobKind::Pipe(next) = kind {
-                        from = next;
-                        continue
-                    } else {
-                        previous_kind = kind;
-                        break
+                    previous_kind = kind;
+                    previous_status = wait(shell, &mut children, remember);
+                    if previous_status == TERMINATED {
+                        terminate_fg(shell);
+                        return previous_status;
                     }
                 }
-                previous_status = wait(shell, &mut children);
-                if previous_status == TERMINATED {
-                    terminate_fg(shell);
-                    return previous_status;
+                _ => {
+                    previous_status = execute_command(shell, &mut parent, foreground);
+                    previous_kind = kind;
                 }
             }
-            _ => {
-                previous_status = execute_command(shell, command, foreground);
-                previous_kind = kind;
-            }
+        } else {
+            break
         }
     }
-
     previous_status
 }
 
@@ -363,10 +437,12 @@ fn wait_on_child(shell: &mut Shell, child: Child, foreground: bool) -> i32 {
 }
 
 /// This function will panic if called with an empty vector
-fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>) -> i32 {
+fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>, commands: Vec<Command>) -> i32 {
     let end = children.len() - 1;
-    for child in children.drain(..end) {
-        if let Some(child) = child {
+    for entry in children.drain(..end).zip(commands.into_iter()) {
+        // _cmd is never used here, but it is important that it gets dropped at the end of this
+        // block in order to write EOF to the pipes that it owns.
+        if let (Some(child), _cmd) = entry {
             let status = shell.watch_foreground(child.id());
             if status == TERMINATED {
                 return status
