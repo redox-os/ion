@@ -9,7 +9,6 @@ use super::status::*;
 use super::Shell;
 
 pub trait JobControl {
-    fn suspend(&mut self, pid: u32);
     fn wait_for_background(&mut self);
     fn handle_signal(&self, signal: i32);
     fn foreground_send(&self, signal: i32);
@@ -122,17 +121,6 @@ pub struct BackgroundProcess {
 }
 
 impl<'a> JobControl for Shell<'a> {
-    #[cfg(all(unix, not(target_os = "redox")))]
-    /// Suspends a given process by it's process ID.
-    fn suspend(&mut self, pid: u32) {
-        let _ = signal::kill(-(pid as pid_t), Some(NixSignal::SIGTSTP));
-    }
-
-    #[cfg(target_os = "redox")]
-    fn suspend(&mut self, _: u32) {
-        // TODO: Redox doesn't support signals yet.
-    }
-
     #[cfg(all(unix, not(target_os = "redox")))]
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.

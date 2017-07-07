@@ -18,6 +18,30 @@ pub fn set_foreground(pid: u32) {
     // TODO
 }
 
+#[cfg(all(unix, not(target_os = "redox")))]
+/// Suspends a given process by it's process ID.
+fn suspend(pid: u32) {
+    let _ = signal::kill(-(pid as pid_t), Some(NixSignal::SIGTSTP));
+}
+
+#[cfg(all(unix, not(target_os = "redox")))]
+/// Resumes a given process by it's process ID.
+fn resume(pid: u32) {
+    let _ = signal::kill(-(pid as pid_t), Some(NixSignal::SIGCONT));
+}
+
+#[cfg(target_os = "redox")]
+fn suspend(pid: u32) {
+    use syscall;
+    let _ = syscall::kill(pid as usize, syscall::SIGSTOP);
+}
+
+#[cfg(target_os = "redox")]
+fn resume(pid: u32) {
+    use syscall;
+    let _ = syscall::kill(pid as usize, syscall::SIGCONT);
+}
+
 /// Display a list of all jobs running in the background.
 pub fn jobs(shell: &mut Shell) {
     let stderr = stderr();
@@ -30,7 +54,6 @@ pub fn jobs(shell: &mut Shell) {
     }
 }
 
-#[cfg(all(unix, not(target_os = "redox")))]
 pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
     let mut status = 0;
     for arg in args {
@@ -52,7 +75,7 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
                     status = shell.watch_foreground(njob)
                 },
                 ProcessState::Stopped => {
-                    let _ = signal::kill(-(job.pid as i32), Some(Signal::SIGCONT));
+                    resume(job.pid);
                     set_foreground(njob);
                     // TODO: This doesn't work
                     status = shell.watch_foreground(njob);
@@ -71,15 +94,6 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
     status
 }
 
-#[cfg(target_os = "redox")]
-pub fn fg(_: &mut Shell, _: &[&str]) -> i32 {
-    let stderr = stderr();
-    // TODO: Redox signal handling support
-    let _ = writeln!(stderr.lock(), "Redox does not yet support signals");
-    0
-}
-
-#[cfg(all(unix, not(target_os = "redox")))]
 pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
     let mut error = false;
     let stderr = stderr();
@@ -93,7 +107,7 @@ pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
                         error = true;
                     },
                     ProcessState::Stopped => {
-                        let _ = signal::kill(-(job.pid as i32), Some(Signal::SIGCONT));
+                        resume(job.pid);
                         job.state = ProcessState::Running;
                         let _ = writeln!(stderr, "[{}] {} Running", njob, job.pid);
                     },
@@ -112,12 +126,4 @@ pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
         }
     }
     if error { FAILURE } else { SUCCESS }
-}
-
-#[cfg(target_os = "redox")]
-pub fn bg(_: &mut Shell, _: &[&str]) -> i32 {
-    let stderr = stderr();
-    // TODO: Redox signal handling support
-    let _ = writeln!(stderr.lock(), "Redox does not yet support signals");
-    0
 }
