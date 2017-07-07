@@ -2,10 +2,21 @@ use shell::Shell;
 use shell::job_control::{JobControl, ProcessState};
 use shell::status::*;
 use std::io::{stderr, Write};
-use std::thread::sleep;
-use std::time::Duration;
 #[cfg(not(target_os = "redox"))] use nix::sys::signal::{self, Signal};
-#[cfg(not(target_os = "redox"))] use libc::{self, pid_t};
+#[cfg(not(target_os = "redox"))] use nix::unistd;
+
+#[cfg(all(unix, not(target_os = "redox")))]
+/// When given a process ID, that process's group will be assigned as the foreground process group.
+pub fn set_foreground(pid: u32) {
+    let _ = unistd::tcsetpgrp(0, pid as i32);
+    let _ = unistd::tcsetpgrp(1, pid as i32);
+    let _ = unistd::tcsetpgrp(2, pid as i32);
+}
+
+#[cfg(target_os = "redox")]
+pub fn set_foreground(pid: u32) {
+    // TODO
+}
 
 /// Display a list of all jobs running in the background.
 pub fn jobs(shell: &mut Shell) {
@@ -19,32 +30,7 @@ pub fn jobs(shell: &mut Shell) {
     }
 }
 
-#[cfg(not(target_os = "redox"))]
-fn fg_listen(shell: &mut Shell, job: u32) {
-    loop {
-        sleep(Duration::from_millis(100));
-        let job = &mut (*shell.background.lock().unwrap())[job as usize];
-        if let ProcessState::Empty = job.state { break }
-        if let Ok(signal) = shell.signals.try_recv() {
-            match signal {
-                libc::SIGTSTP => {
-                    let _ = signal::kill(job.pid as pid_t, Some(Signal::SIGTSTP));
-                    break
-                },
-                libc::SIGTERM => {
-                    shell.handle_signal(libc::SIGTERM);
-                },
-                libc::SIGINT => {
-                    let _ = signal::kill(job.pid as pid_t, Some(Signal::SIGINT));
-                    break
-                },
-                _ => unimplemented!()
-            }
-        }
-    }
-}
-
-#[cfg(not(target_os = "redox"))]
+#[cfg(all(unix, not(target_os = "redox")))]
 pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
     let mut status = 0;
     for arg in args {
@@ -61,13 +47,15 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
 
             match job.state {
                 ProcessState::Running => {
-                    fg_listen(shell, njob);
-                    status = SUCCESS;
+                    set_foreground(njob);
+                    // TODO: This doesn't work
+                    status = shell.watch_foreground(njob)
                 },
                 ProcessState::Stopped => {
-                    let _ = signal::kill(job.pid as pid_t, Some(Signal::SIGCONT));
-                    fg_listen(shell, njob);
-                    status = SUCCESS;
+                    let _ = signal::kill(-(job.pid as i32), Some(Signal::SIGCONT));
+                    set_foreground(njob);
+                    // TODO: This doesn't work
+                    status = shell.watch_foreground(njob);
                 },
                 ProcessState::Empty => {
                     let stderr = stderr();
@@ -91,7 +79,7 @@ pub fn fg(_: &mut Shell, _: &[&str]) -> i32 {
     0
 }
 
-#[cfg(not(target_os = "redox"))]
+#[cfg(all(unix, not(target_os = "redox")))]
 pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
     let mut error = false;
     let stderr = stderr();
@@ -105,8 +93,9 @@ pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
                         error = true;
                     },
                     ProcessState::Stopped => {
-                        let _ = signal::kill(job.pid as pid_t, Some(Signal::SIGCONT));
-                        let _ = writeln!(stderr, "[{}] {} {}", njob, job.pid, job.state);
+                        let _ = signal::kill(-(job.pid as i32), Some(Signal::SIGCONT));
+                        job.state = ProcessState::Running;
+                        let _ = writeln!(stderr, "[{}] {} Running", njob, job.pid);
                     },
                     ProcessState::Empty => {
                         let _ = writeln!(stderr, "ion: bg: job {} does not exist", njob);

@@ -72,7 +72,6 @@ fn inner_main(sigint_rx : mpsc::Receiver<i32>) {
    shell.execute();
 }
 
-
 #[cfg(not(target_os = "redox"))]
 fn main() {
     let (signals_tx, signals_rx) = mpsc::channel();
@@ -82,14 +81,17 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    // Create a stream that will select over SIGINT, SIGTERM and SIGTSTP signals.
-    let signal_stream = Signal::new(unix_signal::SIGINT, &handle).flatten_stream()
-        .select(Signal::new(unix_signal::SIGTERM, &handle).flatten_stream())
-        .select(Signal::new(libc::SIGTSTP, &handle).flatten_stream());
+    // Mask the SIGTSTP signal -- prevents the shell from being stopped
+    // when the foreground group is changed during command execution.
+    mask_sigstp();
+
+    // Create a stream that will select over SIGINT and SIGTERM signals.
+    let signals = Signal::new(unix_signal::SIGINT, &handle).flatten_stream()
+        .select(Signal::new(unix_signal::SIGTERM, &handle).flatten_stream());
 
     // Execute the event loop that will listen for and transmit received
     // signals to the shell.
-    core.run(signal_stream.for_each(|signal| {
+    core.run(signals.for_each(|signal| {
         let _ = signals_tx.send(signal);
         Ok(())
     })).unwrap();
@@ -99,4 +101,22 @@ fn main() {
 fn main() {
     let (_, signals_rx) = mpsc::channel();
     inner_main(signals_rx);
+}
+
+#[cfg(all(unix, not(target_os = "redox")))]
+fn mask_sigstp() {
+    unsafe {
+        use libc::{sigset_t, SIGTSTP, SIG_BLOCK, sigemptyset, sigaddset, sigprocmask};
+        use std::mem;
+        use std::ptr;
+        let mut sigset = mem::uninitialized::<sigset_t>();
+        sigemptyset(&mut sigset as *mut sigset_t);
+        sigaddset(&mut sigset as *mut sigset_t, SIGTSTP);
+        sigprocmask(SIG_BLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
+    }
+}
+
+#[cfg(target_os = "redox")]
+fn mask_sigstp() {
+    // TODO
 }

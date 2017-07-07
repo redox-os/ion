@@ -1,29 +1,76 @@
 #[cfg(all(unix, not(target_os = "redox")))] use libc;
-#[cfg(all(unix, not(target_os = "redox")))] use nix::unistd::{fork, ForkResult};
+#[cfg(all(unix, not(target_os = "redox")))] use nix::unistd::{self, ForkResult};
 #[cfg(all(unix, not(target_os = "redox")))] use nix::Error as NixError;
 #[cfg(target_os = "redox")] use syscall;
 use std::io::{self, Write};
 use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::os::unix::process::CommandExt;
 use std::fs::{File, OpenOptions};
 use std::process::exit;
-use std::thread;
-use std::time::Duration;
 use super::job_control::{JobControl, ProcessState};
 use super::{JobKind, Shell};
 use super::status::*;
 use parser::peg::{Pipeline, RedirectFrom};
 
+use self::crossplat::*;
+
 /// The `crossplat` module contains components that are meant to be abstracted across
 /// different platforms
 #[cfg(not(target_os = "redox"))]
 mod crossplat {
+    use libc;
     use nix::{fcntl, unistd};
     use parser::peg::{RedirectFrom};
     use std::fs::File;
     use std::io::Error;
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::process::{Stdio, Command};
+
+    /// The purpose of the signal handler is to ignore signals when it is active, and then continue
+    /// listening to signals once the handler is dropped.
+    pub struct SignalHandler;
+
+    impl SignalHandler {
+        pub fn new() -> SignalHandler {
+            unsafe { let _ = libc::signal(libc::SIGTTOU, libc::SIG_IGN); }
+            SignalHandler
+        }
+    }
+
+    impl Drop for SignalHandler {
+        fn drop(&mut self) {
+            unsafe { let _ = libc::signal(libc::SIGTTOU, libc::SIG_DFL); }
+        }
+    }
+
+    pub fn unmask_sigtstp() {
+        unsafe {
+            use libc::{sigset_t, SIG_UNBLOCK, SIGTSTP, sigemptyset, sigaddset, sigprocmask};
+            use std::mem;
+            use std::ptr;
+            let mut sigset = mem::uninitialized::<sigset_t>();
+            sigemptyset(&mut sigset as *mut sigset_t);
+            sigaddset(&mut sigset as *mut sigset_t, SIGTSTP);
+            sigprocmask(SIG_UNBLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
+        }
+    }
+
+    /// When given a process ID, that process will be assigned to a new process group.
+    pub fn create_process_group() {
+        let _ = unistd::setpgid(0, 0);
+    }
+
+    /// When given a process ID, that process's group will be assigned as the foreground process group.
+    pub fn set_foreground(pid: u32) {
+        let _ = unistd::tcsetpgrp(0, pid as i32);
+        let _ = unistd::tcsetpgrp(1, pid as i32);
+        let _ = unistd::tcsetpgrp(2, pid as i32);
+    }
+
+    pub fn get_pid() -> u32 {
+        unistd::getpid() as u32
+    }
 
     /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
     /// The content that is sent depends on `mode`
@@ -62,6 +109,39 @@ mod crossplat {
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::process::{Stdio, Command};
     use syscall;
+
+    /// The purpose of the signal handler is to ignore signals when it is active, and then continue
+    /// listening to signals once the handler is dropped.
+    pub struct SignalHandler;
+
+    impl SignalHandler {
+        pub fn new() -> SignalHandler {
+            // TODO
+            SignalHandler
+        }
+    }
+
+    impl Drop for SignalHandler {
+        fn drop(&mut self) {
+            // TODO
+        }
+    }
+
+    pub fn unmask_sigtstp() {
+        // TODO
+    }
+
+    pub fn create_process_group() {
+        // TODO
+    }
+
+    pub fn set_foreground(pid: u32) {
+        // TODO
+    }
+
+    pub fn get_pid() -> u32 {
+        // TODO
+    }
 
     #[derive(Debug)]
     pub enum Error {
@@ -168,10 +248,17 @@ impl<'a> PipelineExecution for Shell<'a> {
         }
 
         self.foreground.clear();
+        // If the given pipeline is a background task, fork the shell.
         if piped_commands[piped_commands.len()-1].1 == JobKind::Background {
             fork_pipe(self, piped_commands)
         } else {
-            pipe(self, piped_commands)
+            // While active, the SIGTTOU signal will be ignored.
+            let _sig_ignore = SignalHandler::new();
+            // Execute each command in the pipeline, giving each command the foreground.
+            let exit_status = pipe(self, piped_commands, true);
+            // Set the shell as the foreground process again to regain the TTY.
+            set_foreground(get_pid());
+            exit_status
         }
     }
 }
@@ -193,30 +280,36 @@ fn ion_fork() -> syscall::error::Result<Fork> {
 
 #[cfg(all(unix, not(target_os = "redox")))]
 fn ion_fork() -> Result<Fork, NixError> {
-    match fork()? {
-        ForkResult::Parent{ child: pid }  => Ok(Fork::Parent(pid as u32)),
-        ForkResult::Child                 => Ok(Fork::Child)
+    match unistd::fork()? {
+        ForkResult::Parent{ child: pid } => Ok(Fork::Parent(pid as u32)),
+        ForkResult::Child                => Ok(Fork::Child)
     }
 }
 
 fn fork_pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
     match ion_fork() {
         Ok(Fork::Parent(pid)) => {
-            shell.send_child_to_background(pid, ProcessState::Running);
+            shell.send_to_background(pid, ProcessState::Running);
             SUCCESS
         },
         Ok(Fork::Child) => {
-            exit(pipe(shell, commands));
+            unmask_sigtstp();
+            create_process_group();
+            exit(pipe(shell, commands, false));
         },
         Err(why) => {
-            eprintln!("ion: background job: {}", why);
+            eprintln!("ion: background fork failed: {}", why);
             FAILURE
         }
     }
 }
 
 /// This function will panic if called with an empty slice
-fn pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
+fn pipe (
+    shell: &mut Shell,
+    commands: Vec<(Command, JobKind)>,
+    foreground: bool
+) -> i32 {
     let mut previous_status = SUCCESS;
     let mut previous_kind = JobKind::And;
     let mut commands = commands.into_iter();
@@ -249,9 +342,14 @@ fn pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
 
                     macro_rules! spawn_proc {
                         ($cmd:expr) => {{
-                            let child = $cmd.spawn();
+                            let child = $cmd.before_exec(move || {
+                                unmask_sigtstp();
+                                create_process_group();
+                                Ok(())
+                            }).spawn();
                             match child {
                                 Ok(child) => {
+                                    if foreground { set_foreground(child.id()); }
                                     shell.foreground.push(child.id());
                                     children.push(Some(child))
                                 },
@@ -296,7 +394,7 @@ fn pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
                     }
                 }
                 _ => {
-                    previous_status = execute_command(shell, &mut parent);
+                    previous_status = execute_command(shell, &mut parent, foreground);
                     previous_kind = kind;
                 }
             }
@@ -317,20 +415,13 @@ fn terminate_fg(shell: &mut Shell) {
     // TODO: Redox does not support signals
 }
 
-#[cfg(all(unix, not(target_os = "redox")))]
-fn is_sigtstp(signal: i32) -> bool {
-    signal == libc::SIGTSTP
-}
-
-#[cfg(target_os = "redox")]
-fn is_sigtstp(_: i32) -> bool {
-    // TODO: Redox does not support signals
-    false
-}
-
-fn execute_command(shell: &mut Shell, command: &mut Command) -> i32 {
-    match command.spawn() {
-        Ok(child) => wait_on_child(shell, child),
+fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -> i32 {
+    match command.before_exec(move || {
+        unmask_sigtstp();
+        create_process_group();
+        Ok(())
+    }).spawn() {
+        Ok(child) => wait_on_child(shell, child, foreground),
         Err(_) => {
             let stderr = io::stderr();
             let mut stderr = stderr.lock();
@@ -340,47 +431,9 @@ fn execute_command(shell: &mut Shell, command: &mut Command) -> i32 {
     }
 }
 
-fn wait_on_child(shell: &mut Shell, mut child: Child) -> i32 {
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                if let Some(code) = status.code() {
-                    break code
-                } else {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = stderr.write_all(b"ion: child ended by signal\n");
-                    break TERMINATED
-                }
-            },
-            Ok(None) => {
-                if let Ok(signal) = shell.signals.try_recv() {
-                    if is_sigtstp(signal) {
-                        shell.received_sigtstp = true;
-                        let pid = child.id();
-                        shell.suspend(pid);
-                        shell.send_child_to_background(pid, ProcessState::Stopped);
-                        break SUCCESS
-                    } else {
-                        if let Err(why) = child.kill() {
-                            let stderr = io::stderr();
-                            let _ = writeln!(stderr.lock(), "ion: unable to kill child: {}", why);
-                        }
-                        shell.foreground_send(signal);
-                        shell.handle_signal(signal);
-                        break TERMINATED
-                    }
-                }
-                thread::sleep(Duration::from_millis(1));
-            },
-            Err(err) => {
-                let stderr = io::stderr();
-                let mut stderr = stderr.lock();
-                let _ = writeln!(stderr, "ion: failed to wait: {}", err);
-                break 100 // TODO what should we return here?
-            }
-        }
-    }
+fn wait_on_child(shell: &mut Shell, child: Child, foreground: bool) -> i32 {
+    if foreground { set_foreground(child.id()); }
+    shell.watch_foreground(child.id())
 }
 
 /// This function will panic if called with an empty vector
@@ -389,84 +442,16 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>, commands: Vec<Comm
     for entry in children.drain(..end).zip(commands.into_iter()) {
         // _cmd is never used here, but it is important that it gets dropped at the end of this
         // block in order to write EOF to the pipes that it owns.
-        if let (Some(mut child), _cmd) = entry {
-            let status = loop {
-                match child.try_wait() {
-                    Ok(Some(status)) => {
-                        if let Some(code) = status.code() {
-                            break code
-                        } else {
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = stderr.write_all(b"ion: child ended by signal\n");
-                            break TERMINATED
-                        }
-                    },
-                    Ok(None) => {
-                        if let Ok(signal) = shell.signals.try_recv() {
-                            if is_sigtstp(signal) {
-                                shell.received_sigtstp = true;
-                                let pid = child.id();
-                                shell.suspend(pid);
-                                shell.send_child_to_background(pid, ProcessState::Stopped);
-                                break SUCCESS
-                            }
-                            shell.foreground_send(signal);
-                            shell.handle_signal(signal);
-                            break TERMINATED
-                        }
-                        thread::sleep(Duration::from_millis(1));
-                    },
-                    Err(err) => {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: failed to wait: {}", err);
-                        break 100 // TODO what should we return here?
-                    }
-                }
-            };
+        if let (Some(child), _cmd) = entry {
+            let status = shell.watch_foreground(child.id());
             if status == TERMINATED {
                 return status
             }
         }
     }
 
-    if let Some(mut child) = children.pop().unwrap() {
-        loop {
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    if let Some(code) = status.code() {
-                        break code
-                    } else {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = stderr.write_all(b"ion: child ended by signal\n");
-                        break TERMINATED
-                    }
-                },
-                Ok(None) => {
-                    if let Ok(signal) = shell.signals.try_recv() {
-                        if is_sigtstp(signal) {
-                            shell.received_sigtstp = true;
-                            let pid = child.id();
-                            shell.suspend(pid);
-                            shell.send_child_to_background(pid, ProcessState::Stopped);
-                            break SUCCESS
-                        }
-                        shell.foreground_send(signal);
-                        shell.handle_signal(signal);
-                        break TERMINATED
-                    }
-                    thread::sleep(Duration::from_millis(1));
-                },
-                Err(err) => {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: failed to wait: {}", err);
-                    break 100 // TODO what should we return here?
-                }
-            }
-        }
+    if let Some(child) = children.pop().unwrap() {
+        shell.watch_foreground(child.id())
     } else {
         NO_SUCH_COMMAND
     }

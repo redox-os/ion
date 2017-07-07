@@ -14,7 +14,8 @@ pub trait JobControl {
     fn handle_signal(&self, signal: i32);
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
-    fn send_child_to_background(&mut self, child: u32, state: ProcessState);
+    fn watch_foreground(&mut self, pid: u32) -> i32;
+    fn send_to_background(&mut self, child: u32, state: ProcessState);
 }
 
 #[derive(Clone)]
@@ -36,45 +37,48 @@ impl fmt::Display for ProcessState {
 }
 
 #[cfg(target_os = "redox")]
-pub fn watch_pid(processes: Arc<Mutex<Vec<BackgroundProcess>>>, pid: u32, njob: usize) {
+pub fn watch_background_pid(processes: Arc<Mutex<Vec<BackgroundProcess>>>, pid: u32, njob: usize) {
     // TODO: Implement this using syscall::call::waitpid
 }
 
 #[cfg(all(unix, not(target_os = "redox")))]
-pub fn watch_pid (
+pub fn watch_background_pid (
     processes: Arc<Mutex<Vec<BackgroundProcess>>>,
     pid: u32,
     njob: usize)
 {
-    use nix::sys::wait::{waitpid, WaitStatus};
+    use nix::sys::wait::{waitpid, WaitStatus, WUNTRACED, WNOHANG};
     loop {
-        match waitpid(pid as pid_t, None) {
+        match waitpid(-(pid as pid_t), Some(WUNTRACED | WNOHANG)) {
             Ok(WaitStatus::Exited(_, status)) => {
-                eprintln!("ion: background process ([{}] {}) exited with {}", njob, pid, status);
+                eprintln!("ion: ([{}] {}) exited with {}", njob, pid, status);
                 let mut processes = processes.lock().unwrap();
                 let process = &mut processes.iter_mut().nth(njob).unwrap();
                 process.state = ProcessState::Empty;
                 break
             },
-            Ok(WaitStatus::Stopped(_, _)) => {
+            Ok(WaitStatus::Stopped(pid, _)) => {
+                eprintln!("ion: ([{}] {}) Stopped", njob, pid);
                 let mut processes = processes.lock().unwrap();
                 let process = &mut processes.iter_mut().nth(njob).unwrap();
                 process.state = ProcessState::Stopped;
             },
-            Ok(WaitStatus::Continued(_)) => {
+            Ok(WaitStatus::Continued(pid)) => {
+                eprintln!("ion: ([{}] {}) Running", njob, pid);
                 let mut processes = processes.lock().unwrap();
                 let process = &mut processes.iter_mut().nth(njob).unwrap();
                 process.state = ProcessState::Running;
             },
             Ok(_) => (),
             Err(why) => {
-                eprintln!("ion: background process ([{}] {}) errored: {}", njob, pid, why);
+                eprintln!("ion: ([{}] {}) errored: {}", njob, pid, why);
                 let mut processes = processes.lock().unwrap();
                 let process = &mut processes.iter_mut().nth(njob).unwrap();
                 process.state = ProcessState::Empty;
                 break
             }
         }
+        sleep(Duration::from_millis(100));
     }
 }
 
@@ -121,7 +125,7 @@ impl<'a> JobControl for Shell<'a> {
     #[cfg(all(unix, not(target_os = "redox")))]
     /// Suspends a given process by it's process ID.
     fn suspend(&mut self, pid: u32) {
-        let _ = signal::kill(pid as pid_t, Some(NixSignal::SIGTSTP));
+        let _ = signal::kill(-(pid as pid_t), Some(NixSignal::SIGTSTP));
     }
 
     #[cfg(target_os = "redox")]
@@ -156,10 +160,70 @@ impl<'a> JobControl for Shell<'a> {
     }
 
     #[cfg(all(unix, not(target_os = "redox")))]
+    fn watch_foreground(&mut self, pid: u32) -> i32 {
+        use nix::sys::wait::{waitpid, WaitStatus, WUNTRACED, WNOHANG};
+        use nix::sys::signal::Signal;
+        loop {
+            match waitpid(-(pid as pid_t), Some(WUNTRACED | WNOHANG)) {
+                Ok(WaitStatus::Exited(_, status)) => {
+                    break status as i32
+                },
+                Ok(WaitStatus::Signaled(_, signal, _)) => {
+                    eprintln!("ion: process ended by signal");
+                    if signal == Signal::SIGTERM {
+                        self.handle_signal(libc::SIGTERM);
+                    } else if signal == Signal::SIGINT {
+                        self.foreground_send(libc::SIGINT as i32);
+                    }
+                    break TERMINATED;
+                },
+                Ok(WaitStatus::Stopped(pid, _)) => {
+                    self.send_to_background(pid as u32, ProcessState::Stopped);
+                    self.received_sigtstp = true;
+                    break TERMINATED
+                },
+                Ok(_) => (),
+                Err(why) => {
+                    eprintln!("ion: process doesn't exist: {}", why);
+                    break FAILURE
+                }
+            }
+            sleep(Duration::from_millis(1));
+        }
+    }
+
+    #[cfg(target_os = "redox")]
+    fn watch_foreground(&mut self, pid: u32) -> i32 {
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    if let Some(code) = status.code() {
+                        break code
+                    } else {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = stderr.write_all(b"ion: child ended by signal\n");
+                        break TERMINATED
+                    }
+                },
+                Ok(None) => {
+                    thread::sleep(Duration::from_millis(1));
+                },
+                Err(err) => {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: failed to wait: {}", err);
+                    break 100 // TODO what should we return here?
+                }
+            }
+        }
+    }
+
+    #[cfg(all(unix, not(target_os = "redox")))]
     /// Send a kill signal to all running foreground tasks.
     fn foreground_send(&self, signal: i32) {
         for process in self.foreground.iter() {
-            let _ = signal::kill(*process as pid_t, NixSignal::from_c_int(signal as c_int).ok());
+            let _ = signal::kill(-(*process as pid_t), NixSignal::from_c_int(signal as c_int).ok());
         }
     }
 
@@ -173,7 +237,7 @@ impl<'a> JobControl for Shell<'a> {
     fn background_send(&self, signal: i32) {
         for process in self.background.lock().unwrap().iter() {
             if let ProcessState::Running = process.state {
-                let _ = signal::kill(process.pid as pid_t, NixSignal::from_c_int(signal as c_int).ok());
+                let _ = signal::kill(-(process.pid as pid_t), NixSignal::from_c_int(signal as c_int).ok());
             }
         }
     }
@@ -183,12 +247,12 @@ impl<'a> JobControl for Shell<'a> {
         // TODO: Redox doesn't support signals yet
     }
 
-    fn send_child_to_background(&mut self, pid: u32, state: ProcessState) {
+    fn send_to_background(&mut self, pid: u32, state: ProcessState) {
         let processes = self.background.clone();
         let _ = spawn(move || {
             let njob = add_to_background(processes.clone(), pid, state);
             eprintln!("ion: bg [{}] {}", njob, pid);
-            watch_pid(processes, pid, njob);
+            watch_background_pid(processes, pid, njob);
         });
     }
 
