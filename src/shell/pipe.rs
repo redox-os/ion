@@ -140,7 +140,7 @@ mod crossplat {
     }
 
     pub fn get_pid() -> u32 {
-        // TODO
+        syscall::getpid().unwrap() as u32
     }
 
     #[derive(Debug)]
@@ -272,7 +272,7 @@ enum Fork {
 fn ion_fork() -> syscall::error::Result<Fork> {
     use syscall::call::clone;
     unsafe {
-        syscall::call::clone(0).map(|pid| {
+        clone(0).map(|pid| {
              if pid == 0 { Fork::Child } else { Fork::Parent(pid as u32) }
         })
     }
@@ -412,7 +412,7 @@ fn terminate_fg(shell: &mut Shell) {
 
 #[cfg(target_os = "redox")]
 fn terminate_fg(shell: &mut Shell) {
-    // TODO: Redox does not support signals
+    shell.foreground_send(syscall::SIGTERM as i32);
 }
 
 fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -> i32 {

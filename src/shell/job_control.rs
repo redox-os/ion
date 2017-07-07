@@ -194,9 +194,18 @@ impl<'a> JobControl for Shell<'a> {
 
     #[cfg(target_os = "redox")]
     fn watch_foreground(&mut self, pid: u32) -> i32 {
+        use std::io::{self, Write};
+        use std::os::unix::process::ExitStatusExt;
+        use std::process::ExitStatus;
+        use syscall;
+        use syscall::flag::WNOHANG;
+
         loop {
-            match child.try_wait() {
-                Ok(Some(status)) => {
+            let mut status_raw = 0;
+            match syscall::waitpid(pid as usize, &mut status_raw, WNOHANG) {
+                Ok(0) => (),
+                Ok(_pid) => {
+                    let status = ExitStatus::from_raw(status_raw as i32);
                     if let Some(code) = status.code() {
                         break code
                     } else {
@@ -206,9 +215,6 @@ impl<'a> JobControl for Shell<'a> {
                         break TERMINATED
                     }
                 },
-                Ok(None) => {
-                    thread::sleep(Duration::from_millis(1));
-                },
                 Err(err) => {
                     let stderr = io::stderr();
                     let mut stderr = stderr.lock();
@@ -216,6 +222,7 @@ impl<'a> JobControl for Shell<'a> {
                     break 100 // TODO what should we return here?
                 }
             }
+            sleep(Duration::from_millis(1));
         }
     }
 
