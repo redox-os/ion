@@ -2,6 +2,7 @@ use shell::Shell;
 use shell::job_control::{JobControl, ProcessState};
 use shell::status::*;
 use std::io::{stderr, Write};
+#[cfg(all(unix, not(target_os = "redox")))] use libc::pid_t;
 #[cfg(not(target_os = "redox"))] use nix::sys::signal::{self, Signal};
 #[cfg(not(target_os = "redox"))] use nix::unistd;
 
@@ -21,13 +22,13 @@ pub fn set_foreground(pid: u32) {
 #[cfg(all(unix, not(target_os = "redox")))]
 /// Suspends a given process by it's process ID.
 fn suspend(pid: u32) {
-    let _ = signal::kill(-(pid as pid_t), Some(NixSignal::SIGTSTP));
+    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGTSTP));
 }
 
 #[cfg(all(unix, not(target_os = "redox")))]
 /// Resumes a given process by it's process ID.
 fn resume(pid: u32) {
-    let _ = signal::kill(-(pid as pid_t), Some(NixSignal::SIGCONT));
+    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGCONT));
 }
 
 #[cfg(target_os = "redox")]
