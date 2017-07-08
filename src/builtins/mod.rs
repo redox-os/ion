@@ -21,7 +21,7 @@ use std::process;
 use std::error::Error;
 
 use parser::QuoteTerminator;
-use shell::job_control::JobControl;
+use shell::job_control::{JobControl, ProcessState};
 use shell::{Shell, FlowLogic, ShellHistory};
 use shell::status::*;
 
@@ -46,9 +46,11 @@ fn exit_builtin() -> Builtin {
             use nix::sys::signal::{self, Signal as NixSignal};
             use libc::pid_t;
 
-            // Kill all background tasks before exiting the shell.
+            // Kill all active background tasks before exiting the shell.
             for process in shell.background.lock().unwrap().iter() {
-                let _ = signal::kill(process.pid as pid_t, Some(NixSignal::SIGTERM));
+                if process.state != ProcessState::Empty {
+                    let _ = signal::kill(process.pid as pid_t, Some(NixSignal::SIGTERM));
+                }
             }
 
             process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
@@ -253,6 +255,23 @@ impl Builtin {
             help: "Resumes and sets a background process as the active process",
             main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
                 job_control::fg(shell, &args[1..])
+            })
+        });
+
+        commands.insert("suspend", Builtin {
+            name: "suspend",
+            help: "Suspends the shell with a SIGTSTOP signal",
+            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
+                job_control::suspend(0);
+                SUCCESS
+            })
+        });
+
+        commands.insert("disown", Builtin {
+            name: "disown",
+            help: "Disowning a process removes that process from the shell's background process table.",
+            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
+                job_control::disown(shell, &args[1..])
             })
         });
 

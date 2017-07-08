@@ -81,13 +81,14 @@ fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    // Mask the SIGTSTP signal -- prevents the shell from being stopped
+    // Block the SIGTSTP signal -- prevents the shell from being stopped
     // when the foreground group is changed during command execution.
-    mask_sigstp();
+    block_signals();
 
-    // Create a stream that will select over SIGINT and SIGTERM signals.
+    // Create a stream that will select over SIGINT, SIGTERM, and SIGHUP signals.
     let signals = Signal::new(unix_signal::SIGINT, &handle).flatten_stream()
-        .select(Signal::new(unix_signal::SIGTERM, &handle).flatten_stream());
+        .select(Signal::new(unix_signal::SIGTERM, &handle).flatten_stream())
+        .select(Signal::new(unix_signal::SIGHUP, &handle).flatten_stream());
 
     // Execute the event loop that will listen for and transmit received
     // signals to the shell.
@@ -104,19 +105,22 @@ fn main() {
 }
 
 #[cfg(all(unix, not(target_os = "redox")))]
-fn mask_sigstp() {
+fn block_signals() {
     unsafe {
-        use libc::{sigset_t, SIGTSTP, SIG_BLOCK, sigemptyset, sigaddset, sigprocmask};
+        use libc::*;
         use std::mem;
         use std::ptr;
         let mut sigset = mem::uninitialized::<sigset_t>();
         sigemptyset(&mut sigset as *mut sigset_t);
         sigaddset(&mut sigset as *mut sigset_t, SIGTSTP);
+        sigaddset(&mut sigset as *mut sigset_t, SIGTTOU);
+        sigaddset(&mut sigset as *mut sigset_t, SIGTTIN);
+        sigaddset(&mut sigset as *mut sigset_t, SIGCHLD);
         sigprocmask(SIG_BLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
     }
 }
 
 #[cfg(target_os = "redox")]
-fn mask_sigstp() {
+fn block_signals() {
     // TODO
 }

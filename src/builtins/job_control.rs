@@ -21,8 +21,8 @@ pub fn set_foreground(pid: u32) {
 
 #[cfg(all(unix, not(target_os = "redox")))]
 /// Suspends a given process by it's process ID.
-fn suspend(pid: u32) {
-    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGTSTP));
+pub fn suspend(pid: u32) {
+    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGSTOP));
 }
 
 #[cfg(all(unix, not(target_os = "redox")))]
@@ -31,8 +31,72 @@ fn resume(pid: u32) {
     let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGCONT));
 }
 
+pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
+    let stderr = stderr();
+    let mut stderr = stderr.lock();
+    const NO_SIGHUP: u8 = 1;
+    const ALL_JOBS:  u8 = 2;
+    const RUN_JOBS:  u8 = 4;
+
+    let mut jobspecs = Vec::new();
+    let mut flags = 0u8;
+    for &arg in args {
+        match arg {
+            "-a" => flags |= ALL_JOBS,
+            "-h" => flags |= NO_SIGHUP,
+            "-r" => flags |= RUN_JOBS,
+            _    => match arg.parse::<u32>() {
+                Ok(jobspec) => jobspecs.push(jobspec),
+                Err(_) => {
+                    let _ = writeln!(stderr, "ion: disown: invalid jobspec: '{}'", arg);
+                    return FAILURE
+                },
+            }
+        }
+    }
+
+    let mut processes = shell.background.lock().unwrap();
+    if jobspecs.is_empty() && flags & ALL_JOBS != 0 {
+        if flags & NO_SIGHUP != 0 {
+            for process in processes.iter_mut() {
+                process.ignore_sighup = true;
+            }
+        } else {
+            for process in processes.iter_mut() {
+                process.state = ProcessState::Empty;
+            }
+        }
+    } else {
+        jobspecs.sort();
+
+        let mut jobspecs = jobspecs.into_iter();
+        let mut current_jobspec = jobspecs.next().unwrap();
+        for (id, process) in processes.iter_mut().enumerate() {
+            if id == current_jobspec as usize {
+                if flags & NO_SIGHUP != 0 { process.ignore_sighup = true; }
+                process.state = ProcessState::Empty;
+                match jobspecs.next() {
+                    Some(jobspec) => current_jobspec = jobspec,
+                    None          => break
+                }
+            }
+        }
+
+        if flags & RUN_JOBS != 0 {
+            for process in processes.iter_mut() {
+                if process.state == ProcessState::Running {
+                    process.state = ProcessState::Empty;
+                }
+            }
+        }
+    }
+
+    SUCCESS
+}
+
+
 #[cfg(target_os = "redox")]
-fn suspend(pid: u32) {
+pub fn suspend(pid: u32) {
     use syscall;
     let _ = syscall::kill(pid as usize, syscall::SIGSTOP);
 }

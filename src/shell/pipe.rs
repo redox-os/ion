@@ -44,14 +44,17 @@ mod crossplat {
         }
     }
 
-    pub fn unmask_sigtstp() {
+    pub fn unblock_signals() {
         unsafe {
-            use libc::{sigset_t, SIG_UNBLOCK, SIGTSTP, sigemptyset, sigaddset, sigprocmask};
+            use libc::*;
             use std::mem;
             use std::ptr;
             let mut sigset = mem::uninitialized::<sigset_t>();
             sigemptyset(&mut sigset as *mut sigset_t);
             sigaddset(&mut sigset as *mut sigset_t, SIGTSTP);
+            sigaddset(&mut sigset as *mut sigset_t, SIGTTOU);
+            sigaddset(&mut sigset as *mut sigset_t, SIGTTIN);
+            sigaddset(&mut sigset as *mut sigset_t, SIGCHLD);
             sigprocmask(SIG_UNBLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
         }
     }
@@ -127,7 +130,7 @@ mod crossplat {
         }
     }
 
-    pub fn unmask_sigtstp() {
+    pub fn unblock_signals() {
         // TODO
     }
 
@@ -293,7 +296,7 @@ fn fork_pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
             SUCCESS
         },
         Ok(Fork::Child) => {
-            unmask_sigtstp();
+            unblock_signals();
             create_process_group();
             exit(pipe(shell, commands, false));
         },
@@ -332,7 +335,6 @@ fn pipe (
 
             match kind {
                 JobKind::Pipe(mut mode) => {
-
                     // We need to remember the commands as they own the file descriptors that are
                     // created by crossplat::create_pipe. We purposfully drop the pipes that are
                     // owned by a given command in `wait` in order to close those pipes, sending
@@ -343,7 +345,7 @@ fn pipe (
                     macro_rules! spawn_proc {
                         ($cmd:expr) => {{
                             let child = $cmd.before_exec(move || {
-                                unmask_sigtstp();
+                                unblock_signals();
                                 create_process_group();
                                 Ok(())
                             }).spawn();
@@ -412,12 +414,12 @@ fn terminate_fg(shell: &mut Shell) {
 
 #[cfg(target_os = "redox")]
 fn terminate_fg(shell: &mut Shell) {
-    shell.foreground_send(syscall::SIGTERM as i32);
+        shell.foreground_send(syscall::SIGTERM as i32);
 }
 
 fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -> i32 {
     match command.before_exec(move || {
-        unmask_sigtstp();
+        unblock_signals();
         create_process_group();
         Ok(())
     }).spawn() {

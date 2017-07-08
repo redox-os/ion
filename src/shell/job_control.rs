@@ -17,7 +17,7 @@ pub trait JobControl {
     fn send_to_background(&mut self, child: u32, state: ProcessState);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 /// Defines whether the background process is running or stopped.
 pub enum ProcessState {
     Running,
@@ -46,9 +46,9 @@ pub fn watch_background_pid (
     pid: u32,
     njob: usize)
 {
-    use nix::sys::wait::{waitpid, WaitStatus, WUNTRACED, WNOHANG};
+    use nix::sys::wait::*;
     loop {
-        match waitpid(-(pid as pid_t), Some(WUNTRACED | WNOHANG)) {
+        match waitpid(-(pid as pid_t), Some(WUNTRACED)) {
             Ok(WaitStatus::Exited(_, status)) => {
                 eprintln!("ion: ([{}] {}) exited with {}", njob, pid, status);
                 let mut processes = processes.lock().unwrap();
@@ -77,7 +77,6 @@ pub fn watch_background_pid (
                 break
             }
         }
-        sleep(Duration::from_millis(100));
     }
 }
 
@@ -93,6 +92,7 @@ pub fn add_to_background (
         Some(id) => {
             (*processes)[id] = BackgroundProcess {
                 pid: pid,
+                ignore_sighup: false,
                 state: state
             };
             id
@@ -101,6 +101,7 @@ pub fn add_to_background (
             let njobs = (*processes).len();
             (*processes).push(BackgroundProcess {
                 pid: pid,
+                ignore_sighup: false,
                 state: state
             });
             njobs
@@ -115,6 +116,7 @@ pub fn add_to_background (
 /// process is executing.
 pub struct BackgroundProcess {
     pub pid: u32,
+    pub ignore_sighup: bool,
     pub state: ProcessState
     // TODO: Each process should have the command registered to it
     // pub command: String
@@ -160,6 +162,8 @@ impl<'a> JobControl for Shell<'a> {
                     eprintln!("ion: process ended by signal");
                     if signal == Signal::SIGTERM {
                         self.handle_signal(libc::SIGTERM);
+                    } else if signal == Signal::SIGHUP {
+                        self.handle_signal(libc::SIGHUP);
                     } else if signal == Signal::SIGINT {
                         self.foreground_send(libc::SIGINT as i32);
                     }
@@ -230,9 +234,17 @@ impl<'a> JobControl for Shell<'a> {
     #[cfg(all(unix, not(target_os = "redox")))]
     /// Send a kill signal to all running background tasks.
     fn background_send(&self, signal: i32) {
-        for process in self.background.lock().unwrap().iter() {
-            if let ProcessState::Running = process.state {
-                let _ = signal::kill(-(process.pid as pid_t), NixSignal::from_c_int(signal as c_int).ok());
+        if signal == libc::SIGHUP {
+            for process in self.background.lock().unwrap().iter() {
+                if !process.ignore_sighup {
+                    let _ = signal::kill(-(process.pid as pid_t), NixSignal::from_c_int(signal as c_int).ok());
+                }
+            }
+        } else {
+            for process in self.background.lock().unwrap().iter() {
+                if let ProcessState::Running = process.state {
+                    let _ = signal::kill(-(process.pid as pid_t), NixSignal::from_c_int(signal as c_int).ok());
+                }
             }
         }
     }
@@ -255,8 +267,8 @@ impl<'a> JobControl for Shell<'a> {
     /// before the shell terminates itself.
     #[cfg(all(unix, not(target_os = "redox")))]
     fn handle_signal(&self, signal: i32) {
-        if signal == libc::SIGTERM {
-            self.background_send(libc::SIGTERM);
+        if signal == libc::SIGTERM || signal == libc::SIGHUP {
+            self.background_send(signal);
             process::exit(TERMINATED);
         }
     }
