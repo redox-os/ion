@@ -1,6 +1,7 @@
 // TODO: Handle Runtime Errors
 extern crate permutate;
 extern crate unicode_segmentation;
+extern crate calc;
 use self::unicode_segmentation::UnicodeSegmentation;
 
 use types::Array;
@@ -13,8 +14,6 @@ use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub use self::words::{WordIterator, WordToken, Select, Index, Range};
 use shell::variables::Variables;
-
-use ::builtins::calc;
 
 use std::io::{self, Write};
 use types::*;
@@ -492,7 +491,7 @@ fn expand_arithmetic(output : &mut String , input : &str, expander : &ExpanderFu
     }
     flush(&mut varbuf, &mut intermediate);
     match calc::eval(&intermediate) {
-        Ok(s) => output.push_str(&s),
+        Ok(s) => output.push_str(&(s.to_string())),
         Err(e) => {
             let err_string : String = e.into();
             output.push_str(&err_string);
