@@ -30,7 +30,7 @@ use smallvec::SmallVec;
 use app_dirs::{AppDataType, AppInfo, app_root};
 use builtins::*;
 use fnv::FnvHashMap;
-use liner::{Context, CursorPosition, Event, EventKind, BasicCompleter};
+use liner::{Context, CursorPosition, Event, EventKind, BasicCompleter, Buffer};
 use types::*;
 use smallstring::SmallString;
 use self::completer::{MultiCompleter, IonFileCompleter};
@@ -47,7 +47,46 @@ use parser::{
     ExpanderFunctions,
     Select,
 };
+
 use parser::peg::Pipeline;
+
+fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
+    let mut res = Vec::new();
+    let mut word_start = None;
+
+    macro_rules! check_boundary {
+        ($c:expr, $index:expr, $escaped:expr) => {{
+            if let Some(start) = word_start {
+                if $c == ' ' && !$escaped {
+                    res.push((start, $index));
+                    word_start = None;
+                }
+            } else {
+                if $c != ' ' {
+                    word_start = Some($index);
+                }
+            }
+        }}
+    }
+
+    let mut iter = buf.chars().enumerate();
+    while let Some((i, &c)) = iter.next() {
+        match c {
+            '\\' => {
+                if let Some((_, &cnext)) = iter.next() {
+                    // We use `i` in order to include the backslash as part of the word
+                    check_boundary!(cnext, i, true);
+                }
+            }
+            c => check_boundary!(c, i, false),
+        }
+    }
+    if let Some(start) = word_start {
+        // When start has been set, that means we have encountered a full word.
+        res.push((start, buf.num_chars()));
+    }
+    res
+}
 
 /// This struct will contain all of the data structures related to this
 /// instance of the shell.
@@ -72,9 +111,11 @@ impl<'a> Shell<'a> {
         builtins: &'a FnvHashMap<&'static str, Builtin>,
         signals: Receiver<i32>
     ) -> Shell<'a> {
+        let mut context = Context::new();
+        context.word_divider_fn = Box::new(word_divide);
         Shell {
             builtins: builtins,
-            context: Context::new(),
+            context,
             variables: Variables::default(),
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new().expect(""),
