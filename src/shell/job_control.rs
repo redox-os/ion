@@ -6,7 +6,7 @@ use std::thread::{sleep, spawn};
 use std::time::Duration;
 use std::process;
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use super::foreground::{ForegroundSignals, BackgroundResult};
 use super::signals;
 use super::status::*;
 use super::Shell;
@@ -20,88 +20,9 @@ pub fn set_foreground_as(pid: u32) {
     signals::unblock();
 }
 
-#[cfg(all(unix, not(target_os = "redox")))]
-/// Suspends a given process by it's process ID.
-pub fn suspend(pid: u32) {
-    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGSTOP));
-}
-
-#[cfg(all(unix, not(target_os = "redox")))]
-/// Resumes a given process by it's process ID.
-pub fn resume(pid: u32) {
-    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGCONT));
-}
-
-#[cfg(target_os = "redox")]
-pub fn suspend(pid: u32) {
-    use syscall;
-    let _ = syscall::kill(pid as usize, syscall::SIGSTOP);
-}
-
-#[cfg(target_os = "redox")]
-pub fn resume(pid: u32) {
-    use syscall;
-    let _ = syscall::kill(pid as usize, syscall::SIGCONT);
-}
-
 #[cfg(target_os = "redox")]
 pub fn set_foreground_as(pid: u32) {
     // TODO
-}
-
-pub enum BackgroundResult {
-    Errored,
-    Status(u8)
-}
-
-pub struct ForegroundSignals {
-    grab:    AtomicUsize, // TODO: Use AtomicU32 when stable
-    status:  AtomicUsize, // TODO: Use AtomicU8 when stable
-    reply:   AtomicBool,
-    errored: AtomicBool   // TODO: Combine with reply when U8 is stable
-}
-
-impl ForegroundSignals {
-    pub fn new() -> ForegroundSignals {
-        ForegroundSignals {
-            grab: AtomicUsize::new(0),
-            status: AtomicUsize::new(0),
-            reply: AtomicBool::new(false),
-            errored: AtomicBool::new(false)
-        }
-    }
-
-    pub fn signal_to_grab(&self, pid: u32) {
-        self.grab.store(pid as usize, Ordering::Relaxed);
-    }
-
-    pub fn reply_with(&self, status: i8) {
-        self.grab.store(0, Ordering::Relaxed);
-        self.reply.store(true, Ordering::Relaxed);
-        self.status.store(status as usize, Ordering::Relaxed);
-    }
-
-    pub fn errored(&self) {
-        self.errored.store(true, Ordering::Relaxed);
-    }
-
-    pub fn was_processed(&self) -> Option<BackgroundResult> {
-        if self.reply.load(Ordering::Relaxed) {
-            self.reply.store(false, Ordering::Relaxed);
-            if self.errored.load(Ordering::Relaxed) {
-                self.errored.store(false, Ordering::Relaxed);
-                Some(BackgroundResult::Errored)
-            } else {
-                Some(BackgroundResult::Status(self.status.load(Ordering::Relaxed) as u8))
-            }
-        } else {
-            None
-        }
-    }
-
-    pub fn was_grabbed(&self, pid: u32) -> bool {
-        self.grab.load(Ordering::Relaxed) == pid as usize
-    }
 }
 
 pub trait JobControl {
@@ -239,7 +160,7 @@ pub struct BackgroundProcess {
 impl<'a> JobControl for Shell<'a> {
     fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32 {
         // Resume the background task, if needed.
-        if cont { resume(pid); }
+        if cont { signals::resume(pid); }
         // Pass the TTY to the background job
         set_foreground_as(pid);
         // Signal the background thread that is waiting on this process to stop waiting.

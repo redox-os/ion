@@ -262,7 +262,7 @@ impl Builtin {
             name: "suspend",
             help: "Suspends the shell with a SIGTSTOP signal",
             main: Box::new(|_: &[&str], _: &mut Shell| -> i32 {
-                shell::job_control::suspend(0);
+                shell::signals::suspend(0);
                 SUCCESS
             })
         });

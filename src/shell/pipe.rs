@@ -310,7 +310,7 @@ fn terminate_fg(shell: &mut Shell) {
 
 #[cfg(target_os = "redox")]
 fn terminate_fg(shell: &mut Shell) {
-        shell.foreground_send(syscall::SIGTERM as i32);
+    shell.foreground_send(syscall::SIGTERM as i32);
 }
 
 fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -> i32 {

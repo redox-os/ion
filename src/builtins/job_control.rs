@@ -1,8 +1,12 @@
+//! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job control in the shell.
 use shell::Shell;
-use shell::job_control::{JobControl, ProcessState, resume};
+use shell::job_control::{JobControl, ProcessState};
 use shell::status::*;
+use shell::signals;
 use std::io::{stderr, Write};
 
+/// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
+/// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark SIGHUP ignoral.
 pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
     let stderr = stderr();
     let mut stderr = stderr.lock();
@@ -78,6 +82,9 @@ pub fn jobs(shell: &mut Shell) {
     }
 }
 
+/// Hands control of the foreground process to the specified jobs, recording their exit status.
+/// If the job is stopped, the job will be resumed.
+/// If multiple jobs are given, then only the last job's exit status will be returned.
 pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
     let mut status = 0;
     for arg in args {
@@ -94,8 +101,11 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
 
             // Bring the process into the foreground and wait for it to finish.
             status = match job.state {
+                // Give the bg task the foreground, and wait for it to finish.
                 ProcessState::Running => shell.set_bg_task_in_foreground(job.pid, false),
+                // Same as above, but also resumes the stopped process in advance.
                 ProcessState::Stopped => shell.set_bg_task_in_foreground(job.pid, true),
+                // Informs the user that the specified job ID no longer exists.
                 ProcessState::Empty => {
                     let stderr = stderr();
                     let _ = writeln!(stderr.lock(), "ion: fg: job {} does not exist", njob);
@@ -110,6 +120,7 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
     status
 }
 
+/// Resumes a stopped background process, if it was stopped.
 pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
     let mut error = false;
     let stderr = stderr();
@@ -122,7 +133,7 @@ pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
                         let _ = writeln!(stderr, "ion: bg: job {} is already running", njob);
                         error = true;
                     },
-                    ProcessState::Stopped => resume(job.pid),
+                    ProcessState::Stopped => signals::resume(job.pid),
                     ProcessState::Empty => {
                         let _ = writeln!(stderr, "ion: bg: job {} does not exist", njob);
                         error = true;
