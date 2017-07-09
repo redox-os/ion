@@ -6,6 +6,9 @@
 // - Implement Heredocs
 // - Fix the cyclomatic complexity issue
 
+use std::collections::HashSet;
+use std::iter::{Peekable, Enumerate};
+
 use parser::peg::{Pipeline, Redirection, RedirectFrom};
 use shell::{Job, JobKind};
 use types::*;
@@ -53,6 +56,91 @@ fn get_job_kind(args: &str, index: usize, pipe_char_was_found: bool) -> (JobKind
     } else {
         (JobKind::Background, false)
     }
+}
+
+pub struct Generator<'a, I: Iterator<Item = u8>> {
+    data: &'a str,
+    bytes: Peekable<Enumerate<I>>,
+}
+
+lazy_static! {
+    /// The set of bytes that will always indicate an end of an arg
+    static ref FOLLOW_ARGS: HashSet<u8> = b"&|<> \t".into_iter().collect();
+    static ref REDIRECT_BYTES: HashSet<u8> = b"&|>".into_iter().collect();
+}
+
+const FOLLOW_ARGS:
+
+impl<'a, I: Iterator<Item = u8>> Generator<'a, I> {
+
+    pub fn new(data: &'a str) -> Self {
+        Generator {
+            data,
+            bytes: data.bytes.enumerate().peekable()
+        }
+    }
+
+    fn peek(&self, index: usize) -> Option<u8> { self.data.as_bytes().get(index) }
+
+    fn quoted(&mut self, start: usize, delimiter: u8) -> Result<&'a str, &str> {
+        while let Some(&(i, b)) = self.bytes.peek() {
+            match b {
+                b'\\' => { self.bytes.next(); },
+                c if c == delimiter {
+                    self.bytes.next();
+                    // This is inclusive as we want to keep the quote type intact
+                    return Ok(&self.data[start...i]);
+                }
+            }
+            self.bytes.next();
+        }
+        unreachable!();
+    }
+
+    fn arg(&mut self, start: usize) -> Result<&'a str, &str> {
+        while let Some(&(i, b)) = self.bytes.peek() {
+            match b {
+                // This is a tricky one: we only end the argment if `^` is followed by a
+                // redirection character
+                b'^' => {
+                    if let Some(next_byte) = self.peek(i + 1) {
+                        if REDIRECT_BYTES.contains(next_byte) {
+                            return Ok(&self.data[start..i])
+                        }
+                    }
+                }
+                // Evaluate a quoted string but do not return it
+                b'"' | b'\'' => {
+                    // We pass in i, which is the quote character, but start one character later.
+                    // This is so that self.quoted will return the string with quotes intact
+                    self.bytes.next();
+                    self.quoted(i, b)?;
+                }
+                // If we see a byte from the follow set, we've definitely reached the end of
+                // the arguments
+                c if FOLLOW_ARGS.contains(c) => {
+                    return Ok(&self.data[start..i]);
+                },
+                _ => ()
+            }
+            // By default just pop the next byte: it will be part of the argument
+            self.bytes.next();
+        }
+    }
+
+    pub fn parse(&mut self) -> Result<Pipeline, &str> {
+        let mut jobs: Vec<Job> = Vec::new();
+        let mut idx = 0;
+        let mut infile = None;
+        let mut outfile = None;
+        while let Some(&b) = self.bytes.peek() {
+            // Determine what production rule we are using based on the first character
+            match b {
+
+            }
+        }
+    }
+
 }
 
 #[allow(cyclomatic_complexity)]
