@@ -64,7 +64,7 @@ pub mod crossplat {
 }
 
 #[cfg(target_os = "redox")]
-mod crossplat {
+pub mod crossplat {
     use parser::peg::{RedirectFrom};
     use std::fs::File;
     use std::io;
