@@ -277,6 +277,12 @@ impl<'a> Shell<'a> {
             }
             self.on_command(&buffer.consume());
         }
+        // The flow control level being non zero means that we have a statement that has
+        // only been partially parsed.
+        if self.flow_control.level != 0 {
+            eprintln!("ion: unexpected end of script: expected end block for `{}`",
+                      self.flow_control.current_statement.short());
+        }
     }
 
     pub fn terminate_quotes(&mut self, command: String) -> Result<String, ()> {
