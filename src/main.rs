@@ -83,7 +83,7 @@ fn main() {
 
     // Block the SIGTSTP signal -- prevents the shell from being stopped
     // when the foreground group is changed during command execution.
-    shell::signals::unix::block();
+    shell::signals::block();
 
     // Create a stream that will select over SIGINT, SIGTERM, and SIGHUP signals.
     let signals = Signal::new(unix_signal::SIGINT, &handle).flatten_stream()

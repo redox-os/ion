@@ -13,8 +13,7 @@ use super::{JobKind, Shell};
 use super::status::*;
 use parser::peg::{Pipeline, RedirectFrom};
 
-#[cfg(all(unix, not(target_os = "redox")))] use super::signals::unix as signals;
-#[cfg(target_os = "redox")] use super::signals::redox as signals;
+use super::signals::{self, SignalHandler};
 
 use self::crossplat::*;
 
@@ -22,30 +21,12 @@ use self::crossplat::*;
 /// different platforms
 #[cfg(not(target_os = "redox"))]
 pub mod crossplat {
-    use libc;
     use nix::{fcntl, unistd};
     use parser::peg::{RedirectFrom};
     use std::fs::File;
     use std::io::Error;
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::process::{Stdio, Command};
-
-    /// The purpose of the signal handler is to ignore signals when it is active, and then continue
-    /// listening to signals once the handler is dropped.
-    pub struct SignalHandler;
-
-    impl SignalHandler {
-        pub fn new() -> SignalHandler {
-            unsafe { let _ = libc::signal(libc::SIGTTOU, libc::SIG_IGN); }
-            SignalHandler
-        }
-    }
-
-    impl Drop for SignalHandler {
-        fn drop(&mut self) {
-            unsafe { let _ = libc::signal(libc::SIGTTOU, libc::SIG_DFL); }
-        }
-    }
 
     /// When given a process ID, that process will be assigned to a new process group.
     pub fn create_process_group() {
@@ -98,23 +79,6 @@ mod crossplat {
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::process::{Stdio, Command};
     use syscall;
-
-    /// The purpose of the signal handler is to ignore signals when it is active, and then continue
-    /// listening to signals once the handler is dropped.
-    pub struct SignalHandler;
-
-    impl SignalHandler {
-        pub fn new() -> SignalHandler {
-            // TODO
-            SignalHandler
-        }
-    }
-
-    impl Drop for SignalHandler {
-        fn drop(&mut self) {
-            // TODO
-        }
-    }
 
     pub fn create_process_group() {
         // TODO

@@ -1,14 +1,13 @@
 #[cfg(all(unix, not(target_os = "redox")))] use libc::{self, pid_t, c_int};
 #[cfg(all(unix, not(target_os = "redox")))] use nix::sys::signal::{self, Signal};
-#[cfg(all(unix, not(target_os = "redox")))] use super::signals::unix as signals;
 #[cfg(all(unix, not(target_os = "redox")))] use nix::unistd;
-#[cfg(target_os = "redox")] use super::signals::unix as signals;
 use std::fmt;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
 use std::process;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use super::signals;
 use super::status::*;
 use super::Shell;
 use super::pipe::crossplat::get_pid;
