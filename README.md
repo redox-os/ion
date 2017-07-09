@@ -207,7 +207,7 @@ The `export` command works similarly to the `let` command, but instead of defini
 global variable that other processes can access.
 
 ```ion
-export PATH = "~/.cargo/bin:${PATH}"
+export PATH = ~/.cargo/bin:${PATH}
 ```
 
 ### Export Arithmetic
