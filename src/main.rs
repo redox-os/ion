@@ -83,7 +83,7 @@ fn main() {
 
     // Block the SIGTSTP signal -- prevents the shell from being stopped
     // when the foreground group is changed during command execution.
-    block_signals();
+    shell::signals::unix::block();
 
     // Create a stream that will select over SIGINT, SIGTERM, and SIGHUP signals.
     let signals = Signal::new(unix_signal::SIGINT, &handle).flatten_stream()
@@ -102,25 +102,4 @@ fn main() {
 fn main() {
     let (_, signals_rx) = mpsc::channel();
     inner_main(signals_rx);
-}
-
-#[cfg(all(unix, not(target_os = "redox")))]
-fn block_signals() {
-    unsafe {
-        use libc::*;
-        use std::mem;
-        use std::ptr;
-        let mut sigset = mem::uninitialized::<sigset_t>();
-        sigemptyset(&mut sigset as *mut sigset_t);
-        sigaddset(&mut sigset as *mut sigset_t, SIGTSTP);
-        sigaddset(&mut sigset as *mut sigset_t, SIGTTOU);
-        sigaddset(&mut sigset as *mut sigset_t, SIGTTIN);
-        sigaddset(&mut sigset as *mut sigset_t, SIGCHLD);
-        sigprocmask(SIG_BLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
-    }
-}
-
-#[cfg(target_os = "redox")]
-fn block_signals() {
-    // TODO
 }

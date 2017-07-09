@@ -22,7 +22,7 @@ use std::error::Error;
 
 use parser::QuoteTerminator;
 use shell::job_control::{JobControl, ProcessState};
-use shell::{Shell, FlowLogic, ShellHistory};
+use shell::{self, Shell, FlowLogic, ShellHistory};
 use shell::status::*;
 
 #[cfg(target_os = "redox")]
@@ -261,8 +261,8 @@ impl Builtin {
         commands.insert("suspend", Builtin {
             name: "suspend",
             help: "Suspends the shell with a SIGTSTOP signal",
-            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                job_control::suspend(0);
+            main: Box::new(|_: &[&str], _: &mut Shell| -> i32 {
+                shell::job_control::suspend(0);
                 SUCCESS
             })
         });

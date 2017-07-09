@@ -1,15 +1,117 @@
 #[cfg(all(unix, not(target_os = "redox")))] use libc::{self, pid_t, c_int};
-#[cfg(all(unix, not(target_os = "redox")))] use nix::sys::signal::{self, Signal as NixSignal};
+#[cfg(all(unix, not(target_os = "redox")))] use nix::sys::signal::{self, Signal};
+#[cfg(all(unix, not(target_os = "redox")))] use super::signals::unix as signals;
+#[cfg(all(unix, not(target_os = "redox")))] use nix::unistd;
+#[cfg(target_os = "redox")] use super::signals::unix as signals;
 use std::fmt;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
 use std::process;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use super::status::*;
 use super::Shell;
+use super::pipe::crossplat::get_pid;
+
+#[cfg(all(unix, not(target_os = "redox")))]
+/// When given a process ID, that process's group will be assigned as the foreground process group.
+pub fn set_foreground_as(pid: u32) {
+    signals::block();
+    let _ = unistd::tcsetpgrp(0, pid as i32);
+    signals::unblock();
+}
+
+#[cfg(all(unix, not(target_os = "redox")))]
+/// Suspends a given process by it's process ID.
+pub fn suspend(pid: u32) {
+    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGSTOP));
+}
+
+#[cfg(all(unix, not(target_os = "redox")))]
+/// Resumes a given process by it's process ID.
+pub fn resume(pid: u32) {
+    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGCONT));
+}
+
+#[cfg(target_os = "redox")]
+pub fn suspend(pid: u32) {
+    use syscall;
+    let _ = syscall::kill(pid as usize, syscall::SIGSTOP);
+}
+
+#[cfg(target_os = "redox")]
+pub fn resume(pid: u32) {
+    use syscall;
+    let _ = syscall::kill(pid as usize, syscall::SIGCONT);
+}
+
+#[cfg(target_os = "redox")]
+pub fn set_foreground_as(pid: u32) {
+    // TODO
+}
+
+pub enum BackgroundResult {
+    Errored,
+    Status(u8)
+}
+
+pub struct ForegroundSignals {
+    grab:    AtomicUsize, // TODO: Use AtomicU32 when stable
+    status:  AtomicUsize, // TODO: Use AtomicU8 when stable
+    reply:   AtomicBool,
+    errored: AtomicBool   // TODO: Combine with reply when U8 is stable
+}
+
+impl ForegroundSignals {
+    pub fn new() -> ForegroundSignals {
+        ForegroundSignals {
+            grab: AtomicUsize::new(0),
+            status: AtomicUsize::new(0),
+            reply: AtomicBool::new(false),
+            errored: AtomicBool::new(false)
+        }
+    }
+
+    pub fn signal_to_grab(&self, pid: u32) {
+        self.grab.store(pid as usize, Ordering::Relaxed);
+    }
+
+    pub fn reply_with(&self, status: i8) {
+        self.grab.store(0, Ordering::Relaxed);
+        self.reply.store(true, Ordering::Relaxed);
+        self.status.store(status as usize, Ordering::Relaxed);
+    }
+
+    pub fn errored(&self) {
+        self.errored.store(true, Ordering::Relaxed);
+    }
+
+    pub fn was_processed(&self) -> Option<BackgroundResult> {
+        if self.reply.load(Ordering::Relaxed) {
+            self.reply.store(false, Ordering::Relaxed);
+            if self.errored.load(Ordering::Relaxed) {
+                self.errored.store(false, Ordering::Relaxed);
+                Some(BackgroundResult::Errored)
+            } else {
+                Some(BackgroundResult::Status(self.status.load(Ordering::Relaxed) as u8))
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn was_grabbed(&self, pid: u32) -> bool {
+        self.grab.load(Ordering::Relaxed) == pid as usize
+    }
+}
 
 pub trait JobControl {
+    /// Waits for background jobs to finish before returning.
     fn wait_for_background(&mut self);
+    /// Takes a background tasks's PID and whether or not it needs to be continued; resumes the task
+    /// and sets it as the foreground process. Once the task exits or stops, the exit status will
+    /// be returned, and ownership of the TTY given back to the shell.
+    fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32;
     fn handle_signal(&self, signal: i32);
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
@@ -36,34 +138,55 @@ impl fmt::Display for ProcessState {
 }
 
 #[cfg(target_os = "redox")]
-pub fn watch_background_pid(processes: Arc<Mutex<Vec<BackgroundProcess>>>, pid: u32, njob: usize) {
+pub fn watch_background (
+    fg: Arc<ForegroundSignals>,
+    processes: Arc<Mutex<Vec<BackgroundProcess>>>,
+    pid: u32,
+    njob: usize
+) {
     // TODO: Implement this using syscall::call::waitpid
 }
 
 #[cfg(all(unix, not(target_os = "redox")))]
-pub fn watch_background_pid (
+pub fn watch_background (
+    fg: Arc<ForegroundSignals>,
     processes: Arc<Mutex<Vec<BackgroundProcess>>>,
     pid: u32,
-    njob: usize)
-{
+    njob: usize
+) {
     use nix::sys::wait::*;
+    let mut fg_was_grabbed = false;
     loop {
-        match waitpid(-(pid as pid_t), Some(WUNTRACED)) {
+        if !fg_was_grabbed {
+            if fg.was_grabbed(pid) { fg_was_grabbed = true; }
+        }
+        match waitpid(-(pid as pid_t), Some(WUNTRACED | WCONTINUED | WNOHANG)) {
             Ok(WaitStatus::Exited(_, status)) => {
-                eprintln!("ion: ([{}] {}) exited with {}", njob, pid, status);
+                if !fg_was_grabbed {
+                    eprintln!("ion: ([{}] {}) exited with {}", njob, pid, status);
+                }
                 let mut processes = processes.lock().unwrap();
                 let process = &mut processes.iter_mut().nth(njob).unwrap();
                 process.state = ProcessState::Empty;
+                if fg_was_grabbed { fg.reply_with(status); }
                 break
             },
             Ok(WaitStatus::Stopped(pid, _)) => {
-                eprintln!("ion: ([{}] {}) Stopped", njob, pid);
+                if !fg_was_grabbed {
+                    eprintln!("ion: ([{}] {}) Stopped", njob, pid);
+                }
                 let mut processes = processes.lock().unwrap();
                 let process = &mut processes.iter_mut().nth(njob).unwrap();
+                if fg_was_grabbed {
+                    fg.reply_with(TERMINATED as i8);
+                    fg_was_grabbed = false;
+                }
                 process.state = ProcessState::Stopped;
             },
             Ok(WaitStatus::Continued(pid)) => {
-                eprintln!("ion: ([{}] {}) Running", njob, pid);
+                if !fg_was_grabbed {
+                    eprintln!("ion: ([{}] {}) Running", njob, pid);
+                }
                 let mut processes = processes.lock().unwrap();
                 let process = &mut processes.iter_mut().nth(njob).unwrap();
                 process.state = ProcessState::Running;
@@ -74,9 +197,11 @@ pub fn watch_background_pid (
                 let mut processes = processes.lock().unwrap();
                 let process = &mut processes.iter_mut().nth(njob).unwrap();
                 process.state = ProcessState::Empty;
+                if fg_was_grabbed { fg.errored(); }
                 break
             }
         }
+        sleep(Duration::from_millis(100));
     }
 }
 
@@ -86,30 +211,20 @@ pub fn add_to_background (
     state: ProcessState
 ) -> usize {
     let mut processes = processes.lock().unwrap();
-    match (*processes).iter().position(|x| {
-        if let ProcessState::Empty = x.state { true } else { false }
-    }) {
+    match (*processes).iter().position(|x| x.state == ProcessState::Empty) {
         Some(id) => {
-            (*processes)[id] = BackgroundProcess {
-                pid: pid,
-                ignore_sighup: false,
-                state: state
-            };
+            (*processes)[id] = BackgroundProcess { pid: pid, ignore_sighup: false, state: state };
             id
         },
         None => {
             let njobs = (*processes).len();
-            (*processes).push(BackgroundProcess {
-                pid: pid,
-                ignore_sighup: false,
-                state: state
-            });
+            (*processes).push(BackgroundProcess { pid: pid, ignore_sighup: false, state: state });
             njobs
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// A background process is a process that is attached to, but not directly managed
 /// by the shell. The shell will only retain information about the process, such
 /// as the process ID, state that the process is in, and the command that the
@@ -123,6 +238,28 @@ pub struct BackgroundProcess {
 }
 
 impl<'a> JobControl for Shell<'a> {
+    fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32 {
+        // Resume the background task, if needed.
+        if cont { resume(pid); }
+        // Pass the TTY to the background job
+        set_foreground_as(pid);
+        // Signal the background thread that is waiting on this process to stop waiting.
+        self.foreground_signals.signal_to_grab(pid);
+        let status = loop {
+            // When the background thread that is monitoring the task receives an exit/stop signal,
+            // the status of that process will be communicated back. To avoid consuming CPU cycles,
+            // we wait 25 ms between polls.
+            match self.foreground_signals.was_processed() {
+                Some(BackgroundResult::Status(stat)) => break stat as i32,
+                Some(BackgroundResult::Errored) => break TERMINATED,
+                None => sleep(Duration::from_millis(25))
+            }
+        };
+        // Have the shell reclaim the TTY
+        set_foreground_as(get_pid());
+        status
+    }
+
     #[cfg(all(unix, not(target_os = "redox")))]
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
@@ -151,13 +288,11 @@ impl<'a> JobControl for Shell<'a> {
 
     #[cfg(all(unix, not(target_os = "redox")))]
     fn watch_foreground(&mut self, pid: u32) -> i32 {
-        use nix::sys::wait::{waitpid, WaitStatus, WUNTRACED, WNOHANG};
+        use nix::sys::wait::{waitpid, WaitStatus, WUNTRACED};
         use nix::sys::signal::Signal;
         loop {
-            match waitpid(-(pid as pid_t), Some(WUNTRACED | WNOHANG)) {
-                Ok(WaitStatus::Exited(_, status)) => {
-                    break status as i32
-                },
+            match waitpid(-(pid as pid_t), Some(WUNTRACED)) {
+                Ok(WaitStatus::Exited(_, status)) => break status as i32,
                 Ok(WaitStatus::Signaled(_, signal, _)) => {
                     eprintln!("ion: process ended by signal");
                     if signal == Signal::SIGTERM {
@@ -180,7 +315,6 @@ impl<'a> JobControl for Shell<'a> {
                     break FAILURE
                 }
             }
-            sleep(Duration::from_millis(1));
         }
     }
 
@@ -194,7 +328,7 @@ impl<'a> JobControl for Shell<'a> {
 
         loop {
             let mut status_raw = 0;
-            match syscall::waitpid(pid as usize, &mut status_raw, WNOHANG) {
+            match syscall::waitpid(pid as usize, &mut status_raw, 0) {
                 Ok(0) => (),
                 Ok(_pid) => {
                     let status = ExitStatus::from_raw(status_raw as i32);
@@ -214,7 +348,6 @@ impl<'a> JobControl for Shell<'a> {
                     break 100 // TODO what should we return here?
                 }
             }
-            sleep(Duration::from_millis(1));
         }
     }
 
@@ -222,7 +355,7 @@ impl<'a> JobControl for Shell<'a> {
     /// Send a kill signal to all running foreground tasks.
     fn foreground_send(&self, signal: i32) {
         for process in self.foreground.iter() {
-            let _ = signal::kill(-(*process as pid_t), NixSignal::from_c_int(signal as c_int).ok());
+            let _ = signal::kill(-(*process as pid_t), Signal::from_c_int(signal as c_int).ok());
         }
     }
 
@@ -237,13 +370,13 @@ impl<'a> JobControl for Shell<'a> {
         if signal == libc::SIGHUP {
             for process in self.background.lock().unwrap().iter() {
                 if !process.ignore_sighup {
-                    let _ = signal::kill(-(process.pid as pid_t), NixSignal::from_c_int(signal as c_int).ok());
+                    let _ = signal::kill(-(process.pid as pid_t), Signal::from_c_int(signal as c_int).ok());
                 }
             }
         } else {
             for process in self.background.lock().unwrap().iter() {
                 if let ProcessState::Running = process.state {
-                    let _ = signal::kill(-(process.pid as pid_t), NixSignal::from_c_int(signal as c_int).ok());
+                    let _ = signal::kill(-(process.pid as pid_t), Signal::from_c_int(signal as c_int).ok());
                 }
             }
         }
@@ -256,10 +389,11 @@ impl<'a> JobControl for Shell<'a> {
 
     fn send_to_background(&mut self, pid: u32, state: ProcessState) {
         let processes = self.background.clone();
+        let fg_signals = self.foreground_signals.clone();
         let _ = spawn(move || {
             let njob = add_to_background(processes.clone(), pid, state);
             eprintln!("ion: bg [{}] {}", njob, pid);
-            watch_background_pid(processes, pid, njob);
+            watch_background(fg_signals, processes, pid, njob);
         });
     }
 

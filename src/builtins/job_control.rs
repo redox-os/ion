@@ -1,35 +1,7 @@
 use shell::Shell;
-use shell::job_control::{JobControl, ProcessState};
+use shell::job_control::{JobControl, ProcessState, resume};
 use shell::status::*;
 use std::io::{stderr, Write};
-#[cfg(all(unix, not(target_os = "redox")))] use libc::pid_t;
-#[cfg(not(target_os = "redox"))] use nix::sys::signal::{self, Signal};
-#[cfg(not(target_os = "redox"))] use nix::unistd;
-
-#[cfg(all(unix, not(target_os = "redox")))]
-/// When given a process ID, that process's group will be assigned as the foreground process group.
-pub fn set_foreground(pid: u32) {
-    let _ = unistd::tcsetpgrp(0, pid as i32);
-    let _ = unistd::tcsetpgrp(1, pid as i32);
-    let _ = unistd::tcsetpgrp(2, pid as i32);
-}
-
-#[cfg(target_os = "redox")]
-pub fn set_foreground(pid: u32) {
-    // TODO
-}
-
-#[cfg(all(unix, not(target_os = "redox")))]
-/// Suspends a given process by it's process ID.
-pub fn suspend(pid: u32) {
-    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGSTOP));
-}
-
-#[cfg(all(unix, not(target_os = "redox")))]
-/// Resumes a given process by it's process ID.
-fn resume(pid: u32) {
-    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGCONT));
-}
 
 pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
     let stderr = stderr();
@@ -94,19 +66,6 @@ pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
     SUCCESS
 }
 
-
-#[cfg(target_os = "redox")]
-pub fn suspend(pid: u32) {
-    use syscall;
-    let _ = syscall::kill(pid as usize, syscall::SIGSTOP);
-}
-
-#[cfg(target_os = "redox")]
-fn resume(pid: u32) {
-    use syscall;
-    let _ = syscall::kill(pid as usize, syscall::SIGCONT);
-}
-
 /// Display a list of all jobs running in the background.
 pub fn jobs(shell: &mut Shell) {
     let stderr = stderr();
@@ -133,24 +92,16 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
                 continue
             }
 
-            match job.state {
-                ProcessState::Running => {
-                    set_foreground(njob);
-                    // TODO: This doesn't work
-                    status = shell.watch_foreground(njob)
-                },
-                ProcessState::Stopped => {
-                    resume(job.pid);
-                    set_foreground(njob);
-                    // TODO: This doesn't work
-                    status = shell.watch_foreground(njob);
-                },
+            // Bring the process into the foreground and wait for it to finish.
+            status = match job.state {
+                ProcessState::Running => shell.set_bg_task_in_foreground(job.pid, false),
+                ProcessState::Stopped => shell.set_bg_task_in_foreground(job.pid, true),
                 ProcessState::Empty => {
                     let stderr = stderr();
                     let _ = writeln!(stderr.lock(), "ion: fg: job {} does not exist", njob);
-                    status = FAILURE;
+                    FAILURE
                 }
-            }
+            };
         } else {
             let stderr = stderr();
             let _ = writeln!(stderr.lock(), "ion: fg: {} is not a valid job number", arg);
@@ -171,11 +122,7 @@ pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
                         let _ = writeln!(stderr, "ion: bg: job {} is already running", njob);
                         error = true;
                     },
-                    ProcessState::Stopped => {
-                        resume(job.pid);
-                        job.state = ProcessState::Running;
-                        let _ = writeln!(stderr, "[{}] {} Running", njob, job.pid);
-                    },
+                    ProcessState::Stopped => resume(job.pid),
                     ProcessState::Empty => {
                         let _ = writeln!(stderr, "ion: bg: job {} does not exist", njob);
                         error = true;

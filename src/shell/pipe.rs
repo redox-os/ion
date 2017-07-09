@@ -13,12 +13,15 @@ use super::{JobKind, Shell};
 use super::status::*;
 use parser::peg::{Pipeline, RedirectFrom};
 
+#[cfg(all(unix, not(target_os = "redox")))] use super::signals::unix as signals;
+#[cfg(target_os = "redox")] use super::signals::redox as signals;
+
 use self::crossplat::*;
 
 /// The `crossplat` module contains components that are meant to be abstracted across
 /// different platforms
 #[cfg(not(target_os = "redox"))]
-mod crossplat {
+pub mod crossplat {
     use libc;
     use nix::{fcntl, unistd};
     use parser::peg::{RedirectFrom};
@@ -44,21 +47,6 @@ mod crossplat {
         }
     }
 
-    pub fn unblock_signals() {
-        unsafe {
-            use libc::*;
-            use std::mem;
-            use std::ptr;
-            let mut sigset = mem::uninitialized::<sigset_t>();
-            sigemptyset(&mut sigset as *mut sigset_t);
-            sigaddset(&mut sigset as *mut sigset_t, SIGTSTP);
-            sigaddset(&mut sigset as *mut sigset_t, SIGTTOU);
-            sigaddset(&mut sigset as *mut sigset_t, SIGTTIN);
-            sigaddset(&mut sigset as *mut sigset_t, SIGCHLD);
-            sigprocmask(SIG_UNBLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
-        }
-    }
-
     /// When given a process ID, that process will be assigned to a new process group.
     pub fn create_process_group() {
         let _ = unistd::setpgid(0, 0);
@@ -67,8 +55,6 @@ mod crossplat {
     /// When given a process ID, that process's group will be assigned as the foreground process group.
     pub fn set_foreground(pid: u32) {
         let _ = unistd::tcsetpgrp(0, pid as i32);
-        let _ = unistd::tcsetpgrp(1, pid as i32);
-        let _ = unistd::tcsetpgrp(2, pid as i32);
     }
 
     pub fn get_pid() -> u32 {
@@ -128,10 +114,6 @@ mod crossplat {
         fn drop(&mut self) {
             // TODO
         }
-    }
-
-    pub fn unblock_signals() {
-        // TODO
     }
 
     pub fn create_process_group() {
@@ -296,7 +278,7 @@ fn fork_pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
             SUCCESS
         },
         Ok(Fork::Child) => {
-            unblock_signals();
+            signals::unblock();
             create_process_group();
             exit(pipe(shell, commands, false));
         },
@@ -345,7 +327,7 @@ fn pipe (
                     macro_rules! spawn_proc {
                         ($cmd:expr) => {{
                             let child = $cmd.before_exec(move || {
-                                unblock_signals();
+                                signals::unblock();
                                 create_process_group();
                                 Ok(())
                             }).spawn();
@@ -419,7 +401,7 @@ fn terminate_fg(shell: &mut Shell) {
 
 fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -> i32 {
     match command.before_exec(move || {
-        unblock_signals();
+        signals::unblock();
         create_process_group();
         Ok(())
     }).spawn() {
