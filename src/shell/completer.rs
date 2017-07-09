@@ -86,7 +86,7 @@ impl Completer for IonFileCompleter {
             }
         }
 
-        self.inner.completions(start).iter().map(|x| escape(x.as_str())).collect()
+        self.inner.completions(&unescape(start)).iter().map(|x| escape(x.as_str())).collect()
     }
 }
 
@@ -103,6 +103,25 @@ fn escape(input: &str) -> String {
             _ => ()
         }
         output.push(character);
+    }
+    unsafe { String::from_utf8_unchecked(output) }
+}
+
+/// Unescapes filenames to be passed into the completer
+fn unescape(input: &str) -> String {
+    let mut output = Vec::with_capacity(input.len());
+    let mut bytes = input.bytes();
+    while let Some(b) = bytes.next() {
+        match b {
+            b'\\' => {
+                if let Some(next) = bytes.next() {
+                    output.push(next);
+                } else {
+                    output.push(b'\\')
+                }
+            }
+            _ => output.push(b),
+        }
     }
     unsafe { String::from_utf8_unchecked(output) }
 }
