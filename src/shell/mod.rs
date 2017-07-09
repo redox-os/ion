@@ -4,6 +4,7 @@ pub mod directory_stack;
 pub mod flags;
 pub mod flow_control;
 mod flow;
+pub mod fork;
 mod history;
 pub mod job_control;
 mod job;
