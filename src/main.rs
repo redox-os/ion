@@ -31,12 +31,7 @@ mod types;
 use std::io::{stderr, Write, ErrorKind};
 
 use builtins::Builtin;
-use shell::Shell;
-
-#[cfg(all(unix, not(target_os = "redox")))] use tokio_core::reactor::Core;
-#[cfg(all(unix, not(target_os = "redox")))] use futures::{Future, Stream};
-#[cfg(all(unix, not(target_os = "redox")))] use tokio_signal::unix::{self as unix_signal, Signal};
-
+use shell::{Shell, signals};
 use std::path::Path;
 use std::fs::File;
 use std::sync::mpsc;
@@ -75,27 +70,8 @@ fn inner_main(sigint_rx : mpsc::Receiver<i32>) {
 #[cfg(not(target_os = "redox"))]
 fn main() {
     let (signals_tx, signals_rx) = mpsc::channel();
-
     thread::spawn(move || inner_main(signals_rx));
-
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-
-    // Block the SIGTSTP signal -- prevents the shell from being stopped
-    // when the foreground group is changed during command execution.
-    shell::signals::block();
-
-    // Create a stream that will select over SIGINT, SIGTERM, and SIGHUP signals.
-    let signals = Signal::new(unix_signal::SIGINT, &handle).flatten_stream()
-        .select(Signal::new(unix_signal::SIGTERM, &handle).flatten_stream())
-        .select(Signal::new(unix_signal::SIGHUP, &handle).flatten_stream());
-
-    // Execute the event loop that will listen for and transmit received
-    // signals to the shell.
-    core.run(signals.for_each(|signal| {
-        let _ = signals_tx.send(signal);
-        Ok(())
-    })).unwrap();
+    signals::event_loop(signals_tx);
 }
 
 #[cfg(target_os = "redox")]

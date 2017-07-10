@@ -9,7 +9,11 @@ pub use self::redox::*;
 
 #[cfg(all(unix, not(target_os = "redox")))]
 mod unix {
+    use futures::{Future, Stream};
     use nix::sys::signal::{kill, Signal};
+    use std::sync::mpsc::Sender;
+    use tokio_core::reactor::Core;
+    use tokio_signal::unix::{self as unix_signal, Signal as TokioSignal};
 
     /// Blocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so that the shell never receives them.
     pub fn block() {
@@ -51,6 +55,27 @@ mod unix {
     /// Resumes a given process by it's process ID.
     pub fn resume(pid: u32) {
         let _ = kill(-(pid as i32), Some(Signal::SIGCONT));
+    }
+
+
+    /// Execute the event loop that will listen for and transmit received signals to the shell.
+    pub fn event_loop(signals_tx: Sender<i32>) {
+        let mut core = Core::new().unwrap();
+        let handle = core.handle();
+
+        // Block the SIGTSTP signal -- prevents the shell from being stopped
+        // when the foreground group is changed during command execution.
+        block();
+
+        // Create a stream that will select over SIGINT, SIGTERM, and SIGHUP signals.
+        let signals = TokioSignal::new(unix_signal::SIGINT, &handle).flatten_stream()
+            .select(TokioSignal::new(unix_signal::SIGTERM, &handle).flatten_stream())
+            .select(TokioSignal::new(unix_signal::SIGHUP, &handle).flatten_stream());
+
+        core.run(signals.for_each(|signal| {
+            let _ = signals_tx.send(signal);
+            Ok(())
+        })).unwrap();
     }
 }
 
