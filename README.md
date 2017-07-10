@@ -32,13 +32,13 @@ Below is an overview of features that Ion has either already implemented, or aim
     - [x] Process Expansions
         - [x] String-based Command Substitution (**$()**)
         - [x] Array-based Command Substitution (**@()**)
-    - [ ] Arithmetic Expansions
+    - [x] Arithmetic Expansions
 - [x] Flow Control
     - [x] For Loops
     - [ ] Foreach Loops
     - [x] While Loops
     - [x] If Conditionals
-    - [ ] Match Statements
+    - [x] Match Statements
 - [x] Functions
     - [x] Optionally-typed Function Parameters
 - [x] Script Execution
@@ -72,7 +72,7 @@ Below is an overview of features that Ion has either already implemented, or aim
 - [x] Signal Handling
 - [x] **&&** and **||** Conditionals
 - [x] Redirecting Stdout / Stderr
-- [ ] Redirecting Stdout & Stderr
+- [x] Redirecting Stdout & Stderr
 - [x] Piping Builtins
 - [x] Background Jobs
 - [ ] Piping Functions
@@ -116,8 +116,8 @@ Unlike Bash, job arguments are their specified job IDs.
 This area is still a work in progress. When a foreground task is stopped with the **Ctrl+Z** signal, that process will
 be added to the background process list as a stopped job. When a supplied command ends with the **&** operator, this
 will specify to run the task the background as a running job. To resume a stopped job, executing the `bg <job_id>`
-command will send a `SIGCONT` to the specified job ID, hence resuming the job. The `fg` command doesn't work at the
-moment though (coming soon).
+command will send a `SIGCONT` to the specified job ID, hence resuming the job. The `fg` command will similarly do the
+same, but also set that task as the foreground process.
 
 #### Exiting the Shell
 
@@ -207,7 +207,7 @@ The `export` command works similarly to the `let` command, but instead of defini
 global variable that other processes can access.
 
 ```ion
-export PATH = "~/.cargo/bin:${PATH}"
+export PATH = ~/.cargo/bin:${PATH}
 ```
 
 ### Export Arithmetic

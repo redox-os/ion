@@ -1,25 +1,22 @@
 #[cfg(all(unix, not(target_os = "redox")))] use libc;
-#[cfg(all(unix, not(target_os = "redox")))] use nix::unistd::{self, ForkResult};
-#[cfg(all(unix, not(target_os = "redox")))] use nix::Error as NixError;
 #[cfg(target_os = "redox")] use syscall;
 use std::io::{self, Write};
 use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::os::unix::process::CommandExt;
 use std::fs::{File, OpenOptions};
-use std::process::exit;
-use super::job_control::{JobControl, ProcessState};
+use super::fork::{fork_pipe, create_process_group};
+use super::job_control::JobControl;
 use super::{JobKind, Shell};
 use super::status::*;
+use super::signals::{self, SignalHandler};
 use parser::peg::{Pipeline, RedirectFrom};
-
 use self::crossplat::*;
 
 /// The `crossplat` module contains components that are meant to be abstracted across
 /// different platforms
 #[cfg(not(target_os = "redox"))]
-mod crossplat {
-    use libc;
+pub mod crossplat {
     use nix::{fcntl, unistd};
     use parser::peg::{RedirectFrom};
     use std::fs::File;
@@ -27,48 +24,9 @@ mod crossplat {
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::process::{Stdio, Command};
 
-    /// The purpose of the signal handler is to ignore signals when it is active, and then continue
-    /// listening to signals once the handler is dropped.
-    pub struct SignalHandler;
-
-    impl SignalHandler {
-        pub fn new() -> SignalHandler {
-            unsafe { let _ = libc::signal(libc::SIGTTOU, libc::SIG_IGN); }
-            SignalHandler
-        }
-    }
-
-    impl Drop for SignalHandler {
-        fn drop(&mut self) {
-            unsafe { let _ = libc::signal(libc::SIGTTOU, libc::SIG_DFL); }
-        }
-    }
-
-    pub fn unblock_signals() {
-        unsafe {
-            use libc::*;
-            use std::mem;
-            use std::ptr;
-            let mut sigset = mem::uninitialized::<sigset_t>();
-            sigemptyset(&mut sigset as *mut sigset_t);
-            sigaddset(&mut sigset as *mut sigset_t, SIGTSTP);
-            sigaddset(&mut sigset as *mut sigset_t, SIGTTOU);
-            sigaddset(&mut sigset as *mut sigset_t, SIGTTIN);
-            sigaddset(&mut sigset as *mut sigset_t, SIGCHLD);
-            sigprocmask(SIG_UNBLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
-        }
-    }
-
-    /// When given a process ID, that process will be assigned to a new process group.
-    pub fn create_process_group() {
-        let _ = unistd::setpgid(0, 0);
-    }
-
     /// When given a process ID, that process's group will be assigned as the foreground process group.
     pub fn set_foreground(pid: u32) {
         let _ = unistd::tcsetpgrp(0, pid as i32);
-        let _ = unistd::tcsetpgrp(1, pid as i32);
-        let _ = unistd::tcsetpgrp(2, pid as i32);
     }
 
     pub fn get_pid() -> u32 {
@@ -77,10 +35,11 @@ mod crossplat {
 
     /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
     /// The content that is sent depends on `mode`
-    pub unsafe fn create_pipe(parent: &mut Command,
-                              child: &mut Command,
-                              mode: RedirectFrom) -> Result<(), Error>
-    {
+    pub unsafe fn create_pipe (
+        parent: &mut Command,
+        child: &mut Command,
+        mode: RedirectFrom
+    ) -> Result<(), Error> {
         let (reader, writer) = unistd::pipe2(fcntl::O_CLOEXEC)?;
         match mode {
             RedirectFrom::Stdout => {
@@ -105,38 +64,13 @@ mod crossplat {
 }
 
 #[cfg(target_os = "redox")]
-mod crossplat {
+pub mod crossplat {
     use parser::peg::{RedirectFrom};
     use std::fs::File;
     use std::io;
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::process::{Stdio, Command};
     use syscall;
-
-    /// The purpose of the signal handler is to ignore signals when it is active, and then continue
-    /// listening to signals once the handler is dropped.
-    pub struct SignalHandler;
-
-    impl SignalHandler {
-        pub fn new() -> SignalHandler {
-            // TODO
-            SignalHandler
-        }
-    }
-
-    impl Drop for SignalHandler {
-        fn drop(&mut self) {
-            // TODO
-        }
-    }
-
-    pub fn unblock_signals() {
-        // TODO
-    }
-
-    pub fn create_process_group() {
-        // TODO
-    }
 
     pub fn set_foreground(pid: u32) {
         // TODO
@@ -162,10 +96,11 @@ mod crossplat {
 
     /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
     /// The content that is sent depends on `mode`
-    pub unsafe fn create_pipe(parent: &mut Command,
-                              child: &mut Command,
-                              mode: RedirectFrom) -> Result<(), Error>
-    {
+    pub unsafe fn create_pipe (
+        parent: &mut Command,
+        child: &mut Command,
+        mode: RedirectFrom
+    ) -> Result<(), Error> {
         // XXX: Zero probably is a bad default for this, but `pipe2` will error if it fails, so
         // one could reason that it isn't dangerous.
         let mut fds: [usize; 2] = [0; 2];
@@ -266,49 +201,8 @@ impl<'a> PipelineExecution for Shell<'a> {
     }
 }
 
-enum Fork {
-    Parent(u32),
-    Child
-}
-
-#[cfg(target_os = "redox")]
-fn ion_fork() -> syscall::error::Result<Fork> {
-    use syscall::call::clone;
-    unsafe {
-        clone(0).map(|pid| {
-             if pid == 0 { Fork::Child } else { Fork::Parent(pid as u32) }
-        })
-    }
-}
-
-#[cfg(all(unix, not(target_os = "redox")))]
-fn ion_fork() -> Result<Fork, NixError> {
-    match unistd::fork()? {
-        ForkResult::Parent{ child: pid } => Ok(Fork::Parent(pid as u32)),
-        ForkResult::Child                => Ok(Fork::Child)
-    }
-}
-
-fn fork_pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
-    match ion_fork() {
-        Ok(Fork::Parent(pid)) => {
-            shell.send_to_background(pid, ProcessState::Running);
-            SUCCESS
-        },
-        Ok(Fork::Child) => {
-            unblock_signals();
-            create_process_group();
-            exit(pipe(shell, commands, false));
-        },
-        Err(why) => {
-            eprintln!("ion: background fork failed: {}", why);
-            FAILURE
-        }
-    }
-}
-
 /// This function will panic if called with an empty slice
-fn pipe (
+pub fn pipe (
     shell: &mut Shell,
     commands: Vec<(Command, JobKind)>,
     foreground: bool
@@ -345,7 +239,7 @@ fn pipe (
                     macro_rules! spawn_proc {
                         ($cmd:expr) => {{
                             let child = $cmd.before_exec(move || {
-                                unblock_signals();
+                                signals::unblock();
                                 create_process_group();
                                 Ok(())
                             }).spawn();
@@ -357,9 +251,11 @@ fn pipe (
                                 },
                                 Err(e) => {
                                     children.push(None);
-                                    eprintln!("ion: failed to spawn `{}`: {}",
-                                              get_command_name($cmd),
-                                              e);
+                                    eprintln! (
+                                        "ion: failed to spawn `{}`: {}",
+                                        get_command_name($cmd),
+                                        e
+                                    );
                                 }
                             }
                         }};
@@ -414,16 +310,19 @@ fn terminate_fg(shell: &mut Shell) {
 
 #[cfg(target_os = "redox")]
 fn terminate_fg(shell: &mut Shell) {
-        shell.foreground_send(syscall::SIGTERM as i32);
+    shell.foreground_send(syscall::SIGTERM as i32);
 }
 
 fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -> i32 {
     match command.before_exec(move || {
-        unblock_signals();
+        signals::unblock();
         create_process_group();
         Ok(())
     }).spawn() {
-        Ok(child) => wait_on_child(shell, child, foreground),
+        Ok(child) => {
+            if foreground { set_foreground(child.id()); }
+            shell.watch_foreground(child.id())
+        },
         Err(_) => {
             let stderr = io::stderr();
             let mut stderr = stderr.lock();
@@ -431,11 +330,6 @@ fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -
             FAILURE
         }
     }
-}
-
-fn wait_on_child(shell: &mut Shell, child: Child, foreground: bool) -> i32 {
-    if foreground { set_foreground(child.id()); }
-    shell.watch_foreground(child.id())
 }
 
 /// This function will panic if called with an empty vector

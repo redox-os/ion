@@ -3,11 +3,14 @@ mod completer;
 pub mod directory_stack;
 pub mod flags;
 pub mod flow_control;
+pub mod foreground;
 mod flow;
+pub mod fork;
 mod history;
 pub mod job_control;
 mod job;
 mod pipe;
+pub mod signals;
 pub mod status;
 pub mod variables;
 
@@ -36,6 +39,7 @@ use smallstring::SmallString;
 use self::completer::{MultiCompleter, IonFileCompleter};
 use self::directory_stack::DirectoryStack;
 use self::flow_control::{FlowControl, Function, FunctionArgument, Statement, Type};
+use self::foreground::ForegroundSignals;
 use self::job_control::{JobControl, BackgroundProcess};
 use self::variables::Variables;
 use self::status::*;
@@ -103,6 +107,7 @@ pub struct Shell<'a> {
     foreground: Vec<u32>,
     pub background: Arc<Mutex<Vec<BackgroundProcess>>>,
     pub received_sigtstp: bool,
+    pub foreground_signals: Arc<ForegroundSignals>
 }
 
 impl<'a> Shell<'a> {
@@ -126,6 +131,7 @@ impl<'a> Shell<'a> {
             foreground: Vec::new(),
             background: Arc::new(Mutex::new(Vec::new())),
             received_sigtstp: false,
+            foreground_signals: Arc::new(ForegroundSignals::new())
         }
     }
 
@@ -276,6 +282,12 @@ impl<'a> Shell<'a> {
                 }
             }
             self.on_command(&buffer.consume());
+        }
+        // The flow control level being non zero means that we have a statement that has
+        // only been partially parsed.
+        if self.flow_control.level != 0 {
+            eprintln!("ion: unexpected end of script: expected end block for `{}`",
+                      self.flow_control.current_statement.short());
         }
     }
 

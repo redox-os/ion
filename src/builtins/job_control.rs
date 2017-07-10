@@ -1,36 +1,12 @@
+//! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job control in the shell.
 use shell::Shell;
 use shell::job_control::{JobControl, ProcessState};
 use shell::status::*;
+use shell::signals;
 use std::io::{stderr, Write};
-#[cfg(all(unix, not(target_os = "redox")))] use libc::pid_t;
-#[cfg(not(target_os = "redox"))] use nix::sys::signal::{self, Signal};
-#[cfg(not(target_os = "redox"))] use nix::unistd;
 
-#[cfg(all(unix, not(target_os = "redox")))]
-/// When given a process ID, that process's group will be assigned as the foreground process group.
-pub fn set_foreground(pid: u32) {
-    let _ = unistd::tcsetpgrp(0, pid as i32);
-    let _ = unistd::tcsetpgrp(1, pid as i32);
-    let _ = unistd::tcsetpgrp(2, pid as i32);
-}
-
-#[cfg(target_os = "redox")]
-pub fn set_foreground(pid: u32) {
-    // TODO
-}
-
-#[cfg(all(unix, not(target_os = "redox")))]
-/// Suspends a given process by it's process ID.
-pub fn suspend(pid: u32) {
-    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGSTOP));
-}
-
-#[cfg(all(unix, not(target_os = "redox")))]
-/// Resumes a given process by it's process ID.
-fn resume(pid: u32) {
-    let _ = signal::kill(-(pid as pid_t), Some(Signal::SIGCONT));
-}
-
+/// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
+/// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark SIGHUP ignoral.
 pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
     let stderr = stderr();
     let mut stderr = stderr.lock();
@@ -94,19 +70,6 @@ pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
     SUCCESS
 }
 
-
-#[cfg(target_os = "redox")]
-pub fn suspend(pid: u32) {
-    use syscall;
-    let _ = syscall::kill(pid as usize, syscall::SIGSTOP);
-}
-
-#[cfg(target_os = "redox")]
-fn resume(pid: u32) {
-    use syscall;
-    let _ = syscall::kill(pid as usize, syscall::SIGCONT);
-}
-
 /// Display a list of all jobs running in the background.
 pub fn jobs(shell: &mut Shell) {
     let stderr = stderr();
@@ -119,6 +82,9 @@ pub fn jobs(shell: &mut Shell) {
     }
 }
 
+/// Hands control of the foreground process to the specified jobs, recording their exit status.
+/// If the job is stopped, the job will be resumed.
+/// If multiple jobs are given, then only the last job's exit status will be returned.
 pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
     let mut status = 0;
     for arg in args {
@@ -133,24 +99,19 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
                 continue
             }
 
-            match job.state {
-                ProcessState::Running => {
-                    set_foreground(njob);
-                    // TODO: This doesn't work
-                    status = shell.watch_foreground(njob)
-                },
-                ProcessState::Stopped => {
-                    resume(job.pid);
-                    set_foreground(njob);
-                    // TODO: This doesn't work
-                    status = shell.watch_foreground(njob);
-                },
+            // Bring the process into the foreground and wait for it to finish.
+            status = match job.state {
+                // Give the bg task the foreground, and wait for it to finish.
+                ProcessState::Running => shell.set_bg_task_in_foreground(job.pid, false),
+                // Same as above, but also resumes the stopped process in advance.
+                ProcessState::Stopped => shell.set_bg_task_in_foreground(job.pid, true),
+                // Informs the user that the specified job ID no longer exists.
                 ProcessState::Empty => {
                     let stderr = stderr();
                     let _ = writeln!(stderr.lock(), "ion: fg: job {} does not exist", njob);
-                    status = FAILURE;
+                    FAILURE
                 }
-            }
+            };
         } else {
             let stderr = stderr();
             let _ = writeln!(stderr.lock(), "ion: fg: {} is not a valid job number", arg);
@@ -159,6 +120,7 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
     status
 }
 
+/// Resumes a stopped background process, if it was stopped.
 pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
     let mut error = false;
     let stderr = stderr();
@@ -171,11 +133,7 @@ pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
                         let _ = writeln!(stderr, "ion: bg: job {} is already running", njob);
                         error = true;
                     },
-                    ProcessState::Stopped => {
-                        resume(job.pid);
-                        job.state = ProcessState::Running;
-                        let _ = writeln!(stderr, "[{}] {} Running", njob, job.pid);
-                    },
+                    ProcessState::Stopped => signals::resume(job.pid),
                     ProcessState::Empty => {
                         let _ = writeln!(stderr, "ion: bg: job {} does not exist", njob);
                         error = true;
