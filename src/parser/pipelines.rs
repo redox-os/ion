@@ -284,8 +284,8 @@ impl<'a> Collector<'a> {
 #[cfg(test)]
 mod tests {
     use shell::flow_control::Statement;
-    use parser::peg::{parse, RedirectFrom, Redirection};
-    use shell::JobKind;
+    use parser::peg::{parse, Pipeline, RedirectFrom, Redirection};
+    use shell::{Job, JobKind};
     use types::*;
 
     #[test]
@@ -630,6 +630,56 @@ mod tests {
         } else {
             assert!(false);
         }
+    }
+
+    #[test]
+    fn pipeline_with_redirection_append_stderr() {
+        let input = "cat | echo hello | cat < stuff ^>> other";
+        let expected = Pipeline {
+            jobs: vec![
+                Job::new(Array::from_vec(vec!["cat".into()]),
+                         JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(Array::from_vec(vec!["echo".into(), "hello".into()]),
+                         JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(Array::from_vec(vec!["cat".into()]), JobKind::Last)
+            ],
+            stdin: Some(Redirection {
+                from: RedirectFrom::Stdout,
+                file: "stuff".into(),
+                append: false
+            }),
+            stdout: Some(Redirection {
+                from: RedirectFrom::Stderr,
+                file: "other".into(),
+                append: true
+            })
+        };
+        assert_eq!(parse(input), Statement::Pipeline(expected));
+    }
+
+    #[test]
+    fn pipeline_with_redirection_append_both() {
+        let input = "cat | echo hello | cat < stuff &>> other";
+        let expected = Pipeline {
+            jobs: vec![
+                Job::new(Array::from_vec(vec!["cat".into()]),
+                         JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(Array::from_vec(vec!["echo".into(), "hello".into()]),
+                         JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(Array::from_vec(vec!["cat".into()]), JobKind::Last)
+            ],
+            stdin: Some(Redirection {
+                from: RedirectFrom::Stdout,
+                file: "stuff".into(),
+                append: false
+            }),
+            stdout: Some(Redirection {
+                from: RedirectFrom::Both,
+                file: "other".into(),
+                append: true
+            })
+        };
+        assert_eq!(parse(input), Statement::Pipeline(expected));
     }
 
     #[test]
