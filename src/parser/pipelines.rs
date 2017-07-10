@@ -7,36 +7,11 @@
 // - Fix the cyclomatic complexity issue
 
 use std::collections::HashSet;
-use std::iter::{Peekable, Enumerate};
-use std::str::Bytes;
+use std::iter::Peekable;
 
 use parser::peg::{Pipeline, Redirection, RedirectFrom};
 use shell::{Job, JobKind};
 use types::*;
-
-bitflags! {
-    pub struct NormalFlags : u8 {
-        const BACKSLASH = 1;
-        const SINGLE_QUOTE = 2;
-        const DOUBLE_QUOTE = 4;
-        const ARRAY_PROCESS = 8;
-        const METHOD = 16;
-        const PROCESS_TWO = 32;
-        const IS_VALID = SINGLE_QUOTE.bits
-                       | METHOD.bits
-                       | PROCESS_TWO.bits
-                       | ARRAY_PROCESS.bits;
-    }
-}
-
-bitflags! {
-    pub struct VariableFlags : u8 {
-        const ARRAY = 1;
-        const VARIABLE = 2;
-        const ARRAY_CHAR_FOUND = 4;
-        const VAR_CHAR_FOUND = 8;
-    }
-}
 
 pub struct Collector<'a> {
     data: &'a str,
@@ -168,15 +143,14 @@ impl<'a> Collector<'a> {
         }
     }
 
-    fn iter(&self) -> Peekable<Enumerate<Bytes<'a>>> { self.data.bytes().enumerate().peekable() }
-
     pub fn parse(&self) -> Result<Pipeline, &'static str> {
-        let mut bytes = self.iter();
+        let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Array::new();
         let mut jobs: Vec<Job> = Vec::new();
         let mut infile: Option<Redirection> = None;
         let mut outfile: Option<Redirection> = None;
 
+        /// Attempt to create a new job given a list of collected arguments
         macro_rules! try_add_job {
             ($kind:expr) => {{
                 if ! args.is_empty() {
@@ -186,6 +160,7 @@ impl<'a> Collector<'a> {
             }}
         }
 
+        /// Attempt to create a job that redirects to some output file
         macro_rules! try_redir_out {
             ($from:expr) => {{
                 try_add_job!(JobKind::Last);
@@ -208,9 +183,10 @@ impl<'a> Collector<'a> {
             }}
         }
 
+        /// Add a new argument that is re
         macro_rules! push_arg {
-            ($arg:expr) => {{
-                if let Some(v) = $arg {
+            () => {{
+                if let Some(v) = self.arg(&mut bytes)? {
                     args.push(v.into());
                 }
             }}
@@ -255,9 +231,7 @@ impl<'a> Collector<'a> {
                             bytes.next();
                             try_add_job!(JobKind::Pipe(RedirectFrom::Stderr));
                         },
-                        Some(_) | None => {
-                            push_arg!(self.arg(&mut bytes)?);
-                        }
+                        Some(_) | None => push_arg!(),
                     }
                 },
                 b'|' => {
@@ -293,8 +267,8 @@ impl<'a> Collector<'a> {
                 b' ' | b'\t' => {
                     bytes.next();
                 },
-                // Assume that the next character starts a job and parse that job
-                _ => push_arg!(self.arg(&mut bytes)?),
+                // Assume that the next character starts an argument and parse that argument
+                _ => push_arg!(),
             }
         }
 
