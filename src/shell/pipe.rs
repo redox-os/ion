@@ -245,7 +245,6 @@ pub fn pipe (
                             }).spawn();
                             match child {
                                 Ok(child) => {
-                                    if foreground { set_foreground(child.id()); }
                                     shell.foreground.push(child.id());
                                     children.push(Some(child))
                                 },
@@ -285,7 +284,7 @@ pub fn pipe (
                     }
 
                     previous_kind = kind;
-                    previous_status = wait(shell, &mut children, remember);
+                    previous_status = wait(shell, &mut children, remember, foreground);
                     if previous_status == TERMINATED {
                         terminate_fg(shell);
                         return previous_status;
@@ -333,12 +332,18 @@ fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -
 }
 
 /// This function will panic if called with an empty vector
-fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>, commands: Vec<Command>) -> i32 {
+fn wait (
+    shell: &mut Shell,
+    children: &mut Vec<Option<Child>>,
+    commands: Vec<Command>,
+    foreground: bool
+) -> i32 {
     let end = children.len() - 1;
     for entry in children.drain(..end).zip(commands.into_iter()) {
         // _cmd is never used here, but it is important that it gets dropped at the end of this
         // block in order to write EOF to the pipes that it owns.
         if let (Some(child), _cmd) = entry {
+            if foreground { set_foreground(child.id()); }
             let status = shell.watch_foreground(child.id());
             if status == TERMINATED {
                 return status
@@ -347,6 +352,7 @@ fn wait(shell: &mut Shell, children: &mut Vec<Option<Child>>, commands: Vec<Comm
     }
 
     if let Some(child) = children.pop().unwrap() {
+        if foreground { set_foreground(child.id()); }
         shell.watch_foreground(child.id())
     } else {
         NO_SUCH_COMMAND
