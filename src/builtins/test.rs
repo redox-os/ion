@@ -1,4 +1,4 @@
-use std::io::{self, Write, BufWriter};
+use std::io::{self, BufWriter};
 use std::fs;
 use std::path::Path;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
@@ -119,37 +119,34 @@ pub fn test(args: &[&str]) -> Result<bool, String> {
     evaluate_arguments(arguments, &mut buffer)
 }
 
-fn evaluate_arguments(arguments: &[&str], buffer: &mut BufWriter<io::StdoutLock>) -> Result<bool, String> {
-    if let Some(arg) = arguments.first() {
-        if *arg == "--help" {
+fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W) -> Result<bool, String> {
+    match arguments.first() {
+        Some(&"--help") => {
             buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| x.description().to_owned())?;
             buffer.flush().map_err(|x| x.description().to_owned())?;
-
-            return Ok(true);
-        }
-        let mut characters = arg.chars().take(2);
-        return match characters.next().unwrap() {
-            '-' => {
-                // If no flag was given, return `SUCCESS`
-                characters.next().map_or(Ok(true), |flag| {
-                    // If no argument was given, return `SUCCESS`
-                    arguments.get(1).map_or(Ok(true), |argument| {
-                        // match the correct function to the associated flag
-                        Ok(match_flag_argument(flag, argument))
-                    })
+            Ok(true)
+        },
+        Some(&s) if s.starts_with("-") => {
+            // Access the second character in the flag string: this will be type of the flag.
+            // If no flag was given, return `SUCCESS`
+            s.chars().nth(1).map_or(Ok(true), |flag| {
+                // If no argument was given, return `SUCCESS`
+                arguments.get(1).map_or(Ok(true), { |arg|
+                    // Match the correct function to the associated flag
+                    Ok(match_flag_argument(flag, arg))
                 })
-            },
-            _   => {
-                // If there is no operator, check if the first argument is non-zero
-                arguments.get(1).map_or(Ok(string_is_nonzero(arg)), |operator| {
-                    // If there is no right hand argument, a condition was expected
-                    let right_arg = arguments.get(2).ok_or_else(|| SmallString::from("parse error: condition expected"))?;
-                    evaluate_expression(arg, operator, right_arg)
-                })
-            },
-        };
-    } else {
-        return Ok(false);
+            })
+        },
+        Some(arg) => {
+            // If there is no operator, check if the first argument is non-zero
+            arguments.get(1).map_or(Ok(string_is_nonzero(arg)), |operator| {
+                // If there is no right hand argument, a condition was expected
+                let right_arg = arguments.get(2).ok_or_else(||
+                    SmallString::from("parse error: condition expected"))?;
+                evaluate_expression(arg, operator, right_arg)
+            })
+        },
+        None => Ok(false)
     }
 }
 
@@ -364,6 +361,15 @@ fn test_strings() {
     assert_eq!(string_is_nonzero("NOT ZERO"), true);
     assert_eq!(string_is_nonzero(""), false);
 }
+
+#[test]
+fn test_empty_str() {
+    let mut empty = BufWriter::new(io::sink());
+    let mut eval = |args: Vec<&str>| evaluate_arguments(&args, &mut empty);
+    assert_eq!(eval(vec![""]), Ok(false));
+    assert_eq!(eval(vec!["c", "=", ""]), Ok(false));
+}
+
 
 #[test]
 fn test_integers_arguments() {
