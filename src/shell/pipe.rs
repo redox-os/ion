@@ -5,6 +5,7 @@ use std::process::{Stdio, Command, Child};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::os::unix::process::CommandExt;
 use std::fs::{File, OpenOptions};
+use super::flags::*;
 use super::fork::{fork_pipe, create_process_group};
 use super::job_control::JobControl;
 use super::{JobKind, Shell};
@@ -128,12 +129,18 @@ pub mod crossplat {
     }
 }
 
-// This function serves two purposes:
-// 1. If the result is `Some`, then we will fork the pipeline executing into the background.
-// 2. The value stored within `Some` will be that background job's command name.
-fn check_if_background_job(pipeline: &Pipeline) -> Option<String> {
+/// This function serves three purposes:
+/// 1. If the result is `Some`, then we will fork the pipeline executing into the background.
+/// 2. The value stored within `Some` will be that background job's command name.
+/// 3. If `set -x` was set, print the command.
+fn check_if_background_job(pipeline: &Pipeline, print_comm: bool) -> Option<String> {
     if pipeline.jobs[pipeline.jobs.len()-1].kind == JobKind::Background {
-        Some(pipeline.to_string())
+        let command = pipeline.to_string();
+        if print_comm { eprintln!("> {}", command); }
+        Some(command)
+    } else if print_comm {
+        eprintln!("> {}", pipeline.to_string());
+        None
     } else {
         None
     }
@@ -145,7 +152,7 @@ pub trait PipelineExecution {
 
 impl<'a> PipelineExecution for Shell<'a> {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
-        let background_string = check_if_background_job(&pipeline);
+        let background_string = check_if_background_job(&pipeline, self.flags & PRINT_COMMS != 0);
 
         // Generate a list of commands from the given pipeline
         let mut piped_commands: Vec<(Command, JobKind)> = pipeline.jobs

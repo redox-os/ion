@@ -8,13 +8,18 @@ const HELP: &'static str = r#"NAME
     set - Set or unset values of shell options and positional parameters.
 
 SYNOPSIS
-    set [ --help ] [-e | +e] [- | --] [STRING]...
+    set [ --help ] [-e | +e] [-x | +x] [-o [vi | emacs]] [- | --] [STRING]...
 
 DESCRIPTION
     Shell options may be set using the '-' character, and unset using the '+' character.
 
 OPTIONS
     -e  Exit immediately if a command exits with a non-zero status.
+
+    -o  Specifies that an argument will follow that sets the key map.
+        The keymap argument may be either `vi` or `emacs`.
+
+    -x  Specifies that commands will be printed as they are executed.
 
     --  Following arguments will be set as positional arguments in the shell.
         If no argument are supplied, arguments will be unset.
@@ -67,7 +72,8 @@ pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
                                 return 0
                             }
                         }
-                    }
+                    },
+                    b'x' => shell.flags |= PRINT_COMMS,
                     _ => {
                         return 0
                     }
@@ -77,6 +83,7 @@ pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
             for flag in arg.bytes().skip(1) {
                 match flag {
                     b'e' => shell.flags &= 255 ^ ERR_EXIT,
+                    b'x' => shell.flags &= 255 ^ PRINT_COMMS,
                     _ => {
                         return 0
                     }

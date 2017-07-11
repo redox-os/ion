@@ -38,6 +38,7 @@ use types::*;
 use smallstring::SmallString;
 use self::completer::{MultiCompleter, IonFileCompleter};
 use self::directory_stack::DirectoryStack;
+use self::flags::*;
 use self::flow_control::{FlowControl, Function, FunctionArgument, Statement, Type};
 use self::foreground::ForegroundSignals;
 use self::job_control::{JobControl, BackgroundProcess};
@@ -474,6 +475,7 @@ impl<'a> Shell<'a> {
         } {
             // Run the 'main' of the command and set exit_status
             if pipeline.jobs.len() == 1 && pipeline.stdin == None && pipeline.stdout == None {
+                if self.flags & PRINT_COMMS != 0 { eprintln!("> {}", pipeline.to_string()); }
                 let borrowed = &pipeline.jobs[0].args;
                 let small: SmallVec<[&str; 4]> = borrowed.iter()
                     .map(|x| x as &str)
@@ -560,6 +562,7 @@ impl<'a> Shell<'a> {
             Path::new(&pipeline.jobs[0].command).is_dir()
         {
             // This branch implements implicit cd support.
+            if self.flags & PRINT_COMMS != 0 { eprintln!("> cd {}", pipeline.to_string()); }
             let mut new_args: SmallVec<[&str; 4]> = SmallVec::new();
             new_args.push("cd");
             new_args.extend(pipeline.jobs[0].args.iter().map(|x| x as &str));
