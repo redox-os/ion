@@ -6,367 +6,286 @@
 // - Implement Heredocs
 // - Fix the cyclomatic complexity issue
 
+use std::collections::HashSet;
+use std::iter::Peekable;
+
 use parser::peg::{Pipeline, Redirection, RedirectFrom};
 use shell::{Job, JobKind};
 use types::*;
 
-bitflags! {
-    pub struct NormalFlags : u8 {
-        const BACKSLASH = 1;
-        const SINGLE_QUOTE = 2;
-        const DOUBLE_QUOTE = 4;
-        const ARRAY_PROCESS = 8;
-        const METHOD = 16;
-        const PROCESS_TWO = 32;
-        const IS_VALID = SINGLE_QUOTE.bits
-                       | METHOD.bits
-                       | PROCESS_TWO.bits
-                       | ARRAY_PROCESS.bits;
-    }
+pub struct Collector<'a> {
+    data: &'a str,
 }
 
-bitflags! {
-    pub struct VariableFlags : u8 {
-        const ARRAY = 1;
-        const VARIABLE = 2;
-        const ARRAY_CHAR_FOUND = 4;
-        const VAR_CHAR_FOUND = 8;
-    }
+lazy_static! {
+    /// The set of bytes that will always indicate an end of an arg
+    static ref FOLLOW_ARGS: HashSet<u8> = b"&|<> \t".into_iter().map(|b| *b).collect();
 }
 
-#[derive(PartialEq)]
-enum RedirMode { False, Stdin, Stdout(RedirectFrom), StdoutAppend(RedirectFrom) }
+impl<'a> Collector<'a> {
 
-/// Determine which type of job will be selected based on the next character.
-///
-/// - If the `|` char was found and the next character is `|`, it's `Or`
-/// - If the `&` char was found and the next character is `&`, it's `And`
-fn get_job_kind(args: &str, index: usize, pipe_char_was_found: bool) -> (JobKind, bool) {
-    if pipe_char_was_found {
-        if args.bytes().nth(index) == Some(b'|') {
-            (JobKind::Or, true)
+    pub fn new(data: &'a str) -> Self {
+        Collector { data }
+    }
+
+    pub fn run(data: &'a str) -> Result<Pipeline, &'static str> {
+        Collector::new(data).parse()
+    }
+
+    fn peek(&self, index: usize) -> Option<u8> {
+        if index < self.data.len() {
+            Some(self.data.as_bytes()[index])
         } else {
-            (JobKind::Pipe(RedirectFrom::Stdout), false)
+            None
         }
-    } else if args.bytes().nth(index) == Some(b'&') {
-        (JobKind::And, true)
-    } else {
-        (JobKind::Background, false)
     }
-}
 
-#[allow(cyclomatic_complexity)]
-/// Parses each individual pipeline, separating arguments, pipes, background tasks, and redirections.
-pub fn collect(possible_error: &mut Option<&str>, args: &str) -> Pipeline {
-    let mut jobs: Vec<Job> = Vec::new();
-    let mut args_iter = args.bytes().peekable();
-    let (mut index, mut arg_start) = (0, 0);
-    let mut flags = NormalFlags::empty(); // (backslash, single_quote, double_quote, x, x, x, process_one, process_two)
-    let mut flags_ext = VariableFlags::empty();
-
-    let mut arguments = Array::new();
-
-    let (mut in_file, mut out_file) = (None, None);
-    let mut mode = RedirMode::False;
-    let (mut levels, mut array_levels, mut array_process_levels) = (0, 0, 0);
-
-    macro_rules! redir_check {
-        ($from:expr, $file:ident, $name:ident, $is_append:expr) => {{
-            if $file.is_none() {
-                if $name.is_empty() {
-                    *possible_error = Some("missing standard output file argument after '>'");
-                } else {
-                    $file = Some(Redirection {
-                        from:   $from,
-                        file:   unsafe { String::from_utf8_unchecked($name) },
-                        append: $is_append
-                    });
-                }
+    fn single_quoted<I>(&self, bytes: &mut Peekable<I>, start: usize)
+        -> Result<&'a str, &'static str>
+        where I: Iterator<Item=(usize, u8)>
+    {
+        while let Some(&(i, b)) = bytes.peek() {
+            match b {
+                // We return an inclusive range to keep the quote type intact
+                b'\'' => { bytes.next(); return Ok(&self.data[start..i+1]) },
+                _ => (),
             }
-        }}
+            bytes.next();
+        }
+        Err("ion: syntax error: unterminated single quote")
     }
 
-    'outer: loop {
+    fn double_quoted<I>(&self, bytes: &mut Peekable<I>, start: usize)
+        -> Result<&'a str, &'static str>
+        where I: Iterator<Item=(usize, u8)>
+    {
+        while let Some(&(i, b)) = bytes.peek() {
+            match b {
+                b'\\' => { bytes.next(); },
+                // We return an inclusive range to keep the quote type intact
+                b'"' => { bytes.next(); return Ok(&self.data[start..i+1]) },
+                _ => (),
+            }
+            bytes.next();
+        }
+        Err("ion: syntax error: unterminated quote")
+    }
 
-        macro_rules! redir_found {
-            ($kind:expr) => {{ mode = $kind; index += 1; arg_start = index; continue 'outer }}
+    fn arg<I>(&self, bytes: &mut Peekable<I>)
+        -> Result<Option<&'a str>, &'static str>
+        where I: Iterator<Item=(usize, u8)>
+    {
+        // XXX: I don't think its the responsibility of the pipeline parser to do this but I'm
+        // not sure of a better solution
+        let mut array_level = 0;
+        let mut proc_level = 0;
+        let mut start = None;
+        let mut end = None;
+
+        macro_rules! is_toplevel { () => (array_level == 0 && proc_level == 0) }
+
+        // Skip over any leading whitespace
+        while let Some(&(_, b)) = bytes.peek() {
+            match b {
+                b' ' | b'\t' => { bytes.next(); }
+                _ => break,
+            }
         }
 
-        macro_rules! job_found {
-            ($from:expr, $pipe_char_was_found:expr) => {{
-
-                let (kind, advance) = match $from {
-                    RedirectFrom::Stdout => get_job_kind(args, index+1, $pipe_char_was_found),
-                    _ => {
-                        arg_start += 1;
-                        index += 1;
-                        (JobKind::Pipe($from), true)
+        while let Some(&(i, b)) = bytes.peek() {
+            if start.is_none() { start = Some(i) }
+            match b {
+                b'(' => { proc_level += 1; bytes.next(); }
+                b')' => { proc_level -= 1; bytes.next(); }
+                b'[' => { array_level += 1; bytes.next(); }
+                b']' => { array_level -= 1; bytes.next(); }
+                // This is a tricky one: we only end the argment if `^` is followed by a
+                // redirection character
+                b'^' => if is_toplevel!() {
+                    if let Some(next_byte) = self.peek(i + 1) {
+                        // If the next byte is for stderr to file or next process, end this
+                        // argument
+                        if next_byte == b'>' || next_byte == b'|' {
+                            end = Some(i);
+                            break;
+                        }
                     }
-                };
+                    // Reaching this block means that either there is no next byte, or the next
+                    // byte is none of '>' or '|', indicating that this is not the beginning of
+                    // a redirection for stderr
+                    bytes.next();
+                },
+                // Evaluate a quoted string but do not return it
+                // We pass in i, the index of a quote, but start a character later. This ensures
+                // the production rules will produce strings with the quotes intact
+                b'"' => {
+                    bytes.next();
+                    self.double_quoted(bytes, i)?;
+                },
+                b'\'' => {
+                    bytes.next();
+                    self.single_quoted(bytes, i)?;
+                },
+                // If we see a byte from the follow set, we've definitely reached the end of
+                // the arguments
+                c if FOLLOW_ARGS.contains(&c) && is_toplevel!() => {
+                    end = Some(i);
+                    break;
+                },
+                // By default just pop the next byte: it will be part of the argument
+                _ => { bytes.next(); }
+            }
+        }
+        match (start, end) {
+            (Some(i), Some(j)) if i < j => Ok(Some(&self.data[i..j])),
+            (Some(i), None) => Ok(Some(&self.data[i..])),
+            _ => Ok(None)
+        }
+    }
 
-                // If either `And` or `Or` was found, advance the iterator once.
-                if advance { let _ = args_iter.next(); }
+    pub fn parse(&self) -> Result<Pipeline, &'static str> {
+        let mut bytes = self.data.bytes().enumerate().peekable();
+        let mut args = Array::new();
+        let mut jobs: Vec<Job> = Vec::new();
+        let mut infile: Option<Redirection> = None;
+        let mut outfile: Option<Redirection> = None;
 
-                if arguments.is_empty() {
-                    jobs.push(
-                        Job::new(
-                            Some(args[arg_start..index].into()).into_iter().collect(),
-                            kind
-                        )
-                    );
-                } else {
-                    let byte_index = if $from == RedirectFrom::Stdout { index-1 } else { index-2 };
-                    if args.as_bytes()[byte_index] != b' ' {
-                        arguments.push(args[arg_start..index].into());
-                    }
-                    jobs.push(Job::new(arguments.clone(), kind));
-                    arguments.clear();
+        /// Attempt to create a new job given a list of collected arguments
+        macro_rules! try_add_job {
+            ($kind:expr) => {{
+                if ! args.is_empty() {
+                    jobs.push(Job::new(args.clone(), $kind));
+                    args.clear();
                 }
-                if advance { index += 1; }
-                arg_start = index + 1;
             }}
         }
 
-        match mode {
-            RedirMode::False => {
-                while let Some(character) = args_iter.next() {
-                    match character {
-                        _ if flags.contains(BACKSLASH) => flags ^= BACKSLASH,
-                        b'\\'                          => flags ^= BACKSLASH,
-                        b'@'                           => {
-                            flags_ext |= ARRAY | ARRAY_CHAR_FOUND;
-                            index += 1;
-                            continue
-                        },
-                        b'$' if !flags.contains(IS_VALID) => {
-                            flags_ext |= VARIABLE | VAR_CHAR_FOUND;
-                            index += 1;
-                            continue
-                        },
-                        b'['                      => array_levels += 1,
-                        b']' if array_levels != 0 => array_levels -= 1,
-                        b'(' if flags_ext.contains(VAR_CHAR_FOUND) => {
-                            flags |= PROCESS_TWO;
-                            levels += 1;
-                        },
-                        b'(' if flags_ext.contains(ARRAY_CHAR_FOUND) => {
-                            flags |= ARRAY_PROCESS;
-                            array_process_levels += 1;
-                        },
-                        b'(' if flags_ext.intersects(VARIABLE | ARRAY) => {
-                            flags |= METHOD;
-                            flags_ext -= VARIABLE | ARRAY;
-                        },
-                        b')' if levels == 0 && flags.contains(METHOD) && !flags.contains(SINGLE_QUOTE) => {
-                            flags -= METHOD;
-                        }
-                        b')' if flags.contains(ARRAY_PROCESS) => array_process_levels -= 1,
-                        b')' if flags.contains(PROCESS_TWO) => {
-                            levels -= 0;
-                            if levels == 0 { flags -= PROCESS_TWO; }
-                        },
-                        b'\'' => { flags ^= SINGLE_QUOTE; flags_ext -= VARIABLE | ARRAY; },
-                        b'"'  => { flags ^= DOUBLE_QUOTE; flags_ext -= VARIABLE | ARRAY; },
-                        b' ' | b'\t' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
-                            && array_process_levels == 0 =>
-                        {
-                            if arg_start != index {
-                                arguments.push(
-                                    args[arg_start..index].into()
-                                );
-                                arg_start = index + 1;
-                            } else {
-                                arg_start += 1;
-                            }
-                        },
-                        b'|' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
-                            && array_process_levels == 0 => job_found!(RedirectFrom::Stdout, true),
-                        b'&' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
-                            && array_process_levels == 0 => {
-                            match args_iter.peek() {
-                                Some(&b'>') => {
-                                    let _ = args_iter.next();
-                                    redir_found!(RedirMode::Stdout(RedirectFrom::Both));
-                                },
-                                Some(&b'|') => {
-                                    let _ = args_iter.next();
-                                    job_found!(RedirectFrom::Both, true);
-                                },
-                                _ => job_found!(RedirectFrom::Stdout, false)
-                            }
-                        },
-                        b'^' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
-                            && array_process_levels == 0 => {
-                            match args_iter.peek() {
-                                Some(&b'>') => {
-                                    let _ = args_iter.next();
-                                    redir_found!(RedirMode::Stdout(RedirectFrom::Stderr));
-                                },
-                                Some(&b'|') => {
-                                    let _ = args_iter.next();
-                                    job_found!(RedirectFrom::Stderr, true);
-                                }
-                                _ => ()
-                            }
-                        },
-                        b'>' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
-                            && array_process_levels == 0 => redir_found!(RedirMode::Stdout(RedirectFrom::Stdout)),
-                        b'<' if !flags.intersects(DOUBLE_QUOTE | IS_VALID) && array_levels == 0
-                            && array_process_levels == 0 => redir_found!(RedirMode::Stdin),
-                        0...47 | 58...64 | 91...94 | 96 | 123...127 => flags_ext -= VARIABLE | ARRAY,
-                        _ => (),
-                    }
-                    flags_ext -= VAR_CHAR_FOUND | ARRAY_CHAR_FOUND;
-                    index += 1;
+        /// Attempt to create a job that redirects to some output file
+        macro_rules! try_redir_out {
+            ($from:expr) => {{
+                try_add_job!(JobKind::Last);
+                let append = if let Some(&(_, b'>')) = bytes.peek() {
+                    // Consume the next byte if it is part of the redirection
+                    bytes.next();
+                    true
+                } else {
+                    false
+                };
+                if let Some(file) = self.arg(&mut bytes)? {
+                    outfile = Some(Redirection {
+                        from: $from,
+                        file: file.into(),
+                        append
+                    });
+                } else {
+                    return Err("expected file argument after redirection for output");
                 }
-                break 'outer
-            },
-            RedirMode::Stdout(from) | RedirMode::StdoutAppend(from) => {
-                match args_iter.next() {
-                    Some(character) => if character == b'>' { mode = RedirMode::StdoutAppend(from); },
-                    None => {
-                        *possible_error = Some("missing standard output file argument after '>'");
-                        break 'outer
-                    }
-                }
+            }}
+        }
 
-                let mut stdout_file = Vec::new();
-                let mut found_file = false;
-                while let Some(character) = args_iter.next() {
-                    if found_file {
-                        if character == b'<' {
-                            if in_file.is_some() {
-                                break 'outer
-                            } else {
-                                mode = RedirMode::Stdin;
-                                continue 'outer
-                            }
+        /// Add a new argument that is re
+        macro_rules! push_arg {
+            () => {{
+                if let Some(v) = self.arg(&mut bytes)? {
+                    args.push(v.into());
+                }
+            }}
+        }
+
+        while let Some(&(i, b)) = bytes.peek() {
+            // Determine what production rule we are using based on the first character
+            match b {
+                b'&' => {
+                    // We have effectively consumed this byte
+                    bytes.next();
+                    match bytes.peek() {
+                        Some(&(_, b'>')) => {
+                            // And this byte
+                            bytes.next();
+                            try_redir_out!(RedirectFrom::Both);
+                        },
+                        Some(&(_, b'|')) => {
+                            bytes.next();
+                            try_add_job!(JobKind::Pipe(RedirectFrom::Both));
+                        },
+                        Some(&(_, b'&')) => {
+                            bytes.next();
+                            try_add_job!(JobKind::And);
+                        },
+                        Some(_) | None => {
+                            try_add_job!(JobKind::Background);
                         }
+                    }
+                },
+                b'^' => {
+                    // We do not immediately consume this byte as it could just be the start of
+                    // a new argument
+                    match self.peek(i + 1) {
+                        Some(b'>') => {
+                            bytes.next();
+                            bytes.next();
+                            try_redir_out!(RedirectFrom::Stderr);
+                        },
+                        Some(b'|') => {
+                            bytes.next();
+                            bytes.next();
+                            try_add_job!(JobKind::Pipe(RedirectFrom::Stderr));
+                        },
+                        Some(_) | None => push_arg!(),
+                    }
+                },
+                b'|' => {
+                    bytes.next();
+                    match bytes.peek() {
+                        Some(&(_, b'|')) => {
+                            bytes.next();
+                            try_add_job!(JobKind::Or);
+                        }
+                        Some(_) | None => {
+                            try_add_job!(JobKind::Pipe(RedirectFrom::Stdout));
+                        }
+                    }
+                },
+                b'>' => {
+                    bytes.next();
+                    try_redir_out!(RedirectFrom::Stdout);
+                },
+                b'<' => {
+                    bytes.next();
+                    if let Some(file) = self.arg(&mut bytes)? {
+                        infile = Some(Redirection {
+                            from: RedirectFrom::Stdout,
+                            file: file.into(),
+                            append: false,
+                        });
                     } else {
-                        match character {
-                            _ if flags.contains(BACKSLASH) => {
-                                stdout_file.push(character);
-                                flags ^= BACKSLASH;
-                            }
-                            b'\\' => flags ^= BACKSLASH,
-                            b' ' | b'\t' | b'|' if stdout_file.is_empty() => (),
-                            b' ' | b'\t' | b'|' => {
-                                found_file = true;
-                                out_file = Some(Redirection {
-                                    from: RedirectFrom::Stdout,
-                                    file: unsafe { String::from_utf8_unchecked(stdout_file.clone()) },
-                                    append: if let RedirMode::StdoutAppend(_) = mode { true } else { false }
-                                });
-                            },
-                            b'<' if stdout_file.is_empty() => {
-                                *possible_error = Some("missing standard output file argument after '>'");
-                                break 'outer
-                            }
-                            b'<' => {
-                                out_file = Some(Redirection {
-                                    from: RedirectFrom::Stdout,
-                                    file: unsafe { String::from_utf8_unchecked(stdout_file.clone()) },
-                                    append: if let RedirMode::StdoutAppend(_) = mode { true } else { false }
-                                });
-
-                                if in_file.is_some() {
-                                    break 'outer
-                                } else {
-                                    mode = RedirMode::Stdin;
-                                    continue 'outer
-                                }
-                            },
-                            _ => stdout_file.push(character),
-                        }
+                        return Err("expected file argument after redirection for input");
                     }
+
                 }
-
-                redir_check!(
-                    from,
-                    out_file,
-                    stdout_file,
-                    if let RedirMode::StdoutAppend(_) = mode { true } else { false }
-                );
-
-                break 'outer
-            },
-            RedirMode::Stdin => {
-                let mut stdin_file = Vec::new();
-                let mut found_file = false;
-
-                while let Some(character) = args_iter.next() {
-                    if found_file {
-                        if character == b'>' {
-                            if out_file.is_some() {
-                                break 'outer
-                            } else {
-                                mode = RedirMode::Stdout(RedirectFrom::Stdout);
-                                continue 'outer
-                            }
-                        }
-                    } else {
-                        match character {
-                            _ if flags.intersects(BACKSLASH) => {
-                                stdin_file.push(character);
-                                flags ^= BACKSLASH;
-                            }
-                            b'\\' => flags ^= BACKSLASH,
-                            b' ' | b'\t' | b'|' if stdin_file.is_empty() => (),
-                            b' ' | b'\t' | b'|' => {
-                                found_file = true;
-                                in_file = Some(Redirection {
-                                    from: RedirectFrom::Stdout,
-                                    file: unsafe { String::from_utf8_unchecked(stdin_file.clone()) },
-                                    append: false
-                                });
-                            },
-                            b'>' if stdin_file.is_empty() => {
-                                *possible_error = Some("missing standard input file argument after '<'");
-                                break 'outer
-                            }
-                            b'>' => {
-                                in_file = Some(Redirection {
-                                    from: RedirectFrom::Stdout,
-                                    file: unsafe { String::from_utf8_unchecked(stdin_file.clone()) },
-                                    append: false
-                                });
-
-                                if out_file.is_some() {
-                                    break 'outer
-                                } else {
-                                    mode = RedirMode::Stdin;
-                                    continue 'outer
-                                }
-                            },
-                            _ => stdin_file.push(character),
-                        }
-                    }
-                }
-
-                let dummy_val = RedirectFrom::Stdout;
-                redir_check!(dummy_val, in_file, stdin_file, false);
-
-                break 'outer
+                // Skip over whitespace between jobs
+                b' ' | b'\t' => {
+                    bytes.next();
+                },
+                // Assume that the next character starts an argument and parse that argument
+                _ => push_arg!(),
             }
         }
+
+        if ! args.is_empty() {
+            jobs.push(Job::new(args, JobKind::Last));
+        }
+
+        Ok(Pipeline::new(jobs, infile, outfile))
     }
 
-    if arg_start != index {
-        arguments.push(args[arg_start..].into());
-    }
-
-    if !arguments.is_empty() {
-        jobs.push(Job::new(arguments, JobKind::Last));
-    }
-
-    Pipeline::new(jobs, in_file, out_file)
 }
 
 #[cfg(test)]
 mod tests {
     use shell::flow_control::Statement;
-    use parser::peg::{parse, RedirectFrom, Redirection};
-    use shell::JobKind;
+    use parser::peg::{parse, Pipeline, RedirectFrom, Redirection};
+    use shell::{Job, JobKind};
     use types::*;
 
     #[test]
@@ -687,7 +606,8 @@ mod tests {
 
     #[test]
     fn pipeline_with_redirection() {
-        if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat < stuff > other") {
+        let input = "cat | echo hello | cat < stuff > other";
+        if let Statement::Pipeline(pipeline) = parse(input) {
             assert_eq!(3, pipeline.jobs.len());
             assert_eq!("cat", &pipeline.clone().jobs[0].args[0]);
             assert_eq!("echo", &pipeline.clone().jobs[1].args[0]);
@@ -696,6 +616,7 @@ mod tests {
             assert_eq!("stuff", &pipeline.clone().stdin.unwrap().file);
             assert_eq!("other", &pipeline.clone().stdout.unwrap().file);
             assert!(!pipeline.clone().stdout.unwrap().append);
+            assert_eq!(input.to_owned(), pipeline.to_string());
         } else {
             assert!(false);
         }
@@ -711,6 +632,56 @@ mod tests {
         } else {
             assert!(false);
         }
+    }
+
+    #[test]
+    fn pipeline_with_redirection_append_stderr() {
+        let input = "cat | echo hello | cat < stuff ^>> other";
+        let expected = Pipeline {
+            jobs: vec![
+                Job::new(Array::from_vec(vec!["cat".into()]),
+                         JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(Array::from_vec(vec!["echo".into(), "hello".into()]),
+                         JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(Array::from_vec(vec!["cat".into()]), JobKind::Last)
+            ],
+            stdin: Some(Redirection {
+                from: RedirectFrom::Stdout,
+                file: "stuff".into(),
+                append: false
+            }),
+            stdout: Some(Redirection {
+                from: RedirectFrom::Stderr,
+                file: "other".into(),
+                append: true
+            })
+        };
+        assert_eq!(parse(input), Statement::Pipeline(expected));
+    }
+
+    #[test]
+    fn pipeline_with_redirection_append_both() {
+        let input = "cat | echo hello | cat < stuff &>> other";
+        let expected = Pipeline {
+            jobs: vec![
+                Job::new(Array::from_vec(vec!["cat".into()]),
+                         JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(Array::from_vec(vec!["echo".into(), "hello".into()]),
+                         JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(Array::from_vec(vec!["cat".into()]), JobKind::Last)
+            ],
+            stdin: Some(Redirection {
+                from: RedirectFrom::Stdout,
+                file: "stuff".into(),
+                append: false
+            }),
+            stdout: Some(Redirection {
+                from: RedirectFrom::Both,
+                file: "other".into(),
+                append: true
+            })
+        };
+        assert_eq!(parse(input), Statement::Pipeline(expected));
     }
 
     #[test]

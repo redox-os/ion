@@ -1,9 +1,10 @@
 use std::io::{stderr, Write};
+use std::fmt;
 
 use shell::flow_control::{Statement, FunctionArgument, Type};
 use self::grammar::parse_;
 use shell::directory_stack::DirectoryStack;
-use shell::Job;
+use shell::{JobKind, Job};
 use shell::variables::Variables;
 use parser::{expand_string, ExpanderFunctions, Select};
 
@@ -25,13 +26,8 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub fn new(jobs: Vec<Job>, stdin: Option<Redirection>, stdout: Option<Redirection>) -> Self
-    {
-        Pipeline {
-            jobs:   jobs,
-            stdin:  stdin,
-            stdout: stdout
-        }
+    pub fn new(jobs: Vec<Job>, stdin: Option<Redirection>, stdout: Option<Redirection>) -> Self {
+        Pipeline { jobs, stdin, stdout }
     }
 
     pub fn expand(&mut self, variables: &Variables, dir_stack: &DirectoryStack) {
@@ -48,6 +44,46 @@ impl Pipeline {
             stdout.file = expand_string(stdout.file.as_str(), &expanders, false).join(" ");
         }
     }
+}
+
+impl fmt::Display for Pipeline {
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut tokens: Vec<String> = Vec::with_capacity(self.jobs.len());
+        for job in &self.jobs {
+            tokens.extend(job.args.clone().into_iter());
+            match job.kind {
+                JobKind::Last => (),
+                JobKind::And => tokens.push("&&".into()),
+                JobKind::Or => tokens.push("||".into()),
+                JobKind::Background => tokens.push("&".into()),
+                JobKind::Pipe(RedirectFrom::Stdout) => tokens.push("|".into()),
+                JobKind::Pipe(RedirectFrom::Stderr) => tokens.push("^|".into()),
+                JobKind::Pipe(RedirectFrom::Both) => tokens.push("&|".into()),
+            }
+        }
+        if let Some(ref infile) = self.stdin {
+            tokens.push("<".into());
+            tokens.push(infile.file.clone());
+        }
+        if let Some(ref outfile) = self.stdout {
+            match outfile.from {
+                RedirectFrom::Stdout => {
+                    tokens.push((if outfile.append { ">>" } else { ">" }).into());
+                },
+                RedirectFrom::Stderr => {
+                    tokens.push((if outfile.append { "^>>" } else { "^>" }).into());
+                },
+                RedirectFrom::Both => {
+                    tokens.push((if outfile.append { "&>>" } else { "&>" }).into());
+                }
+            }
+            tokens.push(outfile.file.clone());
+        }
+
+        write!(f, "{}", tokens.join(" "))
+    }
+
 }
 
 pub fn parse(code: &str) -> Statement {

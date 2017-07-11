@@ -43,33 +43,25 @@ continue_ -> Statement
 #[pub]
 if_ -> Statement
     = whitespace* "if" whitespace? command:$(.*) {?
-        let mut possible_error = None;
-        let pipeline = pipelines::collect(&mut possible_error, command);
-
-        match possible_error {
-            Some(error) => Err(error),
-            None => Ok(Statement::If {
-                expression: pipeline,
-                success: Vec::new(),
-                else_if: Vec::new(),
-                failure: Vec::new()
-            })
+      pipelines::Collector::run(command).map(|p| {
+        Statement::If {
+          expression: p,
+          success: Vec::new(),
+          else_if: Vec::new(),
+          failure: Vec::new()
         }
+      })
     }
 
 #[pub]
 else_if_ -> Statement
     = whitespace* "else" whitespace? "if" whitespace? command:$(.*) {?
-        let mut possible_error = None;
-        let pipeline = pipelines::collect(&mut possible_error, command);
-
-        match possible_error {
-            Some(error) => Err(error),
-            None => Ok(Statement::ElseIf(ElseIf {
-                expression: pipeline,
+        pipelines::Collector::run(command).map(|p| {
+            Statement::ElseIf(ElseIf {
+                expression: p,
                 success:    Vec::new(),
-            }))
-        }
+            })
+        })
     }
 
 #[pub]
@@ -140,16 +132,12 @@ match_ -> Statement = whitespace* "match" whitespace? expression:$(.*) {
 #[pub]
 while_ -> Statement
     = whitespace* "while" whitespace? command:$(.*) {?
-        let mut possible_error = None;
-        let pipeline = pipelines::collect(&mut possible_error, command);
-
-        match possible_error {
-            Some(error) => Err(error),
-            None => Ok(Statement::While {
-                expression: pipeline,
-                statements: Vec::new()
-            })
+      pipelines::Collector::run(command).map(|p| {
+        Statement::While {
+          expression: p,
+          statements: Vec::new()
         }
+      })
     }
 
 pub pipelines -> Statement
@@ -161,13 +149,7 @@ pub pipelines -> Statement
 // Converts the pipeline string into a statement, handling redirection, piping, and backgrounds.
 _pipelines -> Statement
     = command:$(.+) {?
-    let mut possible_error = None;
-    let pipeline = pipelines::collect(&mut possible_error, command);
-
-    match possible_error {
-        Some(error) => Err(error),
-        None        => Ok(Statement::Pipeline(pipeline))
-    }
+    pipelines::Collector::run(command).map(Statement::Pipeline)
 }
 
 unused -> ()

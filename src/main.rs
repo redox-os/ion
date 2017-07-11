@@ -10,6 +10,7 @@ extern crate app_dirs;
 extern crate bitflags;
 extern crate fnv;
 extern crate glob;
+#[macro_use] extern crate lazy_static;
 extern crate liner;
 extern crate smallvec;
 extern crate smallstring;
