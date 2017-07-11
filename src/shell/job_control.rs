@@ -231,16 +231,19 @@ impl<'a> JobControl for Shell<'a> {
                     eprintln!("ion: process ended by signal");
                     if signal == Signal::SIGTERM {
                         self.handle_signal(libc::SIGTERM);
+                        self.break_flow = true;
                     } else if signal == Signal::SIGHUP {
                         self.handle_signal(libc::SIGHUP);
+                        self.break_flow = true;
                     } else if signal == Signal::SIGINT {
                         self.foreground_send(libc::SIGINT as i32);
+                        self.break_flow = true;
                     }
                     break TERMINATED;
                 },
                 Ok(WaitStatus::Stopped(pid, _)) => {
                     self.send_to_background(pid as u32, ProcessState::Stopped, get_command());
-                    self.received_sigtstp = true;
+                    self.break_flow = true;
                     break TERMINATED
                 },
                 Ok(_) => (),

@@ -107,7 +107,7 @@ pub struct Shell<'a> {
     pub signals: Receiver<i32>,
     foreground: Vec<u32>,
     pub background: Arc<Mutex<Vec<BackgroundProcess>>>,
-    pub received_sigtstp: bool,
+    pub break_flow: bool,
     pub foreground_signals: Arc<ForegroundSignals>
 }
 
@@ -131,7 +131,7 @@ impl<'a> Shell<'a> {
             signals: signals,
             foreground: Vec::new(),
             background: Arc::new(Mutex::new(Vec::new())),
-            received_sigtstp: false,
+            break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new())
         }
     }

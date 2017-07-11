@@ -46,7 +46,7 @@ pub trait FlowLogic {
 
 impl<'a> FlowLogic for Shell<'a> {
     fn on_command(&mut self, command_string: &str) {
-        self.received_sigtstp = false;
+        self.break_flow = false;
         let mut iterator = StatementSplitter::new(command_string).map(check_statement);
 
         // If the value is set to `0`, this means that we don't need to append to an existing
@@ -285,8 +285,8 @@ impl<'a> FlowLogic for Shell<'a> {
             if let Ok(signal) = self.signals.try_recv() {
                 self.handle_signal(signal);
                 return Condition::SigInt;
-            } else if self.received_sigtstp {
-                self.received_sigtstp = false;
+            } else if self.break_flow {
+                self.break_flow = false;
                 return Condition::SigInt;
             }
         }
