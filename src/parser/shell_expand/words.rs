@@ -1098,6 +1098,14 @@ impl<'a> Iterator for WordIterator<'a> {
                 b'*'|b'?' if !self.flags.contains(SQUOTE) => {
                     glob = true;
                 },
+                b'~' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                    let output = &self.data[start..self.read];
+                    if output != "" {
+                        return Some(WordToken::Normal(output, glob));
+                    } else {
+                        return self.next();
+                    }
+                }
                 _ => (),
             }
             self.read += 1;
