@@ -606,7 +606,8 @@ mod tests {
 
     #[test]
     fn pipeline_with_redirection() {
-        if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat < stuff > other") {
+        let input = "cat | echo hello | cat < stuff > other";
+        if let Statement::Pipeline(pipeline) = parse(input) {
             assert_eq!(3, pipeline.jobs.len());
             assert_eq!("cat", &pipeline.clone().jobs[0].args[0]);
             assert_eq!("echo", &pipeline.clone().jobs[1].args[0]);
@@ -615,6 +616,7 @@ mod tests {
             assert_eq!("stuff", &pipeline.clone().stdin.unwrap().file);
             assert_eq!("other", &pipeline.clone().stdout.unwrap().file);
             assert!(!pipeline.clone().stdout.unwrap().append);
+            assert_eq!(input.to_owned(), pipeline.to_string());
         } else {
             assert!(false);
         }
