@@ -128,12 +128,25 @@ pub mod crossplat {
     }
 }
 
+// This function serves two purposes:
+// 1. If the result is `Some`, then we will fork the pipeline executing into the background.
+// 2. The value stored within `Some` will be that background job's command name.
+fn check_if_background_job(pipeline: &Pipeline) -> Option<String> {
+    if pipeline.jobs[pipeline.jobs.len()-1].kind == JobKind::Background {
+        Some(pipeline.to_string())
+    } else {
+        None
+    }
+}
+
 pub trait PipelineExecution {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32;
 }
 
 impl<'a> PipelineExecution for Shell<'a> {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
+        let background_string = check_if_background_job(&pipeline);
+
         // Generate a list of commands from the given pipeline
         let mut piped_commands: Vec<(Command, JobKind)> = pipeline.jobs
             .drain(..).map(|mut job| {
@@ -187,8 +200,8 @@ impl<'a> PipelineExecution for Shell<'a> {
 
         self.foreground.clear();
         // If the given pipeline is a background task, fork the shell.
-        if piped_commands[piped_commands.len()-1].1 == JobKind::Background {
-            fork_pipe(self, piped_commands)
+        if let Some(command_name) = background_string {
+            fork_pipe(self, piped_commands, command_name)
         } else {
             // While active, the SIGTTOU signal will be ignored.
             let _sig_ignore = SignalHandler::new();
@@ -320,7 +333,7 @@ fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -
     }).spawn() {
         Ok(child) => {
             if foreground { set_foreground(child.id()); }
-            shell.watch_foreground(child.id())
+            shell.watch_foreground(child.id(), || get_full_command(command))
         },
         Err(_) => {
             let stderr = io::stderr();
@@ -335,16 +348,16 @@ fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -
 fn wait (
     shell: &mut Shell,
     children: &mut Vec<Option<Child>>,
-    commands: Vec<Command>,
+    mut commands: Vec<Command>,
     foreground: bool
 ) -> i32 {
     let end = children.len() - 1;
-    for entry in children.drain(..end).zip(commands.into_iter()) {
-        // _cmd is never used here, but it is important that it gets dropped at the end of this
+    for entry in children.drain(..end).zip(commands.drain(..)) {
+        // It is important that `cmd` gets dropped at the end of this
         // block in order to write EOF to the pipes that it owns.
-        if let (Some(child), _cmd) = entry {
+        if let (Some(child), cmd) = entry {
             if foreground { set_foreground(child.id()); }
-            let status = shell.watch_foreground(child.id());
+            let status = shell.watch_foreground(child.id(), || get_full_command(&cmd));
             if status == TERMINATED {
                 return status
             }
@@ -352,8 +365,9 @@ fn wait (
     }
 
     if let Some(child) = children.pop().unwrap() {
+        let cmd = commands.pop().unwrap();
         if foreground { set_foreground(child.id()); }
-        shell.watch_foreground(child.id())
+        shell.watch_foreground(child.id(), || get_full_command(&cmd))
     } else {
         NO_SUCH_COMMAND
     }
@@ -361,4 +375,16 @@ fn wait (
 
 fn get_command_name(command: &Command) -> String {
     format!("{:?}", command).split('"').nth(1).unwrap_or("").to_string()
+}
+
+fn get_full_command(command: &Command) -> String {
+    let command = format!("{:?}", command);
+    let mut arg_iter = command.split_whitespace();
+    let command = arg_iter.next().unwrap();
+    let mut output = String::from(&command[1..command.len()-1]);
+    for argument in arg_iter {
+        output.push(' ');
+        output.push_str(&argument[1..argument.len()-1]);
+    }
+    output
 }

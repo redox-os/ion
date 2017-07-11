@@ -35,8 +35,8 @@ pub trait JobControl {
     fn handle_signal(&self, signal: i32);
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
-    fn watch_foreground(&mut self, pid: u32) -> i32;
-    fn send_to_background(&mut self, child: u32, state: ProcessState);
+    fn watch_foreground<F: Fn() -> String>(&mut self, pid: u32, get_command: F) -> i32;
+    fn send_to_background(&mut self, child: u32, state: ProcessState, command: String);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -128,17 +128,28 @@ pub fn watch_background (
 pub fn add_to_background (
     processes: Arc<Mutex<Vec<BackgroundProcess>>>,
     pid: u32,
-    state: ProcessState
+    state: ProcessState,
+    command: String
 ) -> usize {
     let mut processes = processes.lock().unwrap();
     match (*processes).iter().position(|x| x.state == ProcessState::Empty) {
         Some(id) => {
-            (*processes)[id] = BackgroundProcess { pid: pid, ignore_sighup: false, state: state };
+            (*processes)[id] = BackgroundProcess {
+                pid: pid,
+                ignore_sighup: false,
+                state: state,
+                name: command
+            };
             id
         },
         None => {
             let njobs = (*processes).len();
-            (*processes).push(BackgroundProcess { pid: pid, ignore_sighup: false, state: state });
+            (*processes).push(BackgroundProcess {
+                pid: pid,
+                ignore_sighup: false,
+                state: state,
+                name: command
+            });
             njobs
         }
     }
@@ -152,9 +163,8 @@ pub fn add_to_background (
 pub struct BackgroundProcess {
     pub pid: u32,
     pub ignore_sighup: bool,
-    pub state: ProcessState
-    // TODO: Each process should have the command registered to it
-    // pub command: String
+    pub state: ProcessState,
+    pub name: String
 }
 
 impl<'a> JobControl for Shell<'a> {
@@ -207,7 +217,11 @@ impl<'a> JobControl for Shell<'a> {
     }
 
     #[cfg(all(unix, not(target_os = "redox")))]
-    fn watch_foreground(&mut self, pid: u32) -> i32 {
+    fn watch_foreground <F: Fn() -> String> (
+        &mut self,
+        pid: u32,
+        get_command: F
+    ) -> i32 {
         use nix::sys::wait::{waitpid, WaitStatus, WUNTRACED};
         use nix::sys::signal::Signal;
         loop {
@@ -225,7 +239,7 @@ impl<'a> JobControl for Shell<'a> {
                     break TERMINATED;
                 },
                 Ok(WaitStatus::Stopped(pid, _)) => {
-                    self.send_to_background(pid as u32, ProcessState::Stopped);
+                    self.send_to_background(pid as u32, ProcessState::Stopped, get_command());
                     self.received_sigtstp = true;
                     break TERMINATED
                 },
@@ -307,11 +321,11 @@ impl<'a> JobControl for Shell<'a> {
         // TODO: Redox doesn't support signals yet
     }
 
-    fn send_to_background(&mut self, pid: u32, state: ProcessState) {
+    fn send_to_background(&mut self, pid: u32, state: ProcessState, command: String) {
         let processes = self.background.clone();
         let fg_signals = self.foreground_signals.clone();
         let _ = spawn(move || {
-            let njob = add_to_background(processes.clone(), pid, state);
+            let njob = add_to_background(processes.clone(), pid, state, command);
             eprintln!("ion: bg [{}] {}", njob, pid);
             watch_background(fg_signals, processes, pid, njob);
         });

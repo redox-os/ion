@@ -60,11 +60,15 @@ use super::pipe::pipe;
 
 /// Forks the shell, adding the child to the parent's background list, and executing
 /// the given commands in the child fork.
-pub fn fork_pipe(shell: &mut Shell, commands: Vec<(Command, JobKind)>) -> i32 {
+pub fn fork_pipe (
+    shell: &mut Shell,
+    commands: Vec<(Command, JobKind)>,
+    command_name: String
+) -> i32 {
     match ion_fork() {
         Ok(Fork::Parent(pid)) => {
             // The parent process should add the child fork's PID to the background.
-            shell.send_to_background(pid, ProcessState::Running);
+            shell.send_to_background(pid, ProcessState::Running, command_name);
             SUCCESS
         },
         Ok(Fork::Child) => {
