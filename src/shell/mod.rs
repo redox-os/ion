@@ -341,7 +341,11 @@ impl<'a> Shell<'a> {
                 if let Some(mut arg) = args.next() {
                     for argument in args {
                         arg.push(' ');
-                        arg.push_str(&argument);
+                        if argument == "" {
+                            arg.push_str("''");
+                        } else {
+                            arg.push_str(&argument);
+                        }
                     }
                     self.on_command(&arg);
                 } else {
@@ -467,7 +471,6 @@ impl<'a> Shell<'a> {
 
         pipeline.expand(&self.variables, &self.directory_stack);
         // Branch if -> input == shell command i.e. echo
-
         let exit_status = if let Some(command) = {
             let key: &str = pipeline.jobs[0].command.as_ref();
             builtins.get(key)
