@@ -126,6 +126,12 @@ impl<'a> Collector<'a> {
                     bytes.next();
                     self.single_quoted(bytes, i)?;
                 },
+                // If we see a backslash, assume that it is leading up to an escaped character
+                // and skip the next character
+                b'\\' => {
+                    bytes.next();
+                    bytes.next();
+                }
                 // If we see a byte from the follow set, we've definitely reached the end of
                 // the arguments
                 c if FOLLOW_ARGS.contains(&c) && is_toplevel!() => {
@@ -135,6 +141,18 @@ impl<'a> Collector<'a> {
                 // By default just pop the next byte: it will be part of the argument
                 _ => { bytes.next(); }
             }
+        }
+        if proc_level > 0 {
+            return Err("ion: syntax error: unmatched left paren");
+        }
+        if array_level > 0 {
+            return Err("ion: syntax error: unmatched left bracket");
+        }
+        if proc_level < 0 {
+            return Err("ion: syntax error: extra right paren(s)");
+        }
+        if array_level < 0 {
+            return Err("ion: syntax error: extra right bracket(s)");
         }
         match (start, end) {
             (Some(i), Some(j)) if i < j => Ok(Some(&self.data[i..j])),
@@ -730,4 +748,23 @@ mod tests {
             assert!(false);
         }
     }
+
+    #[test]
+    fn escaped_filenames() {
+        let input = "echo zardoz >> foo\\'bar";
+        let expected = Pipeline {
+            jobs: vec![
+                Job::new(Array::from_vec(vec!["echo".into(), "zardoz".into()]), JobKind::Last),
+            ],
+            stdin: None,
+            stdout: Some(Redirection {
+                from: RedirectFrom::Stdout,
+                file: "foo\\'bar".into(),
+                append: true
+            })
+        };
+        assert_eq!(parse(input), Statement::Pipeline(expected));
+
+    }
+
 }
