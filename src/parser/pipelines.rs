@@ -248,7 +248,7 @@ impl<'a> Collector<'a> {
                 },
                 b'>' => {
                     bytes.next();
-                    try_redir_out!(RedirectFrom::Stderr);
+                    try_redir_out!(RedirectFrom::Stdout);
                 },
                 b'<' => {
                     bytes.next();
