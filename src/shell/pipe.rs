@@ -359,7 +359,7 @@ fn wait (
     foreground: bool
 ) -> i32 {
     let end = children.len() - 1;
-    for entry in children.drain(..end).zip(commands.drain(..)) {
+    for entry in children.drain(..end).zip(commands.drain(..end)) {
         // It is important that `cmd` gets dropped at the end of this
         // block in order to write EOF to the pipes that it owns.
         if let (Some(child), cmd) = entry {

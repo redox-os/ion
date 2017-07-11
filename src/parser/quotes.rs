@@ -39,13 +39,21 @@ impl QuoteTerminator {
             self.read += 1;
             self.buffer.push('\n');
             false
-        } else if self.buffer.bytes().last() == Some(b'\\') {
-            let _ = self.buffer.pop();
-            self.read -= 1;
-            self.flags |= TRIM;
-            false
         } else {
-            true
+            match self.buffer.bytes().last() {
+                Some(b'\\') => {
+                    let _ = self.buffer.pop();
+                    self.read -= 1;
+                    self.flags |= TRIM;
+                    false
+                },
+                Some(b'|') | Some(b'&') => {
+                    // self.read -= 1;
+                    // self.flags |= TRIM;
+                    false
+                }
+                _ => true
+            }
         }
     }
 

@@ -75,9 +75,8 @@ pub fn jobs(shell: &mut Shell) {
     let stderr = stderr();
     let mut stderr = stderr.lock();
     for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
-        match process.state {
-            ProcessState::Empty => (),
-            _ => { let _ = writeln!(stderr, "[{}] {} {}\t{}", id, process.pid, process.state, process.name); }
+        if process.state != ProcessState::Empty {
+            let _ = writeln!(stderr, "[{}] {} {}\t{}", id, process.pid, process.state, process.name);
         }
     }
 }
