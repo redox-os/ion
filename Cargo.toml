@@ -23,7 +23,7 @@ bitflags = "0.9.1"
 fnv = "1.0"
 glob = "0.2"
 lazy_static = "0.2"
-liner = "0.3"
+liner = { git = "https://github.com/mmstick/liner", branch = "async_history" }
 permutate = "0.3"
 unicode-segmentation = "1.2"
 smallvec = "0.4"

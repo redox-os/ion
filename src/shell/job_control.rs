@@ -4,7 +4,6 @@
 use std::fmt;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
-use std::process;
 use std::sync::{Arc, Mutex};
 use super::foreground::{ForegroundSignals, BackgroundResult};
 use super::signals;
@@ -32,7 +31,7 @@ pub trait JobControl {
     /// and sets it as the foreground process. Once the task exits or stops, the exit status will
     /// be returned, and ownership of the TTY given back to the shell.
     fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32;
-    fn handle_signal(&self, signal: i32);
+    fn handle_signal(&self, signal: i32) -> bool;
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
     fn watch_foreground<F: Fn() -> String>(&mut self, pid: u32, get_command: F) -> i32;
@@ -200,15 +199,16 @@ impl<'a> JobControl for Shell<'a> {
                     if let Ok(signal) = self.signals.try_recv() {
                         if signal != libc::SIGTSTP {
                             self.background_send(signal);
-                            process::exit(TERMINATED);
+                            break 'event
                         }
                     }
                     sleep(Duration::from_millis(100));
                     continue 'event
                 }
             }
-            break
+            return
         }
+        self.exit(TERMINATED);
     }
 
     #[cfg(target_os = "redox")]
@@ -231,10 +231,10 @@ impl<'a> JobControl for Shell<'a> {
                     eprintln!("ion: process ended by signal");
                     if signal == Signal::SIGTERM {
                         self.handle_signal(libc::SIGTERM);
-                        self.break_flow = true;
+                        self.exit(TERMINATED);
                     } else if signal == Signal::SIGHUP {
                         self.handle_signal(libc::SIGHUP);
-                        self.break_flow = true;
+                        self.exit(TERMINATED);
                     } else if signal == Signal::SIGINT {
                         self.foreground_send(libc::SIGINT as i32);
                         self.break_flow = true;
@@ -337,11 +337,11 @@ impl<'a> JobControl for Shell<'a> {
     /// If a SIGTERM is received, a SIGTERM will be sent to all background processes
     /// before the shell terminates itself.
     #[cfg(all(unix, not(target_os = "redox")))]
-    fn handle_signal(&self, signal: i32) {
+    fn handle_signal(&self, signal: i32) -> bool {
         if signal == libc::SIGTERM || signal == libc::SIGHUP {
             self.background_send(signal);
-            process::exit(TERMINATED);
-        }
+            true
+        } else { false }
     }
 
     #[cfg(target_os = "redox")]

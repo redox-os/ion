@@ -17,7 +17,6 @@ use self::test::test;
 
 use fnv::FnvHashMap;
 use std::io::{self, Write};
-use std::process;
 use std::error::Error;
 
 use parser::QuoteTerminator;
@@ -31,7 +30,7 @@ fn exit_builtin() -> Builtin {
         name: "exit",
         help: "To exit the curent session",
         main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-            process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
+            shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
                 .unwrap_or(shell.previous_status))
         }),
     }
@@ -52,9 +51,9 @@ fn exit_builtin() -> Builtin {
                     let _ = signal::kill(process.pid as pid_t, Some(NixSignal::SIGTERM));
                 }
             }
-
-            process::exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
-                .unwrap_or(shell.previous_status))
+            let previous_status = shell.previous_status;
+            shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
+                .unwrap_or(previous_status))
         }),
     }
 }

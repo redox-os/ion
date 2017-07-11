@@ -1,4 +1,3 @@
-use std::process;
 use std::io::{self, Write};
 use std::mem;
 use super::status::*;
@@ -258,7 +257,8 @@ impl<'a> FlowLogic for Shell<'a> {
                 Statement::Pipeline(mut pipeline)  => {
                     self.run_pipeline(&mut pipeline);
                     if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
-                        process::exit(self.previous_status);
+                        let status = self.previous_status;
+                        self.exit(status);
                     }
                 },
                 Statement::Break => { return Condition::Break }
@@ -283,7 +283,9 @@ impl<'a> FlowLogic for Shell<'a> {
                 _ => {}
             }
             if let Ok(signal) = self.signals.try_recv() {
-                self.handle_signal(signal);
+                if self.handle_signal(signal) {
+                    self.exit(TERMINATED);
+                }
                 return Condition::SigInt;
             } else if self.break_flow {
                 self.break_flow = false;
@@ -500,7 +502,8 @@ impl<'a> FlowLogic for Shell<'a> {
             Statement::Pipeline(mut pipeline)  => {
                 self.run_pipeline(&mut pipeline);
                 if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
-                    process::exit(self.previous_status);
+                    let status = self.previous_status;
+                    self.exit(status);
                 }
             },
             // At this level, else and else if keywords are forbidden.
