@@ -93,21 +93,35 @@ fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
     res
 }
 
-/// This struct will contain all of the data structures related to this
-/// instance of the shell.
+/// The shell structure is a megastructure that manages all of the state of the shell throughout the entirety of the
+/// program. It is initialized at the beginning of the program, and lives until the end of the program.
 pub struct Shell<'a> {
+    /// Contains a list of built-in commands that were created when the program started.
     pub builtins: &'a FnvHashMap<&'static str, Builtin>,
-    pub context: Context,
+    /// Contains the history, completions, and manages writes to the history file.
+    pub context: Option<Context>,
+    /// Contains the aliases, strings, and array variable maps.
     pub variables: Variables,
+    /// Contains the current state of flow control parameters.
     flow_control: FlowControl,
+    /// Contains the directory stack parameters.
     pub directory_stack: DirectoryStack,
+    /// Contains all of the user-defined functions that have been created.
     pub functions: FnvHashMap<Identifier, Function>,
+    /// When a command is executed, the final result of that command is stored here.
     pub previous_status: i32,
+    /// Contains all the boolean flags that control shell behavior.
     pub flags: u8,
+    /// When a signal is received in the main thread's event loop, the signal will be sent to this receiver. The shell
+    /// will check this receiver at certain key points throughout the shell's lifetime.
     pub signals: Receiver<i32>,
+    /// A temporary field for storing foreground PIDs used by the pipeline execution.
     foreground: Vec<u32>,
+    /// Contains information on all of the active background processes that are being managed by the shell.
     pub background: Arc<Mutex<Vec<BackgroundProcess>>>,
+    /// Set when a signal is received, this will tell the flow control logic to abort.
     pub break_flow: bool,
+    /// When the `fg` command is run, this will be used to communicate with the specified background process.
     pub foreground_signals: Arc<ForegroundSignals>
 }
 
