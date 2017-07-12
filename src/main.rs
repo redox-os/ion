@@ -23,11 +23,11 @@ extern crate calc;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate users as users_unix;
 #[cfg(target_os = "redox")] extern crate syscall;
 
+#[macro_use] mod types;
 #[macro_use] mod parser;
 mod builtins;
 mod shell;
 mod ascii_helpers;
-mod types;
 
 use std::io::{stderr, Write, ErrorKind};
 

@@ -1370,7 +1370,7 @@ mod tests {
             pattern: Pattern::Whitespace,
             selection: Select::Index(Index::Forward(3))
         };
-        let expected = Array::from_vec(vec!["é".into()]);
+        let expected = array!["é"];
         assert_eq!(method.handle_as_array(&expanders), expected);
         let method = ArrayMethod {
             method: "chars",
@@ -1378,7 +1378,7 @@ mod tests {
             pattern: Pattern::Whitespace,
             selection: Select::Index(Index::Forward(3))
         };
-        let expected = Array::from_vec(vec!["e".into()]);
+        let expected = array!["e"];
         assert_eq!(method.handle_as_array(&expanders), expected);
         let method = ArrayMethod {
             method: "bytes",
@@ -1386,7 +1386,7 @@ mod tests {
             pattern: Pattern::Whitespace,
             selection: Select::Index(Index::Forward(1))
         };
-        let expected = Array::from_vec(vec!["111".into()]);
+        let expected = array!["111"];
         assert_eq!(method.handle_as_array(&expanders), expected);
     }
 
