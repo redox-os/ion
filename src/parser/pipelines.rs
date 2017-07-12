@@ -308,7 +308,7 @@ impl<'a> Collector<'a> {
 #[cfg(test)]
 mod tests {
     use shell::flow_control::Statement;
-    use parser::peg::{parse, Pipeline, RedirectFrom, Redirection};
+    use parser::peg::{parse, Input, Pipeline, RedirectFrom, Redirection};
     use shell::{Job, JobKind};
     use types::*;
 
@@ -637,7 +637,7 @@ mod tests {
             assert_eq!("echo", &pipeline.clone().jobs[1].args[0]);
             assert_eq!("hello", &pipeline.clone().jobs[1].args[1]);
             assert_eq!("cat", &pipeline.clone().jobs[2].args[0]);
-            assert_eq!("stuff", &pipeline.clone().stdin.unwrap().file);
+            assert_eq!(Some(Input::File("stuff".into())), pipeline.stdin);
             assert_eq!("other", &pipeline.clone().stdout.unwrap().file);
             assert!(!pipeline.clone().stdout.unwrap().append);
             assert_eq!(input.to_owned(), pipeline.to_string());
@@ -650,7 +650,7 @@ mod tests {
     fn pipeline_with_redirection_append() {
         if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat < stuff >> other") {
         assert_eq!(3, pipeline.jobs.len());
-        assert_eq!("stuff", &pipeline.clone().stdin.unwrap().file);
+        assert_eq!(Some(Input::File("stuff".into())), pipeline.stdin);
         assert_eq!("other", &pipeline.clone().stdout.unwrap().file);
         assert!(pipeline.clone().stdout.unwrap().append);
         } else {
@@ -669,11 +669,7 @@ mod tests {
                          JobKind::Pipe(RedirectFrom::Stdout)),
                 Job::new(Array::from_vec(vec!["cat".into()]), JobKind::Last)
             ],
-            stdin: Some(Redirection {
-                from: RedirectFrom::Stdout,
-                file: "stuff".into(),
-                append: false
-            }),
+            stdin: Some(Input::File("stuff".into())),
             stdout: Some(Redirection {
                 from: RedirectFrom::Stderr,
                 file: "other".into(),
@@ -694,11 +690,7 @@ mod tests {
                          JobKind::Pipe(RedirectFrom::Stdout)),
                 Job::new(Array::from_vec(vec!["cat".into()]), JobKind::Last)
             ],
-            stdin: Some(Redirection {
-                from: RedirectFrom::Stdout,
-                file: "stuff".into(),
-                append: false
-            }),
+            stdin: Some(Input::File("stuff".into())),
             stdout: Some(Redirection {
                 from: RedirectFrom::Both,
                 file: "other".into(),
@@ -712,7 +704,7 @@ mod tests {
     fn pipeline_with_redirection_reverse_order() {
         if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat > stuff < other") {
             assert_eq!(3, pipeline.jobs.len());
-            assert_eq!("other", &pipeline.clone().stdin.unwrap().file);
+            assert_eq!(Some(Input::File("other".into())), pipeline.stdin);
             assert_eq!("stuff", &pipeline.clone().stdout.unwrap().file);
         } else {
             assert!(false);
