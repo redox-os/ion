@@ -99,7 +99,7 @@ pub struct Shell<'a> {
     /// Contains a list of built-in commands that were created when the program started.
     pub builtins: &'a FnvHashMap<&'static str, Builtin>,
     /// Contains the history, completions, and manages writes to the history file.
-    pub context: Option<Context>,
+    pub context: Context,
     /// Contains the aliases, strings, and array variable maps.
     pub variables: Variables,
     /// Contains the current state of flow control parameters.
