@@ -19,14 +19,20 @@ pub struct Redirection {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum Input {
+    File(String),
+    HereString(String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct Pipeline {
     pub jobs:   Vec<Job>,
     pub stdout: Option<Redirection>,
-    pub stdin:  Option<Redirection>,
+    pub stdin:  Option<Input>,
 }
 
 impl Pipeline {
-    pub fn new(jobs: Vec<Job>, stdin: Option<Redirection>, stdout: Option<Redirection>) -> Self {
+    pub fn new(jobs: Vec<Job>, stdin: Option<Input>, stdout: Option<Redirection>) -> Self {
         Pipeline { jobs, stdin, stdout }
     }
 
@@ -36,9 +42,17 @@ impl Pipeline {
             job.expand(&expanders);
         }
 
-        if let Some(stdin) = self.stdin.iter_mut().next() {
-            stdin.file = expand_string(stdin.file.as_str(), &expanders, false).join(" ");
-        }
+        let stdin = match self.stdin {
+            Some(Input::File(ref s)) => {
+                Some(Input::File(expand_string(s, &expanders, false).join(" ")))
+            },
+            Some(Input::HereString(ref s)) => {
+                Some(Input::HereString(expand_string(s, &expanders, false).join(" ")))
+            },
+            None => None
+        };
+
+        self.stdin = stdin;
 
         if let Some(stdout) = self.stdout.iter_mut().next() {
             stdout.file = expand_string(stdout.file.as_str(), &expanders, false).join(" ");
@@ -62,9 +76,16 @@ impl fmt::Display for Pipeline {
                 JobKind::Pipe(RedirectFrom::Both) => tokens.push("&|".into()),
             }
         }
-        if let Some(ref infile) = self.stdin {
-            tokens.push("<".into());
-            tokens.push(infile.file.clone());
+        match self.stdin {
+            None => (),
+            Some(Input::File(ref file)) => {
+                tokens.push("<".into());
+                tokens.push(file.clone());
+            },
+            Some(Input::HereString(ref string)) => {
+                tokens.push("<<<".into());
+                tokens.push(string.clone());
+            },
         }
         if let Some(ref outfile) = self.stdout {
             match outfile.from {

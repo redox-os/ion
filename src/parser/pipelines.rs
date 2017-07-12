@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 use std::iter::Peekable;
 
-use parser::peg::{Pipeline, Redirection, RedirectFrom};
+use parser::peg::{Pipeline, Input, Redirection, RedirectFrom};
 use shell::{Job, JobKind};
 use types::*;
 
@@ -165,7 +165,7 @@ impl<'a> Collector<'a> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Array::new();
         let mut jobs: Vec<Job> = Vec::new();
-        let mut infile: Option<Redirection> = None;
+        let mut input: Option<Input> = None;
         let mut outfile: Option<Redirection> = None;
 
         /// Attempt to create a new job given a list of collected arguments
@@ -270,16 +270,22 @@ impl<'a> Collector<'a> {
                 },
                 b'<' => {
                     bytes.next();
-                    if let Some(file) = self.arg(&mut bytes)? {
-                        infile = Some(Redirection {
-                            from: RedirectFrom::Stdout,
-                            file: file.into(),
-                            append: false,
-                        });
+                    if Some(b'<') == self.peek(i + 1) && Some(b'<') == self.peek(i + 2) {
+                        // If the next two characters are arrows, then interpret
+                        // the next argument as a herestring
+                        bytes.next();
+                        bytes.next();
+                        if let Some(cmd) = self.arg(&mut bytes)? {
+                            input = Some(Input::HereString(cmd.into()));
+                        } else {
+                            return Err("expected string argument after '<<<'");
+                        }
+                    } else if let Some(file) = self.arg(&mut bytes)? {
+                        // Otherwise interpret it as stdin redirection
+                        input = Some(Input::File(file.into()));
                     } else {
                         return Err("expected file argument after redirection for input");
                     }
-
                 }
                 // Skip over whitespace between jobs
                 b' ' | b'\t' => {
@@ -294,7 +300,7 @@ impl<'a> Collector<'a> {
             jobs.push(Job::new(args, JobKind::Last));
         }
 
-        Ok(Pipeline::new(jobs, infile, outfile))
+        Ok(Pipeline::new(jobs, input, outfile))
     }
 
 }
