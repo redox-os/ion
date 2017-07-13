@@ -204,7 +204,7 @@ impl<'a> PipelineExecution for Shell<'a> {
             Some(Input::HereString(ref mut string)) => {
                 if let Some(command) = piped_commands.first_mut() {
                     if !string.ends_with('\n') { string.push('\n'); }
-                    match unsafe { crossplat::stdin_of(string) } {
+                    match unsafe { crossplat::stdin_of(&string) } {
                         Ok(stdio) => {
                             command.0.stdin(stdio);
                         },
