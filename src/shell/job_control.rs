@@ -256,7 +256,11 @@ impl<'a> JobControl for Shell<'a> {
     }
 
     #[cfg(target_os = "redox")]
-    fn watch_foreground(&mut self, pid: u32) -> i32 {
+    fn watch_foreground <F: Fn() -> String> (
+        &mut self,
+        pid: u32,
+        _get_command: F
+    ) -> i32 {
         use std::io::{self, Write};
         use std::os::unix::process::ExitStatusExt;
         use std::process::ExitStatus;
@@ -345,7 +349,8 @@ impl<'a> JobControl for Shell<'a> {
     }
 
     #[cfg(target_os = "redox")]
-    fn handle_signal(&self, _: i32) {
+    fn handle_signal(&self, _: i32) -> bool {
         // TODO: Redox doesn't support signals yet;
+        false
     }
 }

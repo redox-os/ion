@@ -310,7 +310,7 @@ mod tests {
     use shell::flow_control::Statement;
     use parser::peg::{parse, Input, Pipeline, RedirectFrom, Redirection};
     use shell::{Job, JobKind};
-    use types::*;
+    use types::Array;
 
     #[test]
     fn stderr_redirection() {
@@ -558,8 +558,8 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo one && echo two") {
             let jobs = pipeline.jobs;
             assert_eq!(JobKind::And, jobs[0].kind);
-            assert_eq!(Array::from_vec(vec![String::from("echo"), String::from("one")]), jobs[0].args);
-            assert_eq!(Array::from_vec(vec![String::from("echo"), String::from("two")]), jobs[1].args);
+            assert_eq!(array!["echo", "one"], jobs[0].args);
+            assert_eq!(array!["echo", "two"], jobs[1].args);
         } else {
             assert!(false);
         }
@@ -663,11 +663,9 @@ mod tests {
         let input = "cat | echo hello | cat < stuff ^>> other";
         let expected = Pipeline {
             jobs: vec![
-                Job::new(Array::from_vec(vec!["cat".into()]),
-                         JobKind::Pipe(RedirectFrom::Stdout)),
-                Job::new(Array::from_vec(vec!["echo".into(), "hello".into()]),
-                         JobKind::Pipe(RedirectFrom::Stdout)),
-                Job::new(Array::from_vec(vec!["cat".into()]), JobKind::Last)
+                Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(array!["cat"], JobKind::Last)
             ],
             stdin: Some(Input::File("stuff".into())),
             stdout: Some(Redirection {
@@ -684,11 +682,9 @@ mod tests {
         let input = "cat | echo hello | cat < stuff &>> other";
         let expected = Pipeline {
             jobs: vec![
-                Job::new(Array::from_vec(vec!["cat".into()]),
-                         JobKind::Pipe(RedirectFrom::Stdout)),
-                Job::new(Array::from_vec(vec!["echo".into(), "hello".into()]),
-                         JobKind::Pipe(RedirectFrom::Stdout)),
-                Job::new(Array::from_vec(vec!["cat".into()]), JobKind::Last)
+                Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(array!["cat"], JobKind::Last)
             ],
             stdin: Some(Input::File("stuff".into())),
             stdout: Some(Redirection {
@@ -752,7 +748,7 @@ mod tests {
         let input = "echo zardoz >> foo\\'bar";
         let expected = Pipeline {
             jobs: vec![
-                Job::new(Array::from_vec(vec!["echo".into(), "zardoz".into()]), JobKind::Last),
+                Job::new(array!["echo", "zardoz"], JobKind::Last),
             ],
             stdin: None,
             stdout: Some(Redirection {
