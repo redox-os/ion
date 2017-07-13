@@ -11,7 +11,7 @@ use super::job_control::JobControl;
 use super::{JobKind, Shell};
 use super::status::*;
 use super::signals::{self, SignalHandler};
-use parser::peg::{Pipeline, RedirectFrom};
+use parser::peg::{Pipeline, Input, RedirectFrom};
 use self::crossplat::*;
 
 /// The `crossplat` module contains components that are meant to be abstracted across
@@ -21,7 +21,7 @@ pub mod crossplat {
     use nix::{fcntl, unistd};
     use parser::peg::{RedirectFrom};
     use std::fs::File;
-    use std::io::Error;
+    use std::io::{Write, Error};
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::process::{Stdio, Command};
 
@@ -32,6 +32,21 @@ pub mod crossplat {
 
     pub fn get_pid() -> u32 {
         unistd::getpid() as u32
+    }
+
+    /// Create an instance of Stdio from a byte slice that will echo the
+    /// contents of the slice when read. This can be called with owned or
+    /// borrowed strings
+    pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<Stdio, Error> {
+        let (reader, writer) = unistd::pipe2(fcntl::O_CLOEXEC)?;
+        let mut infile = File::from_raw_fd(writer);
+        // Write the contents; make sure to use write_all so that we block until
+        // the entire string is written
+        infile.write_all(input.as_ref())?;
+        infile.flush()?;
+        // `infile` currently owns the writer end RawFd. If we just return the reader end
+        // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
+        Ok(Stdio::from_raw_fd(reader))
     }
 
     /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
@@ -68,7 +83,7 @@ pub mod crossplat {
 pub mod crossplat {
     use parser::peg::{RedirectFrom};
     use std::fs::File;
-    use std::io;
+    use std::io::{self, Write};
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::process::{Stdio, Command};
     use syscall;
@@ -93,6 +108,19 @@ pub mod crossplat {
 
     impl From<syscall::Error> for Error {
         fn from(data: syscall::Error) -> Error { Error::Sys(data) }
+    }
+
+    pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<Stdio, Error> {
+        let mut fds: [usize; 2] = [0; 2];
+        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)?;
+        let (reader, writer) = (fds[0], fds[1]);
+        let infile = File::from_raw_fd(writer);
+        // Write the contents; make sure to use write_all so that we block until
+        // the entire string is written
+        infile.write_all(input.as_ref())?;
+        // `infile` currently owns the writer end RawFd. If we just return the reader end
+        // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
+        Ok(Stdio::from_raw_fd(reader))
     }
 
     /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
@@ -159,15 +187,31 @@ impl<'a> PipelineExecution for Shell<'a> {
             .drain(..).map(|mut job| {
                 (job.build_command(), job.kind)
             }).collect();
-
-        if let Some(ref stdin) = pipeline.stdin {
-            if let Some(command) = piped_commands.first_mut() {
-                match File::open(&stdin.file) {
-                    Ok(file) => unsafe { command.0.stdin(Stdio::from_raw_fd(file.into_raw_fd())); },
-                    Err(err) => {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: failed to redirect stdin into {}: {}", stdin.file, err);
+        match pipeline.stdin {
+            None => (),
+            Some(Input::File(ref filename)) => {
+                if let Some(command) = piped_commands.first_mut() {
+                    match File::open(filename) {
+                        Ok(file) => unsafe {
+                            command.0.stdin(Stdio::from_raw_fd(file.into_raw_fd()));
+                        },
+                        Err(e) => {
+                            eprintln!("ion: failed to redirect '{}' into stdin: {}", filename, e);
+                        }
+                    }
+                }
+            },
+            Some(Input::HereString(ref mut string)) => {
+                if let Some(command) = piped_commands.first_mut() {
+                    if !string.ends_with('\n') { string.push('\n'); }
+                    match unsafe { crossplat::stdin_of(&string) } {
+                        Ok(stdio) => {
+                            command.0.stdin(stdio);
+                        },
+                        Err(e) => {
+                            eprintln!("ion: failed to redirect herestring '{}' into stdin: {}",
+                                      string, e);
+                        }
                     }
                 }
             }

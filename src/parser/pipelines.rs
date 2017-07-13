@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 use std::iter::Peekable;
 
-use parser::peg::{Pipeline, Redirection, RedirectFrom};
+use parser::peg::{Pipeline, Input, Redirection, RedirectFrom};
 use shell::{Job, JobKind};
 use types::*;
 
@@ -165,7 +165,7 @@ impl<'a> Collector<'a> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Array::new();
         let mut jobs: Vec<Job> = Vec::new();
-        let mut infile: Option<Redirection> = None;
+        let mut input: Option<Input> = None;
         let mut outfile: Option<Redirection> = None;
 
         /// Attempt to create a new job given a list of collected arguments
@@ -270,16 +270,22 @@ impl<'a> Collector<'a> {
                 },
                 b'<' => {
                     bytes.next();
-                    if let Some(file) = self.arg(&mut bytes)? {
-                        infile = Some(Redirection {
-                            from: RedirectFrom::Stdout,
-                            file: file.into(),
-                            append: false,
-                        });
+                    if Some(b'<') == self.peek(i + 1) && Some(b'<') == self.peek(i + 2) {
+                        // If the next two characters are arrows, then interpret
+                        // the next argument as a herestring
+                        bytes.next();
+                        bytes.next();
+                        if let Some(cmd) = self.arg(&mut bytes)? {
+                            input = Some(Input::HereString(cmd.into()));
+                        } else {
+                            return Err("expected string argument after '<<<'");
+                        }
+                    } else if let Some(file) = self.arg(&mut bytes)? {
+                        // Otherwise interpret it as stdin redirection
+                        input = Some(Input::File(file.into()));
                     } else {
                         return Err("expected file argument after redirection for input");
                     }
-
                 }
                 // Skip over whitespace between jobs
                 b' ' | b'\t' => {
@@ -294,7 +300,7 @@ impl<'a> Collector<'a> {
             jobs.push(Job::new(args, JobKind::Last));
         }
 
-        Ok(Pipeline::new(jobs, infile, outfile))
+        Ok(Pipeline::new(jobs, input, outfile))
     }
 
 }
@@ -302,7 +308,7 @@ impl<'a> Collector<'a> {
 #[cfg(test)]
 mod tests {
     use shell::flow_control::Statement;
-    use parser::peg::{parse, Pipeline, RedirectFrom, Redirection};
+    use parser::peg::{parse, Input, Pipeline, RedirectFrom, Redirection};
     use shell::{Job, JobKind};
     use types::Array;
 
@@ -631,7 +637,7 @@ mod tests {
             assert_eq!("echo", &pipeline.clone().jobs[1].args[0]);
             assert_eq!("hello", &pipeline.clone().jobs[1].args[1]);
             assert_eq!("cat", &pipeline.clone().jobs[2].args[0]);
-            assert_eq!("stuff", &pipeline.clone().stdin.unwrap().file);
+            assert_eq!(Some(Input::File("stuff".into())), pipeline.stdin);
             assert_eq!("other", &pipeline.clone().stdout.unwrap().file);
             assert!(!pipeline.clone().stdout.unwrap().append);
             assert_eq!(input.to_owned(), pipeline.to_string());
@@ -644,7 +650,7 @@ mod tests {
     fn pipeline_with_redirection_append() {
         if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat < stuff >> other") {
         assert_eq!(3, pipeline.jobs.len());
-        assert_eq!("stuff", &pipeline.clone().stdin.unwrap().file);
+        assert_eq!(Some(Input::File("stuff".into())), pipeline.stdin);
         assert_eq!("other", &pipeline.clone().stdout.unwrap().file);
         assert!(pipeline.clone().stdout.unwrap().append);
         } else {
@@ -661,11 +667,7 @@ mod tests {
                 Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
                 Job::new(array!["cat"], JobKind::Last)
             ],
-            stdin: Some(Redirection {
-                from: RedirectFrom::Stdout,
-                file: "stuff".into(),
-                append: false
-            }),
+            stdin: Some(Input::File("stuff".into())),
             stdout: Some(Redirection {
                 from: RedirectFrom::Stderr,
                 file: "other".into(),
@@ -684,11 +686,7 @@ mod tests {
                 Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
                 Job::new(array!["cat"], JobKind::Last)
             ],
-            stdin: Some(Redirection {
-                from: RedirectFrom::Stdout,
-                file: "stuff".into(),
-                append: false
-            }),
+            stdin: Some(Input::File("stuff".into())),
             stdout: Some(Redirection {
                 from: RedirectFrom::Both,
                 file: "other".into(),
@@ -702,7 +700,7 @@ mod tests {
     fn pipeline_with_redirection_reverse_order() {
         if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat > stuff < other") {
             assert_eq!(3, pipeline.jobs.len());
-            assert_eq!("other", &pipeline.clone().stdin.unwrap().file);
+            assert_eq!(Some(Input::File("other".into())), pipeline.stdin);
             assert_eq!("stuff", &pipeline.clone().stdout.unwrap().file);
         } else {
             assert!(false);
@@ -729,6 +727,35 @@ mod tests {
         } else {
             assert!(false);
         }
+    }
+
+    #[test]
+    fn herestring() {
+        let input = "calc <<< $(cat math.txt)";
+        let expected = Pipeline {
+            jobs: vec![Job::new(array!["calc"], JobKind::Last)],
+            stdin: Some(Input::HereString("$(cat math.txt)".into())),
+            stdout: None,
+        };
+        assert_eq!(Statement::Pipeline(expected), parse(input));
+    }
+
+    #[test]
+    fn piped_herestring() {
+        let input = "cat | tr 'o' 'x' <<< $VAR > out.log";
+        let expected = Pipeline {
+            jobs: vec![
+                Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(array!["tr", "'o'", "'x'"], JobKind::Last)
+            ],
+            stdin: Some(Input::HereString("$VAR".into())),
+            stdout: Some(Redirection {
+                from: RedirectFrom::Stdout,
+                file: "out.log".into(),
+                append: false
+            })
+        };
+        assert_eq!(Statement::Pipeline(expected), parse(input));
     }
 
     #[test]
