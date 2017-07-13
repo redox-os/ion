@@ -50,7 +50,7 @@ impl Pipeline {
                 Some(Input::File(expand_string(s, &expanders, false).join(" ")))
             },
             Some(Input::HereString(ref s)) => {
-                Some(Input::HereString(expand_string(s, &expanders, false).join(" ")))
+                Some(Input::HereString(expand_string(s, &expanders, true).join(" ")))
             },
             None => None
         };
