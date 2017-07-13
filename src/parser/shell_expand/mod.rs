@@ -340,7 +340,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     } else {
                         let mut output = String::new();
                         array_method.handle(&mut output, expand_func);
-                        Array::from_vec(vec![output])
+                        array!(output)
                     };
                 },
                 _ => ()
@@ -530,7 +530,7 @@ mod test {
         let input = "$FOO:NOT:$BAR";
         let expected = "FOO:NOT:BAR";
         let expanded = expand_string(input, &functions!(), false);
-        assert_eq!(Array::from_vec(vec![expected.to_owned()]), expanded);
+        assert_eq!(array![expected], expanded);
     }
 
     #[test]
@@ -549,19 +549,19 @@ mod test {
     #[test]
     fn expand_variables_with_colons() {
         let expanded = expand_string("$FOO:$BAR", &functions!(), false);
-        assert_eq!(Array::from_vec(vec!["FOO:BAR".to_owned()]), expanded);
+        assert_eq!(array!["FOO:BAR"], expanded);
     }
 
     #[test]
     fn expand_multiple_variables() {
         let expanded = expand_string("${B}${C}...${D}", &functions!(), false);
-        assert_eq!(Array::from_vec(vec!["testing...1 2 3".to_owned()]), expanded);
+        assert_eq!(array!["testing...1 2 3"], expanded);
     }
 
     #[test]
     fn expand_variable_alongside_braces() {
         let line = "$A{1,2}";
-        let expected = Array::from_vec(vec!["11".to_owned(), "12".to_owned()]);
+        let expected = array!["11", "12"];
         let expanded = expand_string(line, &functions!(), false);
         assert_eq!(expected, expanded);
     }
@@ -569,7 +569,7 @@ mod test {
     #[test]
     fn expand_variable_within_braces() {
         let line = "1{$A,2}";
-        let expected = Array::from_vec(vec!["11".to_owned(), "12".to_owned()]);
+        let expected = array!["11", "12"];
         let expanded = expand_string(line, &functions!(), false);
         assert_eq!(&expected, &expanded);
     }
@@ -579,14 +579,14 @@ mod test {
         let base = |idx : &str| format!("[1 2 3][{}]", idx);
         let expander = functions!();
         {
-            let expected = Array::from_vec(vec!["1".to_owned()]);
+            let expected = array!["1"];
             let idxs = vec!["-3", "0", "..-2"];
             for idx in idxs {
                 assert_eq!(expected, expand_string(&base(idx), &expander, false));
             }
         }
         {
-            let expected = Array::from_vec(vec!["2".to_owned(), "3".to_owned()]);
+            let expected = array!["2", "3"];
             let idxs = vec!["1...2", "1...-1"];
             for idx in idxs {
                 assert_eq!(expected, expand_string(&base(idx), &expander, false));
@@ -605,24 +605,24 @@ mod test {
     fn embedded_array_expansion() {
         let line = |idx : &str| format!("[[foo bar] [baz bat] [bing crosby]][{}]", idx);
         let expander = functions!();
-        let cases : Vec<(Vec<String>, &str)> = vec![
-            (vec!["foo".into()], "0"),
-            (vec!["baz".into()], "2"),
-            (vec!["bat".into()], "-3"),
-            (vec!["bar".into(), "baz".into(), "bat".into()], "1...3")
+        let cases = vec![
+            (array!["foo"], "0"),
+            (array!["baz"], "2"),
+            (array!["bat"], "-3"),
+            (array!["bar", "baz", "bat"], "1...3")
         ];
         for (expected, idx) in cases {
-            assert_eq!(Array::from_vec(expected), expand_string(&line(idx), &expander, false));
+            assert_eq!(expected, expand_string(&line(idx), &expander, false));
         }
     }
 
     #[test]
     fn arith_expression() {
         let line = "$((A * A - (A + A)))";
-        let expected = Array::from_vec(vec!["-1".to_owned()]);
+        let expected = array!["-1"];
         assert_eq!(expected, expand_string(line, &functions!(), false));
         let line = "$((3 * 10 - 27))";
-        let expected = Array::from_vec(vec!["3".to_owned()]);
+        let expected = array!["3"];
         assert_eq!(expected, expand_string(line, &functions!(), false));
     }
 }
