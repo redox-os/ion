@@ -1,0 +1,14 @@
+echo $(tr '[a-z]' '[A-Z]' <<< foo)
+
+let output = [foo bar baz bing]
+
+fn find elem array
+  if grep -q $elem <<< $array
+    echo "true"
+  else
+    echo "false"
+  end
+end
+
+find "bar" "@output"
+find "zar" "@output"
