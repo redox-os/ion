@@ -30,8 +30,9 @@ fn exit_builtin() -> Builtin {
         name: "exit",
         help: "To exit the curent session",
         main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
+            let previous_status = shell.previous_status;
             shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
-                .unwrap_or(shell.previous_status))
+                .unwrap_or(previous_status))
         }),
     }
 }
