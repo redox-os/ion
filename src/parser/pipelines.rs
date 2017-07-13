@@ -730,6 +730,35 @@ mod tests {
     }
 
     #[test]
+    fn herestring() {
+        let input = "calc <<< $(cat math.txt)";
+        let expected = Pipeline {
+            jobs: vec![Job::new(array!["calc"], JobKind::Last)],
+            stdin: Some(Input::HereString("$(cat math.txt)".into())),
+            stdout: None,
+        };
+        assert_eq!(Statement::Pipeline(expected), parse(input));
+    }
+
+    #[test]
+    fn piped_herestring() {
+        let input = "cat | tr 'o' 'x' <<< $VAR > out.log";
+        let expected = Pipeline {
+            jobs: vec![
+                Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                Job::new(array!["tr", "'o'", "'x'"], JobKind::Last)
+            ],
+            stdin: Some(Input::HereString("$VAR".into())),
+            stdout: Some(Redirection {
+                from: RedirectFrom::Stdout,
+                file: "out.log".into(),
+                append: false
+            })
+        };
+        assert_eq!(Statement::Pipeline(expected), parse(input));
+    }
+
+    #[test]
     fn awk_tests() {
         if let Statement::Pipeline(pipeline) = parse("awk -v x=$x '{ if (1) print $1 }' myfile") {
             assert_eq!(1, pipeline.jobs.len());
