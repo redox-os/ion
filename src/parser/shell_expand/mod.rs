@@ -159,6 +159,31 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
     let mut output = String::new();
     let mut expanded_words = Array::new();
     let mut is_glob = false;
+
+    macro_rules! expand {
+        ($text:expr, $do_glob:expr, $tilde:expr) => {{
+            let expanded: String = if $tilde {
+                match (expand_func.tilde)($text) {
+                    Some(s) => s,
+                    None => $text.into()
+                }
+            } else {
+                $text.into()
+            };
+            if $do_glob {
+                let globbed = glob(&expanded);
+                if let Ok(var) = globbed {
+                    is_glob = true;
+                    for path in var.filter_map(Result::ok) {
+                        expanded_words.push(path.to_string_lossy().into_owned());
+                    }
+                }
+            } else {
+                output.push_str(&expanded);
+            }
+        }}
+    }
+
     if !token_buffer.is_empty() {
         if contains_brace {
             let mut tokens: Vec<BraceToken> = Vec::new();
@@ -235,12 +260,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     },
                     WordToken::Brace(ref nodes) =>
                         expand_brace(&mut output, &mut expanders, &mut tokens, nodes, expand_func, reverse_quoting),
-                    WordToken::Normal(text,false) => output.push_str(text),
                     WordToken::Whitespace(_) => unreachable!(),
-                    WordToken::Tilde(text) => output.push_str(match (expand_func.tilde)(text) {
-                        Some(ref expanded) => expanded,
-                        None               => text,
-                    }),
                     WordToken::Process(command, quoted, index) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
                         expand_process(&mut output, command, quoted, index, expand_func);
@@ -254,13 +274,8 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
 
                         slice_string(&mut output, &expanded, index);
                     },
-                    WordToken::Normal(text,true) => {
-                        let globbed = glob(text);
-                        if let Ok(var)=globbed{
-                            for path in var.filter_map(Result::ok) {
-                                expanded_words.push(path.to_string_lossy().into_owned());
-                            }
-                        }
+                    WordToken::Normal(text, do_glob, tilde) => {
+                        expand!(text, do_glob, tilde);
                     },
                     WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, &expand_func),
                 }
@@ -416,27 +431,16 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     }
                 },
                 WordToken::Brace(_) => unreachable!(),
-                WordToken::Normal(text,false) | WordToken::Whitespace(text) => {
-                    output.push_str(text);
+                WordToken::Normal(text, do_glob, tilde) => {
+                    expand!(text, do_glob, tilde);
                 },
-                WordToken::Normal(text,true) => {
-                    let globbed = glob(text);
-                    if let Ok(var)=globbed{
-                        is_glob=true;
-                        for path in var.filter_map(Result::ok) {
-                            expanded_words.push(path.to_string_lossy().into_owned());
-
-                        }
-                    }
+                WordToken::Whitespace(text) => {
+                    output.push_str(text);
                 },
                 WordToken::Process(command, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
                     expand_process(&mut output, command, quoted, index, expand_func);
                 }
-                WordToken::Tilde(text) => output.push_str(match (expand_func.tilde)(text) {
-                    Some(ref expanded) => expanded,
-                    None               => text,
-                }),
                 WordToken::Variable(text, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
                     let expanded = match (expand_func.variable)(text, quoted) {
