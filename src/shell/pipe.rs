@@ -203,7 +203,13 @@ impl<'a> PipelineExecution for Shell<'a> {
             },
             Some(Input::HereString(ref string)) => {
                 if let Some(command) = piped_commands.first_mut() {
-                    match unsafe { crossplat::stdin_of(string) } {
+                    let result = if string.ends_with('\n') {
+                        unsafe { crossplat::stdin_of(string) }
+                    } else {
+                        let string = [string, "\n"].concat();
+                        unsafe { crossplat::stdin_of(string) }
+                    };
+                    match result {
                         Ok(stdio) => {
                             command.0.stdin(stdio);
                         },
