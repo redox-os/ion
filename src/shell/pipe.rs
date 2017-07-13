@@ -43,6 +43,7 @@ pub mod crossplat {
         // Write the contents; make sure to use write_all so that we block until
         // the entire string is written
         infile.write_all(input.as_ref())?;
+        infile.flush()?;
         // `infile` currently owns the writer end RawFd. If we just return the reader end
         // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
         Ok(Stdio::from_raw_fd(reader))
@@ -186,7 +187,6 @@ impl<'a> PipelineExecution for Shell<'a> {
             .drain(..).map(|mut job| {
                 (job.build_command(), job.kind)
             }).collect();
-
         match pipeline.stdin {
             None => (),
             Some(Input::File(ref filename)) => {

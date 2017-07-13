@@ -18,9 +18,12 @@ pub struct Redirection {
     pub append: bool
 }
 
+/// Represents input that a process could initially receive from `stdin`
 #[derive(Debug, PartialEq, Clone)]
 pub enum Input {
+    /// A file; the contents of said file will be written to the `stdin` of a process
     File(String),
+    /// A string literal that is written to the `stdin` of a process
     HereString(String),
 }
 
