@@ -138,7 +138,7 @@ impl<'a> Shell<'a> {
             context,
             variables: Variables::default(),
             flow_control: FlowControl::default(),
-            directory_stack: DirectoryStack::new().expect(""),
+            directory_stack: DirectoryStack::new(),
             functions: FnvHashMap::default(),
             previous_status: 0,
             flags: 0,

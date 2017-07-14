@@ -10,15 +10,19 @@ pub struct DirectoryStack {
 }
 
 impl DirectoryStack {
-    /// Attempts to create a new `DirectoryStack` containing the current working directory.
-    pub fn new() -> Result<DirectoryStack, &'static str> {
-        current_dir()
-            .map_err(|_| "ion: failed to get current directory when building directory stack")
-            .map(|curr_dir| {
-                let mut dirs: VecDeque<PathBuf> = VecDeque::new();
+    /// Create a new `DirectoryStack` containing the current working directory, if available.
+    pub fn new() -> DirectoryStack {
+        let mut dirs: VecDeque<PathBuf> = VecDeque::new();
+        match current_dir() {
+            Ok(curr_dir) => {
                 dirs.push_front(curr_dir);
                 DirectoryStack { dirs: dirs }
-            })
+            },
+            Err(_) => {
+                eprintln!("ion: failed to get current directory when building directory stack");
+                DirectoryStack { dirs: dirs}
+            }
+        }
     }
 
     /// This function will take a map of variables as input and attempt to parse the value of the
