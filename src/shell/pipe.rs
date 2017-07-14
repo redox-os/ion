@@ -1,7 +1,7 @@
 #[cfg(all(unix, not(target_os = "redox")))] use libc;
 #[cfg(target_os = "redox")] use syscall;
 use std::io::{self, Write};
-use std::process::{Stdio, Command, Child};
+use std::process::{Stdio, Command};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::os::unix::process::CommandExt;
 use std::fs::{File, OpenOptions};
@@ -287,7 +287,8 @@ pub fn pipe (
                     // owned by a given command in `wait` in order to close those pipes, sending
                     // EOF to the next command
                     let mut remember = Vec::new();
-                    let mut children: Vec<Option<Child>> = Vec::new();
+                    // A list of the PIDs in the piped command
+                    let mut children: Vec<u32> = Vec::new();
 
                     macro_rules! spawn_proc {
                         ($cmd:expr) => {{
@@ -299,15 +300,11 @@ pub fn pipe (
                             match child {
                                 Ok(child) => {
                                     shell.foreground.push(child.id());
-                                    children.push(Some(child))
+                                    children.push(child.id());
                                 },
                                 Err(e) => {
-                                    children.push(None);
-                                    eprintln! (
-                                        "ion: failed to spawn `{}`: {}",
-                                        get_command_name($cmd),
-                                        e
-                                    );
+                                    eprintln!("ion: failed to spawn `{}`: {}", get_command_name($cmd), e);
+                                    return NO_SUCH_COMMAND
                                 }
                             }
                         }};
@@ -384,33 +381,32 @@ fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -
     }
 }
 
-/// This function will panic if called with an empty vector
+/// Waits for all of the children within a pipe to finish exuecting, returning the
+/// exit status of the last process in the queue. TODO: we need a way of
+/// enabling the last command in the pipe to close it's FDs so that the SIGPIPE
+/// signal is propagated back to the first command. Otherwise, there's an issue
+/// where a command like `yes | head` will wait forever, until Ctrl+C'd.
 fn wait (
     shell: &mut Shell,
-    children: &mut Vec<Option<Child>>,
+    children: &mut Vec<u32>,
     mut commands: Vec<Command>,
     foreground: bool
 ) -> i32 {
     let end = children.len() - 1;
-    for entry in children.drain(..end).zip(commands.drain(..end)) {
+    for (child, cmd) in children.drain(..end).zip(commands.drain(..end)) {
         // It is important that `cmd` gets dropped at the end of this
         // block in order to write EOF to the pipes that it owns.
-        if let (Some(child), cmd) = entry {
-            if foreground { set_foreground(child.id()); }
-            let status = shell.watch_foreground(child.id(), || get_full_command(&cmd));
-            if status == TERMINATED {
-                return status
-            }
+        if foreground { set_foreground(child); }
+        let status = shell.watch_foreground(child, || get_full_command(&cmd));
+        if status == TERMINATED {
+            return status
         }
     }
 
-    if let Some(child) = children.pop().unwrap() {
-        let cmd = commands.pop().unwrap();
-        if foreground { set_foreground(child.id()); }
-        shell.watch_foreground(child.id(), || get_full_command(&cmd))
-    } else {
-        NO_SUCH_COMMAND
-    }
+    let child = children.pop().unwrap();
+    let cmd = commands.pop().unwrap();
+    if foreground { set_foreground(child); }
+    shell.watch_foreground(child, || get_full_command(&cmd))
 }
 
 fn get_command_name(command: &Command) -> String {
