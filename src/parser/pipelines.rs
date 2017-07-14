@@ -1,11 +1,5 @@
 #![allow(eq_op)] // Required as a macro sets this clippy warning off.
 
-// TODO:
-// - Rewrite this module like the shell_expand::words module
-// - Implement Herestrings
-// - Implement Heredocs
-// - Fix the cyclomatic complexity issue
-
 use std::collections::HashSet;
 use std::iter::Peekable;
 
@@ -270,15 +264,33 @@ impl<'a> Collector<'a> {
                 },
                 b'<' => {
                     bytes.next();
-                    if Some(b'<') == self.peek(i + 1) && Some(b'<') == self.peek(i + 2) {
-                        // If the next two characters are arrows, then interpret
-                        // the next argument as a herestring
-                        bytes.next();
-                        bytes.next();
-                        if let Some(cmd) = self.arg(&mut bytes)? {
-                            input = Some(Input::HereString(cmd.into()));
+                    if Some(b'<') == self.peek(i + 1) {
+                        if Some(b'<') == self.peek(i + 2) {
+                            // If the next two characters are arrows, then interpret
+                            // the next argument as a herestring
+                            bytes.next();
+                            bytes.next();
+                            if let Some(cmd) = self.arg(&mut bytes)? {
+                                input = Some(Input::HereString(cmd.into()));
+                            } else {
+                                return Err("expected string argument after '<<<'");
+                            }
                         } else {
-                            return Err("expected string argument after '<<<'");
+                            // Otherwise, what we have is not a herestring, but a heredoc.
+                            bytes.next();
+                            // Collect the rest of the byte iterator and then trim the result
+                            // in order to get the EOF phrase that will be used to terminate
+                            // the heredoc.
+                            let heredoc = {
+                                let mut buffer = Vec::new();
+                                while let Some((_, byte)) = bytes.next() {
+                                    buffer.push(byte);
+                                }
+                                unsafe { String::from_utf8_unchecked(buffer) }
+                            };
+                            let heredoc = heredoc.lines().collect::<Vec<&str>>();
+                            // Then collect the heredoc from standard input.
+                            input = Some(Input::HereString(heredoc[1..heredoc.len()-1].join("\n")));
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
                         // Otherwise interpret it as stdin redirection
@@ -735,6 +747,17 @@ mod tests {
         let expected = Pipeline {
             jobs: vec![Job::new(array!["calc"], JobKind::Last)],
             stdin: Some(Input::HereString("$(cat math.txt)".into())),
+            stdout: None,
+        };
+        assert_eq!(Statement::Pipeline(expected), parse(input));
+    }
+
+    #[test]
+    fn heredoc() {
+        let input = "calc << EOF\n1 + 2\n3 + 4\nEOF";
+        let expected = Pipeline {
+            jobs: vec![Job::new(array!["calc"], JobKind::Last)],
+            stdin: Some(Input::HereString("1 + 2\n3 + 4".into())),
             stdout: None,
         };
         assert_eq!(Statement::Pipeline(expected), parse(input));

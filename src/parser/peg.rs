@@ -23,7 +23,8 @@ pub struct Redirection {
 pub enum Input {
     /// A file; the contents of said file will be written to the `stdin` of a process
     File(String),
-    /// A string literal that is written to the `stdin` of a process
+    /// A string literal that is written to the `stdin` of a process.
+    /// If there is a second string, that second string is the EOF phrase for the heredoc.
     HereString(String),
 }
 

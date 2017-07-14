@@ -7,54 +7,99 @@ bitflags! {
     }
 }
 
-
 pub struct QuoteTerminator {
     buffer: String,
+    eof:    Option<String>,
+    eof_buffer: String,
     read:   usize,
     flags:  Flags,
 }
 
 impl QuoteTerminator {
     pub fn new(input: String) -> QuoteTerminator {
-        QuoteTerminator { buffer: input, read: 0, flags: Flags::empty() }
+        QuoteTerminator { buffer: input, eof: None, eof_buffer: String::new(), read: 0, flags: Flags::empty() }
     }
 
     pub fn append(&mut self, input: String) {
-        self.buffer.push_str(if self.flags.contains(TRIM) { input.trim() } else { &input });
+        if self.eof.is_none() {
+            self.buffer.push_str(if self.flags.contains(TRIM) { input.trim() } else { &input });
+        } else {
+            self.eof_buffer.push_str(&input);
+        }
     }
 
     pub fn check_termination(&mut self) -> bool {
-        for character in self.buffer.bytes().skip(self.read) {
-            self.read += 1;
-            match character {
-                _ if self.flags.contains(BACKSL)  => self.flags ^= BACKSL,
-                b'\\'                             => self.flags ^= BACKSL,
-                b'\'' if !self.flags.intersects(DQUOTE) => self.flags ^= SQUOTE,
-                b'"'  if !self.flags.intersects(SQUOTE)  => self.flags ^= DQUOTE,
-                _ => (),
-            }
-        }
-
-        if self.flags.intersects(SQUOTE | DQUOTE) {
-            self.read += 1;
-            self.buffer.push('\n');
-            false
+        let mut eof_line = None;
+        let eof = self.eof.clone();
+        let status = if let Some(ref eof) = eof {
+            let line = &self.eof_buffer;
+            eof_line = Some([&line, "\n"].concat());
+            line.trim() == eof
         } else {
-            match self.buffer.bytes().last() {
-                Some(b'\\') => {
-                    let _ = self.buffer.pop();
-                    self.read -= 1;
-                    self.flags |= TRIM;
-                    false
-                },
-                Some(b'|') | Some(b'&') => {
-                    // self.read -= 1;
-                    // self.flags |= TRIM;
-                    false
+            {
+                let mut eof_found = false;
+                {
+                    let mut bytes = self.buffer.bytes().skip(self.read);
+                    while let Some(character) = bytes.next() {
+                        self.read += 1;
+                        match character {
+                            _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
+                            b'\\'                            => self.flags ^= BACKSL,
+                            b'\'' if !self.flags.intersects(DQUOTE) => self.flags ^= SQUOTE,
+                            b'"'  if !self.flags.intersects(SQUOTE) => self.flags ^= DQUOTE,
+                            b'<' if !self.flags.contains(SQUOTE | DQUOTE) => {
+                                let as_bytes = self.buffer.as_bytes();
+                                if Some(&b'<') == as_bytes.get(self.read) {
+                                    self.read += 1;
+                                    if Some(&b'<') != as_bytes.get(self.read) {
+                                        use std::str;
+                                        let eof_phrase = unsafe { str::from_utf8_unchecked(&as_bytes[self.read..]) };
+                                        self.eof = Some(eof_phrase.trim().to_owned());
+                                        eof_found = true;
+                                        break
+                                    }
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
                 }
-                _ => true
+                if eof_found {
+                    self.buffer.push('\n');
+                    return false
+                }
+            }
+
+            if self.flags.intersects(SQUOTE | DQUOTE) {
+                self.read += 1;
+                self.buffer.push('\n');
+                false
+            } else {
+                match self.buffer.bytes().last() {
+                    Some(b'\\') => {
+                        let _ = self.buffer.pop();
+                        self.read -= 1;
+                        self.flags |= TRIM;
+                        false
+                    },
+                    Some(b'|') | Some(b'&') => {
+                        false
+                    }
+                    _ => true
+                }
+            }
+        };
+
+        if let Some(line) = eof_line {
+            self.buffer.push_str(&line);
+        }
+        if self.eof.is_some() {
+            self.eof_buffer.clear();
+            if status {
+                self.eof = None;
             }
         }
+        status
     }
 
     pub fn consume(self) -> String { self.buffer }

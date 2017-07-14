@@ -12,3 +12,9 @@ end
 
 find "bar" "@output"
 find "zar" "@output"
+
+tr '[a-z]' '[A-Z]' << EOF
+one two
+three four
+five six
+EOF
