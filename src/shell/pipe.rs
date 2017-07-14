@@ -83,7 +83,7 @@ pub mod crossplat {
 pub mod crossplat {
     use parser::peg::{RedirectFrom};
     use std::fs::File;
-    use std::io::{self, Write};
+    use std::io::{self, Error, Write};
     use std::os::unix::io::{IntoRawFd, FromRawFd};
     use std::process::{Stdio, Command};
     use syscall;
@@ -96,25 +96,12 @@ pub mod crossplat {
         syscall::getpid().unwrap() as u32
     }
 
-    #[derive(Debug)]
-    pub enum Error {
-        Io(io::Error),
-        Sys(syscall::Error)
-    }
-
-    impl From<io::Error> for Error {
-        fn from(data: io::Error) -> Error { Error::Io(data) }
-    }
-
-    impl From<syscall::Error> for Error {
-        fn from(data: syscall::Error) -> Error { Error::Sys(data) }
-    }
-
     pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<Stdio, Error> {
         let mut fds: [usize; 2] = [0; 2];
-        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)?;
+        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)
+                      .map_err(|e| Error::from_raw_os_error(e.errno))?;
         let (reader, writer) = (fds[0], fds[1]);
-        let infile = File::from_raw_fd(writer);
+        let mut infile = File::from_raw_fd(writer);
         // Write the contents; make sure to use write_all so that we block until
         // the entire string is written
         infile.write_all(input.as_ref())?;
@@ -133,7 +120,8 @@ pub mod crossplat {
         // XXX: Zero probably is a bad default for this, but `pipe2` will error if it fails, so
         // one could reason that it isn't dangerous.
         let mut fds: [usize; 2] = [0; 2];
-        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)?;
+        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)
+                      .map_err(|e| Error::from_raw_os_error(e.errno))?;
         let (reader, writer) = (fds[0], fds[1]);
         match mode {
             RedirectFrom::Stdout => {
