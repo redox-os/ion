@@ -255,12 +255,11 @@ mod tests {
     use parser::{expand_string, ExpanderFunctions, Select};
 
     fn new_dir_stack() -> DirectoryStack {
-        DirectoryStack::new().unwrap()
+        DirectoryStack::new()
     }
 
     #[test]
     fn undefined_variable_expands_to_empty_string() {
-
         let variables = Variables::default();
         let expanded = expand_string("$FOO", &get_expanders!(&variables, &new_dir_stack()), false).join("");
         assert_eq!("", &expanded);

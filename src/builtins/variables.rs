@@ -190,7 +190,7 @@ mod test {
     use shell::directory_stack::DirectoryStack;
 
     fn new_dir_stack() -> DirectoryStack {
-        DirectoryStack::new().unwrap()
+        DirectoryStack::new()
     }
 
     // TODO: Rewrite tests now that let is part of the grammar.
