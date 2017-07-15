@@ -158,7 +158,6 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
 {
     let mut output = String::new();
     let mut expanded_words = Array::new();
-    let mut is_glob = false;
 
     macro_rules! expand {
         ($text:expr, $do_glob:expr, $tilde:expr) => {{
@@ -171,12 +170,16 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                 $text.into()
             };
             if $do_glob {
-                let globbed = glob(&expanded);
-                if let Ok(var) = globbed {
-                    is_glob = true;
-                    for path in var.filter_map(Result::ok) {
-                        expanded_words.push(path.to_string_lossy().into_owned());
+                match glob(&expanded) {
+                    Ok(var) => {
+                        let mut globs_found = false;
+                        for path in var.filter_map(Result::ok) {
+                            globs_found = true;
+                            expanded_words.push(path.to_string_lossy().into_owned());
+                        }
+                        if !globs_found { expanded_words.push(expanded); }
                     }
+                    Err(_) => expanded_words.push(expanded)
                 }
             } else {
                 output.push_str(&expanded);
@@ -453,8 +456,8 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                 WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
             }
         }
-        //the is_glob variable can probably be removed, I'm not entirely sure if empty strings are valid in any case- maarten
-        if !(is_glob && output == "") {
+        // I'm not entirely sure if empty strings are valid in any case- maarten
+        if output != "" {
             expanded_words.push(output.into());
         }
     }
