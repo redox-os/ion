@@ -136,7 +136,7 @@ pub fn add_to_background (
     pid: u32,
     state: ProcessState,
     command: String
-) -> usize {
+) -> u32 {
     let mut processes = processes.lock().unwrap();
     match (*processes).iter().position(|x| x.state == ProcessState::Empty) {
         Some(id) => {
@@ -146,7 +146,7 @@ pub fn add_to_background (
                 state: state,
                 name: command
             };
-            id
+            id as u32
         },
         None => {
             let njobs = (*processes).len();
@@ -156,7 +156,7 @@ pub fn add_to_background (
                 state: state,
                 name: command
             });
-            njobs
+            njobs as u32
         }
     }
 }
@@ -351,12 +351,22 @@ impl<'a> JobControl for Shell<'a> {
     }
 
     fn send_to_background(&mut self, pid: u32, state: ProcessState, command: String) {
+        // Increment the `Arc` counters so that these fields can be moved into
+        // the upcoming background thread.
         let processes = self.background.clone();
         let fg_signals = self.foreground_signals.clone();
+
+        // Add the process to the background list, and mark the job's ID as
+        // the previous job in the shell (in case fg/bg is executed w/ no args).
+        let njob = add_to_background(processes.clone(), pid, state, command);
+        self.previous_job = njob;
+        eprintln!("ion: bg [{}] {}", njob, pid);
+
+        // Spawn a background thread that will monitor the progress of the
+        // background process, updating it's state changes until it finally
+        // exits.
         let _ = spawn(move || {
-            let njob = add_to_background(processes.clone(), pid, state, command);
-            eprintln!("ion: bg [{}] {}", njob, pid);
-            watch_background(fg_signals, processes, pid, njob);
+            watch_background(fg_signals, processes, pid, njob as usize);
         });
     }
 

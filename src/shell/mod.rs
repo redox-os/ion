@@ -110,6 +110,8 @@ pub struct Shell<'a> {
     pub functions: FnvHashMap<Identifier, Function>,
     /// When a command is executed, the final result of that command is stored here.
     pub previous_status: i32,
+    /// The job ID of the previous command sent to the background.
+    pub previous_job: u32,
     /// Contains all the boolean flags that control shell behavior.
     pub flags: u8,
     /// When a signal is received in the main thread's event loop, the signal will be sent to this receiver. The shell
@@ -140,6 +142,7 @@ impl<'a> Shell<'a> {
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new(),
             functions: FnvHashMap::default(),
+            previous_job: !0,
             previous_status: 0,
             flags: 0,
             signals: signals,

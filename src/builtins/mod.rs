@@ -409,9 +409,10 @@ impl Builtin {
                                             let _ = stdout.write_all(help.as_bytes());
                                             let _ = stdout.write_all(b"\n");
                                         }
+                                    } else {
+                                        let _ = stdout.write_all(b"Command helper not found [run 'help']...");
+                                        let _ = stdout.write_all(b"\n");
                                     }
-                                    let _ = stdout.write_all(b"Command helper not found [run 'help']...");
-                                    let _ = stdout.write_all(b"\n");
                                 } else {
                                     let mut commands = command_helper.keys().cloned().collect::<Vec<&str>>();
                                     commands.sort();
