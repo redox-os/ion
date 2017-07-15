@@ -2,11 +2,12 @@
 name = "ion-shell"
 description = "The Ion Shell"
 repository = "https://github.com/redox-os/ion"
-version = "1.0.4"
+version = "1.0.5"
 license-file = "LICENSE"
 readme = "README.md"
 authors = [
   "Michael Aaron Murphy <mmstickman@gmail.com>",
+  "Hunter Goldstein <hunter.d.goldstein@gmail.com>",
   "Skyler Berg <skylertheberg@gmail.com>",
   "Jeremy Soller <jackpot51@gmail.com>",
   "Michael Gattozzi <mgattozzi@gmail.com>",
@@ -28,7 +29,7 @@ permutate = "0.3"
 unicode-segmentation = "1.2"
 smallvec = "0.4"
 smallstring = "0.1"
-calculate = "0.1.*"
+calculate = "0.1"
 [target.'cfg(target_os = "redox")'.dependencies]
 redox_syscall = "0.1"
 

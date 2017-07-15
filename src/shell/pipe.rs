@@ -289,16 +289,22 @@ pub fn pipe (
                     let mut remember = Vec::new();
                     // A list of the PIDs in the piped command
                     let mut children: Vec<u32> = Vec::new();
+                    // The process group by which all of the PIDs belong to.
+                    let mut pgid = 0; // 0 means the PGID is not set yet.
 
                     macro_rules! spawn_proc {
                         ($cmd:expr) => {{
                             let child = $cmd.before_exec(move || {
                                 signals::unblock();
-                                create_process_group();
+                                create_process_group(pgid);
                                 Ok(())
                             }).spawn();
                             match child {
                                 Ok(child) => {
+                                    if pgid == 0 {
+                                        pgid = child.id();
+                                        if foreground { set_foreground(pgid); }
+                                    }
                                     shell.foreground.push(child.id());
                                     children.push(child.id());
                                 },
@@ -334,7 +340,7 @@ pub fn pipe (
                     }
 
                     previous_kind = kind;
-                    previous_status = wait(shell, &mut children, remember, foreground);
+                    previous_status = wait(shell, children, remember);
                     if previous_status == TERMINATED {
                         terminate_fg(shell);
                         return previous_status;
@@ -365,12 +371,12 @@ fn terminate_fg(shell: &mut Shell) {
 fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -> i32 {
     match command.before_exec(move || {
         signals::unblock();
-        create_process_group();
+        create_process_group(0);
         Ok(())
     }).spawn() {
         Ok(child) => {
             if foreground { set_foreground(child.id()); }
-            shell.watch_foreground(child.id(), || get_full_command(command))
+            shell.watch_foreground(child.id(), child.id(), || get_full_command(command), |_| ())
         },
         Err(_) => {
             let stderr = io::stderr();
@@ -382,31 +388,28 @@ fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -
 }
 
 /// Waits for all of the children within a pipe to finish exuecting, returning the
-/// exit status of the last process in the queue. TODO: we need a way of
-/// enabling the last command in the pipe to close it's FDs so that the SIGPIPE
-/// signal is propagated back to the first command. Otherwise, there's an issue
-/// where a command like `yes | head` will wait forever, until Ctrl+C'd.
+/// exit status of the last process in the queue.
 fn wait (
     shell: &mut Shell,
-    children: &mut Vec<u32>,
-    mut commands: Vec<Command>,
-    foreground: bool
+    mut children: Vec<u32>,
+    mut commands: Vec<Command>
 ) -> i32 {
-    let end = children.len() - 1;
-    for (child, cmd) in children.drain(..end).zip(commands.drain(..end)) {
-        // It is important that `cmd` gets dropped at the end of this
-        // block in order to write EOF to the pipes that it owns.
-        if foreground { set_foreground(child); }
-        let status = shell.watch_foreground(child, || get_full_command(&cmd));
-        if status == TERMINATED {
-            return status
-        }
-    }
+    // TODO: Find a way to only do this when absolutely necessary.
+    let as_string = commands.iter().map(get_full_command)
+            .collect::<Vec<String>>().join(" | ");
 
-    let child = children.pop().unwrap();
-    let cmd = commands.pop().unwrap();
-    if foreground { set_foreground(child); }
-    shell.watch_foreground(child, || get_full_command(&cmd))
+    // Each process in the pipe has the same PGID, which is the first process's PID.
+    let pgid = children[0];
+    // If the last process exits, we know that all processes should exit.
+    let last_pid = children[children.len()-1];
+
+    // Watch the foreground group, dropping all commands that exit as they exit.
+    shell.watch_foreground(pgid, last_pid, move || as_string, move |pid| {
+        if let Some(id) = children.iter().position(|&x| x as i32 == pid) {
+            commands.remove(id);
+            children.remove(id);
+        }
+    })
 }
 
 fn get_command_name(command: &Command) -> String {

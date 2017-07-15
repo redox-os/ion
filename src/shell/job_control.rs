@@ -34,7 +34,14 @@ pub trait JobControl {
     fn handle_signal(&self, signal: i32) -> bool;
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
-    fn watch_foreground<F: Fn() -> String>(&mut self, pid: u32, get_command: F) -> i32;
+    fn watch_foreground <F, D> (
+        &mut self,
+        pid: u32,
+        last_pid: u32,
+        get_command: F,
+        drop_command: D
+        ) -> i32 where F: FnOnce() -> String,
+                       D: FnMut(i32);
     fn send_to_background(&mut self, child: u32, state: ProcessState, command: String);
 }
 
@@ -217,16 +224,27 @@ impl<'a> JobControl for Shell<'a> {
     }
 
     #[cfg(all(unix, not(target_os = "redox")))]
-    fn watch_foreground <F: Fn() -> String> (
+    fn watch_foreground <F: FnOnce() -> String, D: FnMut(i32)> (
         &mut self,
         pid: u32,
-        get_command: F
+        last_pid: u32,
+        get_command: F,
+        mut drop_command: D,
     ) -> i32 {
         use nix::sys::wait::{waitpid, WaitStatus, WUNTRACED};
         use nix::sys::signal::Signal;
+        use nix::{Error, Errno};
+        let mut exit_status = 0;
         loop {
             match waitpid(-(pid as pid_t), Some(WUNTRACED)) {
-                Ok(WaitStatus::Exited(_, status)) => break status as i32,
+                Ok(WaitStatus::Exited(pid, status)) => {
+                    if pid == (last_pid as i32) {
+                        break status as i32
+                    } else {
+                        drop_command(pid);
+                        exit_status = status;
+                    }
+                }
                 Ok(WaitStatus::Signaled(_, signal, _)) => {
                     eprintln!("ion: process ended by signal");
                     if signal == Signal::SIGTERM {
@@ -247,6 +265,8 @@ impl<'a> JobControl for Shell<'a> {
                     break TERMINATED
                 },
                 Ok(_) => (),
+                // ECHILD signifies that all children have exited
+                Err(Error::Sys(Errno::ECHILD)) => break exit_status as i32,
                 Err(why) => {
                     eprintln!("ion: process doesn't exist: {}", why);
                     break FAILURE
@@ -256,10 +276,12 @@ impl<'a> JobControl for Shell<'a> {
     }
 
     #[cfg(target_os = "redox")]
-    fn watch_foreground <F: Fn() -> String> (
+    fn watch_foreground <F: FnOnce() -> String, D: FnMut(i32)> (
         &mut self,
         pid: u32,
-        _get_command: F
+        _last_pid: u32,
+        _get_command: F,
+        mut drop_command: D,
     ) -> i32 {
         use std::io::{self, Write};
         use std::os::unix::process::ExitStatusExt;

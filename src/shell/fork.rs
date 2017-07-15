@@ -24,7 +24,7 @@ mod redox {
     }
 
     /// Ensures that the forked child is given a unique process ID.
-    pub fn create_process_group() {
+    pub fn create_process_group(pgid: u32) {
 
     }
 }
@@ -45,8 +45,8 @@ mod unix {
     }
 
     /// Ensures that the forked child is given a unique process ID.
-    pub fn create_process_group() {
-        let _ = setpgid(0, 0);
+    pub fn create_process_group(pgid: u32) {
+        let _ = setpgid(0, pgid as i32);
     }
 }
 
@@ -75,7 +75,7 @@ pub fn fork_pipe (
             // The child fork should not have any signals blocked, so the shell can control it.
             signals::unblock();
             // This ensures that the child fork has a unique PGID.
-            create_process_group();
+            create_process_group(0);
             // After execution of it's commands, exit with the last command's status.
             exit(pipe(shell, commands, false));
         },
