@@ -20,14 +20,12 @@ pub use self::job::{Job, JobKind};
 pub use self::flow::FlowLogic;
 pub use self::binary::Binary;
 
-
 use app_dirs::{AppDataType, AppInfo, app_root};
 use builtins::*;
 use fnv::FnvHashMap;
-use liner::{Context, CursorPosition, Event, EventKind, BasicCompleter};
-use parser::*;
+use liner::Context;
+use parser::ArgumentSplitter;
 use parser::peg::Pipeline;
-use self::completer::{MultiCompleter, IonFileCompleter};
 use self::directory_stack::DirectoryStack;
 use self::flags::*;
 use self::flow_control::{FlowControl, Function, FunctionArgument, Type};
@@ -36,13 +34,11 @@ use self::job_control::{JobControl, BackgroundProcess};
 use self::pipe::PipelineExecution;
 use self::status::*;
 use self::variables::Variables;
-use smallstring::SmallString;
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
-use std::io::{self, ErrorKind, Write};
-use std::mem;
-use std::path::{PathBuf, Path};
+use std::io::{self, Write};
+use std::path::Path;
 use std::process;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
@@ -108,140 +104,6 @@ impl<'a> Shell<'a> {
         }
     }
 
-    /// Infer if the given filename is actually a partial filename
-    fn complete_as_file(current_dir : PathBuf, filename : String, index : usize) -> bool {
-        let filename = filename.trim();
-        let mut file = current_dir.clone();
-        file.push(&filename);
-        // If the user explicitly requests a file through this syntax then complete as a file
-        if filename.trim().starts_with(".") { return true; }
-        // If the file starts with a dollar sign, it's a variable, not a file
-        if filename.trim().starts_with("$") { return false; }
-        // Once we are beyond the first string, assume its a file
-        if index > 0 { return true; }
-        // If we are referencing a file that exists then just complete to that file
-        if file.exists() { return true; }
-        // If we have a partial file inside an existing directory, e.g. /foo/b when /foo/bar
-        // exists, then treat it as file as long as `foo` isn't the current directory, otherwise
-        // this would apply to any string `foo`
-        if let Some(parent) = file.parent() { return parent.exists() && parent != current_dir; }
-        // By default assume its not a file
-        false
-    }
-
-    /// Ion's interface to Liner's `read_line` method, which handles everything related to
-    /// rendering, controlling, and getting input from the prompt.
-    fn readln(&mut self) -> Option<String> {
-        {
-            let vars_ptr = &self.variables as *const Variables;
-            let dirs_ptr = &self.directory_stack as *const DirectoryStack;
-            let funcs = &self.functions;
-            let vars = &self.variables;
-            let builtins = self.builtins;
-
-            // Collects the current list of values from history for completion.
-            let history = &self.context.as_ref().unwrap().history.buffers.iter()
-                // Map each underlying `liner::Buffer` into a `String`.
-                .map(|x| x.chars().cloned().collect())
-                // Collect each result into a vector to avoid borrowing issues.
-                .collect::<Vec<SmallString>>();
-
-            loop {
-                let prompt = self.prompt();
-                let line = self.context.as_mut().unwrap().read_line(prompt, &mut move |Event { editor, kind }| {
-                    if let EventKind::BeforeComplete = kind {
-                        let (words, pos) = editor.get_words_and_cursor_position();
-
-                        let filename = match pos {
-                            CursorPosition::InWord(index) => index > 0,
-                            CursorPosition::InSpace(Some(_), _) => true,
-                            CursorPosition::InSpace(None, _) => false,
-                            CursorPosition::OnWordLeftEdge(index) => index >= 1,
-                            CursorPosition::OnWordRightEdge(index) => {
-                                match (words.into_iter().nth(index), env::current_dir()) {
-                                    (Some((start, end)), Ok(file)) => {
-                                        let filename = editor.current_buffer().range(start, end);
-                                        Shell::complete_as_file(file, filename, index)
-                                    },
-                                    _ => false,
-                                }
-                            }
-                        };
-
-                        if filename {
-                            if let Ok(current_dir) = env::current_dir() {
-                                if let Some(url) = current_dir.to_str() {
-                                    let completer = IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr);
-                                    mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
-                                }
-                            }
-                        } else {
-                            // Creates a list of definitions from the shell environment that will be used
-                            // in the creation of a custom completer.
-                            let words = builtins.iter()
-                                // Add built-in commands to the completer's definitions.
-                                .map(|(&s, _)| Identifier::from(s))
-                                // Add the history list to the completer's definitions.
-                                .chain(history.iter().cloned())
-                                // Add the aliases to the completer's definitions.
-                                .chain(vars.aliases.keys().cloned())
-                                // Add the list of available functions to the completer's definitions.
-                                .chain(funcs.keys().cloned())
-                                // Add the list of available variables to the completer's definitions.
-                                // TODO: We should make it free to do String->SmallString
-                                //       and mostly free to go back (free if allocated)
-                                .chain(vars.get_vars().into_iter().map(|s| ["$", &s].concat().into()))
-                                .collect();
-
-                            // Initialize a new completer from the definitions collected.
-                            let custom_completer = BasicCompleter::new(words);
-
-                            // Creates completers containing definitions from all directories listed
-                            // in the environment's **$PATH** variable.
-                            let mut file_completers = if let Ok(val) = env::var("PATH") {
-                                val.split(if cfg!(unix) { ':' } else { ';' })
-                                    .map(|s| IonFileCompleter::new(Some(s), dirs_ptr, vars_ptr))
-                                    .collect()
-                            } else {
-                                vec![IonFileCompleter::new(Some("/bin/"), dirs_ptr, vars_ptr)]
-                            };
-
-                            // Also add files/directories in the current directory to the completion list.
-                            if let Ok(current_dir) = env::current_dir() {
-                                if let Some(url) = current_dir.to_str() {
-                                    file_completers.push(IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr));
-                                }
-                            }
-
-                            // Merge the collected definitions with the file path definitions.
-                            let completer = MultiCompleter::new(file_completers, custom_completer);
-
-                            // Replace the shell's current completer with the newly-created completer.
-                            mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
-                        }
-                    }
-                });
-
-                match line {
-                    Ok(line) => return Some(line),
-                    // Handles Ctrl + C
-                    Err(ref err) if err.kind() == ErrorKind::Interrupted => return None,
-                    // Handles Ctrl + D
-                    Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => break,
-                    Err(err) => {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: liner: {}", err);
-                        return None
-                    }
-                }
-            }
-        }
-
-        let previous_status = self.previous_status;
-        self.exit(previous_status);
-    }
-
     pub fn exit(&mut self, status: i32) -> ! {
         if let Some(context) = self.context.as_mut() {
             context.history.commit_history();
@@ -283,15 +145,6 @@ impl<'a> Shell<'a> {
             Err(why) => {
                 eprintln!("ion: unable to get config root: {}", why);
             }
-        }
-    }
-
-    pub fn prompt(&self) -> String {
-        if self.flow_control.level == 0 {
-            let prompt_var = self.variables.get_var_or_empty("PROMPT");
-            expand_string(&prompt_var, &get_expanders!(&self.variables, &self.directory_stack), false).join(" ")
-        } else {
-            "    ".repeat(self.flow_control.level as usize)
         }
     }
 
