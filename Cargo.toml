@@ -18,36 +18,61 @@ build = "build.rs"
 [[bin]]
 name = "ion"
 
+## Shared Dependencies
+
 [dependencies]
+# Provides XDG app directory support
 app_dirs = "1.1.1"
+# Provides methods for bitwise flag operations
 bitflags = "0.9.1"
-fnv = "1.0"
-glob = "0.2"
-lazy_static = "0.2"
-liner = "0.4"
-permutate = "0.3"
-unicode-segmentation = "1.2"
-smallvec = "0.4"
-smallstring = "0.1"
+# Provides inline arithmetic expression and `calc` functionality
 calculate = "0.1"
+# A faster hashing algorithm for the hash maps in the shell.
+fnv = "1.0"
+# Performs globbing on words that are detected to be potentially globbable.
+glob = "0.2"
+# Provides a macro for lazily-evalulated statics
+lazy_static = "0.2"
+# Provides the line editor / prompt for the shell
+liner = { git = "https://github.com/MovingtoMars/liner/" }
+# Provides permutations of strings in brace expansions
+permutate = "0.3"
+# Enables strings to be stored inline on the stack, when possible.
+smallstring = "0.1"
+# Same as the above, but for vectors.
+smallvec = "0.4"
+# Provides grapheme-based string iterators.
+unicode-segmentation = "1.2"
+
+## Redox Dependencies
+
 [target.'cfg(target_os = "redox")'.dependencies]
+# Provides access to Redox syscalls for signals/job control.
 redox_syscall = "0.1"
 
+## *nix Dependencies (Linux, Mac OS, BSDs)
+
 [target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
-users = "0.5.1"
+# Used by `tokio-signal`/`tokio-core` for creating zero-allocation streams of future data.
 futures = "0.1"
+# Required to access some *nix-specific syscalls for signals/job control.
 libc = "0.2"
+# A higher level abstraction of libc-acquired syscalls for signals/job control.
 nix = "0.8"
+# Provides the core event loop for a tokio solution.
 tokio-core = "0.1"
+# Provides a high level abstraction to watching signals with tokio.
 tokio-signal = "0.1"
+# Obtains user directories
+users = "0.5.1"
 
 [build-dependencies]
-peg = "0.5"
 ansi_term = "0.9"
+peg = "0.5"
 version_check = "0.1.3"
 
 [profile.release]
-debug = true
+# debug = true
 # rustflags = [ "-C", "target-cpu=native"]
 lto = true
 panic = "abort"

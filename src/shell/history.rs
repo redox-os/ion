@@ -22,35 +22,40 @@ pub trait ShellHistory {
 
 impl<'a> ShellHistory for Shell<'a> {
     fn print_history(&self, _arguments: &[&str]) -> i32 {
-        let mut buffer = Vec::with_capacity(8*1024);
-        for command in &self.context.history.buffers {
-            let _ = writeln!(buffer, "{}", command);
+        if let Some(context) = self.context.as_ref() {
+            let mut buffer = Vec::with_capacity(8*1024);
+            for command in &context.history.buffers {
+                let _ = writeln!(buffer, "{}", command);
+            }
+            let stdout = io::stdout();
+            let mut stdout = stdout.lock();
+            let _ = stdout.write_all(&buffer);
+            SUCCESS
+        } else {
+            FAILURE
         }
-        let stdout = io::stdout();
-        let mut stdout = stdout.lock();
-        let _ = stdout.write_all(&buffer);
-        SUCCESS
     }
 
     fn set_context_history_from_vars(&mut self) {
+        let context = self.context.as_mut().unwrap();
         let max_history_size = self.variables
             .get_var_or_empty("HISTORY_SIZE")
             .parse()
             .unwrap_or(1000);
 
-        self.context.history.set_max_size(max_history_size);
+        context.history.set_max_size(max_history_size);
 
         if &*self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") == "1" {
             let file_name = self.variables.get_var("HISTORY_FILE");
-            self.context.history.set_file_name(file_name.map(|f| f.into()));
+            context.history.set_file_name(file_name.map(|f| f.into()));
 
             let max_history_file_size = self.variables
                 .get_var_or_empty("HISTORY_FILE_SIZE")
                 .parse()
                 .unwrap_or(1000);
-            self.context.history.set_max_file_size(max_history_file_size);
+            context.history.set_max_file_size(max_history_file_size);
         } else {
-            self.context.history.set_file_name(None);
+            context.history.set_file_name(None);
         }
     }
 }

@@ -99,7 +99,8 @@ pub struct Shell<'a> {
     /// Contains a list of built-in commands that were created when the program started.
     pub builtins: &'a FnvHashMap<&'static str, Builtin>,
     /// Contains the history, completions, and manages writes to the history file.
-    pub context: Context,
+    /// Note that the context is only available in an interactive session.
+    pub context: Option<Context>,
     /// Contains the aliases, strings, and array variable maps.
     pub variables: Variables,
     /// Contains the current state of flow control parameters.
@@ -133,11 +134,9 @@ impl<'a> Shell<'a> {
         builtins: &'a FnvHashMap<&'static str, Builtin>,
         signals: Receiver<i32>
     ) -> Shell<'a> {
-        let mut context = Context::new();
-        context.word_divider_fn = Box::new(word_divide);
         Shell {
             builtins: builtins,
-            context,
+            context: None,
             variables: Variables::default(),
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new(),
@@ -145,7 +144,7 @@ impl<'a> Shell<'a> {
             previous_job: !0,
             previous_status: 0,
             flags: 0,
-            signals: signals,
+            signals,
             foreground: Vec::new(),
             background: Arc::new(Mutex::new(Vec::new())),
             break_flow: false,
@@ -185,7 +184,7 @@ impl<'a> Shell<'a> {
             let builtins = self.builtins;
 
             // Collects the current list of values from history for completion.
-            let history = &self.context.history.buffers.iter()
+            let history = &self.context.as_ref().unwrap().history.buffers.iter()
                 // Map each underlying `liner::Buffer` into a `String`.
                 .map(|x| x.chars().cloned().collect())
                 // Collect each result into a vector to avoid borrowing issues.
@@ -193,7 +192,7 @@ impl<'a> Shell<'a> {
 
             loop {
                 let prompt = self.prompt();
-                let line = self.context.read_line(prompt, &mut move |Event { editor, kind }| {
+                let line = self.context.as_mut().unwrap().read_line(prompt, &mut move |Event { editor, kind }| {
                     if let EventKind::BeforeComplete = kind {
                         let (words, pos) = editor.get_words_and_cursor_position();
 
@@ -288,7 +287,9 @@ impl<'a> Shell<'a> {
     }
 
     pub fn exit(&mut self, status: i32) -> ! {
-        self.context.history.commit_history();
+        if let Some(context) = self.context.as_mut() {
+            context.history.commit_history();
+        }
         process::exit(status);
     }
 
@@ -394,10 +395,40 @@ impl<'a> Shell<'a> {
             self.exit(previous_status);
         }
 
+        // Only interactive sessions will have a context.
+        self.context = Some({
+            let mut context = Context::new();
+            context.word_divider_fn = Box::new(word_divide);
+            if "1" == self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {
+                let path = self.variables.get_var("HISTORY_FILE").expect("shell didn't set history_file");
+                context.history.set_file_name(Some(path.clone()));
+                if !Path::new(path.as_str()).exists() {
+                    eprintln!("ion: creating history file at \"{}\"", path);
+                    if let Err(why) = File::create(path) {
+                        eprintln!("ion: could not create history file: {}", why);
+                    }
+                }
+                match context.history.load_history() {
+                    Ok(()) => {
+                        // pass
+                    }
+                    Err(ref err) if err.kind() == ErrorKind::NotFound => {
+                        let history_filename = self.variables.get_var_or_empty("HISTORY_FILE");
+                        eprintln!("ion: failed to find history file {}: {}", history_filename, err);
+                    },
+                    Err(err) => {
+                        eprintln!("ion: failed to load history: {}", err);
+                    }
+                }
+            }
+            context
+        });
+
         self.variables.set_array (
             "args",
             iter::once(env::args().next().unwrap()).collect(),
         );
+
         loop {
             if let Some(command) = self.readln() {
                 if ! command.is_empty() {
@@ -408,7 +439,7 @@ impl<'a> Shell<'a> {
                         // Mark the command in the context history if it was a success.
                         if self.previous_status != NO_SUCH_COMMAND || self.flow_control.level > 0 {
                             self.set_context_history_from_vars();
-                            if let Err(err) = self.context.history.push(command.into()) {
+                            if let Err(err) = self.context.as_mut().unwrap().history.push(command.into()) {
                                 let stderr = io::stderr();
                                 let mut stderr = stderr.lock();
                                 let _ = writeln!(stderr, "ion: {}", err);
@@ -603,15 +634,17 @@ impl<'a> Shell<'a> {
         // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the pipline
         // just executed to the the file and context histories. At the moment, this means
         // record how long it took.
-        if "1" == self.variables.get_var_or_empty("RECORD_SUMMARY") {
-            if let Ok(elapsed_time) = command_start_time.elapsed() {
-                let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
-                                      elapsed_time.as_secs(), elapsed_time.subsec_nanos());
-                self.context.history.push(summary.into()).unwrap_or_else(|err| {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: {}\n", err);
-                });
+        if let Some(context) = self.context.as_mut() {
+            if "1" == self.variables.get_var_or_empty("RECORD_SUMMARY") {
+                if let Ok(elapsed_time) = command_start_time.elapsed() {
+                    let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
+                                        elapsed_time.as_secs(), elapsed_time.subsec_nanos());
+                    context.history.push(summary.into()).unwrap_or_else(|err| {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = writeln!(stderr, "ion: {}\n", err);
+                    });
+                }
             }
         }
 

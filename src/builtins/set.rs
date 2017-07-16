@@ -58,10 +58,14 @@ pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
                     b'o' => {
                         match args_iter.next() {
                             Some(&mode) if mode == "vi" => {
-                                shell.context.key_bindings = KeyBindings::Vi;
+                                if let Some(context) = shell.context.as_mut() {
+                                    context.key_bindings = KeyBindings::Vi;
+                                }
                             },
                             Some(&mode) if mode == "emacs" => {
-                                shell.context.key_bindings = KeyBindings::Emacs;
+                                if let Some(context) = shell.context.as_mut() {
+                                    context.key_bindings = KeyBindings::Emacs;
+                                }
                             }
                             Some(_) => {
                                 let _ = stderr.lock().write_all(b"set: invalid keymap\n");
