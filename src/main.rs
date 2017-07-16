@@ -30,7 +30,7 @@ mod shell;
 mod ascii_helpers;
 
 use builtins::Builtin;
-use shell::{Shell, signals};
+use shell::{Shell, Binary, signals};
 use std::sync::mpsc;
 use std::thread;
 
@@ -38,7 +38,7 @@ fn inner_main(sigint_rx : mpsc::Receiver<i32>) {
     let builtins = Builtin::map();
     let mut shell = Shell::new(&builtins, sigint_rx);
     shell.evaluate_init_file();
-    shell.execute();
+    shell.main();
 }
 
 #[cfg(not(target_os = "redox"))]
