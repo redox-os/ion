@@ -293,7 +293,7 @@ When an array variable is passed by itself, it will coerced into a string.
 Brace expansions actually create a vector of values under the hood, and thus they can be used to create an array.
 
 ```ion
-let braced_array = [ ]{down,up}vote ]
+let braced_array = [ {down,up}vote ]
 ```
 
 #### Array-based Command Substitution
