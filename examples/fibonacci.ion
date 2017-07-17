@@ -7,6 +7,8 @@ fn fib n
             let temp = $output
             let output += $previous
             let previous = $temp
+            # This also works, but has a higher performance penalty:
+            # let output previous = $((output + previous)) $output
         end
         echo $output
     end

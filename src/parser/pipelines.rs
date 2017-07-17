@@ -73,10 +73,11 @@ impl<'a> Collector<'a> {
         // not sure of a better solution
         let mut array_level = 0;
         let mut proc_level = 0;
+        let mut brace_level = 0;
         let mut start = None;
         let mut end = None;
 
-        macro_rules! is_toplevel { () => (array_level == 0 && proc_level == 0) }
+        macro_rules! is_toplevel { () => (array_level + proc_level + brace_level == 0) }
 
         // Skip over any leading whitespace
         while let Some(&(_, b)) = bytes.peek() {
@@ -93,6 +94,8 @@ impl<'a> Collector<'a> {
                 b')' => { proc_level -= 1; bytes.next(); }
                 b'[' => { array_level += 1; bytes.next(); }
                 b']' => { array_level -= 1; bytes.next(); }
+                b'{' => { brace_level += 1; bytes.next(); }
+                b'}' => { brace_level -= 1; bytes.next();}
                 // This is a tricky one: we only end the argment if `^` is followed by a
                 // redirection character
                 b'^' => if is_toplevel!() {
@@ -141,6 +144,9 @@ impl<'a> Collector<'a> {
         }
         if array_level > 0 {
             return Err("ion: syntax error: unmatched left bracket");
+        }
+        if brace_level > 0 {
+            return Err("ion: syntax error: unmatched left brace");
         }
         if proc_level < 0 {
             return Err("ion: syntax error: extra right paren(s)");
@@ -339,6 +345,17 @@ mod tests {
             };
 
             assert_eq!(Some(expected), pipeline.stdout);
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn braces() {
+        if let Statement::Pipeline(pipeline) = parse("echo {a b} {a {b c}}") {
+            let jobs = pipeline.jobs;
+            assert_eq!("{a b}", jobs[0].args[1]);
+            assert_eq!("{a {b c}}", jobs[0].args[2]);
         } else {
             assert!(false);
         }
