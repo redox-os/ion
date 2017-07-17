@@ -273,12 +273,10 @@ pub fn pipe (
             match previous_kind {
                 JobKind::And => if previous_status != SUCCESS {
                     if let JobKind::Or = kind { previous_kind = kind }
-                    commands.next();
                     continue
                 },
                 JobKind::Or => if previous_status == SUCCESS {
                     if let JobKind::And = kind { previous_kind = kind }
-                    commands.next();
                     continue
                 },
                 _ => ()

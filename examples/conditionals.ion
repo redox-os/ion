@@ -1,0 +1,9 @@
+true && echo and || echo or
+false && echo and || echo or
+false || echo false
+true && echo true
+true || echo cant get here
+false && echo cant get here
+false || false || echo double or
+true && true && echo double and
+false || true && echo or and
