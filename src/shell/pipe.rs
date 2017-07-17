@@ -174,7 +174,11 @@ impl<'a> PipelineExecution for Shell<'a> {
         // Generate a list of commands from the given pipeline
         let mut piped_commands: Vec<(Command, JobKind)> = pipeline.jobs
             .drain(..).map(|mut job| {
-                (job.build_command(), job.kind)
+                if self.builtins.contains_key(&job.command.as_ref()) {
+                    (job.build_command_builtin(), job.kind)
+                } else {
+                    (job.build_command_external(), job.kind)
+                }
             }).collect();
         match pipeline.stdin {
             None => (),
