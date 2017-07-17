@@ -44,40 +44,23 @@ impl Job {
         self.command = self.args.first().map_or("".into(), |c| c.clone().into());
     }
 
-    pub fn build_command(&mut self) -> Command {
-        match CommandType::from(self.command.as_ref()) {
-            CommandType::Builtin => {
-                use std::env;
-                let process = env::current_exe().unwrap();
-                let mut command = Command::new(process);
-                command.arg("-c");
-                command.arg(&self.command);
-                for arg in self.args.drain().skip(1) {
-                    command.arg(arg);
-                }
-                command
-            },
-            CommandType::External => {
-                let mut command = Command::new(&self.command);
-                for arg in self.args.drain().skip(1) {
-                    command.arg(arg);
-                }
-                command
-            }
+    pub fn build_command_external(&mut self) -> Command {
+        let mut command = Command::new(&self.command);
+        for arg in self.args.drain().skip(1) {
+            command.arg(arg);
         }
+        command
     }
-}
 
-enum CommandType {
-    Builtin,
-    External
-}
-
-impl<'a> From<&'a str> for CommandType {
-    fn from(command: &'a str) -> CommandType {
-        match command {
-            "help" | "history" | "echo" | "test" | "calc" => CommandType::Builtin,
-            _ => CommandType::External
+    pub fn build_command_builtin(&mut self) -> Command {
+        use std::env;
+        let process = env::current_exe().unwrap();
+        let mut command = Command::new(process);
+        command.arg("-c");
+        command.arg(&self.command);
+        for arg in self.args.drain().skip(1) {
+            command.arg(arg);
         }
+        command
     }
 }
