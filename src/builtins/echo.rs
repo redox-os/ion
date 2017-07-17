@@ -53,15 +53,25 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
             "--no-spaces" => flags |= NO_SPACES,
             _ => {
                 if arg.starts_with('-') {
-                    let arg = &arg[1..];
-                    for argopt in arg.chars() {
+                    let mut is_opts = true;
+                    let opts = &arg[1..];
+                    let mut short_flags = Flags::empty();
+                    for argopt in opts.chars() {
                         match argopt {
-                            'e' => flags |= ESCAPE,
-                            'n' => flags |= NO_NEWLINE,
-                            's' => flags |= NO_SPACES,
-                            'h' => flags |= HELP,
-                            _ => (),
+                            'e' => short_flags |= ESCAPE,
+                            'n' => short_flags |= NO_NEWLINE,
+                            's' => short_flags |= NO_SPACES,
+                            'h' => short_flags |= HELP,
+                            _ => {
+                                is_opts = false;
+                                break;
+                            },
                         }
+                    }
+                    if is_opts {
+                        flags |= short_flags;
+                    } else {
+                        data.push(arg); 
                     }
                 } else {
                     data.push(arg);
