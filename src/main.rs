@@ -36,8 +36,7 @@ use std::thread;
 
 fn inner_main(sigint_rx : mpsc::Receiver<i32>) {
     let builtins = Builtin::map();
-    let mut shell = Shell::new(&builtins, sigint_rx);
-    shell.evaluate_init_file();
+    let shell = Shell::new(&builtins, sigint_rx);
     shell.main();
 }
 
