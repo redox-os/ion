@@ -17,6 +17,7 @@ build = "build.rs"
 
 [[bin]]
 name = "ion"
+path = "src/main.rs"
 
 ## Shared Dependencies
 
@@ -65,6 +66,9 @@ tokio-core = "0.1"
 tokio-signal = "0.1"
 # Obtains user directories
 users = "0.5.1"
+
+[replace]
+"bytecount:0.1.6" = { git = "https://github.com/llogiq/bytecount", revision = "ea6fb86dfaeb838d22a2feae618d1df7f1b3ce0d" }
 
 [build-dependencies]
 ansi_term = "0.9"
