@@ -113,6 +113,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
             self.read += 1;
             match character {
                 _ if self.flags.contains(POST_MATHEXPR) => (),
+                // [^A-Za-z0-9_}]
                 0...47 | 58...64 | 91...94 | 96 | 123...124 | 126...127 if self.flags.contains(VBRACE) => {
                     // If we are just ending the braced section continue as normal
                     if error.is_none() {
@@ -219,7 +220,15 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         None        => Some(Ok(self.data[start..self.read-1].trim()))
                     };
                 },
-                b'#' if !self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0 && self.array_process_level == 0 => {
+                b'#' if self.read == 1 || (
+                        !self.flags.intersects(SQUOTE | DQUOTE) &&
+                        self.process_level == 0 &&
+                        self.array_process_level == 0 &&
+                        match self.data.as_bytes()[self.read - 2] {
+                            b' ' | b'\t' => true,
+                            _ => false
+                        }
+                ) => {
                     let output = self.data[start..self.read-1].trim();
                     self.read = self.data.len();
                     return match error {
@@ -249,6 +258,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         }
                     }
                 }
+                // [^A-Za-z0-9_]
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => self.flags -= VARIAB | ARRAY,
                 _ => ()
             }
