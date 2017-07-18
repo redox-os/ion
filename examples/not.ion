@@ -1,0 +1,6 @@
+not true || echo not true
+not false && echo not false
+true && not false && echo true and not false 
+not test -z "a" && echo not test
+not echo hello
+echo $?
