@@ -193,6 +193,20 @@ impl Builtin {
                         });
 
         /* Misc */
+        commands.insert("not",
+            Builtin {
+                name: "not",
+                help: "Reverses the exit status value of the given command.",
+                main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
+                    let cmd = args[1..].join(" ");
+                    shell.on_command(&cmd);
+                    match shell.previous_status {
+                        SUCCESS => FAILURE,
+                        FAILURE => SUCCESS,
+                        _ => shell.previous_status
+                    }
+                }),
+            });
         commands.insert("set",
             Builtin {
                 name: "set",
