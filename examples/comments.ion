@@ -1,3 +1,6 @@
 echo Hello world  # End of line comments are ignored
 
 #echo Goodbye world
+	#echo Nada
+echo tabs ok	#comment
+echo not#a#comment
