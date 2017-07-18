@@ -248,6 +248,8 @@ impl<'a> Binary for Shell<'a> {
             context
         });
 
+        self.evaluate_init_file();
+
         self.variables.set_array (
             "args",
             iter::once(env::args().next().unwrap()).collect(),
