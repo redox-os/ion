@@ -419,11 +419,19 @@ impl<'a> ArrayMethod<'a> {
     }
 }
 
+/// Represents a method that operates on and returns a string
 #[derive(Debug, PartialEq, Clone)]
 pub struct StringMethod<'a> {
+    /// Name of this method: currently `join`, `len`, and `len_bytes` are the 
+    /// supported methods
     method: &'a str,
+    /// Variable that this method will operator on. This is a bit of a misnomer
+    /// as this can be an expression as well
     variable: &'a str,
+    /// Pattern to use for certain methods: currently `join` makes use of a 
+    /// pattern
     pattern: &'a str,
+    /// Selection to use to control the output of this method
     selection: Select
 }
 
@@ -432,15 +440,11 @@ impl<'a> StringMethod<'a> {
     pub fn handle(&self, output: &mut String, expand: &ExpanderFunctions) {
         match self.method {
             "join" => {
-                let pattern = &expand_string(self.pattern, expand, false).join(" ");
+                let pattern = expand_string(self.pattern, expand, false).join(" ");
                 if let Some(array) = (expand.array)(self.variable, Select::All) {
-                    slice(output, &array.join(pattern), self.selection);
+                    slice(output, array.join(&pattern), self.selection);
                 } else if is_expression(self.variable) {
-                    slice(output,
-                          &expand_string(self.variable,
-                                         &expand, 
-                                         false).join(pattern),
-                          self.selection);
+                    slice(output, expand_string(self.variable, expand, false).join(&pattern), self.selection);
                 }
             },
             "len" => {
