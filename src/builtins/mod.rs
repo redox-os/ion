@@ -31,8 +31,11 @@ fn exit_builtin() -> Builtin {
         help: "To exit the curent session",
         main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
             let previous_status = shell.previous_status;
-            shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
-                .unwrap_or(previous_status))
+            shell.exit(
+                args.get(1)
+                    .and_then(|status| status.parse::<i32>().ok())
+                    .unwrap_or(previous_status),
+            )
         }),
     }
 }
@@ -53,8 +56,11 @@ fn exit_builtin() -> Builtin {
                 }
             }
             let previous_status = shell.previous_status;
-            shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok())
-                .unwrap_or(previous_status))
+            shell.exit(
+                args.get(1)
+                    .and_then(|status| status.parse::<i32>().ok())
+                    .unwrap_or(previous_status),
+            )
         }),
     }
 }
@@ -84,363 +90,339 @@ impl Builtin {
         let mut commands: FnvHashMap<&str, Self> =
             FnvHashMap::with_capacity_and_hasher(32, Default::default());
 
+        /*
+        Quick and clean way to insert a builtin, define a function named as the builtin
+        for example:
+        fn builtin_not (args: &[&str], shell: &mut Shell) -> i32 {
+            let cmd = args[1..].join(" ");
+            shell.on_command(&cmd);
+            match shell.previous_status {
+                SUCCESS => FAILURE,
+                FAILURE => SUCCESS,
+                _ => shell.previous_status
+            }
+        }
+        
+        insert_builtin!("not", builtin_not, "Reverses the exit status value of the given command.");
+        */
+
+        macro_rules! insert_builtin {
+            ($name:expr, $func:ident, $help:expr) => {
+                commands.insert(
+                    $name,
+                    Builtin {
+                        name: $name,
+                        help: $help,
+                        main: Box::new($func),
+                    }
+                ); 
+            }
+        }
+
         /* Directories */
-        commands.insert("cd",
-                        Builtin {
-                            name: "cd",
-                            help: "Change the current directory\n    cd <path>",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                match shell.directory_stack.cd(args, &shell.variables) {
-                                    Ok(()) => SUCCESS,
-                                    Err(why) => {
-                                        let stderr = io::stderr();
-                                        let mut stderr = stderr.lock();
-                                        let _ = stderr.write_all(why.as_bytes());
-                                        FAILURE
-                                    }
-                                }
-                            }),
-                        });
+        insert_builtin!(
+            "cd",
+            builtin_cd,
+            "Change the current directory\n    cd <path>"
+        );
 
-        commands.insert("dirs",
-                        Builtin {
-                            name: "dirs",
-                            help: "Display the current directory stack",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                shell.directory_stack.dirs(args)
-                            }),
-                        });
-
-        commands.insert("pushd",
-                        Builtin {
-                            name: "pushd",
-                            help: "Push a directory to the stack",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                match shell.directory_stack.pushd(args, &shell.variables) {
-                                    Ok(()) => SUCCESS,
-                                    Err(why) => {
-                                        let stderr = io::stderr();
-                                        let mut stderr = stderr.lock();
-                                        let _ = stderr.write_all(why.as_bytes());
-                                        FAILURE
-                                    }
-                                }
-                            }),
-                        });
-
-        commands.insert("popd",
-                        Builtin {
-                            name: "popd",
-                            help: "Pop a directory from the stack",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                match shell.directory_stack.popd(args) {
-                                    Ok(()) => SUCCESS,
-                                    Err(why) => {
-                                        let stderr = io::stderr();
-                                        let mut stderr = stderr.lock();
-                                        let _ = stderr.write_all(why.as_bytes());
-                                        FAILURE
-                                    }
-                                }
-                            }),
-                        });
+        insert_builtin!("dirs", builtin_dirs, "Display the current directory stack");
+        insert_builtin!("pushd", builtin_pushd, "Push a directory to the stack");
+        insert_builtin!("popd", builtin_popd, "Pop a directory from the stack");
 
         /* Aliases */
-        commands.insert("alias",
-                        Builtin {
-                            name: "alias",
-                            help: "View, set or unset aliases",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                alias(&mut shell.variables, args)
-                            }),
-                        });
-
-        commands.insert("unalias",
-                        Builtin {
-                            name: "drop",
-                            help: "Delete an alias",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                drop_alias(&mut shell.variables, args)
-                            }),
-                        });
+        insert_builtin!("alias", builtin_alias, "View, set or unset aliases");
+        insert_builtin!("unalias", builtin_unalias, "Delete an alias");
 
         /* Variables */
-        commands.insert("fn",
-                        Builtin {
-                            name: "fn",
-                            help: "Print list of functions",
-                            main: Box::new(|_: &[&str], shell: &mut Shell| -> i32 {
-                                fn_(&mut shell.functions)
-                            }),
-                        });
-
-        commands.insert("read",
-                        Builtin {
-                            name: "read",
-                            help: "Read some variables\n    read <variable>",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                shell.variables.read(args)
-                            }),
-                        });
-
-        commands.insert("drop",
-                        Builtin {
-                            name: "drop",
-                            help: "Delete a variable",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                drop_variable(&mut shell.variables, args)
-                            }),
-                        });
+        insert_builtin!("fn", builtin_fn, "Print list of functions");
+        insert_builtin!(
+            "read",
+            builtin_read,
+            "Read some variables\n    read <variable>"
+        );
+        insert_builtin!("drop", builtin_drop, "Delete a variable");
 
         /* Misc */
-        commands.insert("not",
-            Builtin {
-                name: "not",
-                help: "Reverses the exit status value of the given command.",
-                main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                    let cmd = args[1..].join(" ");
-                    shell.on_command(&cmd);
-                    match shell.previous_status {
-                        SUCCESS => FAILURE,
-                        FAILURE => SUCCESS,
-                        _ => shell.previous_status
-                    }
-                }),
-            });
-        commands.insert("set",
-            Builtin {
-                name: "set",
-                help: "Set or unset values of shell options and positional parameters.",
-                main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                    set::set(args, shell)
-                }),
-            });
-
-        commands.insert("eval",
-            Builtin {
-                name: "eval",
-                help: "evaluates the evaluated expression",
-                main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                    let evaluated_command = args[1..].join(" ");
-                    let mut buffer = QuoteTerminator::new(evaluated_command);
-                    if buffer.check_termination() {
-                        shell.on_command(&buffer.consume());
-                        shell.previous_status
-                    } else {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: supplied eval expression was not terminted");
-                        FAILURE
-                    }
-                }),
-            });
-
-
+        insert_builtin!(
+            "not",
+            builtin_not,
+            "Reverses the exit status value of the given command."
+        );
+        insert_builtin!(
+            "set",
+            builtin_set,
+            "Set or unset values of shell options and positional parameters."
+        );
+        insert_builtin!("eval", builtin_eval, "evaluates the evaluated expression");
         commands.insert("exit", exit_builtin());
-
-        commands.insert("wait", Builtin {
-            name: "wait",
-            help: "Waits until all running background processes have completed",
-            main: Box::new(|_: &[&str], shell: &mut Shell| -> i32 {
-                shell.wait_for_background();
-                SUCCESS
-            })
-        });
-
-        commands.insert("jobs", Builtin {
-            name: "jobs",
-            help: "Displays all jobs that are attached to the background",
-            main: Box::new(|_: &[&str], shell: &mut Shell| -> i32 {
-                job_control::jobs(shell);
-                SUCCESS
-            })
-        });
-
-        commands.insert("bg", Builtin {
-            name: "bg",
-            help: "Resumes a stopped background process",
-            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                job_control::bg(shell, &args[1..])
-            })
-        });
-
-        commands.insert("fg", Builtin {
-            name: "fg",
-            help: "Resumes and sets a background process as the active process",
-            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                job_control::fg(shell, &args[1..])
-            })
-        });
-
-        commands.insert("suspend", Builtin {
-            name: "suspend",
-            help: "Suspends the shell with a SIGTSTOP signal",
-            main: Box::new(|_: &[&str], _: &mut Shell| -> i32 {
-                shell::signals::suspend(0);
-                SUCCESS
-            })
-        });
-
-        commands.insert("disown", Builtin {
-            name: "disown",
-            help: "Disowning a process removes that process from the shell's background process table.",
-            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                job_control::disown(shell, &args[1..])
-            })
-        });
-
-        commands.insert("history",
-                        Builtin {
-                            name: "history",
-                            help: "Display a log of all commands previously executed",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                shell.print_history(args)
-                            }),
-                        });
-
-        commands.insert("source",
-                        Builtin {
-                            name: "source",
-                            help: "Evaluate the file following the command or re-initialize the init file",
-                            main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-                                match source(shell, args) {
-                                    Ok(()) => SUCCESS,
-                                    Err(why) => {
-                                        let stderr = io::stderr();
-                                        let mut stderr = stderr.lock();
-                                        let _ = stderr.write_all(why.as_bytes());
-                                        FAILURE
-                                    }
-                                }
-
-                            }),
-                        });
-
-        commands.insert("echo",
-                        Builtin {
-                            name: "echo",
-                            help: "Display a line of text",
-                            main: Box::new(|args: &[&str], _: &mut Shell| -> i32 {
-                                match echo(args) {
-                                    Ok(()) => SUCCESS,
-                                    Err(why) => {
-                                        let stderr = io::stderr();
-                                        let mut stderr = stderr.lock();
-                                        let _ = stderr.write_all(why.description().as_bytes());
-                                        FAILURE
-                                    }
-                                }
-                            })
-                        });
-
-        commands.insert("test",
-                        Builtin {
-                            name: "test",
-                            help: "Performs tests on files and text",
-                            main: Box::new(|args: &[&str], _: &mut Shell| -> i32 {
-                                match test(args) {
-                                    Ok(true) => SUCCESS,
-                                    Ok(false) => FAILURE,
-                                    Err(why) => {
-                                        let stderr = io::stderr();
-                                        let mut stderr = stderr.lock();
-                                        let _ = writeln!(stderr, "{}", why);
-                                        FAILURE
-                                    }
-                                }
-                            })
-                        });
-
-        commands.insert("calc",
-                        Builtin {
-                            name: "calc",
-                            help: "Calculate a mathematical expression",
-                            main: Box::new(|args: &[&str], _: &mut Shell| -> i32 {
-                                match calc::calc(&args[1..]) {
-                                    Ok(()) => SUCCESS,
-                                    Err(why) => {
-                                        let stderr = io::stderr();
-                                        let mut stderr = stderr.lock();
-                                        let _ = writeln!(stderr, "{}", why);
-                                        FAILURE
-                                    }
-                                }
-                            })
-                        });
-
-        commands.insert("time",
-                        Builtin {
-                            name: "time",
-                            help: "Measures the time to execute an external command",
-                            main: Box::new(|args: &[&str], _: &mut Shell| -> i32 {
-                                match time::time(&args[1..]) {
-                                    Ok(()) => SUCCESS,
-                                    Err(why) => {
-                                        let stderr = io::stderr();
-                                        let mut stderr = stderr.lock();
-                                        let _ = writeln!(stderr, "{}", why);
-                                        FAILURE
-                                    }
-                                }
-                            })
-                        });
-
-        commands.insert("true",
-                        Builtin {
-                            name: "true",
-                            help: "Do nothing, successfully",
-                            main: Box::new(|_: &[&str], _: &mut Shell| -> i32 {
-                                SUCCESS
-                            }),
-                        });
-
-        commands.insert("false",
-                        Builtin {
-                            name: "false",
-                            help: "Do nothing, unsuccessfully",
-                            main: Box::new(|_: &[&str], _: &mut Shell| -> i32 {
-                                FAILURE
-                            }),
-                        });
-
-        let command_helper: FnvHashMap<&'static str, &'static str> = commands.iter()
-                                                                          .map(|(k, v)| {
-                                                                              (*k, v.help)
-                                                                          })
-                                                                          .collect();
-
-        commands.insert("help",
-                        Builtin {
-                            name: "help",
-                            help: "Display helpful information about a given command, or list \
-                                   commands if none specified\n    help <command>",
-                            main: Box::new(move |args: &[&str], _: &mut Shell| -> i32 {
-                                let stdout = io::stdout();
-                                let mut stdout = stdout.lock();
-                                if let Some(command) = args.get(1) {
-                                    if command_helper.contains_key(command) {
-                                        if let Some(help) = command_helper.get(command) {
-                                            let _ = stdout.write_all(help.as_bytes());
-                                            let _ = stdout.write_all(b"\n");
-                                        }
-                                    } else {
-                                        let _ = stdout.write_all(b"Command helper not found [run 'help']...");
-                                        let _ = stdout.write_all(b"\n");
-                                    }
-                                } else {
-                                    let mut commands = command_helper.keys().cloned().collect::<Vec<&str>>();
-                                    commands.sort();
-
-                                    let mut buffer: Vec<u8> = Vec::new();
-                                    for command in commands {
-                                        let _ = writeln!(buffer, "{}", command);
-                                    }
-                                    let _ = stdout.write_all(&buffer);
-                                }
-                                SUCCESS
-                            }),
-                        });
+        insert_builtin!(
+            "wait",
+            builtin_wait,
+            "Waits until all running background processes have completed"
+        );
+        insert_builtin!(
+            "jobs",
+            builtin_jobs,
+            "Displays all jobs that are attached to the background"
+        );
+        insert_builtin!("bg", builtin_bg, "Resumes a stopped background process");
+        insert_builtin!(
+            "fg",
+            builtin_fg,
+            "Resumes and sets a background process as the active process"
+        );
+        insert_builtin!(
+            "suspend",
+            builtin_suspend,
+            "Suspends the shell with a SIGTSTOP signal"
+        );
+        insert_builtin!(
+            "disown",
+            builtin_disown,
+            "Disowning a process removes that process from the shell's background process table."
+        );
+        insert_builtin!(
+            "history",
+            builtin_history,
+            "Display a log of all commands previously executed"
+        );
+        insert_builtin!(
+            "source",
+            builtin_source,
+            "Evaluate the file following the command or re-initialize the init file"
+        );
+        insert_builtin!("echo", builtin_echo, "Display a line of text");
+        insert_builtin!("test", builtin_test, "Performs tests on files and text");
+        insert_builtin!("calc", builtin_calc, "Calculate a mathematical expression");
+        insert_builtin!(
+            "time",
+            builtin_time,
+            "Measures the time to execute an external command"
+        );
+        insert_builtin!("true", builtin_true, "Do nothing, successfully");
+        insert_builtin!("false", builtin_false, "Do nothing, unsuccessfully");
+        insert_builtin!(
+            "help",
+            builtin_help,
+            "Display helpful information about a given command or list commands if none specified\n    help <command>"
+        );
 
         commands
     }
+}
+
+/* Definitions of simple builtins go here */
+
+fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
+    match shell.directory_stack.cd(args, &shell.variables) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = stderr.write_all(why.as_bytes());
+            FAILURE
+        }
+    }
+}
+
+fn builtin_dirs(args: &[&str], shell: &mut Shell) -> i32 {
+    shell.directory_stack.dirs(args)
+}
+
+fn builtin_pushd(args: &[&str], shell: &mut Shell) -> i32 {
+    match shell.directory_stack.pushd(args, &shell.variables) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = stderr.write_all(why.as_bytes());
+            FAILURE
+        }
+    }
+}
+
+fn builtin_popd(args: &[&str], shell: &mut Shell) -> i32 {
+    match shell.directory_stack.popd(args) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = stderr.write_all(why.as_bytes());
+            FAILURE
+        }
+    }
+}
+
+fn builtin_alias(args: &[&str], shell: &mut Shell) -> i32 {
+    alias(&mut shell.variables, args)
+}
+
+fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 {
+    drop_alias(&mut shell.variables, args)
+}
+
+fn builtin_fn(_: &[&str], shell: &mut Shell) -> i32 {
+    fn_(&mut shell.functions)
+}
+
+fn builtin_read(args: &[&str], shell: &mut Shell) -> i32 {
+    shell.variables.read(args)
+}
+
+fn builtin_drop(args: &[&str], shell: &mut Shell) -> i32 {
+    drop_variable(&mut shell.variables, args)
+}
+
+fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
+    let cmd = args[1..].join(" ");
+    shell.on_command(&cmd);
+    match shell.previous_status {
+        SUCCESS => FAILURE,
+        FAILURE => SUCCESS,
+        _ => shell.previous_status,
+    }
+}
+fn builtin_set(args: &[&str], shell: &mut Shell) -> i32 {
+    set::set(args, shell)
+}
+fn builtin_eval(args: &[&str], shell: &mut Shell) -> i32 {
+    let evaluated_command = args[1..].join(" ");
+    let mut buffer = QuoteTerminator::new(evaluated_command);
+    if buffer.check_termination() {
+        shell.on_command(&buffer.consume());
+        shell.previous_status
+    } else {
+        let stderr = io::stderr();
+        let mut stderr = stderr.lock();
+        let _ = writeln!(stderr, "ion: supplied eval expression was not terminted");
+        FAILURE
+    }
+}
+fn builtin_history(args: &[&str], shell: &mut Shell) -> i32 {
+    shell.print_history(args)
+}
+
+fn builtin_source(args: &[&str], shell: &mut Shell) -> i32 {
+    match source(shell, args) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = stderr.write_all(why.as_bytes());
+            FAILURE
+        }
+    }
+
+}
+
+fn builtin_echo(args: &[&str], _: &mut Shell) -> i32 {
+    match echo(args) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = stderr.write_all(why.description().as_bytes());
+            FAILURE
+        }
+    }
+}
+
+fn builtin_test(args: &[&str], _: &mut Shell) -> i32 {
+    match test(args) {
+        Ok(true) => SUCCESS,
+        Ok(false) => FAILURE,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "{}", why);
+            FAILURE
+        }
+    }
+}
+
+fn builtin_calc(args: &[&str], _: &mut Shell) -> i32 {
+    match calc::calc(&args[1..]) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "{}", why);
+            FAILURE
+        }
+    }
+}
+
+fn builtin_time(args: &[&str], _: &mut Shell) -> i32 {
+    match time::time(&args[1..]) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "{}", why);
+            FAILURE
+        }
+    }
+}
+
+fn builtin_true(_: &[&str], _: &mut Shell) -> i32 {
+    SUCCESS
+}
+
+fn builtin_false(_: &[&str], _: &mut Shell) -> i32 {
+    FAILURE
+}
+
+fn builtin_wait(_: &[&str], shell: &mut Shell) -> i32 {
+    shell.wait_for_background();
+    SUCCESS
+}
+
+fn builtin_jobs(_: &[&str], shell: &mut Shell) -> i32 {
+    job_control::jobs(shell);
+    SUCCESS
+}
+
+fn builtin_bg(args: &[&str], shell: &mut Shell) -> i32 {
+    job_control::bg(shell, &args[1..])
+}
+
+fn builtin_fg(args: &[&str], shell: &mut Shell) -> i32 {
+    job_control::fg(shell, &args[1..])
+}
+
+fn builtin_suspend(_: &[&str], _: &mut Shell) -> i32 {
+    shell::signals::suspend(0);
+    SUCCESS
+}
+
+fn builtin_disown(args: &[&str], shell: &mut Shell) -> i32 {
+    job_control::disown(shell, &args[1..])
+}
+
+fn builtin_help(args: &[&str], shell: &mut Shell) -> i32 {
+    let builtins = shell.builtins;
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+    if let Some(command) = args.get(1) {
+        if builtins.contains_key(command) {
+            if let Some(bltin) = builtins.get(command) {
+                let _ = stdout.write_all(bltin.help.as_bytes());
+                let _ = stdout.write_all(b"\n");
+            }
+        } else {
+            let _ = stdout.write_all(b"Command helper not found [run 'help']...");
+            let _ = stdout.write_all(b"\n");
+        }
+    } else {
+        let mut commands = builtins.keys().cloned().collect::<Vec<&str>>();
+        commands.sort();
+
+        let mut buffer: Vec<u8> = Vec::new();
+        for command in commands {
+            let _ = writeln!(buffer, "{}", command);
+        }
+        let _ = stdout.write_all(&buffer);
+    }
+    SUCCESS
 }
