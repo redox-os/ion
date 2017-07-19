@@ -160,7 +160,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 },
-                b'(' if self.flags.contains(COMM_1) => {
+                b'(' if self.flags.intersects(COMM_1 | METHOD) => {
                     self.flags -= VARIAB | ARRAY;
                     if self.data.as_bytes()[self.read] == b'(' {
                         self.flags -= COMM_1;
@@ -204,7 +204,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         self.math_paren_level -= 1;
                     }
                 },
-                b')' if !self.flags.contains(SQUOTE) && self.flags.contains(METHOD) => {
+                b')' if !self.flags.contains(SQUOTE) && self.flags.contains(METHOD) && self.process_level == 0 => {
                     self.flags ^= METHOD;
                 },
                 b')' if self.process_level == 0 && self.array_process_level == 0 && !self.flags.contains(SQUOTE) => {

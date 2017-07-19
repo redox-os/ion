@@ -18,6 +18,17 @@ use shell::variables::Variables;
 use std::io::{self, Write};
 use types::*;
 
+/// Determines whether an input string is expression-like as compared to a
+/// bare word. For example, strings starting with '"', '\'', '@', or '$' are
+/// all expressions
+pub fn is_expression(s: &str) -> bool {
+    s.starts_with('@') ||
+    s.starts_with('[') ||
+    s.starts_with('$') ||
+    s.starts_with('"') ||
+    s.starts_with('\'')
+}
+
 pub struct ExpanderFunctions<'f> {
     pub vars:     &'f Variables,
     pub tilde:    &'f Fn(&str) -> Option<String>,
@@ -243,17 +254,35 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         array_method.handle(&mut output, expand_func);
                     },
                     WordToken::StringMethod(method, variable, pattern, index) => {
-                        let pattern = &expand_string(pattern, expand_func, false).join(" ");
                         match method {
-                            "join" => if let Some(array) = (expand_func.array)(variable, Select::All) {
-                                slice_string(&mut output, &array.join(pattern), index);
+                            "join" => {
+                                let pattern = &expand_string(pattern, expand_func, false).join(" ");
+                                if let Some(array) = (expand_func.array)(variable, Select::All) {
+                                    slice_string(&mut output, &array.join(pattern), index);
+                                } else if is_expression(variable) {
+                                    slice_string(&mut output,
+                                                 &expand_string(variable, &expand_func, false).join(pattern),
+                                                 index);
+                                }
                             },
-                            "len" => output.push_str(&UnicodeSegmentation::graphemes (
-                                expand_func.vars.get_var_or_empty(variable).as_str(), true
-                            ).count().to_string()),
-                            "len_bytes" => output.push_str(
-                                &expand_func.vars.get_var_or_empty(variable).len().to_string()
-                            ),
+                            "len" => {
+                                if let Some(value) = expand_func.vars.get_var(variable) {
+                                    let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
+                                    output.push_str(&count.to_string());
+                                } else if is_expression(variable) {
+                                    let word = expand_string(variable, &expand_func, false).join(pattern);
+                                    let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
+                                    output.push_str(&count.to_string());
+                                }
+                            },
+                            "len_bytes" => {
+                                if let Some(value) = expand_func.vars.get_var(variable) {
+                                    output.push_str(&value.as_bytes().len().to_string());
+                                } else if is_expression(variable) {
+                                    let word = expand_string(variable, &expand_func, false).join(pattern);
+                                    output.push_str(&word.as_bytes().len().to_string());
+                                }
+                            },
                             _ => {
                                 let stderr = io::stderr();
                                 let mut stderr = stderr.lock();
@@ -415,17 +444,35 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     array_method.handle(&mut output, expand_func);
                 },
                 WordToken::StringMethod(method, variable, pattern, index) => {
-                    let pattern = &expand_string(pattern, expand_func, false).join(" ");
                     match method {
-                        "join" => if let Some(array) = (expand_func.array)(variable, Select::All) {
-                            slice_string(&mut output, &array.join(pattern), index);
+                        "join" => {
+                            let pattern = &expand_string(pattern, expand_func, false).join(" ");
+                            if let Some(array) = (expand_func.array)(variable, Select::All) {
+                                slice_string(&mut output, &array.join(pattern), index);
+                            } else if is_expression(variable) {
+                                slice_string(&mut output,
+                                             &expand_string(variable, &expand_func, false).join(pattern),
+                                             index);
+                            }
                         },
-                        "len" => output.push_str(&UnicodeSegmentation::graphemes (
-                            expand_func.vars.get_var_or_empty(variable).as_str(), true
-                        ).count().to_string()),
-                        "len_bytes" => output.push_str(
-                            &expand_func.vars.get_var_or_empty(variable).len().to_string()
-                        ),
+                        "len" => {
+                            if let Some(value) = expand_func.vars.get_var(variable) {
+                                let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
+                                output.push_str(&count.to_string());
+                            } else if is_expression(variable) {
+                                let word = expand_string(variable, &expand_func, false).join(pattern);
+                                let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
+                                output.push_str(&count.to_string());
+                            }
+                        },
+                        "len_bytes" => {
+                            if let Some(value) = expand_func.vars.get_var(variable) {
+                                output.push_str(&value.as_bytes().len().to_string());
+                            } else if is_expression(variable) {
+                                let word = expand_string(variable, &expand_func, false).join(pattern);
+                                output.push_str(&word.as_bytes().len().to_string());
+                            }
+                        },
                         _ => {
                             let stderr = io::stderr();
                             let mut stderr = stderr.lock();
@@ -631,5 +678,16 @@ mod test {
         let line = "$((3 * 10 - 27))";
         let expected = array!["3"];
         assert_eq!(expected, expand_string(line, &functions!(), false));
+    }
+
+    #[test]
+    fn inline_expression() {
+        let cases = vec![
+            (array!["5"], "@len([0 1 2 3 4])"),
+            (array!["FxOxO"], "$join(@chars(FOO), 'x')")
+        ];
+        for (expected, input) in cases {
+            assert_eq!(expected, expand_string(input, &functions!(), false));
+        }
     }
 }
