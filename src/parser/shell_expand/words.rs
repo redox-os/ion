@@ -7,6 +7,7 @@ use super::super::ArgumentSplitter;
 use super::unicode_segmentation::UnicodeSegmentation;
 use super::{ExpanderFunctions, expand_string};
 use super::ranges::parse_index_range;
+use super::is_expression;
 
 use types::Array;
 
@@ -224,11 +225,24 @@ impl<'a> ArrayMethod<'a> {
 
     pub fn handle(&self, current: &mut String, expand_func: &ExpanderFunctions) {
         match self.method {
-            "len" => match expand_func.vars.get_array(self.variable) {
-                Some(array) => current.push_str(&array.len().to_string()),
-                None        => current.push_str("0")
+            "len" => {
+                if let Some(array) = expand_func.vars.get_array(self.variable) {
+                    current.push_str(&array.len().to_string())
+                } else if is_expression(self.variable) {
+                    let expanded = expand_string(self.variable, expand_func, false);
+                    current.push_str(&expanded.len().to_string());
+                } else {
+                    current.push_str("0")
+                }
             },
-            "split" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
+            "split" => {
+                let variable = if let Some(variable) = (expand_func.variable)(self.variable, false) {
+                    variable
+                } else if is_expression(self.variable) {
+                    expand_string(self.variable, expand_func, false).join(" ")
+                } else {
+                    return;
+                };
                 match (&self.pattern, self.selection) {
                     (&Pattern::StringPattern(pattern), Select::All) => current.push_str (
                         &variable.split(&expand_string(pattern, expand_func, false).join(" "))
@@ -297,8 +311,22 @@ impl<'a> ArrayMethod<'a> {
     }
 
     pub fn handle_as_array(&self, expand_func: &ExpanderFunctions) -> Array {
+
+        macro_rules! resolve_var {
+            () => {
+                if let Some(variable) = (expand_func.variable)(self.variable, false) {
+                    variable
+                } else if is_expression(self.variable) {
+                    expand_string(self.variable, expand_func, false).join(" ")
+                } else {
+                    "".into()
+                }
+            }
+        }
+
         match self.method {
-            "split" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
+            "split" => {
+                let variable = resolve_var!(); 
                 return match (&self.pattern, self.selection) {
                     (_, Select::None) => Some("".into()).into_iter().collect(),
                     (&Pattern::StringPattern(pattern), Select::All) => variable
@@ -359,19 +387,22 @@ impl<'a> ArrayMethod<'a> {
                     },
                 }
             },
-            "graphemes" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
+            "graphemes" => {
+                let variable = resolve_var!(); 
                 let graphemes = UnicodeSegmentation::graphemes(variable.as_str(), true);
                 let len = graphemes.clone().count();
                 return graphemes.map(From::from)
                                 .select(self.selection, len);
             },
-            "bytes" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
+            "bytes" => {
+                let variable = resolve_var!(); 
                 let len = variable.as_bytes().len();
                 return variable.bytes()
                                .map(|b| b.to_string())
                                .select(self.selection, len);
             },
-            "chars" => if let Some(variable) = (expand_func.variable)(self.variable, false) {
+            "chars" => {
+                let variable = resolve_var!(); 
                 let len = variable.chars().count();
                 return variable.chars()
                                .map(|c| c.to_string())
@@ -486,38 +517,62 @@ impl<'a> WordIterator<'a> {
                     let method = &self.data[start..self.read];
                     self.read += 1;
                     start = self.read;
+                    let mut depth = 0;
                     while let Some(character) = iterator.next() {
-                        if character == b',' {
-                            let variable = &self.data[start..self.read];
-                            self.read += 1;
-                            start = self.read;
-                            while let Some(character) = iterator.next() {
-                                if character == b')' {
-                                    let pattern = &self.data[start..self.read].trim();
-                                    self.read += 1;
-
-                                    return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
-                                        let _ = iterator.next();
-                                        WordToken::StringMethod(method, variable, pattern,
-                                                                self.read_selection(iterator))
-                                    } else {
-                                        WordToken::StringMethod(method, variable, pattern, Select::All)
-                                    };
-                                }
+                        match character {
+                            b',' if depth == 0 => {
+                                let variable = &self.data[start..self.read];
                                 self.read += 1;
-                            }
-                        } else if character == b')' {
-                            // If no pattern is supplied, the default is a space.
-                            let variable = &self.data[start..self.read];
-                            self.read += 1;
+                                start = self.read;
+                                while let Some(character) = iterator.next() {
+                                    if character == b')' {
+                                        let pattern = &self.data[start..self.read].trim();
+                                        self.read += 1;
+                                        return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                                            let _ = iterator.next();
+                                            WordToken::StringMethod(
+                                                method,
+                                                variable,
+                                                pattern,
+                                                self.read_selection(iterator),
+                                            )
+                                        } else {
+                                            WordToken::StringMethod(
+                                                method,
+                                                variable,
+                                                pattern,
+                                                Select::All
+                                            )
+                                        }
+                                    }
+                                    self.read += 1;
+                                }
+                            },
+                            b')' if depth == 0 => {
+                                // If no pattern is supplied, the default is a space.
+                                let variable = &self.data[start..self.read];
+                                self.read += 1;
 
-                            return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
-                                let _ = iterator.next();
-                                WordToken::StringMethod(method, variable, " ",
-                                                        self.read_selection(iterator))
-                            } else {
-                                WordToken::StringMethod(method, variable, " ", Select::All)
-                            };
+                                return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                                    let _ = iterator.next();
+                                    WordToken::StringMethod(
+                                        method,
+                                        variable,
+                                        " ",
+                                        self.read_selection(iterator)
+                                    )
+                                } else {
+                                    WordToken::StringMethod(
+                                        method,
+                                        variable,
+                                        " ",
+                                        Select::All
+                                    )
+                                }
+                            }
+                            b')' => depth -= 1,
+                            b'(' => depth += 1,
+                            _ => (),
                         }
                         self.read += 1;
                     }
@@ -577,55 +632,62 @@ impl<'a> WordIterator<'a> {
                     let method = &self.data[start..self.read];
                     self.read += 1;
                     start = self.read;
+                    let mut depth = 0;
                     while let Some(character) = iterator.next() {
-                        if character == b',' {
-                            let variable = &self.data[start..self.read];
-                            self.read += 1;
-                            start = self.read;
-                            while let Some(character) = iterator.next() {
-                                if character == b')' {
-                                    let pattern = &self.data[start..self.read].trim();
-                                    self.read += 1;
-                                    return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
-                                        let _ = iterator.next();
-                                        WordToken::ArrayMethod(ArrayMethod {
-                                            method,
-                                            variable,
-                                            pattern: Pattern::StringPattern(pattern),
-                                            selection: self.read_selection(iterator)
-                                        })
-                                    } else {
-                                        WordToken::ArrayMethod(ArrayMethod {
-                                            method,
-                                            variable,
-                                            pattern: Pattern::StringPattern(pattern),
-                                            selection: Select::All
-                                        })
-                                    }
-                                }
+                        match character {
+                            b',' if depth == 0 => {
+                                let variable = &self.data[start..self.read];
                                 self.read += 1;
-                            }
-                        } else if character == b')' {
-                            // If no pattern is supplied, the default is a space.
-                            let variable = &self.data[start..self.read];
-                            self.read += 1;
+                                start = self.read;
+                                while let Some(character) = iterator.next() {
+                                    if character == b')' {
+                                        let pattern = &self.data[start..self.read].trim();
+                                        self.read += 1;
+                                        return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                                            let _ = iterator.next();
+                                            WordToken::ArrayMethod(ArrayMethod {
+                                                method,
+                                                variable,
+                                                pattern: Pattern::StringPattern(pattern),
+                                                selection: self.read_selection(iterator)
+                                            })
+                                        } else {
+                                            WordToken::ArrayMethod(ArrayMethod {
+                                                method,
+                                                variable,
+                                                pattern: Pattern::StringPattern(pattern),
+                                                selection: Select::All
+                                            })
+                                        }
+                                    }
+                                    self.read += 1;
+                                }
+                            },
+                            b')' if depth == 0 => {
+                                // If no pattern is supplied, the default is a space.
+                                let variable = &self.data[start..self.read];
+                                self.read += 1;
 
-                            return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
-                                let _ = iterator.next();
-                                WordToken::ArrayMethod(ArrayMethod {
-                                    method,
-                                    variable,
-                                    pattern: Pattern::Whitespace,
-                                    selection: self.read_selection(iterator)
-                                })
-                            } else {
-                                WordToken::ArrayMethod(ArrayMethod {
-                                    method,
-                                    variable,
-                                    pattern: Pattern::Whitespace,
-                                    selection: Select::All
-                                })
+                                return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                                    let _ = iterator.next();
+                                    WordToken::ArrayMethod(ArrayMethod {
+                                        method,
+                                        variable,
+                                        pattern: Pattern::Whitespace,
+                                        selection: self.read_selection(iterator)
+                                    })
+                                } else {
+                                    WordToken::ArrayMethod(ArrayMethod {
+                                        method,
+                                        variable,
+                                        pattern: Pattern::Whitespace,
+                                        selection: Select::All
+                                    })
+                                }
                             }
+                            b')' => depth -= 1,
+                            b'(' => depth += 1,
+                            _ => (),
                         }
                         self.read += 1;
                     }
