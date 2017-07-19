@@ -24,47 +24,6 @@ use shell::job_control::{JobControl, ProcessState};
 use shell::{self, Shell, FlowLogic, ShellHistory};
 use shell::status::*;
 
-#[cfg(target_os = "redox")]
-fn exit_builtin() -> Builtin {
-    Builtin {
-        name: "exit",
-        help: "To exit the curent session",
-        main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-            let previous_status = shell.previous_status;
-            shell.exit(
-                args.get(1)
-                    .and_then(|status| status.parse::<i32>().ok())
-                    .unwrap_or(previous_status),
-            )
-        }),
-    }
-}
-
-#[cfg(not(target_os = "redox"))]
-fn exit_builtin() -> Builtin {
-    Builtin {
-        name: "exit",
-        help: "To exit the curent session",
-        main: Box::new(|args: &[&str], shell: &mut Shell| -> i32 {
-            use nix::sys::signal::{self, Signal as NixSignal};
-            use libc::pid_t;
-
-            // Kill all active background tasks before exiting the shell.
-            for process in shell.background.lock().unwrap().iter() {
-                if process.state != ProcessState::Empty {
-                    let _ = signal::kill(process.pid as pid_t, Some(NixSignal::SIGTERM));
-                }
-            }
-            let previous_status = shell.previous_status;
-            shell.exit(
-                args.get(1)
-                    .and_then(|status| status.parse::<i32>().ok())
-                    .unwrap_or(previous_status),
-            )
-        }),
-    }
-}
-
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the
 /// functionnality associated to this one, with zero, one or several argument(s).
@@ -155,7 +114,7 @@ impl Builtin {
             "Set or unset values of shell options and positional parameters."
         );
         insert_builtin!("eval", builtin_eval, "evaluates the evaluated expression");
-        commands.insert("exit", exit_builtin());
+        insert_builtin!("exit", builtin_exit, "Exits the current session");
         insert_builtin!(
             "wait",
             builtin_wait,
@@ -425,4 +384,33 @@ fn builtin_help(args: &[&str], shell: &mut Shell) -> i32 {
         let _ = stdout.write_all(&buffer);
     }
     SUCCESS
+}
+
+#[cfg(target_os = "redox")]
+fn builtin_exit(args: &[&str], shell: &mut Shell) -> i32 {
+    let previous_status = shell.previous_status;
+    shell.exit(
+        args.get(1)
+            .and_then(|status| status.parse::<i32>().ok())
+            .unwrap_or(previous_status),
+    )
+}
+
+#[cfg(not(target_os = "redox"))]
+fn builtin_exit(args: &[&str], shell: &mut Shell) -> i32 {
+    use nix::sys::signal::{self, Signal as NixSignal};
+    use libc::pid_t;
+
+    // Kill all active background tasks before exiting the shell.
+    for process in shell.background.lock().unwrap().iter() {
+        if process.state != ProcessState::Empty {
+            let _ = signal::kill(process.pid as pid_t, Some(NixSignal::SIGTERM));
+        }
+    }
+    let previous_status = shell.previous_status;
+    shell.exit(
+        args.get(1)
+            .and_then(|status| status.parse::<i32>().ok())
+            .unwrap_or(previous_status),
+    )
 }
