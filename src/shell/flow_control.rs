@@ -133,32 +133,32 @@ pub struct Function {
     pub statements: Vec<Statement>
 }
 
-macro_rules! add_to_case {
-    ($cases:expr, $statement:expr) => {
-        match $cases.last_mut() {
-            // XXX: When does this actually happen? What syntax error is this???
-            None => return Err(["ion: syntax error: encountered ",
-                                 $statement.short(),
-                                 " outside of `case ... end` block"].concat()),
-            Some(ref mut case) => case.statements.push($statement),
-        }
-    }
-}
-
 pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usize) -> Result<(), String>
     where I : Iterator<Item=Statement>
 {
+
+    macro_rules! add_to_case {
+        ($statement:expr) => {
+            match cases.last_mut() {
+                // XXX: When does this actually happen? What syntax error is this???
+                None => return Err(["ion: syntax error: encountered ",
+                                     $statement.short(),
+                                     " outside of `case ...` block"].concat()),
+                Some(ref mut case) => case.statements.push($statement),
+            }
+        }
+    }
+
     while let Some(statement) = iterator.next() {
         match statement {
             Statement::Case(case) => {
-                *level += 1;
-                if *level == 2 {
-                    // When the control flow level equals two, this means we are inside the
-                    // body of the match statement and should treat this as the new case of _this_
-                    // match. Otherwise we will just add it to the current case.
+                if *level == 1 {
+                    // If the level is 1, then we are at a top-level case
+                    // statement for this match block and should push this case
                     cases.push(case);
                 } else {
-                    add_to_case!(cases, Statement::Case(case));
+                    // This is just part of the current case block
+                    add_to_case!(Statement::Case(case));
                 }
             },
             Statement::End => {
@@ -172,15 +172,8 @@ pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usi
             Statement::If { .. } |
             Statement::Match { .. } |
             Statement::Function { .. } => {
-                if *level < 2 {
-                    // If the level is less than two, then this statement has appeared outside
-                    // of a block delimited by a case...end pair
-                    return Err(["ion: syntax error: expected end or case, got ", statement.short()].concat());
-                } else {
-                    // Otherwise it means we've hit a case statement for some other match construct
-                    *level += 1;
-                    add_to_case!(cases, statement);
-                }
+                *level += 1;
+                add_to_case!(statement);
             },
             Statement::Default |
             Statement::Else |
@@ -192,7 +185,7 @@ pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usi
             Statement::Pipeline(_) |
             Statement::Break => {
                 // This is the default case with all of the other statements explicitly listed
-                add_to_case!(cases, statement);
+                add_to_case!(statement);
             },
         }
     }
@@ -208,7 +201,7 @@ pub fn collect_loops <I: Iterator<Item = Statement>> (
     while let Some(statement) = iterator.next() {
         match statement {
             Statement::While{..} | Statement::For{..} | Statement::If{..} |
-                Statement::Function{..} | Statement::Match{..} | Statement::Case{..} => *level += 1,
+                Statement::Function{..} | Statement::Match{..} => *level += 1,
             Statement::End if *level == 1 => { *level = 0; break },
             Statement::End => *level -= 1,
             _ => (),
@@ -226,7 +219,7 @@ pub fn collect_if<I>(iterator: &mut I, success: &mut Vec<Statement>, else_if: &m
     while let Some(statement) = iterator.next() {
         match statement {
             Statement::While{..} | Statement::For{..} | Statement::If{..} |
-                Statement::Function{..} | Statement::Match{..} | Statement::Case{..} => *level += 1,
+                Statement::Function{..} | Statement::Match{..} => *level += 1,
             Statement::ElseIf(ref elseif) if *level == 1 => {
                 if current_block == 1 {
                     return Err("ion: syntax error: else block already given");
