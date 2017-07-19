@@ -53,14 +53,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bytecount"
-version = "0.1.6"
-source = "git+https://github.com/llogiq/bytecount#ea6fb86dfaeb838d22a2feae618d1df7f1b3ce0d"
-
-[[package]]
-name = "bytecount"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-replace = "bytecount 0.1.6 (git+https://github.com/llogiq/bytecount)"
 
 [[package]]
 name = "byteorder"
@@ -139,7 +133,7 @@ name = "liner"
 version = "0.4.0"
 source = "git+https://github.com/MovingtoMars/liner/#f9ae1e311762df5c5113a75e966e7260c1b86692"
 dependencies = [
- "bytecount 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bytecount 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "termion 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-width 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -381,8 +375,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum app_dirs 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b7d1c0d48a81bbb13043847f957971f4d87c81542d80ece5e84ba3cba4058fd4"
 "checksum bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aad18937a628ec6abcd26d1489012cc0e18c21798210f491af69ded9b881106d"
 "checksum bitflags 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4efd02e230a02e18f92fc2735f44597385ed02ad8f831e7c1c1156ee5e1ab3a5"
-"checksum bytecount 0.1.6 (git+https://github.com/llogiq/bytecount)" = "<none>"
-"checksum bytecount 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "1e8f09fbc8c6726a4b616dcfbd4f54491068d6bb1b93ac03c78ac18ff9a5924a"
+"checksum bytecount 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "4bbeb7c30341fce29f6078b4bdf876ea4779600866e98f5b2d203a534f195050"
 "checksum byteorder 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff81738b726f5d099632ceaffe7fb65b90212e8dce59d518729e7e8634032d3d"
 "checksum bytes 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8b24f16593f445422331a5eed46b72f7f171f910fead4f2ea8f17e727e9c5c14"
 "checksum calculate 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1b593017444d7b7d0d1cacfea9dd28a507e42cfd30c5366130d14e1e16eb33e0"
