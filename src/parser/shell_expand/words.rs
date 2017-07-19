@@ -7,7 +7,7 @@ use super::super::ArgumentSplitter;
 use super::unicode_segmentation::UnicodeSegmentation;
 use super::{ExpanderFunctions, expand_string};
 use super::ranges::parse_index_range;
-use super::is_expression;
+use super::{slice, is_expression};
 
 use types::Array;
 
@@ -415,9 +415,58 @@ impl<'a> ArrayMethod<'a> {
             }
         }
 
-
-        Some("".into()).into_iter().collect()
+        array![]
     }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StringMethod<'a> {
+    method: &'a str,
+    variable: &'a str,
+    pattern: &'a str,
+    selection: Select
+}
+
+impl<'a> StringMethod<'a> {
+
+    pub fn handle(&self, output: &mut String, expand: &ExpanderFunctions) {
+        match self.method {
+            "join" => {
+                let pattern = &expand_string(self.pattern, expand, false).join(" ");
+                if let Some(array) = (expand.array)(self.variable, Select::All) {
+                    slice(output, &array.join(pattern), self.selection);
+                } else if is_expression(self.variable) {
+                    slice(output,
+                          &expand_string(self.variable,
+                                         &expand, 
+                                         false).join(pattern),
+                          self.selection);
+                }
+            },
+            "len" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
+                    output.push_str(&count.to_string());
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
+                    output.push_str(&count.to_string());
+                }
+            },
+            "len_bytes" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    output.push_str(&value.as_bytes().len().to_string());
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    output.push_str(&word.as_bytes().len().to_string());
+                }
+            },
+            _ => {
+                eprintln!("ion: unknown string method: {}", self.method);
+            }
+        }
+    }
+
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -433,7 +482,7 @@ pub enum WordToken<'a> {
     ArrayVariable(&'a str, bool, Select),
     ArrayProcess(&'a str, bool, Select),
     Process(&'a str, bool, Select),
-    StringMethod(&'a str, &'a str, &'a str, Select),
+    StringMethod(StringMethod<'a>),
     ArrayMethod(ArrayMethod<'a>),
     Arithmetic(&'a str)
     // Glob(&'a str),
@@ -530,19 +579,19 @@ impl<'a> WordIterator<'a> {
                                         self.read += 1;
                                         return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                             let _ = iterator.next();
-                                            WordToken::StringMethod(
+                                            WordToken::StringMethod(StringMethod {
                                                 method,
-                                                variable,
+                                                variable: variable.trim(),
                                                 pattern,
-                                                self.read_selection(iterator),
-                                            )
+                                                selection: self.read_selection(iterator),
+                                            })
                                         } else {
-                                            WordToken::StringMethod(
+                                            WordToken::StringMethod(StringMethod {
                                                 method,
-                                                variable,
+                                                variable: variable.trim(),
                                                 pattern,
-                                                Select::All
-                                            )
+                                                selection: Select::All
+                                            })
                                         }
                                     }
                                     self.read += 1;
@@ -555,19 +604,19 @@ impl<'a> WordIterator<'a> {
 
                                 return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                     let _ = iterator.next();
-                                    WordToken::StringMethod(
+                                    WordToken::StringMethod(StringMethod {
                                         method,
-                                        variable,
-                                        " ",
-                                        self.read_selection(iterator)
-                                    )
+                                        variable: variable.trim(),
+                                        pattern: " ",
+                                        selection: self.read_selection(iterator)
+                                    })
                                 } else {
-                                    WordToken::StringMethod(
+                                    WordToken::StringMethod(StringMethod {
                                         method,
-                                        variable,
-                                        " ",
-                                        Select::All
-                                    )
+                                        variable: variable.trim(),
+                                        pattern: " ",
+                                        selection: Select::All
+                                    })
                                 }
                             }
                             b')' => depth -= 1,
@@ -647,14 +696,14 @@ impl<'a> WordIterator<'a> {
                                             let _ = iterator.next();
                                             WordToken::ArrayMethod(ArrayMethod {
                                                 method,
-                                                variable,
+                                                variable: variable.trim(),
                                                 pattern: Pattern::StringPattern(pattern),
                                                 selection: self.read_selection(iterator)
                                             })
                                         } else {
                                             WordToken::ArrayMethod(ArrayMethod {
                                                 method,
-                                                variable,
+                                                variable: variable.trim(),
                                                 pattern: Pattern::StringPattern(pattern),
                                                 selection: Select::All
                                             })
@@ -672,14 +721,14 @@ impl<'a> WordIterator<'a> {
                                     let _ = iterator.next();
                                     WordToken::ArrayMethod(ArrayMethod {
                                         method,
-                                        variable,
+                                        variable: variable.trim(),
                                         pattern: Pattern::Whitespace,
                                         selection: self.read_selection(iterator)
                                     })
                                 } else {
                                     WordToken::ArrayMethod(ArrayMethod {
                                         method,
-                                        variable,
+                                        variable: variable.trim(),
                                         pattern: Pattern::Whitespace,
                                         selection: Select::All
                                     })
@@ -1239,9 +1288,19 @@ mod tests {
     fn string_method() {
         let input = "$join(array, 'pattern') $join(array, 'pattern')";
         let expected = vec![
-            WordToken::StringMethod("join", "array", "'pattern'", Select::All),
+            WordToken::StringMethod(StringMethod {
+                method: "join", 
+                variable: "array", 
+                pattern: "'pattern'", 
+                selection: Select::All
+            }),
             WordToken::Whitespace(" "),
-            WordToken::StringMethod("join", "array", "'pattern'", Select::All)
+            WordToken::StringMethod(StringMethod {
+                method: "join", 
+                variable: "array", 
+                pattern: "'pattern'", 
+                selection: Select::All
+            })
         ];
         compare(input, expected);
     }

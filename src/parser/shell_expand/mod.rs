@@ -15,7 +15,6 @@ use self::ranges::parse_range;
 pub use self::words::{WordIterator, WordToken, Select, Index, Range};
 use shell::variables::Variables;
 
-use std::io::{self, Write};
 use types::*;
 
 /// Determines whether an input string is expression-like as compared to a
@@ -51,7 +50,7 @@ fn expand_process(current: &mut String, command: &str, quoted: bool,
     let expanded = expand_tokens(&tokens, expand_func, false, contains_brace).join(" ");
 
     if let Some(result) = (expand_func.command)(&expanded, quoted) {
-        slice_string(current, &result, selection);
+        slice(current, result, selection);
     }
 }
 
@@ -113,22 +112,22 @@ fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, range : Range
     }
 }
 
-fn slice_string(output: &mut String, expanded: &str, selection: Select) {
+fn slice<S: AsRef<str>>(output: &mut String, expanded: S, selection: Select) {
     match selection {
         Select::None => (),
-        Select::All => output.push_str(expanded),
+        Select::All => output.push_str(expanded.as_ref()),
         Select::Index(Index::Forward(id)) => {
-            if let Some(character) = UnicodeSegmentation::graphemes(expanded, true).nth(id) {
+            if let Some(character) = UnicodeSegmentation::graphemes(expanded.as_ref(), true).nth(id) {
                 output.push_str(character);
             }
         },
         Select::Index(Index::Backward(id)) => {
-            if let Some(character) = UnicodeSegmentation::graphemes(expanded, true).rev().nth(id) {
+            if let Some(character) = UnicodeSegmentation::graphemes(expanded.as_ref(), true).rev().nth(id) {
                 output.push_str(character);
             }
         }
         Select::Range(range) => {
-            let graphemes = UnicodeSegmentation::graphemes(expanded, true);
+            let graphemes = UnicodeSegmentation::graphemes(expanded.as_ref(), true);
             if let Some((start, length)) = range.bounds(graphemes.clone().count()) {
                 let substring = graphemes.skip(start)
                                          .take(length)
@@ -250,45 +249,11 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                             }
                         }
                     },
-                    WordToken::ArrayMethod(ref array_method) => {
-                        array_method.handle(&mut output, expand_func);
+                    WordToken::ArrayMethod(ref method) => {
+                        method.handle(&mut output, expand_func);
                     },
-                    WordToken::StringMethod(method, variable, pattern, index) => {
-                        match method {
-                            "join" => {
-                                let pattern = &expand_string(pattern, expand_func, false).join(" ");
-                                if let Some(array) = (expand_func.array)(variable, Select::All) {
-                                    slice_string(&mut output, &array.join(pattern), index);
-                                } else if is_expression(variable) {
-                                    slice_string(&mut output,
-                                                 &expand_string(variable, &expand_func, false).join(pattern),
-                                                 index);
-                                }
-                            },
-                            "len" => {
-                                if let Some(value) = expand_func.vars.get_var(variable) {
-                                    let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
-                                    output.push_str(&count.to_string());
-                                } else if is_expression(variable) {
-                                    let word = expand_string(variable, &expand_func, false).join(pattern);
-                                    let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
-                                    output.push_str(&count.to_string());
-                                }
-                            },
-                            "len_bytes" => {
-                                if let Some(value) = expand_func.vars.get_var(variable) {
-                                    output.push_str(&value.as_bytes().len().to_string());
-                                } else if is_expression(variable) {
-                                    let word = expand_string(variable, &expand_func, false).join(pattern);
-                                    output.push_str(&word.as_bytes().len().to_string());
-                                }
-                            },
-                            _ => {
-                                let stderr = io::stderr();
-                                let mut stderr = stderr.lock();
-                                let _ = writeln!(stderr, "ion: invalid string method: {}", method);
-                            }
-                        }
+                    WordToken::StringMethod(ref method) => {
+                        method.handle(&mut output, expand_func);
                     },
                     WordToken::Brace(ref nodes) =>
                         expand_brace(&mut output, &mut expanders, &mut tokens, nodes, expand_func, reverse_quoting),
@@ -304,7 +269,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                             None      => continue
                         };
 
-                        slice_string(&mut output, &expanded, index);
+                        slice(&mut output, expanded, index);
                     },
                     WordToken::Normal(text, do_glob, tilde) => {
                         expand!(text, do_glob, tilde);
@@ -440,45 +405,11 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         },
                     }
                 },
-                WordToken::ArrayMethod(ref array_method) => {
-                    array_method.handle(&mut output, expand_func);
+                WordToken::ArrayMethod(ref method) => {
+                    method.handle(&mut output, expand_func);
                 },
-                WordToken::StringMethod(method, variable, pattern, index) => {
-                    match method {
-                        "join" => {
-                            let pattern = &expand_string(pattern, expand_func, false).join(" ");
-                            if let Some(array) = (expand_func.array)(variable, Select::All) {
-                                slice_string(&mut output, &array.join(pattern), index);
-                            } else if is_expression(variable) {
-                                slice_string(&mut output,
-                                             &expand_string(variable, &expand_func, false).join(pattern),
-                                             index);
-                            }
-                        },
-                        "len" => {
-                            if let Some(value) = expand_func.vars.get_var(variable) {
-                                let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
-                                output.push_str(&count.to_string());
-                            } else if is_expression(variable) {
-                                let word = expand_string(variable, &expand_func, false).join(pattern);
-                                let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
-                                output.push_str(&count.to_string());
-                            }
-                        },
-                        "len_bytes" => {
-                            if let Some(value) = expand_func.vars.get_var(variable) {
-                                output.push_str(&value.as_bytes().len().to_string());
-                            } else if is_expression(variable) {
-                                let word = expand_string(variable, &expand_func, false).join(pattern);
-                                output.push_str(&word.as_bytes().len().to_string());
-                            }
-                        },
-                        _ => {
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "ion: invalid string method: {}", method);
-                        }
-                    }
+                WordToken::StringMethod(ref method) => {
+                    method.handle(&mut output, expand_func);
                 },
                 WordToken::Brace(_) => unreachable!(),
                 WordToken::Normal(text, do_glob, tilde) => {
@@ -498,7 +429,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         None          => continue
                     };
 
-                    slice_string(&mut output, &expanded, index);
+                    slice(&mut output, expanded, index);
                 },
                 WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
             }
