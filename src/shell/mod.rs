@@ -182,7 +182,7 @@ impl<'a> Shell<'a> {
                 let small: SmallVec<[&str; 4]> = borrowed.iter()
                     .map(|x| x as &str)
                     .collect();
-                Some((*command.main)(&small, self))
+                Some((command.main)(&small, self))
             } else {
                 Some(self.execute_pipeline(pipeline))
             }
@@ -268,7 +268,7 @@ impl<'a> Shell<'a> {
             let mut new_args: SmallVec<[&str; 4]> = SmallVec::new();
             new_args.push("cd");
             new_args.extend(pipeline.jobs[0].args.iter().map(|x| x as &str));
-            Some((*builtins.get("cd").unwrap().main)(&new_args, self))
+            Some((builtins.get("cd").unwrap().main)(&new_args, self))
         } else {
             Some(self.execute_pipeline(pipeline))
         };
