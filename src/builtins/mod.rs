@@ -27,20 +27,10 @@ use shell::status::*;
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the
 /// functionnality associated to this one, with zero, one or several argument(s).
-/// # Example
-/// ```
-/// let my_command = Builtin {
-///     name: "my_command",
-///     help: "Describe what my_command does followed by a newline showing usage",
-///     main: box|args: &[&str], &mut Shell| -> i32 {
-///         println!("Say 'hello' to my command! :-D");
-///     }
-/// }
-/// ```
 pub struct Builtin {
     pub name: &'static str,
     pub help: &'static str,
-    pub main: Box<Fn(&[&str], &mut Shell) -> i32>,
+    pub main: fn(&[&str], &mut Shell) -> i32,
 }
 
 impl Builtin {
@@ -72,7 +62,7 @@ impl Builtin {
                     Builtin {
                         name: $name,
                         help: $help,
-                        main: Box::new($func),
+                        main: $func,
                     }
                 ); 
             }
