@@ -380,10 +380,14 @@ fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -
             if foreground { set_foreground(child.id()); }
             shell.watch_foreground(child.id(), child.id(), || get_full_command(command), |_| ())
         },
-        Err(_) => {
+        Err(e) => {
             let stderr = io::stderr();
             let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "ion: command not found: {}", get_command_name(command));
+            let _ = if e.kind() == io::ErrorKind::NotFound {
+                writeln!(stderr, "ion: Command not found: {}", get_command_name(command))
+            } else {
+                writeln!(stderr, "ion: Error spawning process: {}", e)
+            };
             FAILURE
         }
     }
