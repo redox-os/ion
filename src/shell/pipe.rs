@@ -425,7 +425,11 @@ fn get_full_command(command: &Command) -> String {
     let mut output = String::from(&command[1..command.len()-1]);
     for argument in arg_iter {
         output.push(' ');
-        output.push_str(&argument[1..argument.len()-1]);
+        if argument.len() > 2 {
+            output.push_str(&argument[1..argument.len()-1]);
+        } else {
+            output.push_str(&argument);
+        }
     }
     output
 }
