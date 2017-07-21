@@ -1,1 +1,15 @@
 echo 1{A{1,2},B{1,2}}
+# inclusive ranges
+echo {-1...1}
+echo {2...0}
+echo {a...c}
+echo {d...b}
+echo {A...C}
+echo {D...B}
+# exclusive ranges
+echo {-1..2}
+echo {2..-1}
+echo {a..d}
+echo {d..a}
+echo {A..D}
+echo {D..A}
