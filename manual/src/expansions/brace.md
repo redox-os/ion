@@ -8,7 +8,7 @@ permutations.
 
 **NOTE:** Brace expansions will not work within double quotes.
 
-```ion
+```sh
 $ echo filename.{ext1,ext2}
 > filename.ext1 filename.ext2
 ```
@@ -16,7 +16,7 @@ $ echo filename.{ext1,ext2}
 Multiple brace tokens may occur within a braced collection, where each token expands the
 possible permutation variants.
 
-```ion
+```sh
 $ echo job_{01,02}.{ext1,ext2}
 > job_01.ext1 job_01.ext2 job_02.ext1 job_02.ext2
 ```
@@ -34,18 +34,27 @@ descending or ascending, numbers or latin alphabet characters.
 
 ```sh
 $ echo {1..10}
+> 1 2 3 4 5 6 7 8 9
+
+$ echo {1...10}
 > 1 2 3 4 5 6 7 8 9 10
 
 $ echo {10..1}
+> 10 9 8 7 6 5 4 3 2
+
+$ echo {10...1}
 > 10 9 8 7 6 5 4 3 2 1
 
-$ echo {1...5}
-> 1 2 3 4 5
-
 $ echo {a..d}
+> a b c
+
+$ echo {a...d}
 > a b c d
 
 $ echo {d..a}
+> d c b
+
+$ echo {d...a}
 > d c b a
 ```
 

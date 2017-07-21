@@ -43,6 +43,17 @@ $ echo $a $b
 > 1 2
 ```
 
+## Dropping String Variables
+
+The `drop` command may be used to drop string variables.
+
+```ion
+let variable = "testing"
+echo $variable
+drop variable
+echo $variable
+```
+
 ## Array Variables
 
 The **[]** syntax in Ion is utilized to denote that the contents within should be parsed as an
@@ -68,6 +79,18 @@ let as_string = @array
 let args = [-l -a --color]
 ls @args
 ```
+
+## Dropping Array Variables
+
+The `drop -a` command will drop array variables from the shell.
+
+```sh
+let array = [one two three]
+echo @array
+drop -a array
+echo @array
+```
+
 ## Let Arithmetic
 
 Ion supports applying some basic arithmetic, one operation at a time, to string variables. To
