@@ -15,6 +15,7 @@ extern crate liner;
 extern crate smallvec;
 extern crate smallstring;
 extern crate calc;
+extern crate regex;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate futures;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate libc;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate nix;

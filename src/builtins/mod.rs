@@ -94,6 +94,11 @@ impl Builtin {
 
         /* Misc */
         insert_builtin!(
+            "matches",
+            builtin_matches,
+            "Checks if a string matches a given regex"
+        );
+        insert_builtin!(
             "not",
             builtin_not,
             "Reverses the exit status value of the given command."
@@ -403,4 +408,26 @@ fn builtin_exit(args: &[&str], shell: &mut Shell) -> i32 {
             .and_then(|status| status.parse::<i32>().ok())
             .unwrap_or(previous_status),
     )
+}
+
+use regex::Regex;
+fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
+    if args[1..].len() != 2 {
+        let stderr = io::stderr();
+        let mut stderr = stderr.lock();
+        let _ = stderr.write_all(b"match takes two arguments\n");
+        return FAILURE;
+    }
+    let input = args[1];
+    let re = match Regex::new(args[2]) {
+        Ok(r) => r,
+        Err(e) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = stderr.write_all(format!("couldn't compile input regex {}: {}\n", args[2], e).as_bytes());
+            return FAILURE;
+        }
+    };
+
+    if re.is_match(input) { SUCCESS } else { FAILURE }
 }

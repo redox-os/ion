@@ -22,13 +22,13 @@ parse_ -> Statement
 
 #[pub]
 let_ -> Statement
-    = whitespace* "let" whitespace? value:$(.*) {
+    = whitespace* "let" whitespace+ value:$(.*) {
         Statement::Let { expression: parse_assignment(value) }
     }
 
 #[pub]
 export_ -> Statement
-    = whitespace* "export" whitespace? value:$(.*) {
+    = whitespace* "export" whitespace+ value:$(.*) {
         Statement::Export(parse_assignment(value))
     }
 
@@ -42,7 +42,7 @@ continue_ -> Statement
 
 #[pub]
 if_ -> Statement
-    = whitespace* "if" whitespace? command:$(.*) {?
+    = whitespace* "if" whitespace+ command:$(.*) {?
       pipelines::Collector::run(command).map(|p| {
         Statement::If {
           expression: p,
@@ -55,7 +55,7 @@ if_ -> Statement
 
 #[pub]
 else_if_ -> Statement
-    = whitespace* "else" whitespace? "if" whitespace? command:$(.*) {?
+    = whitespace* "else" whitespace+ "if" whitespace+ command:$(.*) {?
         pipelines::Collector::run(command).map(|p| {
             Statement::ElseIf(ElseIf {
                 expression: p,
@@ -103,7 +103,7 @@ _fn_arg -> String
 
 #[pub]
 for_ -> Statement
-    = whitespace* "for" whitespace? n:_name whitespace? "in" whitespace? expr:$(.*) {
+    = whitespace* "for" whitespace+ n:_name whitespace+ "in" whitespace+ expr:$(.*) {
         Statement::For {
             variable: n.into(),
             values: ArgumentSplitter::new(expr).map(String::from).collect(),
@@ -117,12 +117,12 @@ value_ -> Option<String> = contents:$(.*) { Some(contents.into())}
 pattern_ -> Option<String> = wildcard_ / value_
 
 case_ -> Statement
-    = whitespace* "case" whitespace? p:pattern_ {
+    = whitespace* "case" whitespace+ p:pattern_ {
     Statement::Case(Case { value: p, statements: Vec::new() })
   }
 
 #[pub]
-match_ -> Statement = whitespace* "match" whitespace? expression:$(.*) {
+match_ -> Statement = whitespace* "match" whitespace+ expression:$(.*) {
   Statement::Match {
     expression: expression.into(),
     cases: Vec::new()
@@ -131,7 +131,7 @@ match_ -> Statement = whitespace* "match" whitespace? expression:$(.*) {
 
 #[pub]
 while_ -> Statement
-    = whitespace* "while" whitespace? command:$(.*) {?
+    = whitespace* "while" whitespace+ command:$(.*) {?
       pipelines::Collector::run(command).map(|p| {
         Statement::While {
           expression: p,
