@@ -5,6 +5,45 @@
 [![crates.io](http://meritbadge.herokuapp.com/ion-shell)](https://crates.io/crates/ion-shell)
 ![LOC](https://tokei.rs/b1/github/redox-os/ion)
 
+# Compile / Install Instructions
+
+Rust 1.19 is the minimum requirement for compiling Ion. Simplest way to obtain Rust/Cargo is by
+installing the [Rustup toolchain manager](https://rustup.rs/), in the event that your OS does
+not ship Rust natively, or if you want more flexibility in Rust compilation capabilities.
+
+Then, it's just a matter of performing one of the following methods:
+
+## Install Latest Stable Version From Crates.io
+
+Use the `--force` flag when updating a binary that's already installed with cargo.
+
+```sh
+cargo install ion-shell
+```
+
+## Install Direct From Git
+
+```sh
+cargo install --git https://github.com/redox-os/ion/
+```
+
+## Build Locally
+
+```sh
+git clone https://github.com/redox-os/ion/
+cd ion
+cargo build --release
+```
+
+# New Ion MdBook
+
+See the **manual** directory contained within the repository. Navigating to that directory and executing `mdbook build` will build HTML documentation for Ion.
+Obtain mdbook [here](https://github.com/azerupi/mdBook).
+
+# Summary
+
+**NOTE:** The following content will eventually be removed as we are now developing an mdBook for Ion.
+
 Ion is a modern system shell that is written entirely in Rust, features a simple (and powerful) syntax, and offers performance that exceeds the level of Dash. While it is developed alongside RedoxOS as the default shell for RedoxOS, it is equally supported on UNIX platforms (Linux/Mac/BSDs), on which it is developed and tested. Windows support could also easily be obtained, but we currently do not have any developers that use Windows. Ion's design is influenced by many other successful shells, which can be seen in its borrowing of ideas from Bash, Fish, and Oil; whilst also offering some unique ideas of its own. It is still a work in progress, but most of the core functionality is complete. It is also currently significantly faster than Dash, even though it contains many more features and abilities, making it the fastest system shell to date. Finally, as it is written in Rust, we can guarantee that our codebase offers a high degree of memory safety compared to Bash, Dash, Zsh, Fish and other shells that are written in unsafe languages. That means no chance for a shellshock-like vulnerability to arise.
 
 # Ion's Goals
