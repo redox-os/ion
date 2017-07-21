@@ -44,6 +44,8 @@ smallstring = "0.1"
 smallvec = "0.4"
 # Provides grapheme-based string iterators.
 unicode-segmentation = "1.2"
+# Rusts regex crate
+regex = "0.2"
 
 ## Redox Dependencies
 
