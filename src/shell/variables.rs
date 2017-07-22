@@ -202,9 +202,7 @@ impl Variables {
         None
     }
 
-    pub fn command_expansion(&self, command: &str, quoted: bool) -> Option<Value> {
-        use ascii_helpers::AsciiReplace;
-
+    pub fn command_expansion(&self, command: &str) -> Option<Value> {
         if let Ok(exe) = env::current_exe() {
             if let Ok(output) = process::Command::new(exe).arg("-c").arg(command).output() {
                 if let Ok(mut stdout) = String::from_utf8(output.stdout) {
@@ -212,11 +210,7 @@ impl Variables {
                         stdout.pop();
                     }
 
-                    return if quoted {
-                        Some(stdout.into())
-                    } else {
-                        Some(stdout.ascii_replace('\n', ' ').into())
-                    };
+                    return Some(stdout.into());
                 }
             }
         }

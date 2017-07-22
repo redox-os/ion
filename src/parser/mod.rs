@@ -46,7 +46,7 @@ macro_rules! get_expanders {
                         .map(|x| x.ascii_replace('\n', ' ').into())
                 }
             },
-            command: &|command: &str, quoted: bool| $vars.command_expansion(command, quoted),
+            command: &|command: &str| $vars.command_expansion(command),
         }
     }
 }
