@@ -1263,7 +1263,7 @@ mod tests {
                 tilde:    &|_| None,
                 array:    &|_, _| None,
                 variable: &|_, _| None,
-                command:  &|_, _| None
+                command:  &|_| None
             }
         }
     }
@@ -1497,7 +1497,7 @@ mod tests {
                     "pkmn2" => "Poke\u{0301}mon".to_owned().into(),
                     _ => None
                 },
-                command: &|_, _| None,
+                command: &|_| None,
             }
         }
     }

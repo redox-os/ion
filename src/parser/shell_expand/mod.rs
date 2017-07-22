@@ -33,11 +33,13 @@ pub struct ExpanderFunctions<'f> {
     pub tilde:    &'f Fn(&str) -> Option<String>,
     pub array:    &'f Fn(&str, Select) -> Option<Array>,
     pub variable: &'f Fn(&str, bool) -> Option<Value>,
-    pub command:  &'f Fn(&str, bool) -> Option<Value>
+    pub command:  &'f Fn(&str) -> Option<Value>
 }
 
-fn expand_process(current: &mut String, command: &str, quoted: bool,
-    selection: Select, expand_func: &ExpanderFunctions)
+fn expand_process(current: &mut String, 
+                  command: &str, 
+                  selection: Select, 
+                  expand_func: &ExpanderFunctions)
 {
     let mut tokens = Vec::new();
     let mut contains_brace = false;
@@ -49,7 +51,7 @@ fn expand_process(current: &mut String, command: &str, quoted: bool,
 
     let expanded = expand_tokens(&tokens, expand_func, false, contains_brace).join(" ");
 
-    if let Some(result) = (expand_func.command)(&expanded, quoted) {
+    if let Some(result) = (expand_func.command)(&expanded) {
         slice(current, result, selection);
     }
 }
@@ -212,24 +214,23 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                             output.push_str(&array.join(" "));
                         }
                     },
-                    WordToken::ArrayProcess(command, quoted, index) => {
-                        let quoted = if reverse_quoting { !quoted } else { quoted };
+                    WordToken::ArrayProcess(command, _, index) => {
                         match index {
                             Select::None => (),
                             Select::All => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, Select::All, expand_func);
+                                expand_process(&mut temp, command, Select::All, expand_func);
                                 let temp = temp.split_whitespace().collect::<Vec<&str>>();
                                 output.push_str(&temp.join(" "));
                             },
                             Select::Index(Index::Forward(id)) => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, Select::All, expand_func);
+                                expand_process(&mut temp, command, Select::All, expand_func);
                                 output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
                             },
                             Select::Index(Index::Backward(id)) => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, Select::All, expand_func);
+                                expand_process(&mut temp, command, Select::All, expand_func);
                                 output.push_str(temp.split_whitespace()
                                                     .rev()
                                                     .nth(id)
@@ -237,7 +238,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                             }
                             Select::Range(range) => {
                                 let mut temp = String::new();
-                                expand_process(&mut temp, command, quoted, Select::All, expand_func);
+                                expand_process(&mut temp, command, Select::All, expand_func);
                                 let len = temp.split_whitespace().count();
                                 if let Some((start, length)) = range.bounds(len) {
                                     let res = temp.split_whitespace()
@@ -258,9 +259,8 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     WordToken::Brace(ref nodes) =>
                         expand_brace(&mut output, &mut expanders, &mut tokens, nodes, expand_func, reverse_quoting),
                     WordToken::Whitespace(_) => unreachable!(),
-                    WordToken::Process(command, quoted, index) => {
-                        let quoted = if reverse_quoting { !quoted } else { quoted };
-                        expand_process(&mut output, command, quoted, index, expand_func);
+                    WordToken::Process(command, _, index) => {
+                        expand_process(&mut output, command, index, expand_func);
                     },
                     WordToken::Variable(text, quoted, index) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
@@ -303,18 +303,17 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         None                      => Array::new(),
                     };
                 },
-                WordToken::ArrayProcess(command, quoted, index) => {
-                    let quoted = if reverse_quoting { !quoted } else { quoted };
+                WordToken::ArrayProcess(command, _, index) => {
                     match index {
                         Select::None => return Array::new(),
                         Select::All => {
-                            expand_process(&mut output, command, quoted, Select::All, expand_func);
+                            expand_process(&mut output, command, Select::All, expand_func);
                             return output.split_whitespace()
                                 .map(From::from)
                                 .collect::<Array>();
                         },
                         Select::Index(Index::Forward(id)) => {
-                            expand_process(&mut output, command, quoted, Select::All, expand_func);
+                            expand_process(&mut output, command, Select::All, expand_func);
                             return output.split_whitespace()
                                          .nth(id)
                                          .map(Into::into)
@@ -322,7 +321,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                                          .collect();
                         },
                         Select::Index(Index::Backward(id)) => {
-                            expand_process(&mut output, command, quoted, Select::All, expand_func);
+                            expand_process(&mut output, command, Select::All, expand_func);
                             return output.split_whitespace()
                                          .rev()
                                          .nth(id)
@@ -331,7 +330,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                                          .collect();
                         }
                         Select::Range(range) => {
-                            expand_process(&mut output, command, quoted, Select::All, expand_func);
+                            expand_process(&mut output, command, Select::All, expand_func);
                             if let Some((start, length)) = range.bounds(output.split_whitespace().count()) {
                                 return output.split_whitespace()
                                              .skip(start)
@@ -369,24 +368,23 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         output.push_str(&array.join(" "));
                     }
                 },
-                WordToken::ArrayProcess(command, quoted, index) => {
-                    let quoted = if reverse_quoting { !quoted } else { quoted };
+                WordToken::ArrayProcess(command, _, index) => {
                     match index {
                         Select::None => (),
                         Select::All => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, Select::All, expand_func);
+                            expand_process(&mut temp, command, Select::All, expand_func);
                             let temp = temp.split_whitespace().collect::<Vec<&str>>();
                             output.push_str(&temp.join(" "));
                         },
                         Select::Index(Index::Forward(id)) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, Select::All, expand_func);
+                            expand_process(&mut temp, command, Select::All, expand_func);
                             output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
                         },
                         Select::Index(Index::Backward(id)) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, Select::All, expand_func);
+                            expand_process(&mut temp, command, Select::All, expand_func);
                             output.push_str(temp.split_whitespace()
                                                 .rev()
                                                 .nth(id)
@@ -394,7 +392,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         },
                         Select::Range(range) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, quoted, Select::All, expand_func);
+                            expand_process(&mut temp, command, Select::All, expand_func);
                             if let Some((start, length)) = range.bounds(temp.split_whitespace().count()) {
                                 let temp = temp.split_whitespace()
                                                .skip(start)
@@ -418,9 +416,8 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                 WordToken::Whitespace(text) => {
                     output.push_str(text);
                 },
-                WordToken::Process(command, quoted, index) => {
-                    let quoted = if reverse_quoting { !quoted } else { quoted };
-                    expand_process(&mut output, command, quoted, index, expand_func);
+                WordToken::Process(command, _, index) => {
+                    expand_process(&mut output, command, index, expand_func);
                 }
                 WordToken::Variable(text, quoted, index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
@@ -505,7 +502,7 @@ mod test {
                     "BAR" => Some("BAR".to_owned()),
                     _   => None
                 },
-                command:  &|_, _| None
+                command:  &|_| None
             }
         }
     }
