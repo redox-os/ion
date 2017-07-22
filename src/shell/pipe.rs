@@ -1,6 +1,4 @@
-#[cfg(all(unix, not(target_os = "redox")))] use libc;
-#[cfg(target_os = "redox")] use syscall;
-use std::io::{self, Write};
+use std::io::{self, Error, Write};
 use std::process::{Stdio, Command};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::os::unix::process::CommandExt;
@@ -12,138 +10,50 @@ use super::{JobKind, Shell};
 use super::status::*;
 use super::signals::{self, SignalHandler};
 use parser::peg::{Pipeline, Input, RedirectFrom};
-use self::crossplat::*;
+use sys;
 
-/// The `crossplat` module contains components that are meant to be abstracted across
-/// different platforms
-#[cfg(not(target_os = "redox"))]
-pub mod crossplat {
-    use nix::{fcntl, unistd};
-    use parser::peg::{RedirectFrom};
-    use std::fs::File;
-    use std::io::{Write, Error};
-    use std::os::unix::io::{IntoRawFd, FromRawFd};
-    use std::process::{Stdio, Command};
-
-    /// When given a process ID, that process's group will be assigned as the foreground process group.
-    pub fn set_foreground(pid: u32) {
-        let _ = unistd::tcsetpgrp(0, pid as i32);
-    }
-
-    pub fn get_pid() -> u32 {
-        unistd::getpid() as u32
-    }
-
-    /// Create an instance of Stdio from a byte slice that will echo the
-    /// contents of the slice when read. This can be called with owned or
-    /// borrowed strings
-    pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<Stdio, Error> {
-        let (reader, writer) = unistd::pipe2(fcntl::O_CLOEXEC)?;
-        let mut infile = File::from_raw_fd(writer);
-        // Write the contents; make sure to use write_all so that we block until
-        // the entire string is written
-        infile.write_all(input.as_ref())?;
-        infile.flush()?;
-        // `infile` currently owns the writer end RawFd. If we just return the reader end
-        // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
-        Ok(Stdio::from_raw_fd(reader))
-    }
-
-    /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
-    /// The content that is sent depends on `mode`
-    pub unsafe fn create_pipe (
-        parent: &mut Command,
-        child: &mut Command,
-        mode: RedirectFrom
-    ) -> Result<(), Error> {
-        let (reader, writer) = unistd::pipe2(fcntl::O_CLOEXEC)?;
-        match mode {
-            RedirectFrom::Stdout => {
-                parent.stdout(Stdio::from_raw_fd(writer));
-            },
-            RedirectFrom::Stderr => {
-                parent.stderr(Stdio::from_raw_fd(writer));
-            },
-            RedirectFrom::Both => {
-                let temp_file = File::from_raw_fd(writer);
-                let clone = temp_file.try_clone()?;
-                // We want to make sure that the temp file we created no longer has ownership
-                // over the raw file descriptor otherwise it gets closed
-                temp_file.into_raw_fd();
-                parent.stdout(Stdio::from_raw_fd(writer));
-                parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
-            }
-        }
-        child.stdin(Stdio::from_raw_fd(reader));
-        Ok(())
-    }
+/// Create an instance of Stdio from a byte slice that will echo the
+/// contents of the slice when read. This can be called with owned or
+/// borrowed strings
+pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<Stdio, Error> {
+    let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)?;
+    let mut infile = File::from_raw_fd(writer);
+    // Write the contents; make sure to use write_all so that we block until
+    // the entire string is written
+    infile.write_all(input.as_ref())?;
+    infile.flush()?;
+    // `infile` currently owns the writer end RawFd. If we just return the reader end
+    // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
+    Ok(Stdio::from_raw_fd(reader))
 }
 
-#[cfg(target_os = "redox")]
-pub mod crossplat {
-    use parser::peg::{RedirectFrom};
-    use std::fs::File;
-    use std::io::{self, Error, Write};
-    use std::os::unix::io::{IntoRawFd, FromRawFd};
-    use std::process::{Stdio, Command};
-    use syscall;
-
-    pub fn set_foreground(pid: u32) {
-        // TODO
-    }
-
-    pub fn get_pid() -> u32 {
-        syscall::getpid().unwrap() as u32
-    }
-
-    pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<Stdio, Error> {
-        let mut fds: [usize; 2] = [0; 2];
-        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)
-                      .map_err(|e| Error::from_raw_os_error(e.errno))?;
-        let (reader, writer) = (fds[0], fds[1]);
-        let mut infile = File::from_raw_fd(writer);
-        // Write the contents; make sure to use write_all so that we block until
-        // the entire string is written
-        infile.write_all(input.as_ref())?;
-        infile.flush()?;
-        // `infile` currently owns the writer end RawFd. If we just return the reader end
-        // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
-        Ok(Stdio::from_raw_fd(reader))
-    }
-
-    /// Set up pipes such that the relevant output of parent is sent to the stdin of child.
-    /// The content that is sent depends on `mode`
-    pub unsafe fn create_pipe (
-        parent: &mut Command,
-        child: &mut Command,
-        mode: RedirectFrom
-    ) -> Result<(), Error> {
-        // XXX: Zero probably is a bad default for this, but `pipe2` will error if it fails, so
-        // one could reason that it isn't dangerous.
-        let mut fds: [usize; 2] = [0; 2];
-        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)
-                      .map_err(|e| Error::from_raw_os_error(e.errno))?;
-        let (reader, writer) = (fds[0], fds[1]);
-        match mode {
-            RedirectFrom::Stdout => {
-                parent.stdout(Stdio::from_raw_fd(writer));
-            },
-            RedirectFrom::Stderr => {
-                parent.stderr(Stdio::from_raw_fd(writer));
-            },
-            RedirectFrom::Both => {
-                let temp_file = File::from_raw_fd(writer);
-                let clone = temp_file.try_clone()?;
-                // We want to make sure that the temp file we created no longer has ownership
-                // over the raw file descriptor otherwise it gets closed
-                temp_file.into_raw_fd();
-                parent.stdout(Stdio::from_raw_fd(writer));
-                parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
-            }
+/// Set up pipes such that the relevant output of parent is sent to the stdin of child.
+/// The content that is sent depends on `mode`
+pub unsafe fn create_pipe (
+    parent: &mut Command,
+    child: &mut Command,
+    mode: RedirectFrom
+) -> Result<(), Error> {
+    let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)?;
+    match mode {
+        RedirectFrom::Stdout => {
+            parent.stdout(Stdio::from_raw_fd(writer));
+        },
+        RedirectFrom::Stderr => {
+            parent.stderr(Stdio::from_raw_fd(writer));
+        },
+        RedirectFrom::Both => {
+            let temp_file = File::from_raw_fd(writer);
+            let clone = temp_file.try_clone()?;
+            // We want to make sure that the temp file we created no longer has ownership
+            // over the raw file descriptor otherwise it gets closed
+            temp_file.into_raw_fd();
+            parent.stdout(Stdio::from_raw_fd(writer));
+            parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
         }
-        child.stdin(Stdio::from_raw_fd(reader));
-        Ok(())
     }
+    child.stdin(Stdio::from_raw_fd(reader));
+    Ok(())
 }
 
 /// This function serves three purposes:
@@ -197,7 +107,7 @@ impl<'a> PipelineExecution for Shell<'a> {
             Some(Input::HereString(ref mut string)) => {
                 if let Some(command) = piped_commands.first_mut() {
                     if !string.ends_with('\n') { string.push('\n'); }
-                    match unsafe { crossplat::stdin_of(&string) } {
+                    match unsafe { stdin_of(&string) } {
                         Ok(stdio) => {
                             command.0.stdin(stdio);
                         },
@@ -252,7 +162,7 @@ impl<'a> PipelineExecution for Shell<'a> {
             // Execute each command in the pipeline, giving each command the foreground.
             let exit_status = pipe(self, piped_commands, true);
             // Set the shell as the foreground process again to regain the TTY.
-            set_foreground(get_pid());
+            let _ = sys::tcsetpgrp(0, sys::getpid().unwrap());
             exit_status
         }
     }
@@ -285,7 +195,7 @@ pub fn pipe (
             match kind {
                 JobKind::Pipe(mut mode) => {
                     // We need to remember the commands as they own the file descriptors that are
-                    // created by crossplat::create_pipe. We purposfully drop the pipes that are
+                    // created by create_pipe. We purposfully drop the pipes that are
                     // owned by a given command in `wait` in order to close those pipes, sending
                     // EOF to the next command
                     let mut remember = Vec::new();
@@ -305,7 +215,9 @@ pub fn pipe (
                                 Ok(child) => {
                                     if pgid == 0 {
                                         pgid = child.id();
-                                        if foreground { set_foreground(pgid); }
+                                        if foreground {
+                                            let _ = sys::tcsetpgrp(0, pgid);
+                                        }
                                     }
                                     shell.foreground.push(child.id());
                                     children.push(child.id());
@@ -321,7 +233,7 @@ pub fn pipe (
                     // Append other jobs until all piped jobs are running
                     while let Some((mut child, ckind)) = commands.next() {
                         if let Err(e) = unsafe {
-                            crossplat::create_pipe(&mut parent, &mut child, mode)
+                            create_pipe(&mut parent, &mut child, mode)
                         } {
                             eprintln!("ion: failed to create pipe for redirection: {:?}", e);
                         }
@@ -360,14 +272,8 @@ pub fn pipe (
     previous_status
 }
 
-#[cfg(all(unix, not(target_os = "redox")))]
 fn terminate_fg(shell: &mut Shell) {
-    shell.foreground_send(libc::SIGTERM);
-}
-
-#[cfg(target_os = "redox")]
-fn terminate_fg(shell: &mut Shell) {
-    shell.foreground_send(syscall::SIGTERM as i32);
+    shell.foreground_send(sys::SIGTERM);
 }
 
 fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -> i32 {
@@ -377,7 +283,9 @@ fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -
         Ok(())
     }).spawn() {
         Ok(child) => {
-            if foreground { set_foreground(child.id()); }
+            if foreground {
+                let _ = sys::tcsetpgrp(0, child.id());
+            }
             shell.watch_foreground(child.id(), child.id(), || get_full_command(command), |_| ())
         },
         Err(e) => {
