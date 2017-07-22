@@ -23,6 +23,7 @@ use parser::QuoteTerminator;
 use shell::job_control::{JobControl, ProcessState};
 use shell::{self, Shell, FlowLogic, ShellHistory};
 use shell::status::*;
+use sys;
 
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the
@@ -51,7 +52,7 @@ impl Builtin {
                 _ => shell.previous_status
             }
         }
-        
+
         insert_builtin!("not", builtin_not, "Reverses the exit status value of the given command.");
         */
 
@@ -64,7 +65,7 @@ impl Builtin {
                         help: $help,
                         main: $func,
                     }
-                ); 
+                );
             }
         }
 
@@ -391,25 +392,11 @@ fn builtin_help(args: &[&str], shell: &mut Shell) -> i32 {
     SUCCESS
 }
 
-#[cfg(target_os = "redox")]
 fn builtin_exit(args: &[&str], shell: &mut Shell) -> i32 {
-    let previous_status = shell.previous_status;
-    shell.exit(
-        args.get(1)
-            .and_then(|status| status.parse::<i32>().ok())
-            .unwrap_or(previous_status),
-    )
-}
-
-#[cfg(not(target_os = "redox"))]
-fn builtin_exit(args: &[&str], shell: &mut Shell) -> i32 {
-    use nix::sys::signal::{self, Signal as NixSignal};
-    use libc::pid_t;
-
     // Kill all active background tasks before exiting the shell.
     for process in shell.background.lock().unwrap().iter() {
         if process.state != ProcessState::Empty {
-            let _ = signal::kill(process.pid as pid_t, Some(NixSignal::SIGTERM));
+            let _ = sys::kill(process.pid, sys::SIGTERM);
         }
     }
     let previous_status = shell.previous_status;

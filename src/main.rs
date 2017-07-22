@@ -16,13 +16,18 @@ extern crate smallvec;
 extern crate smallstring;
 extern crate calc;
 extern crate regex;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate futures;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate libc;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate nix;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate tokio_core;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate tokio_signal;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate users as users_unix;
 #[cfg(target_os = "redox")] extern crate syscall;
+
+#[cfg(target_os = "redox")]
+#[path="sys/redox.rs"]
+mod sys;
+
+#[cfg(unix)]
+#[path="sys/unix.rs"]
+mod sys;
 
 #[macro_use] mod types;
 #[macro_use] mod parser;
@@ -31,9 +36,18 @@ mod shell;
 mod ascii_helpers;
 
 use builtins::Builtin;
-use shell::{Shell, Binary, signals};
+use shell::{Shell, Binary};
 use std::sync::mpsc;
-use std::thread;
+use std::{thread, time};
+
+static mut SIGNALS_TX: *const mpsc::Sender<i32> = 0 as *const mpsc::Sender<i32>;
+
+extern "C" fn handler(signal: i32) {
+    let signals_tx = unsafe { SIGNALS_TX };
+    if signals_tx as usize != 0 {
+        let _ = unsafe { (*signals_tx).send(signal) };
+    }
+}
 
 fn inner_main(sigint_rx : mpsc::Receiver<i32>) {
     let builtins = Builtin::map();
@@ -41,15 +55,16 @@ fn inner_main(sigint_rx : mpsc::Receiver<i32>) {
     shell.main();
 }
 
-#[cfg(not(target_os = "redox"))]
 fn main() {
     let (signals_tx, signals_rx) = mpsc::channel();
+    unsafe {
+        SIGNALS_TX = Box::into_raw(Box::new(signals_tx));
+    }
+    let _ = sys::signal(sys::SIGHUP, handler);
+    let _ = sys::signal(sys::SIGINT, handler);
+    let _ = sys::signal(sys::SIGTERM, handler);
     thread::spawn(move || inner_main(signals_rx));
-    signals::event_loop(signals_tx);
-}
-
-#[cfg(target_os = "redox")]
-fn main() {
-    let (_, signals_rx) = mpsc::channel();
-    inner_main(signals_rx);
+    loop {
+        thread::sleep(time::Duration::new(1, 0));
+    }
 }
