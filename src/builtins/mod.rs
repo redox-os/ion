@@ -161,6 +161,16 @@ impl Builtin {
             builtin_help,
             "Display helpful information about a given command or list commands if none specified\n    help <command>"
         );
+        insert_builtin!(
+            "and",
+            builtin_and,
+            "Execute the command if the shell's previous status is success"
+        );
+        insert_builtin!(
+            "or",
+            builtin_or,
+            "Execute the command if the shell's previous status is failure"
+        );
 
         commands
     }
@@ -430,4 +440,26 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
     };
 
     if re.is_match(input) { SUCCESS } else { FAILURE }
+}
+
+fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
+    match shell.previous_status {
+        SUCCESS => {
+            let cmd = args[1..].join(" ");
+            shell.on_command(&cmd);
+            shell.previous_status
+        }
+        _ => shell.previous_status,
+    }
+}
+
+fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
+    match shell.previous_status {
+        FAILURE => {
+            let cmd = args[1..].join(" ");
+            shell.on_command(&cmd);
+            shell.previous_status
+        }
+        _ => shell.previous_status,
+    }
 }
