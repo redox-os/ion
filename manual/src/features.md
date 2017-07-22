@@ -34,7 +34,9 @@ open an issue on the project's GitHub.
   - [x] Array Slicing (**[one two three][2]**)
   - [x] String Process Slicing (**$(command args...)[15..]**)
   - [x] Array Process Slicing (**@(command args...)[1]**)
-- Flow Control
+  - [x] Exclusive Ranges (**N..N**)
+  - [x] Inclusive Ranges (**N...N**)
+- Control Flow
   - [x] For Loops
   - [x] While Loops
   - [x] If Statements
@@ -68,7 +70,7 @@ open an issue on the project's GitHub.
 
 Small features that don't belong in any specific category.
 
-[Miscellanious Features](./miscellanious.md)
+[Miscellanious Features](miscellanious.html)
 
 
 ## Shell Expansions / Substitutions
@@ -79,11 +81,11 @@ their own variant of process expansions (**@()**) which splits outputs by whites
 arithmetic logic is more feature-complete, supports floating-point math, and handles larger
 numbers; and Ion supports methods in the same manner as the [Oil shell](http://www.oilshell.org/).
 
-- [Variable Expansions](expansions/variable.md)
-- [Process Expansions](expansions/process.md)
-- [Brace Expansions](expansions/brace.md)
-- [Arithmetic Expansions](expansions/arithmetic.md)
-- [Method Expansions](expansions/methods.md)
+- [Variable Expansions](expansions/variable.html)
+- [Process Expansions](expansions/process.html)
+- [Brace Expansions](expansions/brace.html)
+- [Arithmetic Expansions](expansions/arithmetic.html)
+- [Method Expansions](expansions/methods.html)
 
 ## Slicing Syntax
 
@@ -93,4 +95,16 @@ expanded value is an index, inclusive range, or exclusive range. This eliminates
 for temporarily storing and/or piping values to other commands, instead performing the slicing at
 parse-time.
 
-## Flow Control
+[Slicing Syntax](slicing.html)
+
+## Control Flow
+
+As Ion features an imperative paradigm, the order that statements are evaluated and executed is
+determined by various control flow keywords, such as `if`, `while`, `for`, `break`, and
+`continue`. Ion's control flow logic is very similar to POSIX shells, but there are a few major
+differences, such as that all blocks are ended with the `end` keyword; and the `do`/`then`
+keywords aren't necessary.
+
+[Control Flow](flow/index.html)
+- [Conditionals](flow/conditionals.html)
+- [Loops](flow/loops.html)
