@@ -60,9 +60,17 @@ fn main() {
     unsafe {
         SIGNALS_TX = Box::into_raw(Box::new(signals_tx));
     }
+
     let _ = sys::signal(sys::SIGHUP, handler);
     let _ = sys::signal(sys::SIGINT, handler);
     let _ = sys::signal(sys::SIGTERM, handler);
+
+    if let Ok(pid) = sys::getpid() {
+        if sys::setpgid(0, pid).is_ok() {
+            let _ = sys::tcsetpgrp(0, pid);
+        }
+    }
+
     thread::spawn(move || inner_main(signals_rx));
     loop {
         thread::sleep(time::Duration::new(1, 0));
