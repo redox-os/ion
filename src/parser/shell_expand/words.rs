@@ -10,6 +10,7 @@ use super::ranges::parse_index_range;
 use super::{slice, is_expression};
 
 use types::Array;
+use std::path::Path;
 
 // Bit Twiddling Guide:
 // var & FLAG != 0 checks if FLAG is enabled
