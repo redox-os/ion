@@ -159,6 +159,33 @@ pub fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     SUCCESS
 }
 
+/// Dropping an array will erase it from the shell.
+pub fn drop_array<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
+    where I::Item: AsRef<str>
+{
+    let args = args.into_iter().collect::<Vec<I::Item>>();
+    if args.len() <= 2 {
+        let stderr = io::stderr();
+        let _ = writeln!(&mut stderr.lock(), "ion: you must specify an array name");
+        return FAILURE;
+    }
+
+    if args[1].as_ref() != "-a" {
+        let stderr = io::stderr();
+        let _ = writeln!(&mut stderr.lock(), "ion: drop_array must be used with -a option");
+        return FAILURE;
+    }
+
+    for array in args.iter().skip(2) {
+        if vars.unset_array(array.as_ref()).is_none() {
+            let stderr = io::stderr();
+            let _ = writeln!(&mut stderr.lock(), "ion: undefined array: {}", array.as_ref());
+            return FAILURE;
+        }
+    }
+    SUCCESS
+}
+
 /// Dropping a variable will erase it from the shell.
 pub fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     where I::Item: AsRef<str>
@@ -238,6 +265,30 @@ mod test {
     fn drop_fails_with_undefined_variable() {
         let mut variables = Variables::default();
         let return_status = drop_variable(&mut variables, vec!["drop", "FOO"]);
+        assert_eq!(FAILURE, return_status);
+    }
+
+    #[test]
+    fn drop_deletes_array() {
+        let mut variables = Variables::default();
+        variables.set_array("FOO", array!["BAR"]);
+        let return_status = drop_array(&mut variables, vec!["drop", "-a", "FOO"]);
+        assert_eq!(SUCCESS, return_status);
+        let expanded = expand_string("@FOO", &get_expanders!(&variables, &new_dir_stack()), false).join("");
+        assert_eq!("", expanded);
+    }
+
+    #[test]
+    fn drop_array_fails_with_no_arguments() {
+        let mut variables = Variables::default();
+        let return_status = drop_array(&mut variables, vec!["drop", "-a"]);
+        assert_eq!(FAILURE, return_status);
+    }
+
+    #[test]
+    fn drop_array_fails_with_undefined_array() {
+        let mut variables = Variables::default();
+        let return_status = drop_array(&mut variables, vec!["drop", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
 }

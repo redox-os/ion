@@ -9,7 +9,7 @@ mod time;
 mod echo;
 mod set;
 
-use self::variables::{alias, drop_alias, drop_variable};
+use self::variables::{alias, drop_alias, drop_variable, drop_array};
 use self::functions::fn_;
 use self::source::source;
 use self::echo::echo;
@@ -236,7 +236,11 @@ fn builtin_read(args: &[&str], shell: &mut Shell) -> i32 {
 }
 
 fn builtin_drop(args: &[&str], shell: &mut Shell) -> i32 {
-    drop_variable(&mut shell.variables, args)
+    if args.len() >= 2 && args[1] == "-a" {
+        drop_array(&mut shell.variables, args)
+    } else {
+        drop_variable(&mut shell.variables, args)
+    }
 }
 
 fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
