@@ -10,6 +10,7 @@ use super::ranges::parse_index_range;
 use super::{slice, is_expression};
 
 use types::Array;
+use std::path::Path;
 
 // Bit Twiddling Guide:
 // var & FLAG != 0 checks if FLAG is enabled
@@ -326,7 +327,7 @@ impl<'a> ArrayMethod<'a> {
 
         match self.method {
             "split" => {
-                let variable = resolve_var!(); 
+                let variable = resolve_var!();
                 return match (&self.pattern, self.selection) {
                     (_, Select::None) => Some("".into()).into_iter().collect(),
                     (&Pattern::StringPattern(pattern), Select::All) => variable
@@ -388,21 +389,21 @@ impl<'a> ArrayMethod<'a> {
                 }
             },
             "graphemes" => {
-                let variable = resolve_var!(); 
+                let variable = resolve_var!();
                 let graphemes = UnicodeSegmentation::graphemes(variable.as_str(), true);
                 let len = graphemes.clone().count();
                 return graphemes.map(From::from)
                                 .select(self.selection, len);
             },
             "bytes" => {
-                let variable = resolve_var!(); 
+                let variable = resolve_var!();
                 let len = variable.as_bytes().len();
                 return variable.bytes()
                                .map(|b| b.to_string())
                                .select(self.selection, len);
             },
             "chars" => {
-                let variable = resolve_var!(); 
+                let variable = resolve_var!();
                 let len = variable.chars().count();
                 return variable.chars()
                                .map(|c| c.to_string())
@@ -422,13 +423,13 @@ impl<'a> ArrayMethod<'a> {
 /// Represents a method that operates on and returns a string
 #[derive(Debug, PartialEq, Clone)]
 pub struct StringMethod<'a> {
-    /// Name of this method: currently `join`, `len`, and `len_bytes` are the 
+    /// Name of this method: currently `join`, `len`, and `len_bytes` are the
     /// supported methods
     method: &'a str,
     /// Variable that this method will operator on. This is a bit of a misnomer
     /// as this can be an expression as well
     variable: &'a str,
-    /// Pattern to use for certain methods: currently `join` makes use of a 
+    /// Pattern to use for certain methods: currently `join` makes use of a
     /// pattern
     pattern: &'a str,
     /// Selection to use to control the output of this method
@@ -463,6 +464,72 @@ impl<'a> StringMethod<'a> {
                 } else if is_expression(self.variable) {
                     let word = expand_string(self.variable, &expand, false).join(self.pattern);
                     output.push_str(&word.as_bytes().len().to_string());
+                }
+            },
+            "basename" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    output.push_str(Path::new(&value).file_name()
+                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    output.push_str(Path::new(&word).file_name()
+                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
+                }
+            },
+            "extension" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    output.push_str(Path::new(&value).extension()
+                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    output.push_str(Path::new(&word).extension()
+                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
+                }
+            },
+            "filename" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    output.push_str(Path::new(&value).file_stem()
+                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    output.push_str(Path::new(&word).file_stem()
+                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
+                }
+            },
+            "parent" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    output.push_str(Path::new(&value).parent()
+                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    output.push_str(Path::new(&word).parent()
+                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
+                }
+            },
+            "reverse" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
+                    output.push_str(rev_graphs.collect::<String>().as_str());
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
+                    output.push_str(rev_graphs.collect::<String>().as_str());
+                }
+            },
+            "to_lowercase" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    output.push_str(value.to_lowercase().as_str());
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    output.push_str(word.to_lowercase().as_str());
+                }
+            },
+            "to_uppercase" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    output.push_str(value.to_uppercase().as_str());
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    output.push_str(word.to_uppercase().as_str());
                 }
             },
             _ => {
@@ -536,7 +603,7 @@ impl<'a> WordIterator<'a> {
     //         }
     //         self.read += 1;
     //     }
-// 
+//
     //     WordToken::Tilde(&self.data[start..])
     // }
 
@@ -1293,16 +1360,16 @@ mod tests {
         let input = "$join(array, 'pattern') $join(array, 'pattern')";
         let expected = vec![
             WordToken::StringMethod(StringMethod {
-                method: "join", 
-                variable: "array", 
-                pattern: "'pattern'", 
+                method: "join",
+                variable: "array",
+                pattern: "'pattern'",
                 selection: Select::All
             }),
             WordToken::Whitespace(" "),
             WordToken::StringMethod(StringMethod {
-                method: "join", 
-                variable: "array", 
-                pattern: "'pattern'", 
+                method: "join",
+                variable: "array",
+                pattern: "'pattern'",
                 selection: Select::All
             })
         ];
