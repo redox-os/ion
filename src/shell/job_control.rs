@@ -194,7 +194,7 @@ impl<'a> JobControl for Shell<'a> {
         'event: loop {
             for process in self.background.lock().unwrap().iter() {
                 if let ProcessState::Running = process.state {
-                    if let Ok(signal) = self.signals.try_recv() {
+                    while let Some(signal) = self.next_signal() {
                         if signal != sys::SIGTSTP {
                             self.background_send(signal);
                             break 'event

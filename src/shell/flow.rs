@@ -282,7 +282,7 @@ impl<'a> FlowLogic for Shell<'a> {
                 }
                 _ => {}
             }
-            if let Ok(signal) = self.signals.try_recv() {
+            if let Some(signal) = self.next_signal() {
                 if self.handle_signal(signal) {
                     self.exit(TERMINATED);
                 }
