@@ -26,7 +26,7 @@ pub fn kill(pid: u32, signal: i32) -> io::Result<()> {
 }
 
 pub fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
-    cvt(syscall::kill(!(pgid as usize), signal as usize)).and(Ok(()))
+    cvt(syscall::kill(-(pgid as isize) as usize, signal as usize)).and(Ok(()))
 }
 
 pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
