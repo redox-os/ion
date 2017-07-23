@@ -99,6 +99,10 @@ impl Variables {
         self.arrays.get(name)
     }
 
+    pub fn unset_array(&mut self, name: &str) -> Option<Array> {
+        self.arrays.remove(name)
+    }
+
     pub fn get_var(&self, name: &str) -> Option<Value> {
         self.variables.get(name).cloned()
             .or_else(|| env::var(name).map(Into::into).ok())
