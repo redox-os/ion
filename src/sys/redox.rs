@@ -1,6 +1,6 @@
 extern crate syscall;
 
-use std::{io, mem};
+use std::{io, mem, slice};
 use std::os::unix::io::RawFd;
 
 use syscall::SigAction;
@@ -35,9 +35,8 @@ pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     Ok((fds[0], fds[1]))
 }
 
-pub fn setpgid(_pid: u32, _pgid: u32) -> io::Result<()> {
-    //TODO: Add setpgid syscall
-    Ok(())
+pub fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
+    cvt(syscall::setpgid(pid as usize, pgid as usize)).and(Ok(()))
 }
 
 pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
@@ -46,13 +45,23 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
         sa_mask: [0; 2],
         sa_flags: 0
     };
-    let mut old = SigAction::default();
-    cvt(syscall::sigaction(signal as usize, &new, &mut old)).and(Ok(()))
+    cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
 }
 
-pub fn tcsetpgrp(_fd: RawFd, _pgid: u32) -> io::Result<()> {
-    //TODO: Add tcsetpgrp implementation
-    Ok(())
+pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
+    let fd = cvt(syscall::dup(tty_fd, b"pgrp"))?;
+
+    let pgid_usize = pgid as usize;
+    let res = syscall::write(fd, unsafe {
+        slice::from_raw_parts(
+            &pgid_usize as *const usize as *const u8,
+            mem::size_of::<usize>()
+        )
+    });
+
+    let _ = syscall::close(fd);
+
+    cvt(res).and(Ok(()))
 }
 
 // Support function for converting syscall error to io error
