@@ -465,6 +465,172 @@ impl<'a> StringMethod<'a> {
                     output.push_str(&word.as_bytes().len().to_string());
                 }
             },
+            "basename" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    //basename of root is root
+                    if value == "/" {
+                        output.push_str("/")
+                    } else if value.ends_with("/") {
+                        //trim trailing /
+                        let cutval = &value[0..value.len()-1];
+                        //split by /, return last element
+                        output.push_str(cutval.split("/").last().unwrap_or("none"));
+                    } else {
+                        output.push_str(value.split("/").last().unwrap_or("none"));
+                    }
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    if word == "/" {
+                        output.push_str("/");
+                    } else if word.ends_with("/") {
+                        let cutword = &word[0..word.len()-1];
+                        output.push_str(cutword.split("/").last().unwrap_or("none"));
+                    } else {
+                        output.push_str(word.split("/").last().unwrap_or("none"));
+                    }
+                }
+            },
+            "extension" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    if value.ends_with("/") {
+                        let cutval = &value[0..value.len()-1];
+                        if cutval.contains(".") {
+                            //return (undotted) extension
+                            output.push_str(cutval.split(".").last().unwrap_or("none"));
+                        } else {
+                            //there is no extension
+                            output.push_str("");
+                        }
+                    } else {
+                        if value.contains(".") {
+                            output.push_str(value.split(".").last().unwrap_or("none"));
+                        } else {
+                            output.push_str("");
+                        }
+                    }
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    if word.ends_with("/") {
+                        let cutword = &word[0..word.len()-1];
+                        if cutword.contains(".") {
+                            output.push_str(cutword.split(".").last().unwrap_or("none"));
+                        } else {
+                            output.push_str("");
+                        }
+                    } else {
+                        if word.contains(".") {
+                            output.push_str(word.split(".").last().unwrap_or("none"));
+                        } else {
+                            output.push_str("");
+                        }
+                    }
+                }
+            },
+            "filename" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    if value.ends_with("/") {
+                        let cutval = &value[0..value.len()-1];
+                        let base = cutval.split("/").last().unwrap_or("none").to_string();
+                        if base.contains(".") {
+                            let last_dot = base.rfind('.').unwrap_or(0);
+                            output.push_str(base.split_at(last_dot).0);
+                        } else {
+                            output.push_str(&base);
+                        }
+                    } else {
+                        let base = value.split("/").last().unwrap_or("none").to_string();
+                        if base.contains(".") {
+                            let last_dot = base.rfind('.').unwrap_or(0);
+                            output.push_str(base.split_at(last_dot).0);
+                        } else {
+                            output.push_str(&base);
+                        }
+                    }
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    if word.ends_with("/") {
+                        let cutword = &word[0..word.len()-1];
+                        let base = cutword.split("/").last().unwrap_or("none").to_string();
+                        if base.contains(".") {
+                            let last_dot = base.rfind('.').unwrap_or(0);
+                            output.push_str(base.split_at(last_dot).0);
+                        } else {
+                            output.push_str(&base);
+                        }
+                    } else {
+                        let base = word.split("/").last().unwrap_or("none").to_string();
+                        if base.contains(".") {
+                            let last_dot = base.rfind('.').unwrap_or(0);
+                            output.push_str(base.split_at(last_dot).0);
+                        } else {
+                            output.push_str(&base);
+                        }
+                    }
+                }
+            },
+            "parent" => {
+                if let Some(value) = expand.vars.get_var(self.variable) {
+                    if value == "/" {
+                        //root is its own parent
+                        output.push_str("/");
+                    } else if !value.contains("/") {
+                        output.push_str("");
+                    } else if value.ends_with("/") {
+                        let cutval = &value[0..value.len()-1];
+                        if cutval.split("/").count() < 3 {
+                            if cutval.split("/").next().unwrap().is_empty() {
+                                 output.push_str("/");
+                             } else {
+                                 output.push_str(cutval.split("/").next().unwrap_or(""));
+                             }
+                        } else {
+                            let par = cutval.split("/").nth(cutval.split("/").count()-2);
+                            output.push_str(par.unwrap_or(""));
+                        }
+                    } else {
+                        if value.split("/").count() < 3 {
+                            if value.split("/").next().unwrap().is_empty() {
+                                 output.push_str("/");
+                             } else {
+                                 output.push_str(value.split("/").next().unwrap_or(""));
+                             }
+                        } else {
+                            let par = value.split("/").nth(value.split("/").count()-2);
+                            output.push_str(par.unwrap_or(""));
+                        }
+                    }
+                } else if is_expression(self.variable) {
+                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                    if word == "/" {
+                        output.push_str("/");
+                    } else if !word.contains("/") {
+                        output.push_str("");
+                    } else if word.ends_with("/") {
+                        let cutword = &word[0..word.len()-1];
+                        if cutword.split("/").count() < 3 {
+                            if cutword.split("/").next().unwrap().is_empty() {
+                                 output.push_str("/");
+                             } else {
+                                 output.push_str(cutword.split("/").next().unwrap_or(""));
+                             }
+                        } else {
+                            let par = cutword.split("/").nth(cutword.split("/").count()-2);
+                            output.push_str(par.unwrap_or(""));
+                        }
+                    } else {
+                        if word.split("/").count() < 3 {
+                            if word.split("/").next().unwrap().is_empty() {
+                                 output.push_str("/");
+                             } else {
+                                 output.push_str(word.split("/").next().unwrap_or(""));
+                             }
+                        } else {
+                            let par = word.split("/").nth(word.split("/").count()-2);
+                            output.push_str(par.unwrap_or(""));
+                        }
+                    }
+                }
+            }
             _ => {
                 eprintln!("ion: unknown string method: {}", self.method);
             }
