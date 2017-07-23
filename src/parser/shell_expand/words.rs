@@ -131,8 +131,19 @@ impl Range {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Key {
+    key : ::types::Key
+}
+
+impl Key {
+    pub fn get(&self) -> &::types::Key {
+        return &self.key
+    }
+}
+
 /// Represents a filter on a vector-like object
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Select {
     /// Select no elements
     None,
@@ -141,7 +152,9 @@ pub enum Select {
     /// Select a single element based on its index
     Index(Index),
     /// Select a range of elements
-    Range(Range)
+    Range(Range),
+    /// Select an element by mapped key
+    Key(Key),
 }
 
 pub trait SelectWithSize {
@@ -168,19 +181,18 @@ impl<I, T> SelectWithSize for I where I : Iterator<Item=T> {
                 } else {
                     empty().collect()
                 }
+            },
+            Select::Key(_) => {
+                empty().collect()
             }
         }
     }
 
 }
 
-pub enum SelectError {
-    Invalid
-}
-
 impl FromStr for Select {
-    type Err = SelectError;
-    fn from_str(data: &str) -> Result<Select, SelectError> {
+    type Err = ();
+    fn from_str(data: &str) -> Result<Select, ()> {
         if ".." == data {
             return Ok(Select::All)
         }
@@ -193,10 +205,7 @@ impl FromStr for Select {
             return Ok(Select::Range(range));
         }
 
-        let stderr = io::stderr();
-        let _ = writeln!(stderr.lock(), "ion: supplied selector, '{}', for array is invalid", data);
-
-        Err(SelectError::Invalid)
+        Ok(Select::Key(Key{ key: data.into() }))
     }
 }
 
@@ -244,7 +253,7 @@ impl<'a> ArrayMethod<'a> {
                 } else {
                     return;
                 };
-                match (&self.pattern, self.selection) {
+                match (&self.pattern, self.selection.clone()) {
                     (&Pattern::StringPattern(pattern), Select::All) => current.push_str (
                         &variable.split(&expand_string(pattern, expand_func, false).join(" "))
                             .collect::<Vec<&str>>()
@@ -301,6 +310,7 @@ impl<'a> ArrayMethod<'a> {
                         }
 
                     },
+                    (_, Select::Key(_)) => ()
                 }
             },
             _ => {
@@ -328,7 +338,7 @@ impl<'a> ArrayMethod<'a> {
         match self.method {
             "split" => {
                 let variable = resolve_var!();
-                return match (&self.pattern, self.selection) {
+                return match (&self.pattern, self.selection.clone()) {
                     (_, Select::None) => Some("".into()).into_iter().collect(),
                     (&Pattern::StringPattern(pattern), Select::All) => variable
                         .split(&expand_string(pattern, expand_func, false).join(" "))
@@ -386,6 +396,9 @@ impl<'a> ArrayMethod<'a> {
                             Array::new()
                         }
                     },
+                    (_, Select::Key(_)) => {
+                        Some("".into()).into_iter().collect()
+                    }
                 }
             },
             "graphemes" => {
@@ -393,21 +406,21 @@ impl<'a> ArrayMethod<'a> {
                 let graphemes = UnicodeSegmentation::graphemes(variable.as_str(), true);
                 let len = graphemes.clone().count();
                 return graphemes.map(From::from)
-                                .select(self.selection, len);
+                                .select(self.selection.clone(), len);
             },
             "bytes" => {
                 let variable = resolve_var!();
                 let len = variable.as_bytes().len();
                 return variable.bytes()
                                .map(|b| b.to_string())
-                               .select(self.selection, len);
+                               .select(self.selection.clone(), len);
             },
             "chars" => {
                 let variable = resolve_var!();
                 let len = variable.chars().count();
                 return variable.chars()
                                .map(|c| c.to_string())
-                               .select(self.selection, len);
+                               .select(self.selection.clone(), len);
             },
             _ => {
                 let stderr = io::stderr();
@@ -443,9 +456,9 @@ impl<'a> StringMethod<'a> {
             "join" => {
                 let pattern = expand_string(self.pattern, expand, false).join(" ");
                 if let Some(array) = (expand.array)(self.variable, Select::All) {
-                    slice(output, array.join(&pattern), self.selection);
+                    slice(output, array.join(&pattern), self.selection.clone());
                 } else if is_expression(self.variable) {
-                    slice(output, expand_string(self.variable, expand, false).join(&pattern), self.selection);
+                    slice(output, expand_string(self.variable, expand, false).join(&pattern), self.selection.clone());
                 }
             },
             "len" => {
@@ -1436,11 +1449,24 @@ mod tests {
             WordToken::ArrayVariable("array", false, Select::Range(Range::inclusive(Index::new(0),
                                                                                     Index::new(3)))),
             WordToken::Whitespace(" "),
-            WordToken::ArrayVariable("array", false, Select::None),
+            WordToken::ArrayVariable("array", false, Select::Key(Key{key: "abc".into()})),
             WordToken::Whitespace(" "),
             WordToken::ArrayVariable("array", false, Select::Range(Range::to(Index::new(3)))),
             WordToken::Whitespace(" "),
             WordToken::ArrayVariable("array", false, Select::Range(Range::from(Index::new(3)))),
+        ];
+        compare(input, expected);
+    }
+
+    #[test]
+    fn string_keys() {
+        let input = "@array['key'] @array[key] @array[]";
+        let expected = vec![
+            WordToken::ArrayVariable("array", false, Select::Key(Key{key: "key".into()})),
+            WordToken::Whitespace(" "),
+            WordToken::ArrayVariable("array", false, Select::Key(Key{key: "key".into()})),
+            WordToken::Whitespace(" "),
+            WordToken::ArrayVariable("array", false, Select::Key(Key{key: "".into()})),
         ];
         compare(input, expected);
     }
