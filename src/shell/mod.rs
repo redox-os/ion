@@ -40,7 +40,7 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process;
-use std::sync::mpsc::Receiver;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use types::*;
@@ -67,9 +67,6 @@ pub struct Shell<'a> {
     pub previous_job: u32,
     /// Contains all the boolean flags that control shell behavior.
     pub flags: u8,
-    /// When a signal is received in the main thread's event loop, the signal will be sent to this receiver. The shell
-    /// will check this receiver at certain key points throughout the shell's lifetime.
-    pub signals: Receiver<i32>,
     /// A temporary field for storing foreground PIDs used by the pipeline execution.
     foreground: Vec<u32>,
     /// Contains information on all of the active background processes that are being managed by the shell.
@@ -83,8 +80,7 @@ pub struct Shell<'a> {
 impl<'a> Shell<'a> {
     /// Panics if DirectoryStack construction fails
     pub fn new (
-        builtins: &'a FnvHashMap<&'static str, Builtin>,
-        signals: Receiver<i32>
+        builtins: &'a FnvHashMap<&'static str, Builtin>
     ) -> Shell<'a> {
         Shell {
             builtins: builtins,
@@ -96,12 +92,21 @@ impl<'a> Shell<'a> {
             previous_job: !0,
             previous_status: 0,
             flags: 0,
-            signals,
             foreground: Vec::new(),
             background: Arc::new(Mutex::new(Vec::new())),
             break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new())
         }
+    }
+
+    pub fn next_signal(&self) -> Option<i32> {
+        for sig in 0..32 {
+            if signals::PENDING.fetch_and(!(1 << sig), Ordering::SeqCst) & (1 << sig) == 1 << sig {
+                return Some(sig);
+            }
+        }
+
+        None
     }
 
     pub fn exit(&mut self, status: i32) -> ! {

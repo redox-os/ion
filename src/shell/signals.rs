@@ -1,6 +1,8 @@
 //! This module contains all of the code that manages signal handling in the shell. Primarily, this will be used to
 //! block signals in the shell at startup, and unblock signals for each of the forked children of the shell.
 
+use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+
 use sys;
 
 #[cfg(all(unix, not(target_os = "redox")))]
@@ -8,6 +10,8 @@ pub use self::unix::*;
 
 #[cfg(target_os = "redox")]
 pub use self::redox::*;
+
+pub static PENDING: AtomicUsize = ATOMIC_USIZE_INIT;
 
 #[cfg(all(unix, not(target_os = "redox")))]
 mod unix {

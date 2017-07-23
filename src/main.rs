@@ -36,31 +36,16 @@ mod shell;
 mod ascii_helpers;
 
 use builtins::Builtin;
-use shell::{Shell, Binary};
-use std::sync::mpsc;
-use std::{thread, time};
-
-static mut SIGNALS_TX: *const mpsc::Sender<i32> = 0 as *const mpsc::Sender<i32>;
+use shell::{Shell, Binary, signals};
+use std::sync::atomic::Ordering;
 
 extern "C" fn handler(signal: i32) {
-    let signals_tx = unsafe { SIGNALS_TX };
-    if signals_tx as usize != 0 {
-        let _ = unsafe { (*signals_tx).send(signal) };
+    if signal < 32 {
+        signals::PENDING.fetch_or(1 << signal, Ordering::SeqCst);
     }
-}
-
-fn inner_main(sigint_rx : mpsc::Receiver<i32>) {
-    let builtins = Builtin::map();
-    let shell = Shell::new(&builtins, sigint_rx);
-    shell.main();
 }
 
 fn main() {
-    let (signals_tx, signals_rx) = mpsc::channel();
-    unsafe {
-        SIGNALS_TX = Box::into_raw(Box::new(signals_tx));
-    }
-
     let _ = sys::signal(sys::SIGHUP, handler);
     let _ = sys::signal(sys::SIGINT, handler);
     let _ = sys::signal(sys::SIGTERM, handler);
@@ -71,8 +56,7 @@ fn main() {
         }
     }
 
-    thread::spawn(move || inner_main(signals_rx));
-    loop {
-        thread::sleep(time::Duration::new(1, 0));
-    }
+    let builtins = Builtin::map();
+    let shell = Shell::new(&builtins);
+    shell.main();
 }
