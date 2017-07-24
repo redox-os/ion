@@ -56,16 +56,10 @@ redox_syscall = "0.1"
 ## *nix Dependencies (Linux, Mac OS, BSDs)
 
 [target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
-# Used by `tokio-signal`/`tokio-core` for creating zero-allocation streams of future data.
-futures = "0.1"
 # Required to access some *nix-specific syscalls for signals/job control.
 libc = "0.2"
 # A higher level abstraction of libc-acquired syscalls for signals/job control.
 nix = "0.8"
-# Provides the core event loop for a tokio solution.
-tokio-core = "0.1"
-# Provides a high level abstraction to watching signals with tokio.
-tokio-signal = "0.1"
 # Obtains user directories
 users = "0.5.1"
 
@@ -79,3 +73,6 @@ version_check = "0.1.3"
 # rustflags = [ "-C", "target-cpu=native"]
 lto = true
 panic = "abort"
+
+[replace]
+"termion:1.4.0" = { git = "https://github.com/redox-os/termion.git" }

@@ -1,6 +1,4 @@
-#[cfg(all(unix, not(target_os = "redox")))] use libc::{self, pid_t, c_int};
-#[cfg(all(unix, not(target_os = "redox")))] use nix::sys::signal::{self, Signal};
-#[cfg(all(unix, not(target_os = "redox")))] use nix::unistd;
+#[cfg(all(unix, not(target_os = "redox")))] use libc::{self, pid_t};
 use std::fmt;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
@@ -9,19 +7,13 @@ use super::foreground::{ForegroundSignals, BackgroundResult};
 use super::signals;
 use super::status::*;
 use super::Shell;
-use super::pipe::crossplat::get_pid;
+use sys;
 
-#[cfg(all(unix, not(target_os = "redox")))]
 /// When given a process ID, that process's group will be assigned as the foreground process group.
 pub fn set_foreground_as(pid: u32) {
     signals::block();
-    let _ = unistd::tcsetpgrp(0, pid as i32);
+    let _ = sys::tcsetpgrp(0, pid);
     signals::unblock();
-}
-
-#[cfg(target_os = "redox")]
-pub fn set_foreground_as(pid: u32) {
-    // TODO
 }
 
 pub trait JobControl {
@@ -192,19 +184,18 @@ impl<'a> JobControl for Shell<'a> {
             }
         };
         // Have the shell reclaim the TTY
-        set_foreground_as(get_pid());
+        set_foreground_as(sys::getpid().unwrap());
         status
     }
 
-    #[cfg(all(unix, not(target_os = "redox")))]
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
     fn wait_for_background(&mut self) {
         'event: loop {
             for process in self.background.lock().unwrap().iter() {
                 if let ProcessState::Running = process.state {
-                    if let Ok(signal) = self.signals.try_recv() {
-                        if signal != libc::SIGTSTP {
+                    while let Some(signal) = self.next_signal() {
+                        if signal != sys::SIGTSTP {
                             self.background_send(signal);
                             break 'event
                         }
@@ -216,11 +207,6 @@ impl<'a> JobControl for Shell<'a> {
             return
         }
         self.exit(TERMINATED);
-    }
-
-    #[cfg(target_os = "redox")]
-    fn wait_for_background(&mut self) {
-        // TODO: Redox doesn't support signals yet.
     }
 
     #[cfg(all(unix, not(target_os = "redox")))]
@@ -287,7 +273,6 @@ impl<'a> JobControl for Shell<'a> {
         use std::os::unix::process::ExitStatusExt;
         use std::process::ExitStatus;
         use syscall;
-        use syscall::flag::WNOHANG;
 
         loop {
             let mut status_raw = 0;
@@ -314,40 +299,28 @@ impl<'a> JobControl for Shell<'a> {
         }
     }
 
-    #[cfg(all(unix, not(target_os = "redox")))]
     /// Send a kill signal to all running foreground tasks.
     fn foreground_send(&self, signal: i32) {
-        for process in self.foreground.iter() {
-            let _ = signal::kill(-(*process as pid_t), Signal::from_c_int(signal as c_int).ok());
+        for &process in self.foreground.iter() {
+            let _ = sys::killpg(process, signal);
         }
     }
 
-    #[cfg(target_os = "redox")]
-    fn foreground_send(&self, _: i32) {
-        // TODO: Redox doesn't support signals yet
-    }
-
-    #[cfg(all(unix, not(target_os = "redox")))]
     /// Send a kill signal to all running background tasks.
     fn background_send(&self, signal: i32) {
-        if signal == libc::SIGHUP {
+        if signal == sys::SIGHUP {
             for process in self.background.lock().unwrap().iter() {
                 if !process.ignore_sighup {
-                    let _ = signal::kill(-(process.pid as pid_t), Signal::from_c_int(signal as c_int).ok());
+                    let _ = sys::killpg(process.pid, signal);
                 }
             }
         } else {
             for process in self.background.lock().unwrap().iter() {
                 if let ProcessState::Running = process.state {
-                    let _ = signal::kill(-(process.pid as pid_t), Signal::from_c_int(signal as c_int).ok());
+                    let _ = sys::killpg(process.pid, signal);
                 }
             }
         }
-    }
-
-    #[cfg(target_os = "redox")]
-    fn background_send(&self, _: i32) {
-        // TODO: Redox doesn't support signals yet
     }
 
     fn send_to_background(&mut self, pid: u32, state: ProcessState, command: String) {
@@ -372,17 +345,10 @@ impl<'a> JobControl for Shell<'a> {
 
     /// If a SIGTERM is received, a SIGTERM will be sent to all background processes
     /// before the shell terminates itself.
-    #[cfg(all(unix, not(target_os = "redox")))]
     fn handle_signal(&self, signal: i32) -> bool {
-        if signal == libc::SIGTERM || signal == libc::SIGHUP {
+        if signal == sys::SIGTERM || signal == sys::SIGHUP {
             self.background_send(signal);
             true
         } else { false }
-    }
-
-    #[cfg(target_os = "redox")]
-    fn handle_signal(&self, _: i32) -> bool {
-        // TODO: Redox doesn't support signals yet;
-        false
     }
 }

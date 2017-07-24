@@ -16,13 +16,18 @@ extern crate smallvec;
 extern crate smallstring;
 extern crate calc;
 extern crate regex;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate futures;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate libc;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate nix;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate tokio_core;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate tokio_signal;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate users as users_unix;
 #[cfg(target_os = "redox")] extern crate syscall;
+
+#[cfg(target_os = "redox")]
+#[path="sys/redox.rs"]
+mod sys;
+
+#[cfg(unix)]
+#[path="sys/unix.rs"]
+mod sys;
 
 #[macro_use] mod types;
 #[macro_use] mod parser;
@@ -32,24 +37,26 @@ mod ascii_helpers;
 
 use builtins::Builtin;
 use shell::{Shell, Binary, signals};
-use std::sync::mpsc;
-use std::thread;
+use std::sync::atomic::Ordering;
 
-fn inner_main(sigint_rx : mpsc::Receiver<i32>) {
+extern "C" fn handler(signal: i32) {
+    if signal < 32 {
+        signals::PENDING.fetch_or(1 << signal, Ordering::SeqCst);
+    }
+}
+
+fn main() {
+    let _ = sys::signal(sys::SIGHUP, handler);
+    let _ = sys::signal(sys::SIGINT, handler);
+    let _ = sys::signal(sys::SIGTERM, handler);
+
+    if let Ok(pid) = sys::getpid() {
+        if sys::setpgid(0, pid).is_ok() {
+            let _ = sys::tcsetpgrp(0, pid);
+        }
+    }
+
     let builtins = Builtin::map();
-    let shell = Shell::new(&builtins, sigint_rx);
+    let shell = Shell::new(&builtins);
     shell.main();
-}
-
-#[cfg(not(target_os = "redox"))]
-fn main() {
-    let (signals_tx, signals_rx) = mpsc::channel();
-    thread::spawn(move || inner_main(signals_rx));
-    signals::event_loop(signals_tx);
-}
-
-#[cfg(target_os = "redox")]
-fn main() {
-    let (_, signals_rx) = mpsc::channel();
-    inner_main(signals_rx);
 }

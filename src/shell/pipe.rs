@@ -1,6 +1,4 @@
-#[cfg(all(unix, not(target_os = "redox")))] use libc;
-#[cfg(target_os = "redox")] use syscall;
-use std::io::{self, Write};
+use std::io::{self, Error, Write};
 use std::process::{Stdio, Command};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::os::unix::process::CommandExt;
@@ -14,76 +12,20 @@ use super::status::*;
 use super::signals::{self, SignalHandler};
 use parser::peg::{Pipeline, Input, RedirectFrom};
 use sys;
-use self::crossplat::*;
 
-/// The `crossplat` module contains components that are meant to be abstracted across
-/// different platforms
-#[cfg(not(target_os = "redox"))]
-pub mod crossplat {
-    use nix::{fcntl, unistd};
-    use parser::peg::{RedirectFrom};
-    use std::fs::File;
-    use std::io::{Write, Error};
-    use std::os::unix::io::{IntoRawFd, FromRawFd};
-    use std::process::{Stdio, Command};
-
-    /// When given a process ID, that process's group will be assigned as the foreground process group.
-    pub fn set_foreground(pid: u32) {
-        let _ = unistd::tcsetpgrp(0, pid as i32);
-    }
-
-    pub fn get_pid() -> u32 {
-        unistd::getpid() as u32
-    }
-
-    /// Create a File from a byte slice that will echo the contents of the slice
-    /// when read. This can be called with owned or borrowed strings
-    pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<File, Error> {
-        let (reader, writer) = unistd::pipe2(fcntl::O_CLOEXEC)?;
-        let mut infile = File::from_raw_fd(writer);
-        // Write the contents; make sure to use write_all so that we block until
-        // the entire string is written
-        infile.write_all(input.as_ref())?;
-        infile.flush()?;
-        // `infile` currently owns the writer end RawFd. If we just return the reader end
-        // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
-        Ok(File::from_raw_fd(reader))
-    }
-
-}
-
-#[cfg(target_os = "redox")]
-pub mod crossplat {
-    use parser::peg::{RedirectFrom};
-    use std::fs::File;
-    use std::io::{self, Error, Write};
-    use std::os::unix::io::{IntoRawFd, FromRawFd};
-    use std::process::{Stdio, Command};
-    use syscall;
-
-    pub fn set_foreground(pid: u32) {
-        // TODO
-    }
-
-    pub fn get_pid() -> u32 {
-        syscall::getpid().unwrap() as u32
-    }
-
-    pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<File, Error> {
-        let mut fds: [usize; 2] = [0; 2];
-        syscall::call::pipe2(&mut fds, syscall::flag::O_CLOEXEC)
-                      .map_err(|e| Error::from_raw_os_error(e.errno))?;
-        let (reader, writer) = (fds[0], fds[1]);
-        let mut infile = File::from_raw_fd(writer);
-        // Write the contents; make sure to use write_all so that we block until
-        // the entire string is written
-        infile.write_all(input.as_ref())?;
-        infile.flush()?;
-        // `infile` currently owns the writer end RawFd. If we just return the reader end
-        // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
-        Ok(File::from_raw_fd(reader))
-    }
-
+/// Create an instance of Stdio from a byte slice that will echo the
+/// contents of the slice when read. This can be called with owned or
+/// borrowed strings
+pub fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<Stdio, Error> {
+    let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)?;
+    let mut infile = File::from_raw_fd(writer);
+    // Write the contents; make sure to use write_all so that we block until
+    // the entire string is written
+    infile.write_all(input.as_ref())?;
+    infile.flush()?;
+    // `infile` currently owns the writer end RawFd. If we just return the reader end
+    // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
+    Ok(Stdio::from_raw_fd(reader))
 }
 
 /// This function serves three purposes:
@@ -147,7 +89,7 @@ impl<'a> PipelineExecution for Shell<'a> {
             Some(Input::HereString(ref mut string)) => {
                 if let Some(command) = piped_commands.first_mut() {
                     if !string.ends_with('\n') { string.push('\n'); }
-                    match unsafe { crossplat::stdin_of(&string) } {
+                    match stdin_of(string) {
                         Ok(stdio) => {
                             command.0.stdin(stdio);
                         },
@@ -207,7 +149,7 @@ impl<'a> PipelineExecution for Shell<'a> {
             // Execute each command in the pipeline, giving each command the foreground.
             let exit_status = pipe(self, piped_commands, true);
             // Set the shell as the foreground process again to regain the TTY.
-            set_foreground(get_pid());
+            let _ = sys::tcsetpgrp(0, sys::getpid().unwrap());
             exit_status
         }
     }
@@ -265,7 +207,7 @@ pub fn pipe (
                                             if pgid == 0 {
                                                 pgid = child.id();
                                                 if foreground {
-                                                    set_foreground(pgid);
+                                                    let _ = sys::tcsetpgrp(0, pgid);
                                                 }
                                             }
                                             shell.foreground.push(child.id());
@@ -289,7 +231,7 @@ pub fn pipe (
                                             if pgid == 0 {
                                                 pgid = pid;
                                                 if foreground {
-                                                    set_foreground(pgid);
+                                                    let _ = sys::tcsetpgrp(0, pgid);
                                                 }
                                             }
                                             shell.foreground.push(pid);
@@ -373,14 +315,8 @@ pub fn pipe (
     previous_status
 }
 
-#[cfg(all(unix, not(target_os = "redox")))]
 fn terminate_fg(shell: &mut Shell) {
-    shell.foreground_send(libc::SIGTERM);
-}
-
-#[cfg(target_os = "redox")]
-fn terminate_fg(shell: &mut Shell) {
-    shell.foreground_send(syscall::SIGTERM as i32);
+    shell.foreground_send(sys::SIGTERM);
 }
 
 fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
@@ -395,13 +331,9 @@ fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
             } {
                 Ok(child) => {
                     if foreground {
-                        set_foreground(child.id());
+                        let _ = sys::tcsetpgrp(0, child.id());
                     }
-                    shell.watch_foreground(
-                        child.id(),
-                        child.id(),
-                        || job.long(),
-                        |_| ())
+                    shell.watch_foreground(child.id(), child.id(), || job.long(), |_| ())
                 },
                 Err(e) => {
                     if e.kind() == io::ErrorKind::NotFound {
@@ -423,6 +355,7 @@ fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
                 Ok(Fork::Parent(pid)) => {
                     if foreground {
                        set_foreground(pid);
+                        let _ = sys::tcsetpgrp(0, child.id());
                     }
                     shell.watch_foreground(pid, pid, || job.long(), |_| ())
                 },
