@@ -51,7 +51,7 @@ mod unix {
 }
 
 use std::process::{Command, exit};
-use super::job::JobKind;
+use super::job::{RefinedJob, JobKind};
 use super::job_control::{JobControl, ProcessState};
 use super::Shell;
 use super::signals;
@@ -62,7 +62,7 @@ use super::pipe::pipe;
 /// the given commands in the child fork.
 pub fn fork_pipe (
     shell: &mut Shell,
-    commands: Vec<(Command, JobKind)>,
+    commands: Vec<(RefinedJob, JobKind)>,
     command_name: String
 ) -> i32 {
     match ion_fork() {

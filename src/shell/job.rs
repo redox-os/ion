@@ -1,10 +1,13 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::os::unix::io::{IntoRawFd, RawFd, FromRawFd};
 
 //use glob::glob;
 use parser::{expand_string, ExpanderFunctions};
 use parser::peg::RedirectFrom;
 use smallstring::SmallString;
 use types::*;
+use builtins::Builtin;
+use shell::Shell;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum JobKind { And, Background, Last, Or, Pipe(RedirectFrom) }
@@ -16,51 +19,119 @@ pub struct Job {
     pub kind: JobKind,
 }
 
+/// This represents a job that has been processed and expanded to be run
+/// as part of some pipeline
+pub enum RefinedJob {
+    /// An external program that is executed by this shell
+    External(Command),
+    /// A procedure embedded into Ion
+    Builtin {
+        /// Name of the procedure
+        name: Identifier,
+        /// Arguments to pass in to the procedure
+        args: Array,
+        /// A file corresponding to the standard input for this builtin
+        stdin: Option<RawFd>,
+        /// A file corresponding to the standard output for this builtin
+        stdout: Option<RawFd>,
+        /// A file corresponding to the standard error for this builtin
+        stderr: Option<RawFd>,
+    }
+}
+
+macro_rules! set_field {
+    ($self:expr, $field:ident, $arg:expr) => {
+        match *$self {
+            RefinedJob::External(ref mut command) => {
+                unsafe {
+                    command.$field(Stdio::from_raw_fd($arg));
+                }
+            }
+            RefinedJob::Builtin { ref mut $field,  .. } => {
+                *$field = Some($arg);
+            }
+        }
+    }
+}
+
+impl RefinedJob {
+
+    pub fn builtin(name: Identifier, args: Array) -> Self {
+        RefinedJob::Builtin {
+            name,
+            args,
+            stdin: None,
+            stdout: None,
+            stderr: None
+        }
+    }
+
+    pub fn stdin<T: IntoRawFd>(&mut self, fd: T) {
+        set_field!(self, stdin, fd.into_raw_fd());
+    }
+
+    pub fn stdout<T: IntoRawFd>(&mut self, fd: T) {
+        set_field!(self, stdout, fd.into_raw_fd());
+    }
+
+    pub fn stderr<T: IntoRawFd>(&mut self, fd: T) {
+        set_field!(self, stderr, fd.into_raw_fd());
+    }
+
+    /// Returns a short description of this job: often just the command
+    /// or builtin name
+    pub fn short(&self) -> String {
+        match *self {
+            RefinedJob::External(cmd) => {
+                format!("{:?}", cmd).split('"').nth(1).unwrap_or("").to_string()
+            },
+            RefinedJob::Builtin { name, .. } => {
+                name.into()
+            }
+        }
+    }
+
+    /// Returns a long description of this job: the commands and arguments
+    pub fn long(&self) -> String {
+        match *self {
+            RefinedJob::External(cmd) => {
+                let command = format!("{:?}", cmd);
+                let mut arg_iter = command.split_whitespace();
+                let command = arg_iter.next().unwrap();
+                let mut output = String::from(&command[1..command.len()-1]);
+                for argument in arg_iter {
+                    output.push(' ');
+                    if argument.len() > 2 {
+                        output.push_str(&argument[1..argument.len()-1]);
+                    } else {
+                        output.push_str(&argument);
+                    }
+                }
+                output
+            },
+            RefinedJob::Builtin { name, args, .. } => {
+                format!("{} {}", name, args.join(" "))
+            }
+        }
+    }
+
+}
+
 impl Job {
     pub fn new(args: Array, kind: JobKind) -> Self {
         let command = SmallString::from_str(&args[0]);
-        Job {
-            command: command,
-            args: args,
-            kind: kind,
-        }
+        Job { command, args, kind }
     }
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
     pub fn expand(&mut self, expanders: &ExpanderFunctions) {
-        use smallvec::SmallVec;
-
-        let mut expanded = SmallVec::new();
+        let mut expanded = Array::new();
         expanded.grow(self.args.len());
-        {
-            for arg in self.args.drain().flat_map(|argument| expand_string(&argument, expanders, false)) {
-
-                expanded.push(arg);
-            }
-        }
-
+        expanded.extend(self.args.drain().flat_map(|arg| {
+            expand_string(&arg, expanders, false)
+        }));
         self.args = expanded;
-        self.command = self.args.first().map_or("".into(), |c| c.clone().into());
     }
 
-    pub fn build_command_external(&mut self) -> Command {
-        let mut command = Command::new(&self.command);
-        for arg in self.args.drain().skip(1) {
-            command.arg(arg);
-        }
-        command
-    }
-
-    pub fn build_command_builtin(&mut self) -> Command {
-        use std::env;
-        let process = env::current_exe().unwrap();
-        let mut command = Command::new(process);
-        command.arg("-c");
-        command.arg(&self.command);
-        for arg in self.args.drain().skip(1) {
-            command.arg(arg);
-        }
-        command
-    }
 }
