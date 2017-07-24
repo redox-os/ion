@@ -1,13 +1,11 @@
 use std::process::{Command, Stdio};
-use std::os::unix::io::{IntoRawFd, RawFd, FromRawFd};
+use std::os::unix::io::{RawFd, FromRawFd};
 
 //use glob::glob;
 use parser::{expand_string, ExpanderFunctions};
 use parser::peg::RedirectFrom;
 use smallstring::SmallString;
 use types::*;
-use builtins::Builtin;
-use shell::Shell;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum JobKind { And, Background, Last, Or, Pipe(RedirectFrom) }
@@ -17,6 +15,25 @@ pub struct Job {
     pub command: Identifier,
     pub args: Array,
     pub kind: JobKind,
+}
+
+impl Job {
+    pub fn new(args: Array, kind: JobKind) -> Self {
+        let command = SmallString::from_str(&args[0]);
+        Job { command, args, kind }
+    }
+
+    /// Takes the current job's arguments and expands them, one argument at a
+    /// time, returning a new `Job` with the expanded arguments.
+    pub fn expand(&mut self, expanders: &ExpanderFunctions) {
+        let mut expanded = Array::new();
+        expanded.grow(self.args.len());
+        expanded.extend(self.args.drain().flat_map(|arg| {
+            expand_string(&arg, expanders, false)
+        }));
+        self.args = expanded;
+    }
+
 }
 
 /// This represents a job that has been processed and expanded to be run
@@ -113,25 +130,6 @@ impl RefinedJob {
                 format!("{} {}", name, args.join(" "))
             }
         }
-    }
-
-}
-
-impl Job {
-    pub fn new(args: Array, kind: JobKind) -> Self {
-        let command = SmallString::from_str(&args[0]);
-        Job { command, args, kind }
-    }
-
-    /// Takes the current job's arguments and expands them, one argument at a
-    /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand(&mut self, expanders: &ExpanderFunctions) {
-        let mut expanded = Array::new();
-        expanded.grow(self.args.len());
-        expanded.extend(self.args.drain().flat_map(|arg| {
-            expand_string(&arg, expanders, false)
-        }));
-        self.args = expanded;
     }
 
 }

@@ -16,6 +16,10 @@ pub const SIGCONT: i32 = libc::SIGCONT;
 pub const SIGSTOP: i32 = libc::SIGSTOP;
 pub const SIGTSTP: i32 = libc::SIGTSTP;
 
+pub const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
+pub const STDERR_FILENO: i32 = libc::STDERR_FILENO;
+pub const STDIN_FILENO: i32 = libc::STDIN_FILENO;
+
 pub unsafe fn fork() -> io::Result<u32> {
     cvt(libc::fork()).map(|pid| pid as u32)
 }
@@ -52,6 +56,10 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
 
 pub fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
     cvt(unsafe { libc::tcsetpgrp(fd as c_int, pgrp as pid_t) }).and(Ok(()))
+}
+
+pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
+    cvt(unsafe { libc::dup2(old, new) })
 }
 
 // Support functions for converting libc return values to io errors {

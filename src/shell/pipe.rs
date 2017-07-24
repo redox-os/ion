@@ -1,5 +1,5 @@
 use std::io::{self, Error, Write};
-use std::process::{Stdio, Command};
+use std::process::Command;
 use std::os::unix::io::{FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::fs::{File, OpenOptions};
@@ -12,6 +12,14 @@ use super::status::*;
 use super::signals::{self, SignalHandler};
 use parser::peg::{Pipeline, Input, RedirectFrom};
 use sys;
+
+/// Use dup2 to replace `old` with `new` using `old`s file descriptor ID
+pub fn redir(old: RawFd, new: RawFd) {
+    if let Err(e) = sys::dup2(old, new) {
+        eprintln!("ion: could not duplicate {} to {}: {}", old, new, e);
+    }
+}
+
 
 /// Create an OS pipe and write the contents of a byte slice to one end
 /// such that reading from this pipe will produce the byte slice. Return
@@ -223,13 +231,25 @@ pub fn pipe (
                                         }
                                     }
                                 }
-                                RefinedJob::Builtin { ref name, ref args, .. } =>
+                                RefinedJob::Builtin { ref name,
+                                                      ref args,
+                                                      ref stdout,
+                                                      ref stderr,
+                                                      ref stdin, } =>
                                 {
                                     match unsafe { sys::fork() } {
                                         Ok(0) => {
                                             signals::unblock();
                                             create_process_group(pgid);
-                                            unimplemented!()
+                                            let args: Vec<&str> = args
+                                                .iter()
+                                                .map(|x| x as &str).collect();
+                                            builtin(shell,
+                                                    name,
+                                                    &args,
+                                                    *stdout,
+                                                    *stderr,
+                                                    *stdin);
                                         },
                                         Ok(pid) => {
                                             if pgid == 0 {
@@ -323,8 +343,8 @@ pub fn pipe (
 fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
     let short = job.short();
     let long = job.long();
-    match job {
-        &mut RefinedJob::External(ref mut command) => {
+    match *job {
+        RefinedJob::External(ref mut command) => {
             match {
                 command.before_exec(move || {
                     signals::unblock();
@@ -348,13 +368,13 @@ fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
                 }
             }
         }
-        &mut RefinedJob::Builtin { ref name, ref args, .. } =>
-        {
+        RefinedJob::Builtin { ref name, ref args, ref stdin, ref stdout, ref stderr } => {
             match unsafe { sys::fork() } {
                 Ok(0) => {
                     signals::unblock();
                     create_process_group(0);
-                    unimplemented!()
+                    let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
+                    builtin(shell, name, &args, *stdout, *stderr, *stdin)
                 },
                 Ok(pid) => {
                     if foreground {
@@ -396,4 +416,36 @@ fn wait (
             children.remove(id);
         }
     })
+}
+
+
+/// Execute a builtin in the current process
+/// # Args
+/// * `shell`: A `Shell` that forwards relevant information to the builtin
+/// * `name`: Name of the builtin to execute.
+/// * `stdin`, `stdout`, `stderr`: File descriptors that will replace the respective
+///   standard streams if they are not `None`
+/// # Preconditions
+/// - `shell.builtins.contains_key(name)`; otherwise this function will panic
+fn builtin(
+    shell: &mut Shell,
+    name: &str,
+    args: &[&str],
+    stdout: Option<RawFd>,
+    stderr: Option<RawFd>,
+    stdin: Option<RawFd>,
+) -> i32 {
+    if let Some(fd) = stdout {
+        redir(fd, sys::STDOUT_FILENO);
+    }
+    if let Some(fd) = stderr {
+        redir(fd, sys::STDERR_FILENO);
+    }
+    if let Some(fd) = stdin {
+        redir(fd, sys::STDIN_FILENO);
+    }
+    // The precondition for this function asserts that there exists some `builtin`
+    // in `shell` named `name`, so we unwrap here
+    let builtin = shell.builtins.get(name).unwrap();
+    (builtin.main)(args, shell)
 }
