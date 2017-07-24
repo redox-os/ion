@@ -53,8 +53,6 @@ impl<'a> PipelineExecution for Shell<'a> {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
         let background_string = check_if_background_job(&pipeline, self.flags & PRINT_COMMS != 0);
 
-        println!("Pipeline: {:?}", pipeline);
-
         let mut piped_commands: Vec<(RefinedJob, JobKind)> = {
             pipeline.jobs
                 .drain(..)
