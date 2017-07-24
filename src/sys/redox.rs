@@ -51,7 +51,7 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
 
 pub fn ignore(signal: i32) -> io::Result<()> {
     let new = SigAction {
-        sa_handler: syscall::SIG_IGN,
+        sa_handler: unsafe { mem::transmute(syscall::SIG_IGN) },
         sa_mask: [0; 2],
         sa_flags: 0
     };
