@@ -49,6 +49,7 @@ fn main() {
     let _ = sys::signal(sys::SIGHUP, handler);
     let _ = sys::signal(sys::SIGINT, handler);
     let _ = sys::signal(sys::SIGTERM, handler);
+    let _ = sys::ignore(sys::SIGTTOU);
 
     if let Ok(pid) = sys::getpid() {
         if sys::setpgid(0, pid).is_ok() {
