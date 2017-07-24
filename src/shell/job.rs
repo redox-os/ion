@@ -66,27 +66,27 @@ impl RefinedJob {
         }
     }
 
-    pub fn stdin<T: IntoRawFd>(&mut self, fd: T) {
-        set_field!(self, stdin, fd.into_raw_fd());
+    pub fn stdin(&mut self, fd: RawFd) {
+        set_field!(self, stdin, fd);
     }
 
-    pub fn stdout<T: IntoRawFd>(&mut self, fd: T) {
-        set_field!(self, stdout, fd.into_raw_fd());
+    pub fn stdout(&mut self, fd: RawFd) {
+        set_field!(self, stdout, fd);
     }
 
-    pub fn stderr<T: IntoRawFd>(&mut self, fd: T) {
-        set_field!(self, stderr, fd.into_raw_fd());
+    pub fn stderr(&mut self, fd: RawFd) {
+        set_field!(self, stderr, fd);
     }
 
     /// Returns a short description of this job: often just the command
     /// or builtin name
     pub fn short(&self) -> String {
         match *self {
-            RefinedJob::External(cmd) => {
+            RefinedJob::External(ref cmd) => {
                 format!("{:?}", cmd).split('"').nth(1).unwrap_or("").to_string()
             },
-            RefinedJob::Builtin { name, .. } => {
-                name.into()
+            RefinedJob::Builtin { ref name, .. } => {
+                name.to_string()
             }
         }
     }
@@ -94,7 +94,7 @@ impl RefinedJob {
     /// Returns a long description of this job: the commands and arguments
     pub fn long(&self) -> String {
         match *self {
-            RefinedJob::External(cmd) => {
+            RefinedJob::External(ref cmd) => {
                 let command = format!("{:?}", cmd);
                 let mut arg_iter = command.split_whitespace();
                 let command = arg_iter.next().unwrap();
@@ -109,7 +109,7 @@ impl RefinedJob {
                 }
                 output
             },
-            RefinedJob::Builtin { name, args, .. } => {
+            RefinedJob::Builtin { ref name, ref args, .. } => {
                 format!("{} {}", name, args.join(" "))
             }
         }
