@@ -50,6 +50,10 @@ fn main() {
     let _ = sys::signal(sys::SIGINT, handler);
     let _ = sys::signal(sys::SIGTERM, handler);
 
+    // This will block SIGTSTP, SIGTTOU, SIGTTIN, and SIGCHLD, which is required
+    // for this shell to manage its own process group / children / etc.
+    signals::block();
+
     if let Ok(pid) = sys::getpid() {
         if sys::setpgid(0, pid).is_ok() {
             let _ = sys::tcsetpgrp(0, pid);
