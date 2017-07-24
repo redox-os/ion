@@ -12,7 +12,6 @@ pub const SIGTERM: i32 = syscall::SIGTERM as i32;
 pub const SIGCONT: i32 = syscall::SIGCONT as i32;
 pub const SIGSTOP: i32 = syscall::SIGSTOP as i32;
 pub const SIGTSTP: i32 = syscall::SIGTSTP as i32;
-pub const SIGTTOU: i32 = syscall::SIGTTOU as i32;
 
 pub unsafe fn fork() -> io::Result<u32> {
     cvt(syscall::clone(0)).map(|pid| pid as u32)
@@ -47,15 +46,6 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
         sa_flags: 0
     };
     cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
-}
-
-pub fn ignore(signal: i32) -> io::Result<()> {
-    let new = SigAction {
-        sa_handler: unsafe { mem::transmute(syscall::SIG_IGN) },
-        sa_mask: [0; 2],
-        sa_flags: 0
-    };
-    cvt(syscall::sigaction(signal as usize, Some(&new), None))
 }
 
 pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {

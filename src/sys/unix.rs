@@ -15,7 +15,6 @@ pub const SIGTERM: i32 = libc::SIGTERM;
 pub const SIGCONT: i32 = libc::SIGCONT;
 pub const SIGSTOP: i32 = libc::SIGSTOP;
 pub const SIGTSTP: i32 = libc::SIGTSTP;
-pub const SIGTTOU: i32 = libc::SIGTTOU;
 
 pub unsafe fn fork() -> io::Result<u32> {
     cvt(libc::fork()).map(|pid| pid as u32)
@@ -45,14 +44,6 @@ pub fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
 
 pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     if unsafe { libc::signal(signal as c_int, handler as sighandler_t) } == libc::SIG_ERR {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
-}
-
-pub fn ignore(signal: i32) -> io::Result<()> {
-    if unsafe { libc::signal(signal as libc::c_int, libc::SIG_IGN) } == libc::SIG_ERR {
         Err(io::Error::last_os_error())
     } else {
         Ok(())
