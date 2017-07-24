@@ -5,7 +5,7 @@ pub fn create_process_group(pgid: u32) {
     let _ = sys::setpgid(0, pgid);
 }
 
-use std::process::{Command, exit};
+use std::process::exit;
 use super::job::{RefinedJob, JobKind};
 use super::job_control::{JobControl, ProcessState};
 use super::Shell;

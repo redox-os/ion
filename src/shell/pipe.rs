@@ -12,7 +12,6 @@ use super::status::*;
 use super::signals::{self, SignalHandler};
 use parser::peg::{Pipeline, Input, RedirectFrom};
 use sys;
-use types::Identifier;
 
 /// Create an OS pipe and write the contents of a byte slice to one end
 /// such that reading from this pipe will produce the byte slice. Return
@@ -53,6 +52,8 @@ pub trait PipelineExecution {
 impl<'a> PipelineExecution for Shell<'a> {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
         let background_string = check_if_background_job(&pipeline, self.flags & PRINT_COMMS != 0);
+
+        println!("Pipeline: {:?}", pipeline);
 
         let mut piped_commands: Vec<(RefinedJob, JobKind)> = {
             pipeline.jobs
@@ -118,22 +119,20 @@ impl<'a> PipelineExecution for Shell<'a> {
                     File::create(&stdout.file)
                 };
                 match file {
-                    Ok(f) => unsafe {
-                        match stdout.from {
-                            RedirectFrom::Both => {
-                                match f.try_clone() {
-                                    Ok(f_copy) => {
-                                        command.0.stdout(f.into_raw_fd());
-                                        command.0.stderr(f_copy.into_raw_fd());
-                                    },
-                                    Err(e) => {
-                                        eprintln!("ion: failed to redirect both stderr and stdout into file '{:?}'", f);
-                                    }
+                    Ok(f) => match stdout.from {
+                        RedirectFrom::Both => {
+                            match f.try_clone() {
+                                Ok(f_copy) => {
+                                    command.0.stdout(f.into_raw_fd());
+                                    command.0.stderr(f_copy.into_raw_fd());
+                                },
+                                Err(e) => {
+                                    eprintln!("ion: failed to redirect both stderr and stdout into file '{:?}': {}", f, e);
                                 }
-                            },
-                            RedirectFrom::Stderr => command.0.stderr(f.into_raw_fd()),
-                            RedirectFrom::Stdout => command.0.stdout(f.into_raw_fd()),
-                        }
+                            }
+                        },
+                        RedirectFrom::Stderr => command.0.stderr(f.into_raw_fd()),
+                        RedirectFrom::Stdout => command.0.stdout(f.into_raw_fd()),
                     },
                     Err(err) => {
                         let stderr = io::stderr();
@@ -198,9 +197,10 @@ pub fn pipe (
                     let mut pgid = 0; // 0 means the PGID is not set yet.
 
                     macro_rules! spawn_proc {
-                        ($cmd:expr) => {{
+                        ($cmd:expr) => {
+                            let short = $cmd.short();
                             match $cmd {
-                                &mut RefinedJob::External(ref mut command) => {
+                                RefinedJob::External(ref mut command) => {
                                     match {
                                         command.before_exec(move || {
                                             signals::unblock();
@@ -220,16 +220,12 @@ pub fn pipe (
                                         },
                                         Err(e) => {
                                             eprintln!("ion: failed to spawn `{}`: {}",
-                                                      $cmd.short(), e);
+                                                      short, e);
                                             return NO_SUCH_COMMAND
                                         }
                                     }
                                 }
-                                &mut RefinedJob::Builtin { ref name,
-                                                           ref args,
-                                                           stdin,
-                                                           stdout,
-                                                           stderr } =>
+                                RefinedJob::Builtin { ref name, ref args, .. } =>
                                 {
                                     match unsafe { sys::fork() } {
                                         Ok(0) => {
@@ -248,12 +244,14 @@ pub fn pipe (
                                             children.push(pid);
                                         },
                                         Err(e) => {
-                                            eprintln!("ion: failed to fork: {}", e);
+                                            eprintln!("ion: failed to fork {}: {}",
+                                                      short,
+                                                      e);
                                         }
                                     }
                                 }
                             }
-                        }};
+                        };
                     }
 
                     // Append other jobs until all piped jobs are running
@@ -277,7 +275,7 @@ pub fn pipe (
                                         };
                                         match temp.try_clone() {
                                             Err(e) => {
-                                                eprintln!("ion: failed to redirect stdout and stderr");
+                                                eprintln!("ion: failed to redirect stdout and stderr: {}", e);
                                             }
                                             Ok(duped) => {
                                                 parent.stderr(temp.into_raw_fd());
@@ -288,7 +286,7 @@ pub fn pipe (
                                 }
                             }
                         }
-                        spawn_proc!(&mut parent);
+                        spawn_proc!(parent);
                         remember.push(parent);
                         if let JobKind::Pipe(m) = ckind {
                             parent = child;
@@ -300,16 +298,15 @@ pub fn pipe (
                             // previous kind set to `And` after processing the
                             // initial pipeline
                             kind = ckind;
-                            spawn_proc!(&mut child);
+                            spawn_proc!(child);
                             remember.push(child);
                             break
                         }
                     }
-                    unimplemented!();
                     previous_kind = kind;
                     previous_status = wait(shell, children, remember);
                     if previous_status == TERMINATED {
-                        terminate_fg(shell);
+                        shell.foreground_send(sys::SIGTERM);
                         return previous_status;
                     }
                 }
@@ -323,10 +320,6 @@ pub fn pipe (
         }
     }
     previous_status
-}
-
-fn terminate_fg(shell: &mut Shell) {
-    shell.foreground_send(sys::SIGTERM);
 }
 
 fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
@@ -357,11 +350,7 @@ fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
                 }
             }
         }
-        &mut RefinedJob::Builtin { ref name,
-                                   ref args,
-                                   stdin,
-                                   stdout,
-                                   stderr } =>
+        &mut RefinedJob::Builtin { ref name, ref args, .. } =>
         {
             match unsafe { sys::fork() } {
                 Ok(0) => {
