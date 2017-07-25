@@ -75,17 +75,20 @@ impl QuoteTerminator {
                 self.buffer.push('\n');
                 false
             } else {
-                match self.buffer.bytes().last() {
-                    Some(b'\\') => {
-                        let _ = self.buffer.pop();
-                        self.read -= 1;
-                        self.flags |= TRIM;
-                        false
-                    },
-                    Some(b'|') | Some(b'&') => {
+                if let Some(b'\\') = self.buffer.bytes().last() {
+                    let _ = self.buffer.pop();
+                    self.read -= 1;
+                    self.flags |= TRIM;
+                    false
+                } else {
+                    // If the last two bytes are either '&&' or '||', we aren't terminated yet.
+                    let bytes = self.buffer.as_bytes();
+                    if bytes.len() >= 2 {
+                        let bytes = &bytes[bytes.len()-2..];
+                        bytes != &[b'&', b'&'] && bytes != &[b'|', b'|']
+                    } else {
                         false
                     }
-                    _ => true
                 }
             }
         };
