@@ -1,5 +1,5 @@
 use std::io::{self, Error, Write};
-use std::process::Command;
+use std::process::{Command, exit};
 use std::os::unix::io::{FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::fs::{File, OpenOptions};
@@ -71,7 +71,7 @@ impl<'a> PipelineExecution for Shell<'a> {
                         ) {
                             RefinedJob::builtin(
                                 job.command,
-                                job.args.drain().skip(1).collect()
+                                job.args.drain().collect()
                             )
                         } else {
                             let mut command = Command::new(job.command);
@@ -419,14 +419,15 @@ fn wait (
 }
 
 
-/// Execute a builtin in the current process
+/// Execute a builtin in the current process. Note that this will exit
+/// the current process with the return code of 
 /// # Args
 /// * `shell`: A `Shell` that forwards relevant information to the builtin
 /// * `name`: Name of the builtin to execute.
-/// * `stdin`, `stdout`, `stderr`: File descriptors that will replace the respective
-///   standard streams if they are not `None`
+/// * `stdin`, `stdout`, `stderr`: File descriptors that will replace the
+///    respective standard streams if they are not `None`
 /// # Preconditions
-/// - `shell.builtins.contains_key(name)`; otherwise this function will panic
+/// * `shell.builtins.contains_key(name)`; otherwise this function will panic
 fn builtin(
     shell: &mut Shell,
     name: &str,
@@ -434,7 +435,16 @@ fn builtin(
     stdout: Option<RawFd>,
     stderr: Option<RawFd>,
     stdin: Option<RawFd>,
-) -> i32 {
+) -> ! {
+    /// Close a file descriptor by opening a `File` and letting it drop
+    fn close(fd: Option<RawFd>) {
+        if let Some(fd) = fd {
+            unsafe {
+                File::from_raw_fd(fd);
+            }
+        }
+    }
+
     if let Some(fd) = stdout {
         redir(fd, sys::STDOUT_FILENO);
     }
@@ -447,5 +457,9 @@ fn builtin(
     // The precondition for this function asserts that there exists some `builtin`
     // in `shell` named `name`, so we unwrap here
     let builtin = shell.builtins.get(name).unwrap();
-    (builtin.main)(args, shell)
+    let ret = (builtin.main)(args, shell);
+    close(stdin);
+    close(stdout);
+    close(stderr);
+    exit(ret)
 }

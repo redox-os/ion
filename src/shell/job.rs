@@ -126,8 +126,8 @@ impl RefinedJob {
                 }
                 output
             },
-            RefinedJob::Builtin { ref name, ref args, .. } => {
-                format!("{} {}", name, args.join(" "))
+            RefinedJob::Builtin { ref args, .. } => {
+                format!("{}", args.join(" "))
             }
         }
     }

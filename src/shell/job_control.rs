@@ -217,12 +217,13 @@ impl<'a> JobControl for Shell<'a> {
         get_command: F,
         mut drop_command: D,
     ) -> i32 {
-        use nix::sys::wait::{waitpid, WaitStatus, WUNTRACED};
+        use nix::sys::wait::{wait, WaitStatus};
         use nix::sys::signal::Signal;
         use nix::{Error, Errno};
         let mut exit_status = 0;
         loop {
-            match waitpid(-(pid as pid_t), Some(WUNTRACED)) {
+            // match waitpid(-(pid as pid_t), Some(WUNTRACED)) {
+            match wait() {
                 Ok(WaitStatus::Exited(pid, status)) => {
                     if pid == (last_pid as i32) {
                         break status as i32
@@ -252,7 +253,9 @@ impl<'a> JobControl for Shell<'a> {
                 },
                 Ok(_) => (),
                 // ECHILD signifies that all children have exited
-                Err(Error::Sys(Errno::ECHILD)) => break exit_status as i32,
+                Err(Error::Sys(Errno::ECHILD)) => {
+                    break exit_status as i32;
+                }
                 Err(why) => {
                     eprintln!("ion: process doesn't exist: {}", why);
                     break FAILURE
