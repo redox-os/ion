@@ -7,8 +7,7 @@ macro_rules! get_expanders {
             array: &|array: &str, selection : Select| {
                 use std::iter::FromIterator;
                 use $crate::types::*;
-
-                match $vars.get_array(array) {
+                let mut found = match $vars.get_array(array) {
                     Some(array) => match selection {
                         Select::None  => None,
                         Select::All   => Some(array.clone()),
@@ -32,10 +31,34 @@ macro_rules! get_expanders {
                             } else {
                                 None
                             }
+                        },
+                        Select::Key(_) => {
+                            None
                         }
                     },
                     None => None
+                };
+                if found.is_none() {
+                    found = match $vars.get_map(array) {
+                        Some(map) => match selection {
+                            Select::All => {
+                                let mut arr = Array::new();
+                                for (_, value) in map {
+                                    arr.push(value.clone());
+                                }
+                                Some(arr)
+                            }
+                            Select::Key(ref key) => {
+                                Some(array![
+                                    map.get(key.get()).unwrap_or(&"".into()).clone()
+                                ])
+                            },
+                            _ => None
+                        },
+                        None => None
+                    }
                 }
+                found
             },
             variable: &|variable: &str, quoted: bool| {
                 use ascii_helpers::AsciiReplace;

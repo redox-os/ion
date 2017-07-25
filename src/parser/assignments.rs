@@ -1,11 +1,11 @@
 use shell::variables::Variables;
-use types::{Identifier, Value as VString, Array};
+use types::{Identifier, Value as VString, Array, Key};
 
 #[derive(Debug, PartialEq, Clone)]
 // TODO: Have the expand_string function return the `Value` type.
 pub enum Value {
     String(VString),
-    Array(Array)
+    Array(Array),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -14,6 +14,7 @@ pub enum Binding {
     ListEntries,
     KeyOnly(Identifier),
     KeyValue(Identifier, VString),
+    MapKeyValue(Identifier, Key, VString),
     Math(Identifier, Operator, VString),
     MultipleKeys(Vec<Identifier>, VString)
 }
@@ -108,6 +109,8 @@ pub fn parse_assignment(arguments: &str) -> Binding {
         let value = char_iter.skip_while(|&x| x == ' ').collect::<VString>();
         if value.is_empty() {
             Binding::KeyOnly(key.into())
+        } else if let Some((key, inner_key)) = Variables::is_hashmap_reference(&key) {
+            Binding::MapKeyValue(key.into(), inner_key.into(), value)
         } else if !Variables::is_valid_variable_name(&key) {
             Binding::InvalidKey(key.into())
         } else {

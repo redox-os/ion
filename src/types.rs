@@ -3,10 +3,13 @@ use fnv::FnvHashMap;
 use smallstring::SmallString;
 
 pub type Array = SmallVec<[Value; 4]>;
+pub type HashMap = FnvHashMap<Key, Value>;
 pub type Identifier = SmallString;
+pub type Key = SmallString;
 pub type Value = String;
 pub type VariableContext = FnvHashMap<Identifier, Value>;
 pub type ArrayVariableContext = FnvHashMap<Identifier, Array>;
+pub type HashMapVariableContext = FnvHashMap<Identifier, HashMap>;
 
 /// Construct a new Array containing the given arguments
 ///
