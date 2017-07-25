@@ -11,6 +11,7 @@ use std::io::{self, Write, Read, ErrorKind};
 use std::iter::{self, FromIterator};
 use std::mem;
 use std::path::{Path, PathBuf};
+use sys;
 use super::completer::*;
 use super::flow_control::Statement;
 use super::status::*;
@@ -115,7 +116,7 @@ impl<'a> Binary for Shell<'a> {
                             // Creates completers containing definitions from all directories listed
                             // in the environment's **$PATH** variable.
                             let mut file_completers = if let Ok(val) = env::var("PATH") {
-                                val.split(if cfg!(unix) { ':' } else { ';' })
+                                val.split(sys::PATH_SEPARATOR)
                                     .map(|s| IonFileCompleter::new(Some(s), dirs_ptr, vars_ptr))
                                     .collect()
                             } else {

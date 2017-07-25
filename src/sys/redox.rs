@@ -5,6 +5,8 @@ use std::os::unix::io::RawFd;
 
 use syscall::SigAction;
 
+pub const PATH_SEPARATOR: &str = ";";
+
 pub const O_CLOEXEC: usize = syscall::O_CLOEXEC;
 pub const SIGHUP: i32 = syscall::SIGHUP as i32;
 pub const SIGINT: i32 = syscall::SIGINT as i32;

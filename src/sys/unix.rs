@@ -4,6 +4,8 @@ use libc::{c_int, pid_t, sighandler_t};
 use std::io;
 use std::os::unix::io::RawFd;
 
+pub const PATH_SEPARATOR: &str = ":";
+
 pub const O_CLOEXEC: usize = libc::O_CLOEXEC as usize;
 pub const SIGHUP: i32 = libc::SIGHUP;
 pub const SIGINT: i32 = libc::SIGINT;
