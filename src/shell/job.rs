@@ -137,6 +137,10 @@ impl RefinedJob {
 
 impl Drop for RefinedJob {
 
+    // This is needed in order to ensure that the parent instance of RefinedJob
+    // cleans up after its own `RawFd`s; otherwise these would never be properly
+    // closed, never sending EOF, causing any process reading from these
+    // `RawFd`s to halt indefinitely.
     fn drop(&mut self) {
         match *self {
             RefinedJob::External(ref mut cmd) => {
