@@ -32,7 +32,13 @@ pub fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
 
 pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     let mut fds = [0; 2];
+
+    #[cfg(not(target_os = "macos"))]
     cvt(unsafe { libc::pipe2(fds.as_mut_ptr(), flags as c_int) })?;
+
+    #[cfg(target_os = "macos")]
+    cvt(unsafe { libc::pipe(fds.as_mut_ptr()) })?;
+
     Ok((fds[0], fds[1]))
 }
 
@@ -129,7 +135,11 @@ pub mod job_control {
     use shell::status::{FAILURE, TERMINATED};
     use shell::Shell;
     use libc::{self, pid_t};
-    use nix::sys::wait::{waitpid, WaitStatus, WCONTINUED, WNOHANG, WUNTRACED};
+
+    use nix::sys::wait::{waitpid, WaitStatus, WNOHANG, WUNTRACED};
+    #[cfg(not(target_os = "macos"))]
+    use nix::sys::wait::{WCONTINUED};
+
     use nix::sys::signal::Signal;
     use nix::{Errno, Error};
 
@@ -146,7 +156,13 @@ pub mod job_control {
                     fg_was_grabbed = true;
                 }
             }
-            match waitpid(-(pid as pid_t), Some(WUNTRACED | WCONTINUED | WNOHANG)) {
+
+            #[cfg(not(target_os = "macos"))]
+            let opts = Some(WUNTRACED | WCONTINUED | WNOHANG);
+            #[cfg(target_os = "macos")]
+            let opts = Some(WUNTRACED | WNOHANG);
+
+            match waitpid(-(pid as pid_t), opts) {
                 Ok(WaitStatus::Exited(_, status)) => {
                     if !fg_was_grabbed {
                         eprintln!("ion: ([{}] {}) exited with {}", njob, pid, status);
