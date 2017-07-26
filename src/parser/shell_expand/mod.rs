@@ -88,6 +88,7 @@ fn array_expand(elements : &[&str], expand_func: &ExpanderFunctions, selection :
         Select::All => elements.iter().flat_map(|e| expand_string(e, expand_func, false)).collect(),
         Select::Index(index) => array_nth(elements, expand_func, index).into_iter().collect(),
         Select::Range(range) => array_range(elements, expand_func, range),
+        Select::Key(_) => Array::new(),
     }
 }
 
@@ -138,6 +139,7 @@ fn slice<S: AsRef<str>>(output: &mut String, expanded: S, selection: Select) {
                output.push_str(&substring);
             }
         },
+        Select::Key(_) => ()
     }
 }
 
@@ -206,16 +208,16 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
 
             for word in token_buffer {
                 match *word {
-                    WordToken::Array(ref elements, index) => {
-                        output.push_str(&array_expand(elements, expand_func, index).join(" "));
+                    WordToken::Array(ref elements, ref index) => {
+                        output.push_str(&array_expand(elements, expand_func, index.clone()).join(" "));
                     },
-                    WordToken::ArrayVariable(array, _, index) => {
-                        if let Some(array) = (expand_func.array)(array, index) {
+                    WordToken::ArrayVariable(array, _, ref index) => {
+                        if let Some(array) = (expand_func.array)(array, index.clone()) {
                             output.push_str(&array.join(" "));
                         }
                     },
-                    WordToken::ArrayProcess(command, _, index) => {
-                        match index {
+                    WordToken::ArrayProcess(command, _, ref index) => {
+                        match *index {
                             Select::None => (),
                             Select::All => {
                                 let mut temp = String::new();
@@ -247,7 +249,8 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                                                   .collect::<Vec<&str>>();
                                     output.push_str(&res.join(" "));
                                 }
-                            }
+                            },
+                            Select::Key(_) => (),
                         }
                     },
                     WordToken::ArrayMethod(ref method) => {
@@ -259,17 +262,17 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     WordToken::Brace(ref nodes) =>
                         expand_brace(&mut output, &mut expanders, &mut tokens, nodes, expand_func, reverse_quoting),
                     WordToken::Whitespace(_) => unreachable!(),
-                    WordToken::Process(command, _, index) => {
-                        expand_process(&mut output, command, index, expand_func);
+                    WordToken::Process(command, _, ref index) => {
+                        expand_process(&mut output, command, index.clone(), expand_func);
                     },
-                    WordToken::Variable(text, quoted, index) => {
+                    WordToken::Variable(text, quoted, ref index) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
                         let expanded = match (expand_func.variable)(text, quoted) {
                             Some(var) => var,
                             None      => continue
                         };
 
-                        slice(&mut output, expanded, index);
+                        slice(&mut output, expanded, index.clone());
                     },
                     WordToken::Normal(text, do_glob, tilde) => {
                         expand!(text, do_glob, tilde);
@@ -292,19 +295,19 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
             return expanded_words;
         } else if token_buffer.len() == 1 {
             match token_buffer[0] {
-                WordToken::Array(ref elements, index) => {
-                    return array_expand(elements, expand_func, index);
+                WordToken::Array(ref elements, ref index) => {
+                    return array_expand(elements, expand_func, index.clone());
                 },
-                WordToken::ArrayVariable(array, quoted, index) => {
-                    return match (expand_func.array)(array, index) {
+                WordToken::ArrayVariable(array, quoted, ref index) => {
+                    return match (expand_func.array)(array, index.clone()) {
                         Some(ref array) if quoted =>
                             Some(array.join(" ").into()).into_iter().collect(),
                         Some(array)               => array,
                         None                      => Array::new(),
                     };
                 },
-                WordToken::ArrayProcess(command, _, index) => {
-                    match index {
+                WordToken::ArrayProcess(command, _, ref index) => {
+                    match *index {
                         Select::None => return Array::new(),
                         Select::All => {
                             expand_process(&mut output, command, Select::All, expand_func);
@@ -342,6 +345,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                                 return Array::new();
                             }
                         },
+                        Select::Key(_) => ()
                     }
                 },
                 WordToken::ArrayMethod(ref array_method) => {
@@ -360,16 +364,16 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
 
         for word in token_buffer {
             match *word {
-                WordToken::Array(ref elements, index) => {
-                    output.push_str(&array_expand(elements, expand_func, index).join(" "));
+                WordToken::Array(ref elements, ref index) => {
+                    output.push_str(&array_expand(elements, expand_func, index.clone()).join(" "));
                 },
-                WordToken::ArrayVariable(array, _, index) => {
-                    if let Some(array) = (expand_func.array)(array, index) {
+                WordToken::ArrayVariable(array, _, ref index) => {
+                    if let Some(array) = (expand_func.array)(array, index.clone()) {
                         output.push_str(&array.join(" "));
                     }
                 },
-                WordToken::ArrayProcess(command, _, index) => {
-                    match index {
+                WordToken::ArrayProcess(command, _, ref index) => {
+                    match index.clone() {
                         Select::None => (),
                         Select::All => {
                             let mut temp = String::new();
@@ -401,6 +405,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                                 output.push_str(&temp.join(" "))
                             }
                         },
+                        Select::Key(_) => ()
                     }
                 },
                 WordToken::ArrayMethod(ref method) => {
@@ -416,17 +421,17 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                 WordToken::Whitespace(text) => {
                     output.push_str(text);
                 },
-                WordToken::Process(command, _, index) => {
-                    expand_process(&mut output, command, index, expand_func);
+                WordToken::Process(command, _, ref index) => {
+                    expand_process(&mut output, command, index.clone(), expand_func);
                 }
-                WordToken::Variable(text, quoted, index) => {
+                WordToken::Variable(text, quoted, ref index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
                     let expanded = match (expand_func.variable)(text, quoted) {
                         Some(var) => var,
                         None          => continue
                     };
 
-                    slice(&mut output, expanded, index);
+                    slice(&mut output, expanded, index.clone());
                 },
                 WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
             }

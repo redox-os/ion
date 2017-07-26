@@ -5,6 +5,8 @@ use std::os::unix::io::RawFd;
 
 use syscall::SigAction;
 
+pub const PATH_SEPARATOR: &str = ";";
+
 pub const O_CLOEXEC: usize = syscall::O_CLOEXEC;
 pub const SIGHUP: i32 = syscall::SIGHUP as i32;
 pub const SIGINT: i32 = syscall::SIGINT as i32;
@@ -43,7 +45,7 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     let new = SigAction {
         sa_handler: unsafe { mem::transmute(handler) },
         sa_mask: [0; 2],
-        sa_flags: 0
+        sa_flags: 0,
     };
     cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
 }
@@ -55,7 +57,7 @@ pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
     let res = syscall::write(fd, unsafe {
         slice::from_raw_parts(
             &pgid_usize as *const usize as *const u8,
-            mem::size_of::<usize>()
+            mem::size_of::<usize>(),
         )
     });
 
@@ -75,4 +77,79 @@ pub fn close(fd: RawFd) -> io::Result<()> {
 // Support function for converting syscall error to io error
 fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
     result.map_err(|err| io::Error::from_raw_os_error(err.errno))
+}
+
+// TODO
+pub mod signals {
+    pub fn block() {}
+
+    /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be controlled
+    /// by the shell.
+    pub fn unblock() {}
+}
+
+pub mod job_control {
+    use shell::job_control::*;
+
+    use std::io::{self, Write};
+    use std::os::unix::process::ExitStatusExt;
+    use std::process::ExitStatus;
+    use std::sync::{Arc, Mutex};
+    use syscall;
+    use shell::foreground::ForegroundSignals;
+    use shell::status::TERMINATED;
+    use shell::Shell;
+
+    pub fn watch_background(
+        fg: Arc<ForegroundSignals>,
+        processes: Arc<Mutex<Vec<BackgroundProcess>>>,
+        pid: u32,
+        njob: usize,
+    ) {
+        // TODO: Implement this using syscall::call::waitpid
+    }
+
+
+    pub fn watch_foreground<'a, F, D>(
+        _shell: &mut Shell<'a>,
+        pid: u32,
+        _last_pid: u32,
+        _get_command: F,
+        mut drop_command: D,
+    ) -> i32
+    where
+        F: FnOnce() -> String,
+        D: FnMut(i32),
+    {
+        loop {
+            let mut status_raw = 0;
+            match syscall::waitpid(pid as usize, &mut status_raw, 0) {
+                Ok(0) => (),
+                Ok(_pid) => {
+                    let status = ExitStatus::from_raw(status_raw as i32);
+                    if let Some(code) = status.code() {
+                        break code;
+                    } else {
+                        let stderr = io::stderr();
+                        let mut stderr = stderr.lock();
+                        let _ = stderr.write_all(b"ion: child ended by signal\n");
+                        break TERMINATED;
+                    }
+                }
+                Err(err) => {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "ion: failed to wait: {}", err);
+                    break 100; // TODO what should we return here?
+                }
+            }
+        }
+    }
+}
+
+pub mod variables {
+    pub fn get_user_home(_username: &str) -> Option<String> {
+        // TODO
+        None
+    }
 }

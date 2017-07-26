@@ -16,14 +16,16 @@ use types::{
     Identifier,
     Value as VString,
     Array as VArray,
+    Key,
     ArrayVariableContext,
-    VariableContext
+    VariableContext,
 };
 use super::status::*;
 
 enum Action {
     UpdateString(Identifier, VString),
     UpdateStrings(Vec<Identifier>, VArray),
+    UpdateHashMap(Identifier, Key, VString),
     UpdateArray(Identifier, VArray),
     List
 }
@@ -77,7 +79,10 @@ fn parse_assignment (
         },
         Binding::KeyValue(key, value) => match parse_expression(&value, &expanders) {
             Value::String(value) => Ok(Action::UpdateString(key, value)),
-            Value::Array(array)  => Ok(Action::UpdateArray(key, array)),
+            Value::Array(array) => Ok(Action::UpdateArray(key, array)),
+        },
+        Binding::MapKeyValue(key, inner_key, value) => {
+            Ok(Action::UpdateHashMap(key, inner_key, value))
         },
         Binding::MultipleKeys(keys, value) => match parse_expression(&value, &expanders) {
             Value::String(value) => {
@@ -85,7 +90,7 @@ fn parse_assignment (
                     .collect::<VArray>();
                 Ok(Action::UpdateStrings(keys, array))
             },
-            Value::Array(array)  => Ok(Action::UpdateStrings(keys, array))
+            Value::Array(array)  => Ok(Action::UpdateStrings(keys, array)),
         },
         Binding::KeyOnly(key) => {
             let stderr = io::stderr();
@@ -135,6 +140,9 @@ pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &Direct
                 vars.set_var(key, value);
             }
         },
+        Ok(Action::UpdateHashMap(key, inner_key, value)) => {
+            vars.set_hashmap_value(&key, &inner_key, &value)
+        },
         Ok(Action::List) => {
             print_vars(&vars.variables);
             print_arrays(&vars.arrays);
@@ -156,6 +164,9 @@ pub fn export_variable(binding : Binding, vars: &mut Variables, dir_stack : &Dir
                 env::set_var(key, value);
             }
         }
+        Ok(Action::UpdateHashMap(key, inner_key, value)) => {
+            vars.set_hashmap_value(&key, &inner_key, &value)
+        },
         Ok(Action::List) => {
             let stdout = io::stdout();
             let stdout = &mut stdout.lock();

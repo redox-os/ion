@@ -7,15 +7,21 @@ use super::directory_stack::DirectoryStack;
 use liner::Context;
 use super::status::{SUCCESS, FAILURE};
 use types::{
+    HashMapVariableContext,
     ArrayVariableContext,
     VariableContext,
     Identifier,
+    Key,
     Value,
     Array,
+    HashMap,
 };
+
+use ::sys::variables as self_sys;
 
 #[derive(Debug)]
 pub struct Variables {
+    pub hashmaps:  HashMapVariableContext,
     pub arrays:    ArrayVariableContext,
     pub variables: VariableContext,
     pub aliases:   VariableContext,
@@ -45,6 +51,10 @@ impl Default for Variables {
         // Initialize the HOME variable
         env::home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| env::set_var("HOME", path.to_str().unwrap_or("?")));
         Variables {
+            hashmaps: FnvHashMap::with_capacity_and_hasher(
+                64,
+                Default::default(),
+            ),
             arrays: FnvHashMap::with_capacity_and_hasher(
                 64,
                 Default::default(),
@@ -93,6 +103,26 @@ impl Variables {
                 self.arrays.insert(name.into(), value);
             }
         }
+    }
+
+    pub fn set_hashmap_value(&mut self, name: &str, key: &str, value: &str) {
+        if !name.is_empty() {
+            if let Some(map) = self.hashmaps.get_mut(name) {
+                map.insert(key.into(), value.into());
+                return
+            }
+
+            let mut map = HashMap::with_capacity_and_hasher(
+                4,
+                Default::default()
+            );
+            map.insert(key.into(), value.into());
+            self.hashmaps.insert(name.into(), map);
+        }
+    }
+
+    pub fn get_map(&self, name: &str) -> Option<&HashMap>{
+        self.hashmaps.get(name)
     }
 
     pub fn get_array(&self, name: &str) -> Option<&Array> {
@@ -196,7 +226,7 @@ impl Variables {
                         }
                     }
                     Err(_) => {
-                        if let Some(home) = get_user_home(tilde_prefix) {
+                        if let Some(home) = self_sys::get_user_home(tilde_prefix) {
                             return Some(home + remainder);
                         }
                     }
@@ -221,29 +251,23 @@ impl Variables {
 
         None
     }
-}
 
-#[cfg(all(unix, not(target_os = "redox")))]
-fn get_user_home(username: &str) -> Option<String> {
-    use users_unix::get_user_by_name;
-    use users_unix::os::unix::UserExt;
+    pub fn is_hashmap_reference(key: &str) -> Option<(Identifier, Key)> {
+        let mut key_iter = key.split('[');
 
-    match get_user_by_name(username) {
-        Some(user) => Some(user.home_dir().to_string_lossy().into_owned()),
-        None => None,
+        if let Some(map_name) = key_iter.next() {
+            if Variables::is_valid_variable_name(map_name) {
+                if let Some(mut inner_key) = key_iter.next() {
+                    if inner_key.ends_with(']') {
+                        inner_key = inner_key.split(']').next().unwrap_or("");
+                        inner_key = inner_key.trim_matches(|c| c == '\'' || c == '\"');
+                        return Some((map_name.into(), inner_key.into()))
+                    }
+                }
+            }
+        }
+        None
     }
-}
-
-#[cfg(target_os = "redox")]
-fn get_user_home(_username: &str) -> Option<String> {
-    // TODO
-    None
-}
-
-#[cfg(not(any(unix, target_os = "redox")))]
-fn get_user_home(_username: &str) -> Option<String> {
-    // TODO
-    None
 }
 
 #[cfg(test)]
@@ -273,5 +297,15 @@ mod tests {
             false
         ).join("");
         assert_eq!("BAR", &expanded);
+    }
+
+    #[test]
+    fn decompose_map_reference() {
+        if let Some((map_name, inner_key)) = Variables::is_hashmap_reference("map[\'key\']") {
+            assert!(map_name == "map".into());
+            assert!(inner_key == "key".into());
+        } else {
+            assert!(false);
+        }
     }
 }
