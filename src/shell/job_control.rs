@@ -28,7 +28,6 @@ pub trait JobControl {
     fn background_send(&self, signal: i32);
     fn watch_foreground <F, D> (
         &mut self,
-        pid: u32,
         last_pid: u32,
         get_command: F,
         drop_command: D
@@ -212,7 +211,6 @@ impl<'a> JobControl for Shell<'a> {
     #[cfg(all(unix, not(target_os = "redox")))]
     fn watch_foreground <F: FnOnce() -> String, D: FnMut(i32)> (
         &mut self,
-        pid: u32,
         last_pid: u32,
         get_command: F,
         mut drop_command: D,

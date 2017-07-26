@@ -64,6 +64,14 @@ pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
     cvt(res).and(Ok(()))
 }
 
+pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
+    syscall::call::dup2(old, new, &[]).map_err(|e| io::Error::from_raw_os_err(err.errno))
+}
+
+pub fn close(fd: RawFd) -> io::Result<()> {
+    cvt(syscall::call::close(fd)).and(Ok())
+}
+
 // Support function for converting syscall error to io error
 fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
     result.map_err(|err| io::Error::from_raw_os_error(err.errno))

@@ -62,6 +62,10 @@ pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
     cvt(unsafe { libc::dup2(old, new) })
 }
 
+pub fn close(fd: RawFd) -> io::Result<()> {
+    cvt(unsafe { libc::close(fd) }).and(Ok(()))
+}
+
 // Support functions for converting libc return values to io errors {
     trait IsMinusOne {
         fn is_minus_one(&self) -> bool;

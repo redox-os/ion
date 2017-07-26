@@ -5,6 +5,7 @@ use std::os::unix::io::{RawFd, FromRawFd};
 use parser::{expand_string, ExpanderFunctions};
 use parser::peg::RedirectFrom;
 use smallstring::SmallString;
+use sys;
 use types::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -128,6 +129,38 @@ impl RefinedJob {
             },
             RefinedJob::Builtin { ref args, .. } => {
                 format!("{}", args.join(" "))
+            }
+        }
+    }
+
+}
+
+impl Drop for RefinedJob {
+
+    fn drop(&mut self) {
+        match *self {
+            RefinedJob::External(ref mut cmd) => {
+                drop(cmd);
+            },
+            RefinedJob::Builtin {
+                ref mut name,
+                ref mut args,
+                ref mut stdin,
+                ref mut stdout,
+                ref mut stderr,
+            } => {
+                fn close(fd: Option<RawFd>) {
+                    if let Some(fd) = fd {
+                        if let Err(e) = sys::close(fd) {
+                            eprintln!("ion: failed to close file '{}': {}", fd, e);
+                        }
+                    }
+                }
+                drop(name);
+                drop(args);
+                close(*stdin);
+                close(*stdout);
+                close(*stderr);
             }
         }
     }

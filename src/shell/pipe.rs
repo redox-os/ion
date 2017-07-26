@@ -356,7 +356,7 @@ fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
                     if foreground {
                         let _ = sys::tcsetpgrp(0, child.id());
                     }
-                    shell.watch_foreground(child.id(), child.id(), move || long, |_| ())
+                    shell.watch_foreground(child.id(), move || long, |_| ())
                 },
                 Err(e) => {
                     if e.kind() == io::ErrorKind::NotFound {
@@ -380,7 +380,7 @@ fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
                     if foreground {
                         let _ = sys::tcsetpgrp(0, pid);
                     }
-                    shell.watch_foreground(pid, pid, move || long, |_| ())
+                    shell.watch_foreground(pid, move || long, |_| ())
                 },
                 Err(e) => {
                     eprintln!("ion: fork error for '{}': {}", short, e);
@@ -404,13 +404,11 @@ fn wait (
         .collect::<Vec<String>>()
         .join(" | ");
 
-    // Each process in the pipe has the same PGID, which is the first process's PID.
-    let pgid = children[0];
     // If the last process exits, we know that all processes should exit.
     let last_pid = children[children.len()-1];
 
     // Watch the foreground group, dropping all commands that exit as they exit.
-    shell.watch_foreground(pgid, last_pid, move || as_string, move |pid| {
+    shell.watch_foreground(last_pid, move || as_string, move |pid| {
         if let Some(id) = children.iter().position(|&x| x as i32 == pid) {
             commands.remove(id);
             children.remove(id);
@@ -436,11 +434,12 @@ fn builtin(
     stderr: Option<RawFd>,
     stdin: Option<RawFd>,
 ) -> ! {
-    use nix;
     /// Close a file descriptor by opening a `File` and letting it drop
     fn close(fd: Option<RawFd>) {
         if let Some(fd) = fd {
-            nix::unistd::close(fd).unwrap();
+            if let Err(e) = sys::close(fd) {
+                eprintln!("ion: failed to close file '{}': {}", fd, e);
+            }
         }
     }
     if let Some(fd) = stdin {
