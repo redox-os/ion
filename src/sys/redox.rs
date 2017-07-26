@@ -15,6 +15,12 @@ pub const SIGCONT: i32 = syscall::SIGCONT as i32;
 pub const SIGSTOP: i32 = syscall::SIGSTOP as i32;
 pub const SIGTSTP: i32 = syscall::SIGTSTP as i32;
 
+/// XXX: These values were infered from the Redox port of `newlib` and may be
+/// sensitive to changes in redox;
+pub const STDIN_FILENO: i32 = 0;
+pub const STDOUT_FILENO: i32 = 1;
+pub const STDERR_FILENO: i32 = 2;
+
 pub unsafe fn fork() -> io::Result<u32> {
     cvt(syscall::clone(0)).map(|pid| pid as u32)
 }
