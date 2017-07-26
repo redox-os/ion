@@ -220,7 +220,8 @@ fn builtin_popd(args: &[&str], shell: &mut Shell) -> i32 {
 }
 
 fn builtin_alias(args: &[&str], shell: &mut Shell) -> i32 {
-    alias(&mut shell.variables, args)
+    let args_str = args[1..].join(" ");
+    alias(&mut shell.variables, &args_str)
 }
 
 fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 {

@@ -34,12 +34,10 @@ enum Operator {
     Multiply
 }
 
-/// Parses let bindings, `let VAR = KEY`, returning the result as a `(key, value)` tuple.
-fn parse_assignment<'a, S: AsRef<str> + 'a>(args: &[S]) -> Binding {
+/// Parses alias as a `(key, value)` tuple.
+fn parse_alias(args: &str) -> Binding {
     // Write all the arguments into a single `String`
-    let mut char_iter = args.iter().skip(1)
-        .map(|arg| arg.as_ref().chars())
-        .flat_map(|chars| chars);
+    let mut char_iter = args.chars();
 
     // Find the key and advance the iterator until the equals operator is found.
     let mut key = "".to_owned();
@@ -115,8 +113,8 @@ fn parse_assignment<'a, S: AsRef<str> + 'a>(args: &[S]) -> Binding {
 
 /// The `alias` command will define an alias for another command, and thus may be used as a
 /// command itself.
-pub fn alias<'a, S: AsRef<str> + 'a>(vars: &mut Variables, args: &[S]) -> i32 {
-    match parse_assignment(args) {
+pub fn alias(vars: &mut Variables, args: &str) -> i32 {
+    match parse_alias(args) {
         Binding::InvalidKey(key) => {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: alias name, '{}', is invalid", key);
