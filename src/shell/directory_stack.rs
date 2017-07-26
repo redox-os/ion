@@ -34,15 +34,52 @@ impl DirectoryStack {
 
     /// Attempts to set the current directory to the directory stack's previous directory,
     /// and then removes the front directory from the stack.
-    pub fn popd<I: IntoIterator>(&mut self, _: I) -> Result<(), Cow<'static, str>>
+    pub fn popd<I: IntoIterator>(&mut self, args: I) -> Result<(), Cow<'static, str>>
         where I::Item: AsRef<str>
     {
-        self.get_previous_dir().cloned()
-            .map_or(Err(Cow::Borrowed("ion: directory stack is empty\n")), |dir| {
-                set_current_dir(&dir)
-                    .map_err(|err| { Cow::Owned(format!("ion: {}: Failed to switch to directory {}\n", err, dir.display())) })
-                    .map(|_| { self.dirs.pop_front(); self.print_dirs(); () })
-            })
+
+	let mut keep_front = false; // whether the -n option is present
+	let mut count_from_back = false; // whether the input number is negative
+	let mut num: usize = 0;
+
+	for arg in args.into_iter().skip(1) {
+		let arg = arg.as_ref();
+		if arg == "-n" {
+			keep_front = true;
+		} else {
+			num = arg[1..].parse::<usize>()
+				.or_else(|_| Err(Cow::Owned(format!("ion: popd: {}: invalid argument\n", arg))))?;
+			count_from_back = match arg.chars().nth(0) {
+				Some('+') => false,
+				Some('-') => true,
+				_ => return Err(Cow::Owned(format!("ion: popd: {}: invalid argument\n", arg)))
+			};
+		}
+	}
+
+	let len: usize = self.dirs.len();
+	if len <= 1 {
+		return Err(Cow::Owned(format!("ion: popd: directory stack empty\n")));
+	}
+
+	let mut index: usize = if count_from_back {
+		(len - 1).checked_sub(num)
+			.ok_or_else(|| Cow::Owned(format!("ion: popd: negative directory stack index out of range\n")))?
+	} else { num };
+
+	if index == 0 && keep_front { index = 1; }
+
+	if self.dirs.remove(index).is_none() {
+		return Err(Cow::Owned(format!("ion: popd: {}: directory stack index out of range\n", index)));
+	}
+
+	if index == 0 {
+		set_current_dir(self.dirs[0].as_path())
+			.or_else(|_| Err(Cow::Owned(format!("ion: popd: Failed setting dir"))))?;
+	}
+
+	self.print_dirs();
+	Ok(())
     }
 
     pub fn pushd<I: IntoIterator>(&mut self, args: I, variables: &Variables) -> Result<(), Cow<'static, str>>
