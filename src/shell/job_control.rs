@@ -30,6 +30,7 @@ pub trait JobControl {
     fn background_send(&self, signal: i32);
     fn watch_foreground<F, D>(
         &mut self,
+        pid: u32,
         last_pid: u32,
         get_command: F,
         drop_command: D,
@@ -151,6 +152,7 @@ impl<'a> JobControl for Shell<'a> {
 
     fn watch_foreground<F, D>(
         &mut self,
+        pid: u32,
         last_pid: u32,
         get_command: F,
         drop_command: D,

@@ -148,7 +148,7 @@ pub mod job_control {
     use shell::Shell;
     use libc::{self, pid_t};
 
-    use nix::sys::wait::{waitpid, WaitStatus, WNOHANG, WUNTRACED};
+    use nix::sys::wait::{waitpid, wait, WaitStatus, WNOHANG, WUNTRACED};
     #[cfg(not(target_os = "macos"))]
     use nix::sys::wait::{WCONTINUED};
 
@@ -225,7 +225,7 @@ pub mod job_control {
 
     pub fn watch_foreground<'a, F, D>(
         shell: &mut Shell<'a>,
-        pid: u32,
+        _pid: u32,
         last_pid: u32,
         get_command: F,
         mut drop_command: D,
@@ -236,7 +236,7 @@ pub mod job_control {
     {
         let mut exit_status = 0;
         loop {
-            match waitpid(-(pid as pid_t), Some(WUNTRACED)) {
+            match wait() {
                 Ok(WaitStatus::Exited(pid, status)) => if pid == (last_pid as i32) {
                     break status as i32;
                 } else {
