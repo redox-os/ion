@@ -89,6 +89,8 @@ pub mod job_control {
     use std::sync::{Arc, Mutex};
     use syscall;
     use shell::foreground::ForegroundSignals;
+    use shell::status::TERMINATED;
+    use shell::Shell;
 
     pub fn watch_background(
         fg: Arc<ForegroundSignals>,
