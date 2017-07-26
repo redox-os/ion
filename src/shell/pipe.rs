@@ -420,7 +420,7 @@ fn wait (
 
 
 /// Execute a builtin in the current process. Note that this will exit
-/// the current process with the return code of 
+/// the current process with the return code of the builtin
 /// # Args
 /// * `shell`: A `Shell` that forwards relevant information to the builtin
 /// * `name`: Name of the builtin to execute.
@@ -436,30 +436,28 @@ fn builtin(
     stderr: Option<RawFd>,
     stdin: Option<RawFd>,
 ) -> ! {
+    use nix;
     /// Close a file descriptor by opening a `File` and letting it drop
     fn close(fd: Option<RawFd>) {
         if let Some(fd) = fd {
-            unsafe {
-                File::from_raw_fd(fd);
-            }
+            nix::unistd::close(fd).unwrap();
         }
     }
-
+    if let Some(fd) = stdin {
+        redir(fd, sys::STDIN_FILENO);
+    }
     if let Some(fd) = stdout {
         redir(fd, sys::STDOUT_FILENO);
     }
     if let Some(fd) = stderr {
         redir(fd, sys::STDERR_FILENO);
     }
-    if let Some(fd) = stdin {
-        redir(fd, sys::STDIN_FILENO);
-    }
     // The precondition for this function asserts that there exists some `builtin`
     // in `shell` named `name`, so we unwrap here
     let builtin = shell.builtins.get(name).unwrap();
     let ret = (builtin.main)(args, shell);
-    close(stdin);
-    close(stdout);
     close(stderr);
+    close(stdout);
+    close(stdin);
     exit(ret)
 }
