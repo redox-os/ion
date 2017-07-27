@@ -13,3 +13,17 @@ echo {a..d}
 echo {d..a}
 echo {A..D}
 echo {D..A}
+# inclusive stepped ranges
+echo {0..2...4}
+echo {a..2...e}
+echo {A..2...E}
+echo {0..-2...-4}
+echo {e..-2...a}
+echo {E..-2...A}
+# exclusive stepped ranges
+echo {0..2..5}
+echo {a..2..f}
+echo {A..2..F}
+echo {0..-2..-5}
+echo {e..-2..a}
+echo {E..-2..A}
