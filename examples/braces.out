@@ -11,3 +11,15 @@ a b c
 d c b
 A B C
 D C B
+0 2 4
+a c e
+A C E
+0 -2 -4
+e c a
+E C A
+0 2 4
+a c e
+A C E
+0 -2 -4
+e c
+E C

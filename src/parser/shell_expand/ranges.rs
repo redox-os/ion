@@ -1,207 +1,214 @@
 use super::words::{Range, Index};
 
-// SteppedRange is used because as of right now (start..end).step_by(step)
-// is experimental/unstable. It is simply an iterator that creates a range
-// (either backwards or forwards) with a given step which can be positive
-// or negative. Since there are combinations of step sizes and start/end values
-// that can cause infinite loops it comes with a `validate` method and a
-// `new_validated` constructor. If the stepper isn't validated it will validate
-// on first `next` call and silently return None if it is invalid
-struct SteppedRange {
-    start: isize,
-    end: isize,
-    step: isize,
-    inclusive: bool,
-    backwards: bool,
-    validated: bool,
-}
-
-impl SteppedRange {
-    #[inline]
-    fn new(start: isize, end: isize, step:isize, inclusive: bool) -> Self {
-        Self {
-            validated: false,
-            start: start,
-            end: end,
-            step: step,
-            inclusive: inclusive,
-            backwards: start > end,
-        }
-    }
-
-    #[inline]
-    fn new_validated(start: isize, end: isize, step:isize, inclusive: bool) -> Result<Self, &'static str> {
-        let mut s = Self::new(start, end, step, inclusive);
-        match s.validate() {
-            Ok(_) => Ok(s),
-            Err(why) => Err(why),            
-        }
-    }
-
-     // Check for cases that would cause infinite loops 
-    fn validate(&mut self) -> Result<(), &'static str> {
-        if self.start < self.end && self.step < 0 {
-            Err("negative step size with start < end would cause infinite loop")
-        } else if self.start > self.end && self.step > 0 {
-            Err("positive step size with start > end would cause infinite loop")
-        } else if self.step == 0 {
-            Err("0 step size would cause infinite loop")
-        } else {
-            self.validated = true;
-            Ok(())
-        }
-    }
-
-    // since we typically want to return a vec of strings instead of isize
-    #[inline]
-    fn new_string_vec(start: isize, end: isize, step:isize, inclusive: bool) -> Option<Vec<String>> {
-        match Self::new_validated(start, end, step, inclusive) {
-            Ok(s) => Some(s.map(|x| x.to_string()).collect()),
-            Err(_) => None,
-        }
+fn stepped_range_numeric(mut start: isize, end: isize, step: isize) -> Option<Vec<String>> {
+    return if step == 0 {
+        None
+    } else if start < end && step < 0 {
+        None
+    } else if start > end && step > 0 {
+        None
+    } else {
+       let mut out = Vec::new();
+       let cmp: fn(isize, isize) -> bool = if start < end {
+           |a: isize, b: isize| -> bool { a < b }
+       } else {
+           |a: isize, b: isize| -> bool { a > b }
+       };
+       while cmp(start, end) {
+           out.push(start.to_string());
+           start += step;
+       }
+       Some(out)
     }
 }
 
-impl Iterator for SteppedRange {
-    type Item = isize;
-    fn next(&mut self) -> Option<Self::Item> {
-        macro_rules! step_logic {
-            ($left:expr, $right:expr) => {
-                if self.inclusive && $left <= $right {
-                    let v = self.start;
-                    self.start += self.step;
-                    Some(v)
-                } else if !self.inclusive && $left < $right {
-                    let v = self.start;
-                    self.start += self.step;
-                    Some(v)
-                } else {
-                    None
-                }
+fn stepped_range_chars(mut start: u8, end: u8, step: u8) -> Option<Vec<String>> {
+    return if step == 0 {
+        None
+    } else {
+       let mut out = Vec::new();
+       let cmp: fn(u8, u8) -> bool = if start < end {
+           |a: u8, b: u8| -> bool { a < b }
+       } else {
+           |a: u8, b: u8| -> bool { a > b }
+       };
+       let step_func: fn(u8, u8) -> u8 = if start > end {
+           |cur: u8, step: u8| -> u8 { cur.wrapping_sub(step) }
+       } else {
+           |cur: u8, step: u8| -> u8 { cur.wrapping_add(step) }
+       };
+       while cmp(start, end) {
+           out.push((start as char).to_string());
+           start = step_func(start, step);
+       }
+       Some(out)
+    }
+}
+
+fn numeric_range(start: isize, mut end: isize, step: isize, inclusive: bool) -> Option<Vec<String>> {
+   return if start < end {
+       if inclusive { end += if end <= 0 { -1 } else { 1 }; }
+       stepped_range_numeric(start, end, step)
+   } else if start > end {
+       if inclusive { end += if end <= 0 { -1 } else { 1 }; }
+       stepped_range_numeric(start, end, step)
+   } else {
+       Some(vec![start.to_string()])
+   }
+}
+
+#[inline]
+fn byte_is_valid_range(b: u8) -> bool {
+    (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z')
+}
+
+use std::u8;
+fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Vec<String>> {
+    if !byte_is_valid_range(start) || !byte_is_valid_range(end) {
+        return None;
+    }
+    
+    let char_step = match step.checked_abs() {
+        Some(v) => {
+            if v > u8::MAX as isize {
+                return None;
+            } else {
+               v as u8 
             }
-        }
-        if !self.validated {
-            match self.validate() {
-                Ok(_) => self.validated = true,
-                Err(_) => return None,
-            }
-        }
-        // we always return and step `self.start`, but if it is backwards we
-        // need to compare the other way around
-        if self.backwards {
-            step_logic!(self.end, self.start)
-        } else {
-            step_logic!(self.start, self.end)
-        }
+        },
+        None => return None,
+    };
+    
+    if start < end {
+        if inclusive { end += 1; }
+        return stepped_range_chars(start, end, char_step);
+    } else if start > end {
+        if inclusive { end -= 1; }
+        return stepped_range_chars(start, end, char_step);
+    } else {
+        return Some(vec![(start as char).to_string()]);
     }
 }
 
+fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize)> {
+    if let Ok(first) = a.parse::<isize>() {
+        if let Ok(sec) = b.parse::<isize>() {
+            Some((first, sec))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+
+// In a range we allow the following syntax:
+//      Exclusive nonstepped: {start..end}
+//      Inclusive nonstepped: {start...end}
+//      Exclusive stepped: {start..step..end}
+//      Inclusive stepped: {start..step...end}
 pub fn parse_range(input: &str) -> Option<Vec<String>> {
-    let mut bytes_iterator = input.bytes().enumerate();
-    let mut parsed_first = false;
-    let mut first = "";
-    let mut step = 1;
-    let mut dots = 0;
-    while let Some((idx, byte)) = bytes_iterator.next() {
+    let mut read = 0;
+    let mut bytes_iterator = input.bytes();
+    while let Some(byte) = bytes_iterator.next() {
         match byte {
-            b'0'...b'9' | b'-' | b'a'...b'z' | b'A'...b'Z' => continue,
-            b',' => {
-                first = &input[..idx];
-                parsed_first = true;
-                // match what is following the , as the step size
-                while let Some((inner_idx, inner_byte)) = bytes_iterator.next() {
-                    match inner_byte {
-                        b'0'...b'9' | b'-' => { continue },
-                        b'.' => {
-                            dots += 1;
-                            step = match input[idx + 1..inner_idx].parse::<isize>() {
-                                Ok(v) => v,
-                                Err(_) => return None,
-                            };
-                            break;
-                        },
-                        _ => return None,
-                    } 
-                }
-            }
+            // can only find these as the first byte, otherwise the syntax is bad
+            b'a'...b'z' | b'-' | b'A'...b'Z' if read == 0 => read += 1,
+            b'0'...b'9' => read += 1,
             b'.' => {
-                if !parsed_first {
-                    first = &input[..idx];
+                let first = &input[..read];
+                read += 1;
+                // The next byte has to be a dot to be valid range
+                // syntax
+                match bytes_iterator.next() {
+                    Some(b'.') => read += 1,
+                    _ => return None,
                 }
-                dots += 1;
-                while let Some((_, byte)) = bytes_iterator.next() {
-                    if byte == b'.' { dots += 1 } else { break }
-                }
-            
-                // 2 dots is exclusive 3 dots is inclusive
-                // 1..3 -> 1 2
-                // 1...3 -> 1 2 3
-                if dots != 2 && dots != 3 { return None; }
-                let inclusive = dots == 3;
-            
-                // when using the stepped range we already consumed one b'.' so the
-                // index is off by 1
-                let end = if parsed_first {
-                    &input[idx+dots-1..]
-                } else {
-                    &input[idx+dots..]
-                };
-            
-                if let Ok(start) = first.parse::<isize>() {
-                    if let Ok(mut end) = end.parse::<isize>() {
-                        return if step != 1 {
-                            SteppedRange::new_string_vec(start, end, step, inclusive)
-                        } else if start < end {
-                            if inclusive {
-                                end += 1;
-                            }
-                            Some((start..end).map(|x| x.to_string()).collect())
-                        } else if start > end {
-                            if dots == 2 {
-                                end += 1;
-                            }
-                            Some((end..start+1).rev().map(|x| x.to_string()).collect())
+
+                macro_rules! finish_char {
+                    ($inclusive:expr, $end_str:expr, $step:expr) => {
+                        if first.len() == 1 && $end_str.len() == 1 {
+                            let start = first.as_bytes()[0];
+                            let end = $end_str.as_bytes()[0];
+                            return char_range(start, end, $step, $inclusive);
                         } else {
-                            Some(vec![first.to_owned()])
+                            return None;
                         }
                     }
-                } else if first.len() == 1 && end.len() == 1 {
-                    let start = first.bytes().next().unwrap();
-                    let mut end = end.bytes().next().unwrap();
-            
-                    let is_valid = ((start >= b'a' && start <= b'z') && (end >= b'a' && end <= b'z'))
-                     || ((start >= b'A' && start <= b'Z') && (end >= b'A' && end <= b'Z'));
-            
-                    if !is_valid { break }
-                    return if start < end {
-                        if dots == 3 {
-                            end += 1;
-                        }
-                        Some((start..end).map(|x| {
-                            let mut output = String::with_capacity(1);
-                            output.push(x as char);
-                            output
-                        }).collect())
-                    } else if start > end {
-                        if dots == 2 {
-                            end += 1;
-                        }
-                        Some((end..start + 1).rev().map(|x| {
-                            let mut output = String::with_capacity(1);
-                            output.push(x as char);
-                            output
-                        }).collect())
-                    } else {
-                        Some(vec![first.to_owned()])
-                    }
-                } else {
-                    break
                 }
+
+                macro_rules! finish {
+                    ($inclusive:expr, $read:expr) => {
+                        let end_str = &input[$read..];
+                        if let Some((start, end)) = strings_to_isizes(first, end_str) {
+                            return numeric_range(start, end, if start < end { 1 } else { -1 }, $inclusive);
+                        } else {
+                            finish_char!($inclusive, end_str, 1);
+                        }
+                    };
+                    ($inclusive:expr, $read:expr, $step:expr) => {
+                        let end_str = &input[$read..];
+                        if let Some((start, end)) = strings_to_isizes(first, end_str) {
+                            return numeric_range(start, end, $step, $inclusive);
+                        } else {
+                            finish_char!($inclusive, end_str, $step);
+                        }
+                    };
+                }
+
+                // if the next byte is a dot we're certain it is an inclusive
+                // unstepped range otherwise it has to be [-0-9a-zA-Z]
+                if let Some(b) = bytes_iterator.next() {
+                    read += 1;
+                    match b {
+                        b'.' => {
+                            // this can only be an inclusive range 
+                            finish!(true, read);
+                        },
+                        b'0'...b'9' | b'-' | b'a'...b'z' | b'A'...b'Z'  => {
+                            // further processing needed to find out if we're reading a step or
+                            // the end of an exclusive range. Step until we find another dot or
+                            // the iterator ends
+                            let start = read - 1;
+                            while let Some(b) = bytes_iterator.next() {
+                                read += 1;
+                                match b {
+                                    b'.' => {
+                                        // stepped range input[start..read - 1] contains the step size
+                                        let step = match (&input[start..read - 1]).parse::<isize>() {
+                                            Ok(v) => v,
+                                            Err(_) => return None,
+                                        };
+                                        // count the dots to determine inclusive/exclusive
+                                        let mut dots = 1;
+                                        while let Some(b) = bytes_iterator.next() {
+                                            read += 1;
+                                            match b {
+                                                b'.' => dots += 1,
+                                                _ => break,
+                                            }
+                                        }
+                                        finish!(dots == 3, read - 1, step);
+                                    }, 
+                                    // numeric values are OK but no letters anymore
+                                    b'0'...b'9' => {},
+                                    // unexpected
+                                    _ => return None,
+                                }
+                            }
+                            // exhausted the iterator without finding anything new means
+                            // exclusive unstepped range
+                            finish!(false, start);
+                        },
+                        // not a valid byte for ranges
+                        _ => return None,
+                    }
+                } 
             },
             _ => break
         }
     }
-
     None
 }
 
