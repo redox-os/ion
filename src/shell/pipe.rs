@@ -368,17 +368,25 @@ fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
             }
         }
         RefinedJob::Builtin { ref name, ref args, ref stdin, ref stdout, ref stderr } => {
-            let stdout_bk = sys::dup(sys::STDOUT_FILENO).unwrap();
-            let stderr_bk = sys::dup(sys::STDERR_FILENO).unwrap();
-            let stdin_bk = sys::dup(sys::STDIN_FILENO).unwrap();
-            let args: Vec<&str> = args
-                .iter()
-                .map(|x| x as &str).collect();
-            let ret = builtin(shell, name, &args, *stdout, *stderr, *stdin);
-            redir(stdout_bk, sys::STDOUT_FILENO);
-            redir(stderr_bk, sys::STDERR_FILENO);
-            redir(stdin_bk, sys::STDIN_FILENO);
-            ret
+            if let Ok(stdout_bk) = sys::dup(sys::STDOUT_FILENO) {
+                if let Ok(stderr_bk) = sys::dup(sys::STDERR_FILENO) {
+                    if let Ok(stdin_bk) = sys::dup(sys::STDIN_FILENO) {
+                        let args: Vec<&str> = args
+                            .iter()
+                            .map(|x| x as &str).collect();
+                        let code = builtin(shell, name, &args, *stdout, *stderr, *stdin);
+                        redir(stdout_bk, sys::STDOUT_FILENO);
+                        redir(stderr_bk, sys::STDERR_FILENO);
+                        redir(stdin_bk, sys::STDIN_FILENO);
+                        return code;
+                    }
+                    let _ = sys::close(stderr_bk);
+                }
+                let _ = sys::close(stdout_bk);
+            }
+            eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
+                      long);
+            FAILURE
         }
     }
 }
