@@ -87,7 +87,7 @@ impl QuoteTerminator {
                         let bytes = &bytes[bytes.len()-2..];
                         bytes != &[b'&', b'&'] && bytes != &[b'|', b'|']
                     } else {
-                        false
+                        true
                     }
                 }
             }
