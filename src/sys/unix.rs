@@ -62,6 +62,10 @@ pub fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
     cvt(unsafe { libc::tcsetpgrp(fd as c_int, pgrp as pid_t) }).and(Ok(()))
 }
 
+pub fn dup(fd: RawFd) -> io::Result<RawFd> {
+    cvt(unsafe { libc::dup(fd) })
+}
+
 pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
     cvt(unsafe { libc::dup2(old, new) })
 }

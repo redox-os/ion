@@ -72,6 +72,10 @@ pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
     cvt(res).and(Ok(()))
 }
 
+pub fn dup(fd: RawFd) -> io::Result<RawFd> {
+    syscall::call::dup(fd, &[]).map_err(|e| io::Error::from_raw_os_error(err.errno))
+}
+
 pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
     syscall::call::dup2(old, new, &[]).map_err(|e| io::Error::from_raw_os_err(err.errno))
 }
