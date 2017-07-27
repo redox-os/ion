@@ -14,6 +14,10 @@ pub const SIGCONT: i32 = libc::SIGCONT;
 pub const SIGSTOP: i32 = libc::SIGSTOP;
 pub const SIGTSTP: i32 = libc::SIGTSTP;
 
+pub const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
+pub const STDERR_FILENO: i32 = libc::STDERR_FILENO;
+pub const STDIN_FILENO: i32 = libc::STDIN_FILENO;
+
 pub unsafe fn fork() -> io::Result<u32> {
     cvt(libc::fork()).map(|pid| pid as u32)
 }
@@ -56,6 +60,14 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
 
 pub fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
     cvt(unsafe { libc::tcsetpgrp(fd as c_int, pgrp as pid_t) }).and(Ok(()))
+}
+
+pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
+    cvt(unsafe { libc::dup2(old, new) })
+}
+
+pub fn close(fd: RawFd) -> io::Result<()> {
+    cvt(unsafe { libc::close(fd) }).and(Ok(()))
 }
 
 // Support functions for converting libc return values to io errors {
@@ -136,7 +148,7 @@ pub mod job_control {
     use shell::Shell;
     use libc::{self, pid_t};
 
-    use nix::sys::wait::{waitpid, WaitStatus, WNOHANG, WUNTRACED};
+    use nix::sys::wait::{waitpid, wait, WaitStatus, WNOHANG, WUNTRACED};
     #[cfg(not(target_os = "macos"))]
     use nix::sys::wait::{WCONTINUED};
 
@@ -213,7 +225,7 @@ pub mod job_control {
 
     pub fn watch_foreground<'a, F, D>(
         shell: &mut Shell<'a>,
-        pid: u32,
+        _pid: u32,
         last_pid: u32,
         get_command: F,
         mut drop_command: D,
@@ -224,7 +236,7 @@ pub mod job_control {
     {
         let mut exit_status = 0;
         loop {
-            match waitpid(-(pid as pid_t), Some(WUNTRACED)) {
+            match wait() {
                 Ok(WaitStatus::Exited(pid, status)) => if pid == (last_pid as i32) {
                     break status as i32;
                 } else {

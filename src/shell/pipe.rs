@@ -1,21 +1,30 @@
 use std::io::{self, Error, Write};
-use std::process::{Stdio, Command};
-use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::process::{Command, exit};
+use std::os::unix::io::{FromRawFd, IntoRawFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::fs::{File, OpenOptions};
 use super::flags::*;
 use super::fork::{fork_pipe, create_process_group};
 use super::job_control::JobControl;
 use super::{JobKind, Shell};
+use super::job::RefinedJob;
 use super::status::*;
 use super::signals::{self, SignalHandler};
 use parser::peg::{Pipeline, Input, RedirectFrom};
 use sys;
 
-/// Create an instance of Stdio from a byte slice that will echo the
-/// contents of the slice when read. This can be called with owned or
-/// borrowed strings
-pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<Stdio, Error> {
+/// Use dup2 to replace `old` with `new` using `old`s file descriptor ID
+pub fn redir(old: RawFd, new: RawFd) {
+    if let Err(e) = sys::dup2(old, new) {
+        eprintln!("ion: could not duplicate {} to {}: {}", old, new, e);
+    }
+}
+
+
+/// Create an OS pipe and write the contents of a byte slice to one end
+/// such that reading from this pipe will produce the byte slice. Return
+/// A file descriptor representing the read end of the pipe.
+pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<RawFd, Error> {
     let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)?;
     let mut infile = File::from_raw_fd(writer);
     // Write the contents; make sure to use write_all so that we block until
@@ -24,36 +33,7 @@ pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<Stdio, Error> {
     infile.flush()?;
     // `infile` currently owns the writer end RawFd. If we just return the reader end
     // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
-    Ok(Stdio::from_raw_fd(reader))
-}
-
-/// Set up pipes such that the relevant output of parent is sent to the stdin of child.
-/// The content that is sent depends on `mode`
-pub unsafe fn create_pipe (
-    parent: &mut Command,
-    child: &mut Command,
-    mode: RedirectFrom
-) -> Result<(), Error> {
-    let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)?;
-    match mode {
-        RedirectFrom::Stdout => {
-            parent.stdout(Stdio::from_raw_fd(writer));
-        },
-        RedirectFrom::Stderr => {
-            parent.stderr(Stdio::from_raw_fd(writer));
-        },
-        RedirectFrom::Both => {
-            let temp_file = File::from_raw_fd(writer);
-            let clone = temp_file.try_clone()?;
-            // We want to make sure that the temp file we created no longer has ownership
-            // over the raw file descriptor otherwise it gets closed
-            temp_file.into_raw_fd();
-            parent.stdout(Stdio::from_raw_fd(writer));
-            parent.stderr(Stdio::from_raw_fd(clone.into_raw_fd()));
-        }
-    }
-    child.stdin(Stdio::from_raw_fd(reader));
-    Ok(())
+    Ok(reader)
 }
 
 /// This function serves three purposes:
@@ -81,25 +61,39 @@ impl<'a> PipelineExecution for Shell<'a> {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
         let background_string = check_if_background_job(&pipeline, self.flags & PRINT_COMMS != 0);
 
-        // Generate a list of commands from the given pipeline
-        let mut piped_commands: Vec<(Command, JobKind)> = pipeline.jobs
-            .drain(..).map(|mut job| {
-                if self.builtins.contains_key(&job.command.as_ref()) {
-                    (job.build_command_builtin(), job.kind)
-                } else {
-                    (job.build_command_external(), job.kind)
-                }
-            }).collect();
+        let mut piped_commands: Vec<(RefinedJob, JobKind)> = {
+            pipeline.jobs
+                .drain(..)
+                .map(|mut job| {
+                    let refined = {
+                        if self.builtins.contains_key::<str>(
+                            job.command.as_ref()
+                        ) {
+                            RefinedJob::builtin(
+                                job.command,
+                                job.args.drain().collect()
+                            )
+                        } else {
+                            let mut command = Command::new(job.command);
+                            for arg in job.args.drain().skip(1) {
+                                command.arg(arg);
+                            }
+                            RefinedJob::External(command)
+                        }
+                    };
+                    (refined, job.kind)
+                })
+                .collect()
+        };
         match pipeline.stdin {
             None => (),
             Some(Input::File(ref filename)) => {
                 if let Some(command) = piped_commands.first_mut() {
                     match File::open(filename) {
-                        Ok(file) => unsafe {
-                            command.0.stdin(Stdio::from_raw_fd(file.into_raw_fd()));
-                        },
+                        Ok(file) => command.0.stdin(file.into_raw_fd()),
                         Err(e) => {
-                            eprintln!("ion: failed to redirect '{}' into stdin: {}", filename, e);
+                            eprintln!("ion: failed to redirect '{}' into stdin: {}",
+                                      filename, e)
                         }
                     }
                 }
@@ -112,8 +106,11 @@ impl<'a> PipelineExecution for Shell<'a> {
                             command.0.stdin(stdio);
                         },
                         Err(e) => {
-                            eprintln!("ion: failed to redirect herestring '{}' into stdin: {}",
-                                      string, e);
+                            eprintln!(
+                                "ion: failed to redirect herestring '{}' into stdin: {}",
+                                string,
+                                e
+                            );
                         }
                     }
                 }
@@ -128,20 +125,20 @@ impl<'a> PipelineExecution for Shell<'a> {
                     File::create(&stdout.file)
                 };
                 match file {
-                    Ok(f) => unsafe {
-                        match stdout.from {
-                            RedirectFrom::Both => {
-                                let fd = f.into_raw_fd();
-                                command.0.stderr(Stdio::from_raw_fd(fd));
-                                command.0.stdout(Stdio::from_raw_fd(fd));
-                            },
-                            RedirectFrom::Stderr => {
-                                command.0.stderr(Stdio::from_raw_fd(f.into_raw_fd()));
-                            },
-                            RedirectFrom::Stdout => {
-                                command.0.stdout(Stdio::from_raw_fd(f.into_raw_fd()));
-                            },
-                        }
+                    Ok(f) => match stdout.from {
+                        RedirectFrom::Both => {
+                            match f.try_clone() {
+                                Ok(f_copy) => {
+                                    command.0.stdout(f.into_raw_fd());
+                                    command.0.stderr(f_copy.into_raw_fd());
+                                },
+                                Err(e) => {
+                                    eprintln!("ion: failed to redirect both stderr and stdout into file '{:?}': {}", f, e);
+                                }
+                            }
+                        },
+                        RedirectFrom::Stderr => command.0.stderr(f.into_raw_fd()),
+                        RedirectFrom::Stdout => command.0.stdout(f.into_raw_fd()),
                     },
                     Err(err) => {
                         let stderr = io::stderr();
@@ -171,7 +168,7 @@ impl<'a> PipelineExecution for Shell<'a> {
 /// This function will panic if called with an empty slice
 pub fn pipe (
     shell: &mut Shell,
-    commands: Vec<(Command, JobKind)>,
+    commands: Vec<(RefinedJob, JobKind)>,
     foreground: bool
 ) -> i32 {
     let mut previous_status = SUCCESS;
@@ -194,9 +191,10 @@ pub fn pipe (
 
             match kind {
                 JobKind::Pipe(mut mode) => {
-                    // We need to remember the commands as they own the file descriptors that are
-                    // created by create_pipe. We purposfully drop the pipes that are
-                    // owned by a given command in `wait` in order to close those pipes, sending
+                    // We need to remember the commands as they own the file
+                    // descriptors that are created by sys::pipe.
+                    // We purposfully drop the pipes that are owned by a given
+                    // command in `wait` in order to close those pipes, sending
                     // EOF to the next command
                     let mut remember = Vec::new();
                     // A list of the PIDs in the piped command
@@ -205,63 +203,133 @@ pub fn pipe (
                     let mut pgid = 0; // 0 means the PGID is not set yet.
 
                     macro_rules! spawn_proc {
-                        ($cmd:expr) => {{
-                            let child = $cmd.before_exec(move || {
-                                signals::unblock();
-                                create_process_group(pgid);
-                                Ok(())
-                            }).spawn();
-                            match child {
-                                Ok(child) => {
-                                    if pgid == 0 {
-                                        pgid = child.id();
-                                        if foreground {
-                                            let _ = sys::tcsetpgrp(0, pgid);
+                        ($cmd:expr) => {
+                            let short = $cmd.short();
+                            match $cmd {
+                                RefinedJob::External(ref mut command) => {
+                                    match {
+                                        command.before_exec(move || {
+                                            signals::unblock();
+                                            create_process_group(pgid);
+                                            Ok(())
+                                        }).spawn()
+                                    } {
+                                        Ok(child) => {
+                                            if pgid == 0 {
+                                                pgid = child.id();
+                                                if foreground {
+                                                    let _ = sys::tcsetpgrp(0, pgid);
+                                                }
+                                            }
+                                            shell.foreground.push(child.id());
+                                            children.push(child.id());
+                                        },
+                                        Err(e) => {
+                                            eprintln!("ion: failed to spawn `{}`: {}",
+                                                      short, e);
+                                            return NO_SUCH_COMMAND
                                         }
                                     }
-                                    shell.foreground.push(child.id());
-                                    children.push(child.id());
-                                },
-                                Err(e) => {
-                                    eprintln!("ion: failed to spawn `{}`: {}", get_command_name($cmd), e);
-                                    return NO_SUCH_COMMAND
+                                }
+                                RefinedJob::Builtin { ref name,
+                                                      ref args,
+                                                      ref stdout,
+                                                      ref stderr,
+                                                      ref stdin, } =>
+                                {
+                                    match unsafe { sys::fork() } {
+                                        Ok(0) => {
+                                            signals::unblock();
+                                            create_process_group(pgid);
+                                            let args: Vec<&str> = args
+                                                .iter()
+                                                .map(|x| x as &str).collect();
+                                            builtin(shell,
+                                                    name,
+                                                    &args,
+                                                    *stdout,
+                                                    *stderr,
+                                                    *stdin);
+                                        },
+                                        Ok(pid) => {
+                                            if pgid == 0 {
+                                                pgid = pid;
+                                                if foreground {
+                                                    let _ = sys::tcsetpgrp(0, pgid);
+                                                }
+                                            }
+                                            shell.foreground.push(pid);
+                                            children.push(pid);
+                                        },
+                                        Err(e) => {
+                                            eprintln!("ion: failed to fork {}: {}",
+                                                      short,
+                                                      e);
+                                        }
+                                    }
                                 }
                             }
-                        }};
+                        };
                     }
 
                     // Append other jobs until all piped jobs are running
                     while let Some((mut child, ckind)) = commands.next() {
-                        if let Err(e) = unsafe {
-                            create_pipe(&mut parent, &mut child, mode)
-                        } {
-                            eprintln!("ion: failed to create pipe for redirection: {:?}", e);
+                        match sys::pipe2(sys::O_CLOEXEC) {
+                            Err(e) =>  {
+                                eprintln!("ion: failed to create pipe: {:?}", e);
+                            },
+                            Ok((reader, writer)) => {
+                                child.stdin(reader);
+                                match mode {
+                                    RedirectFrom::Stderr => {
+                                        parent.stderr(writer);
+                                    },
+                                    RedirectFrom::Stdout => {
+                                        parent.stdout(writer);
+                                    },
+                                    RedirectFrom::Both => {
+                                        let temp = unsafe {
+                                            File::from_raw_fd(writer)
+                                        };
+                                        match temp.try_clone() {
+                                            Err(e) => {
+                                                eprintln!("ion: failed to redirect stdout and stderr: {}", e);
+                                            }
+                                            Ok(duped) => {
+                                                parent.stderr(temp.into_raw_fd());
+                                                parent.stdout(duped.into_raw_fd());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
-                        spawn_proc!(&mut parent);
+                        spawn_proc!(parent);
                         remember.push(parent);
                         if let JobKind::Pipe(m) = ckind {
                             parent = child;
                             mode = m;
                         } else {
-                            // We set the kind to the last child kind that was processed. For
-                            // example, the pipeline `foo | bar | baz && zardoz` should have the
-                            // previous kind set to `And` after processing the initial pipeline
+                            // We set the kind to the last child kind that was
+                            // processed. For example, the pipeline
+                            // `foo | bar | baz && zardoz` should have the
+                            // previous kind set to `And` after processing the
+                            // initial pipeline
                             kind = ckind;
-                            spawn_proc!(&mut child);
+                            spawn_proc!(child);
                             remember.push(child);
                             break
                         }
                     }
-
                     previous_kind = kind;
                     previous_status = wait(shell, children, remember);
                     if previous_status == TERMINATED {
-                        terminate_fg(shell);
+                        shell.foreground_send(sys::SIGTERM);
                         return previous_status;
                     }
                 }
                 _ => {
-                    previous_status = execute_command(shell, &mut parent, foreground);
+                    previous_status = execute(shell, &mut parent, foreground);
                     previous_kind = kind;
                 }
             }
@@ -272,31 +340,53 @@ pub fn pipe (
     previous_status
 }
 
-fn terminate_fg(shell: &mut Shell) {
-    shell.foreground_send(sys::SIGTERM);
-}
-
-fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -> i32 {
-    match command.before_exec(move || {
-        signals::unblock();
-        create_process_group(0);
-        Ok(())
-    }).spawn() {
-        Ok(child) => {
-            if foreground {
-                let _ = sys::tcsetpgrp(0, child.id());
+fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
+    let short = job.short();
+    let long = job.long();
+    match *job {
+        RefinedJob::External(ref mut command) => {
+            match {
+                command.before_exec(move || {
+                    signals::unblock();
+                    create_process_group(0);
+                    Ok(())
+                }).spawn()
+            } {
+                Ok(child) => {
+                    if foreground {
+                        let _ = sys::tcsetpgrp(0, child.id());
+                    }
+                    shell.watch_foreground(child.id(), child.id(), move || long, |_| ())
+                },
+                Err(e) => {
+                    if e.kind() == io::ErrorKind::NotFound {
+                        eprintln!("ion: command not found: {}", short)
+                    } else {
+                        eprintln!("ion: error spawning process: {}", e)
+                    };
+                    FAILURE
+                }
             }
-            shell.watch_foreground(child.id(), child.id(), || get_full_command(command), |_| ())
-        },
-        Err(e) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = if e.kind() == io::ErrorKind::NotFound {
-                writeln!(stderr, "ion: Command not found: {}", get_command_name(command))
-            } else {
-                writeln!(stderr, "ion: Error spawning process: {}", e)
-            };
-            FAILURE
+        }
+        RefinedJob::Builtin { ref name, ref args, ref stdin, ref stdout, ref stderr } => {
+            match unsafe { sys::fork() } {
+                Ok(0) => {
+                    signals::unblock();
+                    create_process_group(0);
+                    let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
+                    builtin(shell, name, &args, *stdout, *stderr, *stdin)
+                },
+                Ok(pid) => {
+                    if foreground {
+                        let _ = sys::tcsetpgrp(0, pid);
+                    }
+                    shell.watch_foreground(pid, pid, move || long, |_| ())
+                },
+                Err(e) => {
+                    eprintln!("ion: fork error for '{}': {}", short, e);
+                    FAILURE
+                }
+            }
         }
     }
 }
@@ -306,14 +396,17 @@ fn execute_command(shell: &mut Shell, command: &mut Command, foreground: bool) -
 fn wait (
     shell: &mut Shell,
     mut children: Vec<u32>,
-    mut commands: Vec<Command>
+    mut commands: Vec<RefinedJob>
 ) -> i32 {
     // TODO: Find a way to only do this when absolutely necessary.
-    let as_string = commands.iter().map(get_full_command)
-            .collect::<Vec<String>>().join(" | ");
+    let as_string = commands.iter()
+        .map(RefinedJob::long)
+        .collect::<Vec<String>>()
+        .join(" | ");
 
     // Each process in the pipe has the same PGID, which is the first process's PID.
     let pgid = children[0];
+
     // If the last process exits, we know that all processes should exit.
     let last_pid = children[children.len()-1];
 
@@ -326,22 +419,47 @@ fn wait (
     })
 }
 
-fn get_command_name(command: &Command) -> String {
-    format!("{:?}", command).split('"').nth(1).unwrap_or("").to_string()
-}
 
-fn get_full_command(command: &Command) -> String {
-    let command = format!("{:?}", command);
-    let mut arg_iter = command.split_whitespace();
-    let command = arg_iter.next().unwrap();
-    let mut output = String::from(&command[1..command.len()-1]);
-    for argument in arg_iter {
-        output.push(' ');
-        if argument.len() > 2 {
-            output.push_str(&argument[1..argument.len()-1]);
-        } else {
-            output.push_str(&argument);
+/// Execute a builtin in the current process. Note that this will exit
+/// the current process with the return code of the builtin
+/// # Args
+/// * `shell`: A `Shell` that forwards relevant information to the builtin
+/// * `name`: Name of the builtin to execute.
+/// * `stdin`, `stdout`, `stderr`: File descriptors that will replace the
+///    respective standard streams if they are not `None`
+/// # Preconditions
+/// * `shell.builtins.contains_key(name)`; otherwise this function will panic
+fn builtin(
+    shell: &mut Shell,
+    name: &str,
+    args: &[&str],
+    stdout: Option<RawFd>,
+    stderr: Option<RawFd>,
+    stdin: Option<RawFd>,
+) -> ! {
+    /// Close a file descriptor by opening a `File` and letting it drop
+    fn close(fd: Option<RawFd>) {
+        if let Some(fd) = fd {
+            if let Err(e) = sys::close(fd) {
+                eprintln!("ion: failed to close file '{}': {}", fd, e);
+            }
         }
     }
-    output
+    if let Some(fd) = stdin {
+        redir(fd, sys::STDIN_FILENO);
+    }
+    if let Some(fd) = stdout {
+        redir(fd, sys::STDOUT_FILENO);
+    }
+    if let Some(fd) = stderr {
+        redir(fd, sys::STDERR_FILENO);
+    }
+    // The precondition for this function asserts that there exists some `builtin`
+    // in `shell` named `name`, so we unwrap here
+    let builtin = shell.builtins.get(name).unwrap();
+    let ret = (builtin.main)(args, shell);
+    close(stderr);
+    close(stdout);
+    close(stdin);
+    exit(ret)
 }

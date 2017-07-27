@@ -1,0 +1,6 @@
+matches Foo '([A-Z])\w+' && echo true
+matches foo '([A-Z])\w+' || echo false
+
+fn foobar x; end
+
+fn | tr '[a-z]' '[A-Z]'
