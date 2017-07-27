@@ -20,7 +20,6 @@ pub fn redir(old: RawFd, new: RawFd) {
     }
 }
 
-
 /// Create an OS pipe and write the contents of a byte slice to one end
 /// such that reading from this pipe will produce the byte slice. Return
 /// A file descriptor representing the read end of the pipe.
@@ -244,12 +243,12 @@ pub fn pipe (
                                             let args: Vec<&str> = args
                                                 .iter()
                                                 .map(|x| x as &str).collect();
-                                            builtin(shell,
-                                                    name,
-                                                    &args,
-                                                    *stdout,
-                                                    *stderr,
-                                                    *stdin);
+                                            exit(builtin(shell,
+                                                         name,
+                                                         &args,
+                                                         *stdout,
+                                                         *stderr,
+                                                         *stdin))
                                         },
                                         Ok(pid) => {
                                             if pgid == 0 {
@@ -369,24 +368,17 @@ fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
             }
         }
         RefinedJob::Builtin { ref name, ref args, ref stdin, ref stdout, ref stderr } => {
-            match unsafe { sys::fork() } {
-                Ok(0) => {
-                    signals::unblock();
-                    create_process_group(0);
-                    let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
-                    builtin(shell, name, &args, *stdout, *stderr, *stdin)
-                },
-                Ok(pid) => {
-                    if foreground {
-                        let _ = sys::tcsetpgrp(0, pid);
-                    }
-                    shell.watch_foreground(pid, pid, move || long, |_| ())
-                },
-                Err(e) => {
-                    eprintln!("ion: fork error for '{}': {}", short, e);
-                    FAILURE
-                }
-            }
+            let stdout_bk = sys::dup(sys::STDOUT_FILENO).unwrap();
+            let stderr_bk = sys::dup(sys::STDERR_FILENO).unwrap();
+            let stdin_bk = sys::dup(sys::STDIN_FILENO).unwrap();
+            let args: Vec<&str> = args
+                .iter()
+                .map(|x| x as &str).collect();
+            let ret = builtin(shell, name, &args, *stdout, *stderr, *stdin);
+            redir(stdout_bk, sys::STDOUT_FILENO);
+            redir(stderr_bk, sys::STDERR_FILENO);
+            redir(stdin_bk, sys::STDIN_FILENO);
+            ret
         }
     }
 }
@@ -420,8 +412,7 @@ fn wait (
 }
 
 
-/// Execute a builtin in the current process. Note that this will exit
-/// the current process with the return code of the builtin
+/// Execute a builtin in the current process.
 /// # Args
 /// * `shell`: A `Shell` that forwards relevant information to the builtin
 /// * `name`: Name of the builtin to execute.
@@ -436,7 +427,7 @@ fn builtin(
     stdout: Option<RawFd>,
     stderr: Option<RawFd>,
     stdin: Option<RawFd>,
-) -> ! {
+) -> i32 {
     /// Close a file descriptor by opening a `File` and letting it drop
     fn close(fd: Option<RawFd>) {
         if let Some(fd) = fd {
@@ -461,5 +452,5 @@ fn builtin(
     close(stderr);
     close(stdout);
     close(stdin);
-    exit(ret)
+    ret
 }
