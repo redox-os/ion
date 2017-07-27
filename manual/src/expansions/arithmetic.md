@@ -22,3 +22,7 @@ string variables. Supported operators are as below:
 - Left Shift(`$((a << b))`)
 - Right Shift(`$((a >> b))`)
 - Parenthesis(`$((4 * (pi * r²)))`)
+
+Take note, however, that these expressions are evaluated to adhere to order of operation rules.
+Therefore, expressions are not guaranteed to evaluate left to right, and parenthesis should be
+used when you are unsure about the order of applied operations.

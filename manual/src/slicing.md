@@ -1,4 +1,4 @@
-# Slicing Syntax
+# Ranges & Slicing Syntax
 
 Ion supports a universal syntax for slicing strings and arrays. For maximum language support,
 strings are sliced and indexed by graphemes. Arrays are sliced and indexed by their elements.
@@ -36,6 +36,81 @@ When using inclusive ranges, the end index does not refer to the Nth value, but 
 $ let array = [{1...10}]
 $ echo @array[1...5]
 > 1 2 3 4 5 6
+```
+
+## Descending Ranges
+
+Ranges do not have to always be specified in ascending order. Descending ranges are also
+supported. However, at this time you cannot provide an descending range as an index to an array.
+
+```ion
+$ echo {10...1}
+> 10 9 8 7 6 5 4 3 2 1
+$ echo {10..1}
+> 10 9 8 7 6 5 4 3 2
+```
+
+## Negative Values Supported
+
+Although this will not work for arrays, you may supply negative values with ranges to create
+negative values in a range of numbers.i
+
+```ion
+$ echo {-10...10}
+> -10 -9 -8 -7 -6 -5 -4 -3 -2 -1 0 1 2 3 4 5 6 7 8 9 10
+```
+
+## Stepping Ranges
+
+Stepped ranges are also supported.
+
+### Stepping Forward w/ Brace Ranges
+
+Brace ranges support a syntax similar to Bash, where the starting index is supplied, followed by
+two periods and a stepping value, followed by either another two periods or three periods, then
+the end index.
+
+```ion
+$ echo {0..3...12}
+> 0 3 6 9 12
+$ echo {1..2..12}
+> 0 3 6 9
+$ let array = [{1...30}]
+```
+
+### Stepping Forward w/ Array Slicing
+
+Array slicing, on the other hand, uses a more Haskell-ish syntax, whereby instead of specifying
+the stepping with two periods, it is specified with a comma.
+
+```ion
+$ let array = [{0...30}]
+$ echo @array[0,3..]
+> 0 3 6 9 12 15 18 21 24 27 30
+```
+
+## Stepping In Reverse w/ Brace Ranges
+
+Brace ranges may also specify a range that descends in value, rather than increases.
+
+```ion
+$ echo {10..-2...-10}
+> 10 8 6 4 2 0 -2 -4 -6 -8 -10
+$ echo {10..-2..-10}
+> 10 8 6 4 2 0 -2 -4 -6 -8
+```
+
+## Stepping In Reverse w/ Array Slicing
+
+Arrays may also be sliced in reverse order using the same syntax as for reverse. Of course,
+negative values aren't allowed here, so ensure that the last value is never less than 0.
+Also note that when a negative stepping is supplied, it is automatically inferred for the
+end index value to be 0 when not specified.
+
+```ion
+$ let array = [{0...30}]
+$ echo @array[30,-3..]
+> 30 27 24 21 18 15 12 9 6 3 0
 ```
 
 ## Process Expansions Also Support Slicing
