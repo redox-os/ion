@@ -1,5 +1,6 @@
+use std::fs::File;
 use std::process::{Command, Stdio};
-use std::os::unix::io::{RawFd, FromRawFd};
+use std::os::unix::io::{FromRawFd, IntoRawFd};
 
 //use glob::glob;
 use parser::{expand_string, ExpanderFunctions};
@@ -49,11 +50,11 @@ pub enum RefinedJob {
         /// Arguments to pass in to the procedure
         args: Array,
         /// A file corresponding to the standard input for this builtin
-        stdin: Option<RawFd>,
+        stdin: Option<File>,
         /// A file corresponding to the standard output for this builtin
-        stdout: Option<RawFd>,
+        stdout: Option<File>,
         /// A file corresponding to the standard error for this builtin
-        stderr: Option<RawFd>,
+        stderr: Option<File>,
     }
 }
 
@@ -62,7 +63,7 @@ macro_rules! set_field {
         match *$self {
             RefinedJob::External(ref mut command) => {
                 unsafe {
-                    command.$field(Stdio::from_raw_fd($arg));
+                    command.$field(Stdio::from_raw_fd($arg.into_raw_fd()));
                 }
             }
             RefinedJob::Builtin { ref mut $field,  .. } => {
@@ -84,15 +85,15 @@ impl RefinedJob {
         }
     }
 
-    pub fn stdin(&mut self, fd: RawFd) {
+    pub fn stdin<T: IntoRawFd>(&mut self, fd: T) {
         set_field!(self, stdin, fd);
     }
 
-    pub fn stdout(&mut self, fd: RawFd) {
+    pub fn stdout<T: IntoRawFd>(&mut self, fd: T) {
         set_field!(self, stdout, fd);
     }
 
-    pub fn stderr(&mut self, fd: RawFd) {
+    pub fn stderr<T: IntoRawFd>(&mut self, fd: T) {
         set_field!(self, stderr, fd);
     }
 
@@ -129,44 +130,6 @@ impl RefinedJob {
             },
             RefinedJob::Builtin { ref args, .. } => {
                 format!("{}", args.join(" "))
-            }
-        }
-    }
-
-}
-
-impl Drop for RefinedJob {
-
-    // This is needed in order to ensure that the parent instance of RefinedJob
-    // cleans up after its own `RawFd`s; otherwise these would never be properly
-    // closed, never sending EOF, causing any process reading from these
-    // `RawFd`s to halt indefinitely.
-    fn drop(&mut self) {
-        match *self {
-            RefinedJob::External(ref mut cmd) => {
-                drop(cmd);
-            },
-            RefinedJob::Builtin {
-                ref mut name,
-                ref mut args,
-                ref mut stdin,
-                ref mut stdout,
-                ref mut stderr,
-            } => {
-                fn close(fd: Option<RawFd>) {
-                    if let Some(fd) = fd {
-                        if let Err(e) = sys::close(fd) {
-                            eprintln!("ion: failed to close file descriptor '{}': {}",
-                                      fd,
-                                      e);
-                        }
-                    }
-                }
-                drop(name);
-                drop(args);
-                close(*stdin);
-                close(*stdout);
-                close(*stderr);
             }
         }
     }
