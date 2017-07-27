@@ -156,7 +156,9 @@ impl Drop for RefinedJob {
                 fn close(fd: Option<RawFd>) {
                     if let Some(fd) = fd {
                         if let Err(e) = sys::close(fd) {
-                            eprintln!("ion: failed to close file '{}': {}", fd, e);
+                            eprintln!("ion: failed to close file descriptor '{}': {}",
+                                      fd,
+                                      e);
                         }
                     }
                 }

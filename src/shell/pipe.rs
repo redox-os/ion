@@ -170,6 +170,15 @@ pub fn pipe (
     commands: Vec<(RefinedJob, JobKind)>,
     foreground: bool
 ) -> i32 {
+
+    fn close(fd: Option<RawFd>) {
+        if let Some(fd) = fd {
+            if let Err(e) = sys::close(fd) {
+                eprintln!("ion: failed to close file descriptor '{}': {}", fd, e);
+            }
+        }
+    }
+
     let mut previous_status = SUCCESS;
     let mut previous_kind = JobKind::And;
     let mut commands = commands.into_iter();
@@ -243,12 +252,16 @@ pub fn pipe (
                                             let args: Vec<&str> = args
                                                 .iter()
                                                 .map(|x| x as &str).collect();
-                                            exit(builtin(shell,
-                                                         name,
-                                                         &args,
-                                                         *stdout,
-                                                         *stderr,
-                                                         *stdin))
+                                            let ret = builtin(shell,
+                                                              name,
+                                                              &args,
+                                                              *stdout,
+                                                              *stderr,
+                                                              *stdin);
+                                            close(*stdout);
+                                            close(*stderr);
+                                            close(*stdin);
+                                            exit(ret)
                                         },
                                         Ok(pid) => {
                                             if pgid == 0 {
@@ -436,14 +449,6 @@ fn builtin(
     stderr: Option<RawFd>,
     stdin: Option<RawFd>,
 ) -> i32 {
-    /// Close a file descriptor by opening a `File` and letting it drop
-    fn close(fd: Option<RawFd>) {
-        if let Some(fd) = fd {
-            if let Err(e) = sys::close(fd) {
-                eprintln!("ion: failed to close file '{}': {}", fd, e);
-            }
-        }
-    }
     if let Some(fd) = stdin {
         redir(fd, sys::STDIN_FILENO);
     }
@@ -456,9 +461,5 @@ fn builtin(
     // The precondition for this function asserts that there exists some `builtin`
     // in `shell` named `name`, so we unwrap here
     let builtin = shell.builtins.get(name).unwrap();
-    let ret = (builtin.main)(args, shell);
-    close(stderr);
-    close(stdout);
-    close(stdin);
-    ret
+    (builtin.main)(args, shell)
 }
