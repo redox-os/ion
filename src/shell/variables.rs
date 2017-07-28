@@ -29,7 +29,7 @@ impl Default for Variables {
         let mut map = FnvHashMap::with_capacity_and_hasher(64, Default::default());
         map.insert("DIRECTORY_STACK_SIZE".into(), "1000".into());
         map.insert("HISTORY_SIZE".into(), "1000".into());
-        map.insert("HISTORY_FILE_SIZE".into(), "1000".into());
+        map.insert("HISTFILE_SIZE".into(), "1000".into());
         map.insert("PROMPT".into(), "\x1B\']\'0;${USER}: ${PWD}\x07\x1B\'[\'0m\x1B\'[\'1;38;5;85m${USER}\x1B\'[\'37m:\x1B\'[\'38;5;75m${PWD}\x1B\'[\'37m#\x1B\'[\'0m ".into());
         // Set the PID variable to the PID of the shell
         let pid = getpid().map(|p| p.to_string()).unwrap_or_else(
@@ -37,7 +37,7 @@ impl Default for Variables {
         );
         map.insert("PID".into(), pid.into());
 
-        // Initialize the HISTORY_FILE variable
+        // Initialize the HISTFILE variable
         if let Ok(mut home_path) =
             app_root(
                 AppDataType::UserData,
@@ -48,8 +48,8 @@ impl Default for Variables {
             )
         {
             home_path.push("history");
-            map.insert("HISTORY_FILE".into(), home_path.to_str().unwrap_or("?").into());
-            map.insert("HISTORY_FILE_ENABLED".into(), "1".into());
+            map.insert("HISTFILE".into(), home_path.to_str().unwrap_or("?").into());
+            map.insert("HISTFILE_ENABLED".into(), "1".into());
         }
 
         // Initialize the PWD (Present Working Directory) variable

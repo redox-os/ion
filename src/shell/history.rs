@@ -10,7 +10,7 @@ pub trait ShellHistory {
     /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if it
     /// is set otherwise to a default value (1000).
     ///
-    /// If the HISTORY_FILE_ENABLED shell variable is set to 1, then HISTORY_FILE_SIZE is synced
+    /// If the HISTFILE_ENABLED shell variable is set to 1, then HISTFILE_SIZE is synced
     /// with the shell context as well. Otherwise, the history file name is set to None in the
     /// shell context.
     ///
@@ -45,15 +45,15 @@ impl<'a> ShellHistory for Shell<'a> {
 
         context.history.set_max_size(max_history_size);
 
-        if &*self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") == "1" {
-            let file_name = self.variables.get_var("HISTORY_FILE");
+        if &*self.variables.get_var_or_empty("HISTFILE_ENABLED") == "1" {
+            let file_name = self.variables.get_var("HISTFILE");
             context.history.set_file_name(file_name.map(|f| f.into()));
 
-            let max_history_file_size = self.variables
-                .get_var_or_empty("HISTORY_FILE_SIZE")
+            let max_histfile_size = self.variables
+                .get_var_or_empty("HISTFILE_SIZE")
                 .parse()
                 .unwrap_or(1000);
-            context.history.set_max_file_size(max_history_file_size);
+            context.history.set_max_file_size(max_histfile_size);
         } else {
             context.history.set_file_name(None);
         }
