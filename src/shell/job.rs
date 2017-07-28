@@ -30,7 +30,12 @@ impl Job {
         let mut expanded = Array::new();
         expanded.grow(self.args.len());
         expanded.extend(self.args.drain().flat_map(|arg| {
-            expand_string(&arg, expanders, false)
+            let res = expand_string(&arg, expanders, false);
+            if res.is_empty() {
+                array![""]
+            } else {
+                res
+            }
         }));
         self.args = expanded;
     }
@@ -131,6 +136,34 @@ impl RefinedJob {
                 format!("{}", args.join(" "))
             }
         }
+    }
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use parser::ExpanderFunctions;
+    use shell::variables::Variables;
+
+    macro_rules! functions {
+        () => {
+            ExpanderFunctions {
+                vars:     &Variables::default(),
+                tilde:    &|_| None,
+                array:    &|_, _| None,
+                variable: &|_, _| None,
+                command:  &|_| None
+            }
+        }
+    }
+
+    #[test]
+    fn preserve_empty_arg() {
+        let job = Job::new(array!("rename", "", "0", "a"), JobKind::Last);
+        let mut expanded = job.clone();
+        expanded.expand(&functions!());
+        assert_eq!(job, expanded);
     }
 
 }
