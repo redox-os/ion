@@ -1,4 +1,5 @@
 use std::io::{self, Error, Write};
+use std::iter;
 use std::process::{Command, exit};
 use std::os::unix::io::{FromRawFd, AsRawFd, RawFd};
 use std::os::unix::process::CommandExt;
@@ -53,6 +54,11 @@ fn check_if_background_job(pipeline: &Pipeline, print_comm: bool) -> Option<Stri
     }
 }
 
+#[inline(always)]
+fn is_implicit_cd(argument: &str) -> bool {
+    argument.starts_with('.') || argument.starts_with('/') || argument.ends_with('/')
+}
+
 pub trait PipelineExecution {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32;
 }
@@ -66,7 +72,12 @@ impl<'a> PipelineExecution for Shell<'a> {
                 .drain(..)
                 .map(|mut job| {
                     let refined = {
-                        if self.builtins.contains_key::<str>(
+                        if is_implicit_cd(&job.args[0]) {
+                            RefinedJob::builtin(
+                                "cd".into(),
+                                iter::once("cd".into()).chain(job.args.drain()).collect()
+                            )
+                        } else if self.builtins.contains_key::<str>(
                             job.command.as_ref()
                         ) {
                             RefinedJob::builtin(
