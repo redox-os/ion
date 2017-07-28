@@ -442,105 +442,125 @@ pub struct StringMethod<'a> {
 impl<'a> StringMethod<'a> {
 
     pub fn handle(&self, output: &mut String, expand: &ExpanderFunctions) {
+        let (variable, pattern) = (self.variable, self.pattern);
+
+        macro_rules! string_eval {
+            ($variable:ident $method:tt $pattern:ident) => {{
+                let pattern = expand_string($pattern, expand, false).join(" ");
+                let is_true = if let Some(value) = expand.vars.get_var($variable) {
+                    value.$method(&pattern)
+                } else if is_expression($variable) {
+                    expand_string($variable, &expand, false).join($pattern)
+                        .$method(&pattern)
+                } else {
+                    false
+                };
+                output.push_str(if is_true { "1" } else { "0" });
+            }}
+        }
+        
         match self.method {
+            "ends_with" => string_eval!(variable ends_with pattern),
+            "contains" => string_eval!(variable contains pattern),
+            "starts_with" => string_eval!(variable starts_with pattern), 
             "join" => {
-                let pattern = expand_string(self.pattern, expand, false).join(" ");
-                if let Some(array) = (expand.array)(self.variable, Select::All) {
+                let pattern = expand_string(pattern, expand, false).join(" ");
+                if let Some(array) = (expand.array)(variable, Select::All) {
                     slice(output, array.join(&pattern), self.selection.clone());
-                } else if is_expression(self.variable) {
-                    slice(output, expand_string(self.variable, expand, false).join(&pattern), self.selection.clone());
+                } else if is_expression(variable) {
+                    slice(output, expand_string(variable, expand, false).join(&pattern), self.selection.clone());
                 }
             },
             "len" => {
-                if self.variable.starts_with('@') || self.variable.starts_with('[') {
-                    if let Some(array) = expand.vars.get_array(self.variable) {
+                if variable.starts_with('@') || variable.starts_with('[') {
+                    if let Some(array) = expand.vars.get_array(variable) {
                         output.push_str(&array.len().to_string())
-                    } else if is_expression(self.variable) {
-                        let expanded = expand_string(self.variable, expand, false);
+                    } else if is_expression(variable) {
+                        let expanded = expand_string(variable, expand, false);
                         output.push_str(&expanded.len().to_string());
                     } else {
                         output.push_str("0")
                     }
-                } else if let Some(value) = expand.vars.get_var(self.variable) {
+                } else if let Some(value) = expand.vars.get_var(variable) {
                     let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
                     output.push_str(&count.to_string());
-                } else if is_expression(self.variable) {
-                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
                     let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
                     output.push_str(&count.to_string());
                 }
             },
             "len_bytes" => {
-                if let Some(value) = expand.vars.get_var(self.variable) {
+                if let Some(value) = expand.vars.get_var(variable) {
                     output.push_str(&value.as_bytes().len().to_string());
-                } else if is_expression(self.variable) {
-                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
                     output.push_str(&word.as_bytes().len().to_string());
                 }
             },
             "basename" => {
-                if let Some(value) = expand.vars.get_var(self.variable) {
+                if let Some(value) = expand.vars.get_var(variable) {
                     output.push_str(Path::new(&value).file_name()
                         .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
-                } else if is_expression(self.variable) {
-                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
                     output.push_str(Path::new(&word).file_name()
                         .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
                 }
             },
             "extension" => {
-                if let Some(value) = expand.vars.get_var(self.variable) {
+                if let Some(value) = expand.vars.get_var(variable) {
                     output.push_str(Path::new(&value).extension()
                         .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
-                } else if is_expression(self.variable) {
-                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
                     output.push_str(Path::new(&word).extension()
                         .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
                 }
             },
             "filename" => {
-                if let Some(value) = expand.vars.get_var(self.variable) {
+                if let Some(value) = expand.vars.get_var(variable) {
                     output.push_str(Path::new(&value).file_stem()
                         .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
-                } else if is_expression(self.variable) {
-                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
                     output.push_str(Path::new(&word).file_stem()
                         .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
                 }
             },
             "parent" => {
-                if let Some(value) = expand.vars.get_var(self.variable) {
+                if let Some(value) = expand.vars.get_var(variable) {
                     output.push_str(Path::new(&value).parent()
                         .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
-                } else if is_expression(self.variable) {
-                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
                     output.push_str(Path::new(&word).parent()
                         .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
                 }
             },
             "reverse" => {
-                if let Some(value) = expand.vars.get_var(self.variable) {
+                if let Some(value) = expand.vars.get_var(variable) {
                     let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
-                } else if is_expression(self.variable) {
-                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
                     let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
                 }
             },
             "to_lowercase" => {
-                if let Some(value) = expand.vars.get_var(self.variable) {
+                if let Some(value) = expand.vars.get_var(variable) {
                     output.push_str(value.to_lowercase().as_str());
-                } else if is_expression(self.variable) {
-                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
                     output.push_str(word.to_lowercase().as_str());
                 }
             },
             "to_uppercase" => {
-                if let Some(value) = expand.vars.get_var(self.variable) {
+                if let Some(value) = expand.vars.get_var(variable) {
                     output.push_str(value.to_uppercase().as_str());
-                } else if is_expression(self.variable) {
-                    let word = expand_string(self.variable, &expand, false).join(self.pattern);
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
                     output.push_str(word.to_uppercase().as_str());
                 }
             },
