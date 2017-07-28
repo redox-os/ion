@@ -82,6 +82,15 @@ pub fn close(fd: RawFd) -> io::Result<()> {
     cvt(syscall::close(fd)).and(Ok(()))
 }
 
+pub fn isatty(fd: RawFd) -> bool {
+    if let Ok(fd) = syscall::dup(f, &[]) {
+        let _ = syscall::close(fd);
+        true
+    } else {
+        false
+    }
+}
+
 // Support function for converting syscall error to io error
 fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
     result.map_err(|err| io::Error::from_raw_os_error(err.errno))

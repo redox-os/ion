@@ -4,3 +4,6 @@ matches foo '([A-Z])\w+' || echo false
 fn foobar x; end
 
 fn | tr '[a-z]' '[A-Z]'
+
+read foo <<< $(echo bar)
+echo $foo
