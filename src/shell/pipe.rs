@@ -1,6 +1,6 @@
 use std::io::{self, Error, Write};
 use std::process::{Command, exit};
-use std::os::unix::io::{FromRawFd, IntoRawFd, RawFd};
+use std::os::unix::io::{FromRawFd, AsRawFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::fs::{File, OpenOptions};
 use super::flags::*;
@@ -13,8 +13,9 @@ use super::signals::{self, SignalHandler};
 use parser::peg::{Pipeline, Input, RedirectFrom};
 use sys;
 
+
 /// Use dup2 to replace `old` with `new` using `old`s file descriptor ID
-pub fn redir(old: RawFd, new: RawFd) {
+fn redir(old: RawFd, new: RawFd) {
     if let Err(e) = sys::dup2(old, new) {
         eprintln!("ion: could not duplicate {} to {}: {}", old, new, e);
     }
@@ -89,7 +90,7 @@ impl<'a> PipelineExecution for Shell<'a> {
             Some(Input::File(ref filename)) => {
                 if let Some(command) = piped_commands.first_mut() {
                     match File::open(filename) {
-                        Ok(file) => command.0.stdin(file.into_raw_fd()),
+                        Ok(file) => command.0.stdin(file),
                         Err(e) => {
                             eprintln!("ion: failed to redirect '{}' into stdin: {}",
                                       filename, e)
@@ -102,7 +103,9 @@ impl<'a> PipelineExecution for Shell<'a> {
                     if !string.ends_with('\n') { string.push('\n'); }
                     match unsafe { stdin_of(&string) } {
                         Ok(stdio) => {
-                            command.0.stdin(stdio);
+                            command.0.stdin(unsafe {
+                                File::from_raw_fd(stdio)
+                            });
                         },
                         Err(e) => {
                             eprintln!(
@@ -128,16 +131,16 @@ impl<'a> PipelineExecution for Shell<'a> {
                         RedirectFrom::Both => {
                             match f.try_clone() {
                                 Ok(f_copy) => {
-                                    command.0.stdout(f.into_raw_fd());
-                                    command.0.stderr(f_copy.into_raw_fd());
+                                    command.0.stdout(f);
+                                    command.0.stderr(f_copy);
                                 },
                                 Err(e) => {
                                     eprintln!("ion: failed to redirect both stderr and stdout into file '{:?}': {}", f, e);
                                 }
                             }
                         },
-                        RedirectFrom::Stderr => command.0.stderr(f.into_raw_fd()),
-                        RedirectFrom::Stdout => command.0.stdout(f.into_raw_fd()),
+                        RedirectFrom::Stderr => command.0.stderr(f),
+                        RedirectFrom::Stdout => command.0.stdout(f),
                     },
                     Err(err) => {
                         let stderr = io::stderr();
@@ -171,10 +174,10 @@ pub fn pipe (
     foreground: bool
 ) -> i32 {
 
-    fn close(fd: Option<RawFd>) {
-        if let Some(fd) = fd {
-            if let Err(e) = sys::close(fd) {
-                eprintln!("ion: failed to close file descriptor '{}': {}", fd, e);
+    fn close(file: &Option<File>) {
+        if let &Some(ref file) = file {
+            if let Err(e) = sys::close(file.as_raw_fd()) {
+                eprintln!("ion: failed to close file '{:?}': {}", file, e);
             }
         }
     }
@@ -255,12 +258,12 @@ pub fn pipe (
                                             let ret = builtin(shell,
                                                               name,
                                                               &args,
-                                                              *stdout,
-                                                              *stderr,
-                                                              *stdin);
-                                            close(*stdout);
-                                            close(*stderr);
-                                            close(*stdin);
+                                                              stdout,
+                                                              stderr,
+                                                              stdin);
+                                            close(stdout);
+                                            close(stderr);
+                                            close(stdin);
                                             exit(ret)
                                         },
                                         Ok(pid) => {
@@ -291,13 +294,19 @@ pub fn pipe (
                                 eprintln!("ion: failed to create pipe: {:?}", e);
                             },
                             Ok((reader, writer)) => {
-                                child.stdin(reader);
+                                child.stdin(unsafe {
+                                    File::from_raw_fd(reader)
+                                });
                                 match mode {
                                     RedirectFrom::Stderr => {
-                                        parent.stderr(writer);
+                                        parent.stderr(unsafe {
+                                            File::from_raw_fd(writer)
+                                        });
                                     },
                                     RedirectFrom::Stdout => {
-                                        parent.stdout(writer);
+                                        parent.stdout(unsafe {
+                                            File::from_raw_fd(writer)
+                                        });
                                     },
                                     RedirectFrom::Both => {
                                         let temp = unsafe {
@@ -308,8 +317,8 @@ pub fn pipe (
                                                 eprintln!("ion: failed to redirect stdout and stderr: {}", e);
                                             }
                                             Ok(duped) => {
-                                                parent.stderr(temp.into_raw_fd());
-                                                parent.stdout(duped.into_raw_fd());
+                                                parent.stderr(temp);
+                                                parent.stdout(duped);
                                             }
                                         }
                                     }
@@ -387,7 +396,7 @@ fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
                         let args: Vec<&str> = args
                             .iter()
                             .map(|x| x as &str).collect();
-                        let code = builtin(shell, name, &args, *stdout, *stderr, *stdin);
+                        let code = builtin(shell, name, &args, stdout, stderr, stdin);
                         redir(stdout_bk, sys::STDOUT_FILENO);
                         redir(stderr_bk, sys::STDERR_FILENO);
                         redir(stdin_bk, sys::STDIN_FILENO);
@@ -445,18 +454,18 @@ fn builtin(
     shell: &mut Shell,
     name: &str,
     args: &[&str],
-    stdout: Option<RawFd>,
-    stderr: Option<RawFd>,
-    stdin: Option<RawFd>,
+    stdout: &Option<File>,
+    stderr: &Option<File>,
+    stdin: &Option<File>,
 ) -> i32 {
-    if let Some(fd) = stdin {
-        redir(fd, sys::STDIN_FILENO);
+    if let Some(ref file) = *stdin {
+        redir(file.as_raw_fd(), sys::STDIN_FILENO);
     }
-    if let Some(fd) = stdout {
-        redir(fd, sys::STDOUT_FILENO);
+    if let Some(ref file) = *stdout {
+        redir(file.as_raw_fd(), sys::STDOUT_FILENO);
     }
-    if let Some(fd) = stderr {
-        redir(fd, sys::STDERR_FILENO);
+    if let Some(ref file) = *stderr {
+        redir(file.as_raw_fd(), sys::STDERR_FILENO);
     }
     // The precondition for this function asserts that there exists some `builtin`
     // in `shell` named `name`, so we unwrap here

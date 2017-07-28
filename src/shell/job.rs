@@ -6,7 +6,6 @@ use std::os::unix::io::{FromRawFd, IntoRawFd};
 use parser::{expand_string, ExpanderFunctions};
 use parser::peg::RedirectFrom;
 use smallstring::SmallString;
-use sys;
 use types::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -85,16 +84,16 @@ impl RefinedJob {
         }
     }
 
-    pub fn stdin<T: IntoRawFd>(&mut self, fd: T) {
-        set_field!(self, stdin, fd);
+    pub fn stdin(&mut self, file: File) {
+        set_field!(self, stdin, file);
     }
 
-    pub fn stdout<T: IntoRawFd>(&mut self, fd: T) {
-        set_field!(self, stdout, fd);
+    pub fn stdout(&mut self, file: File) {
+        set_field!(self, stdout, file);
     }
 
-    pub fn stderr<T: IntoRawFd>(&mut self, fd: T) {
-        set_field!(self, stderr, fd);
+    pub fn stderr(&mut self, file: File) {
+        set_field!(self, stderr, file);
     }
 
     /// Returns a short description of this job: often just the command
