@@ -616,7 +616,7 @@ mod test {
     #[test]
     fn inline_expression() {
         let cases = vec![
-            (array!["5"], "@len([0 1 2 3 4])"),
+            (array!["5"], "$len([0 1 2 3 4])"),
             (array!["FxOxO"], "$join(@chars(FOO), 'x')")
         ];
         for (expected, input) in cases {
