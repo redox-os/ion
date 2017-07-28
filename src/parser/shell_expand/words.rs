@@ -493,6 +493,22 @@ impl<'a> StringMethod<'a> {
             "parent"       => path_eval!(parent),
             "to_lowercase" => string_case!(to_lowercase),
             "to_uppercase" => string_case!(to_uppercase),
+            "repeat" => {
+                let pattern = expand_string(pattern, expand, false).join(" ");
+                match pattern.parse::<usize>() {
+                    Ok(repeat) => {
+                        if let Some(value) = expand.vars.get_var(variable) {
+                            output.push_str(&value.repeat(repeat));
+                        } else if is_expression(variable) {
+                            let value = expand_string(variable, &expand, false).join(" ");
+                            output.push_str(&value.repeat(repeat));
+                        }
+                    },
+                    Err(_) => {
+                        eprintln!("ion: value supplied to $repeat() is not a valid number");
+                    }
+                }
+            }
             "replace" => {
                 let pattern = ArgumentSplitter::new(pattern)
                     .map(|x| expand_string(x, expand, false).join(" "))
