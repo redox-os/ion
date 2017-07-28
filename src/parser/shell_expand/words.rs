@@ -458,11 +458,41 @@ impl<'a> StringMethod<'a> {
                 output.push_str(if is_true { "1" } else { "0" });
             }}
         }
-        
+
+        macro_rules! path_eval {
+            ($method:tt) => {{
+                if let Some(value) = expand.vars.get_var(variable) {
+                    output.push_str(Path::new(&value).$method()
+                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
+                    output.push_str(Path::new(&word).$method()
+                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
+                }
+            }}
+        }
+
+        macro_rules! string_case {
+            ($method:tt) => {{
+                if let Some(value) = expand.vars.get_var(variable) {
+                    output.push_str(value.$method().as_str());
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, &expand, false).join(pattern);
+                    output.push_str(word.$method().as_str());
+                }
+            }}
+        }
+
         match self.method {
-            "ends_with" => string_eval!(variable ends_with pattern),
-            "contains" => string_eval!(variable contains pattern),
-            "starts_with" => string_eval!(variable starts_with pattern), 
+            "ends_with"    => string_eval!(variable ends_with pattern),
+            "contains"     => string_eval!(variable contains pattern),
+            "starts_with"  => string_eval!(variable starts_with pattern),
+            "basename"     => path_eval!(file_name),
+            "extension"    => path_eval!(extension),
+            "filename"     => path_eval!(file_stem),
+            "parent"       => path_eval!(parent),
+            "to_lowercase" => string_case!(to_lowercase),
+            "to_uppercase" => string_case!(to_uppercase),
             "join" => {
                 let pattern = expand_string(pattern, expand, false).join(" ");
                 if let Some(array) = (expand.array)(variable, Select::All) {
@@ -498,46 +528,6 @@ impl<'a> StringMethod<'a> {
                     output.push_str(&word.as_bytes().len().to_string());
                 }
             },
-            "basename" => {
-                if let Some(value) = expand.vars.get_var(variable) {
-                    output.push_str(Path::new(&value).file_name()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
-                } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
-                    output.push_str(Path::new(&word).file_name()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
-                }
-            },
-            "extension" => {
-                if let Some(value) = expand.vars.get_var(variable) {
-                    output.push_str(Path::new(&value).extension()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
-                } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
-                    output.push_str(Path::new(&word).extension()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
-                }
-            },
-            "filename" => {
-                if let Some(value) = expand.vars.get_var(variable) {
-                    output.push_str(Path::new(&value).file_stem()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
-                } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
-                    output.push_str(Path::new(&word).file_stem()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
-                }
-            },
-            "parent" => {
-                if let Some(value) = expand.vars.get_var(variable) {
-                    output.push_str(Path::new(&value).parent()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
-                } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
-                    output.push_str(Path::new(&word).parent()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
-                }
-            },
             "reverse" => {
                 if let Some(value) = expand.vars.get_var(variable) {
                     let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
@@ -546,22 +536,6 @@ impl<'a> StringMethod<'a> {
                     let word = expand_string(variable, &expand, false).join(pattern);
                     let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
-                }
-            },
-            "to_lowercase" => {
-                if let Some(value) = expand.vars.get_var(variable) {
-                    output.push_str(value.to_lowercase().as_str());
-                } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
-                    output.push_str(word.to_lowercase().as_str());
-                }
-            },
-            "to_uppercase" => {
-                if let Some(value) = expand.vars.get_var(variable) {
-                    output.push_str(value.to_uppercase().as_str());
-                } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
-                    output.push_str(word.to_uppercase().as_str());
                 }
             },
             _ => {
