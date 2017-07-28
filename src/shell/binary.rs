@@ -224,8 +224,8 @@ impl<'a> Binary for Shell<'a> {
         self.context = Some({
             let mut context = Context::new();
             context.word_divider_fn = Box::new(word_divide);
-            if "1" == self.variables.get_var_or_empty("HISTORY_FILE_ENABLED") {
-                let path = self.variables.get_var("HISTORY_FILE").expect("shell didn't set history_file");
+            if "1" == self.variables.get_var_or_empty("HISTFILE_ENABLED") {
+                let path = self.variables.get_var("HISTFILE").expect("shell didn't set HISTFILE");
                 context.history.set_file_name(Some(path.clone()));
                 if !Path::new(path.as_str()).exists() {
                     eprintln!("ion: creating history file at \"{}\"", path);
@@ -238,7 +238,7 @@ impl<'a> Binary for Shell<'a> {
                         // pass
                     }
                     Err(ref err) if err.kind() == ErrorKind::NotFound => {
-                        let history_filename = self.variables.get_var_or_empty("HISTORY_FILE");
+                        let history_filename = self.variables.get_var_or_empty("HISTFILE");
                         eprintln!("ion: failed to find history file {}: {}", history_filename, err);
                     },
                     Err(err) => {
