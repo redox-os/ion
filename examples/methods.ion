@@ -7,8 +7,8 @@ echo @split(space_string)
 echo @split(comma_string, ', ')
 
 let array = ["one two" "three four" "five six" "seven eight" "nine ten"]
-echo @len(array)
-for element in 0..@len(array)
+echo $len(@array)
+for element in 0..$len(@array)
     echo @array[$element]
 end
 

@@ -235,16 +235,6 @@ impl<'a> ArrayMethod<'a> {
 
     pub fn handle(&self, current: &mut String, expand_func: &ExpanderFunctions) {
         match self.method {
-            "len" => {
-                if let Some(array) = expand_func.vars.get_array(self.variable) {
-                    current.push_str(&array.len().to_string())
-                } else if is_expression(self.variable) {
-                    let expanded = expand_string(self.variable, expand_func, false);
-                    current.push_str(&expanded.len().to_string());
-                } else {
-                    current.push_str("0")
-                }
-            },
             "split" => {
                 let variable = if let Some(variable) = (expand_func.variable)(self.variable, false) {
                     variable
@@ -462,7 +452,16 @@ impl<'a> StringMethod<'a> {
                 }
             },
             "len" => {
-                if let Some(value) = expand.vars.get_var(self.variable) {
+                if self.variable.starts_with('@') || self.variable.starts_with('[') {
+                    if let Some(array) = expand.vars.get_array(self.variable) {
+                        output.push_str(&array.len().to_string())
+                    } else if is_expression(self.variable) {
+                        let expanded = expand_string(self.variable, expand, false);
+                        output.push_str(&expanded.len().to_string());
+                    } else {
+                        output.push_str("0")
+                    }
+                } else if let Some(value) = expand.vars.get_var(self.variable) {
                     let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
                     output.push_str(&count.to_string());
                 } else if is_expression(self.variable) {
