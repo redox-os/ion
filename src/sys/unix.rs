@@ -74,6 +74,10 @@ pub fn close(fd: RawFd) -> io::Result<()> {
     cvt(unsafe { libc::close(fd) }).and(Ok(()))
 }
 
+pub fn isatty(fd: RawFd) -> bool {
+    unsafe { libc::isatty(fd) == 1 }
+}
+
 // Support functions for converting libc return values to io errors {
 trait IsMinusOne {
     fn is_minus_one(&self) -> bool;

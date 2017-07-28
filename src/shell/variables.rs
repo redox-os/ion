@@ -1,5 +1,6 @@
 use fnv::FnvHashMap;
 use std::env;
+use std::io::{self, BufRead};
 use std::process;
 
 use super::directory_stack::DirectoryStack;
@@ -14,6 +15,7 @@ use sys::getpid;
 #[cfg(all(unix, not(target_os = "unix")))]
 use sys::getpid;
 
+use sys;
 use sys::variables as self_sys;
 
 #[derive(Debug)]
@@ -80,11 +82,22 @@ impl Variables {
     pub fn read<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
-        let mut con = Context::new();
-        for arg in args.into_iter().skip(1) {
-            match con.read_line(format!("{}=", arg.as_ref().trim()), &mut |_| {}) {
-                Ok(buffer) => self.set_var(arg.as_ref(), buffer.trim()),
-                Err(_) => return FAILURE,
+        if sys::isatty(sys::STDIN_FILENO) {
+            let mut con = Context::new();
+            for arg in args.into_iter().skip(1) {
+                match con.read_line(format!("{}=", arg.as_ref().trim()), &mut |_| {}) {
+                    Ok(buffer) => self.set_var(arg.as_ref(), buffer.trim()),
+                    Err(_) => return FAILURE,
+                }
+            }
+        } else {
+            let stdin = io::stdin();
+            let handle = stdin.lock();
+            let mut lines = handle.lines();
+            for arg in args.into_iter().skip(1) {
+                if let Some(Ok(line)) = lines.next() {
+                    self.set_var(arg.as_ref(), line.trim());
+                }
             }
         }
         SUCCESS
