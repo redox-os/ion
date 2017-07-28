@@ -493,6 +493,40 @@ impl<'a> StringMethod<'a> {
             "parent"       => path_eval!(parent),
             "to_lowercase" => string_case!(to_lowercase),
             "to_uppercase" => string_case!(to_uppercase),
+            "replace" => {
+                let pattern = ArgumentSplitter::new(pattern)
+                    .map(|x| expand_string(x, expand, false).join(" "))
+                    .collect::<Vec<_>>();
+                if pattern.len() == 2 {
+                    if let Some(value) = expand.vars.get_var(variable) {
+                        output.push_str(&value.replace(pattern[0].as_str(), pattern[1].as_str()));
+                    } else if is_expression(variable) {
+                        let word = expand_string(variable, &expand, false).join(" ");
+                        output.push_str(&word.replace(pattern[0].as_str(), pattern[1].as_str()));
+                    }
+                } else {
+                    eprintln!("ion: only two patterns can be supplied to $replace()");
+                }
+            }
+            "replacen" => {
+                let pattern = ArgumentSplitter::new(pattern)
+                    .map(|x| expand_string(x, expand, false).join(" "))
+                    .collect::<Vec<_>>();
+                if pattern.len() == 3 {
+                    if let Ok(nth) = pattern[2].as_str().parse::<usize>() {
+                        if let Some(value) = expand.vars.get_var(variable) {
+                            output.push_str(&value.replacen(pattern[0].as_str(), pattern[1].as_str(), nth));
+                        } else if is_expression(variable) {
+                            let word = expand_string(variable, &expand, false).join(" ");
+                            output.push_str(&word.replacen(pattern[0].as_str(), pattern[1].as_str(), nth));
+                        }
+                    } else {
+                        eprintln!("ion: the supplied count value is invalid");
+                    }
+                } else {
+                    eprintln!("ion: only three patterns can be supplied to $replacen()");
+                }
+            }
             "join" => {
                 let pattern = expand_string(pattern, expand, false).join(" ");
                 if let Some(array) = (expand.array)(variable, Select::All) {
