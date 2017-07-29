@@ -58,6 +58,14 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     }
 }
 
+pub fn reset_signal(signal: i32) -> io::Result<()> {
+    if unsafe { libc::signal(signal as c_int, libc::SIG_DFL) } == libc::SIG_ERR {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
 pub fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
     cvt(unsafe { libc::tcsetpgrp(fd as c_int, pgrp as pid_t) }).and(Ok(()))
 }

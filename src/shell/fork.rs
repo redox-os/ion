@@ -24,6 +24,8 @@ pub fn fork_pipe (
         Ok(0) => {
             // The child fork should not have any signals blocked, so the shell can control it.
             signals::unblock();
+            let _ = sys::reset_signal(sys::SIGINT);
+            let _ = sys::reset_signal(sys::SIGHUP);
             // This ensures that the child fork has a unique PGID.
             create_process_group(0);
             // After execution of it's commands, exit with the last command's status.

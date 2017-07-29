@@ -33,12 +33,14 @@ impl ForegroundSignals {
 
     pub fn reply_with(&self, status: i8) {
         self.grab.store(0, Ordering::Relaxed);
-        self.reply.store(true, Ordering::Relaxed);
         self.status.store(status as usize, Ordering::Relaxed);
+        self.reply.store(true, Ordering::Relaxed);
     }
 
     pub fn errored(&self) {
+        self.grab.store(0, Ordering::Relaxed);
         self.errored.store(true, Ordering::Relaxed);
+        self.reply.store(true, Ordering::Relaxed);
     }
 
     pub fn was_processed(&self) -> Option<BackgroundResult> {

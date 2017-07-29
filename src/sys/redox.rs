@@ -54,6 +54,15 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
 }
 
+pub fn reset_signal(signal: i32) -> io::Result<()> {
+    let new = SigAction {
+        sa_handler: unsafe { mem::transmute(syscall::flag::SIG_DFL) },
+        sa_mask: [0; 2],
+        sa_flags: 0,
+    };
+    cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
+}
+
 pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
     let fd = cvt(syscall::dup(tty_fd, b"pgrp"))?;
 
