@@ -37,9 +37,8 @@ impl DirectoryStack {
     pub fn popd<I: IntoIterator>(&mut self, args: I) -> Result<(), Cow<'static, str>>
         where I::Item: AsRef<str>
     {
-
 	let mut keep_front = false; // whether the -n option is present
-	let mut count_from_back = false; // whether the input number is negative
+	let mut count_from_front = true; // <=> input number is positive
 	let mut num: usize = 0;
 
 	for arg in args.into_iter().skip(1) {
@@ -47,35 +46,34 @@ impl DirectoryStack {
 		if arg == "-n" {
 			keep_front = true;
 		} else {
-			num = arg[1..].parse::<usize>()
-				.or_else(|_| Err(Cow::Owned(format!("ion: popd: {}: invalid argument\n", arg))))?;
-			count_from_back = match arg.chars().nth(0) {
-				Some('+') => false,
-				Some('-') => true,
-				_ => return Err(Cow::Owned(format!("ion: popd: {}: invalid argument\n", arg)))
+			match parse_numeric_arg(arg) {
+				Some((x, y)) => { count_from_front = x; num = y; }
+				None => return Err(Cow::Owned(format!("ion: popd: {}: invalid argument\n", arg)))
 			};
 		}
 	}
 
 	let len: usize = self.dirs.len();
 	if len <= 1 {
-		return Err(Cow::Owned(format!("ion: popd: directory stack empty\n")));
+		return Err(Cow::Borrowed("ion: popd: directory stack empty\n"));
 	}
 
-	let mut index: usize = if count_from_back {
+	let mut index: usize = if count_from_front { num } else {
 		(len - 1).checked_sub(num)
 			.ok_or_else(|| Cow::Owned(format!("ion: popd: negative directory stack index out of range\n")))?
-	} else { num };
+	};
 
+	// apply -n
 	if index == 0 && keep_front { index = 1; }
 
-	if self.dirs.remove(index).is_none() {
-		return Err(Cow::Owned(format!("ion: popd: {}: directory stack index out of range\n", index)));
+	// change to new directory, return if not possible
+	if index == 0 {
+		self.set_current_dir_by_index(1, "popd")?;
 	}
 
-	if index == 0 {
-		set_current_dir(self.dirs[0].as_path())
-			.or_else(|_| Err(Cow::Owned(format!("ion: popd: Failed setting dir"))))?;
+	// pop element
+	if self.dirs.remove(index).is_none() {
+		return Err(Cow::Owned(format!("ion: popd: {}: directory stack index out of range\n", index)));
 	}
 
 	self.print_dirs();
@@ -176,4 +174,27 @@ impl DirectoryStack {
         });
         println!("{}", dir.trim_left());
     }
+
+    // sets current_dir to the element referred by index
+    fn set_current_dir_by_index(&self, index: usize, caller: &str) -> Result<(), Cow<'static, str>> {
+	let dir = self.dirs.iter().nth(index)
+		.ok_or_else(|| Cow::Owned(format!("ion: {}: {}: directory stack out of range\n", caller, index)))?;
+
+	set_current_dir(dir)
+		.map_err(|_| Cow::Owned(format!("ion: {}: Failed setting current dir\n", caller)))
+    }
+}
+
+// parses -N or +N patterns
+// required for popd, pushd, dirs
+fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
+	match arg.chars().nth(0) {
+		Some('+') => Some(true),
+		Some('-') => Some(false),
+		_ => None
+	}.and_then(|b| {
+		arg[1..].parse::<usize>()
+			.ok()
+			.map(|num| (b, num))
+	})
 }
