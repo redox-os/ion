@@ -1,4 +1,4 @@
-use super::words::{Range, Index};
+use super::words::{Index, Range};
 
 fn stepped_range_numeric(mut start: isize, end: isize, step: isize) -> Option<Vec<String>> {
     return if step == 0 {
@@ -8,82 +8,86 @@ fn stepped_range_numeric(mut start: isize, end: isize, step: isize) -> Option<Ve
     } else if start > end && step > 0 {
         None
     } else {
-       let mut out = Vec::new();
-       let cmp: fn(isize, isize) -> bool = if start < end {
-           |a: isize, b: isize| -> bool { a < b }
-       } else {
-           |a: isize, b: isize| -> bool { a > b }
-       };
-       while cmp(start, end) {
-           out.push(start.to_string());
-           start += step;
-       }
-       Some(out)
-    }
+        let mut out = Vec::new();
+        let cmp: fn(isize, isize) -> bool = if start < end {
+            |a: isize, b: isize| -> bool { a < b }
+        } else {
+            |a: isize, b: isize| -> bool { a > b }
+        };
+        while cmp(start, end) {
+            out.push(start.to_string());
+            start += step;
+        }
+        Some(out)
+    };
 }
 
 fn stepped_range_chars(mut start: u8, end: u8, step: u8) -> Option<Vec<String>> {
-    return if step == 0 {
+    if step == 0 {
         None
     } else {
-       let mut out = Vec::new();
-       let cmp: fn(u8, u8) -> bool = if start < end {
-           |a: u8, b: u8| -> bool { a < b }
-       } else {
-           |a: u8, b: u8| -> bool { a > b }
-       };
-       let step_func: fn(u8, u8) -> u8 = if start > end {
-           |cur: u8, step: u8| -> u8 { cur.wrapping_sub(step) }
-       } else {
-           |cur: u8, step: u8| -> u8 { cur.wrapping_add(step) }
-       };
-       while cmp(start, end) {
-           out.push((start as char).to_string());
-           start = step_func(start, step);
-       }
-       Some(out)
+        let mut out = Vec::new();
+        let cmp: fn(u8, u8) -> bool = if start < end {
+            |a: u8, b: u8| -> bool { a < b }
+        } else {
+            |a: u8, b: u8| -> bool { a > b }
+        };
+        let step_func: fn(u8, u8) -> u8 = if start > end {
+            |cur: u8, step: u8| -> u8 { cur.wrapping_sub(step) }
+        } else {
+            |cur: u8, step: u8| -> u8 { cur.wrapping_add(step) }
+        };
+        while cmp(start, end) {
+            out.push((start as char).to_string());
+            start = step_func(start, step);
+        }
+        Some(out)
     }
 }
 
 fn numeric_range(start: isize, mut end: isize, step: isize, inclusive: bool) -> Option<Vec<String>> {
-   return if start < end {
-       if inclusive { end += if end <= 0 { -1 } else { 1 }; }
-       stepped_range_numeric(start, end, step)
-   } else if start > end {
-       if inclusive { end += if end <= 0 { -1 } else { 1 }; }
-       stepped_range_numeric(start, end, step)
-   } else {
-       Some(vec![start.to_string()])
-   }
+    if start < end {
+        if inclusive {
+            end += 1;
+        }
+        stepped_range_numeric(start, end, step)
+    } else if start > end {
+        if inclusive {
+            end += if end <= 0 { -1 } else { 1 };
+        }
+        stepped_range_numeric(start, end, step)
+    } else {
+        Some(vec![start.to_string()])
+    }
 }
 
 #[inline]
-fn byte_is_valid_range(b: u8) -> bool {
-    (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z')
-}
+fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') }
 
 use std::u8;
 fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Vec<String>> {
     if !byte_is_valid_range(start) || !byte_is_valid_range(end) {
         return None;
     }
-    
+
     let char_step = match step.checked_abs() {
-        Some(v) => {
-            if v > u8::MAX as isize {
-                return None;
-            } else {
-               v as u8 
-            }
+        Some(v) => if v > u8::MAX as isize {
+            return None;
+        } else {
+            v as u8
         },
         None => return None,
     };
-    
+
     if start < end {
-        if inclusive { end += 1; }
+        if inclusive {
+            end += 1;
+        }
         return stepped_range_chars(start, end, char_step);
     } else if start > end {
-        if inclusive { end -= 1; }
+        if inclusive {
+            end -= 1;
+        }
         return stepped_range_chars(start, end, char_step);
     } else {
         return Some(vec![(start as char).to_string()]);
@@ -163,10 +167,10 @@ pub fn parse_range(input: &str) -> Option<Vec<String>> {
                     read += 1;
                     match b {
                         b'.' => {
-                            // this can only be an inclusive range 
+                            // this can only be an inclusive range
                             finish!(true, read);
-                        },
-                        b'0'...b'9' | b'-' | b'a'...b'z' | b'A'...b'Z'  => {
+                        }
+                        b'0'...b'9' | b'-' | b'a'...b'z' | b'A'...b'Z' => {
                             // further processing needed to find out if we're reading a step or
                             // the end of an exclusive range. Step until we find another dot or
                             // the iterator ends
@@ -190,9 +194,9 @@ pub fn parse_range(input: &str) -> Option<Vec<String>> {
                                             }
                                         }
                                         finish!(dots == 3, read - 1, step);
-                                    }, 
+                                    }
                                     // numeric values are OK but no letters anymore
-                                    b'0'...b'9' => {},
+                                    b'0'...b'9' => {}
                                     // unexpected
                                     _ => return None,
                                 }
@@ -200,13 +204,13 @@ pub fn parse_range(input: &str) -> Option<Vec<String>> {
                             // exhausted the iterator without finding anything new means
                             // exclusive unstepped range
                             finish!(false, start);
-                        },
+                        }
                         // not a valid byte for ranges
                         _ => return None,
                     }
-                } 
-            },
-            _ => break
+                }
+            }
+            _ => break,
         }
     }
     None
@@ -222,16 +226,20 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
 
                 let mut dots = 1;
                 while let Some((_, byte)) = bytes_iterator.next() {
-                    if byte == b'.' { dots += 1 } else { break }
+                    if byte == b'.' {
+                        dots += 1
+                    } else {
+                        break;
+                    }
                 }
 
                 let inclusive = match dots {
                     2 => false,
                     3 => true,
-                    _ => break
+                    _ => break,
                 };
 
-                let end = &input[id+dots..];
+                let end = &input[id + dots..];
 
                 if first.is_empty() {
                     return if end.is_empty() {
@@ -239,14 +247,14 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                     } else {
                         match end.parse::<isize>() {
                             Ok(end) => Some(Range::to(Index::new(end))),
-                            Err(_)  => None
+                            Err(_) => None,
                         }
-                    }
+                    };
                 } else if end.is_empty() {
                     return match first.parse::<isize>() {
                         Ok(start) => Some(Range::from(Index::new(start))),
-                        Err(_)    => None
-                    }
+                        Err(_) => None,
+                    };
                 }
 
                 if let Ok(start) = first.parse::<isize>() {
@@ -258,10 +266,10 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                         });
                     }
                 } else {
-                    break
+                    break;
                 }
-            },
-            _ => break
+            }
+            _ => break,
         }
     }
 
@@ -278,17 +286,14 @@ fn index_ranges() {
         (Range::inclusive(Index::Forward(0), Index::Backward(0)), "0...-1"),
         (Range::exclusive(Index::Backward(2), Index::Backward(0)), "-3..-1"),
         (Range::from(Index::Backward(2)), "-3.."),
-        (Range::to(Index::Forward(5)), "..5")
+        (Range::to(Index::Forward(5)), "..5"),
     ];
-    
+
     for (range, string) in valid_cases {
         assert_eq!(Some(range), parse_index_range(string));
     }
 
-    let invalid_cases = vec![
-        "0..A",
-        "3-3..42"
-    ];
+    let invalid_cases = vec!["0..A", "3-3..42"];
 
     for range in invalid_cases {
         assert_eq!(None, parse_index_range(range))
@@ -326,53 +331,31 @@ fn range_expand() {
     assert_eq!(actual, expected);
 
     let actual = parse_range("a...c");
-    let expected = Some(vec![
-        "a".to_owned(),
-        "b".to_owned(),
-        "c".to_owned(),
-    ]);
+    let expected = Some(vec!["a".to_owned(), "b".to_owned(), "c".to_owned()]);
 
     assert_eq!(actual, expected);
 
     let actual = parse_range("c...a");
-    let expected = Some(vec![
-        "c".to_owned(),
-        "b".to_owned(),
-        "a".to_owned()
-    ]);
+    let expected = Some(vec!["c".to_owned(), "b".to_owned(), "a".to_owned()]);
 
     assert_eq!(actual, expected);
 
     let actual = parse_range("A...C");
-    let expected = Some(vec![
-        "A".to_owned(),
-        "B".to_owned(),
-        "C".to_owned(),
-    ]);
+    let expected = Some(vec!["A".to_owned(), "B".to_owned(), "C".to_owned()]);
 
     assert_eq!(actual, expected);
 
     let actual = parse_range("C...A");
-    let expected = Some(vec![
-        "C".to_owned(),
-        "B".to_owned(),
-        "A".to_owned()
-    ]);
+    let expected = Some(vec!["C".to_owned(), "B".to_owned(), "A".to_owned()]);
 
     assert_eq!(actual, expected);
 
     let actual = parse_range("C..A");
-    let expected = Some(vec![
-        "C".to_owned(),
-        "B".to_owned(),
-    ]);
+    let expected = Some(vec!["C".to_owned(), "B".to_owned()]);
     assert_eq!(actual, expected);
 
     let actual = parse_range("c..a");
-    let expected = Some(vec![
-        "c".to_owned(),
-        "b".to_owned(),
-    ]);
+    let expected = Some(vec!["c".to_owned(), "b".to_owned()]);
     assert_eq!(actual, expected);
 
 
@@ -399,4 +382,14 @@ fn range_expand() {
         "-2".to_owned(),
         "-3".to_owned(),
     ]);
+
+    assert_eq!(actual, expected);
+
+    let actual = parse_range("-3...0");
+    let expected = Some(vec!["-3".into(), "-2".into(), "-1".into(), "0".into()]);
+    assert_eq!(actual, expected);
+
+    let actual = parse_range("-3..0");
+    let expected = Some(vec!["-3".into(), "-2".into(), "-1".into()]);
+    assert_eq!(actual, expected);
 }

@@ -9,6 +9,6 @@ imports_indent = "Block"
 reorder_imported_names = true
 reorder_imports = true
 reorder_imports_in_group = true
-single_line_if_else_max_width = 100
+single_line_if_else_max_width = 80
 struct_field_align_threshold = 30
 
