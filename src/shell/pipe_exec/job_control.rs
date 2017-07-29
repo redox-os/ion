@@ -125,7 +125,7 @@ impl<'a> JobControl for Shell<'a> {
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
     fn wait_for_background(&mut self) {
-        let mut sigcode = 0;
+        let sigcode;
         'event: loop {
             for process in self.background.lock().unwrap().iter() {
                 if let ProcessState::Running = process.state {

@@ -3,12 +3,14 @@ pub mod variables;
 pub mod functions;
 pub mod calc;
 
+mod conditionals;
 mod job_control;
 mod test;
 mod time;
 mod echo;
 mod set;
 
+use self::conditionals::{starts_with, ends_with, contains};
 use self::variables::{alias, drop_alias, drop_variable, drop_array};
 use self::functions::fn_;
 use self::source::source;
@@ -171,6 +173,21 @@ impl Builtin {
             "or",
             builtin_or,
             "Execute the command if the shell's previous status is failure"
+        );
+        insert_builtin!(
+            "starts_with",
+            starts_with,
+            "Evaluates if the supplied argument starts with a given string"
+        );
+        insert_builtin!(
+            "ends_with",
+            ends_with,
+            "Evaluates if the supplied argument ends with a given string"
+        );
+        insert_builtin!(
+            "contains",
+            contains,
+            "Evaluates if the supplied argument contains a given string"
         );
 
         commands
