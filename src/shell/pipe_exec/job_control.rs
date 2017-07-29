@@ -1,15 +1,15 @@
+use super::foreground::BackgroundResult;
+use super::super::Shell;
+use super::super::signals;
+use super::super::status::*;
 use std::fmt;
+use std::sync::{Arc, Mutex};
 use std::thread::{sleep, spawn};
 use std::time::Duration;
-use std::sync::{Arc, Mutex};
-use super::foreground::BackgroundResult;
-use super::signals;
-use super::status::*;
-use super::Shell;
 use sys;
 
-pub use sys::job_control::watch_background;
 use sys::job_control as self_sys;
+pub use sys::job_control::watch_background;
 
 /// When given a process ID, that process's group will be assigned as the foreground process group.
 pub fn set_foreground_as(pid: u32) {
@@ -28,16 +28,9 @@ pub trait JobControl {
     fn handle_signal(&self, signal: i32) -> bool;
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
-    fn watch_foreground<F, D>(
-        &mut self,
-        pid: u32,
-        last_pid: u32,
-        get_command: F,
-        drop_command: D,
-    ) -> i32
-    where
-        F: FnOnce() -> String,
-        D: FnMut(i32);
+    fn watch_foreground<F, D>(&mut self, pid: u32, last_pid: u32, get_command: F, drop_command: D) -> i32
+        where F: FnOnce() -> String,
+              D: FnMut(i32);
     fn send_to_background(&mut self, child: u32, state: ProcessState, command: String);
 }
 
@@ -72,20 +65,20 @@ pub fn add_to_background(
     {
         Some(id) => {
             (*processes)[id] = BackgroundProcess {
-                pid: pid,
+                pid:           pid,
                 ignore_sighup: false,
-                state: state,
-                name: command,
+                state:         state,
+                name:          command,
             };
             id as u32
         }
         None => {
             let njobs = (*processes).len();
             (*processes).push(BackgroundProcess {
-                pid: pid,
+                pid:           pid,
                 ignore_sighup: false,
-                state: state,
-                name: command,
+                state:         state,
+                name:          command,
             });
             njobs as u32
         }
@@ -98,10 +91,10 @@ pub fn add_to_background(
 /// as the process ID, state that the process is in, and the command that the
 /// process is executing.
 pub struct BackgroundProcess {
-    pub pid: u32,
+    pub pid:           u32,
     pub ignore_sighup: bool,
-    pub state: ProcessState,
-    pub name: String,
+    pub state:         ProcessState,
+    pub name:          String,
 }
 
 impl<'a> JobControl for Shell<'a> {
@@ -150,16 +143,9 @@ impl<'a> JobControl for Shell<'a> {
         self.exit(TERMINATED);
     }
 
-    fn watch_foreground<F, D>(
-        &mut self,
-        pid: u32,
-        last_pid: u32,
-        get_command: F,
-        drop_command: D,
-    ) -> i32
-    where
-        F: FnOnce() -> String,
-        D: FnMut(i32),
+    fn watch_foreground<F, D>(&mut self, pid: u32, last_pid: u32, get_command: F, drop_command: D) -> i32
+        where F: FnOnce() -> String,
+              D: FnMut(i32)
     {
         self_sys::watch_foreground(self, pid, last_pid, get_command, drop_command)
     }
@@ -203,9 +189,7 @@ impl<'a> JobControl for Shell<'a> {
         // Spawn a background thread that will monitor the progress of the
         // background process, updating it's state changes until it finally
         // exits.
-        let _ = spawn(move || {
-            watch_background(fg_signals, processes, pid, njob as usize);
-        });
+        let _ = spawn(move || { watch_background(fg_signals, processes, pid, njob as usize); });
     }
 
     /// If a SIGTERM is received, a SIGTERM will be sent to all background processes

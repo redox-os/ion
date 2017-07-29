@@ -1,9 +1,10 @@
 //! Contains the logic for enabling foreground management.
+
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 pub enum BackgroundResult {
     Errored,
-    Status(u8)
+    Status(u8),
 }
 
 /// An atomic structure that can safely be shared across threads, which serves to provide
@@ -14,22 +15,20 @@ pub struct ForegroundSignals {
     grab:    AtomicUsize, // TODO: Use AtomicU32 when stable
     status:  AtomicUsize, // TODO: Use AtomicU8 when stable
     reply:   AtomicBool,
-    errored: AtomicBool   // TODO: Combine with reply when U8 is stable
+    errored: AtomicBool, // TODO: Combine with reply when U8 is stable
 }
 
 impl ForegroundSignals {
     pub fn new() -> ForegroundSignals {
         ForegroundSignals {
-            grab: AtomicUsize::new(0),
-            status: AtomicUsize::new(0),
-            reply: AtomicBool::new(false),
-            errored: AtomicBool::new(false)
+            grab:    AtomicUsize::new(0),
+            status:  AtomicUsize::new(0),
+            reply:   AtomicBool::new(false),
+            errored: AtomicBool::new(false),
         }
     }
 
-    pub fn signal_to_grab(&self, pid: u32) {
-        self.grab.store(pid as usize, Ordering::Relaxed);
-    }
+    pub fn signal_to_grab(&self, pid: u32) { self.grab.store(pid as usize, Ordering::Relaxed); }
 
     pub fn reply_with(&self, status: i8) {
         self.grab.store(0, Ordering::Relaxed);
@@ -57,7 +56,5 @@ impl ForegroundSignals {
         }
     }
 
-    pub fn was_grabbed(&self, pid: u32) -> bool {
-        self.grab.load(Ordering::Relaxed) == pid as usize
-    }
+    pub fn was_grabbed(&self, pid: u32) -> bool { self.grab.load(Ordering::Relaxed) == pid as usize }
 }
