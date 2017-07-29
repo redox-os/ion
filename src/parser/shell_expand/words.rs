@@ -251,8 +251,9 @@ impl<'a> ArrayMethod<'a> {
                     ),
                     (&Pattern::Whitespace, Select::All) => current.push_str (
                         &variable.split(char::is_whitespace)
-                                 .collect::<Vec<&str>>()
-                                 .join(" ")
+                                .filter(|x| !x.is_empty())
+                                .collect::<Vec<&str>>()
+                                .join(" ")
                     ),
                     (_, Select::None) => (),
                     (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => {
@@ -263,6 +264,7 @@ impl<'a> ArrayMethod<'a> {
                     } ,
                     (&Pattern::Whitespace, Select::Index(Index::Forward(id))) => current.push_str (
                         variable.split(char::is_whitespace)
+                                .filter(|x| !x.is_empty())
                                 .nth(id)
                                 .unwrap_or_default()
                     ),
@@ -274,6 +276,7 @@ impl<'a> ArrayMethod<'a> {
                     },
                     (&Pattern::Whitespace, Select::Index(Index::Backward(id))) => current.push_str(
                         variable.rsplit(char::is_whitespace)
+                                .filter(|x| !x.is_empty())
                                 .nth(id)
                                 .unwrap_or_default()
                     ),
@@ -289,9 +292,10 @@ impl<'a> ArrayMethod<'a> {
                         }
                     },
                     (&Pattern::Whitespace, Select::Range(range)) => {
-                        let len = variable.split(char::is_whitespace).count();
+                        let len = variable.split(char::is_whitespace).filter(|x| !x.is_empty()).count();
                         if let Some((start, length)) = range.bounds(len) {
                             let range = variable.split(char::is_whitespace)
+                                                .filter(|x| !x.is_empty())
                                                 .skip(start)
                                                 .take(length)
                                                 .collect::<Vec<&str>>()
@@ -336,6 +340,7 @@ impl<'a> ArrayMethod<'a> {
                         .collect(),
                     (&Pattern::Whitespace, Select::All) => variable
                         .split(char::is_whitespace)
+                        .filter(|x| !x.is_empty())
                         .map(From::from)
                         .collect(),
                     (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) =>
@@ -346,6 +351,7 @@ impl<'a> ArrayMethod<'a> {
                                     .collect(),
                     (&Pattern::Whitespace, Select::Index(Index::Forward(id))) =>
                             variable.split(char::is_whitespace)
+                                    .filter(|x| !x.is_empty())
                                     .nth(id)
                                     .map(From::from)
                                     .into_iter()
@@ -358,6 +364,7 @@ impl<'a> ArrayMethod<'a> {
                                     .collect(),
                     (&Pattern::Whitespace, Select::Index(Index::Backward(id))) =>
                             variable.rsplit(char::is_whitespace)
+                                    .filter(|x| !x.is_empty())
                                     .nth(id)
                                     .map(From::from)
                                     .into_iter()
@@ -375,9 +382,10 @@ impl<'a> ArrayMethod<'a> {
                         }
                     },
                     (&Pattern::Whitespace, Select::Range(range)) => {
-                        let len = variable.split(char::is_whitespace).count();
+                        let len = variable.split(char::is_whitespace).filter(|x| !x.is_empty()).count();
                         if let Some((start, length)) = range.bounds(len) {
                             variable.split(char::is_whitespace)
+                                    .filter(|x| !x.is_empty())
                                     .skip(start)
                                     .take(length)
                                     .map(From::from)
