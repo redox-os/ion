@@ -83,8 +83,8 @@ pub fn close(fd: RawFd) -> io::Result<()> {
 }
 
 pub fn isatty(fd: RawFd) -> bool {
-    if let Ok(fd) = syscall::dup(f, &[]) {
-        let _ = syscall::close(fd);
+    if let Ok(tfd) = syscall::dup(fd, b"termios") {
+        let _ = syscall::close(tfd);
         true
     } else {
         false
