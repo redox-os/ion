@@ -16,10 +16,9 @@ use std::process::exit;
 pub fn fork_pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, command_name: String) -> i32 {
     match unsafe { sys::fork() } {
         Ok(0) => {
-            // The child fork should not have any signals blocked, so the shell can control it.
-            signals::unblock();
             let _ = sys::reset_signal(sys::SIGINT);
             let _ = sys::reset_signal(sys::SIGHUP);
+            let _ = sys::reset_signal(sys::SIGTERM);
             // This ensures that the child fork has a unique PGID.
             create_process_group(0);
             // After execution of it's commands, exit with the last command's status.

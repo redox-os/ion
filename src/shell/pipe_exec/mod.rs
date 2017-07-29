@@ -23,7 +23,6 @@ use std::os::unix::process::CommandExt;
 use std::process::{exit, Command};
 use sys;
 
-
 /// Use dup2 to replace `old` with `new` using `old`s file descriptor ID
 fn redir(old: RawFd, new: RawFd) {
     if let Err(e) = sys::dup2(old, new) {
@@ -257,6 +256,9 @@ pub fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground:
                                     match unsafe { sys::fork() } {
                                         Ok(0) => {
                                             signals::unblock();
+                                            let _ = sys::reset_signal(sys::SIGINT);
+                                            let _ = sys::reset_signal(sys::SIGHUP);
+                                            let _ = sys::reset_signal(sys::SIGTERM);
                                             create_process_group(pgid);
                                             let args: Vec<&str> = args
                                                 .iter()

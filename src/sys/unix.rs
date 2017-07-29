@@ -252,7 +252,7 @@ pub mod job_control {
     {
         let mut exit_status = 0;
         loop {
-            match wait() {
+            match waitpid(-1, Some(WUNTRACED)) {
                 Ok(WaitStatus::Exited(pid, status)) => if pid == (last_pid as i32) {
                     break status as i32;
                 } else {
