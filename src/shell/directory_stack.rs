@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::env::{set_current_dir, current_dir, home_dir};
 use std::path::PathBuf;
 use super::variables::Variables;
-use super::status::SUCCESS;
+use super::status::{SUCCESS, FAILURE};
 
 pub struct DirectoryStack {
     dirs: VecDeque<PathBuf>, // The top is always the current directory
@@ -209,11 +209,71 @@ impl DirectoryStack {
         self.dirs.truncate(DirectoryStack::get_size(variables));
     }
 
-    pub fn dirs<I: IntoIterator>(&self, _: I) -> i32
+    pub fn dirs<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
-        self.print_dirs();
-        SUCCESS
+	const CLEAR: u8 = 1;		// -c
+	const ABS_PATHNAMES: u8 = 2;	// -l
+	const MULTILINE: u8 = 4;	// -p | -v
+	const INDEX: u8 = 8;		// -v
+
+	let mut dirs_args: u8 = 0;
+	let mut num_arg: Option<usize> = None;
+
+	for arg in args.into_iter().skip(1) {
+		let arg = arg.as_ref();
+		match arg {
+			"-c" => dirs_args |= CLEAR,
+			"-l" => dirs_args |= ABS_PATHNAMES,
+			"-p" => dirs_args |= MULTILINE,
+			"-v" => dirs_args |= INDEX | MULTILINE,
+			arg => {
+				num_arg = match parse_numeric_arg(arg) {
+					Some((true, num)) => Some(num),
+					Some((false, num)) if self.dirs.len() > num => Some(self.dirs.len() - num - 1),
+					_ => return FAILURE // Err(Cow::Owned(format!("ion: dirs: {}: invalid argument\n", arg)))
+				};
+			}
+		}
+	}
+
+	if dirs_args & CLEAR > 0 {
+		self.dirs.truncate(1);
+	}
+
+	let mapper: fn((usize, &PathBuf)) -> Cow<str> =
+		match (dirs_args & ABS_PATHNAMES > 0, dirs_args & INDEX > 0) {
+			// ABS, INDEX
+			(true, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, try_abs_path(x))),
+			(true, false) => |(_, x)| try_abs_path(x),
+			(false, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, x.to_string_lossy())),
+			(false, false) => |(_, x)| x.to_string_lossy()
+		};
+
+	let mut iter = self.dirs.iter()
+		.enumerate()
+		.map(mapper);
+
+	if let Some(num) = num_arg {
+		match iter.nth(num) {
+			Some(x) => println!("{}", x),
+			None => return FAILURE
+		};
+	} else {
+		let folder: fn(String, Cow<str>) -> String =
+			match dirs_args & MULTILINE > 0 {
+				true => |x, y| x + "\n" + &y,
+				false => |x, y| x + " " + &y,
+			};
+
+		let first = match iter.next() {
+			Some(x) => x.to_string(),
+			None => return SUCCESS
+		};
+
+		println!("{}", iter.fold(first, folder));
+	}
+	SUCCESS
     }
 
     pub fn dir_from_top(&self, num: usize) -> Option<&PathBuf> {
@@ -269,4 +329,14 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
 			.ok()
 			.map(|num| (b, num))
 	})
+}
+
+// converts pbuf to an absolute path if possible
+fn try_abs_path(pbuf: &PathBuf) -> Cow<str> {
+	Cow::Owned(
+		pbuf.canonicalize()
+			.unwrap_or_else(|_| pbuf.clone())
+			.to_string_lossy()
+			.to_string()
+	)
 }
