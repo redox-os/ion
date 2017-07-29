@@ -164,7 +164,7 @@ pub mod job_control {
     use shell::Shell;
     use libc::{self, pid_t};
 
-    use nix::sys::wait::{waitpid, wait, WaitStatus, WNOHANG, WUNTRACED};
+    use nix::sys::wait::{waitpid, WaitStatus, WNOHANG, WUNTRACED};
     #[cfg(not(target_os = "macos"))]
     use nix::sys::wait::{WCONTINUED};
 

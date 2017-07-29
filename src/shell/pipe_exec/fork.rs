@@ -7,7 +7,6 @@ use super::job_control::{JobControl, ProcessState};
 use super::pipe;
 use super::super::Shell;
 use super::super::job::{JobKind, RefinedJob};
-use super::super::signals;
 use super::super::status::*;
 use std::process::exit;
 

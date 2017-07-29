@@ -418,7 +418,7 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
         let stderr = io::stderr();
         let mut stderr = stderr.lock();
         let _ = stderr.write_all(b"match takes two arguments\n");
-        return FAILURE;
+        return BAD_ARG;
     }
     let input = args[1];
     let re = match Regex::new(args[2]) {

@@ -241,9 +241,13 @@ pub fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground:
                                             children.push(child.id());
                                         },
                                         Err(e) => {
-                                            eprintln!("ion: failed to spawn `{}`: {}",
-                                                      short, e);
-                                            return NO_SUCH_COMMAND
+                                            return if e.kind() == io::ErrorKind::NotFound {
+                                                eprintln!("ion: command not found: {}", short);
+                                                NO_SUCH_COMMAND
+                                            } else {
+                                                eprintln!("ion: error spawning process: {}", e);
+                                                COULD_NOT_EXEC
+                                            }
                                         }
                                     }
                                 }
@@ -382,11 +386,12 @@ fn execute(shell: &mut Shell, job: &mut RefinedJob, foreground: bool) -> i32 {
             }
             Err(e) => {
                 if e.kind() == io::ErrorKind::NotFound {
-                    eprintln!("ion: command not found: {}", short)
+                    eprintln!("ion: command not found: {}", short);
+                    NO_SUCH_COMMAND
                 } else {
-                    eprintln!("ion: error spawning process: {}", e)
-                };
-                FAILURE
+                    eprintln!("ion: error spawning process: {}", e);
+                    COULD_NOT_EXEC
+                }
             }
         },
         RefinedJob::Builtin {

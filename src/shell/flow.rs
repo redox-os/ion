@@ -284,7 +284,7 @@ impl<'a> FlowLogic for Shell<'a> {
             }
             if let Some(signal) = self.next_signal() {
                 if self.handle_signal(signal) {
-                    self.exit(TERMINATED);
+                    self.exit(get_signal_code(signal));
                 }
                 return Condition::SigInt;
             } else if self.break_flow {
