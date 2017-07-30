@@ -1,10 +1,11 @@
+use std::char;
 use std::fmt;
 use std::io::{Write, stderr};
 
 use self::grammar::parse_;
+use super::{ArgumentSplitter, pipelines};
 use super::{ExpanderFunctions, Select, expand_string};
 use super::assignments::parse_assignment;
-use super::pipelines;
 use shell::{Job, JobKind};
 use shell::directory_stack::DirectoryStack;
 use shell::flow_control::{ElseIf, FunctionArgument, Statement, Type};
@@ -166,6 +167,32 @@ pub fn parse(code: &str) -> Statement {
                     statements: Vec::new(),
                 }
             });
+        }
+        _ if cmd.starts_with("for ") => {
+            let mut cmd = cmd[4..].trim_left();
+            let pos = match cmd.find(char::is_whitespace) {
+                Some(pos) => pos,
+                None => {
+                    eprintln!("ion: syntax error: incorrect for loop syntax");
+                    return Statement::Default;
+                }
+            };
+
+            let variable = &cmd[..pos];
+            cmd = &cmd[pos..].trim_left();
+
+            if cmd.starts_with("in ") {
+                cmd = cmd[3..].trim_left();
+            } else {
+                eprintln!("ion: syntax error: incorrect for loop syntax");
+                return Statement::Default;
+            }
+
+            return Statement::For {
+                variable: variable.into(),
+                values: ArgumentSplitter::new(cmd).map(String::from).collect(),
+                statements: Vec::new(),
+            };
         }
         _ => (),
     }

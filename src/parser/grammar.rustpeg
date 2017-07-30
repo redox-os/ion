@@ -1,11 +1,10 @@
-use parser::{pipelines, ArgumentSplitter};
+use parser::pipelines;
 use parser::peg::get_function_args;
 use shell::flow_control::*;
 
 #[pub]
 parse_ -> Statement
-      = for_
-      / fn_
+      = fn_
       / match_
       / case_
       / pipelines
@@ -38,16 +37,6 @@ _arg -> String
 
 _fn_arg -> String
     = n:$([A-z0-9_:]+) { n.into()}
-
-#[pub]
-for_ -> Statement
-    = "for" whitespace+ n:_name whitespace+ "in" whitespace+ expr:$(.*) {
-        Statement::For {
-            variable: n.into(),
-            values: ArgumentSplitter::new(expr).map(String::from).collect(),
-            statements: Vec::new(),
-        }
-    }
 
 wildcard_ -> Option<String> = "_" { None }
 value_ -> Option<String> = contents:$(.*) { Some(contents.into())}
