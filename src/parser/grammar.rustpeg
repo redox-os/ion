@@ -1,75 +1,19 @@
-use parser::assignments::parse_assignment;
 use parser::{pipelines, ArgumentSplitter};
 use parser::peg::get_function_args;
 use shell::flow_control::*;
 
 #[pub]
 parse_ -> Statement
-      = let_
-      / export_
-      / if_
-      / else_if_
-      / else_
-      / for_
+      = for_
       / while_
       / fn_
-      / break_
-      / continue_
       / match_
       / case_
       / pipelines
 
 #[pub]
-let_ -> Statement
-    = whitespace* "let" whitespace+ value:$(.*) {
-        Statement::Let { expression: parse_assignment(value) }
-    }
-
-#[pub]
-export_ -> Statement
-    = whitespace* "export" whitespace+ value:$(.*) {
-        Statement::Export(parse_assignment(value))
-    }
-
-#[pub]
-break_ -> Statement
-    = whitespace* "break" { Statement::Break }
-
-#[pub]
-continue_ -> Statement
-    = whitespace* "continue" { Statement::Continue }
-
-#[pub]
-if_ -> Statement
-    = whitespace* "if" whitespace+ command:$(.*) {?
-      pipelines::Collector::run(command).map(|p| {
-        Statement::If {
-          expression: p,
-          success: Vec::new(),
-          else_if: Vec::new(),
-          failure: Vec::new()
-        }
-      })
-    }
-
-#[pub]
-else_if_ -> Statement
-    = whitespace* "else" whitespace+ "if" whitespace+ command:$(.*) {?
-        pipelines::Collector::run(command).map(|p| {
-            Statement::ElseIf(ElseIf {
-                expression: p,
-                success:    Vec::new(),
-            })
-        })
-    }
-
-#[pub]
-else_ -> Statement
-    = whitespace* "else" whitespace*  { Statement::Else }
-
-#[pub]
 fn_ -> Statement
-    = whitespace* "fn " n:_name whitespace* args:_fn_args whitespace* description:_description? {?
+    = "fn " n:_name whitespace* args:_fn_args whitespace* description:_description? {?
         get_function_args(args).map(|args| Statement::Function {
             description: description.unwrap_or("".into()),
             name: n.into(),
@@ -98,7 +42,7 @@ _fn_arg -> String
 
 #[pub]
 for_ -> Statement
-    = whitespace* "for" whitespace+ n:_name whitespace+ "in" whitespace+ expr:$(.*) {
+    = "for" whitespace+ n:_name whitespace+ "in" whitespace+ expr:$(.*) {
         Statement::For {
             variable: n.into(),
             values: ArgumentSplitter::new(expr).map(String::from).collect(),
@@ -112,12 +56,12 @@ value_ -> Option<String> = contents:$(.*) { Some(contents.into())}
 pattern_ -> Option<String> = wildcard_ / value_
 
 case_ -> Statement
-    = whitespace* "case" whitespace+ p:pattern_ {
+    = "case" whitespace+ p:pattern_ {
     Statement::Case(Case { value: p, statements: Vec::new() })
   }
 
 #[pub]
-match_ -> Statement = whitespace* "match" whitespace+ expression:$(.*) {
+match_ -> Statement = "match" whitespace+ expression:$(.*) {
   Statement::Match {
     expression: expression.into(),
     cases: Vec::new()
@@ -126,7 +70,7 @@ match_ -> Statement = whitespace* "match" whitespace+ expression:$(.*) {
 
 #[pub]
 while_ -> Statement
-    = whitespace* "while" whitespace+ command:$(.*) {?
+    = "while" whitespace+ command:$(.*) {?
       pipelines::Collector::run(command).map(|p| {
         Statement::While {
           expression: p,

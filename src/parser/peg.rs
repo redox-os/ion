@@ -1,12 +1,14 @@
 use std::io::{stderr, Write};
 use std::fmt;
 
-use shell::flow_control::{Statement, FunctionArgument, Type};
+use shell::flow_control::{ElseIf, Statement, FunctionArgument, Type};
 use self::grammar::parse_;
 use shell::directory_stack::DirectoryStack;
 use shell::{JobKind, Job};
 use shell::variables::Variables;
-use parser::{expand_string, ExpanderFunctions, Select};
+use super::{expand_string, ExpanderFunctions, Select};
+use super::assignments::parse_assignment;
+use super::pipelines;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RedirectFrom { Stdout, Stderr, Both}
@@ -112,8 +114,67 @@ impl fmt::Display for Pipeline {
 }
 
 pub fn parse(code: &str) -> Statement {
-    let trimmed = code.trim();
-    if trimmed == "end" { return Statement::End; }
+    let mut trimmed = code.trim();
+    match trimmed {
+        "end"      => return Statement::End,
+        "break"    => return Statement::Break,
+        "continue" => return Statement::Continue,
+        _ if trimmed.starts_with("let ") => {
+            trimmed = trimmed[4..].trim_left();
+            return Statement::Let { expression: parse_assignment(trimmed) }
+        },
+        _ if trimmed.starts_with("export ") => {
+            trimmed = trimmed[7..].trim_left();
+            return Statement::Export(parse_assignment(trimmed))
+        },
+        _ if trimmed.starts_with("if ") => {
+            trimmed = trimmed[3..].trim_left();
+
+            let result = pipelines::Collector::run(trimmed).map(|p| {
+                Statement::If {
+                    expression: p,
+                    success: Vec::new(),
+                    else_if: Vec::new(),
+                    failure: Vec::new()
+                    }
+                });
+
+            match result {
+                Ok(statement) => return statement,
+                Err(err) => {
+                    let stderr = stderr();
+                    let _ = writeln!(stderr.lock(), "ion: Syntax {}", err);
+                    return Statement::Default
+                }
+            }
+        }
+        "else" => return Statement::Else,
+        _ if trimmed.starts_with("else") => {
+            let mut trimmed = trimmed[4..].trim_left();
+            if trimmed.len() == 0 {
+                return Statement::Else
+            } else if trimmed.starts_with("if ") {
+                trimmed = trimmed[3..].trim_left();
+                let result = pipelines::Collector::run(&trimmed).map(|p| {
+                    Statement::ElseIf(ElseIf {
+                        expression: p,
+                        success:    Vec::new(),
+                    })
+                });
+
+                match result {
+                    Ok(statement) => return statement,
+                    Err(err) => {
+                        let stderr = stderr();
+                        let _ = writeln!(stderr.lock(), "ion: Syntax {}", err);
+                        return Statement::Default
+                    }
+                }
+            }
+        }
+        _ => ()
+    }
+
     match parse_(trimmed) {
         Ok(code_ok) => code_ok,
         Err(err) => {
@@ -228,7 +289,7 @@ else
     #[test]
     fn parsing_ifs() {
         // Default case where spaced normally
-        let parsed_if = if_("if test 1 -eq 2").unwrap();
+        let parsed_if = parse("if test 1 -eq 2");
         let correct_parse = Statement::If {
             expression: Pipeline::new(
                 vec!(Job::new(
@@ -246,42 +307,40 @@ else
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = if_("if test 1 -eq 2         ").unwrap();
+        let parsed_if = parse("if test 1 -eq 2         ");
         assert_eq!(correct_parse, parsed_if);
     }
 
     #[test]
     fn parsing_elses() {
         // Default case where spaced normally
-        let parsed_if = else_("else").unwrap();
+        let mut parsed_if = parse("else");
         let correct_parse = Statement::Else;
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = else_("else         ").unwrap();
-        let correct_parse = Statement::Else;
+        parsed_if = parse("else         ");
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
-        let parsed_if = else_("         else").unwrap();
-        let correct_parse = Statement::Else;
+        parsed_if = parse("         else");
         assert_eq!(correct_parse, parsed_if);
     }
 
     #[test]
     fn parsing_ends() {
         // Default case where spaced normally
-        let parsed_if = end_("end").unwrap();
+        let parsed_if = parse("end");
         let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = end_("end         ").unwrap();
+        let parsed_if = parse("end         ");
         let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
-        let parsed_if = end_("         end").unwrap();
+        let parsed_if = parse("         end");
         let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
     }
@@ -289,7 +348,7 @@ else
     #[test]
     fn parsing_functions() {
         // Default case where spaced normally
-        let parsed_if = fn_("fn bob").unwrap();
+        let parsed_if = parse("fn bob");
         let correct_parse = Statement::Function{
             description: "".into(),
             name:        "bob".into(),
@@ -299,15 +358,14 @@ else
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = fn_("fn bob        ").unwrap();
+        let parsed_if = parse("fn bob        ");
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
-        let parsed_if = fn_("         fn bob").unwrap();
-        assert_eq!(correct_parse, parsed_if);
+        let parsed_if = parse("         fn bob");
 
         // Default case where spaced normally
-        let parsed_if = fn_("fn bob a b").unwrap();
+        let parsed_if = parse("fn bob a b");
         let correct_parse = Statement::Function{
             description: "".into(),
             name:        "bob".into(),
@@ -317,14 +375,10 @@ else
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = fn_("fn bob a b       ").unwrap();
+        let parsed_if = parse("fn bob a b       ");
         assert_eq!(correct_parse, parsed_if);
 
-        // Leading spaces after final value
-        let parsed_if = fn_("         fn bob a b").unwrap();
-        assert_eq!(correct_parse, parsed_if);
-
-        let parsed_if = fn_("fn bob a b --bob is a nice function").unwrap();
+        let parsed_if = parse("fn bob a b --bob is a nice function");
         let correct_parse = Statement::Function{
             description: "bob is a nice function".to_string(),
             name:        "bob".into(),
@@ -332,9 +386,9 @@ else
             statements:  vec!()
         };
         assert_eq!(correct_parse, parsed_if);
-        let parsed_if = fn_("fn bob a b --          bob is a nice function").unwrap();
+        let parsed_if = parse("fn bob a b --          bob is a nice function");
         assert_eq!(correct_parse, parsed_if);
-        let parsed_if = fn_("fn bob a b      --bob is a nice function").unwrap();
+        let parsed_if = parse("fn bob a b      --bob is a nice function");
         assert_eq!(correct_parse, parsed_if);
     }
 }

@@ -7,3 +7,12 @@ false && echo cant get here
 false || false || echo double or
 true && true && echo double and
 false || true && echo or and
+contains "one two three" two && echo true || echo false
+contains "one two three" abc two && echo true || echo false
+contains "one two three" foo bar && echo true || echo false
+starts-with "one two three" one && echo true || echo false
+starts-with "one two three" abc one && echo true || echo false
+starts-with "one two three" three && echo true || echo false
+ends-with "one two three" three && echo true || echo false
+ends-with "one two three" abc three && echo true || echo false
+ends-with "one two three" one two && echo true || echo false
