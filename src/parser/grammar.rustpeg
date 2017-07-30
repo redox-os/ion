@@ -5,7 +5,6 @@ use shell::flow_control::*;
 #[pub]
 parse_ -> Statement
       = for_
-      / while_
       / fn_
       / match_
       / case_
@@ -67,17 +66,6 @@ match_ -> Statement = "match" whitespace+ expression:$(.*) {
     cases: Vec::new()
   }
 }
-
-#[pub]
-while_ -> Statement
-    = "while" whitespace+ command:$(.*) {?
-      pipelines::Collector::run(command).map(|p| {
-        Statement::While {
-          expression: p,
-          statements: Vec::new()
-        }
-      })
-    }
 
 pub pipelines -> Statement
     = (unused* newline)* [#] .* { Statement::Default }
