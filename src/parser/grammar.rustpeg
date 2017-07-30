@@ -13,7 +13,6 @@ parse_ -> Statement
       / for_
       / while_
       / fn_
-      / end_
       / break_
       / continue_
       / match_
@@ -67,10 +66,6 @@ else_if_ -> Statement
 #[pub]
 else_ -> Statement
     = whitespace* "else" whitespace*  { Statement::Else }
-
-#[pub]
-end_ -> Statement
-    = whitespace* "end" whitespace* { Statement ::End }
 
 #[pub]
 fn_ -> Statement

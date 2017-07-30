@@ -79,13 +79,17 @@ fn is_implicit_cd(argument: &str) -> bool {
 /// This function is to be executed when a stdin value is supplied to a pipeline job.
 ///
 /// Using that value, the stdin of the first command will be mapped to either a `File`,
-/// or `HereString`, which may be either a herestring or heredoc.
-fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKind)>) {
+/// or `HereString`, which may be either a herestring or heredoc. Returns `true` if
+/// the input error occurred.
+fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
     match input {
         Input::File(ref filename) => if let Some(command) = piped_commands.first_mut() {
             match File::open(filename) {
                 Ok(file) => command.0.stdin(file),
-                Err(e) => eprintln!("ion: failed to redirect '{}' into stdin: {}", filename, e),
+                Err(e) => {
+                    eprintln!("ion: failed to redirect '{}' into stdin: {}", filename, e);
+                    return true;
+                },
             }
         },
         Input::HereString(ref mut string) => if let Some(command) = piped_commands.first_mut() {
@@ -98,17 +102,19 @@ fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKin
                 }
                 Err(e) => {
                     eprintln!("ion: failed to redirect herestring '{}' into stdin: {}", string, e);
+                    return true;
                 }
             }
         },
     }
+    false
 }
 
 /// This function is to be executed when a stdout/stderr value is supplied to a pipeline job.
 ///
 /// Using that value, the stdout and/or stderr of the last command will be redirected accordingly
-/// to the designated output.
-fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, JobKind)>) {
+/// to the designated output. Returns `true` if the outputs couldn't be redirected.
+fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
     if let Some(mut command) = piped_commands.last_mut() {
         let file = if stdout.append {
             OpenOptions::new()
@@ -128,6 +134,7 @@ fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, Jo
                     }
                     Err(e) => {
                         eprintln!("ion: failed to redirect both stderr and stdout into file '{:?}': {}", f, e);
+                        return true;
                     }
                 },
                 RedirectFrom::Stderr => command.0.stderr(f),
@@ -137,9 +144,11 @@ fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, Jo
                 let stderr = io::stderr();
                 let mut stderr = stderr.lock();
                 let _ = writeln!(stderr, "ion: failed to redirect stdout into {}: {}", stdout.file, err);
+                return true;
             }
         }
     }
+    false
 }
 
 pub trait PipelineExecution {
@@ -204,9 +213,13 @@ impl<'a> PipelineExecution for Shell<'a> {
         // Generates commands for execution, differentiating between external and builtin commands.
         let mut piped_commands = self.generate_commands(pipeline);
         // Redirect the inputs if a custom redirect value was given.
-        if let Some(stdin) = pipeline.stdin.take() { redirect_input(stdin, &mut piped_commands); }
+        if let Some(stdin) = pipeline.stdin.take() {
+            if redirect_input(stdin, &mut piped_commands) { return COULD_NOT_EXEC; }
+        }
         // Redirect the outputs if a custom redirect value was given.
-        if let Some(stdout) = pipeline.stdout.take() { redirect_output(stdout, &mut piped_commands); }
+        if let Some(stdout) = pipeline.stdout.take() {
+            if redirect_output(stdout, &mut piped_commands) { return COULD_NOT_EXEC; }
+        }
         // If the given pipeline is a background task, fork the shell.
         if let Some(command_name) = possible_background_name {
             fork_pipe(self, piped_commands, command_name)
@@ -321,7 +334,7 @@ impl<'a> PipelineExecution for Shell<'a> {
                     let _ = sys::close(stdout_bk);
                 }
                 eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", long);
-                FAILURE
+                COULD_NOT_EXEC
             }
         }
     }

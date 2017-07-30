@@ -175,12 +175,12 @@ impl Builtin {
             "Execute the command if the shell's previous status is failure"
         );
         insert_builtin!(
-            "starts_with",
+            "starts-with",
             starts_with,
             "Evaluates if the supplied argument starts with a given string"
         );
         insert_builtin!(
-            "ends_with",
+            "ends-with",
             ends_with,
             "Evaluates if the supplied argument ends with a given string"
         );
@@ -270,6 +270,7 @@ fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
         _ => shell.previous_status,
     }
 }
+
 fn builtin_set(args: &[&str], shell: &mut Shell) -> i32 {
     set::set(args, shell)
 }

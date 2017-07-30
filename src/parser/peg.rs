@@ -112,14 +112,16 @@ impl fmt::Display for Pipeline {
 }
 
 pub fn parse(code: &str) -> Statement {
-    match parse_(code) {
-		Ok(code_ok) => code_ok,
-		Err(err) => {
+    let trimmed = code.trim();
+    if trimmed == "end" { return Statement::End; }
+    match parse_(trimmed) {
+        Ok(code_ok) => code_ok,
+        Err(err) => {
             let stderr = stderr();
             let _ = writeln!(stderr.lock(), "ion: Syntax {}", err);
-			Statement::Default
-		}
-	}
+            Statement::Default
+        }
+    }
 }
 
 pub fn get_function_args(args: Vec<String>) -> Option<Vec<FunctionArgument>> {
