@@ -8,8 +8,8 @@ macro_rules! string_function {
                 0...2 => {
                     eprintln!("ion: $method: two arguments must be supplied");
                     return BAD_ARG
-                }
-                3 => if args[1].$method(&args[2]) { SUCCESS } else { FAILURE }
+                },
+                3 => if args[1].$method(&args[2]) { SUCCESS } else { FAILURE },
                 _ => {
                     for arg in args[2..].iter() {
                         if args[1].$method(arg) { return SUCCESS }
