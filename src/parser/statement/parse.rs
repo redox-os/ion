@@ -229,7 +229,7 @@ pub fn get_function_args(args: Vec<String>) -> Option<Vec<FunctionArgument>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shell::JobKind;
+    use shell::{Job, JobKind};
     use shell::flow_control::Statement;
 
     #[test]

@@ -346,7 +346,8 @@ impl<'a> Collector<'a> {
 
 #[cfg(test)]
 mod tests {
-    use parser::peg::{Input, Pipeline, RedirectFrom, Redirection, parse};
+    use parser::pipelines::{Input, Pipeline, RedirectFrom, Redirection};
+    use parser::statement::parse;
     use shell::{Job, JobKind};
     use shell::flow_control::Statement;
     use types::Array;
