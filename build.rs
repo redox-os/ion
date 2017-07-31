@@ -1,5 +1,4 @@
 extern crate ansi_term;
-extern crate peg;
 extern crate version_check;
 
 use ansi_term::Color::{Red, Yellow, Blue, White};
@@ -46,6 +45,4 @@ fn main() {
             println!("cargo:warning={}", "Build may fail due to incompatible rustc version.");
         }
     }
-
-    peg::cargo_build("src/parser/grammar.rustpeg");
 }

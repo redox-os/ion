@@ -12,7 +12,6 @@ dependencies = [
  "libc 0.2.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "liner 0.4.0 (git+https://github.com/MovingtoMars/liner/)",
  "nix 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "peg 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "permutate 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -131,21 +130,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "peg"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "permutate"
 version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "quote"
-version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -297,9 +283,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum memchr 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1dbccc0e46f1ea47b9f17e6d67c5a96bd27030519c519c9c91327e31275a47b4"
 "checksum nix 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "47e49f6982987135c5e9620ab317623e723bd06738fd85377e8d55f57c8b6487"
 "checksum ole32-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5d2c49021782e5233cd243168edfa8037574afed4eba4bbaf538b3d8d1789d8c"
-"checksum peg 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)" = "36a474cba42744afe0f223e9d4263594b3387f172e512259c72d2011e477c4fb"
 "checksum permutate 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "53b7d5b19a715ffab38693a9dd44b067fdfa2b18eef65bd93562dfe507022fae"
-"checksum quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
 "checksum redox_syscall 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)" = "ddab7acd8e7bf3e49dfdf78ac1209b992329eb2f66e0bf672ab49c70a76d1d68"
 "checksum redox_termios 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc495930de8d330f14856cface52561b7d79a072c76e438cf8f34d7233a35fa7"
 "checksum regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1731164734096285ec2a5ec7fea5248ae2f5485b3feeb0115af4fda2183b2d1b"

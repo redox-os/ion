@@ -1,14 +1,12 @@
 use std::char;
 use std::fmt;
-use std::io::{Write, stderr};
 
-use self::grammar::parse_;
 use super::{ArgumentSplitter, pipelines};
 use super::{ExpanderFunctions, Select, expand_string};
 use super::assignments::parse_assignment;
 use shell::{Job, JobKind};
 use shell::directory_stack::DirectoryStack;
-use shell::flow_control::{ElseIf, FunctionArgument, Statement, Type};
+use shell::flow_control::{Case, ElseIf, FunctionArgument, Statement, Type};
 use shell::variables::Variables;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -128,12 +126,20 @@ fn collect<F>(arguments: &str, statement: F) -> Statement
     }
 }
 
+fn is_valid_name(name: &str) -> bool {
+    !name.chars().any(|c| !(c.is_alphanumeric() || c == '_'))
+}
+
 pub fn parse(code: &str) -> Statement {
     let cmd = code.trim();
     match cmd {
         "end" => return Statement::End,
         "break" => return Statement::Break,
         "continue" => return Statement::Continue,
+        "for" | "match" | "case" => {
+            eprintln!("ion: syntax error: incomplete control flow statement");
+            return Statement::Default;
+        }
         _ if cmd.starts_with("let ") => return Statement::Let { expression: parse_assignment(cmd[4..].trim_left()) },
         _ if cmd.starts_with("export ") => return Statement::Export(parse_assignment(cmd[7..].trim_left())),
         _ if cmd.starts_with("if ") => {
@@ -181,30 +187,106 @@ pub fn parse(code: &str) -> Statement {
             let variable = &cmd[..pos];
             cmd = &cmd[pos..].trim_left();
 
-            if cmd.starts_with("in ") {
-                cmd = cmd[3..].trim_left();
-            } else {
+            if !cmd.starts_with("in ") {
                 eprintln!("ion: syntax error: incorrect for loop syntax");
                 return Statement::Default;
             }
 
             return Statement::For {
                 variable: variable.into(),
-                values: ArgumentSplitter::new(cmd).map(String::from).collect(),
+                values: ArgumentSplitter::new(cmd[3..].trim_left()).map(String::from).collect(),
                 statements: Vec::new(),
             };
         }
-        _ => (),
+        _ if cmd.starts_with("case ") => {
+            let value = match cmd[5..].trim_left() {
+                "_"       => None,
+                value @ _ => Some(value.into())
+            };
+            return Statement::Case(Case { value: value, statements: Vec::new() });
+        }
+        _ if cmd.starts_with("match ") => {
+            return Statement::Match {
+                expression: cmd[6..].trim_left().into(),
+                cases: Vec::new()
+            };
+        }
+        _ if cmd.starts_with("fn ") => {
+            let cmd = cmd[3..].trim_left();
+            let pos = cmd.find(char::is_whitespace).unwrap_or(cmd.len());
+            let name = &cmd[..pos];
+            if !is_valid_name(name) {
+                eprintln!("ion: syntax error: {} is not a valid function name\n     \
+                    Function names may only contain alphanumeric characters", name);
+                return Statement::Default;
+            }
+
+            let mut args_iter = cmd[pos..].split_whitespace();
+            let mut args = Vec::new();
+            let mut description = String::new();
+            let mut description_flag = 0u8;
+
+            while let Some(arg) = args_iter.next() {
+                if arg.starts_with("--") {
+                    if arg.len() > 2 {
+                        description.push_str(&arg[2..]);
+                        description_flag |= 1;
+                    }
+                    description_flag |= 2;
+                    break
+                } else {
+                    args.push(arg.to_owned());
+                }
+            }
+
+            if description_flag & 2 != 0 {
+                if description_flag & 1 != 0 {
+                    if let Some(arg) = args_iter.next() {
+                        description.push(' ');
+                        description.push_str(&arg);
+                    }
+
+                    for argument in args_iter {
+                        description.push(' ');
+                        description.push_str(&argument);
+                    }
+                } else {
+                    if let Some(arg) = args_iter.next() {
+                        description.push_str(&arg);
+                    }
+
+                    for argument in args_iter {
+                        description.push(' ');
+                        description.push_str(&argument);
+                    }
+                }
+            }
+
+            match get_function_args(args) {
+                Some(args) => {
+                    return Statement::Function {
+                        description: description,
+                        name: name.into(),
+                        args: args,
+                        statements: Vec::new(),
+                    };
+                }
+                None => {
+                    eprintln!("ion: syntax error: invalid arguments");
+                    return Statement::Default;
+                }
+            }
+        }
+        _ => ()
     }
 
-    match parse_(cmd) {
-        Ok(code_ok) => code_ok,
-        Err(err) => {
-            let stderr = stderr();
-            let _ = writeln!(stderr.lock(), "ion: Syntax {}", err);
-            Statement::Default
-        }
+
+    if cmd.is_empty() || cmd.starts_with('#') {
+        Statement::Default
+    } else {
+        collect(cmd, Statement::Pipeline)
     }
+
 }
 
 pub fn get_function_args(args: Vec<String>) -> Option<Vec<FunctionArgument>> {
@@ -247,73 +329,12 @@ pub fn get_function_args(args: Vec<String>) -> Option<Vec<FunctionArgument>> {
     Some(fn_args)
 }
 
-mod grammar {
-    include!(concat!(env!("OUT_DIR"), "/grammar.rs"));
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::grammar::*;
     use shell::JobKind;
     use shell::flow_control::Statement;
 
-    #[test]
-    fn full_script() {
-        pipelines(
-            r#"if a == a
-  echo true a == a
-
-  if b != b
-    echo true b != b
-  else
-    echo false b != b
-
-    if 3 > 2
-      echo true 3 > 2
-    else
-      echo false 3 > 2
-    fi
-  fi
-else
-  echo false a == a
-fi
-"#,
-        ).unwrap(); // Make sure it parses
-    }
-
-    #[test]
-    fn leading_and_trailing_junk() {
-        pipelines(
-            r#"
-
-# comment
-   # comment
-
-
-    if a == a
-  echo true a == a  # Line ending commment
-
-  if b != b
-    echo true b != b
-  else
-    echo false b != b
-
-    if 3 > 2
-      echo true 3 > 2
-    else
-      echo false 3 > 2
-    fi
-  fi
-else
-  echo false a == a
-      fi
-
-# comment
-
-"#,
-        ).unwrap(); // Make sure it parses
-    }
     #[test]
     fn parsing_ifs() {
         // Default case where spaced normally
