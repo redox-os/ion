@@ -14,7 +14,7 @@ use super::flags::*;
 use super::job::RefinedJob;
 use super::signals::{self, SignalHandler};
 use super::status::*;
-use parser::peg::{Input, Pipeline, Redirection, RedirectFrom};
+use parser::pipelines::{Input, Pipeline, Redirection, RedirectFrom};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Error, Write};
 use std::iter;

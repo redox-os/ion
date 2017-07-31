@@ -5,8 +5,8 @@ use super::Shell;
 use super::flags::*;
 use super::job_control::JobControl;
 use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_cases, collect_if, Case};
-use parser::{ForExpression, StatementSplitter, check_statement, expand_string, Select, ExpanderFunctions};
-use parser::peg::Pipeline;
+use parser::{ForExpression, StatementSplitter, parse_and_validate, expand_string, Select, ExpanderFunctions};
+use parser::pipelines::Pipeline;
 use super::assignments::{let_assignment, export_variable};
 use types::Array;
 
@@ -46,7 +46,7 @@ pub trait FlowLogic {
 impl<'a> FlowLogic for Shell<'a> {
     fn on_command(&mut self, command_string: &str) {
         self.break_flow = false;
-        let mut iterator = StatementSplitter::new(command_string).map(check_statement);
+        let mut iterator = StatementSplitter::new(command_string).map(parse_and_validate);
 
         // If the value is set to `0`, this means that we don't need to append to an existing
         // partial statement block in memory, but can read and execute new statements.

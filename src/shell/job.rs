@@ -4,7 +4,7 @@ use std::os::unix::io::{FromRawFd, IntoRawFd};
 
 //use glob::glob;
 use parser::{expand_string, ExpanderFunctions};
-use parser::peg::RedirectFrom;
+use parser::pipelines::RedirectFrom;
 use smallstring::SmallString;
 use types::*;
 

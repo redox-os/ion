@@ -24,7 +24,7 @@ use builtins::*;
 use fnv::FnvHashMap;
 use liner::Context;
 use parser::ArgumentSplitter;
-use parser::peg::Pipeline;
+use parser::pipelines::Pipeline;
 use self::directory_stack::DirectoryStack;
 use self::flags::*;
 use self::flow_control::{FlowControl, Function, FunctionArgument, Type};

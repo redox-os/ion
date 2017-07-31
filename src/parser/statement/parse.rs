@@ -1,118 +1,9 @@
 use std::char;
-use std::fmt;
 
-use super::{ArgumentSplitter, pipelines};
-use super::{ExpanderFunctions, Select, expand_string};
-use super::assignments::parse_assignment;
-use shell::{Job, JobKind};
-use shell::directory_stack::DirectoryStack;
+use super::super::{ArgumentSplitter, pipelines};
+use super::super::assignments::parse_assignment;
+use super::super::pipelines::Pipeline;
 use shell::flow_control::{Case, ElseIf, FunctionArgument, Statement, Type};
-use shell::variables::Variables;
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum RedirectFrom {
-    Stdout,
-    Stderr,
-    Both,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Redirection {
-    pub from: RedirectFrom,
-    pub file: String,
-    pub append: bool,
-}
-
-/// Represents input that a process could initially receive from `stdin`
-#[derive(Debug, PartialEq, Clone)]
-pub enum Input {
-    /// A file; the contents of said file will be written to the `stdin` of a process
-    File(String),
-    /// A string literal that is written to the `stdin` of a process.
-    /// If there is a second string, that second string is the EOF phrase for the heredoc.
-    HereString(String),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Pipeline {
-    pub jobs: Vec<Job>,
-    pub stdout: Option<Redirection>,
-    pub stdin: Option<Input>,
-}
-
-impl Pipeline {
-    pub fn new(jobs: Vec<Job>, stdin: Option<Input>, stdout: Option<Redirection>) -> Self {
-        Pipeline {
-            jobs,
-            stdin,
-            stdout,
-        }
-    }
-
-    pub fn expand(&mut self, variables: &Variables, dir_stack: &DirectoryStack) {
-        let expanders = get_expanders!(variables, dir_stack);
-        for job in &mut self.jobs {
-            job.expand(&expanders);
-        }
-
-        let stdin = match self.stdin {
-            Some(Input::File(ref s)) => Some(Input::File(expand_string(s, &expanders, false).join(" "))),
-            Some(Input::HereString(ref s)) => Some(Input::HereString(expand_string(s, &expanders, true).join(" "))),
-            None => None,
-        };
-
-        self.stdin = stdin;
-
-        if let Some(stdout) = self.stdout.iter_mut().next() {
-            stdout.file = expand_string(stdout.file.as_str(), &expanders, false).join(" ");
-        }
-    }
-}
-
-impl fmt::Display for Pipeline {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut tokens: Vec<String> = Vec::with_capacity(self.jobs.len());
-        for job in &self.jobs {
-            tokens.extend(job.args.clone().into_iter());
-            match job.kind {
-                JobKind::Last => (),
-                JobKind::And => tokens.push("&&".into()),
-                JobKind::Or => tokens.push("||".into()),
-                JobKind::Background => tokens.push("&".into()),
-                JobKind::Pipe(RedirectFrom::Stdout) => tokens.push("|".into()),
-                JobKind::Pipe(RedirectFrom::Stderr) => tokens.push("^|".into()),
-                JobKind::Pipe(RedirectFrom::Both) => tokens.push("&|".into()),
-            }
-        }
-        match self.stdin {
-            None => (),
-            Some(Input::File(ref file)) => {
-                tokens.push("<".into());
-                tokens.push(file.clone());
-            }
-            Some(Input::HereString(ref string)) => {
-                tokens.push("<<<".into());
-                tokens.push(string.clone());
-            }
-        }
-        if let Some(ref outfile) = self.stdout {
-            match outfile.from {
-                RedirectFrom::Stdout => {
-                    tokens.push((if outfile.append { ">>" } else { ">" }).into());
-                }
-                RedirectFrom::Stderr => {
-                    tokens.push((if outfile.append { "^>>" } else { "^>" }).into());
-                }
-                RedirectFrom::Both => {
-                    tokens.push((if outfile.append { "&>>" } else { "&>" }).into());
-                }
-            }
-            tokens.push(outfile.file.clone());
-        }
-
-        write!(f, "{}", tokens.join(" "))
-    }
-}
 
 fn collect<F>(arguments: &str, statement: F) -> Statement
     where F: Fn(Pipeline) -> Statement
@@ -126,9 +17,7 @@ fn collect<F>(arguments: &str, statement: F) -> Statement
     }
 }
 
-fn is_valid_name(name: &str) -> bool {
-    !name.chars().any(|c| !(c.is_alphanumeric() || c == '_'))
-}
+fn is_valid_name(name: &str) -> bool { !name.chars().any(|c| !(c.is_alphanumeric() || c == '_')) }
 
 pub fn parse(code: &str) -> Statement {
     let cmd = code.trim();
@@ -194,21 +83,26 @@ pub fn parse(code: &str) -> Statement {
 
             return Statement::For {
                 variable: variable.into(),
-                values: ArgumentSplitter::new(cmd[3..].trim_left()).map(String::from).collect(),
+                values: ArgumentSplitter::new(cmd[3..].trim_left())
+                    .map(String::from)
+                    .collect(),
                 statements: Vec::new(),
             };
         }
         _ if cmd.starts_with("case ") => {
             let value = match cmd[5..].trim_left() {
-                "_"       => None,
-                value @ _ => Some(value.into())
+                "_" => None,
+                value @ _ => Some(value.into()),
             };
-            return Statement::Case(Case { value: value, statements: Vec::new() });
+            return Statement::Case(Case {
+                value: value,
+                statements: Vec::new(),
+            });
         }
         _ if cmd.starts_with("match ") => {
             return Statement::Match {
                 expression: cmd[6..].trim_left().into(),
-                cases: Vec::new()
+                cases: Vec::new(),
             };
         }
         _ if cmd.starts_with("fn ") => {
@@ -216,8 +110,11 @@ pub fn parse(code: &str) -> Statement {
             let pos = cmd.find(char::is_whitespace).unwrap_or(cmd.len());
             let name = &cmd[..pos];
             if !is_valid_name(name) {
-                eprintln!("ion: syntax error: {} is not a valid function name\n     \
-                    Function names may only contain alphanumeric characters", name);
+                eprintln!(
+                    "ion: syntax error: {} is not a valid function name\n     \
+                    Function names may only contain alphanumeric characters",
+                    name
+                );
                 return Statement::Default;
             }
 
@@ -233,7 +130,7 @@ pub fn parse(code: &str) -> Statement {
                         description_flag |= 1;
                     }
                     description_flag |= 2;
-                    break
+                    break;
                 } else {
                     args.push(arg.to_owned());
                 }
@@ -277,7 +174,7 @@ pub fn parse(code: &str) -> Statement {
                 }
             }
         }
-        _ => ()
+        _ => (),
     }
 
 

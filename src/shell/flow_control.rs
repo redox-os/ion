@@ -1,5 +1,5 @@
 use types::Identifier;
-use parser::peg::Pipeline;
+use parser::pipelines::Pipeline;
 use parser::assignments::Binding;
 
 #[derive(Debug, PartialEq, Clone)]
