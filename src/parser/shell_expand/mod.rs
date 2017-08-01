@@ -28,6 +28,18 @@ pub fn is_expression(s: &str) -> bool {
     s.starts_with('\'')
 }
 
+/// Trait representing different elements of string expansion
+pub trait Expander {
+    /// Expand a tilde form to the correct directory
+    fn tilde(&self, &str) -> Option<String> { None }
+    /// Expand an array variable with some selection
+    fn array(&self, &str, Select) -> Option<Array> { None }
+    /// Expand a string variable given if its quoted / unquoted
+    fn variable(&self, &str, bool) -> Option<Value> { None }
+    /// Expand a subshell expression
+    fn command(&self, &str) -> Option<Value> { None }
+}
+
 pub struct ExpanderFunctions<'f> {
     pub vars:     &'f Variables,
     pub tilde:    &'f Fn(&str) -> Option<String>,
@@ -36,10 +48,10 @@ pub struct ExpanderFunctions<'f> {
     pub command:  &'f Fn(&str) -> Option<Value>
 }
 
-fn expand_process(current: &mut String, 
-                  command: &str, 
-                  selection: Select, 
-                  expand_func: &ExpanderFunctions)
+fn expand_process<E: Expander>(current: &mut String,
+                               command: &str,
+                               selection: Select,
+                               expand_func: &E)
 {
     let mut tokens = Vec::new();
     let mut contains_brace = false;
@@ -51,14 +63,17 @@ fn expand_process(current: &mut String,
 
     let expanded = expand_tokens(&tokens, expand_func, false, contains_brace).join(" ");
 
-    if let Some(result) = (expand_func.command)(&expanded) {
+    if let Some(result) = expand_func.command(&expanded) {
         slice(current, result, selection);
     }
 }
 
-fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
-    tokens: &mut Vec<BraceToken>, nodes: &[&str], expand_func: &ExpanderFunctions,
-    reverse_quoting: bool)
+fn expand_brace<E: Expander>(current: &mut String,
+                             expanders: &mut Vec<Vec<String>>,
+                             tokens: &mut Vec<BraceToken>,
+                             nodes: &[&str],
+                             expand_func: &E,
+                             reverse_quoting: bool)
 {
     let mut temp = Vec::new();
     for word in nodes.into_iter()
@@ -82,17 +97,23 @@ fn expand_brace(current: &mut String, expanders: &mut Vec<Vec<String>>,
     }
 }
 
-fn array_expand(elements : &[&str], expand_func: &ExpanderFunctions, selection : Select) -> Array {
+fn array_expand<E: Expander>(elements: &[&str],
+                             expand_func: &E,
+                             selection: Select) -> Array {
     match selection {
         Select::None => Array::new(),
-        Select::All => elements.iter().flat_map(|e| expand_string(e, expand_func, false)).collect(),
-        Select::Index(index) => array_nth(elements, expand_func, index).into_iter().collect(),
+        Select::All => elements.iter()
+            .flat_map(|e| expand_string(e, expand_func, false)).collect(),
+        Select::Index(index) =>
+            array_nth(elements, expand_func, index).into_iter().collect(),
         Select::Range(range) => array_range(elements, expand_func, range),
         Select::Key(_) => Array::new(),
     }
 }
 
-fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, index: Index) -> Option<Value> {
+fn array_nth<E: Expander>(elements: &[&str],
+                          expand_func: &E,
+                          index: Index) -> Option<Value> {
     let mut expanded = elements.iter().flat_map(|e| expand_string(e, expand_func, false));
     match index {
         Index::Forward(n) => expanded.nth(n),
@@ -100,7 +121,7 @@ fn array_nth(elements: &[&str], expand_func: &ExpanderFunctions, index: Index) -
     }
 }
 
-fn array_range(elements: &[&str], expand_func: &ExpanderFunctions, range : Range) -> Array {
+fn array_range<E: Expander>(elements: &[&str], expand_func: &E, range : Range) -> Array {
     let expanded = elements.iter()
                            .flat_map(|e| expand_string(e, expand_func, false))
                            .collect::<Array>();
@@ -143,11 +164,12 @@ fn slice<S: AsRef<str>>(output: &mut String, expanded: S, selection: Select) {
     }
 }
 
-/// Performs shell expansions to an input string, efficiently returning the final expanded form.
-/// Shells must provide their own batteries for expanding tilde and variable words.
-pub fn expand_string(
+/// Performs shell expansions to an input string, efficiently returning the final
+/// expanded form. Shells must provide their own batteries for expanding tilde
+/// and variable words.
+pub fn expand_string<E: Expander>(
     original: &str,
-    expand_func: &ExpanderFunctions,
+    expand_func: &E,
     reverse_quoting: bool
 ) -> Array {
     let mut token_buffer = Vec::new();
@@ -167,8 +189,10 @@ pub fn expand_string(
 }
 
 #[allow(cyclomatic_complexity)]
-pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFunctions,
-    reverse_quoting: bool, contains_brace: bool) -> Array
+pub fn expand_tokens<E: Expander>(token_buffer: &[WordToken],
+                                  expand_func: &E,
+                                  reverse_quoting: bool,
+                                  contains_brace: bool) -> Array
 {
     let mut output = String::new();
     let mut expanded_words = Array::new();
@@ -176,7 +200,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
     macro_rules! expand {
         ($text:expr, $do_glob:expr, $tilde:expr) => {{
             let expanded: String = if $tilde {
-                match (expand_func.tilde)($text) {
+                match expand_func.tilde($text) {
                     Some(s) => s,
                     None => $text.into()
                 }
@@ -212,7 +236,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                         output.push_str(&array_expand(elements, expand_func, index.clone()).join(" "));
                     },
                     WordToken::ArrayVariable(array, _, ref index) => {
-                        if let Some(array) = (expand_func.array)(array, index.clone()) {
+                        if let Some(array) = expand_func.array(array, index.clone()) {
                             output.push_str(&array.join(" "));
                         }
                     },
@@ -267,7 +291,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     },
                     WordToken::Variable(text, quoted, ref index) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
-                        let expanded = match (expand_func.variable)(text, quoted) {
+                        let expanded = match expand_func.variable(text, quoted) {
                             Some(var) => var,
                             None      => continue
                         };
@@ -277,7 +301,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     WordToken::Normal(text, do_glob, tilde) => {
                         expand!(text, do_glob, tilde);
                     },
-                    WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, &expand_func),
+                    WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
                 }
             }
 
@@ -299,7 +323,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     return array_expand(elements, expand_func, index.clone());
                 },
                 WordToken::ArrayVariable(array, quoted, ref index) => {
-                    return match (expand_func.array)(array, index.clone()) {
+                    return match expand_func.array(array, index.clone()) {
                         Some(ref array) if quoted =>
                             Some(array.join(" ").into()).into_iter().collect(),
                         Some(array)               => array,
@@ -368,7 +392,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                     output.push_str(&array_expand(elements, expand_func, index.clone()).join(" "));
                 },
                 WordToken::ArrayVariable(array, _, ref index) => {
-                    if let Some(array) = (expand_func.array)(array, index.clone()) {
+                    if let Some(array) = expand_func.array(array, index.clone()) {
                         output.push_str(&array.join(" "));
                     }
                 },
@@ -426,7 +450,7 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
                 }
                 WordToken::Variable(text, quoted, ref index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
-                    let expanded = match (expand_func.variable)(text, quoted) {
+                    let expanded = match expand_func.variable(text, quoted) {
                         Some(var) => var,
                         None          => continue
                     };
@@ -450,14 +474,16 @@ pub fn expand_tokens<'a>(token_buffer: &[WordToken], expand_func: &'a ExpanderFu
 /// x * 5 + y => 22
 /// ```
 /// if `x=5` and `y=7`
-fn expand_arithmetic(output : &mut String , input : &str, expander : &ExpanderFunctions) {
+fn expand_arithmetic<E: Expander>(output: &mut String,
+                                  input: &str,
+                                  expander: &E) {
     let mut intermediate = String::with_capacity(input.as_bytes().len());
     let mut varbuf = String::new();
     let flush = |var : &mut String, out : &mut String| {
         if ! var.is_empty() {
             // We have reached the end of a potential variable, so we expand it and push
             // it onto the result
-            let res = (expander.variable)(&var, false);
+            let res = expander.variable(&var, false);
             match res {
                 Some(v) => out.push_str(&v),
                 None => out.push_str(&var),

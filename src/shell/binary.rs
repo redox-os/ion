@@ -42,7 +42,7 @@ impl<'a> Binary for Shell<'a> {
     fn prompt(&self) -> String {
         if self.flow_control.level == 0 {
             let prompt_var = self.variables.get_var_or_empty("PROMPT");
-            expand_string(&prompt_var, &get_expanders!(&self.variables, &self.directory_stack), false).join(" ")
+            expand_string(&prompt_var, self, false).join(" ")
         } else {
             "    ".repeat(self.flow_control.level as usize)
         }

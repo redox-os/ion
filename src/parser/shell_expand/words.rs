@@ -5,7 +5,7 @@ use std::iter::{empty, FromIterator};
 
 use super::super::ArgumentSplitter;
 use super::unicode_segmentation::UnicodeSegmentation;
-use super::{ExpanderFunctions, expand_string};
+use super::{Expander, expand_string};
 use super::ranges::parse_index_range;
 use super::{slice, is_expression};
 
@@ -233,10 +233,10 @@ impl<'a> ArrayMethod<'a> {
         }
     }
 
-    pub fn handle(&self, current: &mut String, expand_func: &ExpanderFunctions) {
+    pub fn handle<E: Expander>(&self, current: &mut String, expand_func: &E) {
         match self.method {
             "split" => {
-                let variable = if let Some(variable) = (expand_func.variable)(self.variable, false) {
+                let variable = if let Some(variable) = expand_func.variable(self.variable, false) {
                     variable
                 } else if is_expression(self.variable) {
                     expand_string(self.variable, expand_func, false).join(" ")
@@ -315,11 +315,11 @@ impl<'a> ArrayMethod<'a> {
         }
     }
 
-    pub fn handle_as_array(&self, expand_func: &ExpanderFunctions) -> Array {
+    pub fn handle_as_array<E: Expander>(&self, expand_func: &E) -> Array {
 
         macro_rules! resolve_var {
             () => {
-                if let Some(variable) = (expand_func.variable)(self.variable, false) {
+                if let Some(variable) = expand_func.variable(self.variable, false) {
                     variable
                 } else if is_expression(self.variable) {
                     expand_string(self.variable, expand_func, false).join(" ")
@@ -449,16 +449,16 @@ pub struct StringMethod<'a> {
 
 impl<'a> StringMethod<'a> {
 
-    pub fn handle(&self, output: &mut String, expand: &ExpanderFunctions) {
+    pub fn handle<E: Expander>(&self, output: &mut String, expand: &E) {
         let (variable, pattern) = (self.variable, self.pattern);
 
         macro_rules! string_eval {
             ($variable:ident $method:tt $pattern:ident) => {{
                 let pattern = expand_string($pattern, expand, false).join(" ");
-                let is_true = if let Some(value) = expand.vars.get_var($variable) {
+                let is_true = if let Some(value) = expand.variable($variable, false) {
                     value.$method(&pattern)
                 } else if is_expression($variable) {
-                    expand_string($variable, &expand, false).join($pattern)
+                    expand_string($variable, expand, false).join($pattern)
                         .$method(&pattern)
                 } else {
                     false
@@ -469,11 +469,11 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! path_eval {
             ($method:tt) => {{
-                if let Some(value) = expand.vars.get_var(variable) {
+                if let Some(value) = expand.variable(variable, false) {
                     output.push_str(Path::new(&value).$method()
                         .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
                 } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
+                    let word = expand_string(variable, expand, false).join(pattern);
                     output.push_str(Path::new(&word).$method()
                         .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
                 }
@@ -482,10 +482,10 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! string_case {
             ($method:tt) => {{
-                if let Some(value) = expand.vars.get_var(variable) {
+                if let Some(value) = expand.variable(variable, false) {
                     output.push_str(value.$method().as_str());
                 } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
+                    let word = expand_string(variable, expand, false).join(pattern);
                     output.push_str(word.$method().as_str());
                 }
             }}
@@ -505,10 +505,10 @@ impl<'a> StringMethod<'a> {
                 let pattern = expand_string(pattern, expand, false).join(" ");
                 match pattern.parse::<usize>() {
                     Ok(repeat) => {
-                        if let Some(value) = expand.vars.get_var(variable) {
+                        if let Some(value) = expand.variable(variable, false) {
                             output.push_str(&value.repeat(repeat));
                         } else if is_expression(variable) {
-                            let value = expand_string(variable, &expand, false).join(" ");
+                            let value = expand_string(variable, expand, false).join(" ");
                             output.push_str(&value.repeat(repeat));
                         }
                     },
@@ -522,10 +522,10 @@ impl<'a> StringMethod<'a> {
                     .map(|x| expand_string(x, expand, false).join(" "))
                     .collect::<Vec<_>>();
                 if pattern.len() == 2 {
-                    if let Some(value) = expand.vars.get_var(variable) {
+                    if let Some(value) = expand.variable(variable, false) {
                         output.push_str(&value.replace(pattern[0].as_str(), pattern[1].as_str()));
                     } else if is_expression(variable) {
-                        let word = expand_string(variable, &expand, false).join(" ");
+                        let word = expand_string(variable, expand, false).join(" ");
                         output.push_str(&word.replace(pattern[0].as_str(), pattern[1].as_str()));
                     }
                 } else {
@@ -538,10 +538,10 @@ impl<'a> StringMethod<'a> {
                     .collect::<Vec<_>>();
                 if pattern.len() == 3 {
                     if let Ok(nth) = pattern[2].as_str().parse::<usize>() {
-                        if let Some(value) = expand.vars.get_var(variable) {
+                        if let Some(value) = expand.variable(variable, false) {
                             output.push_str(&value.replacen(pattern[0].as_str(), pattern[1].as_str(), nth));
                         } else if is_expression(variable) {
-                            let word = expand_string(variable, &expand, false).join(" ");
+                            let word = expand_string(variable, expand, false).join(" ");
                             output.push_str(&word.replacen(pattern[0].as_str(), pattern[1].as_str(), nth));
                         }
                     } else {
@@ -553,7 +553,7 @@ impl<'a> StringMethod<'a> {
             }
             "join" => {
                 let pattern = expand_string(pattern, expand, false).join(" ");
-                if let Some(array) = (expand.array)(variable, Select::All) {
+                if let Some(array) = expand.array(variable, Select::All) {
                     slice(output, array.join(&pattern), self.selection.clone());
                 } else if is_expression(variable) {
                     slice(output, expand_string(variable, expand, false).join(&pattern), self.selection.clone());
@@ -561,7 +561,7 @@ impl<'a> StringMethod<'a> {
             },
             "len" => {
                 if variable.starts_with('@') || variable.starts_with('[') {
-                    if let Some(array) = expand.vars.get_array(variable) {
+                    if let Some(array) = expand.variable(variable, false) {
                         output.push_str(&array.len().to_string())
                     } else if is_expression(variable) {
                         let expanded = expand_string(variable, expand, false);
@@ -569,29 +569,29 @@ impl<'a> StringMethod<'a> {
                     } else {
                         output.push_str("0")
                     }
-                } else if let Some(value) = expand.vars.get_var(variable) {
+                } else if let Some(value) = expand.variable(variable, false) {
                     let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
                     output.push_str(&count.to_string());
                 } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
+                    let word = expand_string(variable, expand, false).join(pattern);
                     let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
                     output.push_str(&count.to_string());
                 }
             },
             "len_bytes" => {
-                if let Some(value) = expand.vars.get_var(variable) {
+                if let Some(value) = expand.variable(variable, false) {
                     output.push_str(&value.as_bytes().len().to_string());
                 } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
+                    let word = expand_string(variable, expand, false).join(pattern);
                     output.push_str(&word.as_bytes().len().to_string());
                 }
             },
             "reverse" => {
-                if let Some(value) = expand.vars.get_var(variable) {
+                if let Some(value) = expand.variable(variable, false) {
                     let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
                 } else if is_expression(variable) {
-                    let word = expand_string(variable, &expand, false).join(pattern);
+                    let word = expand_string(variable, expand, false).join(pattern);
                     let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
                 }
@@ -623,17 +623,19 @@ pub enum WordToken<'a> {
     // Glob(&'a str),
 }
 
-pub struct WordIterator<'a> {
+pub struct WordIterator<'a, E: Expander + 'a> {
     data:          &'a str,
     read:          usize,
     flags:         Flags,
-    expanders:     &'a ExpanderFunctions<'a>
+    expanders:     &'a E
 }
 
-impl<'a> WordIterator<'a> {
-    pub fn new(data: &'a str, expand_processes: bool, expanders: &'a ExpanderFunctions) -> WordIterator<'a> {
+impl<'a, E: Expander + 'a> WordIterator<'a, E> {
+    pub fn new(data: &'a str,
+               expand_processes: bool,
+               expanders: &'a E) -> WordIterator<'a, E> {
         let flags = if expand_processes { EXPAND_PROCESSES } else { Flags::empty() };
-        WordIterator { data, read: 0, flags, expanders}
+        WordIterator { data, read: 0, flags, expanders }
     }
 
     // Contains the grammar for collecting whitespace characters
@@ -1171,7 +1173,7 @@ impl<'a> WordIterator<'a> {
     }
 }
 
-impl<'a> Iterator for WordIterator<'a> {
+impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
     type Item = WordToken<'a>;
 
     fn next(&mut self) -> Option<WordToken<'a>> {

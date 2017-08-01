@@ -2,10 +2,8 @@ mod collector;
 
 pub use self::collector::*;
 
-use super::{ExpanderFunctions, Select, expand_string};
+use super::{expand_string, Expander};
 use shell::{Job, JobKind};
-use shell::directory_stack::DirectoryStack;
-use shell::variables::Variables;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -48,22 +46,23 @@ impl Pipeline {
         }
     }
 
-    pub fn expand(&mut self, variables: &Variables, dir_stack: &DirectoryStack) {
-        let expanders = get_expanders!(variables, dir_stack);
+    pub fn expand<E: Expander>(&mut self, expanders: &E) {
         for job in &mut self.jobs {
-            job.expand(&expanders);
+            job.expand(expanders);
         }
 
         let stdin = match self.stdin {
-            Some(Input::File(ref s)) => Some(Input::File(expand_string(s, &expanders, false).join(" "))),
-            Some(Input::HereString(ref s)) => Some(Input::HereString(expand_string(s, &expanders, true).join(" "))),
+            Some(Input::File(ref s)) =>
+                Some(Input::File(expand_string(s, expanders, false).join(" "))),
+            Some(Input::HereString(ref s)) =>
+                Some(Input::HereString(expand_string(s, expanders, true).join(" "))),
             None => None,
         };
 
         self.stdin = stdin;
 
         if let Some(stdout) = self.stdout.iter_mut().next() {
-            stdout.file = expand_string(stdout.file.as_str(), &expanders, false).join(" ");
+            stdout.file = expand_string(stdout.file.as_str(), expanders, false).join(" ");
         }
     }
 }

@@ -3,7 +3,7 @@ use std::process::{Command, Stdio};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 
 //use glob::glob;
-use parser::{expand_string, ExpanderFunctions};
+use parser::{expand_string, Expander};
 use parser::pipelines::RedirectFrom;
 use smallstring::SmallString;
 use types::*;
@@ -26,7 +26,7 @@ impl Job {
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand(&mut self, expanders: &ExpanderFunctions) {
+    pub fn expand<E: Expander>(&mut self, expanders: &E) {
         let mut expanded = Array::new();
         expanded.grow(self.args.len());
         expanded.extend(self.args.drain().flat_map(|arg| {

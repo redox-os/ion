@@ -23,7 +23,7 @@ use app_dirs::{AppDataType, AppInfo, app_root};
 use builtins::*;
 use fnv::FnvHashMap;
 use liner::Context;
-use parser::ArgumentSplitter;
+use parser::{Expander, ArgumentSplitter, Select};
 use parser::pipelines::Pipeline;
 use self::directory_stack::DirectoryStack;
 use self::flags::*;
@@ -172,7 +172,7 @@ impl<'a> Shell<'a> {
             }
         }
 
-        pipeline.expand(&self.variables, &self.directory_stack);
+        pipeline.expand(self);
         // Branch if -> input == shell command i.e. echo
         let exit_status = if let Some(command) = {
             let key: &str = pipeline.jobs[0].command.as_ref();
@@ -293,4 +293,83 @@ impl<'a> Shell<'a> {
     }
 
 
+}
+
+impl<'a> Expander for Shell<'a> {
+    fn tilde(&self, input: &str) -> Option<String> {
+        self.variables.tilde_expansion(input, &self.directory_stack)
+    }
+
+    /// Expand an array variable with some selection
+    fn array(&self, array: &str, selection: Select) -> Option<Array> {
+        use std::iter::FromIterator;
+        let mut found = match self.variables.get_array(array) {
+            Some(array) => match selection {
+                Select::None  => None,
+                Select::All   => Some(array.clone()),
+                Select::Index(id) => {
+                    id.resolve(array.len())
+                        .and_then(|n| array.get(n))
+                        .map(|x| Array::from_iter(Some(x.to_owned())))
+                },
+                Select::Range(range) => {
+                    if let Some((start, length)) = range.bounds(array.len()) {
+                        let array = array.iter()
+                            .skip(start)
+                            .take(length)
+                            .map(|x| x.to_owned())
+                            .collect::<Array>();
+                        if array.is_empty() {
+                            None
+                        } else {
+                            Some(array)
+                        }
+                    } else {
+                        None
+                    }
+                },
+                Select::Key(_) => {
+                    None
+                }
+            },
+            None => None
+        };
+        if found.is_none() {
+            found = match self.variables.get_map(array) {
+                Some(map) => match selection {
+                    Select::All => {
+                        let mut arr = Array::new();
+                        for (_, value) in map {
+                            arr.push(value.clone());
+                        }
+                        Some(arr)
+                    }
+                    Select::Key(ref key) => {
+                        Some(array![
+                            map.get(key.get()).unwrap_or(&"".into()).clone()
+                        ])
+                    },
+                    _ => None
+                },
+                None => None
+            }
+        }
+        found
+    }
+    /// Expand a string variable given if its quoted / unquoted
+    fn variable(&self, variable: &str, quoted: bool) -> Option<Value> {
+        use ascii_helpers::AsciiReplace;
+        if quoted {
+            self.variables.get_var(variable)
+        } else {
+            self.variables.get_var(variable)
+                .map(|x| x.ascii_replace('\n', ' ').into())
+        }
+    }
+    /// Expand a subshell expression
+    fn command(&self, command: &str) -> Option<Value> {
+        /// XXX: This is a terrible implementation: the `Variables` struct
+        /// should not know nor be responsible for expanding a subshell
+        self.variables.command_expansion(command)
+    }
 }
