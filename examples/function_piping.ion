@@ -17,3 +17,15 @@ fn format_with pat
 end
 
 echo one two three four five | format_with "-"
+
+fn square
+    read x
+    echo $(( x * x ))
+end
+
+fn mult x
+    read y
+    echo $(( y * x ))
+end
+
+echo 5 | square | mult 3

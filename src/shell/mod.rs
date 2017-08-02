@@ -180,7 +180,7 @@ impl<'a> Shell<'a> {
             builtins.get(key)
         } {
             // Run the 'main' of the command and set exit_status
-            if pipeline.jobs.len() == 1 && pipeline.stdin == None && pipeline.stdout == None {
+            if !pipeline.requires_piping() {
                 if self.flags & PRINT_COMMS != 0 { eprintln!("> {}", pipeline.to_string()); }
                 let borrowed = &pipeline.jobs[0].args;
                 let small: SmallVec<[&str; 4]> = borrowed.iter()
@@ -192,7 +192,7 @@ impl<'a> Shell<'a> {
             }
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(function) = self.functions.get(&pipeline.jobs[0].command).cloned() {
-            if pipeline.jobs.len() == 1 {
+            if !pipeline.requires_piping() {
                 let args: &[String] = pipeline.jobs[0].args.deref();
                 let args: Vec<&str> = args.iter().map(AsRef::as_ref).collect();
                 match function.execute(self, &args) {

@@ -65,6 +65,13 @@ impl Pipeline {
             stdout.file = expand_string(stdout.file.as_str(), expanders, false).join(" ");
         }
     }
+
+    pub fn requires_piping(&self) -> bool {
+        self.jobs.len() > 1 ||
+            self.stdin != None ||
+            self.stdout != None ||
+            self.jobs.last().unwrap().kind == JobKind::Background
+    }
 }
 
 impl fmt::Display for Pipeline {
