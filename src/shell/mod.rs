@@ -297,6 +297,8 @@ impl<'a> Shell<'a> {
 
 impl<'a> Expander for Shell<'a> {
     fn tilde(&self, input: &str) -> Option<String> {
+        /// XXX: This is a silly implementation: the `Variables` struct
+        /// should not know nor be responsible for expanding tildes
         self.variables.tilde_expansion(input, &self.directory_stack)
     }
 
@@ -368,7 +370,7 @@ impl<'a> Expander for Shell<'a> {
     }
     /// Expand a subshell expression
     fn command(&self, command: &str) -> Option<Value> {
-        /// XXX: This is a terrible implementation: the `Variables` struct
+        /// XXX: This is a silly implementation: the `Variables` struct
         /// should not know nor be responsible for expanding a subshell
         self.variables.command_expansion(command)
     }
