@@ -1393,13 +1393,9 @@ mod tests {
 
     impl Expander for Empty {}
 
-    macro_rules! functions {
-        () => { Empty }
-    }
-
     fn compare(input: &str, expected: Vec<WordToken>) {
         let mut correct = 0;
-        for (actual, expected) in WordIterator::new(input, true, &functions!()).zip(expected.iter()) {
+        for (actual, expected) in WordIterator::new(input, true, &Empty).zip(expected.iter()) {
             assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
             correct += 1;
         }
@@ -1640,13 +1636,9 @@ mod tests {
         }
     }
 
-    macro_rules! functions_with_vars {
-        () => { WithVars }
-    }
-
     #[test]
     fn array_methods() {
-        let expanders = functions_with_vars!();
+        let expanders = WithVars;
         let method = ArrayMethod {
             method: "graphemes",
             variable: "pkmn1",
