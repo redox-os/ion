@@ -52,35 +52,45 @@ impl ForExpression {
     }
 }
 
-#[test]
-fn for_inclusive_range() {
-    let dir_stack = DirectoryStack::new();
-    let variables = Variables::default();
-    let input = &["1...10".to_owned()];
-    assert_eq!(ForExpression::new(input, &dir_stack, &variables), ForExpression::Range(1, 11));
+mod tests {
+    use super::*;
+    use shell::variables::Variables;
+
+    struct VariableExpander(pub Variables);
+
+    impl Expander for VariableExpander {
+        fn variable(&self, var: &str, _: bool) -> Option<Value> {
+            self.0.get_var(var)
+        }
+    }
+
+    #[test]
+    fn for_inclusive_range() {
+        let variables = Variables::default();
+        let input = &["1...10".to_owned()];
+        assert_eq!(ForExpression::new(input, &VariableExpander(variables)), ForExpression::Range(1, 11));
+    }
+
+    #[test]
+    fn for_exclusive_range() {
+        let variables = Variables::default();
+        let input = &["1..10".to_owned()];
+        assert_eq!(ForExpression::new(input, &VariableExpander(variables)), ForExpression::Range(1, 10));
+    }
+
+    #[test]
+    fn for_normal() {
+        let variables = Variables::default();
+        let output = vec!["1".to_owned(), "2".to_owned(), "3".to_owned(), "4".to_owned(), "5".to_owned()];
+        assert_eq!(ForExpression::new(&output.clone(), &VariableExpander(variables)), ForExpression::Multiple(output));
+    }
+
+    #[test]
+    fn for_variable() {
+        let mut variables = Variables::default();
+        variables.set_var("A", "1 2 3 4 5");
+        assert_eq!(ForExpression::new(&["$A".to_owned()], &VariableExpander(variables)),
+                   ForExpression::Normal("1 2 3 4 5".to_owned()));
+    }
 }
 
-#[test]
-fn for_exclusive_range() {
-    let dir_stack = DirectoryStack::new();
-    let variables = Variables::default();
-    let input = &["1..10".to_owned()];
-    assert_eq!(ForExpression::new(input, &dir_stack, &variables), ForExpression::Range(1, 10));
-}
-
-#[test]
-fn for_normal() {
-    let dir_stack = DirectoryStack::new();
-    let variables = Variables::default();
-    let output = vec!["1".to_owned(), "2".to_owned(), "3".to_owned(), "4".to_owned(), "5".to_owned()];
-    assert_eq!(ForExpression::new(&output.clone(), &dir_stack, &variables), ForExpression::Multiple(output));
-}
-
-#[test]
-fn for_variable() {
-    let dir_stack = DirectoryStack::new();
-    let mut variables = Variables::default();
-    variables.set_var("A", "1 2 3 4 5");
-    assert_eq!(ForExpression::new(&["$A".to_owned()], &dir_stack, &variables),
-        ForExpression::Normal("1 2 3 4 5".to_owned()));
-}

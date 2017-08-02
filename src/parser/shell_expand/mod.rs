@@ -13,8 +13,6 @@ use glob::glob;
 use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub use self::words::{WordIterator, WordToken, Select, Index, Range};
-use shell::variables::Variables;
-
 use types::*;
 
 /// Determines whether an input string is expression-like as compared to a
@@ -38,14 +36,6 @@ pub trait Expander {
     fn variable(&self, &str, bool) -> Option<Value> { None }
     /// Expand a subshell expression
     fn command(&self, &str) -> Option<Value> { None }
-}
-
-pub struct ExpanderFunctions<'f> {
-    pub vars:     &'f Variables,
-    pub tilde:    &'f Fn(&str) -> Option<String>,
-    pub array:    &'f Fn(&str, Select) -> Option<Array>,
-    pub variable: &'f Fn(&str, bool) -> Option<Value>,
-    pub command:  &'f Fn(&str) -> Option<Value>
 }
 
 fn expand_process<E: Expander>(current: &mut String,
@@ -518,22 +508,18 @@ fn expand_arithmetic<E: Expander>(output: &mut String,
 mod test {
     use super::*;
 
-    macro_rules! functions {
-        () => {
-            ExpanderFunctions {
-                vars:     &Variables::default(),
-                tilde:    &|_| None,
-                array:    &|_, _| None,
-                variable: &|variable: &str, _| match variable {
-                    "A" => Some("1".to_owned()),
-                    "B" => Some("test".to_owned()),
-                    "C" => Some("ing".to_owned()),
-                    "D" => Some("1 2 3".to_owned()),
-                    "FOO" => Some("FOO".to_owned()),
-                    "BAR" => Some("BAR".to_owned()),
-                    _   => None
-                },
-                command:  &|_| None
+    struct VariableExpander;
+
+    impl Expander for VariableExpander {
+        fn variable(&self, variable: &str, _: bool) -> Option<Value> {
+            match variable {
+                "A" => Some("1".to_owned()),
+                "B" => Some("test".to_owned()),
+                "C" => Some("ing".to_owned()),
+                "D" => Some("1 2 3".to_owned()),
+                "FOO" => Some("FOO".to_owned()),
+                "BAR" => Some("BAR".to_owned()),
+                _   => None
             }
         }
     }
@@ -542,7 +528,7 @@ mod test {
     fn expand_variable_normal_variable() {
         let input = "$FOO:NOT:$BAR";
         let expected = "FOO:NOT:BAR";
-        let expanded = expand_string(input, &functions!(), false);
+        let expanded = expand_string(input, &VariableExpander, false);
         assert_eq!(array![expected], expanded);
     }
 
@@ -550,7 +536,7 @@ mod test {
     fn expand_braces() {
         let line = "pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
         let expected = "prodigal programmer processed prototype procedures proficiently proving prospective projections";
-        let expanded = expand_string(line, &functions!(), false);
+        let expanded = expand_string(line, &VariableExpander, false);
         assert_eq!(
             expected.split_whitespace()
                 .map(|x| x.to_owned())
@@ -561,13 +547,13 @@ mod test {
 
     #[test]
     fn expand_variables_with_colons() {
-        let expanded = expand_string("$FOO:$BAR", &functions!(), false);
+        let expanded = expand_string("$FOO:$BAR", &VariableExpander, false);
         assert_eq!(array!["FOO:BAR"], expanded);
     }
 
     #[test]
     fn expand_multiple_variables() {
-        let expanded = expand_string("${B}${C}...${D}", &functions!(), false);
+        let expanded = expand_string("${B}${C}...${D}", &VariableExpander, false);
         assert_eq!(array!["testing...1 2 3"], expanded);
     }
 
@@ -575,7 +561,7 @@ mod test {
     fn expand_variable_alongside_braces() {
         let line = "$A{1,2}";
         let expected = array!["11", "12"];
-        let expanded = expand_string(line, &functions!(), false);
+        let expanded = expand_string(line, &VariableExpander, false);
         assert_eq!(expected, expanded);
     }
 
@@ -583,14 +569,14 @@ mod test {
     fn expand_variable_within_braces() {
         let line = "1{$A,2}";
         let expected = array!["11", "12"];
-        let expanded = expand_string(line, &functions!(), false);
+        let expanded = expand_string(line, &VariableExpander, false);
         assert_eq!(&expected, &expanded);
     }
 
     #[test]
     fn array_indexing() {
         let base = |idx : &str| format!("[1 2 3][{}]", idx);
-        let expander = functions!();
+        let expander = VariableExpander;
         {
             let expected = array!["1"];
             let idxs = vec!["-3", "0", "..-2"];
@@ -617,7 +603,7 @@ mod test {
     #[test]
     fn embedded_array_expansion() {
         let line = |idx : &str| format!("[[foo bar] [baz bat] [bing crosby]][{}]", idx);
-        let expander = functions!();
+        let expander = VariableExpander;
         let cases = vec![
             (array!["foo"], "0"),
             (array!["baz"], "2"),
@@ -633,10 +619,10 @@ mod test {
     fn arith_expression() {
         let line = "$((A * A - (A + A)))";
         let expected = array!["-1"];
-        assert_eq!(expected, expand_string(line, &functions!(), false));
+        assert_eq!(expected, expand_string(line, &VariableExpander, false));
         let line = "$((3 * 10 - 27))";
         let expected = array!["3"];
-        assert_eq!(expected, expand_string(line, &functions!(), false));
+        assert_eq!(expected, expand_string(line, &VariableExpander, false));
     }
 
     #[test]
@@ -646,7 +632,7 @@ mod test {
             (array!["FxOxO"], "$join(@chars(FOO), 'x')")
         ];
         for (expected, input) in cases {
-            assert_eq!(expected, expand_string(input, &functions!(), false));
+            assert_eq!(expected, expand_string(input, &VariableExpander, false));
         }
     }
 }

@@ -1387,18 +1387,14 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shell::variables::Variables;
+    use types::Value;
+
+    struct Empty;
+
+    impl Expander for Empty {}
 
     macro_rules! functions {
-        () => {
-            ExpanderFunctions {
-                vars:     &Variables::default(),
-                tilde:    &|_| None,
-                array:    &|_, _| None,
-                variable: &|_, _| None,
-                command:  &|_| None
-            }
-        }
+        () => { Empty }
     }
 
     fn compare(input: &str, expected: Vec<WordToken>) {
@@ -1632,20 +1628,20 @@ mod tests {
         compare(input, expected);
     }
 
-    macro_rules! functions_with_vars {
-        () => {
-            ExpanderFunctions {
-                vars:     &Variables::default(),
-                tilde:    &|_| None,
-                array:    &|_, _| None,
-                variable:  &|var : &str, _| match var {
-                    "pkmn1" => "Pokémon".to_owned().into(),
-                    "pkmn2" => "Poke\u{0301}mon".to_owned().into(),
-                    _ => None
-                },
-                command: &|_| None,
+    struct WithVars;
+
+    impl Expander for WithVars {
+        fn variable(&self, var: &str, _: bool) -> Option<Value> {
+            match var {
+                "pkmn1" => "Pokémon".to_owned().into(),
+                "pkmn2" => "Poke\u{0301}mon".to_owned().into(),
+                _ => None
             }
         }
+    }
+
+    macro_rules! functions_with_vars {
+        () => { WithVars }
     }
 
     #[test]

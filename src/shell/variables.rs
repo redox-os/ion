@@ -273,15 +273,22 @@ impl Variables {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::{ExpanderFunctions, Select, expand_string};
+    use parser::{Expander, expand_string};
     use shell::directory_stack::DirectoryStack;
 
-    fn new_dir_stack() -> DirectoryStack { DirectoryStack::new() }
+    struct VariableExpander(pub Variables);
+
+    impl Expander for VariableExpander {
+        fn variable(&self, var: &str, _: bool) -> Option<Value> {
+            self.0.get_var(var)
+        }
+    }
+
 
     #[test]
     fn undefined_variable_expands_to_empty_string() {
         let variables = Variables::default();
-        let expanded = expand_string("$FOO", &get_expanders!(&variables, &new_dir_stack()), false).join("");
+        let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
         assert_eq!("", &expanded);
     }
 
@@ -289,7 +296,7 @@ mod tests {
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
-        let expanded = expand_string("$FOO", &get_expanders!(&variables, &new_dir_stack()), false).join("");
+        let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
         assert_eq!("BAR", &expanded);
     }
 

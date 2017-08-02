@@ -143,26 +143,17 @@ impl RefinedJob {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::ExpanderFunctions;
-    use shell::variables::Variables;
+    use parser::Expander;
 
-    macro_rules! functions {
-        () => {
-            ExpanderFunctions {
-                vars:     &Variables::default(),
-                tilde:    &|_| None,
-                array:    &|_, _| None,
-                variable: &|_, _| None,
-                command:  &|_| None
-            }
-        }
-    }
+    struct Empty;
+
+    impl Expander for Empty {}
 
     #[test]
     fn preserve_empty_arg() {
         let job = Job::new(array!("rename", "", "0", "a"), JobKind::Last);
         let mut expanded = job.clone();
-        expanded.expand(&functions!());
+        expanded.expand(&Empty);
         assert_eq!(job, expanded);
     }
 
