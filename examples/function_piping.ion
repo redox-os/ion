@@ -1,0 +1,19 @@
+fn square
+    read x
+    echo $(( x * x ))
+end
+
+echo 5 | square
+
+fn square x
+    echo $(( x * x ))
+end
+
+square 5 | cat
+
+fn format_with pat
+    read input
+    echo $join(@split(input), $pat)
+end
+
+echo one two three four five | format_with "-"
