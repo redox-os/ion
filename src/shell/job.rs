@@ -59,6 +59,19 @@ pub enum RefinedJob {
         stdout: Option<File>,
         /// A file corresponding to the standard error for this builtin
         stderr: Option<File>,
+    },
+    /// Functions can act as commands too!
+    Function {
+        /// Name of the procedure
+        name: Identifier,
+        /// Arguments to pass in to the procedure
+        args: Array,
+        /// A file corresponding to the standard input for this builtin
+        stdin: Option<File>,
+        /// A file corresponding to the standard output for this builtin
+        stdout: Option<File>,
+        /// A file corresponding to the standard error for this builtin
+        stderr: Option<File>,
     }
 }
 
@@ -70,7 +83,7 @@ macro_rules! set_field {
                     command.$field(Stdio::from_raw_fd($arg.into_raw_fd()));
                 }
             }
-            RefinedJob::Builtin { ref mut $field,  .. } => {
+            RefinedJob::Builtin { ref mut $field,  .. } | RefinedJob::Function { ref mut $field, .. } => {
                 *$field = Some($arg);
             }
         }
@@ -78,9 +91,18 @@ macro_rules! set_field {
 }
 
 impl RefinedJob {
-
     pub fn builtin(name: Identifier, args: Array) -> Self {
         RefinedJob::Builtin {
+            name,
+            args,
+            stdin: None,
+            stdout: None,
+            stderr: None
+        }
+    }
+
+    pub fn function(name: Identifier, args: Array) -> Self {
+        RefinedJob::Function {
             name,
             args,
             stdin: None,
@@ -108,7 +130,7 @@ impl RefinedJob {
             RefinedJob::External(ref cmd) => {
                 format!("{:?}", cmd).split('"').nth(1).unwrap_or("").to_string()
             },
-            RefinedJob::Builtin { ref name, .. } => {
+            RefinedJob::Builtin { ref name, .. } | RefinedJob::Function { ref name, .. } => {
                 name.to_string()
             }
         }
@@ -132,7 +154,7 @@ impl RefinedJob {
                 }
                 output
             },
-            RefinedJob::Builtin { ref args, .. } => {
+            RefinedJob::Builtin { ref args, .. } | RefinedJob::Function { ref args, .. } => {
                 format!("{}", args.join(" "))
             }
         }

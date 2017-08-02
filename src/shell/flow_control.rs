@@ -1,6 +1,10 @@
 use types::Identifier;
 use parser::pipelines::Pipeline;
 use parser::assignments::Binding;
+use super::Shell;
+use super::flow::FlowLogic;
+use types::*;
+use fnv::*;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ElseIf {
@@ -131,6 +135,68 @@ pub struct Function {
     pub name: Identifier,
     pub args: Vec<FunctionArgument>,
     pub statements: Vec<Statement>
+}
+
+pub enum FunctionError {
+    InvalidArgumentCount,
+    InvalidArgumentType(Type, String),
+}
+
+impl Function {
+    pub fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
+        if args.len() - 1 != self.args.len() {
+            return Err(FunctionError::InvalidArgumentCount);
+        }
+
+        let mut variables_backup: FnvHashMap<&str, Option<Value>> =
+            FnvHashMap::with_capacity_and_hasher (
+                64, Default::default()
+            );
+
+        let mut bad_argument: Option<(&str, Type)> = None;
+        for (name_arg, value) in self.args.iter().zip(args.iter().skip(1)) {
+            let name: &str = match name_arg {
+                &FunctionArgument::Typed(ref name, ref type_) => {
+                    match *type_ {
+                        Type::Float if value.parse::<f64>().is_ok() => name.as_str(),
+                        Type::Int if value.parse::<i64>().is_ok() => name.as_str(),
+                        Type::Bool if *value == "true" || *value == "false" => name.as_str(),
+                        _ => {
+                            bad_argument = Some((value, *type_));
+                            break
+                        }
+                    }
+                },
+                &FunctionArgument::Untyped(ref name) => name.as_str()
+            };
+            variables_backup.insert(name, shell.variables.get_var(name));
+            shell.variables.set_var(name, value);
+        }
+
+        match bad_argument {
+            Some((actual_value, expected_type)) => {
+                for (name, value_option) in &variables_backup {
+                    match *value_option {
+                        Some(ref value) => shell.variables.set_var(name, value),
+                        None => {shell.variables.unset_var(name);},
+                    }
+                }
+
+                return Err(FunctionError::InvalidArgumentType(expected_type, actual_value.to_owned()));
+            }
+            None => {
+                shell.execute_statements(self.statements);
+
+                for (name, value_option) in &variables_backup {
+                    match *value_option {
+                        Some(ref value) => shell.variables.set_var(name, value),
+                        None => {shell.variables.unset_var(name);},
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usize) -> Result<(), String>

@@ -14,6 +14,7 @@ use super::flags::*;
 use super::job::RefinedJob;
 use super::signals::{self, SignalHandler};
 use super::status::*;
+use super::flow_control::{FunctionError, Type};
 use parser::pipelines::{Input, Pipeline, Redirection, RedirectFrom};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Error, Write};
@@ -202,6 +203,15 @@ pub trait PipelineExecution {
         stderr: &Option<File>,
         stdin: &Option<File>,
     ) -> i32;
+
+    fn exec_function(
+        &mut self,
+        name: &str,
+        args: &[&str],
+        stdout: &Option<File>,
+        stderr: &Option<File>,
+        stdin: &Option<File>,
+    ) -> i32;
 }
 
 impl<'a> PipelineExecution for Shell<'a> {
@@ -242,6 +252,8 @@ impl<'a> PipelineExecution for Shell<'a> {
                 let refined = {
                     if is_implicit_cd(&job.args[0]) {
                         RefinedJob::builtin("cd".into(), iter::once("cd".into()).chain(job.args.drain()).collect())
+                    } else if self.functions.contains_key::<str>(job.command.as_ref()) {
+                        RefinedJob::function(job.command, job.args.drain().collect())
                     } else if self.builtins.contains_key::<str>(job.command.as_ref()) {
                         RefinedJob::builtin(job.command, job.args.drain().collect())
                     } else {
@@ -335,6 +347,30 @@ impl<'a> PipelineExecution for Shell<'a> {
                 }
                 eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", long);
                 COULD_NOT_EXEC
+            },
+            RefinedJob::Function {
+                ref name,
+                ref args,
+                ref stdin,
+                ref stdout,
+                ref stderr,
+            } => {
+                if let Ok(stdout_bk) = sys::dup(sys::STDOUT_FILENO) {
+                    if let Ok(stderr_bk) = sys::dup(sys::STDERR_FILENO) {
+                        if let Ok(stdin_bk) = sys::dup(sys::STDIN_FILENO) {
+                            let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
+                            let code = self.exec_function(name, &args, stdout, stderr, stdin);
+                            redir(stdout_bk, sys::STDOUT_FILENO);
+                            redir(stderr_bk, sys::STDERR_FILENO);
+                            redir(stdin_bk, sys::STDIN_FILENO);
+                            return code;
+                        }
+                        let _ = sys::close(stderr_bk);
+                    }
+                    let _ = sys::close(stdout_bk);
+                }
+                eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", long);
+                COULD_NOT_EXEC
             }
         }
     }
@@ -360,6 +396,44 @@ impl<'a> PipelineExecution for Shell<'a> {
         // in the shell named `name`, so we unwrap here.
         let builtin = self.builtins.get(name).unwrap();
         (builtin.main)(args, self)
+    }
+
+    fn exec_function(
+        &mut self,
+        name: &str,
+        args: &[&str],
+        stdout: &Option<File>,
+        stderr: &Option<File>,
+        stdin: &Option<File>,
+    ) -> i32 {
+        if let Some(ref file) = *stdin {
+            redir(file.as_raw_fd(), sys::STDIN_FILENO);
+        }
+        if let Some(ref file) = *stdout {
+            redir(file.as_raw_fd(), sys::STDOUT_FILENO);
+        }
+        if let Some(ref file) = *stderr {
+            redir(file.as_raw_fd(), sys::STDERR_FILENO);
+        }
+
+        let function = self.functions.get(name).cloned().unwrap();
+        match function.execute(self, args) {
+            Ok(()) => SUCCESS,
+            Err(FunctionError::InvalidArgumentCount) => {
+                eprintln!("ion: invalid number of function arguments supplied");
+                FAILURE
+            },
+            Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
+                let type_ = match expected_type {
+                    Type::Float => "Float",
+                    Type::Int   => "Int",
+                    Type::Bool  => "Bool"
+                };
+
+                eprintln!("ion: function argument has invalid type: expected {}, found value \'{}\'", type_, value);
+                FAILURE
+            }
+        }
     }
 }
 
@@ -459,6 +533,49 @@ pub fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground:
                                                 .iter()
                                                 .map(|x| x as &str).collect();
                                             let ret = shell.exec_builtin(name,
+                                                              &args,
+                                                              stdout,
+                                                              stderr,
+                                                              stdin);
+                                            close(stdout);
+                                            close(stderr);
+                                            close(stdin);
+                                            exit(ret)
+                                        },
+                                        Ok(pid) => {
+                                            if pgid == 0 {
+                                                pgid = pid;
+                                                if foreground {
+                                                    let _ = sys::tcsetpgrp(0, pgid);
+                                                }
+                                            }
+                                            shell.foreground.push(pid);
+                                            children.push(pid);
+                                        },
+                                        Err(e) => {
+                                            eprintln!("ion: failed to fork {}: {}",
+                                                      short,
+                                                      e);
+                                        }
+                                    }
+                                }
+                                RefinedJob::Function { ref name,
+                                                      ref args,
+                                                      ref stdout,
+                                                      ref stderr,
+                                                      ref stdin, } =>
+                                {
+                                    match unsafe { sys::fork() } {
+                                        Ok(0) => {
+                                            signals::unblock();
+                                            let _ = sys::reset_signal(sys::SIGINT);
+                                            let _ = sys::reset_signal(sys::SIGHUP);
+                                            let _ = sys::reset_signal(sys::SIGTERM);
+                                            create_process_group(pgid);
+                                            let args: Vec<&str> = args
+                                                .iter()
+                                                .map(|x| x as &str).collect();
+                                            let ret = shell.exec_function(name,
                                                               &args,
                                                               stdout,
                                                               stderr,

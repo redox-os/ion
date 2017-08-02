@@ -27,7 +27,7 @@ use parser::ArgumentSplitter;
 use parser::pipelines::Pipeline;
 use self::directory_stack::DirectoryStack;
 use self::flags::*;
-use self::flow_control::{FlowControl, Function, FunctionArgument, Type};
+use self::flow_control::{FlowControl, Function, FunctionError, Type};
 use self::foreground::ForegroundSignals;
 use self::job_control::{JobControl, BackgroundProcess};
 use self::pipe_exec::PipelineExecution;
@@ -37,6 +37,7 @@ use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
 use std::io::{self, Write};
+use std::ops::Deref;
 use std::process;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -192,76 +193,27 @@ impl<'a> Shell<'a> {
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(function) = self.functions.get(&pipeline.jobs[0].command).cloned() {
             if pipeline.jobs.len() == 1 {
-                if pipeline.jobs[0].args.len() - 1 == function.args.len() {
-                    let mut variables_backup: FnvHashMap<&str, Option<Value>> =
-                        FnvHashMap::with_capacity_and_hasher (
-                            64, Default::default()
-                        );
-
-                    let mut bad_argument: Option<(&str, Type)> = None;
-                    for (name_arg, value) in function.args.iter().zip(pipeline.jobs[0].args.iter().skip(1)) {
-                        let name: &str = match name_arg {
-                            &FunctionArgument::Typed(ref name, ref type_) => {
-                                match *type_ {
-                                    Type::Float if value.parse::<f64>().is_ok() => name.as_str(),
-                                    Type::Int if value.parse::<i64>().is_ok() => name.as_str(),
-                                    Type::Bool if value == "true" || value == "false" => name.as_str(),
-                                    _ => {
-                                        bad_argument = Some((value.as_str(), *type_));
-                                        break
-                                    }
-                                }
-                            },
-                            &FunctionArgument::Untyped(ref name) => name.as_str()
+                let args: &[String] = pipeline.jobs[0].args.deref();
+                let args: Vec<&str> = args.iter().map(AsRef::as_ref).collect();
+                match function.execute(self, &args) {
+                    Ok(()) => None,
+                    Err(FunctionError::InvalidArgumentCount) => {
+                        eprintln!("ion: invalid number of function arguments supplied");
+                        Some(FAILURE)
+                    },
+                    Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
+                        let type_ = match expected_type {
+                            Type::Float => "Float",
+                            Type::Int   => "Int",
+                            Type::Bool  => "Bool"
                         };
-                        variables_backup.insert(name, self.variables.get_var(name));
-                        self.variables.set_var(name, value);
+
+                        eprintln!("ion: function argument has invalid type: expected {}, found value \'{}\'", type_, value);
+                        Some(FAILURE)
                     }
-
-                    match bad_argument {
-                        Some((actual_value, expected_type)) => {
-                            for (name, value_option) in &variables_backup {
-                                match *value_option {
-                                    Some(ref value) => self.variables.set_var(name, value),
-                                    None => {self.variables.unset_var(name);},
-                                }
-                            }
-
-                            let type_ = match expected_type {
-                                Type::Float => "Float",
-                                Type::Int   => "Int",
-                                Type::Bool  => "Bool"
-                            };
-
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "ion: function argument has invalid type: expected {}, found value \'{}\'", type_, actual_value);
-                            Some(FAILURE)
-                        }
-                        None => {
-                            self.execute_statements(function.statements);
-
-                            for (name, value_option) in &variables_backup {
-                                match *value_option {
-                                    Some(ref value) => self.variables.set_var(name, value),
-                                    None => {self.variables.unset_var(name);},
-                                }
-                            }
-                            None
-                        }
-                    }
-                } else {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: function takes {} arguments, but you provided {}",
-                        function.args.len(), pipeline.jobs[0].args.len()-1);
-                    Some(NO_SUCH_COMMAND) // not sure if this is the right error code
                 }
             } else {
-                let stderr = io::stderr();
-                let mut stderr = stderr.lock();
-                let _ = writeln!(stderr, "ion: function pipelining is not implemented yet");
-                Some(FAILURE)
+                Some(self.execute_pipeline(pipeline))
             }
         } else {
             Some(self.execute_pipeline(pipeline))
