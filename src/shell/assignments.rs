@@ -1,14 +1,11 @@
 use std::io::{self, Write};
 use std::env;
 
-use super::variables::Variables;
-use super::directory_stack::DirectoryStack;
 use parser::assignments::{
     Binding, Operator, Value
 };
 use parser::{
-    ExpanderFunctions,
-    Select,
+    Expander,
     ArgumentSplitter,
     expand_string,
 };
@@ -21,6 +18,7 @@ use types::{
     VariableContext,
 };
 use super::status::*;
+use super::Shell;
 
 enum Action {
     UpdateString(Identifier, VString),
@@ -65,26 +63,24 @@ fn print_arrays(list: &ArrayVariableContext) {
     }
 }
 
-fn parse_assignment (
+fn parse_assignment<E: Expander>(
     binding: Binding,
-    vars: &mut Variables,
-    dir_stack: &DirectoryStack
+    expanders: &E,
 ) -> Result<Action, i32> {
-    let expanders = get_expanders!(vars, dir_stack);
     match binding {
         Binding::InvalidKey(key) => {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
             Err(FAILURE)
         },
-        Binding::KeyValue(key, value) => match parse_expression(&value, &expanders) {
+        Binding::KeyValue(key, value) => match parse_expression(&value, expanders) {
             Value::String(value) => Ok(Action::UpdateString(key, value)),
             Value::Array(array) => Ok(Action::UpdateArray(key, array)),
         },
         Binding::MapKeyValue(key, inner_key, value) => {
             Ok(Action::UpdateHashMap(key, inner_key, value))
         },
-        Binding::MultipleKeys(keys, value) => match parse_expression(&value, &expanders) {
+        Binding::MultipleKeys(keys, value) => match parse_expression(&value, expanders) {
             Value::String(value) => {
                 let array = value.split_whitespace().map(String::from)
                     .collect::<VArray>();
@@ -99,9 +95,11 @@ fn parse_assignment (
         },
         Binding::ListEntries => Ok(Action::List),
         Binding::Math(key, operator, value) => {
-            match parse_expression(&value, &expanders) {
+            match parse_expression(&value, expanders) {
                 Value::String(ref value) => {
-                    let left = match vars.get_var(&key).and_then(|x| x.parse::<f32>().ok()) {
+                    let left = match expanders.variable(&key, false).and_then(|x| {
+                        x.parse::<f32>().ok()
+                    }) {
                         Some(left) => left,
                         None => return Err(FAILURE),
                     };
@@ -131,61 +129,72 @@ fn parse_assignment (
     }
 }
 
-pub fn let_assignment(binding: Binding, vars: &mut Variables, dir_stack: &DirectoryStack) -> i32 {
-    match parse_assignment(binding, vars, dir_stack) {
-        Ok(Action::UpdateArray(key, array)) => vars.set_array(&key, array),
-        Ok(Action::UpdateString(key, string)) => vars.set_var(&key, &string),
-        Ok(Action::UpdateStrings(keys, array)) => {
-            for (key, value) in keys.iter().zip(array.iter()) {
-                vars.set_var(key, value);
-            }
-        },
-        Ok(Action::UpdateHashMap(key, inner_key, value)) => {
-            vars.set_hashmap_value(&key, &inner_key, &value)
-        },
-        Ok(Action::List) => {
-            print_vars(&vars.variables);
-            print_arrays(&vars.arrays);
-        }
-        Err(code) => return code,
-    };
-
-    SUCCESS
+/// Represents: A variable store capable of setting local variables or
+/// exporting variables to some global environment
+pub trait VariableStore {
+    /// Set a local variable given a binding
+    fn local(&mut self, Binding) -> i32;
+    /// Export a variable to the process environment given a binding
+    fn export(&mut self, Binding) -> i32;
 }
 
-/// Exporting a variable sets that variable as a global variable in the system.
-/// Global variables can be accessed by other programs running on the system.
-pub fn export_variable(binding : Binding, vars: &mut Variables, dir_stack : &DirectoryStack) -> i32 {
-    match parse_assignment(binding, vars, dir_stack) {
-        Ok(Action::UpdateArray(key, array)) => env::set_var(&key, array.join(" ")),
-        Ok(Action::UpdateString(key, string)) => env::set_var(&key, string),
-        Ok(Action::UpdateStrings(keys, array)) => {
-            for (key, value) in keys.iter().zip(array.iter()) {
-                env::set_var(key, value);
-            }
-        }
-        Ok(Action::UpdateHashMap(key, inner_key, value)) => {
-            vars.set_hashmap_value(&key, &inner_key, &value)
-        },
-        Ok(Action::List) => {
-            let stdout = io::stdout();
-            let stdout = &mut stdout.lock();
-            for (key, value) in env::vars() {
-                let _ = stdout.write(key.as_bytes())
-                    .and_then(|_| stdout.write_all(b"="))
-                    .and_then(|_| stdout.write_all(value.as_bytes()))
-                    .and_then(|_| stdout.write_all(b"\n"));
-            }
-        }
-        Err(code) => return code
-    };
+impl<'a> VariableStore for Shell<'a> {
 
-    SUCCESS
+    fn local(&mut self, binding: Binding) -> i32 {
+        match parse_assignment(binding, self) {
+            Ok(Action::UpdateArray(key, array)) => self.variables.set_array(&key, array),
+            Ok(Action::UpdateString(key, string)) => self.variables.set_var(&key, &string),
+            Ok(Action::UpdateStrings(keys, array)) => {
+                for (key, value) in keys.iter().zip(array.iter()) {
+                    self.variables.set_var(key, value);
+                }
+            },
+            Ok(Action::UpdateHashMap(key, inner_key, value)) => {
+                self.variables.set_hashmap_value(&key, &inner_key, &value)
+            },
+            Ok(Action::List) => {
+                print_vars(&self.variables.variables);
+                print_arrays(&self.variables.arrays);
+            }
+            Err(code) => return code,
+        };
+
+        SUCCESS
+    }
+
+    fn export(&mut self, binding: Binding) -> i32 {
+        match parse_assignment(binding, self) {
+            Ok(Action::UpdateArray(key, array)) => env::set_var(&key, array.join(" ")),
+            Ok(Action::UpdateString(key, string)) => env::set_var(&key, string),
+            Ok(Action::UpdateStrings(keys, array)) => {
+                for (key, value) in keys.iter().zip(array.iter()) {
+                    env::set_var(key, value);
+                }
+            }
+            Ok(Action::UpdateHashMap(key, inner_key, value)) => {
+                self.variables.set_hashmap_value(&key, &inner_key, &value)
+            },
+            Ok(Action::List) => {
+                let stdout = io::stdout();
+                let stdout = &mut stdout.lock();
+                for (key, value) in env::vars() {
+                    let _ = stdout.write(key.as_bytes())
+                        .and_then(|_| stdout.write_all(b"="))
+                        .and_then(|_| stdout.write_all(value.as_bytes()))
+                        .and_then(|_| stdout.write_all(b"\n"));
+                }
+            }
+            Err(code) => return code
+        };
+
+        SUCCESS
+    }
+
 }
 
-fn parse_expression (
+fn parse_expression<E: Expander>(
     expression: &str,
-    shell_funcs: &ExpanderFunctions
+    shell_funcs: &E
 ) -> Value {
     let arguments: Vec<&str> = ArgumentSplitter::new(expression).collect();
 

@@ -3,7 +3,7 @@ use std::process::{Command, Stdio};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 
 //use glob::glob;
-use parser::{expand_string, ExpanderFunctions};
+use parser::{expand_string, Expander};
 use parser::pipelines::RedirectFrom;
 use smallstring::SmallString;
 use types::*;
@@ -26,7 +26,7 @@ impl Job {
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand(&mut self, expanders: &ExpanderFunctions) {
+    pub fn expand<E: Expander>(&mut self, expanders: &E) {
         let mut expanded = Array::new();
         expanded.grow(self.args.len());
         expanded.extend(self.args.drain().flat_map(|arg| {
@@ -165,26 +165,17 @@ impl RefinedJob {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::ExpanderFunctions;
-    use shell::variables::Variables;
+    use parser::Expander;
 
-    macro_rules! functions {
-        () => {
-            ExpanderFunctions {
-                vars:     &Variables::default(),
-                tilde:    &|_| None,
-                array:    &|_, _| None,
-                variable: &|_, _| None,
-                command:  &|_| None
-            }
-        }
-    }
+    struct Empty;
+
+    impl Expander for Empty {}
 
     #[test]
     fn preserve_empty_arg() {
         let job = Job::new(array!("rename", "", "0", "a"), JobKind::Last);
         let mut expanded = job.clone();
-        expanded.expand(&functions!());
+        expanded.expand(&Empty);
         assert_eq!(job, expanded);
     }
 

@@ -210,12 +210,15 @@ pub fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
 #[cfg(test)]
 mod test {
     use super::*;
-    use parser::{expand_string, ExpanderFunctions, Select};
+    use parser::{expand_string, Expander};
     use shell::status::{FAILURE, SUCCESS};
-    use shell::directory_stack::DirectoryStack;
 
-    fn new_dir_stack() -> DirectoryStack {
-        DirectoryStack::new()
+    struct VariableExpander(pub Variables);
+
+    impl Expander for VariableExpander {
+        fn variable(&self, var: &str, _: bool) -> Option<Value> {
+            self.0.get_var(var)
+        }
     }
 
     // TODO: Rewrite tests now that let is part of the grammar.
@@ -248,7 +251,7 @@ mod test {
         variables.set_var("FOO", "BAR");
         let return_status = drop_variable(&mut variables, vec!["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = expand_string("$FOO", &get_expanders!(&variables, &new_dir_stack()), false).join("");
+        let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
         assert_eq!("", expanded);
     }
 
@@ -272,7 +275,7 @@ mod test {
         variables.set_array("FOO", array!["BAR"]);
         let return_status = drop_array(&mut variables, vec!["drop", "-a", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = expand_string("@FOO", &get_expanders!(&variables, &new_dir_stack()), false).join("");
+        let expanded = expand_string("@FOO", &VariableExpander(variables), false).join("");
         assert_eq!("", expanded);
     }
 

@@ -5,9 +5,9 @@ use super::Shell;
 use super::flags::*;
 use super::job_control::JobControl;
 use super::flow_control::{ElseIf, Function, Statement, collect_loops, collect_cases, collect_if, Case};
-use parser::{ForExpression, StatementSplitter, parse_and_validate, expand_string, Select, ExpanderFunctions};
+use parser::{ForExpression, StatementSplitter, parse_and_validate, expand_string};
 use parser::pipelines::Pipeline;
-use super::assignments::{let_assignment, export_variable};
+use shell::assignments::VariableStore;
 use types::Array;
 
 pub enum Condition {
@@ -115,10 +115,10 @@ impl<'a> FlowLogic for Shell<'a> {
                 match replacement {
                     Statement::Error(number) => self.previous_status = number,
                     Statement::Let { expression } => {
-                        self.previous_status = let_assignment(expression, &mut self.variables, &self.directory_stack);
+                        self.previous_status = self.local(expression);
                     },
                     Statement::Export(expression) => {
-                        self.previous_status = export_variable(expression, &mut self.variables, &self.directory_stack);
+                        self.previous_status = self.export(expression);
                     }
                     Statement::While { expression, statements } => {
                         if let Condition::SigInt = self.execute_while(expression, statements) {
@@ -176,14 +176,10 @@ impl<'a> FlowLogic for Shell<'a> {
             }
             return false;
         }
-        let value = expand_string(&expression,
-                                  &get_expanders!(&self.variables, &self.directory_stack),
-                                  false);
+        let value = expand_string(&expression, self, false);
         let mut condition = Condition::NoOp;
         for case in cases {
-            let pattern = case.value.map(|v| {
-                expand_string(&v, &get_expanders!(&self.variables, &self.directory_stack), false)
-            });
+            let pattern = case.value.map(|v| { expand_string(&v, self, false) });
             match pattern {
                 None => {
                     condition = self.execute_statements(case.statements);
@@ -205,10 +201,10 @@ impl<'a> FlowLogic for Shell<'a> {
             match statement {
                 Statement::Error(number) => self.previous_status = number,
                 Statement::Let { expression } => {
-                    self.previous_status = let_assignment(expression, &mut self.variables, &self.directory_stack);
+                    self.previous_status = self.local(expression);
                 },
                 Statement::Export(expression) => {
-                    self.previous_status = export_variable(expression, &mut self.variables, &self.directory_stack);
+                    self.previous_status = self.export(expression);
                 }
                 Statement::While { expression, mut statements } => {
                     self.flow_control.level += 1;
@@ -318,7 +314,7 @@ impl<'a> FlowLogic for Shell<'a> {
         statements: Vec<Statement>
     ) -> Condition {
         let ignore_variable = variable == "_";
-        match ForExpression::new(values, &self.directory_stack, &self.variables) {
+        match ForExpression::new(values, self) {
             ForExpression::Multiple(ref values) if ignore_variable => {
                 for _ in values.iter() {
                     match self.execute_statements(statements.clone()) {
@@ -403,10 +399,10 @@ impl<'a> FlowLogic for Shell<'a> {
             Statement::Error(number) => self.previous_status = number,
             // Execute a Let Statement
             Statement::Let { expression } => {
-                self.previous_status = let_assignment(expression, &mut self.variables, &self.directory_stack);
+                self.previous_status = self.local(expression);
             },
             Statement::Export(expression) => {
-               self.previous_status = export_variable(expression, &mut self.variables, &self.directory_stack);
+               self.previous_status = self.export(expression);
             }
             // Collect the statements for the while loop, and if the loop is complete,
             // execute the while loop with the provided expression.
