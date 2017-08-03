@@ -70,6 +70,8 @@ pub struct Shell<'a> {
     foreground: Vec<u32>,
     /// Contains information on all of the active background processes that are being managed by the shell.
     pub background: Arc<Mutex<Vec<BackgroundProcess>>>,
+    /// If set, denotes that this shell is running as a background job.
+    pub is_background_shell: bool,
     /// Set when a signal is received, this will tell the flow control logic to abort.
     pub break_flow: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified background process.
@@ -93,6 +95,7 @@ impl<'a> Shell<'a> {
             flags: 0,
             foreground: Vec::new(),
             background: Arc::new(Mutex::new(Vec::new())),
+            is_background_shell: false,
             break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new())
         }

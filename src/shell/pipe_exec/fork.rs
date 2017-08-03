@@ -15,6 +15,7 @@ use std::process::exit;
 pub fn fork_pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, command_name: String) -> i32 {
     match unsafe { sys::fork() } {
         Ok(0) => {
+            shell.is_background_shell = true;
             let _ = sys::reset_signal(sys::SIGINT);
             let _ = sys::reset_signal(sys::SIGHUP);
             let _ = sys::reset_signal(sys::SIGTERM);

@@ -236,10 +236,13 @@ impl<'a> PipelineExecution for Shell<'a> {
         } else {
             // While active, the SIGTTOU signal will be ignored.
             let _sig_ignore = SignalHandler::new();
+            let foreground = !self.is_background_shell;
             // Execute each command in the pipeline, giving each command the foreground.
-            let exit_status = pipe(self, piped_commands, true);
+            let exit_status = pipe(self, piped_commands, foreground);
             // Set the shell as the foreground process again to regain the TTY.
-            let _ = sys::tcsetpgrp(0, sys::getpid().unwrap());
+            if foreground {
+                let _ = sys::tcsetpgrp(0, sys::getpid().unwrap());
+            }
             exit_status
         }
     }
@@ -567,7 +570,7 @@ pub fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground:
                                 {
                                     match unsafe { sys::fork() } {
                                         Ok(0) => {
-                                            signals::unblock();
+                                            // signals::unblock();
                                             let _ = sys::reset_signal(sys::SIGINT);
                                             let _ = sys::reset_signal(sys::SIGHUP);
                                             let _ = sys::reset_signal(sys::SIGTERM);
