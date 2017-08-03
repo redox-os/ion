@@ -194,7 +194,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "termion"
 version = "1.5.0"
-source = "git+https://github.com/redox-os/termion.git?branch=redox_termios#cd455e835842831125df0ca23507384f5ae06c8b"
+source = "git+https://github.com/redox-os/termion.git?branch=redox_termios#18e589b9d92e8f93ae75475389e234bbe5deb109"
 dependencies = [
  "libc 0.2.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
