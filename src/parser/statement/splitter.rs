@@ -94,8 +94,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 _ if self.flags.contains(POST_MATHEXPR) => {
                     self.flags -= POST_MATHEXPR;
                 },
-                // [^A-Za-z0-9_}]
-                0...47 | 58...64 | 91...94 | 96 | 123...124 | 126...127 if self.flags.contains(VBRACE) => {
+                // [^A-Za-z0-9_:}]
+                0...47 | 59...64 | 91...94 | 96 | 123...124 | 126...127 if self.flags.contains(VBRACE) => {
                     // If we are just ending the braced section continue as normal
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))

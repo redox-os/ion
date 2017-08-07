@@ -143,9 +143,19 @@ impl Variables {
     pub fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
 
     pub fn get_var(&self, name: &str) -> Option<Value> {
-        self.variables.get(name).cloned().or_else(|| {
-            env::var(name).map(Into::into).ok()
-        })
+        if let Some((namespace, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos+2..])) {
+            match namespace {
+                "env" => env::var(variable).map(Into::into).ok(),
+                _ => {
+                    eprintln!("ion: unsupported namespace: '{}'", namespace);
+                    None
+                }
+            }
+        } else {
+            self.variables.get(name).cloned().or_else(|| {
+                env::var(name).map(Into::into).ok()
+            })
+        }
     }
 
     pub fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
@@ -283,7 +293,6 @@ mod tests {
             self.0.get_var(var)
         }
     }
-
 
     #[test]
     fn undefined_variable_expands_to_empty_string() {
