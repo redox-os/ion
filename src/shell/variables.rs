@@ -145,10 +145,13 @@ impl Variables {
 
     pub fn get_var(&self, name: &str) -> Option<Value> {
         if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
+            // If the parsed name contains the '::' pattern, then a namespace was designated. Find it.
             match name {
                 "env" => env::var(variable).map(Into::into).ok(),
                 _ => {
+                    // Attempt to obtain the given namespace from our lazily-generated map of namespaces.
                     if let Some(namespace) = STRING_NAMESPACES.get(name.into()) {
+                        // Attempt to execute the given function from that namespace, and map it's results.
                         match namespace.execute(variable.into()) {
                             Ok(value) => value.map(Into::into),
                             Err(why) => {
@@ -163,6 +166,7 @@ impl Variables {
                 }
             }
         } else {
+            // Otherwise, it's just a simple variable name.
             self.variables.get(name).cloned().or_else(|| {
                 env::var(name).map(Into::into).ok()
             })

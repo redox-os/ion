@@ -105,3 +105,14 @@ It can be tested out by navigating to a directory within a git repository, and r
 ```ion
 echo Current Branch: ${git::branch}
 ```
+
+# Vim/NeoVim Syntax Highlighting Plugin
+
+We do have an [officially-supported syntax highlighting plugin](https://github.com/vmchale/ion-vim) for all the
+vim/nvim users out there.
+
+```vimscript
+Plugin 'vmchale/ion-vim'
+```
+
+![Screenshot of Syntax Highlighting](http://i.imgur.com/JzZp7WT.png)

@@ -1,52 +1,27 @@
 use super::super::{LibraryIterator, config_dir};
+use super::{NamespaceError, NamespaceResult};
 use fnv::FnvHashMap;
 use libloading::{Library, Symbol};
 use libloading::os::unix::Symbol as RawSymbol;
-use std::ffi::CString;
-use std::fmt::{self, Display, Formatter};
 use std::fs::read_dir;
-use std::io;
 use std::slice;
 use std::str;
 use types::Identifier;
 
-#[derive(Debug)]
-pub enum NamespaceError {
-    SymbolErr(io::Error),
-    UTF8Function,
-    UTF8Result,
-    FunctionMissing(Identifier),
-}
-
-impl Display for NamespaceError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match *self {
-            NamespaceError::SymbolErr(ref error) => write!(f, "symbol error: {}", error),
-            NamespaceError::UTF8Function => write!(f, "function has invalid UTF-8 name"),
-            NamespaceError::UTF8Result => write!(f, "result is not valid UTF-8"),
-            NamespaceError::FunctionMissing(ref func) => write!(f, "{} doesn't exist in namespace", func),
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Debug)]
-struct NamespaceResult {
-    exists: bool,
-    data: *mut i8,
-}
-
-impl NamespaceResult {
-    fn into_option(self) -> Option<CString> {
-        if self.exists { Some(unsafe { CString::from_raw(self.data) }) } else { None }
-    }
-}
-
+/// A dynamically-loaded string namespace from an external library.
+///
+/// The purpose of the structure is to: A) hold a `Library` handle to the dynamically-loaded
+/// plugin to ensure that the plugin remains loaded in memory, and it's contained symbols
+/// remain validly-executable; and B) holds a map of functions that may be executed within
+/// the namespace.
 pub struct StringNamespace {
-    /// Do not remove this field, as it ensures that the library remains loaded.
+    /// This field, although never used directly, is required to exist in order to ensure
+    /// that each element in the `symbols` field remains relevant. When Rust can support
+    /// self-referencing lifetimes, we won't need to hold raw symbols anymore.
     #[allow(dead_code)]
     library: Library,
     /// A hash map of symbols collected from the `Library` stored in the `library` field.
+    /// These are considered raw because they have their lifetimes erased.
     symbols: FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn() -> NamespaceResult>>,
 }
 
@@ -55,10 +30,13 @@ impl StringNamespace {
         unsafe {
             let mut symbols = FnvHashMap::default();
             {
+                // The `index` function contains a list of functions provided by the library.
                 let index: Symbol<unsafe extern "C" fn() -> *const u8> =
                     library.get(b"index\0").map_err(NamespaceError::SymbolErr)?;
                 let symbol_list = index();
 
+                // Yet we need to convert the raw stream of binary into a native slice if we
+                // want to properly reason about the contents of said aforementioned stream.
                 let (mut start, mut counter) = (0, 0usize);
                 let symbol_list: &[u8] = {
                     let mut byte = *symbol_list.offset(0);
@@ -68,25 +46,36 @@ impl StringNamespace {
                     }
                     slice::from_raw_parts(symbol_list, counter)
                 };
-
                 counter = 0;
+
+                // Each function symbol is delimited by spaces, so this will slice our
+                // newly-created byte slice on each space, and then attempt to load and
+                // store that symbol for future use.
                 for &byte in symbol_list {
                     if byte == b' ' {
                         if start == counter {
                             start += 1;
                         } else {
+                            // Grab a slice and ensure that the name of the function is UTF-8.
                             let slice = &symbol_list[start..counter];
                             let identifier = str::from_utf8(slice).map(Identifier::from).map_err(|_| {
                                 NamespaceError::UTF8Function
                             })?;
+
+                            // To obtain the symbol, we need to create a new `\0`-ended byte array.
+                            // TODO: There's no need to use a vector here. An array will do fine.
                             let mut symbol = Vec::new();
                             symbol.reserve_exact(slice.len() + 1);
                             symbol.extend_from_slice(slice);
                             symbol.push(b'\0');
+
+                            // Then attempt to load that symbol from the dynamic library.
                             let symbol: Symbol<unsafe extern "C" fn() -> NamespaceResult> =
                                 library.get(symbol.as_slice()).map_err(
                                     NamespaceError::SymbolErr,
                                 )?;
+
+                            // And finally add the name of the function and it's function into the map.
                             symbols.insert(identifier, symbol.into_raw());
                             start = counter + 1;
                         }
@@ -94,6 +83,8 @@ impl StringNamespace {
                     counter += 1;
                 }
 
+                // Identical to the logic in the loop above. Handles any unparsed stragglers that
+                // have been left over.
                 if counter != start {
                     let slice = &symbol_list[start..];
                     let identifier = str::from_utf8(slice).map(Identifier::from).map_err(|_| {
@@ -110,10 +101,15 @@ impl StringNamespace {
                     symbols.insert(identifier, symbol.into_raw());
                 }
             }
+
             Ok(StringNamespace { library, symbols })
         }
     }
 
+    /// Attempts to execute a function within a dynamically-loaded namespace.
+    ///
+    /// If the function exists, it is executed, and it's return value is then converted into a
+    /// proper Rusty type.
     pub fn execute(&self, function: Identifier) -> Result<Option<String>, NamespaceError> {
         let func = self.symbols.get(&function).ok_or(
             NamespaceError::FunctionMissing(
@@ -134,6 +130,10 @@ impl StringNamespace {
     }
 }
 
+/// Collects all dynamically-loaded namespaces and their associated symbols all at once.
+///
+/// This function is meant to be called with `lazy_static` to ensure that there isn't a
+/// cost to collecting all this information when the shell never uses it in the first place!
 pub fn collect() -> FnvHashMap<Identifier, StringNamespace> {
     let mut hashmap = FnvHashMap::default();
     if let Some(mut path) = config_dir() {
