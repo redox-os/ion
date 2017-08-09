@@ -266,9 +266,7 @@ impl<'a> Shell<'a> {
 }
 
 impl<'a> Expander for Shell<'a> {
-    fn tilde(&self, input: &str) -> Option<String> {
-        self.variables.tilde_expansion(input, &self.directory_stack)
-    }
+    fn tilde(&self, input: &str) -> Option<String> { self.variables.tilde_expansion(input, &self.directory_stack) }
 
     /// Expand an array variable with some selection
     fn array(&self, array: &str, selection: Select) -> Option<Array> {
@@ -335,7 +333,5 @@ impl<'a> Expander for Shell<'a> {
         }
     }
     /// Expand a subshell expression
-    fn command(&self, command: &str) -> Option<Value> {
-        self.variables.command_expansion(command)
-    }
+    fn command(&self, command: &str) -> Option<Value> { self.variables.command_expansion(command) }
 }

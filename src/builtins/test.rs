@@ -1,12 +1,13 @@
-use std::io::{self, BufWriter};
-use std::fs;
-use std::path::Path;
-use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
-use std::time::SystemTime;
-use std::error::Error;
-use smallstring::SmallString;
 
-const MAN_PAGE: &'static str = /* @MANSTART{test} */ r#"NAME
+use smallstring::SmallString;
+use std::error::Error;
+use std::fs;
+use std::io::{self, BufWriter};
+use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
+use std::path::Path;
+use std::time::SystemTime;
+
+const MAN_PAGE: &'static str = r#"NAME
     test - perform tests on files and text
 
 SYNOPSIS
@@ -122,42 +123,49 @@ pub fn test(args: &[&str]) -> Result<bool, String> {
 fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W) -> Result<bool, String> {
     match arguments.first() {
         Some(&"--help") => {
-            buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| x.description().to_owned())?;
+            buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| {
+                x.description().to_owned()
+            })?;
             buffer.flush().map_err(|x| x.description().to_owned())?;
             Ok(true)
-        },
+        }
         Some(&s) if s.starts_with("-") => {
             // Access the second character in the flag string: this will be type of the flag.
             // If no flag was given, return `SUCCESS`
             s.chars().nth(1).map_or(Ok(true), |flag| {
                 // If no argument was given, return `SUCCESS`
-                arguments.get(1).map_or(Ok(true), { |arg|
+                arguments.get(1).map_or(Ok(true), {
+                    |arg|
                     // Match the correct function to the associated flag
                     Ok(match_flag_argument(flag, arg))
                 })
             })
-        },
+        }
         Some(arg) => {
             // If there is no operator, check if the first argument is non-zero
-            arguments.get(1).map_or(Ok(string_is_nonzero(arg)), |operator| {
-                // If there is no right hand argument, a condition was expected
-                let right_arg = arguments.get(2).ok_or_else(||
-                    SmallString::from("parse error: condition expected"))?;
-                evaluate_expression(arg, operator, right_arg)
-            })
-        },
-        None => Ok(false)
+            arguments.get(1).map_or(
+                Ok(string_is_nonzero(arg)),
+                |operator| {
+                    // If there is no right hand argument, a condition was expected
+                    let right_arg = arguments.get(2).ok_or_else(|| {
+                        SmallString::from("parse error: condition expected")
+                    })?;
+                    evaluate_expression(arg, operator, right_arg)
+                },
+            )
+        }
+        None => Ok(false),
     }
 }
 
 fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool, String> {
     match operator {
         "=" | "==" => Ok(first == second),
-        "!="       => Ok(first != second),
-        "-ef"      => Ok(files_have_same_device_and_inode_numbers(first, second)),
-        "-nt"      => Ok(file_is_newer_than(first, second)),
-        "-ot"      => Ok(file_is_newer_than(second, first)),
-        _          => {
+        "!=" => Ok(first != second),
+        "-ef" => Ok(files_have_same_device_and_inode_numbers(first, second)),
+        "-nt" => Ok(file_is_newer_than(first, second)),
+        "-ot" => Ok(file_is_newer_than(second, first)),
+        _ => {
             let (left, right) = parse_integers(first, second)?;
             match operator {
                 "-eq" => Ok(left == right),
@@ -166,9 +174,7 @@ fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool
                 "-le" => Ok(left <= right),
                 "-lt" => Ok(left < right),
                 "-ne" => Ok(left != right),
-                _     => {
-                    Err(format!("test: unknown condition: {:?}", operator))
-                }
+                _ => Err(format!("test: unknown condition: {:?}", operator)),
             }
         }
     }
@@ -189,7 +195,9 @@ fn files_have_same_device_and_inode_numbers(first: &str, second: &str) -> bool {
 
 /// Obtains the device and inode numbers of the file specified
 fn get_dev_and_inode(filename: &str) -> Option<(u64, u64)> {
-    fs::metadata(filename).map(|file| (file.dev(), file.ino())).ok()
+    fs::metadata(filename)
+        .map(|file| (file.dev(), file.ino()))
+        .ok()
 }
 
 /// Exits SUCCESS if the first file is newer than the second file.
@@ -206,7 +214,9 @@ fn file_is_newer_than(first: &str, second: &str) -> bool {
 
 /// Obtain the time the file was last modified as a `SystemTime` type.
 fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
-    fs::metadata(filename).ok().and_then(|file| file.modified().ok())
+    fs::metadata(filename).ok().and_then(
+        |file| file.modified().ok(),
+    )
 }
 
 /// Attempt to parse a &str as a usize.
@@ -220,9 +230,9 @@ fn parse_integers(left: &str, right: &str) -> Result<(Option<usize>, Option<usiz
         }
     };
 
-    parse_integer(left).and_then(|left| match parse_integer(right){
+    parse_integer(left).and_then(|left| match parse_integer(right) {
         Ok(right) => Ok((left, right)),
-        Err(why) => Err(why)
+        Err(why) => Err(why),
     })
 }
 
@@ -255,7 +265,9 @@ fn match_flag_argument(flag: char, argument: &str) -> bool {
 
 /// Exits SUCCESS if the file size is greather than zero.
 fn file_size_is_greater_than_zero(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.len() > 0)
+    fs::metadata(filepath).ok().map_or(false, |metadata| {
+        metadata.len() > 0
+    })
 }
 
 /// Exits SUCCESS if the file has read permissions. This function is rather low level because
@@ -263,7 +275,7 @@ fn file_size_is_greater_than_zero(filepath: &str) -> bool {
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective read bits.
 fn file_has_read_permission(filepath: &str) -> bool {
-    const USER:  u32 = 0b100000000;
+    const USER: u32 = 0b100000000;
     const GROUP: u32 = 0b100000;
     const GUEST: u32 = 0b100;
 
@@ -278,7 +290,7 @@ fn file_has_read_permission(filepath: &str) -> bool {
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective write bits.
 fn file_has_write_permission(filepath: &str) -> bool {
-    const USER:  u32 = 0b10000000;
+    const USER: u32 = 0b10000000;
     const GROUP: u32 = 0b10000;
     const GUEST: u32 = 0b10;
 
@@ -293,7 +305,7 @@ fn file_has_write_permission(filepath: &str) -> bool {
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective execute bits.
 fn file_has_execute_permission(filepath: &str) -> bool {
-    const USER:  u32 = 0b1000000;
+    const USER: u32 = 0b1000000;
     const GROUP: u32 = 0b1000;
     const GUEST: u32 = 0b1;
 
@@ -305,54 +317,57 @@ fn file_has_execute_permission(filepath: &str) -> bool {
 
 /// Exits SUCCESS if the file argument is a socket
 fn file_is_socket(filepath: &str) -> bool {
-    fs::metadata(filepath).ok()
-        .map_or(false, |metadata| metadata.file_type().is_socket())
+    fs::metadata(filepath).ok().map_or(false, |metadata| {
+        metadata.file_type().is_socket()
+    })
 }
 
 /// Exits SUCCESS if the file argument is a block device
 fn file_is_block_device(filepath: &str) -> bool {
-    fs::metadata(filepath).ok()
-        .map_or(false, |metadata| metadata.file_type().is_block_device())
+    fs::metadata(filepath).ok().map_or(false, |metadata| {
+        metadata.file_type().is_block_device()
+    })
 }
 
 /// Exits SUCCESS if the file argument is a character device
 fn file_is_character_device(filepath: &str) -> bool {
-    fs::metadata(filepath).ok()
-        .map_or(false, |metadata| metadata.file_type().is_char_device())
+    fs::metadata(filepath).ok().map_or(false, |metadata| {
+        metadata.file_type().is_char_device()
+    })
 }
 
 /// Exits SUCCESS if the file exists
-fn file_exists(filepath: &str) -> bool {
-    Path::new(filepath).exists()
-}
+fn file_exists(filepath: &str) -> bool { Path::new(filepath).exists() }
 
 /// Exits SUCCESS if the file is a regular file
 fn file_is_regular(filepath: &str) -> bool {
-    fs::metadata(filepath).ok()
-        .map_or(false, |metadata| metadata.file_type().is_file())
+    fs::metadata(filepath).ok().map_or(false, |metadata| {
+        metadata.file_type().is_file()
+    })
 }
 
 /// Exits SUCCESS if the file is a directory
 fn file_is_directory(filepath: &str) -> bool {
-    fs::metadata(filepath).ok()
-        .map_or(false, |metadata| metadata.file_type().is_dir())
+    fs::metadata(filepath).ok().map_or(false, |metadata| {
+        metadata.file_type().is_dir()
+    })
 }
 
 /// Exits SUCCESS if the file is a symbolic link
 fn file_is_symlink(filepath: &str) -> bool {
-    fs::symlink_metadata(filepath).ok()
-        .map_or(false, |metadata| metadata.file_type().is_symlink())
+    fs::symlink_metadata(filepath).ok().map_or(
+        false,
+        |metadata| {
+            metadata.file_type().is_symlink()
+        },
+    )
 }
 
 /// Exits SUCCESS if the string is not empty
-fn string_is_nonzero(string: &str) -> bool {
-    !string.is_empty()
-}
+fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
 
 /// Exits SUCCESS if the string is empty
-fn string_is_zero(string: &str) -> bool {
-    string.is_empty()
-}
+fn string_is_zero(string: &str) -> bool { string.is_empty() }
 
 #[test]
 fn test_strings() {
@@ -377,44 +392,30 @@ fn test_integers_arguments() {
     let mut buffer = BufWriter::new(stdout.lock());
 
     // Equal To
-    assert_eq!(evaluate_arguments(&["10", "-eq", "10"],
-        &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["10", "-eq", "5"],
-        &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["10", "-eq", "10"], &mut buffer), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-eq", "5"], &mut buffer), Ok(false));
 
     // Greater Than or Equal To
-    assert_eq!(evaluate_arguments(&["10", "-ge", "10"],
-        &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["10", "-ge", "5"],
-        &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["5", "-ge", "10"],
-        &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["10", "-ge", "10"], &mut buffer), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-ge", "5"], &mut buffer), Ok(true));
+    assert_eq!(evaluate_arguments(&["5", "-ge", "10"], &mut buffer), Ok(false));
 
     // Less Than or Equal To
-    assert_eq!(evaluate_arguments(&["5", "-le", "5"],
-        &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["5", "-le", "10"],
-        &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["10", "-le", "5"],
-        &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["5", "-le", "5"], &mut buffer), Ok(true));
+    assert_eq!(evaluate_arguments(&["5", "-le", "10"], &mut buffer), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-le", "5"], &mut buffer), Ok(false));
 
     // Less Than
-    assert_eq!(evaluate_arguments(&["5", "-lt", "10"],
-        &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["10", "-lt", "5"],
-        &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["5", "-lt", "10"], &mut buffer), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-lt", "5"], &mut buffer), Ok(false));
 
     // Greater Than
-    assert_eq!(evaluate_arguments(&["10", "-gt", "5"],
-        &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["5", "-gt", "10"],
-        &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["10", "-gt", "5"], &mut buffer), Ok(true));
+    assert_eq!(evaluate_arguments(&["5", "-gt", "10"], &mut buffer), Ok(false));
 
     // Not Equal To
-    assert_eq!(evaluate_arguments(&["10", "-ne", "5"],
-        &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["5", "-ne", "5"],
-        &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["10", "-ne", "5"], &mut buffer), Ok(true));
+    assert_eq!(evaluate_arguments(&["5", "-ne", "5"], &mut buffer), Ok(false));
 }
 
 #[test]

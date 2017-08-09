@@ -1,4 +1,3 @@
-
 use super::Shell;
 use super::status::*;
 use std::io::{self, Write};

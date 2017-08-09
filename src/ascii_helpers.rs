@@ -1,6 +1,6 @@
 use std::ascii::AsciiExt;
-use std::ops::DerefMut;
 use std::mem::transmute;
+use std::ops::DerefMut;
 
 // TODO: These could be generalised to work on non-ASCII characters (and even
 //       strings!) as long as the byte size of the needle and haystack match.
@@ -13,7 +13,7 @@ pub trait AsciiReplace: Sized {
     fn ascii_replace(self, needle: char, haystack: char) -> Self;
 }
 
-impl<T: DerefMut<Target=str>> AsciiReplace for T {
+impl<T: DerefMut<Target = str>> AsciiReplace for T {
     fn ascii_replace(mut self, needle: char, haystack: char) -> Self {
         self.ascii_replace_in_place(needle, haystack);
         self

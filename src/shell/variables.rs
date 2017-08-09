@@ -1,4 +1,3 @@
-
 use super::directory_stack::DirectoryStack;
 use super::plugins::namespaces::{self, StringNamespace};
 use super::status::{FAILURE, SUCCESS};

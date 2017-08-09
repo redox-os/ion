@@ -10,20 +10,20 @@ mod time;
 mod echo;
 mod set;
 
-use self::conditionals::{starts_with, ends_with, contains};
-use self::variables::{alias, drop_alias, drop_variable, drop_array};
+use self::conditionals::{contains, ends_with, starts_with};
+use self::echo::echo;
 use self::functions::fn_;
 use self::source::source;
-use self::echo::echo;
 use self::test::test;
+use self::variables::{alias, drop_alias, drop_array, drop_variable};
 
 use fnv::FnvHashMap;
-use std::io::{self, Write};
 use std::error::Error;
+use std::io::{self, Write};
 
 use parser::QuoteTerminator;
+use shell::{self, FlowLogic, Shell, ShellHistory};
 use shell::job_control::{JobControl, ProcessState};
-use shell::{self, Shell, FlowLogic, ShellHistory};
 use shell::status::*;
 use sys;
 
@@ -39,8 +39,7 @@ pub struct Builtin {
 impl Builtin {
     /// Return the map from command names to commands
     pub fn map() -> FnvHashMap<&'static str, Self> {
-        let mut commands: FnvHashMap<&str, Self> =
-            FnvHashMap::with_capacity_and_hasher(32, Default::default());
+        let mut commands: FnvHashMap<&str, Self> = FnvHashMap::with_capacity_and_hasher(32, Default::default());
 
         /*
         Quick and clean way to insert a builtin, define a function named as the builtin
@@ -72,11 +71,7 @@ impl Builtin {
         }
 
         /* Directories */
-        insert_builtin!(
-            "cd",
-            builtin_cd,
-            "Change the current directory\n    cd <path>"
-        );
+        insert_builtin!("cd", builtin_cd, "Change the current directory\n    cd <path>");
 
         insert_builtin!("dirs", builtin_dirs, "Display the current directory stack");
         insert_builtin!("pushd", builtin_pushd, "Push a directory to the stack");
@@ -88,24 +83,12 @@ impl Builtin {
 
         /* Variables */
         insert_builtin!("fn", builtin_fn, "Print list of functions");
-        insert_builtin!(
-            "read",
-            builtin_read,
-            "Read some variables\n    read <variable>"
-        );
+        insert_builtin!("read", builtin_read, "Read some variables\n    read <variable>");
         insert_builtin!("drop", builtin_drop, "Delete a variable");
 
         /* Misc */
-        insert_builtin!(
-            "matches",
-            builtin_matches,
-            "Checks if a string matches a given regex"
-        );
-        insert_builtin!(
-            "not",
-            builtin_not,
-            "Reverses the exit status value of the given command."
-        );
+        insert_builtin!("matches", builtin_matches, "Checks if a string matches a given regex");
+        insert_builtin!("not", builtin_not, "Reverses the exit status value of the given command.");
         insert_builtin!(
             "set",
             builtin_set,
@@ -118,32 +101,16 @@ impl Builtin {
             builtin_wait,
             "Waits until all running background processes have completed"
         );
-        insert_builtin!(
-            "jobs",
-            builtin_jobs,
-            "Displays all jobs that are attached to the background"
-        );
+        insert_builtin!("jobs", builtin_jobs, "Displays all jobs that are attached to the background");
         insert_builtin!("bg", builtin_bg, "Resumes a stopped background process");
-        insert_builtin!(
-            "fg",
-            builtin_fg,
-            "Resumes and sets a background process as the active process"
-        );
-        insert_builtin!(
-            "suspend",
-            builtin_suspend,
-            "Suspends the shell with a SIGTSTOP signal"
-        );
+        insert_builtin!("fg", builtin_fg, "Resumes and sets a background process as the active process");
+        insert_builtin!("suspend", builtin_suspend, "Suspends the shell with a SIGTSTOP signal");
         insert_builtin!(
             "disown",
             builtin_disown,
             "Disowning a process removes that process from the shell's background process table."
         );
-        insert_builtin!(
-            "history",
-            builtin_history,
-            "Display a log of all commands previously executed"
-        );
+        insert_builtin!("history", builtin_history, "Display a log of all commands previously executed");
         insert_builtin!(
             "source",
             builtin_source,
@@ -152,11 +119,7 @@ impl Builtin {
         insert_builtin!("echo", builtin_echo, "Display a line of text");
         insert_builtin!("test", builtin_test, "Performs tests on files and text");
         insert_builtin!("calc", builtin_calc, "Calculate a mathematical expression");
-        insert_builtin!(
-            "time",
-            builtin_time,
-            "Measures the time to execute an external command"
-        );
+        insert_builtin!("time", builtin_time, "Measures the time to execute an external command");
         insert_builtin!("true", builtin_true, "Do nothing, successfully");
         insert_builtin!("false", builtin_false, "Do nothing, unsuccessfully");
         insert_builtin!(
@@ -208,9 +171,7 @@ fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_dirs(args: &[&str], shell: &mut Shell) -> i32 {
-    shell.directory_stack.dirs(args)
-}
+fn builtin_dirs(args: &[&str], shell: &mut Shell) -> i32 { shell.directory_stack.dirs(args) }
 
 fn builtin_pushd(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.directory_stack.pushd(args, &shell.variables) {
@@ -241,17 +202,11 @@ fn builtin_alias(args: &[&str], shell: &mut Shell) -> i32 {
     alias(&mut shell.variables, &args_str)
 }
 
-fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 {
-    drop_alias(&mut shell.variables, args)
-}
+fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 { drop_alias(&mut shell.variables, args) }
 
-fn builtin_fn(_: &[&str], shell: &mut Shell) -> i32 {
-    fn_(&mut shell.functions)
-}
+fn builtin_fn(_: &[&str], shell: &mut Shell) -> i32 { fn_(&mut shell.functions) }
 
-fn builtin_read(args: &[&str], shell: &mut Shell) -> i32 {
-    shell.variables.read(args)
-}
+fn builtin_read(args: &[&str], shell: &mut Shell) -> i32 { shell.variables.read(args) }
 
 fn builtin_drop(args: &[&str], shell: &mut Shell) -> i32 {
     if args.len() >= 2 && args[1] == "-a" {
@@ -271,9 +226,7 @@ fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_set(args: &[&str], shell: &mut Shell) -> i32 {
-    set::set(args, shell)
-}
+fn builtin_set(args: &[&str], shell: &mut Shell) -> i32 { set::set(args, shell) }
 fn builtin_eval(args: &[&str], shell: &mut Shell) -> i32 {
     let evaluated_command = args[1..].join(" ");
     let mut buffer = QuoteTerminator::new(evaluated_command);
@@ -287,9 +240,7 @@ fn builtin_eval(args: &[&str], shell: &mut Shell) -> i32 {
         FAILURE
     }
 }
-fn builtin_history(args: &[&str], shell: &mut Shell) -> i32 {
-    shell.print_history(args)
-}
+fn builtin_history(args: &[&str], shell: &mut Shell) -> i32 { shell.print_history(args) }
 
 fn builtin_source(args: &[&str], shell: &mut Shell) -> i32 {
     match source(shell, args) {
@@ -353,13 +304,9 @@ fn builtin_time(args: &[&str], _: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_true(_: &[&str], _: &mut Shell) -> i32 {
-    SUCCESS
-}
+fn builtin_true(_: &[&str], _: &mut Shell) -> i32 { SUCCESS }
 
-fn builtin_false(_: &[&str], _: &mut Shell) -> i32 {
-    FAILURE
-}
+fn builtin_false(_: &[&str], _: &mut Shell) -> i32 { FAILURE }
 
 fn builtin_wait(_: &[&str], shell: &mut Shell) -> i32 {
     shell.wait_for_background();
@@ -371,22 +318,16 @@ fn builtin_jobs(_: &[&str], shell: &mut Shell) -> i32 {
     SUCCESS
 }
 
-fn builtin_bg(args: &[&str], shell: &mut Shell) -> i32 {
-    job_control::bg(shell, &args[1..])
-}
+fn builtin_bg(args: &[&str], shell: &mut Shell) -> i32 { job_control::bg(shell, &args[1..]) }
 
-fn builtin_fg(args: &[&str], shell: &mut Shell) -> i32 {
-    job_control::fg(shell, &args[1..])
-}
+fn builtin_fg(args: &[&str], shell: &mut Shell) -> i32 { job_control::fg(shell, &args[1..]) }
 
 fn builtin_suspend(_: &[&str], _: &mut Shell) -> i32 {
     shell::signals::suspend(0);
     SUCCESS
 }
 
-fn builtin_disown(args: &[&str], shell: &mut Shell) -> i32 {
-    job_control::disown(shell, &args[1..])
-}
+fn builtin_disown(args: &[&str], shell: &mut Shell) -> i32 { job_control::disown(shell, &args[1..]) }
 
 fn builtin_help(args: &[&str], shell: &mut Shell) -> i32 {
     let builtins = shell.builtins;

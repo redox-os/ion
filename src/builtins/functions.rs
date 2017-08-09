@@ -1,5 +1,6 @@
-use shell::flow_control::Function;
+
 use fnv::FnvHashMap;
+use shell::flow_control::Function;
 use shell::status::*;
 use std::io::{self, Write};
 use types::Identifier;
@@ -18,8 +19,7 @@ fn print_functions(functions: &FnvHashMap<Identifier, Function>) {
     }
 }
 
-pub fn fn_(functions: &mut FnvHashMap<Identifier, Function>) -> i32
-{
+pub fn fn_(functions: &mut FnvHashMap<Identifier, Function>) -> i32 {
     print_functions(functions);
     SUCCESS
 }

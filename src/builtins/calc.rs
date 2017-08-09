@@ -1,7 +1,7 @@
 extern crate calc;
 
+use calc::{CalcError, eval};
 use std::io::{self, Write};
-use calc::{eval, CalcError};
 
 pub fn calc(args: &[&str]) -> Result<(), String> {
     let stdout = io::stdout();
@@ -23,7 +23,7 @@ pub fn calc(args: &[&str]) -> Result<(), String> {
                     "exit" => break,
                     s => {
                         writeln!(stdout, "{}", eval(s)?).map_err(CalcError::IO)?;
-                    },
+                    }
                 }
             }
         }

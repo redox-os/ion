@@ -1,7 +1,7 @@
 extern crate ansi_term;
 extern crate version_check;
 
-use ansi_term::Color::{Red, Yellow, Blue, White};
+use ansi_term::Color::{Blue, Red, White, Yellow};
 use version_check::is_min_version;
 
 // Specifies the minimum version needed to compile Ion.
@@ -20,26 +20,32 @@ macro_rules! printerr {
 
 fn main() {
     let print_version_err = |version: &str| {
-        printerr!("{} {}. {} {}.",
-                  White.paint("Installed version is:"),
-                  Yellow.paint(format!("{}", version)),
-                  White.paint("Minimum required:"),
-                  Yellow.paint(format!("{}", MIN_VERSION)));
+        printerr!(
+            "{} {}. {} {}.",
+            White.paint("Installed version is:"),
+            Yellow.paint(format!("{}", version)),
+            White.paint("Minimum required:"),
+            Yellow.paint(format!("{}", MIN_VERSION))
+        );
     };
 
     match is_min_version(MIN_VERSION) {
         Some((is_minimum, _)) if is_minimum => (), // Success!
         Some((_, ref version_string)) => {
-            printerr!("{} {}",
-                      Red.bold().paint("Error:"),
-                      White.paint("Ion requires at least version 1.19.0 to build."));
+            printerr!(
+                "{} {}",
+                Red.bold().paint("Error:"),
+                White.paint("Ion requires at least version 1.19.0 to build.")
+            );
             print_version_err(&*version_string);
-            printerr!("{}{}{}",
+            printerr!(
+                "{}{}{}",
                 Blue.paint("Use `"),
                 White.paint("rustup update"),
-                Blue.paint("` to update to the latest stable compiler."));
+                Blue.paint("` to update to the latest stable compiler.")
+            );
             panic!("Aborting compilation due to incompatible compiler.")
-        },
+        }
         _ => {
             println!("cargo:warning={}", "Ion was unable to check rustc compatibility.");
             println!("cargo:warning={}", "Build may fail due to incompatible rustc version.");

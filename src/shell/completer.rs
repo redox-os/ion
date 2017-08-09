@@ -1,4 +1,3 @@
-
 use super::directory_stack::DirectoryStack;
 use super::variables::Variables;
 use liner::{Completer, FilenameCompleter};

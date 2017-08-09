@@ -71,11 +71,13 @@ fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Ve
     }
 
     let char_step = match step.checked_abs() {
-        Some(v) => if v > u8::MAX as isize {
-            return None;
-        } else {
-            v as u8
-        },
+        Some(v) => {
+            if v > u8::MAX as isize {
+                return None;
+            } else {
+                v as u8
+            }
+        }
         None => return None,
     };
 
@@ -96,11 +98,7 @@ fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Ve
 
 fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize)> {
     if let Ok(first) = a.parse::<isize>() {
-        if let Ok(sec) = b.parse::<isize>() {
-            Some((first, sec))
-        } else {
-            None
-        }
+        if let Ok(sec) = b.parse::<isize>() { Some((first, sec)) } else { None }
     } else {
         None
     }

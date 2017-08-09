@@ -1,7 +1,8 @@
-use std::io::{stdout, Write};
+
+use std::error::Error;
+use std::io::{Write, stdout};
 use std::process::Command;
 use std::time::Instant;
-use std::error::Error;
 
 const MAN_PAGE: &'static str = r#"NAME
     time - timer for commands
@@ -24,10 +25,12 @@ pub fn time(args: &[&str]) -> Result<(), String> {
 
     for arg in args {
         if *arg == "-h" || *arg == "--help" {
-            return match stdout.write_all(MAN_PAGE.as_bytes()).and_then(|_| stdout.flush()) {
-                Ok(_)    => Ok(()),
-                Err(err) => Err(err.description().to_owned())
-            }
+            return match stdout.write_all(MAN_PAGE.as_bytes()).and_then(
+                |_| stdout.flush(),
+            ) {
+                Ok(_) => Ok(()),
+                Err(err) => Err(err.description().to_owned()),
+            };
         }
     }
 
@@ -35,9 +38,14 @@ pub fn time(args: &[&str]) -> Result<(), String> {
 
     if !args.is_empty() {
         let mut command = Command::new(&args[0]);
-        for arg in &args[1..] { command.arg(arg); }
-        command.spawn().and_then(|mut child| child.wait())
-            .map_err(|err| format!("time: {:?}", err))?;
+        for arg in &args[1..] {
+            command.arg(arg);
+        }
+        command.spawn().and_then(|mut child| child.wait()).map_err(
+            |err| {
+                format!("time: {:?}", err)
+            },
+        )?;
     }
 
     let duration = time.elapsed();

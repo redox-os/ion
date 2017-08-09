@@ -19,17 +19,11 @@ pub const STDIN_FILENO: RawFd = 0;
 pub const STDOUT_FILENO: RawFd = 1;
 pub const STDERR_FILENO: RawFd = 2;
 
-pub unsafe fn fork() -> io::Result<u32> {
-    cvt(syscall::clone(0)).map(|pid| pid as u32)
-}
+pub unsafe fn fork() -> io::Result<u32> { cvt(syscall::clone(0)).map(|pid| pid as u32) }
 
-pub fn getpid() -> io::Result<u32> {
-    cvt(syscall::getpid()).map(|pid| pid as u32)
-}
+pub fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
 
-pub fn kill(pid: u32, signal: i32) -> io::Result<()> {
-    cvt(syscall::kill(pid as usize, signal as usize)).and(Ok(()))
-}
+pub fn kill(pid: u32, signal: i32) -> io::Result<()> { cvt(syscall::kill(pid as usize, signal as usize)).and(Ok(())) }
 
 pub fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
     cvt(syscall::kill(-(pgid as isize) as usize, signal as usize)).and(Ok(()))
@@ -41,9 +35,7 @@ pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     Ok((fds[0], fds[1]))
 }
 
-pub fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
-    cvt(syscall::setpgid(pid as usize, pgid as usize)).and(Ok(()))
-}
+pub fn setpgid(pid: u32, pgid: u32) -> io::Result<()> { cvt(syscall::setpgid(pid as usize, pgid as usize)).and(Ok(())) }
 
 pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     let new = SigAction {
@@ -68,10 +60,7 @@ pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
 
     let pgid_usize = pgid as usize;
     let res = syscall::write(fd, unsafe {
-        slice::from_raw_parts(
-            &pgid_usize as *const usize as *const u8,
-            mem::size_of::<usize>(),
-        )
+        slice::from_raw_parts(&pgid_usize as *const usize as *const u8, mem::size_of::<usize>())
     });
 
     let _ = syscall::close(fd);
@@ -79,17 +68,11 @@ pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
     cvt(res).and(Ok(()))
 }
 
-pub fn dup(fd: RawFd) -> io::Result<RawFd> {
-    cvt(syscall::dup(fd, &[]))
-}
+pub fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(syscall::dup(fd, &[])) }
 
-pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
-    cvt(syscall::dup2(old, new, &[]))
-}
+pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(syscall::dup2(old, new, &[])) }
 
-pub fn close(fd: RawFd) -> io::Result<()> {
-    cvt(syscall::close(fd)).and(Ok(()))
-}
+pub fn close(fd: RawFd) -> io::Result<()> { cvt(syscall::close(fd)).and(Ok(())) }
 
 pub fn isatty(fd: RawFd) -> bool {
     if let Ok(tfd) = syscall::dup(fd, b"termios") {
@@ -117,14 +100,14 @@ pub mod signals {
 pub mod job_control {
     use shell::job_control::*;
 
+    use shell::Shell;
+    use shell::foreground::ForegroundSignals;
+    use shell::status::TERMINATED;
     use std::io::{self, Write};
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
     use std::sync::{Arc, Mutex};
     use syscall;
-    use shell::foreground::ForegroundSignals;
-    use shell::status::TERMINATED;
-    use shell::Shell;
 
     pub fn watch_background(
         fg: Arc<ForegroundSignals>,
@@ -143,9 +126,8 @@ pub mod job_control {
         _get_command: F,
         mut drop_command: D,
     ) -> i32
-    where
-        F: FnOnce() -> String,
-        D: FnMut(i32),
+        where F: FnOnce() -> String,
+              D: FnMut(i32)
     {
         loop {
             let mut status_raw = 0;

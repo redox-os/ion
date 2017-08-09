@@ -9,20 +9,30 @@ bitflags! {
 
 pub struct QuoteTerminator {
     buffer: String,
-    eof:    Option<String>,
+    eof: Option<String>,
     eof_buffer: String,
-    read:   usize,
-    flags:  Flags,
+    read: usize,
+    flags: Flags,
 }
 
 impl QuoteTerminator {
     pub fn new(input: String) -> QuoteTerminator {
-        QuoteTerminator { buffer: input, eof: None, eof_buffer: String::new(), read: 0, flags: Flags::empty() }
+        QuoteTerminator {
+            buffer: input,
+            eof: None,
+            eof_buffer: String::new(),
+            read: 0,
+            flags: Flags::empty(),
+        }
     }
 
     pub fn append(&mut self, input: String) {
         if self.eof.is_none() {
-            self.buffer.push_str(if self.flags.contains(TRIM) { input.trim() } else { &input });
+            self.buffer.push_str(if self.flags.contains(TRIM) {
+                input.trim()
+            } else {
+                &input
+            });
         } else {
             self.eof_buffer.push_str(&input);
         }
@@ -44,9 +54,9 @@ impl QuoteTerminator {
                         self.read += 1;
                         match character {
                             _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
-                            b'\\'                            => self.flags ^= BACKSL,
+                            b'\\' => self.flags ^= BACKSL,
                             b'\'' if !self.flags.intersects(DQUOTE) => self.flags ^= SQUOTE,
-                            b'"'  if !self.flags.intersects(SQUOTE) => self.flags ^= DQUOTE,
+                            b'"' if !self.flags.intersects(SQUOTE) => self.flags ^= DQUOTE,
                             b'<' if !self.flags.contains(SQUOTE | DQUOTE) => {
                                 let as_bytes = self.buffer.as_bytes();
                                 if Some(&b'<') == as_bytes.get(self.read) {
@@ -56,7 +66,7 @@ impl QuoteTerminator {
                                         let eof_phrase = unsafe { str::from_utf8_unchecked(&as_bytes[self.read..]) };
                                         self.eof = Some(eof_phrase.trim().to_owned());
                                         eof_found = true;
-                                        break
+                                        break;
                                     }
                                 }
                             }
@@ -66,7 +76,7 @@ impl QuoteTerminator {
                 }
                 if eof_found {
                     self.buffer.push('\n');
-                    return false
+                    return false;
                 }
             }
 
@@ -84,7 +94,7 @@ impl QuoteTerminator {
                     // If the last two bytes are either '&&' or '||', we aren't terminated yet.
                     let bytes = self.buffer.as_bytes();
                     if bytes.len() >= 2 {
-                        let bytes = &bytes[bytes.len()-2..];
+                        let bytes = &bytes[bytes.len() - 2..];
                         bytes != &[b'&', b'&'] && bytes != &[b'|', b'|']
                     } else {
                         true

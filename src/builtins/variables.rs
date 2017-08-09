@@ -2,16 +2,17 @@
 
 use std::io::{self, Write};
 
-use types::*;
 use shell::status::*;
 use shell::variables::Variables;
+use types::*;
 
 fn print_list(list: &VariableContext) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 
     for (key, value) in list {
-        let _ = stdout.write(key.as_bytes())
+        let _ = stdout
+            .write(key.as_bytes())
             .and_then(|_| stdout.write_all(b" = "))
             .and_then(|_| stdout.write_all(value.as_bytes()))
             .and_then(|_| stdout.write_all(b"\n"));
@@ -24,14 +25,14 @@ enum Binding {
     KeyOnly(Identifier),
     KeyValue(Identifier, Value),
     Math(Identifier, Operator, f32),
-    MathInvalid(Value)
+    MathInvalid(Value),
 }
 
 enum Operator {
     Plus,
     Minus,
     Divide,
-    Multiply
+    Multiply,
 }
 
 /// Parses alias as a `(key, value)` tuple.
@@ -55,35 +56,35 @@ fn parse_alias(args: &str) -> Binding {
                     operator = Some(Operator::Plus);
                     found_key = true;
                 }
-                break
-            },
+                break;
+            }
             '-' => {
                 if char_iter.next() == Some('=') {
                     operator = Some(Operator::Minus);
                     found_key = true;
                 }
-                break
-            },
+                break;
+            }
             '*' => {
                 if char_iter.next() == Some('=') {
                     operator = Some(Operator::Multiply);
                     found_key = true;
                 }
-                break
-            },
+                break;
+            }
             '/' => {
                 if char_iter.next() == Some('=') {
                     operator = Some(Operator::Divide);
                     found_key = true;
                 }
-                break
-            },
+                break;
+            }
             '=' => {
                 found_key = true;
-                break
-            },
+                break;
+            }
             _ if !found_key => key.push(character),
-            _ => ()
+            _ => (),
         }
     }
 
@@ -102,10 +103,10 @@ fn parse_alias(args: &str) -> Binding {
                 Some(operator) => {
                     match value.parse::<f32>() {
                         Ok(value) => Binding::Math(key, operator, value),
-                        Err(_)    => Binding::MathInvalid(value)
+                        Err(_) => Binding::MathInvalid(value),
                     }
-                },
-                None => Binding::KeyValue(key, value)
+                }
+                None => Binding::KeyValue(key, value),
             }
         }
     }
@@ -119,14 +120,16 @@ pub fn alias(vars: &mut Variables, args: &str) -> i32 {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: alias name, '{}', is invalid", key);
             return FAILURE;
-        },
-        Binding::KeyValue(key, value) => { vars.aliases.insert(key, value); },
+        }
+        Binding::KeyValue(key, value) => {
+            vars.aliases.insert(key, value);
+        }
         Binding::ListEntries => print_list(&vars.aliases),
         Binding::KeyOnly(key) => {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: please provide value for alias '{}'", key);
             return FAILURE;
-        },
+        }
         _ => {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: invalid alias syntax");
@@ -210,15 +213,13 @@ pub fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
 #[cfg(test)]
 mod test {
     use super::*;
-    use parser::{expand_string, Expander};
+    use parser::{Expander, expand_string};
     use shell::status::{FAILURE, SUCCESS};
 
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn variable(&self, var: &str, _: bool) -> Option<Value> {
-            self.0.get_var(var)
-        }
+        fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
     }
 
     // TODO: Rewrite tests now that let is part of the grammar.

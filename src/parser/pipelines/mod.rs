@@ -2,7 +2,7 @@ mod collector;
 
 pub use self::collector::*;
 
-use super::{expand_string, Expander};
+use super::{Expander, expand_string};
 use shell::{Job, JobKind};
 use std::fmt;
 
@@ -52,10 +52,8 @@ impl Pipeline {
         }
 
         let stdin = match self.stdin {
-            Some(Input::File(ref s)) =>
-                Some(Input::File(expand_string(s, expanders, false).join(" "))),
-            Some(Input::HereString(ref s)) =>
-                Some(Input::HereString(expand_string(s, expanders, true).join(" "))),
+            Some(Input::File(ref s)) => Some(Input::File(expand_string(s, expanders, false).join(" "))),
+            Some(Input::HereString(ref s)) => Some(Input::HereString(expand_string(s, expanders, true).join(" "))),
             None => None,
         };
 
@@ -67,9 +65,7 @@ impl Pipeline {
     }
 
     pub fn requires_piping(&self) -> bool {
-        self.jobs.len() > 1 ||
-            self.stdin != None ||
-            self.stdout != None ||
+        self.jobs.len() > 1 || self.stdin != None || self.stdout != None ||
             self.jobs.last().unwrap().kind == JobKind::Background
     }
 }

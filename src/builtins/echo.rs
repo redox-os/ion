@@ -1,4 +1,4 @@
-use std::io::{self, Write, BufWriter};
+use std::io::{self, BufWriter, Write};
 
 bitflags! {
     struct Flags : u8 {
@@ -10,7 +10,7 @@ bitflags! {
 }
 
 
-const MAN_PAGE: &'static str = /* @MANSTART{echo} */ r#"NAME
+const MAN_PAGE: &'static str = r#"NAME
     echo - display a line of text
 
 SYNOPSIS
@@ -65,13 +65,13 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
                             _ => {
                                 is_opts = false;
                                 break;
-                            },
+                            }
                         }
                     }
                     if is_opts {
                         flags |= short_flags;
                     } else {
-                        data.push(arg); 
+                        data.push(arg);
                     }
                 } else {
                     data.push(arg);
@@ -104,49 +104,51 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
                     b'\\' if check => {
                         buffer.write_all(&[byte])?;
                         check = false;
-                    },
+                    }
                     b'\\' => check = true,
                     b'a' if check => {
                         buffer.write_all(&[7u8])?; // bell
                         check = false;
-                    },
+                    }
                     b'b' if check => {
                         buffer.write_all(&[8u8])?; // backspace
                         check = false;
-                    },
+                    }
                     b'c' if check => {
                         buffer.flush()?;
                         return Ok(());
-                    },
+                    }
                     b'e' if check => {
                         buffer.write_all(&[27u8])?; // escape
                         check = false;
-                    },
+                    }
                     b'f' if check => {
                         buffer.write_all(&[12u8])?; // form feed
                         check = false;
-                    },
+                    }
                     b'n' if check => {
                         buffer.write_all(&[b'\n'])?; // newline
                         check = false;
-                    },
+                    }
                     b'r' if check => {
                         buffer.write_all(&[b'\r'])?;
                         check = false;
-                    },
+                    }
                     b't' if check => {
                         buffer.write_all(&[b'\t'])?;
                         check = false;
-                    },
+                    }
                     b'v' if check => {
                         buffer.write_all(&[11u8])?; // vertical tab
                         check = false;
-                    },
+                    }
                     _ if check => {
                         buffer.write_all(&[b'\\', byte])?;
                         check = false;
-                    },
-                    _ => { buffer.write_all(&[byte])?; }
+                    }
+                    _ => {
+                        buffer.write_all(&[byte])?;
+                    }
                 }
             }
         } else {

@@ -1,6 +1,7 @@
+
+use shell::{FlowLogic, Shell};
 use std::fs::File;
 use std::io::Read;
-use shell::{Shell, FlowLogic};
 
 /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
 pub fn source(shell: &mut Shell, arguments: &[&str]) -> Result<(), String> {
@@ -20,10 +21,10 @@ pub fn source(shell: &mut Shell, arguments: &[&str]) -> Result<(), String> {
             } else {
                 Err(format!("ion: failed to open {}\n", argument))
             }
-        },
+        }
         None => {
             shell.evaluate_init_file();
             Ok(())
-        },
+        }
     }
 }

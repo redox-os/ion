@@ -1,5 +1,5 @@
 use shell::variables::Variables;
-use types::{Identifier, Value as VString, Array, Key};
+use types::{Array, Identifier, Key, Value as VString};
 
 #[derive(Debug, PartialEq, Clone)]
 // TODO: Have the expand_string function return the `Value` type.
@@ -16,7 +16,7 @@ pub enum Binding {
     KeyValue(Identifier, VString),
     MapKeyValue(Identifier, Key, VString),
     Math(Identifier, Operator, VString),
-    MultipleKeys(Vec<Identifier>, VString)
+    MultipleKeys(Vec<Identifier>, VString),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -31,7 +31,7 @@ pub enum Operator {
 #[allow(dead_code)]
 enum Expression {
     Arithmetic,
-    Regular
+    Regular,
 }
 
 /// Parses let bindings, `let VAR = KEY`, returning the result as a `(key, value)` tuple.
@@ -62,34 +62,36 @@ pub fn parse_assignment(arguments: &str) -> Binding {
             ' ' => {
                 keys.push(key.clone().into());
                 key.clear();
-            },
+            }
             '+' => {
                 match_operator!(Operator::Add);
-                break
-            },
+                break;
+            }
             '-' => {
                 match_operator!(Operator::Subtract);
-                break
-            },
+                break;
+            }
             '*' => {
                 match_operator!(Operator::Multiply);
-                break
-            },
+                break;
+            }
             '/' => {
                 match_operator!(Operator::Divide);
-                break
-            },
+                break;
+            }
             '^' => {
                 match_operator!(Operator::Exponent);
-                break
-            },
+                break;
+            }
             '=' => {
-                if !key.is_empty() { keys.push(key.into()); }
+                if !key.is_empty() {
+                    keys.push(key.into());
+                }
                 found_key = true;
-                break
-            },
+                break;
+            }
             _ if !found_key => key.push(character),
-            _ => ()
+            _ => (),
         }
     }
 
@@ -116,7 +118,7 @@ pub fn parse_assignment(arguments: &str) -> Binding {
         } else {
             match operator {
                 Some(operator) => Binding::Math(key.into(), operator, value),
-                None => Binding::KeyValue(key.into(), value)
+                None => Binding::KeyValue(key.into(), value),
             }
         }
     }

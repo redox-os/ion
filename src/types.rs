@@ -1,6 +1,7 @@
-use smallvec::SmallVec;
+
 use fnv::FnvHashMap;
 use smallstring::SmallString;
+use smallvec::SmallVec;
 
 pub type Array = SmallVec<[Value; 4]>;
 pub type HashMap = FnvHashMap<Key, Value>;

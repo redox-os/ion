@@ -1,4 +1,3 @@
-
 use super::status::{FAILURE, SUCCESS};
 use super::variables::Variables;
 use std::borrow::Cow;

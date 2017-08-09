@@ -1,25 +1,25 @@
 const DOUBLE: u8 = 1;
 const SINGLE: u8 = 2;
-const BACK:   u8 = 4;
+const BACK: u8 = 4;
 const COMM_1: u8 = 8;
 const COMM_2: u8 = 16;
 const VARIAB: u8 = 32;
-const ARRAY:  u8 = 64;
+const ARRAY: u8 = 64;
 const METHOD: u8 = 128;
 
 /// An efficient `Iterator` structure for splitting arguments
 pub struct ArgumentSplitter<'a> {
-    data:         &'a str,
-    read:         usize,
-    flags:        u8,
+    data: &'a str,
+    read: usize,
+    flags: u8,
 }
 
 impl<'a> ArgumentSplitter<'a> {
     pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
         ArgumentSplitter {
-            data:         data,
-            read:         0,
-            flags:        0,
+            data: data,
+            read: 0,
+            flags: 0,
         }
     }
 }
@@ -37,47 +37,44 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
         for character in self.data.bytes().skip(self.read) {
             match character {
                 _ if self.flags & BACK != 0 => self.flags ^= BACK,
-                b'\\'                       => self.flags ^= BACK,
+                b'\\' => self.flags ^= BACK,
                 b'@' if self.flags & SINGLE == 0 => {
                     self.flags &= 255 ^ COMM_1;
                     self.flags |= COMM_2 + ARRAY;
                     self.read += 1;
-                    continue
-                },
+                    continue;
+                }
                 b'$' if self.flags & SINGLE == 0 => {
                     self.flags &= 255 ^ COMM_2;
                     self.flags |= COMM_1 + VARIAB;
                     self.read += 1;
-                    continue
-                },
-                b'['  if self.flags & SINGLE == 0 && self.flags & COMM_2 != 0 => array_process_level += 1,
-                b'['  if self.flags & SINGLE == 0 => array_level += 1,
-                b']'  if self.flags & SINGLE == 0 && array_level != 0 => array_level -= 1,
-                b']'  if self.flags & SINGLE == 0 => array_process_level -= 1,
-                b'('  if self.flags & SINGLE == 0 && self.flags & COMM_1 != 0 => level += 1,
-                b'('  if self.flags & SINGLE == 0 && self.flags & (VARIAB + ARRAY) != 0 => {
+                    continue;
+                }
+                b'[' if self.flags & SINGLE == 0 && self.flags & COMM_2 != 0 => array_process_level += 1,
+                b'[' if self.flags & SINGLE == 0 => array_level += 1,
+                b']' if self.flags & SINGLE == 0 && array_level != 0 => array_level -= 1,
+                b']' if self.flags & SINGLE == 0 => array_process_level -= 1,
+                b'(' if self.flags & SINGLE == 0 && self.flags & COMM_1 != 0 => level += 1,
+                b'(' if self.flags & SINGLE == 0 && self.flags & (VARIAB + ARRAY) != 0 => {
                     self.flags |= METHOD;
                     self.flags &= 255 ^ (VARIAB + ARRAY);
-                },
-                b')'  if self.flags & SINGLE == 0 && self.flags & METHOD != 0 => {
+                }
+                b')' if self.flags & SINGLE == 0 && self.flags & METHOD != 0 => {
                     self.flags &= 255 ^ METHOD;
-                },
-                b')'  if self.flags & SINGLE == 0 => level -= 1,
-                b'"'  if self.flags & SINGLE == 0 => self.flags ^= DOUBLE,
+                }
+                b')' if self.flags & SINGLE == 0 => level -= 1,
+                b'"' if self.flags & SINGLE == 0 => self.flags ^= DOUBLE,
                 b'\'' if self.flags & DOUBLE == 0 => self.flags ^= SINGLE,
-                b' '  if self.flags & (SINGLE + DOUBLE + METHOD) == 0
-                    && level == 0 && array_level == 0 && array_process_level == 0 => break,
-                _ => ()
+                b' '
+                    if self.flags & (SINGLE + DOUBLE + METHOD) == 0 && level == 0 && array_level == 0 &&
+                           array_process_level == 0 => break,
+                _ => (),
             }
             self.read += 1;
             self.flags &= 255 ^ (COMM_1 + COMM_2);
         }
 
-        if start == self.read {
-            None
-        } else {
-            Some(&self.data[start..self.read])
-        }
+        if start == self.read { None } else { Some(&self.data[start..self.read]) }
     }
 }
 
@@ -111,14 +108,22 @@ mod tests {
     #[test]
     fn arrays() {
         let input = "echo [ one two @[echo three four] five ] [ six seven ]";
-        let expected = vec!["echo", "[ one two @[echo three four] five ]", "[ six seven ]"];
+        let expected = vec![
+            "echo",
+            "[ one two @[echo three four] five ]",
+            "[ six seven ]",
+        ];
         compare(input, expected);
     }
 
     #[test]
     fn quotes() {
         let input = "echo 'one two \"three four\"' \"five six 'seven eight'\"";
-        let expected = vec!["echo", "'one two \"three four\"'", "\"five six 'seven eight'\""];
+        let expected = vec![
+            "echo",
+            "'one two \"three four\"'",
+            "\"five six 'seven eight'\"",
+        ];
         compare(input, expected);
     }
 }

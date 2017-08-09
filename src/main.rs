@@ -10,34 +10,42 @@ extern crate app_dirs;
 extern crate bitflags;
 extern crate fnv;
 extern crate glob;
-#[macro_use] extern crate lazy_static;
+#[macro_use]
+extern crate lazy_static;
 extern crate liner;
 extern crate smallvec;
 extern crate smallstring;
 extern crate calc;
 extern crate regex;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate libc;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate nix;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate users as users_unix;
-#[cfg(all(unix, not(target_os = "redox")))] extern crate libloading;
-#[cfg(target_os = "redox")] extern crate syscall;
+#[cfg(all(unix, not(target_os = "redox")))]
+extern crate libc;
+#[cfg(all(unix, not(target_os = "redox")))]
+extern crate nix;
+#[cfg(all(unix, not(target_os = "redox")))]
+extern crate users as users_unix;
+#[cfg(all(unix, not(target_os = "redox")))]
+extern crate libloading;
+#[cfg(target_os = "redox")]
+extern crate syscall;
 
 #[cfg(target_os = "redox")]
-#[path="sys/redox.rs"]
+#[path = "sys/redox.rs"]
 mod sys;
 
 #[cfg(unix)]
-#[path="sys/unix.rs"]
+#[path = "sys/unix.rs"]
 mod sys;
 
-#[macro_use] mod types;
-#[macro_use] mod parser;
+#[macro_use]
+mod types;
+#[macro_use]
+mod parser;
 mod builtins;
 mod shell;
 mod ascii_helpers;
 
 use builtins::Builtin;
-use shell::{Shell, Binary, signals};
+use shell::{Binary, Shell, signals};
 use std::sync::atomic::Ordering;
 
 extern "C" fn handler(signal: i32) {

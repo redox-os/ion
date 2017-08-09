@@ -24,4 +24,3 @@ macro_rules! string_function {
 string_function!(starts_with);
 string_function!(ends_with);
 string_function!(contains);
-
