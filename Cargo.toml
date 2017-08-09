@@ -62,6 +62,8 @@ libc = "0.2"
 nix = "0.8"
 # Obtains user directories
 users = "0.5.1"
+# Enables loading plugins
+libloading = "0.4"
 
 [build-dependencies]
 ansi_term = "0.9"

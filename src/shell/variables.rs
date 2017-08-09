@@ -1,12 +1,13 @@
+
+use super::directory_stack::DirectoryStack;
+use super::plugins::namespaces::{self, StringNamespace};
+use super::status::{FAILURE, SUCCESS};
+use app_dirs::{AppDataType, AppInfo, app_root};
 use fnv::FnvHashMap;
+use liner::Context;
 use std::env;
 use std::io::{self, BufRead};
 use std::process;
-
-use super::directory_stack::DirectoryStack;
-use super::status::{FAILURE, SUCCESS};
-use app_dirs::{AppDataType, AppInfo, app_root};
-use liner::Context;
 use types::{Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value, VariableContext};
 
 #[cfg(target_os = "redox")]
@@ -17,6 +18,10 @@ use sys::getpid;
 
 use sys;
 use sys::variables as self_sys;
+
+lazy_static! {
+    static ref STRING_NAMESPACES: FnvHashMap<Identifier, StringNamespace> = namespaces::collect();
+}
 
 #[derive(Debug)]
 pub struct Variables {
@@ -63,12 +68,9 @@ impl Default for Variables {
         );
 
         // Initialize the HOME variable
-        env::home_dir().map_or_else(
-            || env::set_var("HOME", "?"),
-            |path| {
-                env::set_var("HOME", path.to_str().unwrap_or("?"))
-            },
-        );
+        env::home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| {
+            env::set_var("HOME", path.to_str().unwrap_or("?"))
+        });
         Variables {
             hashmaps: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
             arrays: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
@@ -143,12 +145,22 @@ impl Variables {
     pub fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
 
     pub fn get_var(&self, name: &str) -> Option<Value> {
-        if let Some((namespace, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos+2..])) {
-            match namespace {
+        if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
+            match name {
                 "env" => env::var(variable).map(Into::into).ok(),
                 _ => {
-                    eprintln!("ion: unsupported namespace: '{}'", namespace);
-                    None
+                    if let Some(namespace) = STRING_NAMESPACES.get(name.into()) {
+                        match namespace.execute(variable.into()) {
+                            Ok(value) => value.map(Into::into),
+                            Err(why) => {
+                                eprintln!("ion: string namespace erorr: {}: {}", name, why);
+                                None
+                            }
+                        }
+                    } else {
+                        eprintln!("ion: unsupported namespace: '{}'", name);
+                        None
+                    }
                 }
             }
         } else {
@@ -289,9 +301,7 @@ mod tests {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn variable(&self, var: &str, _: bool) -> Option<Value> {
-            self.0.get_var(var)
-        }
+        fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
     }
 
     #[test]

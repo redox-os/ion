@@ -19,6 +19,7 @@ extern crate regex;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate libc;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate nix;
 #[cfg(all(unix, not(target_os = "redox")))] extern crate users as users_unix;
+#[cfg(all(unix, not(target_os = "redox")))] extern crate libloading;
 #[cfg(target_os = "redox")] extern crate syscall;
 
 #[cfg(target_os = "redox")]
