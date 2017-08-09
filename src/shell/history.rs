@@ -1,6 +1,7 @@
-use std::io::{self, Write};
-use super::status::*;
+
 use super::Shell;
+use super::status::*;
+use std::io::{self, Write};
 
 /// Contains all history-related functionality for the `Shell`.
 pub trait ShellHistory {
@@ -23,7 +24,7 @@ pub trait ShellHistory {
 impl<'a> ShellHistory for Shell<'a> {
     fn print_history(&self, _arguments: &[&str]) -> i32 {
         if let Some(context) = self.context.as_ref() {
-            let mut buffer = Vec::with_capacity(8*1024);
+            let mut buffer = Vec::with_capacity(8 * 1024);
             for command in &context.history.buffers {
                 let _ = writeln!(buffer, "{}", command);
             }

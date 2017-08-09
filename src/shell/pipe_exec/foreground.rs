@@ -12,18 +12,18 @@ pub enum BackgroundResult {
 /// structure to notify a background thread that it needs to wait for and return
 /// the exit status back to the `fg` function.
 pub struct ForegroundSignals {
-    grab:    AtomicUsize, // TODO: Use AtomicU32 when stable
-    status:  AtomicUsize, // TODO: Use AtomicU8 when stable
-    reply:   AtomicBool,
+    grab: AtomicUsize, // TODO: Use AtomicU32 when stable
+    status: AtomicUsize, // TODO: Use AtomicU8 when stable
+    reply: AtomicBool,
     errored: AtomicBool, // TODO: Combine with reply when U8 is stable
 }
 
 impl ForegroundSignals {
     pub fn new() -> ForegroundSignals {
         ForegroundSignals {
-            grab:    AtomicUsize::new(0),
-            status:  AtomicUsize::new(0),
-            reply:   AtomicBool::new(false),
+            grab: AtomicUsize::new(0),
+            status: AtomicUsize::new(0),
+            reply: AtomicBool::new(false),
             errored: AtomicBool::new(false),
         }
     }

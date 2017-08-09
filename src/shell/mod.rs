@@ -7,40 +7,40 @@ mod job;
 mod pipe_exec;
 pub mod directory_stack;
 pub mod flags;
-
+pub mod plugins;
 pub mod flow_control;
 pub mod signals;
 pub mod status;
 pub mod variables;
 
-pub use self::pipe_exec::{foreground, job_control};
+pub use self::binary::Binary;
+pub use self::flow::FlowLogic;
 pub use self::history::ShellHistory;
 pub use self::job::{Job, JobKind};
-pub use self::flow::FlowLogic;
-pub use self::binary::Binary;
+pub use self::pipe_exec::{foreground, job_control};
 
-use app_dirs::{AppDataType, AppInfo, app_root};
-use builtins::*;
-use fnv::FnvHashMap;
-use liner::Context;
-use parser::{Expander, ArgumentSplitter, Select};
-use parser::pipelines::Pipeline;
 use self::directory_stack::DirectoryStack;
 use self::flags::*;
 use self::flow_control::{FlowControl, Function, FunctionError, Type};
 use self::foreground::ForegroundSignals;
-use self::job_control::{JobControl, BackgroundProcess};
+use self::job_control::{BackgroundProcess, JobControl};
 use self::pipe_exec::PipelineExecution;
 use self::status::*;
 use self::variables::Variables;
+use app_dirs::{AppDataType, AppInfo, app_root};
+use builtins::*;
+use fnv::FnvHashMap;
+use liner::Context;
+use parser::{ArgumentSplitter, Expander, Select};
+use parser::pipelines::Pipeline;
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
 use std::io::{self, Write};
 use std::ops::Deref;
 use std::process;
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 use types::*;
 
@@ -75,14 +75,12 @@ pub struct Shell<'a> {
     /// Set when a signal is received, this will tell the flow control logic to abort.
     pub break_flow: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified background process.
-    pub foreground_signals: Arc<ForegroundSignals>
+    pub foreground_signals: Arc<ForegroundSignals>,
 }
 
 impl<'a> Shell<'a> {
     /// Panics if DirectoryStack construction fails
-    pub fn new (
-        builtins: &'a FnvHashMap<&'static str, Builtin>
-    ) -> Shell<'a> {
+    pub fn new(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
         Shell {
             builtins: builtins,
             context: None,
@@ -97,7 +95,7 @@ impl<'a> Shell<'a> {
             background: Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
             break_flow: false,
-            foreground_signals: Arc::new(ForegroundSignals::new())
+            foreground_signals: Arc::new(ForegroundSignals::new()),
         }
     }
 
@@ -124,20 +122,29 @@ impl<'a> Shell<'a> {
     fn update_variables(&mut self) {
         // Update the PWD (Present Working Directory) variable if the current working directory has
         // been updated.
-        env::current_dir().ok().map_or_else(|| env::set_var("PWD", "?"), |path| {
-            let pwd = self.variables.get_var_or_empty("PWD");
-            let pwd: &str = &pwd;
-            let current_dir = path.to_str().unwrap_or("?");
-            if pwd != current_dir {
-                env::set_var("OLDPWD", pwd);
-                env::set_var("PWD", current_dir);
-            }
-        })
+        env::current_dir().ok().map_or_else(
+            || env::set_var("PWD", "?"),
+            |path| {
+                let pwd = self.variables.get_var_or_empty("PWD");
+                let pwd: &str = &pwd;
+                let current_dir = path.to_str().unwrap_or("?");
+                if pwd != current_dir {
+                    env::set_var("OLDPWD", pwd);
+                    env::set_var("PWD", current_dir);
+                }
+            },
+        )
     }
 
     /// Evaluates the source init file in the user's home directory.
     pub fn evaluate_init_file(&mut self) {
-        match app_root(AppDataType::UserConfig, &AppInfo{ name: "ion", author: "Redox OS Developers" }) {
+        match app_root(
+            AppDataType::UserConfig,
+            &AppInfo {
+                name: "ion",
+                author: "Redox OS Developers",
+            },
+        ) {
             Ok(mut initrc) => {
                 initrc.push("initrc");
                 if initrc.exists() {
@@ -148,7 +155,7 @@ impl<'a> Shell<'a> {
                         eprintln!("ion: could not create initrc file: {}", why);
                     }
                 }
-            },
+            }
             Err(why) => {
                 eprintln!("ion: unable to get config root: {}", why);
             }
@@ -167,8 +174,10 @@ impl<'a> Shell<'a> {
             if let Some(alias) = {
                 let key: &str = pipeline.jobs[job_no].command.as_ref();
                 self.variables.aliases.get(key)
-            } {
-                let new_args = ArgumentSplitter::new(alias).map(String::from)
+            }
+            {
+                let new_args = ArgumentSplitter::new(alias)
+                    .map(String::from)
                     .chain(pipeline.jobs[job_no].args.drain().skip(1))
                     .collect::<SmallVec<[String; 4]>>();
                 pipeline.jobs[job_no].command = new_args[0].clone().into();
@@ -181,14 +190,15 @@ impl<'a> Shell<'a> {
         let exit_status = if let Some(command) = {
             let key: &str = pipeline.jobs[0].command.as_ref();
             builtins.get(key)
-        } {
+        }
+        {
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
-                if self.flags & PRINT_COMMS != 0 { eprintln!("> {}", pipeline.to_string()); }
+                if self.flags & PRINT_COMMS != 0 {
+                    eprintln!("> {}", pipeline.to_string());
+                }
                 let borrowed = &pipeline.jobs[0].args;
-                let small: SmallVec<[&str; 4]> = borrowed.iter()
-                    .map(|x| x as &str)
-                    .collect();
+                let small: SmallVec<[&str; 4]> = borrowed.iter().map(|x| x as &str).collect();
                 Some((command.main)(&small, self))
             } else {
                 Some(self.execute_pipeline(pipeline))
@@ -203,15 +213,19 @@ impl<'a> Shell<'a> {
                     Err(FunctionError::InvalidArgumentCount) => {
                         eprintln!("ion: invalid number of function arguments supplied");
                         Some(FAILURE)
-                    },
+                    }
                     Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
                         let type_ = match expected_type {
                             Type::Float => "Float",
-                            Type::Int   => "Int",
-                            Type::Bool  => "Bool"
+                            Type::Int => "Int",
+                            Type::Bool => "Bool",
                         };
 
-                        eprintln!("ion: function argument has invalid type: expected {}, found value \'{}\'", type_, value);
+                        eprintln!(
+                            "ion: function argument has invalid type: expected {}, found value \'{}\'",
+                            type_,
+                            value
+                        );
                         Some(FAILURE)
                     }
                 }
@@ -228,8 +242,11 @@ impl<'a> Shell<'a> {
         if let Some(context) = self.context.as_mut() {
             if "1" == self.variables.get_var_or_empty("RECORD_SUMMARY") {
                 if let Ok(elapsed_time) = command_start_time.elapsed() {
-                    let summary = format!("#summary# elapsed real time: {}.{:09} seconds",
-                                        elapsed_time.as_secs(), elapsed_time.subsec_nanos());
+                    let summary = format!(
+                        "#summary# elapsed real time: {}.{:09} seconds",
+                        elapsed_time.as_secs(),
+                        elapsed_time.subsec_nanos()
+                    );
                     context.history.push(summary.into()).unwrap_or_else(|err| {
                         let stderr = io::stderr();
                         let mut stderr = stderr.lock();
@@ -246,14 +263,10 @@ impl<'a> Shell<'a> {
         }
         exit_status
     }
-
-
 }
 
 impl<'a> Expander for Shell<'a> {
     fn tilde(&self, input: &str) -> Option<String> {
-        /// XXX: This is a silly implementation: the `Variables` struct
-        /// should not know nor be responsible for expanding tildes
         self.variables.tilde_expansion(input, &self.directory_stack)
     }
 
@@ -261,54 +274,51 @@ impl<'a> Expander for Shell<'a> {
     fn array(&self, array: &str, selection: Select) -> Option<Array> {
         use std::iter::FromIterator;
         let mut found = match self.variables.get_array(array) {
-            Some(array) => match selection {
-                Select::None  => None,
-                Select::All   => Some(array.clone()),
-                Select::Index(id) => {
-                    id.resolve(array.len())
-                        .and_then(|n| array.get(n))
-                        .map(|x| Array::from_iter(Some(x.to_owned())))
-                },
-                Select::Range(range) => {
-                    if let Some((start, length)) = range.bounds(array.len()) {
-                        let array = array.iter()
-                            .skip(start)
-                            .take(length)
-                            .map(|x| x.to_owned())
-                            .collect::<Array>();
-                        if array.is_empty() {
-                            None
-                        } else {
-                            Some(array)
-                        }
-                    } else {
-                        None
+            Some(array) => {
+                match selection {
+                    Select::None => None,
+                    Select::All => Some(array.clone()),
+                    Select::Index(id) => {
+                        id.resolve(array.len()).and_then(|n| array.get(n)).map(
+                            |x| {
+                                Array::from_iter(Some(x.to_owned()))
+                            },
+                        )
                     }
-                },
-                Select::Key(_) => {
-                    None
+                    Select::Range(range) => {
+                        if let Some((start, length)) = range.bounds(array.len()) {
+                            let array = array
+                                .iter()
+                                .skip(start)
+                                .take(length)
+                                .map(|x| x.to_owned())
+                                .collect::<Array>();
+                            if array.is_empty() { None } else { Some(array) }
+                        } else {
+                            None
+                        }
+                    }
+                    Select::Key(_) => None,
                 }
-            },
-            None => None
+            }
+            None => None,
         };
         if found.is_none() {
             found = match self.variables.get_map(array) {
-                Some(map) => match selection {
-                    Select::All => {
-                        let mut arr = Array::new();
-                        for (_, value) in map {
-                            arr.push(value.clone());
+                Some(map) => {
+                    match selection {
+                        Select::All => {
+                            let mut arr = Array::new();
+                            for (_, value) in map {
+                                arr.push(value.clone());
+                            }
+                            Some(arr)
                         }
-                        Some(arr)
+                        Select::Key(ref key) => Some(array![map.get(key.get()).unwrap_or(&"".into()).clone()]),
+                        _ => None,
                     }
-                    Select::Key(ref key) => {
-                        Some(array![
-                            map.get(key.get()).unwrap_or(&"".into()).clone()
-                        ])
-                    },
-                    _ => None
-                },
-                None => None
+                }
+                None => None,
             }
         }
         found
@@ -319,14 +329,13 @@ impl<'a> Expander for Shell<'a> {
         if quoted {
             self.variables.get_var(variable)
         } else {
-            self.variables.get_var(variable)
-                .map(|x| x.ascii_replace('\n', ' ').into())
+            self.variables.get_var(variable).map(|x| {
+                x.ascii_replace('\n', ' ').into()
+            })
         }
     }
     /// Expand a subshell expression
     fn command(&self, command: &str) -> Option<Value> {
-        /// XXX: This is a silly implementation: the `Variables` struct
-        /// should not know nor be responsible for expanding a subshell
         self.variables.command_expansion(command)
     }
 }

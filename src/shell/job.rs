@@ -1,15 +1,22 @@
 use std::fs::File;
-use std::process::{Command, Stdio};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::process::{Command, Stdio};
 
 //use glob::glob;
-use parser::{expand_string, Expander};
+
+use parser::{Expander, expand_string};
 use parser::pipelines::RedirectFrom;
 use smallstring::SmallString;
 use types::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum JobKind { And, Background, Last, Or, Pipe(RedirectFrom) }
+pub enum JobKind {
+    And,
+    Background,
+    Last,
+    Or,
+    Pipe(RedirectFrom),
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Job {
@@ -21,7 +28,11 @@ pub struct Job {
 impl Job {
     pub fn new(args: Array, kind: JobKind) -> Self {
         let command = SmallString::from_str(&args[0]);
-        Job { command, args, kind }
+        Job {
+            command,
+            args,
+            kind,
+        }
     }
 
     /// Takes the current job's arguments and expands them, one argument at a
@@ -31,15 +42,10 @@ impl Job {
         expanded.grow(self.args.len());
         expanded.extend(self.args.drain().flat_map(|arg| {
             let res = expand_string(&arg, expanders, false);
-            if res.is_empty() {
-                array![""]
-            } else {
-                res
-            }
+            if res.is_empty() { array![""] } else { res }
         }));
         self.args = expanded;
     }
-
 }
 
 /// This represents a job that has been processed and expanded to be run
@@ -72,7 +78,7 @@ pub enum RefinedJob {
         stdout: Option<File>,
         /// A file corresponding to the standard error for this builtin
         stderr: Option<File>,
-    }
+    },
 }
 
 macro_rules! set_field {
@@ -97,7 +103,7 @@ impl RefinedJob {
             args,
             stdin: None,
             stdout: None,
-            stderr: None
+            stderr: None,
         }
     }
 
@@ -107,7 +113,7 @@ impl RefinedJob {
             args,
             stdin: None,
             stdout: None,
-            stderr: None
+            stderr: None,
         }
     }
 
@@ -128,11 +134,14 @@ impl RefinedJob {
     pub fn short(&self) -> String {
         match *self {
             RefinedJob::External(ref cmd) => {
-                format!("{:?}", cmd).split('"').nth(1).unwrap_or("").to_string()
-            },
-            RefinedJob::Builtin { ref name, .. } | RefinedJob::Function { ref name, .. } => {
-                name.to_string()
+                format!("{:?}", cmd)
+                    .split('"')
+                    .nth(1)
+                    .unwrap_or("")
+                    .to_string()
             }
+            RefinedJob::Builtin { ref name, .. } |
+            RefinedJob::Function { ref name, .. } => name.to_string(),
         }
     }
 
@@ -143,23 +152,21 @@ impl RefinedJob {
                 let command = format!("{:?}", cmd);
                 let mut arg_iter = command.split_whitespace();
                 let command = arg_iter.next().unwrap();
-                let mut output = String::from(&command[1..command.len()-1]);
+                let mut output = String::from(&command[1..command.len() - 1]);
                 for argument in arg_iter {
                     output.push(' ');
                     if argument.len() > 2 {
-                        output.push_str(&argument[1..argument.len()-1]);
+                        output.push_str(&argument[1..argument.len() - 1]);
                     } else {
                         output.push_str(&argument);
                     }
                 }
                 output
-            },
-            RefinedJob::Builtin { ref args, .. } | RefinedJob::Function { ref args, .. } => {
-                format!("{}", args.join(" "))
             }
+            RefinedJob::Builtin { ref args, .. } |
+            RefinedJob::Function { ref args, .. } => format!("{}", args.join(" ")),
         }
     }
-
 }
 
 #[cfg(test)]

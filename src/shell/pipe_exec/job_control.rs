@@ -59,26 +59,25 @@ pub fn add_to_background(
     command: String,
 ) -> u32 {
     let mut processes = processes.lock().unwrap();
-    match (*processes)
-        .iter()
-        .position(|x| x.state == ProcessState::Empty)
-    {
+    match (*processes).iter().position(
+        |x| x.state == ProcessState::Empty,
+    ) {
         Some(id) => {
             (*processes)[id] = BackgroundProcess {
-                pid:           pid,
+                pid: pid,
                 ignore_sighup: false,
-                state:         state,
-                name:          command,
+                state: state,
+                name: command,
             };
             id as u32
         }
         None => {
             let njobs = (*processes).len();
             (*processes).push(BackgroundProcess {
-                pid:           pid,
+                pid: pid,
                 ignore_sighup: false,
-                state:         state,
-                name:          command,
+                state: state,
+                name: command,
             });
             njobs as u32
         }
@@ -91,10 +90,10 @@ pub fn add_to_background(
 /// as the process ID, state that the process is in, and the command that the
 /// process is executing.
 pub struct BackgroundProcess {
-    pub pid:           u32,
+    pub pid: u32,
     pub ignore_sighup: bool,
-    pub state:         ProcessState,
-    pub name:          String,
+    pub state: ProcessState,
+    pub name: String,
 }
 
 impl<'a> JobControl for Shell<'a> {

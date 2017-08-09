@@ -11,18 +11,18 @@ use self::fork::{create_process_group, fork_pipe};
 use self::job_control::JobControl;
 use super::{JobKind, Shell};
 use super::flags::*;
+use super::flow_control::{FunctionError, Type};
 use super::job::RefinedJob;
 use super::signals::{self, SignalHandler};
 use super::status::*;
-use super::flow_control::{FunctionError, Type};
-use parser::pipelines::{Input, Pipeline, Redirection, RedirectFrom};
+use parser::pipelines::{Input, Pipeline, RedirectFrom, Redirection};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Error, Write};
 use std::iter;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
-use std::process::{exit, Command};
+use std::process::{Command, exit};
 use sys;
 
 /// Use dup2 to replace `old` with `new` using `old`s file descriptor ID
@@ -73,8 +73,7 @@ fn gen_background_string(pipeline: &Pipeline, print_comm: bool) -> Option<String
 /// directory path.
 #[inline(always)]
 fn is_implicit_cd(argument: &str) -> bool {
-    (argument.starts_with('.') || argument.starts_with('/') || argument.ends_with('/')) &&
-        Path::new(argument).is_dir()
+    (argument.starts_with('.') || argument.starts_with('/') || argument.ends_with('/')) && Path::new(argument).is_dir()
 }
 
 /// This function is to be executed when a stdin value is supplied to a pipeline job.
@@ -84,29 +83,33 @@ fn is_implicit_cd(argument: &str) -> bool {
 /// the input error occurred.
 fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
     match input {
-        Input::File(ref filename) => if let Some(command) = piped_commands.first_mut() {
-            match File::open(filename) {
-                Ok(file) => command.0.stdin(file),
-                Err(e) => {
-                    eprintln!("ion: failed to redirect '{}' into stdin: {}", filename, e);
-                    return true;
-                },
-            }
-        },
-        Input::HereString(ref mut string) => if let Some(command) = piped_commands.first_mut() {
-            if !string.ends_with('\n') {
-                string.push('\n');
-            }
-            match unsafe { stdin_of(&string) } {
-                Ok(stdio) => {
-                    command.0.stdin(unsafe { File::from_raw_fd(stdio) });
-                }
-                Err(e) => {
-                    eprintln!("ion: failed to redirect herestring '{}' into stdin: {}", string, e);
-                    return true;
+        Input::File(ref filename) => {
+            if let Some(command) = piped_commands.first_mut() {
+                match File::open(filename) {
+                    Ok(file) => command.0.stdin(file),
+                    Err(e) => {
+                        eprintln!("ion: failed to redirect '{}' into stdin: {}", filename, e);
+                        return true;
+                    }
                 }
             }
-        },
+        }
+        Input::HereString(ref mut string) => {
+            if let Some(command) = piped_commands.first_mut() {
+                if !string.ends_with('\n') {
+                    string.push('\n');
+                }
+                match unsafe { stdin_of(&string) } {
+                    Ok(stdio) => {
+                        command.0.stdin(unsafe { File::from_raw_fd(stdio) });
+                    }
+                    Err(e) => {
+                        eprintln!("ion: failed to redirect herestring '{}' into stdin: {}", string, e);
+                        return true;
+                    }
+                }
+            }
+        }
     }
     false
 }
@@ -127,20 +130,24 @@ fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, Jo
             File::create(&stdout.file)
         };
         match file {
-            Ok(f) => match stdout.from {
-                RedirectFrom::Both => match f.try_clone() {
-                    Ok(f_copy) => {
-                        command.0.stdout(f);
-                        command.0.stderr(f_copy);
+            Ok(f) => {
+                match stdout.from {
+                    RedirectFrom::Both => {
+                        match f.try_clone() {
+                            Ok(f_copy) => {
+                                command.0.stdout(f);
+                                command.0.stderr(f_copy);
+                            }
+                            Err(e) => {
+                                eprintln!("ion: failed to redirect both stderr and stdout into file '{:?}': {}", f, e);
+                                return true;
+                            }
+                        }
                     }
-                    Err(e) => {
-                        eprintln!("ion: failed to redirect both stderr and stdout into file '{:?}': {}", f, e);
-                        return true;
-                    }
-                },
-                RedirectFrom::Stderr => command.0.stderr(f),
-                RedirectFrom::Stdout => command.0.stdout(f),
-            },
+                    RedirectFrom::Stderr => command.0.stderr(f),
+                    RedirectFrom::Stdout => command.0.stdout(f),
+                }
+            }
             Err(err) => {
                 let stderr = io::stderr();
                 let mut stderr = stderr.lock();
@@ -224,11 +231,15 @@ impl<'a> PipelineExecution for Shell<'a> {
         let mut piped_commands = self.generate_commands(pipeline);
         // Redirect the inputs if a custom redirect value was given.
         if let Some(stdin) = pipeline.stdin.take() {
-            if redirect_input(stdin, &mut piped_commands) { return COULD_NOT_EXEC; }
+            if redirect_input(stdin, &mut piped_commands) {
+                return COULD_NOT_EXEC;
+            }
         }
         // Redirect the outputs if a custom redirect value was given.
         if let Some(stdout) = pipeline.stdout.take() {
-            if redirect_output(stdout, &mut piped_commands) { return COULD_NOT_EXEC; }
+            if redirect_output(stdout, &mut piped_commands) {
+                return COULD_NOT_EXEC;
+            }
         }
         // If the given pipeline is a background task, fork the shell.
         if let Some(command_name) = possible_background_name {
@@ -287,46 +298,45 @@ impl<'a> PipelineExecution for Shell<'a> {
         let last_pid = children[children.len() - 1];
 
         // Watch the foreground group, dropping all commands that exit as they exit.
-        self.watch_foreground(
-            pgid,
-            last_pid,
-            move || as_string,
-            move |pid| if let Some(id) = children.iter().position(|&x| x as i32 == pid) {
-                commands.remove(id);
-                children.remove(id);
-            },
-        )
+        self.watch_foreground(pgid, last_pid, move || as_string, move |pid| if let Some(id) =
+            children.iter().position(|&x| x as i32 == pid)
+        {
+            commands.remove(id);
+            children.remove(id);
+        })
     }
 
     fn exec_job(&mut self, job: &mut RefinedJob, foreground: bool) -> i32 {
         let short = job.short();
         let long = job.long();
         match *job {
-            RefinedJob::External(ref mut command) => match {
-                command
-                    .before_exec(move || {
-                        signals::unblock();
-                        create_process_group(0);
-                        Ok(())
-                    })
-                    .spawn()
-            } {
-                Ok(child) => {
-                    if foreground {
-                        let _ = sys::tcsetpgrp(0, child.id());
+            RefinedJob::External(ref mut command) => {
+                match {
+                    command
+                        .before_exec(move || {
+                            signals::unblock();
+                            create_process_group(0);
+                            Ok(())
+                        })
+                        .spawn()
+                } {
+                    Ok(child) => {
+                        if foreground {
+                            let _ = sys::tcsetpgrp(0, child.id());
+                        }
+                        self.watch_foreground(child.id(), child.id(), move || long, |_| ())
                     }
-                    self.watch_foreground(child.id(), child.id(), move || long, |_| ())
-                }
-                Err(e) => {
-                    if e.kind() == io::ErrorKind::NotFound {
-                        eprintln!("ion: command not found: {}", short);
-                        NO_SUCH_COMMAND
-                    } else {
-                        eprintln!("ion: error spawning process: {}", e);
-                        COULD_NOT_EXEC
+                    Err(e) => {
+                        if e.kind() == io::ErrorKind::NotFound {
+                            eprintln!("ion: command not found: {}", short);
+                            NO_SUCH_COMMAND
+                        } else {
+                            eprintln!("ion: error spawning process: {}", e);
+                            COULD_NOT_EXEC
+                        }
                     }
                 }
-            },
+            }
             RefinedJob::Builtin {
                 ref name,
                 ref args,
@@ -350,7 +360,7 @@ impl<'a> PipelineExecution for Shell<'a> {
                 }
                 eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", long);
                 COULD_NOT_EXEC
-            },
+            }
             RefinedJob::Function {
                 ref name,
                 ref args,
@@ -425,15 +435,19 @@ impl<'a> PipelineExecution for Shell<'a> {
             Err(FunctionError::InvalidArgumentCount) => {
                 eprintln!("ion: invalid number of function arguments supplied");
                 FAILURE
-            },
+            }
             Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
                 let type_ = match expected_type {
                     Type::Float => "Float",
-                    Type::Int   => "Int",
-                    Type::Bool  => "Bool"
+                    Type::Int => "Int",
+                    Type::Bool => "Bool",
                 };
 
-                eprintln!("ion: function argument has invalid type: expected {}, found value \'{}\'", type_, value);
+                eprintln!(
+                    "ion: function argument has invalid type: expected {}, found value \'{}\'",
+                    type_,
+                    value
+                );
                 FAILURE
             }
         }
@@ -458,18 +472,22 @@ pub fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground:
         if let Some((mut parent, mut kind)) = commands.next() {
             // When an `&&` or `||` operator is utilized, execute commands based on the previous status.
             match previous_kind {
-                JobKind::And => if previous_status != SUCCESS {
-                    if let JobKind::Or = kind {
-                        previous_kind = kind
+                JobKind::And => {
+                    if previous_status != SUCCESS {
+                        if let JobKind::Or = kind {
+                            previous_kind = kind
+                        }
+                        continue;
                     }
-                    continue;
-                },
-                JobKind::Or => if previous_status == SUCCESS {
-                    if let JobKind::And = kind {
-                        previous_kind = kind
+                }
+                JobKind::Or => {
+                    if previous_status == SUCCESS {
+                        if let JobKind::And = kind {
+                            previous_kind = kind
+                        }
+                        continue;
                     }
-                    continue;
-                },
+                }
                 _ => (),
             }
 

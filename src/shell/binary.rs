@@ -1,21 +1,21 @@
 //! Contains the binary logic of Ion.
 
-use liner::{BasicCompleter, Buffer, Context, Event, EventKind, CursorPosition};
+use super::{DirectoryStack, FlowLogic, JobControl, Shell, ShellHistory, Variables};
+use super::completer::*;
+use super::flow_control::Statement;
+use super::status::*;
+use liner::{BasicCompleter, Buffer, Context, CursorPosition, Event, EventKind};
 use parser::*;
 use parser::QuoteTerminator;
 use smallstring::SmallString;
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
-use std::io::{self, Write, Read, ErrorKind};
+use std::io::{self, ErrorKind, Read, Write};
 use std::iter::{self, FromIterator};
 use std::mem;
 use std::path::{Path, PathBuf};
 use sys;
-use super::completer::*;
-use super::flow_control::Statement;
-use super::status::*;
-use super::{Shell, FlowLogic, JobControl, ShellHistory, Variables, DirectoryStack};
 use types::*;
 
 pub trait Binary {
@@ -65,37 +65,42 @@ impl<'a> Binary for Shell<'a> {
 
             loop {
                 let prompt = self.prompt();
-                let line = self.context.as_mut().unwrap().read_line(prompt, &mut move |Event { editor, kind }| {
-                    if let EventKind::BeforeComplete = kind {
-                        let (words, pos) = editor.get_words_and_cursor_position();
+                let line = self.context.as_mut().unwrap().read_line(
+                    prompt,
+                    &mut move |Event {
+                                   editor,
+                                   kind,
+                               }| {
+                        if let EventKind::BeforeComplete = kind {
+                            let (words, pos) = editor.get_words_and_cursor_position();
 
-                        let filename = match pos {
-                            CursorPosition::InWord(index) => index > 0,
-                            CursorPosition::InSpace(Some(_), _) => true,
-                            CursorPosition::InSpace(None, _) => false,
-                            CursorPosition::OnWordLeftEdge(index) => index >= 1,
-                            CursorPosition::OnWordRightEdge(index) => {
-                                match (words.into_iter().nth(index), env::current_dir()) {
-                                    (Some((start, end)), Ok(file)) => {
-                                        let filename = editor.current_buffer().range(start, end);
-                                        complete_as_file(file, filename, index)
-                                    },
-                                    _ => false,
+                            let filename = match pos {
+                                CursorPosition::InWord(index) => index > 0,
+                                CursorPosition::InSpace(Some(_), _) => true,
+                                CursorPosition::InSpace(None, _) => false,
+                                CursorPosition::OnWordLeftEdge(index) => index >= 1,
+                                CursorPosition::OnWordRightEdge(index) => {
+                                    match (words.into_iter().nth(index), env::current_dir()) {
+                                        (Some((start, end)), Ok(file)) => {
+                                            let filename = editor.current_buffer().range(start, end);
+                                            complete_as_file(file, filename, index)
+                                        }
+                                        _ => false,
+                                    }
                                 }
-                            }
-                        };
+                            };
 
-                        if filename {
-                            if let Ok(current_dir) = env::current_dir() {
-                                if let Some(url) = current_dir.to_str() {
-                                    let completer = IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr);
-                                    mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                            if filename {
+                                if let Ok(current_dir) = env::current_dir() {
+                                    if let Some(url) = current_dir.to_str() {
+                                        let completer = IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr);
+                                        mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                                    }
                                 }
-                            }
-                        } else {
-                            // Creates a list of definitions from the shell environment that will be used
-                            // in the creation of a custom completer.
-                            let words = builtins.iter()
+                            } else {
+                                // Creates a list of definitions from the shell environment that will be used
+                                // in the creation of a custom completer.
+                                let words = builtins.iter()
                                 // Add built-in commands to the completer's definitions.
                                 .map(|(&s, _)| Identifier::from(s))
                                 // Add the history list to the completer's definitions.
@@ -110,34 +115,35 @@ impl<'a> Binary for Shell<'a> {
                                 .chain(vars.get_vars().into_iter().map(|s| ["$", &s].concat().into()))
                                 .collect();
 
-                            // Initialize a new completer from the definitions collected.
-                            let custom_completer = BasicCompleter::new(words);
+                                // Initialize a new completer from the definitions collected.
+                                let custom_completer = BasicCompleter::new(words);
 
-                            // Creates completers containing definitions from all directories listed
-                            // in the environment's **$PATH** variable.
-                            let mut file_completers = if let Ok(val) = env::var("PATH") {
-                                val.split(sys::PATH_SEPARATOR)
-                                    .map(|s| IonFileCompleter::new(Some(s), dirs_ptr, vars_ptr))
-                                    .collect()
-                            } else {
-                                vec![IonFileCompleter::new(Some("/bin/"), dirs_ptr, vars_ptr)]
-                            };
+                                // Creates completers containing definitions from all directories listed
+                                // in the environment's **$PATH** variable.
+                                let mut file_completers = if let Ok(val) = env::var("PATH") {
+                                    val.split(sys::PATH_SEPARATOR)
+                                        .map(|s| IonFileCompleter::new(Some(s), dirs_ptr, vars_ptr))
+                                        .collect()
+                                } else {
+                                    vec![IonFileCompleter::new(Some("/bin/"), dirs_ptr, vars_ptr)]
+                                };
 
-                            // Also add files/directories in the current directory to the completion list.
-                            if let Ok(current_dir) = env::current_dir() {
-                                if let Some(url) = current_dir.to_str() {
-                                    file_completers.push(IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr));
+                                // Also add files/directories in the current directory to the completion list.
+                                if let Ok(current_dir) = env::current_dir() {
+                                    if let Some(url) = current_dir.to_str() {
+                                        file_completers.push(IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr));
+                                    }
                                 }
+
+                                // Merge the collected definitions with the file path definitions.
+                                let completer = MultiCompleter::new(file_completers, custom_completer);
+
+                                // Replace the shell's current completer with the newly-created completer.
+                                mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                             }
-
-                            // Merge the collected definitions with the file path definitions.
-                            let completer = MultiCompleter::new(file_completers, custom_completer);
-
-                            // Replace the shell's current completer with the newly-created completer.
-                            mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                         }
-                    }
-                });
+                    },
+                );
 
                 match line {
                     Ok(line) => return Some(line),
@@ -149,7 +155,7 @@ impl<'a> Binary for Shell<'a> {
                         let stderr = io::stderr();
                         let mut stderr = stderr.lock();
                         let _ = writeln!(stderr, "ion: liner: {}", err);
-                        return None
+                        return None;
                     }
                 }
             }
@@ -166,7 +172,7 @@ impl<'a> Binary for Shell<'a> {
                 loop {
                     if let Some(command) = lines.next() {
                         buffer.append(command);
-                        break
+                        break;
                     } else {
                         let stderr = io::stderr();
                         let _ = writeln!(stderr.lock(), "ion: unterminated quote in script");
@@ -179,8 +185,10 @@ impl<'a> Binary for Shell<'a> {
         // The flow control level being non zero means that we have a statement that has
         // only been partially parsed.
         if self.flow_control.level != 0 {
-            eprintln!("ion: unexpected end of script: expected end block for `{}`",
-                self.flow_control.current_statement.short());
+            eprintln!(
+                "ion: unexpected end of script: expected end block for `{}`",
+                self.flow_control.current_statement.short()
+            );
         }
     }
 
@@ -191,7 +199,7 @@ impl<'a> Binary for Shell<'a> {
             loop {
                 if let Some(command) = self.readln() {
                     buffer.append(command);
-                    break
+                    break;
                 } else {
                     return Err(());
                 }
@@ -225,7 +233,9 @@ impl<'a> Binary for Shell<'a> {
             let mut context = Context::new();
             context.word_divider_fn = Box::new(word_divide);
             if "1" == self.variables.get_var_or_empty("HISTFILE_ENABLED") {
-                let path = self.variables.get_var("HISTFILE").expect("shell didn't set HISTFILE");
+                let path = self.variables.get_var("HISTFILE").expect(
+                    "shell didn't set HISTFILE",
+                );
                 context.history.set_file_name(Some(path.clone()));
                 if !Path::new(path.as_str()).exists() {
                     eprintln!("ion: creating history file at \"{}\"", path);
@@ -240,7 +250,7 @@ impl<'a> Binary for Shell<'a> {
                     Err(ref err) if err.kind() == ErrorKind::NotFound => {
                         let history_filename = self.variables.get_var_or_empty("HISTFILE");
                         eprintln!("ion: failed to find history file {}: {}", history_filename, err);
-                    },
+                    }
                     Err(err) => {
                         eprintln!("ion: failed to load history: {}", err);
                     }
@@ -251,14 +261,15 @@ impl<'a> Binary for Shell<'a> {
 
         self.evaluate_init_file();
 
-        self.variables.set_array (
+        self.variables.set_array(
             "args",
-            iter::once(env::args().next().unwrap()).collect(),
+            iter::once(env::args().next().unwrap())
+                .collect(),
         );
 
         loop {
             if let Some(command) = self.readln() {
-                if ! command.is_empty() {
+                if !command.is_empty() {
                     if let Ok(command) = self.terminate_quotes(command) {
                         // Parse and potentially execute the command.
                         self.on_command(command.trim());
@@ -293,10 +304,10 @@ impl<'a> Binary for Shell<'a> {
             if path == "-c" {
                 self.execute_arguments(args);
             } else {
-                let mut array = SmallVec::from_iter(
-                    Some(path.clone().into())
-                );
-                for arg in args { array.push(arg.into()); }
+                let mut array = SmallVec::from_iter(Some(path.clone().into()));
+                for arg in args {
+                    array.push(arg.into());
+                }
                 self.variables.set_array("args", array);
                 self.execute_script(&path);
             }
@@ -323,7 +334,7 @@ impl<'a> Binary for Shell<'a> {
                         let _ = writeln!(stderr, "ion: failed to read {:?}: {}", path, err);
                     }
                 }
-            },
+            }
             Err(err) => {
                 let stderr = io::stderr();
                 let mut stderr = stderr.lock();
@@ -372,22 +383,32 @@ fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
 }
 
 /// Infer if the given filename is actually a partial filename
-fn complete_as_file(current_dir : PathBuf, filename : String, index : usize) -> bool {
+fn complete_as_file(current_dir: PathBuf, filename: String, index: usize) -> bool {
     let filename = filename.trim();
     let mut file = current_dir.clone();
     file.push(&filename);
     // If the user explicitly requests a file through this syntax then complete as a file
-    if filename.trim().starts_with(".") { return true; }
+    if filename.trim().starts_with(".") {
+        return true;
+    }
     // If the file starts with a dollar sign, it's a variable, not a file
-    if filename.trim().starts_with("$") { return false; }
+    if filename.trim().starts_with("$") {
+        return false;
+    }
     // Once we are beyond the first string, assume its a file
-    if index > 0 { return true; }
+    if index > 0 {
+        return true;
+    }
     // If we are referencing a file that exists then just complete to that file
-    if file.exists() { return true; }
+    if file.exists() {
+        return true;
+    }
     // If we have a partial file inside an existing directory, e.g. /foo/b when /foo/bar
     // exists, then treat it as file as long as `foo` isn't the current directory, otherwise
     // this would apply to any string `foo`
-    if let Some(parent) = file.parent() { return parent.exists() && parent != current_dir; }
+    if let Some(parent) = file.parent() {
+        return parent.exists() && parent != current_dir;
+    }
     // By default assume its not a file
     false
 }
