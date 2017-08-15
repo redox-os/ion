@@ -6,5 +6,6 @@ determined by various control flow keywords, such as `if`, `while`, `for`, `brea
 differences, such as that all blocks are ended with the `end` keyword; and the `do`/`then`
 keywords aren't necessary.
 
-- [Conditionals](flow/conditionals.html)
-- [Loops](flow/loops.html)
+- [Conditionals](ch07-01-conditionals.html)
+- [Loops](ch07-02-loops.html)
+- [Matches](ch07-03-matches.html)
