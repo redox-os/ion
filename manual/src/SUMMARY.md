@@ -11,9 +11,10 @@
     - [Quoting Rules](ch03-03-quotation.md)
     - [Multi-line Arguments](ch03-04-multiargs.md)
     - [Multi-line Comments](ch03-05-multicomments.md)
+    - [General Tips](ch03-06-general.md)
 
 - [Variable Assignments](ch04-00-variables.md)
-        
+
     - [String Variables](ch04-01-strings.md)
     - [Tuple Variables](ch04-02-tuples.md)
     - [Array Variables](ch04-03-arrays.md)
@@ -21,16 +22,16 @@
     - [Exporting Variables](ch04-05-exporting.md)
 
 - [Expansions](ch05-00-expansions.md)
-    
+
     - [Variable Expansions](ch05-01-variable.md)
     - [Process Expansions](ch05-02-process.md)
     - [Brace Expansions](ch05-03-brace.md)
     - [Arithmetic Expansions](ch05-04-arithmetic.md)
-    - [Method Expansions](ch05-05-methods.md)
+    - [Method Expansions](ch05-05-method.md)
 
 - [Slicing Syntax](ch06-00-slicing.md)
 
-- [Control Flow](ch07-00-index.md)
+- [Control Flow](ch07-00-flow.md)
 
     - [Conditionals](ch07-01-conditionals.md)
     - [Loops](ch07-02-loops.md)
