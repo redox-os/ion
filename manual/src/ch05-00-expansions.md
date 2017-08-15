@@ -6,8 +6,8 @@ their own variant of process expansions (**@()**) which splits outputs by whites
 arithmetic logic is more feature-complete, supports floating-point math, and handles larger
 numbers; and Ion supports methods in the same manner as the [Oil shell](http://www.oilshell.org/).
 
-- [Variable Expansions](expansions/variable.html)
-- [Process Expansions](expansions/process.html)
-- [Brace Expansions](expansions/brace.html)
-- [Arithmetic Expansions](expansions/arithmetic.html)
-- [Method Expansions](expansions/methods.html)
+- [Variable Expansions](ch05-01-variable.html)
+- [Process Expansions](ch05-02-process.html)
+- [Brace Expansions](ch05-03-brace.html)
+- [Arithmetic Expansions](ch05-04-arithmetic.html)
+- [Method Expansions](ch05-05-method.html)

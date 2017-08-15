@@ -70,7 +70,7 @@ open an issue on the project's GitHub.
 
 Small features that don't belong in any specific category.
 
-[Miscellanious Features](miscellanious.html)
+[Miscellanious Features](ch03-00-miscellaneous.html)
 
 
 ## Shell Expansions / Substitutions
@@ -81,11 +81,12 @@ their own variant of process expansions (**@()**) which splits outputs by whites
 arithmetic logic is more feature-complete, supports floating-point math, and handles larger
 numbers; and Ion supports methods in the same manner as the [Oil shell](http://www.oilshell.org/).
 
-- [Variable Expansions](expansions/variable.html)
-- [Process Expansions](expansions/process.html)
-- [Brace Expansions](expansions/brace.html)
-- [Arithmetic Expansions](expansions/arithmetic.html)
-- [Method Expansions](expansions/methods.html)
+[Expansions](ch05-00-expansions.html)
+- [Variable Expansions](ch05-01-variable.html)
+- [Process Expansions](ch05-02-process.html)
+- [Brace Expansions](ch05-03-brace.html)
+- [Arithmetic Expansions](ch05-04-arithmetic.html)
+- [Method Expansions](ch05-05-method.html)
 
 ## Slicing Syntax
 
@@ -95,7 +96,7 @@ expanded value is an index, inclusive range, or exclusive range. This eliminates
 for temporarily storing and/or piping values to other commands, instead performing the slicing at
 parse-time.
 
-[Slicing Syntax](slicing.html)
+[Slicing Syntax](ch06-00-slicing.html)
 
 ## Control Flow
 
@@ -105,6 +106,7 @@ determined by various control flow keywords, such as `if`, `while`, `for`, `brea
 differences, such as that all blocks are ended with the `end` keyword; and the `do`/`then`
 keywords aren't necessary.
 
-[Control Flow](flow/index.html)
-- [Conditionals](flow/conditionals.html)
-- [Loops](flow/loops.html)
+[Control Flow](ch07-00-flow.html)
+- [Conditionals](ch07-01-conditionals.html)
+- [Loops](ch07-02-loops.html)
+- [Matches](ch07-03-matches.html)
