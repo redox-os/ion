@@ -1,5 +1,5 @@
 use types::Identifier;
-use super::NamespaceError;
+use super::super::StringError;
 
 pub struct StringNamespace {}
 

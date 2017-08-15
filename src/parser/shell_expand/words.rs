@@ -9,9 +9,15 @@ use super::{is_expression, slice};
 use super::ranges::parse_index_range;
 use super::super::ArgumentSplitter;
 use super::unicode_segmentation::UnicodeSegmentation;
+use shell::plugins::StringError;
+use shell::plugins::methods::{self, StringMethodPlugins, MethodArguments};
 
 use std::path::Path;
 use types::Array;
+
+lazy_static! {
+    static ref STRING_METHODS: StringMethodPlugins = methods::collect();
+}
 
 // Bit Twiddling Guide:
 // var & FLAG != 0 checks if FLAG is enabled
@@ -599,14 +605,8 @@ impl<'a> StringMethod<'a> {
             }
             "len" => {
                 if variable.starts_with('@') || variable.starts_with('[') {
-                    if let Some(array) = expand.variable(variable, false) {
-                        output.push_str(&array.len().to_string())
-                    } else if is_expression(variable) {
-                        let expanded = expand_string(variable, expand, false);
-                        output.push_str(&expanded.len().to_string());
-                    } else {
-                        output.push_str("0")
-                    }
+                    let expanded = expand_string(variable, expand, false);
+                    output.push_str(&expanded.len().to_string());
                 } else if let Some(value) = expand.variable(variable, false) {
                     let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
                     output.push_str(&count.to_string());
@@ -634,8 +634,42 @@ impl<'a> StringMethod<'a> {
                     output.push_str(rev_graphs.collect::<String>().as_str());
                 }
             }
-            _ => {
-                eprintln!("ion: unknown string method: {}", self.method);
+            method @ _ => {
+                let pattern = ArgumentSplitter::new(self.pattern)
+                    .flat_map(|arg| expand_string(&arg, expand, false))
+                    .collect::<_>();
+                let args = if variable.starts_with('@') || variable.starts_with('[') {
+                    MethodArguments::Array(
+                        expand_string(variable, expand, false).into_vec(),
+                        pattern
+                    )
+                } else if let Some(value) = expand.variable(variable, false) {
+                    MethodArguments::StringArg(
+                        value,
+                        pattern
+                    )
+                } else if is_expression(variable) {
+                    let expanded = expand_string(variable, expand, false);
+                    match expanded.len() {
+                        0 => MethodArguments::NoArgs,
+                        1 => MethodArguments::StringArg(
+                            expanded[0].clone(),
+                            pattern
+                        ),
+                        _ => MethodArguments::Array(
+                            expanded.into_vec(),
+                            pattern
+                        )
+                    }
+                } else {
+                    MethodArguments::NoArgs
+                };
+
+                match STRING_METHODS.execute(method, args) {
+                    Ok(Some(string)) => output.push_str(&string),
+                    Ok(None) => (),
+                    Err(why) => eprintln!("ion: method plugin: {}", why)
+                }
             }
         }
     }

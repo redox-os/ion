@@ -4,31 +4,110 @@ use libloading::{Library, Symbol};
 use libloading::os::unix::Symbol as RawSymbol;
 use std::ffi::CString;
 use std::fs::read_dir;
+use std::mem::forget;
+use std::ptr;
 use std::slice;
 use std::str;
 use types::Identifier;
 
-/// A dynamically-loaded string namespace from an external library.
+/// Either one or the other will be set. Optional status can be conveyed by setting the
+/// corresponding field to `NULL`. Libraries importing this structure should check for nullness.
+#[repr(C)]
+pub struct RawMethodArguments {
+    key_ptr: *mut i8,
+    key_array_ptr: *mut *mut i8,
+    args_ptr: *mut *mut i8,
+    key_len: usize,
+    args_len: usize,
+}
+
+pub enum MethodArguments {
+    StringArg(String, Vec<String>),
+    Array(Vec<String>, Vec<String>),
+    NoArgs
+}
+
+impl From<MethodArguments> for RawMethodArguments {
+    fn from(arg: MethodArguments) -> RawMethodArguments {
+        match arg {
+            MethodArguments::StringArg(string, args) => {
+                let args_len = args.len();
+                let mut args = args.iter().map(|x| unsafe {
+                        CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
+                    }).collect::<Vec<*mut i8>>();
+                args.shrink_to_fit();
+                let mut args_ptr = args.as_mut_ptr();
+                forget(args);
+
+                RawMethodArguments {
+                    key_ptr: unsafe {
+                        CString::from_vec_unchecked(string.as_bytes().to_owned()).into_raw()
+                    },
+                    key_array_ptr: ptr::null_mut(),
+                    args_ptr,
+                    key_len: 1,
+                    args_len
+                }
+            },
+            MethodArguments::Array(array, args) => {
+                let key_len = array.len();
+                let mut key_array = array.iter().map(|x| unsafe {
+                        CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
+                    }).collect::<Vec<*mut i8>>();
+                let mut key_array_ptr = key_array.as_mut_ptr();
+                forget(key_array);
+
+                let args_len = args.len();
+                let mut args = args.iter().map(|x| unsafe {
+                        CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
+                    }).collect::<Vec<*mut i8>>();
+                args.shrink_to_fit();
+                let mut args_ptr = args.as_mut_ptr();
+                forget(args);
+
+                RawMethodArguments {
+                    key_ptr: ptr::null_mut(),
+                    key_array_ptr,
+                    args_ptr,
+                    key_len,
+                    args_len
+                }
+
+            },
+            MethodArguments::NoArgs => {
+                RawMethodArguments {
+                    key_ptr: ptr::null_mut(),
+                    key_array_ptr: ptr::null_mut(),
+                    args_ptr: ptr::null_mut(),
+                    key_len: 0,
+                    args_len: 0
+                }
+            }
+        }
+    }
+}
+
+/// Contains all dynamically-loaded libraries and their symbols.
 ///
 /// The purpose of the structure is to: A) hold a `Library` handle to the dynamically-loaded
 /// plugin to ensure that the plugin remains loaded in memory, and it's contained symbols
 /// remain validly-executable; and B) holds a map of functions that may be executed within
 /// the namespace.
-pub struct StringNamespace {
-    /// This field, although never used directly, is required to exist in order to ensure
-    /// that each element in the `symbols` field remains relevant. When Rust can support
-    /// self-referencing lifetimes, we won't need to hold raw symbols anymore.
+pub struct StringMethodPlugins {
     #[allow(dead_code)]
-    library: Library,
-    /// A hash map of symbols collected from the `Library` stored in the `library` field.
-    /// These are considered raw because they have their lifetimes erased.
-    symbols: FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn() -> *mut i8>>,
+    /// Contains all of the loaded libraries from whence the symbols were obtained.
+    libraries: Vec<Library>,
+    /// A map of all the symbols that were collected from the above libraries.
+    pub symbols: FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn(RawMethodArguments) -> *mut i8>>,
 }
 
-impl StringNamespace {
-    pub fn new(library: Library) -> Result<StringNamespace, StringError> {
+impl StringMethodPlugins {
+    pub fn new() -> StringMethodPlugins {
+        StringMethodPlugins { libraries: Vec::new(), symbols: FnvHashMap::default() }
+    }
+
+    pub fn load(&mut self, library: Library) -> Result<(), StringError> {
         unsafe {
-            let mut symbols = FnvHashMap::default();
             {
                 // The `index` function contains a list of functions provided by the library.
                 let index: Symbol<unsafe extern "C" fn() -> *const u8> =
@@ -70,13 +149,13 @@ impl StringNamespace {
                             symbol.push(b'\0');
 
                             // Then attempt to load that symbol from the dynamic library.
-                            let symbol: Symbol<unsafe extern "C" fn() -> *mut i8> =
+                            let symbol: Symbol<unsafe extern "C" fn(RawMethodArguments) -> *mut i8> =
                                 library.get(symbol.as_slice()).map_err(
                                     StringError::SymbolErr,
                                 )?;
 
                             // And finally add the name of the function and it's function into the map.
-                            symbols.insert(identifier, symbol.into_raw());
+                            self.symbols.insert(identifier, symbol.into_raw());
                             start = counter + 1;
                         }
                     }
@@ -94,15 +173,16 @@ impl StringNamespace {
                     symbol.reserve_exact(slice.len() + 1);
                     symbol.extend_from_slice(slice);
                     symbol.push(b'\0');
-                    let symbol: Symbol<unsafe extern "C" fn() -> *mut i8> =
+                    let symbol: Symbol<unsafe extern "C" fn(RawMethodArguments) -> *mut i8> =
                         library.get(symbol.as_slice()).map_err(
                             StringError::SymbolErr,
                         )?;
-                    symbols.insert(identifier, symbol.into_raw());
+                    self.symbols.insert(identifier, symbol.into_raw());
                 }
             }
 
-            Ok(StringNamespace { library, symbols })
+            self.libraries.push(library);
+            Ok(())
         }
     }
 
@@ -110,14 +190,14 @@ impl StringNamespace {
     ///
     /// If the function exists, it is executed, and it's return value is then converted into a
     /// proper Rusty type.
-    pub fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> {
-        let func = self.symbols.get(&function).ok_or(
+    pub fn execute(&self, function: &str, arguments: MethodArguments) -> Result<Option<String>, StringError> {
+        let func = self.symbols.get(function.into()).ok_or(
             StringError::FunctionMissing(
-                function.clone(),
+                function.into(),
             ),
         )?;
         unsafe {
-            let data = (*func)();
+            let data = (*func)(RawMethodArguments::from(arguments));
             if data.is_null() {
                 Ok(None)
             } else {
@@ -134,29 +214,23 @@ impl StringNamespace {
 ///
 /// This function is meant to be called with `lazy_static` to ensure that there isn't a
 /// cost to collecting all this information when the shell never uses it in the first place!
-pub fn collect() -> FnvHashMap<Identifier, StringNamespace> {
-    let mut hashmap = FnvHashMap::default();
+pub fn collect() -> StringMethodPlugins {
+    let mut methods = StringMethodPlugins::new();
     if let Some(mut path) = config_dir() {
-        path.push("namespaces");
+        path.push("methods");
         path.push("strings");
         match read_dir(&path).map(LibraryIterator::new) {
             Ok(iterator) => {
                 for (identifier, library) in iterator {
-                    match StringNamespace::new(library) {
-                        Ok(namespace) => {
-                            hashmap.insert(identifier, namespace);
-                        }
-                        Err(why) => {
-                            eprintln!("ion: string namespace error: {}", why);
-                            continue;
-                        }
+                    if let Err(why) = methods.load(library) {
+                        eprintln!("ion: string method error: {}", why);
                     }
                 }
             }
             Err(why) => {
-                eprintln!("ion: unable to read namespaces plugin directory: {}", why);
+                eprintln!("ion: unable to read methods plugin directory: {}", why);
             }
         }
     }
-    hashmap
+    methods
 }

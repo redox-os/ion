@@ -1,8 +1,12 @@
+pub mod methods;
 pub mod namespaces;
 #[cfg(all(unix, not(target_os = "redox")))]
 mod library_iter;
 #[cfg(all(unix, not(target_os = "redox")))]
 pub use self::library_iter::*;
+mod string;
+
+pub use self::string::StringError;
 
 use app_dirs::{AppDataType, AppInfo, app_root};
 use std::path::PathBuf;
