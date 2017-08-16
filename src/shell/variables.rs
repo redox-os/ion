@@ -200,7 +200,7 @@ impl Variables {
                         eprintln!("ion: {} is not a valid color", name);
                         None
                     }
-                }
+                },
                 "env" => env::var(variable).map(Into::into).ok(),
                 _ => {
                     // Attempt to obtain the given namespace from our lazily-generated map of namespaces.
