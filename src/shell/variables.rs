@@ -22,6 +22,53 @@ lazy_static! {
     static ref STRING_NAMESPACES: FnvHashMap<Identifier, StringNamespace> = namespaces::collect();
 }
 
+lazy_static! {
+    static ref COLORS: FnvHashMap<&'static str, &'static str> = {
+        let mut map = FnvHashMap::default();
+        map.insert("reset", "\x1b[0m");
+        map.insert("bold", "\x1b[1m");
+        map.insert("dim", "\x1b[2m");
+        map.insert("underlined", "\x1b[4m");
+        map.insert("blink", "\x1b[5m");
+        map.insert("reverse", "\x1b[7m");
+        map.insert("hidden", "\x1b[8m");
+        map.insert("black", "\x1b[30m");
+        map.insert("red", "\x1b[31m");
+        map.insert("green", "\x1b[32m");
+        map.insert("yellow", "\x1b[33m");
+        map.insert("blue", "\x1b[34m");
+        map.insert("magenta", "\x1b[35m");
+        map.insert("cyan", "\x1b[36m");
+        map.insert("light_gray", "\x1b[37m");
+        map.insert("default", "\x1b[39m");
+        map.insert("blackbg", "\x1b[40m");
+        map.insert("redbg", "\x1b[41m");
+        map.insert("greenbg", "\x1b[42m");
+        map.insert("yellowbg", "\x1b[43m");
+        map.insert("bluebg", "\x1b[44m");
+        map.insert("magentabg", "\x1b[45m");
+        map.insert("cyanbg", "\x1b[46m");
+        map.insert("light_graybg", "\x1b[47m");
+        map.insert("defaultbg", "\x1b[49m");
+        map.insert("dark_gray", "\x1b[90m");
+        map.insert("light_red", "\x1b[91m");
+        map.insert("light_green", "\x1b[92m");
+        map.insert("light_yellow", "\x1b[93m");
+        map.insert("light_blue", "\x1b[94m");
+        map.insert("light_magenta", "\x1b[95m");
+        map.insert("light_cyan", "\x1b[96m");
+        map.insert("dark_graybg", "\x1b[100m");
+        map.insert("light_redbg", "\x1b[101m");
+        map.insert("light_greenbg", "\x1b[102m");
+        map.insert("light_yellowbg",  "\x1b[103m");
+        map.insert("light_bluebg", "\x1b[104m");
+        map.insert("light_magentabg", "\x1b[105m");
+        map.insert("light_cyanbg", "\x1b[106m");
+        map.insert("white_bg", "\x1b[107m");
+        map
+    };
+}
+
 #[derive(Debug)]
 pub struct Variables {
     pub hashmaps: HashMapVariableContext,
@@ -147,6 +194,13 @@ impl Variables {
         if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
             // If the parsed name contains the '::' pattern, then a namespace was designated. Find it.
             match name {
+                "color" => match COLORS.get(&variable) {
+                    Some(color) => Some((*color).into()),
+                    None => {
+                        eprintln!("ion: {} is not a valid color", name);
+                        None
+                    }
+                }
                 "env" => env::var(variable).map(Into::into).ok(),
                 _ => {
                     // Attempt to obtain the given namespace from our lazily-generated map of namespaces.
