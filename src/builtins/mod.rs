@@ -6,7 +6,6 @@ pub mod calc;
 mod conditionals;
 mod job_control;
 mod test;
-mod time;
 mod echo;
 mod set;
 
@@ -119,7 +118,6 @@ impl Builtin {
         insert_builtin!("echo", builtin_echo, "Display a line of text");
         insert_builtin!("test", builtin_test, "Performs tests on files and text");
         insert_builtin!("calc", builtin_calc, "Calculate a mathematical expression");
-        insert_builtin!("time", builtin_time, "Measures the time to execute an external command");
         insert_builtin!("true", builtin_true, "Do nothing, successfully");
         insert_builtin!("false", builtin_false, "Do nothing, unsuccessfully");
         insert_builtin!(
@@ -282,18 +280,6 @@ fn builtin_test(args: &[&str], _: &mut Shell) -> i32 {
 
 fn builtin_calc(args: &[&str], _: &mut Shell) -> i32 {
     match calc::calc(&args[1..]) {
-        Ok(()) => SUCCESS,
-        Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "{}", why);
-            FAILURE
-        }
-    }
-}
-
-fn builtin_time(args: &[&str], _: &mut Shell) -> i32 {
-    match time::time(&args[1..]) {
         Ok(()) => SUCCESS,
         Err(why) => {
             let stderr = io::stderr();

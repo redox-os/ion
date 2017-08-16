@@ -174,6 +174,7 @@ pub fn parse(code: &str) -> Statement {
                 }
             }
         }
+        _ if cmd.starts_with("time ") => return Statement::Time(Box::new(parse(cmd[4..].trim_left()))),
         _ => (),
     }
 

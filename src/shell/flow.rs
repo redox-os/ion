@@ -6,7 +6,7 @@ use super::status::*;
 use parser::{ForExpression, StatementSplitter, expand_string, parse_and_validate};
 use parser::pipelines::Pipeline;
 use shell::assignments::VariableStore;
-use std::io::{self, Write};
+use std::io::{self, Write, stdout};
 use std::mem;
 use types::Array;
 
@@ -587,6 +587,29 @@ impl<'a> FlowLogic for Shell<'a> {
                     self.exit(status);
                 }
             }
+            Statement::Time(box_statement) => {
+                let time = ::std::time::Instant::now();
+
+                if let Err(why) = self.execute_toplevel(iterator, *box_statement) {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "{}", why);
+                    self.flow_control.level = 0;
+                    self.flow_control.current_if_mode = 0;
+                }
+
+                let duration = time.elapsed();
+                let seconds = duration.as_secs();
+                let nanoseconds = duration.subsec_nanos();
+
+                let stdout = stdout();
+                let mut stdout = stdout.lock();
+                let _ = if seconds > 60 {
+                    writeln!(stdout, "real    {}m{:02}.{:09}s", seconds / 60, seconds % 60, nanoseconds)
+                } else {
+                    writeln!(stdout, "real    {}.{:09}s", seconds, nanoseconds)
+                };
+            },
             // At this level, else and else if keywords are forbidden.
             Statement::ElseIf { .. } |
             Statement::Else => {
