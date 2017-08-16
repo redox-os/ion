@@ -4,6 +4,9 @@ use std::fs;
 use std::io::{self, BufWriter};
 use smallstring::SmallString;
 
+use shell::Shell;
+use shell::variables::Variables;
+
 const MAN_PAGE: &'static str = r#"NAME
     exists - perform tests on files and text
 
@@ -18,7 +21,7 @@ OPTIONS
         array var is not empty
 
     -b BINARY
-        binary is in PATH
+        binary is in PATH (not yet implemented)
 
     -d PATH
         path is a directory
@@ -41,15 +44,15 @@ AUTHOR
     Heavily based on implementation of the test builtin, which was written by Michael Murph.
 "#; /* @MANEND */
 
-pub fn exists(args: &[&str]) -> Result<bool, String> {
+pub fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
 
     let arguments = &args[1..];
-    evaluate_arguments(arguments, &mut buffer)
+    evaluate_arguments(arguments, &mut buffer, shell)
 }
 
-fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W) -> Result<bool, String> {
+fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W, shell: &Shell) -> Result<bool, String> {
     match arguments.first() {
         Some(&"--help") => {
             buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| {
@@ -66,32 +69,25 @@ fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W) -> Resul
                 arguments.get(1).map_or(Ok(true), {
                     |arg|
                     // Match the correct function to the associated flag
-                    Ok(match_flag_argument(flag, arg))
+                    Ok(match_flag_argument(flag, arg, shell))
                 })
             })
         }
-        Some(arg) => {
-            // If there is no operator, check if the first argument is non-zero
-            arguments.get(1).map_or(
-                Ok(string_is_nonzero(arg)),
-                |operator| {
-                    // TODO: STRING check
-                    Err("exists: Not implemented.".to_owned())
-                },
-            )
+        Some(string) => {
+            Ok(string_is_nonzero(string))
         }
         None => Ok(false),
     }
 }
 
 /// Matches flag arguments to their respective functionaity when the `-` character is detected.
-fn match_flag_argument(flag: char, argument: &str) -> bool {
+fn match_flag_argument(flag: char, argument: &str, shell: &Shell) -> bool {
     match flag {
-        'a' => array_var_is_not_empty(argument),
+        'a' => array_var_is_not_empty(argument, shell),
         'b' => binary_is_in_path(argument),
         'd' => path_is_directory(argument),
         'f' => path_is_file(argument),
-        's' => string_var_is_not_empty(argument),
+        's' => string_var_is_not_empty(argument, shell),
         _ => false,
     }
 }
@@ -119,13 +115,19 @@ fn binary_is_in_path(filepath: &str) -> bool {
 fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
 
 /// Returns true if the variable is an array and the array is not empty
-fn array_var_is_not_empty(arrayvar: &str) -> bool {
-    false
+fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
+    match shell.variables.get_array(arrayvar) {
+        Some(array) => !array.is_empty(),
+        None => false
+    }
 }
 
-/// Returns true if the variable is a string and the array is not empty
-fn string_var_is_not_empty(stringvar: &str) -> bool {
-    false
+/// Returns true if the variable is a string and the string is not empty
+fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
+    match shell.variables.get_var(stringvar) {
+        Some(string) => !string.is_empty(),
+        None => false
+    }
 }
 
 

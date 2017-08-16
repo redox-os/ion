@@ -418,8 +418,8 @@ fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_exists(args: &[&str], _: &mut Shell) -> i32 {
-    match exists(args) {
+fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
+    match exists(args, shell) {
         Ok(true) => SUCCESS,
         Ok(false) => FAILURE,
         Err(why) => {
