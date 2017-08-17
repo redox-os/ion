@@ -11,36 +11,50 @@ use shell::Shell;
 use shell::variables::Variables;
 
 const MAN_PAGE: &'static str = r#"NAME
-    exists - perform tests on files and text
+    exists - check whether items exist
 
 SYNOPSIS
-    test [EXPRESSION]
+    exists [EXPRESSION]
 
 DESCRIPTION
-    Tests the expressions given and returns an exit status of 0 if true, else 1.
+    Checks whether the given item exists and returns an exit status of 0 if it does, else 1.
 
 OPTIONS
     -a ARRAY
         array var is not empty
 
     -b BINARY
-        binary is in PATH (not yet implemented)
+        binary is in PATH
 
     -d PATH
         path is a directory
+        This is the same as test -d
 
     -f PATH
         path is a file
+        This is the same as test -f
 
     -s STRING
         string var is not empty
 
     STRING
         string is not empty
+        This is the same as test -n
 
 EXAMPLES
     Test if the file exists:
         exists -f FILE && echo "The FILE exists" || echo "The FILE does not exist"
+
+    Test if some-command exists in the path and is executable:
+        exists -b some-command && echo "some-command exists" || echo "some-command does not exist"
+
+    Test if variable exists AND is not empty
+        exists -s myVar && echo "myVar exists: $myVar" || echo "myVar does not exist or is empty"
+        NOTE: Don't use the '$' sigil, but only the name of the variable to check
+
+    Test if array exists and is not empty
+        exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
+        NOTE: Don't use the '@' sigil, but only the name of the array to check
 
 AUTHOR
     Written by Fabian Würfl.
@@ -66,9 +80,11 @@ fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W, shell: &
         }
         Some(&s) if s.starts_with("-") => {
             // Access the second character in the flag string: this will be type of the flag.
-            // If no flag was given, return `SUCCESS`
+            // If no flag was given, return `SUCCESS`, as this means a string with value "-" was
+            // checked.
             s.chars().nth(1).map_or(Ok(true), |flag| {
-                // If no argument was given, return `SUCCESS`
+                // If no argument was given, return `SUCCESS`, as this means a string starting
+                // with a dash was given
                 arguments.get(1).map_or(Ok(true), {
                     |arg|
                     // Match the correct function to the associated flag
@@ -111,6 +127,10 @@ fn path_is_directory(filepath: &str) -> bool {
 
 /// Returns true if the binary is found in path (and is executable)
 fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
+    // TODO: Maybe this function should reflect the logic for spawning new processes
+    // TODO: Right now they use an entirely different logic which means that it *might* be possible
+    // TODO: that `exists` reports a binary to be in the path, while the shell cannot find it or
+    // TODO: vice-versa
     if let Some(path) = shell.variables.get_var("PATH") {
         for dir in path.split(":") {
             let fname = format!("{}/{}", dir, binaryname);
