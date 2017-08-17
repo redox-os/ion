@@ -4,7 +4,9 @@ use std::fs;
 use std::io::{self, BufWriter};
 use std::os::unix::fs::{PermissionsExt};
 use smallstring::SmallString;
+use smallvec::SmallVec;
 
+use builtins::Builtin;
 use shell::Shell;
 use shell::variables::Variables;
 
@@ -159,37 +161,111 @@ fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
     }
 }
 
+#[test]
+// TODO: Come up with some reasonable test cases for this and implement them
+fn test_evaluate_arguments() {
+}
 
 #[test]
-fn test_strings() {
-    assert_eq!(string_is_zero("NOT ZERO"), false);
-    assert_eq!(string_is_zero(""), true);
+fn test_flag_argument() {
+    let builtins = Builtin::map();
+    let shell = Shell::new(&builtins);
+
+    // we don't really care about the passed values, as long as both sited return the same value
+    assert_eq!(match_flag_argument('a', "ARRAY", &shell), array_var_is_not_empty("ARRAY", &shell));
+    assert_eq!(match_flag_argument('b', "binary", &shell), binary_is_in_path("binary", &shell));
+    assert_eq!(match_flag_argument('d', "path", &shell), path_is_directory("path"));
+    assert_eq!(match_flag_argument('f', "file", &shell), path_is_file("file"));
+    assert_eq!(match_flag_argument('s', "STR", &shell), string_var_is_not_empty("STR", &shell));
+
+    // Any flag which is not implemented
+    assert_eq!(match_flag_argument('x', "ARG", &shell), false);
+}
+
+#[test]
+fn test_path_is_file() {
+    assert_eq!(path_is_file("testing/empty_file"), true);
+    assert_eq!(path_is_file("this-does-not-exist"), false);
+}
+
+#[test]
+fn test_path_is_directory() {
+    assert_eq!(path_is_directory("testing"), true);
+    assert_eq!(path_is_directory("testing/empty_file"), false);
+}
+
+#[test]
+fn test_binary_is_in_path() {
+    let builtins = Builtin::map();
+    let mut shell = Shell::new(&builtins);
+
+    // TODO: We should probably also test with more complex PATH-variables:
+    // TODO: multiple/:directories/
+    // TODO: PATH containing directories which do not exist
+    // TODO: PATH containing directories without read permission (for user)
+    // TODO: PATH containing directories without execute ("enter") permission (for user)
+    // TODO: empty PATH?
+    shell.variables.set_var("PATH", "testing/");
+
+    assert_eq!(binary_is_in_path("executable_file", &shell), true);
+    assert_eq!(binary_is_in_path("empty_file", &shell), false);
+    assert_eq!(binary_is_in_path("file_does_not_exist", &shell), false);
+}
+
+#[test]
+fn test_file_has_execute_permission() {
+    assert_eq!(file_has_execute_permission("testing/executable_file"), true);
+    assert_eq!(file_has_execute_permission("testing"), true);
+    assert_eq!(file_has_execute_permission("testing/empty_file"), false);
+    assert_eq!(file_has_execute_permission("this-does-not-exist"), false);
+}
+
+#[test]
+fn test_string_is_nonzero() {
     assert_eq!(string_is_nonzero("NOT ZERO"), true);
     assert_eq!(string_is_nonzero(""), false);
 }
 
 #[test]
-fn test_empty_str() {
-    let mut empty = BufWriter::new(io::sink());
-    let mut eval = |args: Vec<&str>| evaluate_arguments(&args, &mut empty);
-    assert_eq!(eval(vec![""]), Ok(false));
-    assert_eq!(eval(vec!["c", "=", ""]), Ok(false));
+fn test_array_var_is_not_empty() {
+    let builtins = Builtin::map();
+    let mut shell = Shell::new(&builtins);
+
+    shell.variables.set_array("EMPTY_ARRAY", SmallVec::from_vec(Vec::new()));
+    assert_eq!(array_var_is_not_empty("EMPTY_ARRAY", &shell), false);
+
+    let mut not_empty_vec = Vec::new();
+    not_empty_vec.push("array not empty".to_owned());
+    shell.variables.set_array("NOT_EMPTY_ARRAY", SmallVec::from_vec(not_empty_vec));
+    assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), true);
+
+    // test for array which does not even exist
+    shell.variables.unset_array("NOT_EMPTY_ARRAY");
+    assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), false);
+
+    // array_var_is_not_empty should NOT match for non-array variables with the same name
+    shell.variables.set_var("VARIABLE", "notempty-variable");
+    assert_eq!(array_var_is_not_empty("VARIABLE", &shell), false);
 }
 
 #[test]
-fn test_file_exists() {
-    assert_eq!(file_exists("testing/empty_file"), true);
-    assert_eq!(file_exists("this-does-not-exist"), false);
-}
+fn test_string_var_is_not_empty() {
+    let builtins = Builtin::map();
+    let mut shell = Shell::new(&builtins);
 
-#[test]
-fn test_file_is_regular() {
-    assert_eq!(file_is_regular("testing/empty_file"), true);
-    assert_eq!(file_is_regular("testing"), false);
-}
+    shell.variables.set_var("EMPTY", "");
+    assert_eq!(string_var_is_not_empty("EMPTY", &shell), false);
 
-#[test]
-fn test_file_is_directory() {
-    assert_eq!(file_is_directory("testing"), true);
-    assert_eq!(file_is_directory("testing/empty_file"), false);
+    shell.variables.set_var("NOT_EMPTY", "notempty");
+    assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), true);
+
+    // string_var_is_not_empty should NOT match for arrays with the same name
+    let mut vec = Vec::new();
+    vec.push("not-empty".to_owned());
+    shell.variables.set_array("ARRAY_NOT_EMPTY", SmallVec::from_vec(vec) );
+    assert_eq!(string_var_is_not_empty("ARRAY_NOT_EMPTY", &shell), false);
+
+    // test for a variable which does not even exist
+    shell.variables.unset_var("NOT_EMPTY");
+    assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), false);
 }
