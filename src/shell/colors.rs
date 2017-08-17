@@ -26,7 +26,6 @@ lazy_static! {
         map.insert("cyan", "36");
         map.insert("light_gray", "37");
         map.insert("default", "39");
-        map.insert("blackbg", "40");
         map.insert("dark_gray", "90");
         map.insert("light_red", "91");
         map.insert("light_green", "92");
@@ -41,6 +40,7 @@ lazy_static! {
 lazy_static! {
     static ref BG_COLORS: FnvHashMap<&'static str, &'static str> = {
         let mut map = FnvHashMap::default();
+        map.insert("blackbg", "40");
         map.insert("redbg", "41");
         map.insert("greenbg", "42");
         map.insert("yellowbg", "43");
