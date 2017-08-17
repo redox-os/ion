@@ -182,8 +182,88 @@ fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
 }
 
 #[test]
-// TODO: Come up with some reasonable test cases for this and implement them
 fn test_evaluate_arguments() {
+    let builtins = Builtin::map();
+    let mut shell = Shell::new(&builtins);
+    let mut sink = BufWriter::new(io::sink());
+
+    // assert_eq!(evaluate_arguments(&[], &mut sink, &shell), Ok(false));
+    // no parameters
+    assert_eq!(evaluate_arguments(&[], &mut sink, &shell), Ok(false));
+    // multiple arguments
+    // ignores all but the first argument
+    assert_eq!(evaluate_arguments(&["foo", "bar"], &mut sink, &shell), Ok(true));
+
+    // check whether --help returns SUCCESS
+    assert_eq!(evaluate_arguments(&["--help"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["--help", "unused", "params"], &mut sink, &shell), Ok(true));
+
+    // check `exists STRING`
+    assert_eq!(evaluate_arguments(&[""], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["string"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["string with space"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-startswithdash"], &mut sink, &shell), Ok(true));
+
+    // check `exists -a`
+    // no argument means we treat it as a string
+    assert_eq!(evaluate_arguments(&["-a"], &mut sink, &shell), Ok(true));
+    shell.variables.set_array("emptyarray", SmallVec::from_vec(Vec::new()));
+    assert_eq!(evaluate_arguments(&["-a", "emptyarray"], &mut sink, &shell), Ok(false));
+    let mut vec = Vec::new();
+    vec.push("element".to_owned());
+    shell.variables.set_array("array", SmallVec::from_vec(vec));
+    assert_eq!(evaluate_arguments(&["-a", "array"], &mut sink, &shell), Ok(true));
+    shell.variables.unset_array("array");
+    assert_eq!(evaluate_arguments(&["-a", "array"], &mut sink, &shell), Ok(false));
+
+    // check `exists -b`
+    // TODO: see test_binary_is_in_path()
+    // no argument means we treat it as a string
+    assert_eq!(evaluate_arguments(&["-b"], &mut sink, &shell), Ok(true));
+    let oldpath = shell.variables.get_var("PATH").unwrap_or("/usr/bin".to_owned());
+    shell.variables.set_var("PATH", "testing/");
+
+    assert_eq!(evaluate_arguments(&["-b", "executable_file"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-b", "empty_file"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-b", "file_does_not_exist"], &mut sink, &shell), Ok(false));
+
+    // restore original PATH. Not necessary for the currently defined test cases but this might
+    // change in the future? Better safe than sorry!
+    shell.variables.set_var("PATH", &oldpath);
+
+    // check `exists -d`
+    // no argument means we treat it as a string
+    assert_eq!(evaluate_arguments(&["-d"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-d", "testing/"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-d", "testing/empty_file"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-d", "does/not/exist/"], &mut sink, &shell), Ok(false));
+
+    // check `exists -f`
+    // no argument means we treat it as a string
+    assert_eq!(evaluate_arguments(&["-f"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-f", "testing/"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-f", "testing/empty_file"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-f", "does-not-exist"], &mut sink, &shell), Ok(false));
+
+    // check `exists -s`
+    // no argument means we treat it as a string
+    assert_eq!(evaluate_arguments(&["-s"], &mut sink, &shell), Ok(true));
+    shell.variables.set_var("emptyvar", "");
+    assert_eq!(evaluate_arguments(&["-s", "emptyvar"], &mut sink, &shell), Ok(false));
+    shell.variables.set_var("testvar", "foobar");
+    assert_eq!(evaluate_arguments(&["-s", "testvar"], &mut sink, &shell), Ok(true));
+    shell.variables.unset_var("testvar");
+    assert_eq!(evaluate_arguments(&["-s", "testvar"], &mut sink, &shell), Ok(false));
+    // also check that it doesn't trigger on arrays
+    let mut vec = Vec::new();
+    vec.push("element".to_owned());
+    shell.variables.unset_var("array");
+    shell.variables.set_array("array", SmallVec::from_vec(vec));
+    assert_eq!(evaluate_arguments(&["-s", "array"], &mut sink, &shell), Ok(false));
+
+    // check invalid flags / parameters (should all be treated as strings and therefore succeed)
+    assert_eq!(evaluate_arguments(&["--foo"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-x"], &mut sink, &shell), Ok(true));
 }
 
 #[test]
