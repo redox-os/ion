@@ -2,6 +2,7 @@
 use std::error::Error;
 use std::fs;
 use std::io::{self, BufWriter};
+use std::os::unix::fs::{PermissionsExt};
 use smallstring::SmallString;
 
 use shell::Shell;
@@ -84,7 +85,7 @@ fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W, shell: &
 fn match_flag_argument(flag: char, argument: &str, shell: &Shell) -> bool {
     match flag {
         'a' => array_var_is_not_empty(argument, shell),
-        'b' => binary_is_in_path(argument),
+        'b' => binary_is_in_path(argument, shell),
         'd' => path_is_directory(argument),
         'f' => path_is_file(argument),
         's' => string_var_is_not_empty(argument, shell),
@@ -107,8 +108,36 @@ fn path_is_directory(filepath: &str) -> bool {
 }
 
 /// Returns true if the binary is found in path (and is executable)
-fn binary_is_in_path(filepath: &str) -> bool {
+fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
+    if let Some(path) = shell.variables.get_var("PATH") {
+        for dir in path.split(":") {
+            let fname = format!("{}/{}", dir, binaryname);
+            if let Ok(metadata) = fs::metadata(&fname) {
+                if metadata.is_file() && file_has_execute_permission(&fname) {
+                    return true;
+                }
+            }
+        }
+    };
+
     false
+}
+
+/// Returns true if the file has execute permissions. This function is rather low level because
+/// Rust currently does not have a higher level abstraction for obtaining non-standard file modes.
+/// To extract the permissions from the mode, the bitwise AND operator will be used and compared
+/// with the respective execute bits.
+/// Note: This function is 1:1 the same as src/builtins/test.rs:file_has_execute_permission
+/// If you change the following function, please also update the one in src/builtins/test.rs
+fn file_has_execute_permission(filepath: &str) -> bool {
+    const USER: u32 = 0b1000000;
+    const GROUP: u32 = 0b1000;
+    const GUEST: u32 = 0b1;
+
+    // Collect the mode of permissions for the file
+    fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
+        // If the mode is equal to any of the above, return `SUCCESS`
+        .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
 }
 
 /// Returns true if the string is not empty
