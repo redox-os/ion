@@ -61,11 +61,13 @@ lazy_static! {
     };
 }
 
+/// Colors may be called by name, or by a hexadecimal-converted decimal value.
 enum Mode {
     Name(&'static str),
     bits256(u16),
 }
 
+/// Stores a reprensetation of text formatting data which can be used to get an ANSI color code.
 pub struct Colors {
     foreground: Option<Mode>,
     background: Option<Mode>,
@@ -73,40 +75,58 @@ pub struct Colors {
 }
 
 impl Colors {
+    /// Parses the given input and returns a structure obtaining the text data needed for proper
+    /// transformation into ANSI code parameters, which may be obtained by calling the
+    /// `into_string()` method on the newly-created `Colors` structure.
     pub fn collect(input: &str) -> Colors {
         let mut colors = Colors { foreground: None, background: None, attribute: None };
         for variable in input.split(",") {
             if variable == "reset" {
                 return Colors { foreground: None, background: None, attribute: Some(vec!["0"]) };
-            } else if let Some(color) = ATTRIBUTES.get(&variable) {
-                let vec_exists = match colors.attribute.as_mut() {
-                    Some(vec) => { vec.push(color); true },
-                    None => false
-                };
-
-                if !vec_exists {
-                    colors.attribute = Some(vec![color]);
-                }
+            } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
+                colors.append_attribute(attribute);
             } else if let Some(color) = COLORS.get(&variable) {
-                colors.foreground = Some(Mode::Name(*color))
+                colors.foreground = Some(Mode::Name(*color));
+            } else if let Some(color) = BG_COLORS.get(&variable) {
+                colors.background = Some(Mode::Name(*color));
             } else {
-                match BG_COLORS.get(&variable) {
-                    Some(color) => colors.background = Some(Mode::Name(*color)),
-                    None => if let Ok(value) = u16::from_str_radix(&variable[0..2], 16) {
-                        if variable.ends_with("bg") {
-                            colors.background = Some(Mode::bits256(value));
-                        } else {
-                            colors.foreground = Some(Mode::bits256(value));
-                        }
-                    } else {
-                        eprintln!("ion: {} is not a valid color", variable)
-                    }
-                }
+                colors.attempt_256bit_parsing(variable);
             }
         }
         colors
     }
 
+    /// Attributes can be stacked, so this function serves to enable that stacking.
+    fn append_attribute(&mut self, attribute: &'static str) {
+        let vec_exists = match self.attribute.as_mut() {
+            Some(vec) => { vec.push(attribute); true },
+            None => false
+        };
+
+        if !vec_exists {
+            self.attribute = Some(vec![attribute]);
+        }
+    }
+
+    /// If no matches were made, then this will attempt to parse the variable as a two-digit
+    /// hexadecimal value, which corresponds to a 256-bit color.
+    fn attempt_256bit_parsing(&mut self, variable: &str) {
+        if variable.len() < 2 {
+            eprintln!("ion: {} is not a valid color", variable)
+        } else if let Ok(value) = u16::from_str_radix(&variable[0..2], 16) {
+            if variable.ends_with("bg") {
+                self.background = Some(Mode::bits256(value));
+            } else {
+                self.foreground = Some(Mode::bits256(value));
+            }
+        } else {
+            eprintln!("ion: {} is not a valid color", variable)
+        }
+    }
+
+    /// Attempts to transform the data in the structure into the corresponding ANSI code
+    /// representation. It would very ugly to require shell scripters to have to interface
+    /// with these codes directly.
     pub fn into_string(self) -> Option<String> {
         let mut output = String::from("\x1b[");
 
