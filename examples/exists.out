@@ -24,6 +24,9 @@ OPTIONS
         path is a file
         This is the same as test -f
 
+    --fn FUNCTION
+        function is defined
+
     -s STRING
         string var is not empty
 
@@ -45,6 +48,9 @@ EXAMPLES
     Test if array exists and is not empty
         exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
         NOTE: Don't use the '@' sigil, but only the name of the array to check
+
+    Test if a function named 'myFunc' exists
+        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
 
 AUTHOR
     Written by Fabian Würfl.
@@ -74,6 +80,9 @@ OPTIONS
         path is a file
         This is the same as test -f
 
+    --fn FUNCTION
+        function is defined
+
     -s STRING
         string var is not empty
 
@@ -95,6 +104,9 @@ EXAMPLES
     Test if array exists and is not empty
         exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
         NOTE: Don't use the '@' sigil, but only the name of the array to check
+
+    Test if a function named 'myFunc' exists
+        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
 
 AUTHOR
     Written by Fabian Würfl.
@@ -128,6 +140,7 @@ Reset PATH to old path
 1
 0
 1
+0
 0
 emptyvar = 
 1

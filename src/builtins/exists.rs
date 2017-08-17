@@ -7,6 +7,7 @@ use smallstring::SmallString;
 use smallvec::SmallVec;
 
 use builtins::Builtin;
+use shell::flow_control::{Function, FunctionArgument, Statement};
 use shell::Shell;
 use shell::variables::Variables;
 
@@ -34,6 +35,9 @@ OPTIONS
         path is a file
         This is the same as test -f
 
+    --fn FUNCTION
+        function is defined
+
     -s STRING
         string var is not empty
 
@@ -56,6 +60,9 @@ EXAMPLES
         exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
         NOTE: Don't use the '@' sigil, but only the name of the array to check
 
+    Test if a function named 'myFunc' exists
+        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
+
 AUTHOR
     Written by Fabian Würfl.
     Heavily based on implementation of the test builtin, which was written by Michael Murph.
@@ -72,11 +79,22 @@ pub fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
 fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W, shell: &Shell) -> Result<bool, String> {
     match arguments.first() {
         Some(&"--help") => {
+            // not handled by the second case, so that we don't have to pass the buffer around
             buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| {
                 x.description().to_owned()
             })?;
             buffer.flush().map_err(|x| x.description().to_owned())?;
             Ok(true)
+        }
+        Some(&s) if s.starts_with("--") => {
+            let (_, option) = s.split_at(2);
+            // If no argument was given, return `SUCCESS`, as this means a string starting
+            // with a dash was given
+            arguments.get(1).map_or(Ok(true), {
+                |arg|
+                // Match the correct function to the associated flag
+                Ok(match_option_argument(option, arg, shell))
+            })
         }
         Some(&s) if s.starts_with("-") => {
             // Access the second character in the flag string: this will be type of the flag.
@@ -107,6 +125,14 @@ fn match_flag_argument(flag: char, argument: &str, shell: &Shell) -> bool {
         'd' => path_is_directory(argument),
         'f' => path_is_file(argument),
         's' => string_var_is_not_empty(argument, shell),
+        _ => false,
+    }
+}
+
+// Matches option arguments to their respective functionality
+fn match_option_argument(option: &str, argument: &str, shell: &Shell) -> bool {
+    match option {
+        "fn" => function_is_defined(argument, &shell),
         _ => false,
     }
 }
@@ -177,6 +203,14 @@ fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
 fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
     match shell.variables.get_var(stringvar) {
         Some(string) => !string.is_empty(),
+        None => false
+    }
+}
+
+/// Returns true if a function with the given name is defined
+fn function_is_defined(function: &str, shell: &Shell) -> bool {
+    match shell.functions.get(function) {
+        Some(_) => true,
         None => false
     }
 }
@@ -261,13 +295,36 @@ fn test_evaluate_arguments() {
     shell.variables.set_array("array", SmallVec::from_vec(vec));
     assert_eq!(evaluate_arguments(&["-s", "array"], &mut sink, &shell), Ok(false));
 
+    // check `exists --fn`
+    let name_str = "test_function";
+    let name = SmallString::from_str(name_str);
+    let mut args = Vec::new();
+    args.push(FunctionArgument::Untyped("testy".to_owned()));
+    let mut statements = Vec::new();
+    statements.push(Statement::End);
+    let description = "description".to_owned();
+
+    shell.functions.insert(
+        name.clone(),
+        Function {
+            name: name,
+            args: args,
+            statements: statements,
+            description: description,
+        },
+    );
+
+    assert_eq!(evaluate_arguments(&["--fn", name_str], &mut sink, &shell), Ok(true));
+    shell.functions.remove(name_str);
+    assert_eq!(evaluate_arguments(&["--fn", name_str], &mut sink, &shell), Ok(false));
+
     // check invalid flags / parameters (should all be treated as strings and therefore succeed)
     assert_eq!(evaluate_arguments(&["--foo"], &mut sink, &shell), Ok(true));
     assert_eq!(evaluate_arguments(&["-x"], &mut sink, &shell), Ok(true));
 }
 
 #[test]
-fn test_flag_argument() {
+fn test_match_flag_argument() {
     let builtins = Builtin::map();
     let shell = Shell::new(&builtins);
 
@@ -280,6 +337,18 @@ fn test_flag_argument() {
 
     // Any flag which is not implemented
     assert_eq!(match_flag_argument('x', "ARG", &shell), false);
+}
+
+#[test]
+fn test_match_option_argument() {
+    let builtins = Builtin::map();
+    let shell = Shell::new(&builtins);
+
+    // we don't really care about the passed values, as long as both sited return the same value
+    assert_eq!(match_option_argument("fn", "FUN", &shell), array_var_is_not_empty("FUN", &shell));
+
+    // Any option which is not implemented
+    assert_eq!(match_option_argument("foo", "ARG", &shell), false);
 }
 
 #[test]
@@ -368,4 +437,33 @@ fn test_string_var_is_not_empty() {
     // test for a variable which does not even exist
     shell.variables.unset_var("NOT_EMPTY");
     assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), false);
+}
+
+#[test]
+fn test_function_is_defined() {
+    let builtins = Builtin::map();
+    let mut shell = Shell::new(&builtins);
+
+    // create a simple dummy function
+    let name_str = "test_function";
+    let name = SmallString::from_str(name_str);
+    let mut args = Vec::new();
+    args.push(FunctionArgument::Untyped("testy".to_owned()));
+    let mut statements = Vec::new();
+    statements.push(Statement::End);
+    let description = "description".to_owned();
+
+    shell.functions.insert(
+        name.clone(),
+        Function {
+            name: name,
+            args: args,
+            statements: statements,
+            description: description,
+        },
+    );
+
+    assert_eq!(function_is_defined(name_str, &shell), true);
+    shell.functions.remove(name_str);
+    assert_eq!(function_is_defined(name_str, &shell), false);
 }

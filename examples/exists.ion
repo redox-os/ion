@@ -69,6 +69,11 @@ echo $?
 exists -f does-not-exist
 echo $?
 
+fn testFunc a
+  echo $a
+end
+exists --fn testFunc
+echo $?
 
 exists -s
 echo $?
