@@ -3,13 +3,16 @@ use std::error::Error;
 use std::fs;
 use std::io::{self, BufWriter};
 use std::os::unix::fs::{PermissionsExt};
+#[cfg(test)]
 use smallstring::SmallString;
+#[cfg(test)]
 use smallvec::SmallVec;
 
+#[cfg(test)]
 use builtins::Builtin;
+#[cfg(test)]
 use shell::flow_control::{Function, FunctionArgument, Statement};
 use shell::Shell;
-use shell::variables::Variables;
 
 const MAN_PAGE: &'static str = r#"NAME
     exists - check whether items exist
