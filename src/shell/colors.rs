@@ -61,17 +61,19 @@ lazy_static! {
     };
 }
 
+#[derive(Debug, PartialEq)]
 /// Colors may be called by name, or by a hexadecimal-converted decimal value.
 enum Mode {
     Name(&'static str),
     bits256(u16),
 }
 
+#[derive(Debug, PartialEq)]
 /// Stores a reprensetation of text formatting data which can be used to get an ANSI color code.
 pub struct Colors {
     foreground: Option<Mode>,
     background: Option<Mode>,
-    attribute: Option<Vec<&'static str>>
+    attributes: Option<Vec<&'static str>>
 }
 
 impl Colors {
@@ -79,18 +81,18 @@ impl Colors {
     /// transformation into ANSI code parameters, which may be obtained by calling the
     /// `into_string()` method on the newly-created `Colors` structure.
     pub fn collect(input: &str) -> Colors {
-        let mut colors = Colors { foreground: None, background: None, attribute: None };
+        let mut colors = Colors { foreground: None, background: None, attributes: None };
         for variable in input.split(",") {
             if variable == "reset" {
-                return Colors { foreground: None, background: None, attribute: Some(vec!["0"]) };
+                return Colors { foreground: None, background: None, attributes: Some(vec!["0"]) };
             } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
                 colors.append_attribute(attribute);
             } else if let Some(color) = COLORS.get(&variable) {
                 colors.foreground = Some(Mode::Name(*color));
             } else if let Some(color) = BG_COLORS.get(&variable) {
                 colors.background = Some(Mode::Name(*color));
-            } else {
-                colors.attempt_256bit_parsing(variable);
+            } else if !colors.set_256bit_color(variable) {
+                eprintln!("ion: {} is not a valid color", variable)
             }
         }
         colors
@@ -98,30 +100,41 @@ impl Colors {
 
     /// Attributes can be stacked, so this function serves to enable that stacking.
     fn append_attribute(&mut self, attribute: &'static str) {
-        let vec_exists = match self.attribute.as_mut() {
+        let vec_exists = match self.attributes.as_mut() {
             Some(vec) => { vec.push(attribute); true },
             None => false
         };
 
         if !vec_exists {
-            self.attribute = Some(vec![attribute]);
+            self.attributes = Some(vec![attribute]);
         }
     }
 
-    /// If no matches were made, then this will attempt to parse the variable as a two-digit
-    /// hexadecimal value, which corresponds to a 256-bit color.
-    fn attempt_256bit_parsing(&mut self, variable: &str) {
-        if variable.len() < 2 {
-            eprintln!("ion: {} is not a valid color", variable)
-        } else if let Ok(value) = u16::from_str_radix(&variable[0..2], 16) {
-            if variable.ends_with("bg") {
-                self.background = Some(Mode::bits256(value));
-            } else {
-                self.foreground = Some(Mode::bits256(value));
+    /// If no matches were made, then this will attempt to parse the variable as either a
+    /// two-digit hexadecimal value, or a decimal value, which corresponds to a 256-bit color.
+    fn set_256bit_color(&mut self, variable: &str) -> bool {
+        if variable.len() > 3 && variable.starts_with("0x") {
+            if let Ok(value) = u16::from_str_radix(&variable[2..4], 16) {
+                if variable.ends_with("bg") && variable.len() == 6 {
+                    self.background = Some(Mode::bits256(value));
+                    return true;
+                } else if variable.len() == 4 {
+                    self.foreground = Some(Mode::bits256(value));
+                    return true;
+                }
             }
-        } else {
-            eprintln!("ion: {} is not a valid color", variable)
+        } else if variable.ends_with("bg") && variable.len() > 2 {
+            let (number, _) = variable.split_at(variable.len()-2);
+            if let Ok(value) = number.parse::<u16>() {
+                self.background = Some(Mode::bits256(value));
+                return true
+            }
+        } else if let Ok(value) = variable.parse::<u16>() {
+            self.foreground = Some(Mode::bits256(value));
+            return true
         }
+
+        false
     }
 
     /// Attempts to transform the data in the structure into the corresponding ANSI code
@@ -142,7 +155,7 @@ impl Colors {
             None => None
         };
 
-        if let Some(attr) = self.attribute {
+        if let Some(attr) = self.attributes {
             output.push_str(&attr.join(";"));
             match (foreground, background) {
                 (Some(c), None) | (None, Some(c)) => Some([&output, ";", &c, "m"].concat()),
@@ -156,5 +169,58 @@ impl Colors {
                 (Some(fg), Some(bg)) => Some([&output, &fg, ";", &bg, "m"].concat())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn set_multiple_color_attributes() {
+        let expected = Colors {
+            attributes: Some(vec!["1", "4", "5"]),
+            background: None,
+            foreground: None,
+        };
+        let actual = Colors::collect("bold,underlined,blink");
+        assert_eq!(actual, expected);
+        assert_eq!(Some("\x1b[1;4;5m".to_owned()), actual.into_string());
+    }
+
+    #[test]
+    fn set_multiple_colors() {
+        let expected = Colors {
+            attributes: Some(vec!["1"]),
+            background: Some(Mode::Name("107")),
+            foreground: Some(Mode::Name("35"))
+        };
+        let actual = Colors::collect("whitebg,magenta,bold");
+        assert_eq!(actual, expected);
+        assert_eq!(Some("\x1b[1;35;107m".to_owned()), actual.into_string());
+    }
+
+    #[test]
+    fn hexadecimal_256bit_colors() {
+        let expected = Colors {
+            attributes: None,
+            background: Some(Mode::bits256(77)),
+            foreground: Some(Mode::bits256(75))
+        };
+        let actual = Colors::collect("0x4b,0x4dbg");
+        assert_eq!(actual, expected);
+        assert_eq!(Some("\x1b[38;5;75;48;5;77m".to_owned()), actual.into_string())
+    }
+
+    #[test]
+    fn decimal_256bit_colors() {
+        let expected = Colors {
+            attributes: None,
+            background: Some(Mode::bits256(78)),
+            foreground: Some(Mode::bits256(32))
+        };
+        let actual = Colors::collect("78bg,32");
+        assert_eq!(actual, expected);
+        assert_eq!(Some("\x1b[38;5;32;48;5;78m".to_owned()), actual.into_string())
     }
 }

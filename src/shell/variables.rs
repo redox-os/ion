@@ -148,7 +148,7 @@ impl Variables {
         if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
             // If the parsed name contains the '::' pattern, then a namespace was designated. Find it.
             match name {
-                "color" => Colors::collect(variable).into_string(),
+                "c" | "color" => Colors::collect(variable).into_string(),
                 "env" => env::var(variable).map(Into::into).ok(),
                 _ => {
                     // Attempt to obtain the given namespace from our lazily-generated map of namespaces.
