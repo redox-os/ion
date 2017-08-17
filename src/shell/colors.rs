@@ -65,7 +65,8 @@ lazy_static! {
 /// Colors may be called by name, or by a hexadecimal-converted decimal value.
 enum Mode {
     Name(&'static str),
-    bits256(u16),
+    Range256(u8),
+    TrueColor(u8, u8, u8),
 }
 
 #[derive(Debug, PartialEq)]
@@ -91,7 +92,7 @@ impl Colors {
                 colors.foreground = Some(Mode::Name(*color));
             } else if let Some(color) = BG_COLORS.get(&variable) {
                 colors.background = Some(Mode::Name(*color));
-            } else if !colors.set_256bit_color(variable) {
+            } else if !colors.parse_colors(variable) {
                 eprintln!("ion: {} is not a valid color", variable)
             }
         }
@@ -110,28 +111,55 @@ impl Colors {
         }
     }
 
+
     /// If no matches were made, then this will attempt to parse the variable as either a
-    /// two-digit hexadecimal value, or a decimal value, which corresponds to a 256-bit color.
-    fn set_256bit_color(&mut self, variable: &str) -> bool {
-        if variable.len() > 3 && variable.starts_with("0x") {
-            if let Ok(value) = u16::from_str_radix(&variable[2..4], 16) {
-                if variable.ends_with("bg") && variable.len() == 6 {
-                    self.background = Some(Mode::bits256(value));
+    /// 24-bit true color color, or one of 256 colors. It supports both hexadecimal and decimals.
+    fn parse_colors(&mut self, variable: &str) -> bool {
+        // First, determine which field we will write to.
+        let (field, variable) = if variable.ends_with("bg") {
+            (&mut self.background, &variable[..variable.len()-2])
+        } else {
+            (&mut self.foreground, variable)
+        };
+
+        // Then, check if the value is a hexadecimal value
+        if variable.starts_with("0x") {
+            let variable = &variable[2..];
+
+            match variable.len() {
+                // 256 colors: 0xF | 0xFF
+                1 | 2 => if let Ok(value) = u8::from_str_radix(variable, 16) {
+                    *field = Some(Mode::Range256(value));
                     return true;
-                } else if variable.len() == 4 {
-                    self.foreground = Some(Mode::bits256(value));
-                    return true;
-                }
+                },
+                // 24-bit Color 0xRGB
+                3 => {
+                    let mut chars = variable.chars();
+                    if let Some(red) = hex_char_to_u8_range(chars.next().unwrap()) {
+                        if let Some(green) = hex_char_to_u8_range(chars.next().unwrap()) {
+                            if let Some(blue) = hex_char_to_u8_range(chars.next().unwrap()) {
+                                *field = Some(Mode::TrueColor(red, green, blue));
+                                return true;
+                            }
+                        }
+                    }
+                },
+                // 24-bit Color 0xRRGGBB
+                6 => if let Ok(red) = u8::from_str_radix(&variable[0..2], 16) {
+                    if let Ok(green) = u8::from_str_radix(&variable[2..4], 16) {
+                        if let Ok(blue) = u8::from_str_radix(&variable[4..6], 16) {
+                            *field = Some(Mode::TrueColor(red, green, blue));
+                            return true;
+                        }
+                    }
+                },
+                _ => ()
             }
-        } else if variable.ends_with("bg") && variable.len() > 2 {
-            let (number, _) = variable.split_at(variable.len()-2);
-            if let Ok(value) = number.parse::<u16>() {
-                self.background = Some(Mode::bits256(value));
-                return true
+        } else {
+            if let Ok(value) = variable.parse::<u8>() {
+                *field = Some(Mode::Range256(value));
+                return true;
             }
-        } else if let Ok(value) = variable.parse::<u16>() {
-            self.foreground = Some(Mode::bits256(value));
-            return true
         }
 
         false
@@ -145,13 +173,15 @@ impl Colors {
 
         let foreground = match self.foreground {
             Some(Mode::Name(string)) => Some(string.to_owned()),
-            Some(Mode::bits256(value)) => Some(format!("38;5;{}", value)),
+            Some(Mode::Range256(value)) => Some(format!("38;5;{}", value)),
+            Some(Mode::TrueColor(red, green, blue)) => Some(format!("38;2;{};{};{}", red, green, blue)),
             None => None
         };
 
         let background = match self.background {
             Some(Mode::Name(string)) => Some(string.to_owned()),
-            Some(Mode::bits256(value)) => Some(format!("48;5;{}", value)),
+            Some(Mode::Range256(value)) => Some(format!("48;5;{}", value)),
+            Some(Mode::TrueColor(red, green, blue)) => Some(format!("48;2;{};{};{}", red, green, blue)),
             None => None
         };
 
@@ -172,9 +202,32 @@ impl Colors {
     }
 }
 
+fn hex_char_to_u8_range(character: char) -> Option<u8> {
+    if character >= '0' && character <= '9' {
+        Some((character as u8 - b'0') * 16)
+    } else {
+        // Convert the character to uppercase, if it isn't already.
+        let mut character = character as u8 & !0x20;
+        if character >= b'A' {
+            character -= 54;
+            if character < 17 {
+                return Some(character * 15 + 15);
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn convert_hex_digit() {
+        assert_eq!(Some(255), hex_char_to_u8_range('F'));
+        assert_eq!(Some(255), hex_char_to_u8_range('f'));
+        assert_eq!(Some(0), hex_char_to_u8_range('0'));
+    }
 
     #[test]
     fn set_multiple_color_attributes() {
@@ -201,11 +254,11 @@ mod test {
     }
 
     #[test]
-    fn hexadecimal_256bit_colors() {
+    fn hexadecimal_256_colors() {
         let expected = Colors {
             attributes: None,
-            background: Some(Mode::bits256(77)),
-            foreground: Some(Mode::bits256(75))
+            background: Some(Mode::Range256(77)),
+            foreground: Some(Mode::Range256(75))
         };
         let actual = Colors::collect("0x4b,0x4dbg");
         assert_eq!(actual, expected);
@@ -213,14 +266,37 @@ mod test {
     }
 
     #[test]
-    fn decimal_256bit_colors() {
+    fn decimal_256_colors() {
         let expected = Colors {
             attributes: None,
-            background: Some(Mode::bits256(78)),
-            foreground: Some(Mode::bits256(32))
+            background: Some(Mode::Range256(78)),
+            foreground: Some(Mode::Range256(32))
         };
         let actual = Colors::collect("78bg,32");
         assert_eq!(actual, expected);
         assert_eq!(Some("\x1b[38;5;32;48;5;78m".to_owned()), actual.into_string())
+    }
+
+    #[test]
+    fn three_digit_hex_24bit_colors() {
+        let expected = Colors {
+            attributes: None,
+            background: Some(Mode::TrueColor(255, 255, 255)),
+            foreground: Some(Mode::TrueColor(0, 0, 0))
+        };
+        let actual = Colors::collect("0x000,0xFFFbg");
+        assert_eq!(expected, actual);
+        assert_eq!(Some("\x1b[38;2;0;0;0;48;2;255;255;255m".to_owned()), actual.into_string());
+    }
+
+    #[test]
+    fn six_digit_hex_24bit_colors() {
+        let expected = Colors {
+            attributes: None,
+            background: Some(Mode::TrueColor(255, 0, 0)),
+            foreground: Some(Mode::TrueColor(0, 255, 0)),
+        };
+        let actual = Colors::collect("0x00FF00,0xFF0000bg");
+        assert_eq!(expected, actual);
     }
 }
