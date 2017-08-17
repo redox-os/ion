@@ -1,5 +1,4 @@
 use fnv::FnvHashMap;
-use std::u16;
 
 lazy_static! {
     static ref ATTRIBUTES: FnvHashMap<&'static str, &'static str> = {

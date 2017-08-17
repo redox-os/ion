@@ -37,7 +37,7 @@ impl Default for Variables {
         map.insert("DIRECTORY_STACK_SIZE".into(), "1000".into());
         map.insert("HISTORY_SIZE".into(), "1000".into());
         map.insert("HISTFILE_SIZE".into(), "1000".into());
-        map.insert("PROMPT".into(), "\x1B\']\'0;${USER}: ${PWD}\x07\x1B\'[\'0m\x1B\'[\'1;38;5;85m${USER}\x1B\'[\'37m:\x1B\'[\'38;5;75m${PWD}\x1B\'[\'37m#\x1B\'[\'0m ".into());
+        map.insert("PROMPT".into(), "${c::0x55,bold}${USER}${c::default}:${c::0x4B}${PWD}${c::default}# ${c::reset}".into());
         // Set the PID variable to the PID of the shell
         let pid = getpid().map(|p| p.to_string()).unwrap_or_else(
             |e| e.to_string(),
