@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use std::u16;
 
 lazy_static! {
     static ref ATTRIBUTES: FnvHashMap<&'static str, &'static str> = {
@@ -60,9 +61,14 @@ lazy_static! {
     };
 }
 
+enum Mode {
+    Name(&'static str),
+    bits256(u16),
+}
+
 pub struct Colors {
-    foreground: Option<&'static str>,
-    background: Option<&'static str>,
+    foreground: Option<Mode>,
+    background: Option<Mode>,
     attribute: Option<Vec<&'static str>>
 }
 
@@ -74,19 +80,27 @@ impl Colors {
                 return Colors { foreground: None, background: None, attribute: Some(vec!["0"]) };
             } else if let Some(color) = ATTRIBUTES.get(&variable) {
                 let vec_exists = match colors.attribute.as_mut() {
-                    Some(mut vec) => { vec.push(color); true },
+                    Some(vec) => { vec.push(color); true },
                     None => false
                 };
 
-                if vec_exists {
+                if !vec_exists {
                     colors.attribute = Some(vec![color]);
                 }
             } else if let Some(color) = COLORS.get(&variable) {
-                colors.foreground = Some(*color)
+                colors.foreground = Some(Mode::Name(*color))
             } else {
                 match BG_COLORS.get(&variable) {
-                    Some(color) => colors.background = Some(*color),
-                    None => eprintln!("ion: {} is not a valid color", variable),
+                    Some(color) => colors.background = Some(Mode::Name(*color)),
+                    None => if let Ok(value) = u16::from_str_radix(&variable[0..2], 16) {
+                        if variable.ends_with("bg") {
+                            colors.background = Some(Mode::bits256(value));
+                        } else {
+                            colors.foreground = Some(Mode::bits256(value));
+                        }
+                    } else {
+                        eprintln!("ion: {} is not a valid color", variable)
+                    }
                 }
             }
         }
@@ -95,18 +109,31 @@ impl Colors {
 
     pub fn into_string(self) -> Option<String> {
         let mut output = String::from("\x1b[");
+
+        let foreground = match self.foreground {
+            Some(Mode::Name(string)) => Some(string.to_owned()),
+            Some(Mode::bits256(value)) => Some(format!("38;5;{}", value)),
+            None => None
+        };
+
+        let background = match self.background {
+            Some(Mode::Name(string)) => Some(string.to_owned()),
+            Some(Mode::bits256(value)) => Some(format!("48;5;{}", value)),
+            None => None
+        };
+
         if let Some(attr) = self.attribute {
             output.push_str(&attr.join(";"));
-            match (self.foreground, self.background) {
-                (Some(c), None) | (None, Some(c)) => Some([&output, ";", c, "m"].concat()),
+            match (foreground, background) {
+                (Some(c), None) | (None, Some(c)) => Some([&output, ";", &c, "m"].concat()),
                 (None, None) => Some([&output, "m"].concat()),
-                (Some(fg), Some(bg)) => Some([&output, ";", fg, ";", bg, "m"].concat())
+                (Some(fg), Some(bg)) => Some([&output, ";", &fg, ";", &bg, "m"].concat())
             }
         } else {
-            match (self.foreground, self.background) {
-                (Some(c), None) | (None, Some(c)) => Some([&output, c, "m"].concat()),
+            match (foreground, background) {
+                (Some(c), None) | (None, Some(c)) => Some([&output, &c, "m"].concat()),
                 (None, None) => None,
-                (Some(fg), Some(bg)) => Some([&output, fg, ";", bg, "m"].concat())
+                (Some(fg), Some(bg)) => Some([&output, &fg, ";", &bg, "m"].concat())
             }
         }
     }
