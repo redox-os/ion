@@ -9,6 +9,7 @@ mod test;
 mod time;
 mod echo;
 mod set;
+mod exists;
 
 use self::conditionals::{contains, ends_with, starts_with};
 use self::echo::echo;
@@ -16,6 +17,7 @@ use self::functions::fn_;
 use self::source::source;
 use self::test::test;
 use self::variables::{alias, drop_alias, drop_array, drop_variable};
+use self::exists::exists;
 
 use fnv::FnvHashMap;
 use std::error::Error;
@@ -152,6 +154,7 @@ impl Builtin {
             contains,
             "Evaluates if the supplied argument contains a given string"
         );
+        insert_builtin!("exists", builtin_exists, "Performs tests on files and text");
 
         commands
     }
@@ -412,5 +415,18 @@ fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
             shell.previous_status
         }
         _ => shell.previous_status,
+    }
+}
+
+fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
+    match exists(args, shell) {
+        Ok(true) => SUCCESS,
+        Ok(false) => FAILURE,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "{}", why);
+            FAILURE
+        }
     }
 }
