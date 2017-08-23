@@ -1,8 +1,7 @@
 // TODO: Handle Runtime Errors
 extern crate permutate;
-extern crate unicode_segmentation;
 extern crate calc;
-use self::unicode_segmentation::UnicodeSegmentation;
+use unicode_segmentation::UnicodeSegmentation;
 
 use types::Array;
 

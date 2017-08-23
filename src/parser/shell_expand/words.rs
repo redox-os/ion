@@ -8,7 +8,7 @@ use super::{Expander, expand_string};
 use super::{is_expression, slice};
 use super::ranges::parse_index_range;
 use super::super::ArgumentSplitter;
-use super::unicode_segmentation::UnicodeSegmentation;
+use unicode_segmentation::UnicodeSegmentation;
 use shell::plugins::methods::{self, StringMethodPlugins, MethodArguments};
 
 use std::path::Path;
