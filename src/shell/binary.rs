@@ -276,16 +276,8 @@ impl<'a> Binary for Shell<'a> {
                     if let Ok(command) = self.terminate_quotes(command) {
                         // Parse and potentially execute the command.
                         self.on_command(command.trim());
-
-                        // Mark the command in the context history if it was a success.
-                        if self.previous_status != NO_SUCH_COMMAND || self.flow_control.level > 0 {
-                            self.set_context_history_from_vars();
-                            if let Err(err) = self.context.as_mut().unwrap().history.push(command.into()) {
-                                let stderr = io::stderr();
-                                let mut stderr = stderr.lock();
-                                let _ = writeln!(stderr, "ion: {}", err);
-                            }
-                        }
+                        // save command in history (or maybe not, depending on HISTORY_IGNORE)
+                        self.save_command_in_history(&command);
                     } else {
                         self.flow_control.level = 0;
                         self.flow_control.current_if_mode = 0;
