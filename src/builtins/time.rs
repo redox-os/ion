@@ -1,4 +1,3 @@
-
 use std::error::Error;
 use std::io::{Write, stdout};
 use std::process::Command;

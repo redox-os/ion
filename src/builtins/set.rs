@@ -1,4 +1,3 @@
-
 use liner::KeyBindings;
 use shell::Shell;
 use shell::flags::*;

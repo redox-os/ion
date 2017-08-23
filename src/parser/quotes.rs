@@ -81,8 +81,14 @@ impl QuoteTerminator {
             }
 
             if self.flags.intersects(SQUOTE | DQUOTE) {
-                self.read += 1;
-                self.buffer.push('\n');
+                if let Some(b'\\') = self.buffer.bytes().last() {
+                    let _ = self.buffer.pop();
+                    self.read -= 1;
+                    self.flags |= TRIM;
+                } else {
+                    self.read += 1;
+                    self.buffer.push('\n');
+                }
                 false
             } else {
                 if let Some(b'\\') = self.buffer.bytes().last() {

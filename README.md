@@ -95,9 +95,7 @@ there's an official git plugin that can be installed to experiment with the exis
 To install the git plugin, first install ion, and then execute the following:
 
 ```ion
-git clone https://github.com/mmstick/ion-plugins
-cd ion-plugins
-./install.ion
+./setup.ion install plugins
 ```
 
 It can be tested out by navigating to a directory within a git repository, and running the following:
@@ -105,6 +103,11 @@ It can be tested out by navigating to a directory within a git repository, and r
 ```ion
 echo Current Branch: ${git::branch}
 ```
+
+# Install Documentation
+
+The mdBook shipping with Ion can be installed into the system and accessed via the `ion-docs` builtin.
+See the `setup.ion` script in this repository (execute it without arguments to get more info).
 
 # Vim/NeoVim Syntax Highlighting Plugin
 

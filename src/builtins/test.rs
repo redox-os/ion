@@ -1,4 +1,3 @@
-
 use smallstring::SmallString;
 use std::error::Error;
 use std::fs;

@@ -1,18 +1,17 @@
-
-use std::error::Error;
-use std::fs;
-use std::io::{self, BufWriter};
-use std::os::unix::fs::{PermissionsExt};
 #[cfg(test)]
 use smallstring::SmallString;
 #[cfg(test)]
 use smallvec::SmallVec;
+use std::error::Error;
+use std::fs;
+use std::io::{self, BufWriter};
+use std::os::unix::fs::PermissionsExt;
 
 #[cfg(test)]
 use builtins::Builtin;
+use shell::Shell;
 #[cfg(test)]
 use shell::flow_control::{Function, FunctionArgument, Statement};
-use shell::Shell;
 
 const MAN_PAGE: &'static str = r#"NAME
     exists - check whether items exist
@@ -113,9 +112,7 @@ fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W, shell: &
                 })
             })
         }
-        Some(string) => {
-            Ok(string_is_nonzero(string))
-        }
+        Some(string) => Ok(string_is_nonzero(string)),
         None => Ok(false),
     }
 }
@@ -198,7 +195,7 @@ fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
 fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
     match shell.variables.get_array(arrayvar) {
         Some(array) => !array.is_empty(),
-        None => false
+        None => false,
     }
 }
 
@@ -206,7 +203,7 @@ fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
 fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
     match shell.variables.get_var(stringvar) {
         Some(string) => !string.is_empty(),
-        None => false
+        None => false,
     }
 }
 
@@ -214,7 +211,7 @@ fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
 fn function_is_defined(function: &str, shell: &Shell) -> bool {
     match shell.functions.get(function) {
         Some(_) => true,
-        None => false
+        None => false,
     }
 }
 
@@ -244,7 +241,10 @@ fn test_evaluate_arguments() {
     // check `exists -a`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-a"], &mut sink, &shell), Ok(true));
-    shell.variables.set_array("emptyarray", SmallVec::from_vec(Vec::new()));
+    shell.variables.set_array(
+        "emptyarray",
+        SmallVec::from_vec(Vec::new()),
+    );
     assert_eq!(evaluate_arguments(&["-a", "emptyarray"], &mut sink, &shell), Ok(false));
     let mut vec = Vec::new();
     vec.push("element".to_owned());
@@ -257,7 +257,9 @@ fn test_evaluate_arguments() {
     // TODO: see test_binary_is_in_path()
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-b"], &mut sink, &shell), Ok(true));
-    let oldpath = shell.variables.get_var("PATH").unwrap_or("/usr/bin".to_owned());
+    let oldpath = shell.variables.get_var("PATH").unwrap_or(
+        "/usr/bin".to_owned(),
+    );
     shell.variables.set_var("PATH", "testing/");
 
     assert_eq!(evaluate_arguments(&["-b", "executable_file"], &mut sink, &shell), Ok(true));
@@ -332,7 +334,10 @@ fn test_match_flag_argument() {
     let shell = Shell::new(&builtins);
 
     // we don't really care about the passed values, as long as both sited return the same value
-    assert_eq!(match_flag_argument('a', "ARRAY", &shell), array_var_is_not_empty("ARRAY", &shell));
+    assert_eq!(
+        match_flag_argument('a', "ARRAY", &shell),
+        array_var_is_not_empty("ARRAY", &shell)
+    );
     assert_eq!(match_flag_argument('b', "binary", &shell), binary_is_in_path("binary", &shell));
     assert_eq!(match_flag_argument('d', "path", &shell), path_is_directory("path"));
     assert_eq!(match_flag_argument('f', "file", &shell), path_is_file("file"));
@@ -348,7 +353,10 @@ fn test_match_option_argument() {
     let shell = Shell::new(&builtins);
 
     // we don't really care about the passed values, as long as both sited return the same value
-    assert_eq!(match_option_argument("fn", "FUN", &shell), array_var_is_not_empty("FUN", &shell));
+    assert_eq!(
+        match_option_argument("fn", "FUN", &shell),
+        array_var_is_not_empty("FUN", &shell)
+    );
 
     // Any option which is not implemented
     assert_eq!(match_option_argument("foo", "ARG", &shell), false);
@@ -403,12 +411,18 @@ fn test_array_var_is_not_empty() {
     let builtins = Builtin::map();
     let mut shell = Shell::new(&builtins);
 
-    shell.variables.set_array("EMPTY_ARRAY", SmallVec::from_vec(Vec::new()));
+    shell.variables.set_array(
+        "EMPTY_ARRAY",
+        SmallVec::from_vec(Vec::new()),
+    );
     assert_eq!(array_var_is_not_empty("EMPTY_ARRAY", &shell), false);
 
     let mut not_empty_vec = Vec::new();
     not_empty_vec.push("array not empty".to_owned());
-    shell.variables.set_array("NOT_EMPTY_ARRAY", SmallVec::from_vec(not_empty_vec));
+    shell.variables.set_array(
+        "NOT_EMPTY_ARRAY",
+        SmallVec::from_vec(not_empty_vec),
+    );
     assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), true);
 
     // test for array which does not even exist
@@ -434,7 +448,10 @@ fn test_string_var_is_not_empty() {
     // string_var_is_not_empty should NOT match for arrays with the same name
     let mut vec = Vec::new();
     vec.push("not-empty".to_owned());
-    shell.variables.set_array("ARRAY_NOT_EMPTY", SmallVec::from_vec(vec) );
+    shell.variables.set_array(
+        "ARRAY_NOT_EMPTY",
+        SmallVec::from_vec(vec),
+    );
     assert_eq!(string_var_is_not_empty("ARRAY_NOT_EMPTY", &shell), false);
 
     // test for a variable which does not even exist
