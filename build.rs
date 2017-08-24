@@ -56,7 +56,10 @@ fn main() {
             println!("cargo:warning={}", "Build may fail due to incompatible rustc version.");
         }
     }
-    write_version_file().unwrap();
+    match write_version_file() {
+        Ok(_) => {},
+        Err(e) => panic!("Failed to create a version file: {:?}", e),
+    }
 }
 
 fn write_version_file() -> io::Result<()> {
@@ -74,6 +77,6 @@ fn write_version_file() -> io::Result<()> {
     let target = env::var("TARGET").unwrap();
     let version_fname = Path::new(&env::var("OUT_DIR").unwrap()).join("version_string");
     let mut version_file = File::create(&version_fname)?;
-    write!(&mut version_file, "\"ion {} ({}) rev {}\"", version, target, rev)?;
+    write!(&mut version_file, "r#\"ion {} ({})\nrev {}\"#", version, target, rev.trim())?;
     Ok(())
 }
