@@ -16,7 +16,7 @@ pub mod variables;
 
 pub use self::binary::Binary;
 pub use self::flow::FlowLogic;
-pub use self::history::ShellHistory;
+pub use self::history::{ShellHistory, IgnoreSetting};
 pub use self::job::{Job, JobKind};
 pub use self::pipe_exec::{foreground, job_control};
 
@@ -77,6 +77,8 @@ pub struct Shell<'a> {
     pub break_flow: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified background process.
     pub foreground_signals: Arc<ForegroundSignals>,
+    /// Stores the patterns used to determine whether a command should be saved in the history or not
+    ignore_setting: IgnoreSetting,
 }
 
 impl<'a> Shell<'a> {
@@ -97,6 +99,7 @@ impl<'a> Shell<'a> {
             is_background_shell: false,
             break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new()),
+            ignore_setting: IgnoreSetting::default(),
         }
     }
 

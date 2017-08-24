@@ -1,6 +1,8 @@
 use std::env;
 use std::io::{self, Write};
 
+use smallstring::SmallString;
+use super::history::ShellHistory;
 use super::Shell;
 use super::status::*;
 use parser::expand_string;
@@ -79,6 +81,11 @@ impl<'a> VariableStore for Shell<'a> {
                             };
 
                             if use_original {
+                                // When we changed the HISTORY_IGNORE variable, update the ignore
+                                // patterns. This happens first because `set_array` consumes 'values'
+                                if key.name == "HISTORY_IGNORE" {
+                                    self.update_ignore_patterns(&values);
+                                }
                                 self.variables.set_array(key.name, values);
                             }
                         }

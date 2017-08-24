@@ -19,6 +19,21 @@ bitflags! {
     }
 }
 
+pub struct IgnoreSetting {
+    flags: IgnoreFlags,
+    // Yes, a bad heap-based Vec, however unfortunately its not possible to store Regex'es in Array
+    regexes: Option<Vec<Regex>>,
+}
+
+impl IgnoreSetting {
+    pub fn default() -> IgnoreSetting {
+        IgnoreSetting {
+            flags: IgnoreFlags::empty(),
+            regexes: None,
+        }
+    }
+}
+
 /// Contains all history-related functionality for the `Shell`.
 pub trait ShellHistory {
     /// Prints the commands contained within the history buffers to standard output.
@@ -39,14 +54,14 @@ pub trait ShellHistory {
     /// Saves a command in the history, depending on @HISTORY_IGNORE. Should be called
     /// immediately after `on_command()`
     fn save_command_in_history(&mut self, command: &str);
+
+    /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE is changed.
+    fn update_ignore_patterns(&mut self, patterns: &Array);
 }
 
 trait ShellHistoryPrivate {
     /// Returns true if the given command with the given exit status should be saved in the history
     fn should_save_command(&self, command: &str) -> bool;
-
-    /// Parses the @HISTORY_IGNORE environment variable
-    fn parse_history_ignore(&self) -> (IgnoreFlags, Option<Array>);
 }
 
 impl<'a> ShellHistory for Shell<'a> {
@@ -99,11 +114,44 @@ impl<'a> ShellHistory for Shell<'a> {
             }
         }
     }
+
+    fn update_ignore_patterns(&mut self, patterns: &Array) {
+        let mut flags = IgnoreFlags::empty();
+        let mut regexes = Vec::new();
+        // for convenience and to avoid typos
+        let regex_prefix = "regex:";
+        for pattern in patterns {
+            match pattern.as_ref() {
+                "all" => flags |= IGNORE_ALL,
+                "no_such_command" => flags |= IGNORE_NO_SUCH_COMMAND,
+                "whitespace" => flags |= IGNORE_WHITESPACE,
+                // The length check is there to just ignore empty regex definitions
+                _ if pattern.starts_with(regex_prefix) && pattern.len() > regex_prefix.len() => {
+                    flags |= IGNORE_BASED_ON_REGEX;
+                    let regex_string = pattern[regex_prefix.len()..].to_owned();
+                    // We save the compiled regexes, as compiling them can be  an expensive task
+                    if let Ok(regex) = Regex::new(&regex_string) {
+                        regexes.push(regex);
+                    }
+                }
+                _ => continue,
+            }
+        }
+
+        self.ignore_setting.flags = flags;
+        self.ignore_setting.regexes = if regexes.len() > 0 {
+            Some(regexes)
+        } else {
+            None
+        }
+    }
 }
 
 impl<'a> ShellHistoryPrivate for Shell<'a> {
     fn should_save_command(&self, command: &str) -> bool {
-        let (ignore, regexes) = self.parse_history_ignore();
+        // just for convenience and to make the code look a bit cleaner
+        let ignore = &self.ignore_setting.flags;
+        let regexes = &self.ignore_setting.regexes;
 
         // without the second check the command which sets the environment variable would also be
         // ignored. However, this behavior might not be wanted.
@@ -125,52 +173,18 @@ impl<'a> ShellHistoryPrivate for Shell<'a> {
             return false;
         }
 
-        if let Some(regexes) = regexes {
+        if let Some(ref regexes) = *regexes {
             for regex in regexes {
-                // NOTE: If a user defines many (large) regexes this might turn into a bottleneck,
-                // as compiling a regex is expensive (see
-                // https://doc.rust-lang.org/regex/regex/index.html#example-avoid-compiling-the-same-regex-in-a-loop)
-                // However, I don't think that we can use lazy_static here, as we don't know the
-                // regexes at compile time.
-                if let Ok(re) = Regex::new(&regex) {
-                    // ignore command when regex is matched but only if it does not contain
-                    // "HISTORY_IGNORE", otherwise we would also ignore the command which
-                    // sets the variable, which could be annoying.
-                    if re.is_match(command) && !command.contains("HISTORY_IGNORE") {
-                        return false;
-                    }
+                // ignore command when regex is matched but only if it does not contain
+                // "HISTORY_IGNORE", otherwise we would also ignore the command which
+                // sets the variable, which could be annoying.
+                if regex.is_match(command) && !command.contains("HISTORY_IGNORE") {
+                    return false;
                 }
             }
         }
 
         // default to true, as it's more likely that we want to save a command in history
         true
-    }
-
-    fn parse_history_ignore(&self) -> (IgnoreFlags, Option<Array>) {
-        if let Some(ignore_values) = self.variables.get_array("HISTORY_IGNORE") {
-            let mut flags = IgnoreFlags::empty();
-            let mut regexes: Array = Array::new();
-            // for convenience and to avoid typos
-            let regex_prefix = "regex:";
-            for elem in ignore_values {
-                match elem.as_ref() {
-                    "all" => flags |= IGNORE_ALL,
-                    "no_such_command" => flags |= IGNORE_NO_SUCH_COMMAND,
-                    "whitespace" => flags |= IGNORE_WHITESPACE,
-                    // The length check is there to just ignore empty regex definitions
-                    _ if elem.starts_with(regex_prefix) && elem.len() > regex_prefix.len() => {
-                        flags |= IGNORE_BASED_ON_REGEX;
-                        let regex = elem[regex_prefix.len()..].to_owned();
-                        regexes.push(regex);
-                    }
-                    _ => continue,
-                }
-            }
-
-            return (flags, Some(regexes));
-        }
-
-        (IgnoreFlags::empty(), None)
     }
 }
