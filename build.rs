@@ -69,7 +69,6 @@ fn write_version_file() -> io::Result<()> {
         .join("refs")
         .join("heads")
         .join("master");
-    println!("opening {:?}", git_file);
     let mut file = File::open(git_file)?;
     let mut rev = String::new();
     file.read_to_string(&mut rev)?;
