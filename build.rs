@@ -9,6 +9,11 @@ use version_check::is_min_version;
 // `loop` (RFC 1624, rust-lang/rust GitHub issue #37339).
 const MIN_VERSION: &'static str = "1.19.0";
 
+use std::env;
+use std::path::Path;
+use std::fs::File;
+use std::io::{self, Write, Read};
+
 // Convenience macro for writing to stderr.
 macro_rules! printerr {
     ($($arg:tt)*) => ({
@@ -51,4 +56,24 @@ fn main() {
             println!("cargo:warning={}", "Build may fail due to incompatible rustc version.");
         }
     }
+    write_version_file().unwrap();
+}
+
+fn write_version_file() -> io::Result<()> {
+    // get the .git/refs/head/master file and read that for the rev
+    let git_file = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
+        .join(".git")
+        .join("refs")
+        .join("heads")
+        .join("master");
+    println!("opening {:?}", git_file);
+    let mut file = File::open(git_file)?;
+    let mut rev = String::new();
+    file.read_to_string(&mut rev)?;
+    let version = env::var("CARGO_PKG_VERSION").unwrap();
+    let target = env::var("TARGET").unwrap();
+    let version_fname = Path::new(&env::var("OUT_DIR").unwrap()).join("version_string");
+    let mut version_file = File::create(&version_fname)?;
+    write!(&mut version_file, "\"ion {} ({}) rev {}\"", version, target, rev)?;
+    Ok(())
 }
