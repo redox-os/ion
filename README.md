@@ -11,7 +11,7 @@ We are providing our manual for Ion in the form of a markdown-based book, which 
 
 - The official page for Ion's manual on Redox's website: https://doc.redox-os.org/ion-manual/
 - Installing the mdbook via our `setup.ion` script and having Ion open an offline copy via `ion-docs`.
-- Building and serving the book in the **manual** directory in the yourself with [mdBook](https://github.com/azerupi/mdBook)
+- Building and serving the book in the **manual** directory yourself with [mdBook](https://github.com/azerupi/mdBook)
 
 # Introduction
 
