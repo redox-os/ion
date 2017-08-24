@@ -597,18 +597,21 @@ impl<'a> FlowLogic for Shell<'a> {
                     self.flow_control.level = 0;
                     self.flow_control.current_if_mode = 0;
                 }
-
+                // Collect timing here so we do not count anything but the execution.
                 let duration = time.elapsed();
                 let seconds = duration.as_secs();
                 let nanoseconds = duration.subsec_nanos();
 
-                let stdout = stdout();
-                let mut stdout = stdout.lock();
-                let _ = if seconds > 60 {
-                    writeln!(stdout, "real    {}m{:02}.{:09}s", seconds / 60, seconds % 60, nanoseconds)
-                } else {
-                    writeln!(stdout, "real    {}.{:09}s", seconds, nanoseconds)
-                };
+                // A statement was executed, output the time
+                if self.flow_control.level == 0 {
+                    let stdout = stdout();
+                    let mut stdout = stdout.lock();
+                    let _ = if seconds > 60 {
+                        writeln!(stdout, "real    {}m{:02}.{:09}s", seconds / 60, seconds % 60, nanoseconds)
+                    } else {
+                        writeln!(stdout, "real    {}.{:09}s", seconds, nanoseconds)
+                    };
+                }
             },
             // At this level, else and else if keywords are forbidden.
             Statement::ElseIf { .. } |
