@@ -304,17 +304,6 @@ impl<'a> Binary for Shell<'a> {
     fn main(mut self) {
         let mut args = env::args().skip(1);
         if let Some(path) = args.next() {
-<<<<<<< Updated upstream
-            if path == "-c" {
-                self.execute_arguments(args);
-            } else {
-                let mut array = SmallVec::from_iter(Some(path.clone().into()));
-                for arg in args {
-                    array.push(arg.into());
-                }
-                self.variables.set_array("args", array);
-                self.execute_script(&path);
-=======
             match path.as_str() {
                 "-c" => self.execute_arguments(args),
                 "--version" => self.display_version(),
@@ -326,7 +315,6 @@ impl<'a> Binary for Shell<'a> {
                     self.variables.set_array("args", array);
                     self.execute_script(&path);
                 }
->>>>>>> Stashed changes
             }
 
             self.wait_for_background();
