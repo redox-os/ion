@@ -8,10 +8,14 @@ mod job_control;
 mod test;
 mod echo;
 mod set;
+mod exists;
+mod ion;
 
 use self::conditionals::{contains, ends_with, starts_with};
 use self::echo::echo;
+use self::exists::exists;
 use self::functions::fn_;
+use self::ion::ion_docs;
 use self::source::source;
 use self::test::test;
 use self::variables::{alias, drop_alias, drop_array, drop_variable};
@@ -150,6 +154,8 @@ impl Builtin {
             contains,
             "Evaluates if the supplied argument contains a given string"
         );
+        insert_builtin!("exists", builtin_exists, "Performs tests on files and text");
+        insert_builtin!("ion-docs", ion_docs, "Opens the Ion manual");
 
         commands
     }
@@ -398,5 +404,18 @@ fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
             shell.previous_status
         }
         _ => shell.previous_status,
+    }
+}
+
+fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
+    match exists(args, shell) {
+        Ok(true) => SUCCESS,
+        Ok(false) => FAILURE,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "{}", why);
+            FAILURE
+        }
     }
 }

@@ -1,4 +1,3 @@
-use std::ffi::CString;
 use std::fmt::{self, Display, Formatter};
 use std::io;
 use types::Identifier;

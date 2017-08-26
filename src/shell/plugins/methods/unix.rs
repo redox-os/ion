@@ -36,7 +36,7 @@ impl From<MethodArguments> for RawMethodArguments {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
                     }).collect::<Vec<*mut i8>>();
                 args.shrink_to_fit();
-                let mut args_ptr = args.as_mut_ptr();
+                let args_ptr = args.as_mut_ptr();
                 forget(args);
 
                 RawMethodArguments {
@@ -54,7 +54,7 @@ impl From<MethodArguments> for RawMethodArguments {
                 let mut key_array = array.iter().map(|x| unsafe {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
                     }).collect::<Vec<*mut i8>>();
-                let mut key_array_ptr = key_array.as_mut_ptr();
+                let key_array_ptr = key_array.as_mut_ptr();
                 forget(key_array);
 
                 let args_len = args.len();
@@ -62,7 +62,7 @@ impl From<MethodArguments> for RawMethodArguments {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
                     }).collect::<Vec<*mut i8>>();
                 args.shrink_to_fit();
-                let mut args_ptr = args.as_mut_ptr();
+                let args_ptr = args.as_mut_ptr();
                 forget(args);
 
                 RawMethodArguments {
@@ -221,7 +221,7 @@ pub fn collect() -> StringMethodPlugins {
         path.push("strings");
         match read_dir(&path).map(LibraryIterator::new) {
             Ok(iterator) => {
-                for (identifier, library) in iterator {
+                for (_, library) in iterator {
                     if let Err(why) = methods.load(library) {
                         eprintln!("ion: string method error: {}", why);
                     }

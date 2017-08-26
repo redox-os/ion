@@ -7,8 +7,11 @@
 
 # New Ion MdBook
 
-See the **manual** directory contained within the repository. Navigating to that directory and executing `mdbook build` will build HTML documentation for Ion.
-Obtain mdbook [here](https://github.com/azerupi/mdBook).
+We are providing our manual for Ion in the form of a markdown-based book, which is accessible via:
+
+- The official page for Ion's manual on Redox's website: https://doc.redox-os.org/ion-manual/
+- Installing the mdbook via our `setup.ion` script and having Ion open an offline copy via `ion-docs`.
+- Building and serving the book in the **manual** directory yourself with [mdBook](https://github.com/azerupi/mdBook)
 
 # Introduction
 
@@ -95,15 +98,13 @@ there's an official git plugin that can be installed to experiment with the exis
 To install the git plugin, first install ion, and then execute the following:
 
 ```ion
-git clone https://github.com/mmstick/ion-plugins
-cd ion-plugins
-./install.ion
+./setup.ion install plugins
 ```
 
 It can be tested out by navigating to a directory within a git repository, and running the following:
 
 ```ion
-echo Current Branch: ${git::branch}
+echo Current Branch: ${git::branch}${git::modified_count}${git::untracked_count}
 ```
 
 # Vim/NeoVim Syntax Highlighting Plugin

@@ -5,6 +5,7 @@ mod flow;
 mod history;
 mod job;
 mod pipe_exec;
+pub mod colors;
 pub mod directory_stack;
 pub mod flags;
 pub mod plugins;

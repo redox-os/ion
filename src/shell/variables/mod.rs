@@ -8,6 +8,7 @@ use std::env;
 use std::io::{self, BufRead};
 use std::process;
 use types::{Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value, VariableContext};
+use unicode_segmentation::UnicodeSegmentation;
 
 #[cfg(target_os = "redox")]
 use sys::getpid;
@@ -15,6 +16,7 @@ use sys::getpid;
 #[cfg(all(unix, not(target_os = "unix")))]
 use sys::getpid;
 
+use super::colors::Colors;
 use sys;
 use sys::variables as self_sys;
 
@@ -36,7 +38,10 @@ impl Default for Variables {
         map.insert("DIRECTORY_STACK_SIZE".into(), "1000".into());
         map.insert("HISTORY_SIZE".into(), "1000".into());
         map.insert("HISTFILE_SIZE".into(), "1000".into());
-        map.insert("PROMPT".into(), "\x1B\']\'0;${USER}: ${PWD}\x07\x1B\'[\'0m\x1B\'[\'1;38;5;85m${USER}\x1B\'[\'37m:\x1B\'[\'38;5;75m${PWD}\x1B\'[\'37m#\x1B\'[\'0m ".into());
+        map.insert(
+            "PROMPT".into(),
+            "${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}".into(),
+        );
         // Set the PID variable to the PID of the shell
         let pid = getpid().map(|p| p.to_string()).unwrap_or_else(
             |e| e.to_string(),
@@ -143,10 +148,56 @@ impl Variables {
 
     pub fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
 
+    /// Obtains the value for the **SWD** variable.
+    ///
+    /// Useful for getting smaller prompts, this will produce a simplified variant of the
+    /// working directory which the leading `HOME` prefix replaced with a tilde character.
+    fn get_simplified_directory(&self) -> Value {
+        self.get_var("PWD").unwrap().replace(&self.get_var("HOME").unwrap(), "~")
+    }
+
+    /// Obtains the value for the **MWD** variable.
+    ///
+    /// Further minimizes the directory path in the same manner that Fish does by default.
+    /// That is, if more than two parents are visible in the path, all parent directories
+    /// of the current directory will be reduced to a single character.
+    fn get_minimal_directory(&self) -> Value {
+        let swd = self.get_simplified_directory();
+
+        {
+            // Temporarily borrow the `swd` variable while we attempt to assemble a minimal
+            // variant of the directory path. If that is not possible, we will cancel the
+            // borrow and return `swd` itself as the minified path.
+            let elements = swd.split("/").collect::<Vec<&str>>();
+            if elements.len() > 2 {
+                let mut output = String::new();
+                for element in &elements[0..elements.len()-1] {
+                    let mut segmenter = UnicodeSegmentation::graphemes(*element, true);
+                    let grapheme = segmenter.next().unwrap();
+                    output.push_str(grapheme);
+                    if grapheme == "." {
+                        output.push_str(segmenter.next().unwrap());
+                    }
+                    output.push('/');
+                }
+                output.push_str(&elements[elements.len()-1]);
+                return output;
+            }
+        }
+
+        swd
+    }
+
     pub fn get_var(&self, name: &str) -> Option<Value> {
+        match name {
+            "SWD" => return Some(self.get_simplified_directory()),
+            "MWD" => return Some(self.get_minimal_directory()),
+            _ => (),
+        }
         if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
             // If the parsed name contains the '::' pattern, then a namespace was designated. Find it.
             match name {
+                "c" | "color" => Colors::collect(variable).into_string(),
                 "env" => env::var(variable).map(Into::into).ok(),
                 _ => {
                     // Attempt to obtain the given namespace from our lazily-generated map of namespaces.

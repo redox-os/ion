@@ -1,4 +1,3 @@
-
 use smallstring::SmallString;
 use std::error::Error;
 use std::fs;
@@ -304,6 +303,8 @@ fn file_has_write_permission(filepath: &str) -> bool {
 /// Rust currently does not have a higher level abstraction for obtaining non-standard file modes.
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective execute bits.
+/// Note: This function is 1:1 the same as src/builtins/exists.rs:file_has_execute_permission
+/// If you change the following function, please also update the one in src/builtins/exists.rs
 fn file_has_execute_permission(filepath: &str) -> bool {
     const USER: u32 = 0b1000000;
     const GROUP: u32 = 0b1000;
