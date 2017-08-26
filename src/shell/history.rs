@@ -108,9 +108,7 @@ impl<'a> ShellHistory for Shell<'a> {
             // Mark the command in the context history
             self.set_context_history_from_vars();
             if let Err(err) = self.context.as_mut().unwrap().history.push(command.into()) {
-                let stderr = io::stderr();
-                let mut stderr = stderr.lock();
-                let _ = writeln!(stderr, "ion: {}", err);
+                eprintln!("ion: {}", err);
             }
         }
     }
@@ -128,9 +126,9 @@ impl<'a> ShellHistory for Shell<'a> {
                 // The length check is there to just ignore empty regex definitions
                 _ if pattern.starts_with(regex_prefix) && pattern.len() > regex_prefix.len() => {
                     flags |= IGNORE_BASED_ON_REGEX;
-                    let regex_string = pattern[regex_prefix.len()..].to_owned();
+                    let regex_string = &pattern[regex_prefix.len()..];
                     // We save the compiled regexes, as compiling them can be  an expensive task
-                    if let Ok(regex) = Regex::new(&regex_string) {
+                    if let Ok(regex) = Regex::new(regex_string) {
                         regexes.push(regex);
                     }
                 }
@@ -162,10 +160,8 @@ impl<'a> ShellHistoryPrivate for Shell<'a> {
         // Here we allow to also ignore the setting of the environment variable because we assume
         // the user entered the leading whitespace on purpose.
         if ignore.contains(IGNORE_WHITESPACE) {
-            if let Some(c) = command.chars().next() {
-                if c.is_whitespace() {
-                    return false;
-                }
+            if command.chars().next().map_or(false, |b| b.is_whitespace()) {
+                return false;
             }
         }
 
@@ -174,13 +170,11 @@ impl<'a> ShellHistoryPrivate for Shell<'a> {
         }
 
         if let Some(ref regexes) = *regexes {
-            for regex in regexes {
-                // ignore command when regex is matched but only if it does not contain
-                // "HISTORY_IGNORE", otherwise we would also ignore the command which
-                // sets the variable, which could be annoying.
-                if regex.is_match(command) && !command.contains("HISTORY_IGNORE") {
-                    return false;
-                }
+            // ignore command when regex is matched but only if it does not contain
+            // "HISTORY_IGNORE", otherwise we would also ignore the command which
+            // sets the variable, which could be annoying.
+            if regexes.iter().any(|regex| regex.is_match(command)) && !command.contains("HISTORY_IGNORE") {
+                return false;
             }
         }
 
