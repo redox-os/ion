@@ -9,12 +9,14 @@ pub struct TypeArg<'a> {
 #[derive(Debug, PartialEq)]
 pub enum TypeError<'a> {
     Invalid(&'a str),
+    BadValue(TypePrimitive),
 }
 
 impl<'a> Display for TypeError<'a> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
             TypeError::Invalid(parm) => write!(f, "invalid type supplied: {}", parm),
+            TypeError::BadValue(expected) => write!(f, "expected {}", expected),
         }
     }
 }

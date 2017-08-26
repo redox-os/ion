@@ -6,9 +6,8 @@ use super::status::*;
 use parser::expand_string;
 use parser::types::assignments::*;
 use parser::types::parse::*;
-// use parser::assignments::{Binding, Operator, Value};
-
-use types::{ArrayVariableContext, VariableContext};
+use smallvec::SmallVec;
+use types::{Array, ArrayVariableContext, VariableContext};
 
 fn print_vars(list: &VariableContext) {
     let stdout = io::stdout();
@@ -66,9 +65,22 @@ impl<'a> VariableStore for Shell<'a> {
                 for action in assignment_actions {
                     match action {
                         Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
-                            // TODO: Handle different array types accordingly.
-                            let value = expand_string(expression, self, false);
-                            self.variables.set_array(key.name, value);
+                            let values = expand_string(expression, self, false);
+                            let use_original = match array_is_valid(&values, key.kind) {
+                                Ok(Some(normalized)) => {
+                                    self.variables.set_array(key.name, normalized);
+                                    false
+                                }
+                                Ok(None) => true,
+                                Err(why) => {
+                                    eprintln!("ion: assignment error: {}", why);
+                                    return FAILURE;
+                                }
+                            };
+
+                            if use_original {
+                                self.variables.set_array(key.name, values);
+                            }
                         }
                         Ok(Action::UpdateArray(..)) => {
                             eprintln!("ion: arithmetic operators on array expressions aren't supported yet.");
@@ -76,6 +88,14 @@ impl<'a> VariableStore for Shell<'a> {
                         }
                         Ok(Action::UpdateString(key, operator, expression)) => {
                             let value = expand_string(expression, self, false).join(" ");
+                            let value = match string_is_valid(&value, key.kind) {
+                                Ok(value) => value,
+                                Err(why) => {
+                                    eprintln!("ion: assignment error: {}", why);
+                                    return FAILURE;
+                                }
+                            };
+
                             if !integer_math(self, key, operator, &value) {
                                 return FAILURE;
                             }
@@ -106,8 +126,22 @@ impl<'a> VariableStore for Shell<'a> {
                 for action in assignment_actions {
                     match action {
                         Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
-                            let value = expand_string(expression, self, false);
-                            env::set_var(key.name, &value.join(" "));
+                            let values = expand_string(expression, self, false);
+                            let use_original = match array_is_valid(&values, key.kind) {
+                                Ok(Some(normalized)) => {
+                                    env::set_var(key.name, normalized.join(" "));
+                                    false
+                                }
+                                Ok(None) => true,
+                                Err(why) => {
+                                    eprintln!("ion: assignment error: {}", why);
+                                    return FAILURE;
+                                }
+                            };
+
+                            if use_original {
+                                env::set_var(key.name, values.join(" "));
+                            }
                         }
                         Ok(Action::UpdateArray(..)) => {
                             eprintln!("ion: arithmetic operators on array expressions aren't supported yet.");
@@ -115,7 +149,15 @@ impl<'a> VariableStore for Shell<'a> {
                         }
                         Ok(Action::UpdateString(key, operator, expression)) => {
                             let value = expand_string(expression, self, false).join(" ");
-                            if !integer_math_export(key, operator, &value) {
+                            let value = match string_is_valid(&value, key.kind) {
+                                Ok(value) => value,
+                                Err(why) => {
+                                    eprintln!("ion: assignment error: {}", why);
+                                    return FAILURE;
+                                }
+                            };
+
+                            if !integer_math_export(key, operator, value) {
                                 return FAILURE;
                             }
                         }
@@ -147,6 +189,71 @@ impl<'a> VariableStore for Shell<'a> {
     }
 }
 
+fn is_boolean(value: &str) -> Result<&str, ()> {
+    if ["true", "1", "y"].contains(&value) {
+        Ok("true")
+    } else if ["false", "0", "n"].contains(&value) {
+        Ok("false")
+    } else {
+        Err(())
+    }
+}
+
+fn string_is_valid(value: &str, expected: TypePrimitive) -> Result<&str, TypeError> {
+    match expected {
+        TypePrimitive::Any | TypePrimitive::Str => Ok(value),
+        TypePrimitive::Boolean => is_boolean(value).map_err(|_| TypeError::BadValue(expected)),
+        TypePrimitive::Integer => {
+            if value.parse::<i64>().is_ok() {
+                Ok(value)
+            } else {
+                Err(TypeError::BadValue(expected))
+            }
+        }
+        TypePrimitive::Float => {
+            if value.parse::<f64>().is_ok() {
+                Ok(value)
+            } else {
+                Err(TypeError::BadValue(expected))
+            }
+        }
+        _ => unreachable!(),
+    }
+}
+
+fn array_is_valid(values: &[String], expected: TypePrimitive) -> Result<Option<Array>, TypeError> {
+    match expected {
+        TypePrimitive::AnyArray | TypePrimitive::StrArray => Ok(None),
+        TypePrimitive::BooleanArray => {
+            let mut output = SmallVec::new();
+            for value in values {
+                let value = is_boolean(value.as_str())
+                    .map_err(|_| TypeError::BadValue(expected))?
+                    .into();
+                output.push(value);
+            }
+            Ok(Some(output))
+        }
+        TypePrimitive::IntegerArray => {
+            for value in values {
+                if !value.parse::<i64>().is_ok() {
+                    return Err(TypeError::BadValue(expected));
+                }
+            }
+            Ok(None)
+        }
+        TypePrimitive::FloatArray => {
+            for value in values {
+                if !value.parse::<f64>().is_ok() {
+                    return Err(TypeError::BadValue(expected));
+                }
+            }
+            Ok(None)
+        }
+        _ => unreachable!(),
+    }
+}
+
 // NOTE: Here there be excessively long functions.
 
 fn integer_math(shell: &mut Shell, key: TypeArg, operator: Operator, value: &str) -> bool {
@@ -168,9 +275,9 @@ fn integer_math(shell: &mut Shell, key: TypeArg, operator: Operator, value: &str
                 }
                 return false;
             } else if let TypePrimitive::Integer = key.kind {
-                match shell.variables.get_var_or_empty(key.name).parse::<u64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
-                        match value.parse::<u64>() {
+                        match value.parse::<i64>() {
                             Ok(rhs) => {
                                 let value = (lhs + rhs).to_string();
                                 shell.variables.set_var(key.name, &value);
@@ -204,9 +311,9 @@ fn integer_math(shell: &mut Shell, key: TypeArg, operator: Operator, value: &str
                 }
                 return false;
             } else if let TypePrimitive::Integer = key.kind {
-                match shell.variables.get_var_or_empty(key.name).parse::<u64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
-                        match value.parse::<u64>() {
+                        match value.parse::<i64>() {
                             Ok(rhs) => {
                                 let value = (lhs / rhs).to_string();
                                 shell.variables.set_var(key.name, &value);
@@ -240,9 +347,9 @@ fn integer_math(shell: &mut Shell, key: TypeArg, operator: Operator, value: &str
                 }
                 return false;
             } else if let TypePrimitive::Integer = key.kind {
-                match shell.variables.get_var_or_empty(key.name).parse::<u64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
-                        match value.parse::<u64>() {
+                        match value.parse::<i64>() {
                             Ok(rhs) => {
                                 let value = (lhs - rhs).to_string();
                                 shell.variables.set_var(key.name, &value);
@@ -276,9 +383,9 @@ fn integer_math(shell: &mut Shell, key: TypeArg, operator: Operator, value: &str
                 }
                 return false;
             } else if let TypePrimitive::Integer = key.kind {
-                match shell.variables.get_var_or_empty(key.name).parse::<u64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
-                        match value.parse::<u64>() {
+                        match value.parse::<i64>() {
                             Ok(rhs) => {
                                 let value = (lhs * rhs).to_string();
                                 shell.variables.set_var(key.name, &value);
@@ -312,7 +419,7 @@ fn integer_math(shell: &mut Shell, key: TypeArg, operator: Operator, value: &str
                 }
                 return false;
             } else if let TypePrimitive::Integer = key.kind {
-                match shell.variables.get_var_or_empty(key.name).parse::<u64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
                         match value.parse::<u32>() {
                             Ok(rhs) => {
@@ -357,9 +464,9 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
                 }
                 return false;
             } else if let TypePrimitive::Integer = key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<u64>() {
+                match env::var(key.name).unwrap_or("".into()).parse::<i64>() {
                     Ok(lhs) => {
-                        match value.parse::<u64>() {
+                        match value.parse::<i64>() {
                             Ok(rhs) => {
                                 let value = (lhs + rhs).to_string();
                                 env::set_var(key.name, &value);
@@ -393,9 +500,9 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
                 }
                 return false;
             } else if let TypePrimitive::Integer = key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<u64>() {
+                match env::var(key.name).unwrap_or("".into()).parse::<i64>() {
                     Ok(lhs) => {
-                        match value.parse::<u64>() {
+                        match value.parse::<i64>() {
                             Ok(rhs) => {
                                 let value = (lhs / rhs).to_string();
                                 env::set_var(key.name, &value);
@@ -429,9 +536,9 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
                 }
                 return false;
             } else if let TypePrimitive::Integer = key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<u64>() {
+                match env::var(key.name).unwrap_or("".into()).parse::<i64>() {
                     Ok(lhs) => {
-                        match value.parse::<u64>() {
+                        match value.parse::<i64>() {
                             Ok(rhs) => {
                                 let value = (lhs - rhs).to_string();
                                 env::set_var(key.name, &value);
@@ -465,9 +572,9 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
                 }
                 return false;
             } else if let TypePrimitive::Integer = key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<u64>() {
+                match env::var(key.name).unwrap_or("".into()).parse::<i64>() {
                     Ok(lhs) => {
-                        match value.parse::<u64>() {
+                        match value.parse::<i64>() {
                             Ok(rhs) => {
                                 let value = (lhs * rhs).to_string();
                                 env::set_var(key.name, &value);
@@ -501,7 +608,7 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
                 }
                 return false;
             } else if let TypePrimitive::Integer = key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<u64>() {
+                match env::var(key.name).unwrap_or("".into()).parse::<i64>() {
                     Ok(lhs) => {
                         match value.parse::<u32>() {
                             Ok(rhs) => {

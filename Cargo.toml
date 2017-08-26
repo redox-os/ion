@@ -35,7 +35,7 @@ glob = "0.2"
 # Provides a macro for lazily-evalulated statics
 lazy_static = "0.2"
 # Provides the line editor / prompt for the shell
-liner = { git = "https://github.com/MovingtoMars/liner/" }
+liner = "0.4"
 # Provides permutations of strings in brace expansions
 permutate = "0.3"
 # Enables strings to be stored inline on the stack, when possible.
