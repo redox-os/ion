@@ -223,7 +223,7 @@ fn string_is_valid(value: &str, expected: TypePrimitive) -> Result<&str, TypeErr
 
 fn array_is_valid(values: &[String], expected: TypePrimitive) -> Result<Option<Array>, TypeError> {
     match expected {
-        TypePrimitive::AnyArray | TypePrimitive::StrArray => Ok(None),
+        TypePrimitive::Any | TypePrimitive::AnyArray | TypePrimitive::StrArray => Ok(None),
         TypePrimitive::BooleanArray => {
             let mut output = SmallVec::new();
             for value in values {
