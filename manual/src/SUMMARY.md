@@ -46,3 +46,5 @@
 - [Builtin Commands](ch11-00-builtins.md)
 
 - [Ion by Example](ch12-00-examples.md)
+
+- [Command History](ch13-00-history.md)
