@@ -1,7 +1,6 @@
 use super::Shell;
 use super::flow::FlowLogic;
 use fnv::*;
-use parser::assignments::Binding;
 use parser::pipelines::Pipeline;
 use types::*;
 use types::Identifier;
@@ -52,11 +51,12 @@ pub struct Case {
     pub statements: Vec<Statement>,
 }
 
+// TODO: Enable statements and expressions to contain &str values.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
-    Let { expression: Binding },
+    Let { expression: String },
     Case(Case),
-    Export(Binding),
+    Export(String),
     If {
         expression: Pipeline,
         success: Vec<Statement>,
@@ -333,7 +333,7 @@ pub fn collect_if<I>(
             0 => success.push(statement),
             1 => failure.push(statement),
             2 => {
-                let mut last = else_if.last_mut().unwrap(); // This is a bug if there isn't a value
+                let last = else_if.last_mut().unwrap(); // This is a bug if there isn't a value
                 last.success.push(statement);
             }
             _ => unreachable!(),

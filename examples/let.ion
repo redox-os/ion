@@ -1,11 +1,7 @@
 let a = 5
 echo $a
 
-let a b = [10 $a]
-echo $a
-echo $b
-
-let b a = [$a $b]
+let a b = 10 $a
 echo $a
 echo $b
 
@@ -14,8 +10,7 @@ echo $a
 echo $b
 echo $c
 
-let a b c = ["one two" "three four" "five six"]
-let a b c = [$c $a $b]
+let a b c = "one two" "three four" "five six"
 echo $a
 echo $b
 echo $c
@@ -27,3 +22,13 @@ let a *= 5
 echo $a
 let a /= 4
 echo $a
+
+let a[] b c[] = [one two] three [four five]
+echo @a
+echo $b
+echo @c
+
+let a b c = 6 3 5
+echo $a $b $c
+let a b c -= 2 2 4
+echo $a $b $c

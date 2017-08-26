@@ -128,10 +128,10 @@ impl<'a> FlowLogic for Shell<'a> {
                 match replacement {
                     Statement::Error(number) => self.previous_status = number,
                     Statement::Let { expression } => {
-                        self.previous_status = self.local(expression);
+                        self.previous_status = self.local(&expression);
                     }
                     Statement::Export(expression) => {
-                        self.previous_status = self.export(expression);
+                        self.previous_status = self.export(&expression);
                     }
                     Statement::While {
                         expression,
@@ -236,10 +236,10 @@ impl<'a> FlowLogic for Shell<'a> {
             match statement {
                 Statement::Error(number) => self.previous_status = number,
                 Statement::Let { expression } => {
-                    self.previous_status = self.local(expression);
+                    self.previous_status = self.local(&expression);
                 }
                 Statement::Export(expression) => {
-                    self.previous_status = self.export(expression);
+                    self.previous_status = self.export(&expression);
                 }
                 Statement::While {
                     expression,
@@ -458,10 +458,10 @@ impl<'a> FlowLogic for Shell<'a> {
             Statement::Error(number) => self.previous_status = number,
             // Execute a Let Statement
             Statement::Let { expression } => {
-                self.previous_status = self.local(expression);
+                self.previous_status = self.local(&expression);
             }
             Statement::Export(expression) => {
-                self.previous_status = self.export(expression);
+                self.previous_status = self.export(&expression);
             }
             // Collect the statements for the while loop, and if the loop is complete,
             // execute the while loop with the provided expression.

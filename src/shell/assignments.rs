@@ -3,17 +3,12 @@ use std::io::{self, Write};
 
 use super::Shell;
 use super::status::*;
-use parser::{ArgumentSplitter, Expander, expand_string};
-use parser::assignments::{Binding, Operator, Value};
-use types::{Array as VArray, ArrayVariableContext, Identifier, Key, Value as VString, VariableContext};
+use parser::expand_string;
+use parser::types::assignments::*;
+use parser::types::parse::*;
+// use parser::assignments::{Binding, Operator, Value};
 
-enum Action {
-    UpdateString(Identifier, VString),
-    UpdateStrings(Vec<Identifier>, VArray),
-    UpdateHashMap(Identifier, Key, VString),
-    UpdateArray(Identifier, VArray),
-    List,
-}
+use types::{ArrayVariableContext, VariableContext};
 
 fn print_vars(list: &VariableContext) {
     let stdout = io::stdout();
@@ -55,118 +50,83 @@ fn print_arrays(list: &ArrayVariableContext) {
     }
 }
 
-fn parse_assignment<E: Expander>(binding: Binding, expanders: &E) -> Result<Action, i32> {
-    match binding {
-        Binding::InvalidKey(key) => {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: variable name, '{}', is invalid", key);
-            Err(FAILURE)
-        }
-        Binding::KeyValue(key, value) => {
-            match parse_expression(&value, expanders) {
-                Value::String(value) => Ok(Action::UpdateString(key, value)),
-                Value::Array(array) => Ok(Action::UpdateArray(key, array)),
-            }
-        }
-        Binding::MapKeyValue(key, inner_key, value) => Ok(Action::UpdateHashMap(key, inner_key, value)),
-        Binding::MultipleKeys(keys, value) => {
-            match parse_expression(&value, expanders) {
-                Value::String(value) => {
-                    let array = value
-                        .split_whitespace()
-                        .map(String::from)
-                        .collect::<VArray>();
-                    Ok(Action::UpdateStrings(keys, array))
-                }
-                Value::Array(array) => Ok(Action::UpdateStrings(keys, array)),
-            }
-        }
-        Binding::KeyOnly(key) => {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: please provide value for variable '{}'", key);
-            Err(FAILURE)
-        }
-        Binding::ListEntries => Ok(Action::List),
-        Binding::Math(key, operator, value) => {
-            match parse_expression(&value, expanders) {
-                Value::String(ref value) => {
-                    let left = match expanders.variable(&key, false).and_then(
-                        |x| x.parse::<f32>().ok(),
-                    ) {
-                        Some(left) => left,
-                        None => return Err(FAILURE),
-                    };
-
-                    let right = match value.parse::<f32>().ok() {
-                        Some(right) => right,
-                        None => return Err(FAILURE),
-                    };
-
-                    let result = match operator {
-                        Operator::Add => left + right,
-                        Operator::Subtract => left - right,
-                        Operator::Divide => left / right,
-                        Operator::Multiply => left * right,
-                        Operator::Exponent => f32::powf(left, right),
-                    };
-
-                    Ok(Action::UpdateString(key, result.to_string()))
-                }
-                Value::Array(_) => {
-                    let stderr = io::stderr();
-                    let _ = writeln!(stderr.lock(), "ion: array math not supported yet");
-                    Err(FAILURE)
-                }
-            }
-        }
-    }
-}
-
 /// Represents: A variable store capable of setting local variables or
 /// exporting variables to some global environment
 pub trait VariableStore {
     /// Set a local variable given a binding
-    fn local(&mut self, Binding) -> i32;
+    fn local(&mut self, &str) -> i32;
     /// Export a variable to the process environment given a binding
-    fn export(&mut self, Binding) -> i32;
+    fn export(&mut self, &str) -> i32;
 }
 
 impl<'a> VariableStore for Shell<'a> {
-    fn local(&mut self, binding: Binding) -> i32 {
-        match parse_assignment(binding, self) {
-            Ok(Action::UpdateArray(key, array)) => self.variables.set_array(&key, array),
-            Ok(Action::UpdateString(key, string)) => self.variables.set_var(&key, &string),
-            Ok(Action::UpdateStrings(keys, array)) => {
-                for (key, value) in keys.iter().zip(array.iter()) {
-                    self.variables.set_var(key, value);
+    fn local(&mut self, expression: &str) -> i32 {
+        match AssignmentActions::new(expression) {
+            Ok(assignment_actions) => {
+                for action in assignment_actions {
+                    match action {
+                        Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
+                            // TODO: Handle different array types accordingly.
+                            let value = expand_string(expression, self, false);
+                            self.variables.set_array(key.name, value);
+                        }
+                        Ok(Action::UpdateArray(..)) => {
+                            eprintln!("ion: arithmetic operators on array expressions aren't supported yet.");
+                            return FAILURE;
+                        }
+                        Ok(Action::UpdateString(key, operator, expression)) => {
+                            let value = expand_string(expression, self, false).join(" ");
+                            if !integer_math(self, key, operator, &value) {
+                                return FAILURE;
+                            }
+                        }
+                        Err(why) => {
+                            eprintln!("ion: assignment error: {}", why);
+                            return FAILURE;
+                        }
+                    }
                 }
             }
-            Ok(Action::UpdateHashMap(key, inner_key, value)) => {
-                self.variables.set_hashmap_value(&key, &inner_key, &value)
-            }
-            Ok(Action::List) => {
+            Err(AssignmentError::NoKeys) => {
                 print_vars(&self.variables.variables);
                 print_arrays(&self.variables.arrays);
             }
-            Err(code) => return code,
-        };
+            Err(why) => {
+                eprintln!("ion: assignment error: {}", why);
+                return FAILURE;
+            }
+        }
 
         SUCCESS
     }
 
-    fn export(&mut self, binding: Binding) -> i32 {
-        match parse_assignment(binding, self) {
-            Ok(Action::UpdateArray(key, array)) => env::set_var(&key, array.join(" ")),
-            Ok(Action::UpdateString(key, string)) => env::set_var(&key, string),
-            Ok(Action::UpdateStrings(keys, array)) => {
-                for (key, value) in keys.iter().zip(array.iter()) {
-                    env::set_var(key, value);
+    fn export(&mut self, expression: &str) -> i32 {
+        match AssignmentActions::new(expression) {
+            Ok(assignment_actions) => {
+                for action in assignment_actions {
+                    match action {
+                        Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
+                            let value = expand_string(expression, self, false);
+                            env::set_var(key.name, &value.join(" "));
+                        }
+                        Ok(Action::UpdateArray(..)) => {
+                            eprintln!("ion: arithmetic operators on array expressions aren't supported yet.");
+                            return FAILURE;
+                        }
+                        Ok(Action::UpdateString(key, operator, expression)) => {
+                            let value = expand_string(expression, self, false).join(" ");
+                            if !integer_math_export(key, operator, &value) {
+                                return FAILURE;
+                            }
+                        }
+                        Err(why) => {
+                            eprintln!("ion: assignment error: {}", why);
+                            return FAILURE;
+                        }
+                    }
                 }
             }
-            Ok(Action::UpdateHashMap(key, inner_key, value)) => {
-                self.variables.set_hashmap_value(&key, &inner_key, &value)
-            }
-            Ok(Action::List) => {
+            Err(AssignmentError::NoKeys) => {
                 let stdout = io::stdout();
                 let stdout = &mut stdout.lock();
                 for (key, value) in env::vars() {
@@ -177,31 +137,392 @@ impl<'a> VariableStore for Shell<'a> {
                         .and_then(|_| stdout.write_all(b"\n"));
                 }
             }
-            Err(code) => return code,
-        };
+            Err(why) => {
+                eprintln!("ion: assignment error: {}", why);
+                return FAILURE;
+            }
+        }
 
         SUCCESS
     }
 }
 
-fn parse_expression<E: Expander>(expression: &str, shell_funcs: &E) -> Value {
-    let arguments: Vec<&str> = ArgumentSplitter::new(expression).collect();
+// NOTE: Here there be excessively long functions.
 
-    if arguments.len() == 1 {
-        let array = expand_string(expression, shell_funcs, false);
-        if expression.starts_with('[') && expression.ends_with(']') {
-            Value::Array(array)
-        } else {
-            Value::String(array.join(" "))
+fn integer_math(shell: &mut Shell, key: TypeArg, operator: Operator, value: &str) -> bool {
+    match operator {
+        Operator::Add => {
+            if TypePrimitive::Any == key.kind || TypePrimitive::Float == key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
+                    Ok(lhs) => {
+                        match value.parse::<f64>() {
+                            Ok(rhs) => {
+                                let value = (lhs + rhs).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else if let TypePrimitive::Integer = key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<u64>() {
+                    Ok(lhs) => {
+                        match value.parse::<u64>() {
+                            Ok(rhs) => {
+                                let value = (lhs + rhs).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
         }
-    } else {
-        // If multiple arguments have been passed, they will be collapsed into a single string.
-        // IE: `[ one two three ] four` is equivalent to `one two three four`
-        let arguments: Vec<String> = arguments
-            .iter()
-            .flat_map(|expression| expand_string(expression, shell_funcs, false))
-            .collect();
+        Operator::Divide => {
+            if TypePrimitive::Any == key.kind || TypePrimitive::Float == key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
+                    Ok(lhs) => {
+                        match value.parse::<f64>() {
+                            Ok(rhs) => {
+                                let value = (lhs / rhs).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else if let TypePrimitive::Integer = key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<u64>() {
+                    Ok(lhs) => {
+                        match value.parse::<u64>() {
+                            Ok(rhs) => {
+                                let value = (lhs / rhs).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::Subtract => {
+            if TypePrimitive::Any == key.kind || TypePrimitive::Float == key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
+                    Ok(lhs) => {
+                        match value.parse::<f64>() {
+                            Ok(rhs) => {
+                                let value = (lhs - rhs).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else if let TypePrimitive::Integer = key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<u64>() {
+                    Ok(lhs) => {
+                        match value.parse::<u64>() {
+                            Ok(rhs) => {
+                                let value = (lhs - rhs).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::Multiply => {
+            if TypePrimitive::Any == key.kind || TypePrimitive::Float == key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
+                    Ok(lhs) => {
+                        match value.parse::<f64>() {
+                            Ok(rhs) => {
+                                let value = (lhs * rhs).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else if let TypePrimitive::Integer = key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<u64>() {
+                    Ok(lhs) => {
+                        match value.parse::<u64>() {
+                            Ok(rhs) => {
+                                let value = (lhs * rhs).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::Exponent => {
+            if TypePrimitive::Any == key.kind || TypePrimitive::Float == key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
+                    Ok(lhs) => {
+                        match value.parse::<f64>() {
+                            Ok(rhs) => {
+                                let value = (lhs.powf(rhs)).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else if let TypePrimitive::Integer = key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<u64>() {
+                    Ok(lhs) => {
+                        match value.parse::<u32>() {
+                            Ok(rhs) => {
+                                let value = (lhs.pow(rhs)).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::Equal => {
+            shell.variables.set_var(key.name, &value);
+            true
+        }
+    }
+}
 
-        Value::String(arguments.join(" "))
+fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
+    match operator {
+        Operator::Add => {
+            if TypePrimitive::Any == key.kind || TypePrimitive::Float == key.kind {
+                match env::var(key.name).unwrap_or("".into()).parse::<f64>() {
+                    Ok(lhs) => {
+                        match value.parse::<f64>() {
+                            Ok(rhs) => {
+                                let value = (lhs + rhs).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else if let TypePrimitive::Integer = key.kind {
+                match env::var(key.name).unwrap_or("".into()).parse::<u64>() {
+                    Ok(lhs) => {
+                        match value.parse::<u64>() {
+                            Ok(rhs) => {
+                                let value = (lhs + rhs).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::Divide => {
+            if TypePrimitive::Any == key.kind || TypePrimitive::Float == key.kind {
+                match env::var(key.name).unwrap_or("".into()).parse::<f64>() {
+                    Ok(lhs) => {
+                        match value.parse::<f64>() {
+                            Ok(rhs) => {
+                                let value = (lhs / rhs).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else if let TypePrimitive::Integer = key.kind {
+                match env::var(key.name).unwrap_or("".into()).parse::<u64>() {
+                    Ok(lhs) => {
+                        match value.parse::<u64>() {
+                            Ok(rhs) => {
+                                let value = (lhs / rhs).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::Subtract => {
+            if TypePrimitive::Any == key.kind || TypePrimitive::Float == key.kind {
+                match env::var(key.name).unwrap_or("".into()).parse::<f64>() {
+                    Ok(lhs) => {
+                        match value.parse::<f64>() {
+                            Ok(rhs) => {
+                                let value = (lhs - rhs).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else if let TypePrimitive::Integer = key.kind {
+                match env::var(key.name).unwrap_or("".into()).parse::<u64>() {
+                    Ok(lhs) => {
+                        match value.parse::<u64>() {
+                            Ok(rhs) => {
+                                let value = (lhs - rhs).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::Multiply => {
+            if TypePrimitive::Any == key.kind || TypePrimitive::Float == key.kind {
+                match env::var(key.name).unwrap_or("".into()).parse::<f64>() {
+                    Ok(lhs) => {
+                        match value.parse::<f64>() {
+                            Ok(rhs) => {
+                                let value = (lhs * rhs).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else if let TypePrimitive::Integer = key.kind {
+                match env::var(key.name).unwrap_or("".into()).parse::<u64>() {
+                    Ok(lhs) => {
+                        match value.parse::<u64>() {
+                            Ok(rhs) => {
+                                let value = (lhs * rhs).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::Exponent => {
+            if TypePrimitive::Any == key.kind || TypePrimitive::Float == key.kind {
+                match env::var(key.name).unwrap_or("".into()).parse::<f64>() {
+                    Ok(lhs) => {
+                        match value.parse::<f64>() {
+                            Ok(rhs) => {
+                                let value = (lhs.powf(rhs)).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else if let TypePrimitive::Integer = key.kind {
+                match env::var(key.name).unwrap_or("".into()).parse::<u64>() {
+                    Ok(lhs) => {
+                        match value.parse::<u32>() {
+                            Ok(rhs) => {
+                                let value = (lhs.pow(rhs)).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::Equal => {
+            env::set_var(key.name, &value);
+            true
+        }
     }
 }

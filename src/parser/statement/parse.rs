@@ -1,7 +1,6 @@
 use std::char;
 
 use super::super::{ArgumentSplitter, pipelines};
-use super::super::assignments::parse_assignment;
 use super::super::pipelines::Pipeline;
 use shell::flow_control::{Case, ElseIf, FunctionArgument, Statement, Type};
 
@@ -29,8 +28,8 @@ pub fn parse(code: &str) -> Statement {
             eprintln!("ion: syntax error: incomplete control flow statement");
             return Statement::Default;
         }
-        _ if cmd.starts_with("let ") => return Statement::Let { expression: parse_assignment(cmd[4..].trim_left()) },
-        _ if cmd.starts_with("export ") => return Statement::Export(parse_assignment(cmd[7..].trim_left())),
+        _ if cmd.starts_with("let ") => return Statement::Let { expression: cmd[4..].trim_left().into() },
+        _ if cmd.starts_with("export ") => return Statement::Export(cmd[7..].trim_left().into()),
         _ if cmd.starts_with("if ") => {
             return collect(cmd[3..].trim_left(), |pipeline| {
                 Statement::If {
