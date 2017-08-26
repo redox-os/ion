@@ -279,6 +279,19 @@ pub fn collect_loops<I: Iterator<Item = Statement>>(
             Statement::If { .. } |
             Statement::Function { .. } |
             Statement::Match { .. } => *level += 1,
+            Statement::Time(ref box_stmt) => match box_stmt.as_ref() {
+                &Statement::While { .. } |
+                &Statement::For { .. } |
+                &Statement::If { .. } |
+                &Statement::Function { .. } |
+                &Statement::Match { .. } => *level += 1,
+                &Statement::End if *level == 1 => {
+                    *level = 0;
+                    break;
+                }
+                &Statement::End => *level -= 1,
+                _ => (),
+            }
             Statement::End if *level == 1 => {
                 *level = 0;
                 break;
