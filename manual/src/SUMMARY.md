@@ -16,10 +16,9 @@
 - [Variable Assignments](ch04-00-variables.md)
 
     - [String Variables](ch04-01-strings.md)
-    - [Tuple Variables](ch04-02-tuples.md)
-    - [Array Variables](ch04-03-arrays.md)
-    - [Arithmetic Variables](ch04-04-arithmetic.md)
-    - [Exporting Variables](ch04-05-exporting.md)
+    - [Array Variables](ch04-02-arrays.md)
+    - [Arithmetic Variables](ch04-03-arithmetic.md)
+    - [Exporting Variables](ch04-04-exporting.md)
 
 - [Expansions](ch05-00-expansions.md)
 

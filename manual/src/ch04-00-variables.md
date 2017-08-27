@@ -4,3 +4,76 @@ The `let` builtin is used to create local variables within the shell, and apply 
 to variables. The `export` keyword may be used to do the same for the creation of external
 variables. Variables cannot be created the POSIX way, as the POSIX way is awkard to read/write
 and parse.
+
+```ion
+let string_variable = "hello string"
+let array_variable = [ hello array ]
+```
+
+## Multiple Assignments
+
+Ion also supports setting multiple values at the same time
+
+```ion
+let a b = one two
+echo $a
+echo $b
+
+let a b = one [two three four]
+echo $a
+echo @b
+```
+
+#### Output
+
+```
+one
+two
+one
+two three four
+```
+
+## Type-Checked Assignments
+
+It's also possible to designate the type that a variable is allowed to be initialized with.
+Boolean type assignments will also normalize inputs into either `true` or `false`. When an
+invalid value is supplied, the assignment operation will fail and an error message will be
+printed. All assignments after the failed assignment will be ignored.
+
+```ion
+let a:bool = 1
+let b:bool = true
+let c:bool = n
+echo $a $b $c
+
+
+let a:str b[] c:int d:float[] = one [two three] 4 [5.1 6.2 7.3]
+echo $a
+echo @b
+echo $c
+echo @d
+```
+
+#### Output
+
+```
+true
+true
+false
+one
+two three
+4
+5.1 6.2 7.3
+```
+
+## Supported Types
+
+- []
+- bool
+- bool[]
+- float
+- float[]
+- int
+- int[]
+- str
+- str[]
