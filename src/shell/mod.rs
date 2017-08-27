@@ -22,7 +22,7 @@ pub use self::pipe_exec::{foreground, job_control};
 
 use self::directory_stack::DirectoryStack;
 use self::flags::*;
-use self::flow_control::{FlowControl, Function, FunctionError, Type};
+use self::flow_control::{FlowControl, Function, FunctionError};
 use self::foreground::ForegroundSignals;
 use self::job_control::{BackgroundProcess, JobControl};
 use self::pipe_exec::PipelineExecution;
@@ -189,13 +189,13 @@ impl<'a> Shell<'a> {
             }
         }
 
-        pipeline.expand(self);
         // Branch if -> input == shell command i.e. echo
         let exit_status = if let Some(command) = {
             let key: &str = pipeline.jobs[0].command.as_ref();
             builtins.get(key)
         }
         {
+            pipeline.expand(self);
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
                 if self.flags & PRINT_COMMS != 0 {
@@ -219,15 +219,9 @@ impl<'a> Shell<'a> {
                         Some(FAILURE)
                     }
                     Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
-                        let type_ = match expected_type {
-                            Type::Float => "Float",
-                            Type::Int => "Int",
-                            Type::Bool => "Bool",
-                        };
-
                         eprintln!(
                             "ion: function argument has invalid type: expected {}, found value \'{}\'",
-                            type_,
+                            expected_type,
                             value
                         );
                         Some(FAILURE)
@@ -237,6 +231,7 @@ impl<'a> Shell<'a> {
                 Some(self.execute_pipeline(pipeline))
             }
         } else {
+            pipeline.expand(self);
             Some(self.execute_pipeline(pipeline))
         };
 

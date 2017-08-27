@@ -2,6 +2,8 @@ use super::Shell;
 use super::flow::FlowLogic;
 use fnv::*;
 use parser::pipelines::Pipeline;
+use parser::types::checker::{ReturnValue, value_check};
+use parser::types::parse::{Primitive, TypeArgBuf};
 use types::*;
 use types::Identifier;
 
@@ -10,20 +12,6 @@ pub struct ElseIf {
     pub expression: Pipeline,
     pub success: Vec<Statement>,
 }
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Type {
-    Float,
-    Int,
-    Bool,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum FunctionArgument {
-    Typed(String, Type),
-    Untyped(String),
-}
-
 
 /// Represents a single branch in a match statement. For example, in the expression
 /// ```ignore
@@ -66,8 +54,8 @@ pub enum Statement {
     ElseIf(ElseIf),
     Function {
         name: Identifier,
-        description: String,
-        args: Vec<FunctionArgument>,
+        description: Option<String>,
+        args: Vec<TypeArgBuf>,
         statements: Vec<Statement>,
     },
     For {
@@ -134,15 +122,15 @@ impl Default for FlowControl {
 
 #[derive(Clone)]
 pub struct Function {
-    pub description: String,
+    pub description: Option<String>,
     pub name: Identifier,
-    pub args: Vec<FunctionArgument>,
+    pub args: Vec<TypeArgBuf>,
     pub statements: Vec<Statement>,
 }
 
 pub enum FunctionError {
     InvalidArgumentCount,
-    InvalidArgumentType(Type, String),
+    InvalidArgumentType(Primitive, String),
 }
 
 impl Function {
@@ -154,53 +142,51 @@ impl Function {
         let mut variables_backup: FnvHashMap<&str, Option<Value>> =
             FnvHashMap::with_capacity_and_hasher(64, Default::default());
 
-        let mut bad_argument: Option<(&str, Type)> = None;
-        for (name_arg, value) in self.args.iter().zip(args.iter().skip(1)) {
-            let name: &str = match name_arg {
-                &FunctionArgument::Typed(ref name, ref type_) => {
-                    match *type_ {
-                        Type::Float if value.parse::<f64>().is_ok() => name.as_str(),
-                        Type::Int if value.parse::<i64>().is_ok() => name.as_str(),
-                        Type::Bool if *value == "true" || *value == "false" => name.as_str(),
-                        _ => {
-                            bad_argument = Some((value, *type_));
-                            break;
-                        }
-                    }
+        let mut arrays_backup: FnvHashMap<&str, Option<Array>> =
+            FnvHashMap::with_capacity_and_hasher(64, Default::default());
+
+        for (type_, value) in self.args.iter().zip(args.iter().skip(1)) {
+            let value = match value_check(shell, value, type_.kind) {
+                Ok(value) => value,
+                Err(_) => {
+                    return Err(FunctionError::InvalidArgumentType(type_.kind, (*value).into()));
                 }
-                &FunctionArgument::Untyped(ref name) => name.as_str(),
             };
-            variables_backup.insert(name, shell.variables.get_var(name));
-            shell.variables.set_var(name, value);
-        }
 
-        match bad_argument {
-            Some((actual_value, expected_type)) => {
-                for (name, value_option) in &variables_backup {
-                    match *value_option {
-                        Some(ref value) => shell.variables.set_var(name, value),
-                        None => {
-                            shell.variables.unset_var(name);
-                        }
-                    }
+            match value {
+                ReturnValue::Vector(vector) => {
+                    let array = shell.variables.get_array(&type_.name).cloned();
+                    arrays_backup.insert(&type_.name, array);
+                    shell.variables.set_array(&type_.name, vector);
                 }
-
-                return Err(FunctionError::InvalidArgumentType(expected_type, actual_value.to_owned()));
-            }
-            None => {
-                shell.execute_statements(self.statements);
-
-                for (name, value_option) in &variables_backup {
-                    match *value_option {
-                        Some(ref value) => shell.variables.set_var(name, value),
-                        None => {
-                            shell.variables.unset_var(name);
-                        }
-                    }
+                ReturnValue::Str(string) => {
+                    variables_backup.insert(&type_.name, shell.variables.get_var(&type_.name));
+                    shell.variables.set_var(&type_.name, &string);
                 }
-                Ok(())
             }
         }
+
+        shell.execute_statements(self.statements);
+
+        for (name, value_option) in &variables_backup {
+            match *value_option {
+                Some(ref value) => shell.variables.set_var(name, value),
+                None => {
+                    shell.variables.unset_var(name);
+                }
+            }
+        }
+
+        for (name, value_option) in arrays_backup {
+            match value_option {
+                Some(value) => shell.variables.set_array(name, value),
+                None => {
+                    shell.variables.unset_array(name);
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

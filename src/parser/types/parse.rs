@@ -2,14 +2,20 @@ use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeArg<'a> {
-    pub kind: TypePrimitive,
+    pub kind: Primitive,
     pub name: &'a str,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct TypeArgBuf {
+    pub kind: Primitive,
+    pub name: String,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum TypeError<'a> {
     Invalid(&'a str),
-    BadValue(TypePrimitive),
+    BadValue(Primitive),
 }
 
 impl<'a> Display for TypeError<'a> {
@@ -23,15 +29,24 @@ impl<'a> Display for TypeError<'a> {
 
 impl<'a> TypeArg<'a> {
     fn new(name: &'a str, data: &'a str) -> Result<TypeArg<'a>, TypeError<'a>> {
-        match TypePrimitive::parse(data) {
+        match Primitive::parse(data) {
             Some(data) => Ok(TypeArg { kind: data, name }),
             None => Err(TypeError::Invalid(data)),
         }
     }
 }
 
+impl<'a> From<TypeArg<'a>> for TypeArgBuf {
+    fn from(typearg: TypeArg<'a>) -> TypeArgBuf {
+        TypeArgBuf {
+            kind: typearg.kind,
+            name: typearg.name.to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub enum TypePrimitive {
+pub enum Primitive {
     Any,
     AnyArray,
     Str,
@@ -44,36 +59,36 @@ pub enum TypePrimitive {
     FloatArray,
 }
 
-impl TypePrimitive {
-    fn parse(data: &str) -> Option<TypePrimitive> {
+impl Primitive {
+    fn parse(data: &str) -> Option<Primitive> {
         let data = match data {
-            "[]" => TypePrimitive::AnyArray,
-            "str" => TypePrimitive::Str,
-            "str[]" => TypePrimitive::StrArray,
-            "bool" => TypePrimitive::Boolean,
-            "bool[]" => TypePrimitive::BooleanArray,
-            "int" => TypePrimitive::Integer,
-            "int[]" => TypePrimitive::IntegerArray,
-            "float" => TypePrimitive::Float,
-            "float[]" => TypePrimitive::FloatArray,
+            "[]" => Primitive::AnyArray,
+            "str" => Primitive::Str,
+            "str[]" => Primitive::StrArray,
+            "bool" => Primitive::Boolean,
+            "bool[]" => Primitive::BooleanArray,
+            "int" => Primitive::Integer,
+            "int[]" => Primitive::IntegerArray,
+            "float" => Primitive::Float,
+            "float[]" => Primitive::FloatArray,
             _ => return None,
         };
         Some(data)
     }
 }
 
-impl Display for TypePrimitive {
+impl Display for Primitive {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
-            TypePrimitive::Any | TypePrimitive::Str => write!(f, "str"),
-            TypePrimitive::AnyArray => write!(f, "[]"),
-            TypePrimitive::Boolean => write!(f, "bool"),
-            TypePrimitive::BooleanArray => write!(f, "bool[]"),
-            TypePrimitive::Float => write!(f, "float"),
-            TypePrimitive::FloatArray => write!(f, "float[]"),
-            TypePrimitive::Integer => write!(f, "int"),
-            TypePrimitive::IntegerArray => write!(f, "int[]"),
-            TypePrimitive::StrArray => write!(f, "str[]"),
+            Primitive::Any | Primitive::Str => write!(f, "str"),
+            Primitive::AnyArray => write!(f, "[]"),
+            Primitive::Boolean => write!(f, "bool"),
+            Primitive::BooleanArray => write!(f, "bool[]"),
+            Primitive::Float => write!(f, "float"),
+            Primitive::FloatArray => write!(f, "float[]"),
+            Primitive::Integer => write!(f, "int"),
+            Primitive::IntegerArray => write!(f, "int[]"),
+            Primitive::StrArray => write!(f, "str[]"),
         }
     }
 }
@@ -93,7 +108,7 @@ impl<'a> TypeParser<'a> {
             self.read += 1;
             match byte {
                 b' ' if start + 1 == self.read => start += 1,
-                b' ' => return TypeArg::new(name, &self.data[start..self.read]),
+                b' ' => return TypeArg::new(name, &self.data[start..self.read].trim()),
                 _ => (),
             }
         }
@@ -101,7 +116,7 @@ impl<'a> TypeParser<'a> {
         if start == self.read {
             Err(TypeError::Invalid(""))
         } else {
-            TypeArg::new(name, &self.data[start..self.read])
+            TypeArg::new(name, &self.data[start..self.read].trim())
         }
     }
 
@@ -113,7 +128,7 @@ impl<'a> TypeParser<'a> {
                     "[]" => {
                         return Ok(TypeArg {
                             name,
-                            kind: TypePrimitive::AnyArray,
+                            kind: Primitive::AnyArray,
                         })
                     }
                     data @ _ => return Err(TypeError::Invalid(data)),
@@ -125,7 +140,7 @@ impl<'a> TypeParser<'a> {
             "[]" => {
                 return Ok(TypeArg {
                     name,
-                    kind: TypePrimitive::AnyArray,
+                    kind: Primitive::AnyArray,
                 })
             }
             data @ _ => return Err(TypeError::Invalid(data)),
@@ -144,7 +159,7 @@ impl<'a> Iterator for TypeParser<'a> {
                 b' ' => {
                     return Some(Ok(TypeArg {
                         name: &self.data[start..self.read].trim(),
-                        kind: TypePrimitive::Any,
+                        kind: Primitive::Any,
                     }))
                 }
                 b':' => {
@@ -165,7 +180,7 @@ impl<'a> Iterator for TypeParser<'a> {
         } else {
             Some(Ok(TypeArg {
                 name: &self.data[start..self.read].trim(),
-                kind: TypePrimitive::Any,
+                kind: Primitive::Any,
             }))
         }
     }

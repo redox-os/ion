@@ -1,8 +1,8 @@
-use std::char;
-
+use super::functions::{collect_arguments, parse_function};
 use super::super::{ArgumentSplitter, pipelines};
 use super::super::pipelines::Pipeline;
-use shell::flow_control::{Case, ElseIf, FunctionArgument, Statement, Type};
+use shell::flow_control::{Case, ElseIf, Statement};
+use std::char;
 
 fn collect<F>(arguments: &str, statement: F) -> Statement
     where F: Fn(Pipeline) -> Statement
@@ -110,65 +110,25 @@ pub fn parse(code: &str) -> Statement {
             let name = &cmd[..pos];
             if !is_valid_name(name) {
                 eprintln!(
-                    "ion: syntax error: {} is not a valid function name\n     \
+                    "ion: syntax error: '{}' is not a valid function name\n     \
                     Function names may only contain alphanumeric characters",
                     name
                 );
                 return Statement::Default;
             }
 
-            let mut args_iter = cmd[pos..].split_whitespace();
-            let mut args = Vec::new();
-            let mut description = String::new();
-            let mut description_flag = 0u8;
-
-            while let Some(arg) = args_iter.next() {
-                if arg.starts_with("--") {
-                    if arg.len() > 2 {
-                        description.push_str(&arg[2..]);
-                        description_flag |= 1;
-                    }
-                    description_flag |= 2;
-                    break;
-                } else {
-                    args.push(arg.to_owned());
-                }
-            }
-
-            if description_flag & 2 != 0 {
-                if description_flag & 1 != 0 {
-                    if let Some(arg) = args_iter.next() {
-                        description.push(' ');
-                        description.push_str(&arg);
-                    }
-
-                    for argument in args_iter {
-                        description.push(' ');
-                        description.push_str(&argument);
-                    }
-                } else {
-                    if let Some(arg) = args_iter.next() {
-                        description.push_str(&arg);
-                    }
-
-                    for argument in args_iter {
-                        description.push(' ');
-                        description.push_str(&argument);
-                    }
-                }
-            }
-
-            match get_function_args(args) {
-                Some(args) => {
+            let (args, description) = parse_function(&cmd[pos..]);
+            match collect_arguments(args) {
+                Ok(args) => {
                     return Statement::Function {
-                        description: description,
+                        description: description.map(String::from),
                         name: name.into(),
-                        args: args,
+                        args,
                         statements: Vec::new(),
-                    };
+                    }
                 }
-                None => {
-                    eprintln!("ion: syntax error: invalid arguments");
+                Err(why) => {
+                    eprintln!("ion: function argument error: {}", why);
                     return Statement::Default;
                 }
             }
@@ -185,49 +145,10 @@ pub fn parse(code: &str) -> Statement {
 
 }
 
-pub fn get_function_args(args: Vec<String>) -> Option<Vec<FunctionArgument>> {
-    let mut fn_args = Vec::with_capacity(args.len());
-    for argument in args.into_iter() {
-        let length = argument.len();
-        let argument = if argument.ends_with(":int") {
-            if length <= 4 {
-                return None;
-            }
-            let arg = &argument[..length - 4];
-            if arg.contains(':') {
-                return None;
-            }
-            FunctionArgument::Typed(arg.to_owned(), Type::Int)
-        } else if argument.ends_with(":float") {
-            if length <= 6 {
-                return None;
-            }
-            let arg = &argument[..length - 6];
-            if arg.contains(':') {
-                return None;
-            }
-            FunctionArgument::Typed(arg.to_owned(), Type::Float)
-        } else if argument.ends_with(":bool") {
-            if length <= 5 {
-                return None;
-            }
-            let arg = &argument[..length - 5];
-            if arg.contains(':') {
-                return None;
-            }
-            FunctionArgument::Typed(arg.to_owned(), Type::Bool)
-        } else {
-            FunctionArgument::Untyped(argument)
-        };
-        fn_args.push(argument);
-    }
-
-    Some(fn_args)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use parser::types::parse::{Primitive, TypeArgBuf};
     use shell::{Job, JobKind};
     use shell::flow_control::Statement;
 
@@ -302,7 +223,7 @@ mod tests {
         // Default case where spaced normally
         let parsed_if = parse("fn bob");
         let correct_parse = Statement::Function {
-            description: "".into(),
+            description: None,
             name: "bob".into(),
             args: Default::default(),
             statements: Default::default(),
@@ -319,11 +240,17 @@ mod tests {
         // Default case where spaced normally
         let parsed_if = parse("fn bob a b");
         let correct_parse = Statement::Function {
-            description: "".into(),
+            description: None,
             name: "bob".into(),
             args: vec![
-                FunctionArgument::Untyped("a".to_owned()),
-                FunctionArgument::Untyped("b".to_owned()),
+                TypeArgBuf {
+                    name: "a".into(),
+                    kind: Primitive::Any,
+                },
+                TypeArgBuf {
+                    name: "b".into(),
+                    kind: Primitive::Any,
+                },
             ],
             statements: Default::default(),
         };
@@ -335,11 +262,17 @@ mod tests {
 
         let parsed_if = parse("fn bob a b --bob is a nice function");
         let correct_parse = Statement::Function {
-            description: "bob is a nice function".to_string(),
+            description: Some("bob is a nice function".to_string()),
             name: "bob".into(),
             args: vec![
-                FunctionArgument::Untyped("a".to_owned()),
-                FunctionArgument::Untyped("b".to_owned()),
+                TypeArgBuf {
+                    name: "a".into(),
+                    kind: Primitive::Any,
+                },
+                TypeArgBuf {
+                    name: "b".into(),
+                    kind: Primitive::Any,
+                },
             ],
             statements: vec![],
         };

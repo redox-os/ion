@@ -10,7 +10,7 @@ fn print_functions(functions: &FnvHashMap<Identifier, Function>) {
     let _ = writeln!(stdout, "# Functions");
     for fn_name in functions.keys() {
         let description = &functions.get(fn_name).unwrap().description;
-        if description.len() >= 1 {
+        if let Some(ref description) = *description {
             let _ = writeln!(stdout, "    {} -- {}", fn_name, description);
         } else {
             let _ = writeln!(stdout, "    {}", fn_name);

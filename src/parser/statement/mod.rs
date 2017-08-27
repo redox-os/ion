@@ -1,7 +1,8 @@
+mod functions;
 mod parse;
 mod splitter;
 
-pub use self::parse::{get_function_args, parse};
+pub use self::parse::parse;
 pub use self::splitter::{StatementError, StatementSplitter};
 use shell::flow_control::Statement;
 

@@ -11,7 +11,7 @@ use self::fork::{create_process_group, fork_pipe};
 use self::job_control::JobControl;
 use super::{JobKind, Shell};
 use super::flags::*;
-use super::flow_control::{FunctionError, Type};
+use super::flow_control::FunctionError;
 use super::job::RefinedJob;
 use super::signals::{self, SignalHandler};
 use super::status::*;
@@ -119,7 +119,7 @@ fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKin
 /// Using that value, the stdout and/or stderr of the last command will be redirected accordingly
 /// to the designated output. Returns `true` if the outputs couldn't be redirected.
 fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
-    if let Some(mut command) = piped_commands.last_mut() {
+    if let Some(command) = piped_commands.last_mut() {
         let file = if stdout.append {
             OpenOptions::new()
                 .create(true)
@@ -437,15 +437,9 @@ impl<'a> PipelineExecution for Shell<'a> {
                 FAILURE
             }
             Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
-                let type_ = match expected_type {
-                    Type::Float => "Float",
-                    Type::Int => "Int",
-                    Type::Bool => "Bool",
-                };
-
                 eprintln!(
                     "ion: function argument has invalid type: expected {}, found value \'{}\'",
-                    type_,
+                    expected_type,
                     value
                 );
                 FAILURE

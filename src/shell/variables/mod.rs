@@ -153,7 +153,10 @@ impl Variables {
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
     fn get_simplified_directory(&self) -> Value {
-        self.get_var("PWD").unwrap().replace(&self.get_var("HOME").unwrap(), "~")
+        self.get_var("PWD").unwrap().replace(
+            &self.get_var("HOME").unwrap(),
+            "~",
+        )
     }
 
     /// Obtains the value for the **MWD** variable.
@@ -171,7 +174,7 @@ impl Variables {
             let elements = swd.split("/").collect::<Vec<&str>>();
             if elements.len() > 2 {
                 let mut output = String::new();
-                for element in &elements[0..elements.len()-1] {
+                for element in &elements[0..elements.len() - 1] {
                     let mut segmenter = UnicodeSegmentation::graphemes(*element, true);
                     let grapheme = segmenter.next().unwrap();
                     output.push_str(grapheme);
@@ -180,7 +183,7 @@ impl Variables {
                     }
                     output.push('/');
                 }
-                output.push_str(&elements[elements.len()-1]);
+                output.push_str(&elements[elements.len() - 1]);
                 return output;
             }
         }
@@ -350,7 +353,6 @@ impl Variables {
 mod tests {
     use super::*;
     use parser::{Expander, expand_string};
-    use shell::directory_stack::DirectoryStack;
 
     struct VariableExpander(pub Variables);
 

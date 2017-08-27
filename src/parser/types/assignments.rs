@@ -1,3 +1,4 @@
+use super::checker::*;
 use super::parse::*;
 use super::super::ArgumentSplitter;
 use std::fmt::{self, Display, Formatter};
@@ -45,7 +46,7 @@ pub enum AssignmentError<'a> {
     NoOperator,
     NoValues,
     InvalidOperator(&'a str),
-    InvalidValue(TypePrimitive, TypePrimitive),
+    InvalidValue(Primitive, Primitive),
     TypeError(TypeError<'a>),
 }
 
@@ -106,8 +107,6 @@ impl<'a> Iterator for AssignmentActions<'a> {
     }
 }
 
-fn is_array(value: &str) -> bool { value.starts_with('[') && value.ends_with(']') }
-
 #[derive(Debug, PartialEq)]
 pub enum Action<'a> {
     UpdateString(TypeArg<'a>, Operator, &'a str),
@@ -117,20 +116,17 @@ pub enum Action<'a> {
 impl<'a> Action<'a> {
     fn new(var: TypeArg<'a>, operator: Operator, value: &'a str) -> Result<Action<'a>, AssignmentError<'a>> {
         match var.kind {
-            TypePrimitive::AnyArray |
-            TypePrimitive::BooleanArray |
-            TypePrimitive::FloatArray |
-            TypePrimitive::IntegerArray |
-            TypePrimitive::StrArray => {
+            Primitive::AnyArray | Primitive::BooleanArray | Primitive::FloatArray | Primitive::IntegerArray |
+            Primitive::StrArray => {
                 if is_array(value) {
                     Ok(Action::UpdateArray(var, operator, value))
                 } else {
-                    Err(AssignmentError::InvalidValue(var.kind, TypePrimitive::Any))
+                    Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))
                 }
             }
-            TypePrimitive::Any if is_array(value) => Ok(Action::UpdateArray(var, operator, value)),
-            TypePrimitive::Any => Ok(Action::UpdateString(var, operator, value)),
-            _ if is_array(value) => Err(AssignmentError::InvalidValue(var.kind, TypePrimitive::AnyArray)),
+            Primitive::Any if is_array(value) => Ok(Action::UpdateArray(var, operator, value)),
+            Primitive::Any => Ok(Action::UpdateString(var, operator, value)),
+            _ if is_array(value) => Err(AssignmentError::InvalidValue(var.kind, Primitive::AnyArray)),
             _ => Ok(Action::UpdateString(var, operator, value)),
         }
     }
@@ -215,7 +211,7 @@ mod tests {
             Ok(Action::UpdateString(
                 TypeArg {
                     name: "abc",
-                    kind: TypePrimitive::Any,
+                    kind: Primitive::Any,
                 },
                 Operator::Equal,
                 "123",
@@ -226,7 +222,7 @@ mod tests {
             Ok(Action::UpdateString(
                 TypeArg {
                     name: "def",
-                    kind: TypePrimitive::Any,
+                    kind: Primitive::Any,
                 },
                 Operator::Equal,
                 "456",
@@ -242,7 +238,7 @@ mod tests {
             Ok(Action::UpdateString(
                 TypeArg {
                     name: "ab",
-                    kind: TypePrimitive::Integer,
+                    kind: Primitive::Integer,
                 },
                 Operator::Multiply,
                 "3",
@@ -258,7 +254,7 @@ mod tests {
             Ok(Action::UpdateString(
                 TypeArg {
                     name: "a",
-                    kind: TypePrimitive::Any,
+                    kind: Primitive::Any,
                 },
                 Operator::Equal,
                 "one",
@@ -269,7 +265,7 @@ mod tests {
             Ok(Action::UpdateArray(
                 TypeArg {
                     name: "b",
-                    kind: TypePrimitive::AnyArray,
+                    kind: Primitive::AnyArray,
                 },
                 Operator::Equal,
                 "[two three]",
@@ -280,7 +276,7 @@ mod tests {
             Ok(Action::UpdateArray(
                 TypeArg {
                     name: "c",
-                    kind: TypePrimitive::IntegerArray,
+                    kind: Primitive::IntegerArray,
                 },
                 Operator::Equal,
                 "[4 5 6]",
@@ -296,7 +292,7 @@ mod tests {
             Ok(Action::UpdateArray(
                 TypeArg {
                     name: "a",
-                    kind: TypePrimitive::AnyArray,
+                    kind: Primitive::AnyArray,
                 },
                 Operator::Equal,
                 "[one two]",
@@ -307,7 +303,7 @@ mod tests {
             Ok(Action::UpdateString(
                 TypeArg {
                     name: "b",
-                    kind: TypePrimitive::Any,
+                    kind: Primitive::Any,
                 },
                 Operator::Equal,
                 "three",
@@ -318,7 +314,7 @@ mod tests {
             Ok(Action::UpdateArray(
                 TypeArg {
                     name: "c",
-                    kind: TypePrimitive::AnyArray,
+                    kind: Primitive::AnyArray,
                 },
                 Operator::Equal,
                 "[four five]",

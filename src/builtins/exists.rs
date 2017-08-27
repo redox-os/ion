@@ -11,7 +11,7 @@ use std::os::unix::fs::PermissionsExt;
 use builtins::Builtin;
 use shell::Shell;
 #[cfg(test)]
-use shell::flow_control::{Function, FunctionArgument, Statement};
+use shell::flow_control::{Function, Statement};
 
 const MAN_PAGE: &'static str = r#"NAME
     exists - check whether items exist
@@ -217,6 +217,7 @@ fn function_is_defined(function: &str, shell: &Shell) -> bool {
 
 #[test]
 fn test_evaluate_arguments() {
+    use parser::types::parse::{Primitive, TypeArgBuf};
     let builtins = Builtin::map();
     let mut shell = Shell::new(&builtins);
     let mut sink = BufWriter::new(io::sink());
@@ -304,7 +305,10 @@ fn test_evaluate_arguments() {
     let name_str = "test_function";
     let name = SmallString::from_str(name_str);
     let mut args = Vec::new();
-    args.push(FunctionArgument::Untyped("testy".to_owned()));
+    args.push(TypeArgBuf {
+        name: "testy".into(),
+        kind: Primitive::Any,
+    });
     let mut statements = Vec::new();
     statements.push(Statement::End);
     let description = "description".to_owned();
@@ -315,7 +319,7 @@ fn test_evaluate_arguments() {
             name: name,
             args: args,
             statements: statements,
-            description: description,
+            description: Some(description),
         },
     );
 
@@ -461,6 +465,7 @@ fn test_string_var_is_not_empty() {
 
 #[test]
 fn test_function_is_defined() {
+    use parser::types::parse::{Primitive, TypeArgBuf};
     let builtins = Builtin::map();
     let mut shell = Shell::new(&builtins);
 
@@ -468,7 +473,10 @@ fn test_function_is_defined() {
     let name_str = "test_function";
     let name = SmallString::from_str(name_str);
     let mut args = Vec::new();
-    args.push(FunctionArgument::Untyped("testy".to_owned()));
+    args.push(TypeArgBuf {
+        name: "testy".into(),
+        kind: Primitive::Any,
+    });
     let mut statements = Vec::new();
     statements.push(Statement::End);
     let description = "description".to_owned();
@@ -479,7 +487,7 @@ fn test_function_is_defined() {
             name: name,
             args: args,
             statements: statements,
-            description: description,
+            description: Some(description),
         },
     );
 
