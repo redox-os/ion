@@ -3,7 +3,7 @@ use super::flow::FlowLogic;
 use fnv::*;
 use parser::pipelines::Pipeline;
 use parser::types::checker::{ReturnValue, value_check};
-use parser::types::parse::{Primitive, KeyBuf};
+use parser::types::parse::{KeyBuf, Primitive};
 use types::*;
 use types::Identifier;
 
@@ -36,6 +36,8 @@ pub struct ElseIf {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Case {
     pub value: Option<String>,
+    pub binding: Option<String>,
+    pub conditional: Option<String>,
     pub statements: Vec<Statement>,
 }
 

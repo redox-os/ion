@@ -1,3 +1,4 @@
+mod case;
 mod functions;
 mod parse;
 mod splitter;

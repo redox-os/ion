@@ -1,3 +1,4 @@
+use super::case;
 use super::functions::{collect_arguments, parse_function};
 use super::super::{ArgumentSplitter, pipelines};
 use super::super::pipelines::Pipeline;
@@ -89,12 +90,24 @@ pub fn parse(code: &str) -> Statement {
             };
         }
         _ if cmd.starts_with("case ") => {
-            let value = match cmd[5..].trim_left() {
-                "_" => None,
-                value @ _ => Some(value.into()),
+            let (value, binding, conditional) = match cmd[5..].trim_left() {
+                "_" => (None, None, None),
+                value @ _ => {
+                    let (value, binding, conditional) = case::parse_case(value);
+                    let binding = binding.map(Into::into);
+                    let conditional = conditional.map(Into::into);
+                    if value == "_" {
+                        (None, binding, conditional)
+                    } else {
+                        (Some(value.into()), binding, conditional)
+                    }
+                }
             };
+
             return Statement::Case(Case {
-                value: value,
+                value,
+                binding,
+                conditional,
                 statements: Vec::new(),
             });
         }

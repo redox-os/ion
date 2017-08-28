@@ -5,6 +5,7 @@ use super::job_control::JobControl;
 use super::status::*;
 use parser::{ForExpression, StatementSplitter, expand_string, parse_and_validate};
 use parser::pipelines::Pipeline;
+use parser::types::checker::{ReturnValue, is_array};
 use shell::assignments::VariableStore;
 use std::io::{self, Write};
 use std::mem;
@@ -209,19 +210,67 @@ impl<'a> FlowLogic for Shell<'a> {
                     return true;
                 }
             }
-            return false;
+            false
         }
+
+        let is_array = is_array(&expression);
         let value = expand_string(&expression, self, false);
         let mut condition = Condition::NoOp;
         for case in cases {
             let pattern = case.value.map(|v| expand_string(&v, self, false));
             match pattern {
                 None => {
+                    let mut previous_bind = None;
+                    if let Some(ref bind) = case.binding {
+                        if is_array {
+                            previous_bind = self.variables.get_array(bind).map(|x| {
+                                ReturnValue::Vector(x.clone())
+                            });
+                            self.variables.set_array(&bind, value);
+                        } else {
+                            previous_bind = self.variables.get_var(bind).map(|x| ReturnValue::Str(x));
+                            self.variables.set_var(&bind, &value.join(" "));
+                        }
+                    }
+
                     condition = self.execute_statements(case.statements);
+
+                    if let Some(ref bind) = case.binding {
+                        if let Some(value) = previous_bind {
+                            match value {
+                                ReturnValue::Str(value) => self.variables.set_var(bind, &value),
+                                ReturnValue::Vector(values) => self.variables.set_array(bind, values),
+                            }
+                        }
+                    }
+
                     break;
                 }
                 Some(ref v) if matches(v, &value) => {
+                    let mut previous_bind = None;
+                    if let Some(ref bind) = case.binding {
+                        if is_array {
+                            previous_bind = self.variables.get_array(bind).map(|x| {
+                                ReturnValue::Vector(x.clone())
+                            });
+                            self.variables.set_array(&bind, value);
+                        } else {
+                            previous_bind = self.variables.get_var(bind).map(|x| ReturnValue::Str(x));
+                            self.variables.set_var(&bind, &value.join(" "));
+                        }
+                    }
+
                     condition = self.execute_statements(case.statements);
+
+                    if let Some(ref bind) = case.binding {
+                        if let Some(value) = previous_bind {
+                            match value {
+                                ReturnValue::Str(value) => self.variables.set_var(bind, &value),
+                                ReturnValue::Vector(values) => self.variables.set_array(bind, values),
+                            }
+                        }
+                    }
+
                     break;
                 }
                 Some(_) => (),
