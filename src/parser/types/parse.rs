@@ -195,3 +195,49 @@ impl<'a> Iterator for KeyIterator<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn key_parsing() {
+        let mut parser = KeyIterator::new("a:int b[] c:bool d e:int[] d:a");
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "a",
+                kind: Primitive::Integer,
+            })
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "b",
+                kind: Primitive::AnyArray,
+            })
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "c",
+                kind: Primitive::Boolean,
+            })
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "d",
+                kind: Primitive::Any,
+            })
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "e",
+                kind: Primitive::IntegerArray,
+            })
+        );
+        assert_eq!(parser.next().unwrap(), Err(TypeError::Invalid("a")));
+    }
+}

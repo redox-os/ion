@@ -27,12 +27,33 @@ pub fn collect_arguments<'a>(args: KeyIterator<'a>) -> Result<Vec<KeyBuf>, TypeE
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::split_pattern;
+    use super::super::super::types::parse::{KeyBuf, Primitive};
 
     #[test]
     fn function_parsing() {
-        let (args, description) = split_pattern("a:int b:bool -- a comment", "--");
-        assert_eq!(args, "a:int b:bool");
-        assert_eq!(description, Some("a comment"));
+        let (arg_iter, description) = parse_function("a:int b:bool c[] d -- description");
+        let args = collect_arguments(arg_iter);
+        assert_eq!(
+            args,
+            Ok(vec![
+                KeyBuf {
+                    name: "a".into(),
+                    kind: Primitive::Integer,
+                },
+                KeyBuf {
+                    name: "b".into(),
+                    kind: Primitive::Boolean,
+                },
+                KeyBuf {
+                    name: "c".into(),
+                    kind: Primitive::AnyArray,
+                },
+                KeyBuf {
+                    name: "d".into(),
+                    kind: Primitive::Any,
+                },
+            ])
+        );
+        assert_eq!(description, Some("description"))
     }
 }

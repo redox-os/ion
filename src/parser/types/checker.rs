@@ -3,12 +3,29 @@ use super::super::Expander;
 use super::super::expand_string;
 use types::{Array, Value};
 
+#[derive(Debug, PartialEq)]
 pub enum ReturnValue {
     Str(Value),
     Vector(Array),
 }
 
-pub fn is_array(value: &str) -> bool { value.starts_with('[') && value.ends_with(']') }
+/// Determines if the supplied value is either an array or a string.
+///
+/// - `[ 1 2 3 ]` = Array
+/// - `[ 1 2 3 ][1]` = String
+/// - `string` = String
+pub fn is_array(value: &str) -> bool {
+    if value.starts_with('[') && value.ends_with(']') {
+        let pos = value.bytes().rev().position(|x| x == b'[').unwrap() + 2;
+        if value.len() <= pos {
+            true
+        } else {
+            value.as_bytes()[value.len() - (pos + 2)] == b'['
+        }
+    } else {
+        false
+    }
+}
 
 pub fn is_boolean(value: &str) -> Result<&str, ()> {
     if ["true", "1", "y"].contains(&value) {
@@ -127,5 +144,35 @@ pub fn value_check<'a, E: Expander>(
         Primitive::Float if !is_array => is_float_string(string!()).map_err(|_| TypeError::BadValue(expected)),
         Primitive::FloatArray if is_array => is_float_array(array!()).map_err(|_| TypeError::BadValue(expected)),
         _ => Err(TypeError::BadValue(expected)),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn is_array_() {
+        assert!(is_array("[1 2 3]"));
+        assert!(!is_array("[1 2 3][0]"));
+        assert!(!is_array("string"));
+    }
+
+    #[test]
+    fn is_boolean_() {
+        assert_eq!(is_boolean("1"), Ok("true"));
+        assert_eq!(is_boolean("y"), Ok("true"));
+        assert_eq!(is_boolean("true"), Ok("true"));
+        assert_eq!(is_boolean("0"), Ok("false"));
+        assert_eq!(is_boolean("n"), Ok("false"));
+        assert_eq!(is_boolean("false"), Ok("false"));
+        assert_eq!(is_boolean("other"), Err(()));
+    }
+
+    #[test]
+    fn is_integer_array_() {
+        let expected = Ok(ReturnValue::Vector(array!["1", "2", "3"]));
+        assert_eq!(is_integer_array(ReturnValue::Vector(array!["1", "2", "3"])), expected);
+        assert_eq!(is_integer_array(ReturnValue::Vector(array!["1", "2", "three"])), Err(()));
     }
 }

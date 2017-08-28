@@ -30,3 +30,23 @@ pub fn split_pattern<'a>(arg: &'a str, pattern: &str) -> (&'a str, Option<&'a st
         None => (arg, None),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn statement_pattern_splitting() {
+        let (args, description) = split_pattern("a:int b:bool -- a comment", "--");
+        assert_eq!(args, "a:int b:bool");
+        assert_eq!(description, Some("a comment"));
+
+        let (args, description) = split_pattern("a --", "--");
+        assert_eq!(args, "a");
+        assert_eq!(description, None);
+
+        let (args, description) = split_pattern("a", "--");
+        assert_eq!(args, "a");
+        assert_eq!(description, None);
+    }
+}
