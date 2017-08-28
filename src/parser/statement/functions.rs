@@ -24,14 +24,14 @@ pub fn collect_arguments<'a>(args: KeyIterator<'a>) -> Result<Vec<KeyBuf>, TypeE
     Ok(output)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::split_pattern;
 
     #[test]
     fn function_parsing() {
-        let (args, description) = split_comments("a:int b:bool -- a comment");
+        let (args, description) = split_pattern("a:int b:bool -- a comment", "--");
         assert_eq!(args, "a:int b:bool");
         assert_eq!(description, Some("a comment"));
     }
