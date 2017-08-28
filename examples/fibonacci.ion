@@ -7,13 +7,11 @@ fn fib n
             let temp = $output
             let output += $previous
             let previous = $temp
-            # This also works, but has a higher performance penalty:
-            # let output previous = $((output + previous)) $output
         end
         echo $output
     end
 end
 
-for i in 1..20
+for i in 1..200
     fib $i
 end

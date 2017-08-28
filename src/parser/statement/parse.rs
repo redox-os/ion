@@ -148,7 +148,7 @@ pub fn parse(code: &str) -> Statement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::types::parse::{Primitive, TypeArgBuf};
+    use parser::types::parse::{KeyBuf, Primitive};
     use shell::{Job, JobKind};
     use shell::flow_control::Statement;
 
@@ -243,11 +243,11 @@ mod tests {
             description: None,
             name: "bob".into(),
             args: vec![
-                TypeArgBuf {
+                KeyBuf {
                     name: "a".into(),
                     kind: Primitive::Any,
                 },
-                TypeArgBuf {
+                KeyBuf {
                     name: "b".into(),
                     kind: Primitive::Any,
                 },
@@ -265,11 +265,11 @@ mod tests {
             description: Some("bob is a nice function".to_string()),
             name: "bob".into(),
             args: vec![
-                TypeArgBuf {
+                KeyBuf {
                     name: "a".into(),
                     kind: Primitive::Any,
                 },
-                TypeArgBuf {
+                KeyBuf {
                     name: "b".into(),
                     kind: Primitive::Any,
                 },

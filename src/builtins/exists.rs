@@ -217,7 +217,7 @@ fn function_is_defined(function: &str, shell: &Shell) -> bool {
 
 #[test]
 fn test_evaluate_arguments() {
-    use parser::types::parse::{Primitive, TypeArgBuf};
+    use parser::types::parse::{Primitive, KeyBuf};
     let builtins = Builtin::map();
     let mut shell = Shell::new(&builtins);
     let mut sink = BufWriter::new(io::sink());
@@ -305,7 +305,7 @@ fn test_evaluate_arguments() {
     let name_str = "test_function";
     let name = SmallString::from_str(name_str);
     let mut args = Vec::new();
-    args.push(TypeArgBuf {
+    args.push(KeyBuf {
         name: "testy".into(),
         kind: Primitive::Any,
     });
@@ -465,7 +465,7 @@ fn test_string_var_is_not_empty() {
 
 #[test]
 fn test_function_is_defined() {
-    use parser::types::parse::{Primitive, TypeArgBuf};
+    use parser::types::parse::{Primitive, KeyBuf};
     let builtins = Builtin::map();
     let mut shell = Shell::new(&builtins);
 
@@ -473,7 +473,7 @@ fn test_function_is_defined() {
     let name_str = "test_function";
     let name = SmallString::from_str(name_str);
     let mut args = Vec::new();
-    args.push(TypeArgBuf {
+    args.push(KeyBuf {
         name: "testy".into(),
         kind: Primitive::Any,
     });

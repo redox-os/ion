@@ -153,7 +153,7 @@ impl<'a> VariableStore for Shell<'a> {
                                 _ => unreachable!()
                             };
 
-                            if !integer_math_export(key, operator, &value) {
+                            if !integer_math_export(&self, key, operator, &value) {
                                 return FAILURE;
                             }
                         }
@@ -185,64 +185,9 @@ impl<'a> VariableStore for Shell<'a> {
     }
 }
 
-// fn string_is_valid(value: &str, expected: Primitive) -> Result<&str, TypeError> {
-//     match expected {
-//         Primitive::Any | Primitive::Str => Ok(value),
-//         Primitive::Boolean => is_boolean(value).map_err(|_| TypeError::BadValue(expected)),
-//         Primitive::Integer => {
-//             if value.parse::<i64>().is_ok() {
-//                 Ok(value)
-//             } else {
-//                 Err(TypeError::BadValue(expected))
-//             }
-//         }
-//         Primitive::Float => {
-//             if value.parse::<f64>().is_ok() {
-//                 Ok(value)
-//             } else {
-//                 Err(TypeError::BadValue(expected))
-//             }
-//         }
-//         _ => unreachable!(),
-//     }
-// }
-//
-// fn array_is_valid(values: &[String], expected: Primitive) -> Result<Option<Array>, TypeError> {
-//     match expected {
-//         Primitive::Any | Primitive::AnyArray | Primitive::StrArray => Ok(None),
-//         Primitive::BooleanArray => {
-//             let mut output = SmallVec::new();
-//             for value in values {
-//                 let value = is_boolean(value.as_str())
-//                     .map_err(|_| TypeError::BadValue(expected))?
-//                     .into();
-//                 output.push(value);
-//             }
-//             Ok(Some(output))
-//         }
-//         Primitive::IntegerArray => {
-//             for value in values {
-//                 if !value.parse::<i64>().is_ok() {
-//                     return Err(TypeError::BadValue(expected));
-//                 }
-//             }
-//             Ok(None)
-//         }
-//         Primitive::FloatArray => {
-//             for value in values {
-//                 if !value.parse::<f64>().is_ok() {
-//                     return Err(TypeError::BadValue(expected));
-//                 }
-//             }
-//             Ok(None)
-//         }
-//         _ => unreachable!(),
-//     }
-// }
-
 // NOTE: Here there be excessively long functions.
 
-fn integer_math(shell: &mut Shell, key: TypeArg, operator: Operator, value: &str) -> bool {
+fn integer_math(shell: &mut Shell, key: Key, operator: Operator, value: &str) -> bool {
     match operator {
         Operator::Add => {
             if Primitive::Any == key.kind || Primitive::Float == key.kind {
@@ -297,6 +242,27 @@ fn integer_math(shell: &mut Shell, key: TypeArg, operator: Operator, value: &str
                 }
                 return false;
             } else if let Primitive::Integer = key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
+                    Ok(lhs) => {
+                        match value.parse::<i64>() {
+                            Ok(rhs) => {
+                                let value = (lhs / rhs).to_string();
+                                shell.variables.set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::IntegerDivide => {
+            if Primitive::Any == key.kind || Primitive::Float == key.kind {
                 match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
                         match value.parse::<i64>() {
@@ -431,11 +397,11 @@ fn integer_math(shell: &mut Shell, key: TypeArg, operator: Operator, value: &str
     }
 }
 
-fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
+fn integer_math_export(shell: &Shell, key: Key, operator: Operator, value: &str) -> bool {
     match operator {
         Operator::Add => {
             if Primitive::Any == key.kind || Primitive::Float == key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<f64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
                     Ok(lhs) => {
                         match value.parse::<f64>() {
                             Ok(rhs) => {
@@ -450,7 +416,7 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
                 }
                 return false;
             } else if let Primitive::Integer = key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<i64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
                         match value.parse::<i64>() {
                             Ok(rhs) => {
@@ -471,7 +437,7 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
         }
         Operator::Divide => {
             if Primitive::Any == key.kind || Primitive::Float == key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<f64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
                     Ok(lhs) => {
                         match value.parse::<f64>() {
                             Ok(rhs) => {
@@ -486,7 +452,28 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
                 }
                 return false;
             } else if let Primitive::Integer = key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<i64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
+                    Ok(lhs) => {
+                        match value.parse::<i64>() {
+                            Ok(rhs) => {
+                                let value = (lhs / rhs).to_string();
+                                env::set_var(key.name, &value);
+                                return true;
+                            }
+                            Err(_) => eprintln!("ion: right hand side has invalid value type"),
+                        }
+                    }
+                    Err(_) => eprintln!("ion: variable has invalid value type"),
+                }
+                return false;
+            } else {
+                eprintln!("ion: variable does not support this operation");
+                return false;
+            }
+        }
+        Operator::IntegerDivide => {
+            if Primitive::Any == key.kind || Primitive::Float == key.kind {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
                         match value.parse::<i64>() {
                             Ok(rhs) => {
@@ -507,7 +494,7 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
         }
         Operator::Subtract => {
             if Primitive::Any == key.kind || Primitive::Float == key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<f64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
                     Ok(lhs) => {
                         match value.parse::<f64>() {
                             Ok(rhs) => {
@@ -522,7 +509,7 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
                 }
                 return false;
             } else if let Primitive::Integer = key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<i64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
                         match value.parse::<i64>() {
                             Ok(rhs) => {
@@ -543,7 +530,7 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
         }
         Operator::Multiply => {
             if Primitive::Any == key.kind || Primitive::Float == key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<f64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
                     Ok(lhs) => {
                         match value.parse::<f64>() {
                             Ok(rhs) => {
@@ -558,7 +545,7 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
                 }
                 return false;
             } else if let Primitive::Integer = key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<i64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
                         match value.parse::<i64>() {
                             Ok(rhs) => {
@@ -579,7 +566,7 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
         }
         Operator::Exponent => {
             if Primitive::Any == key.kind || Primitive::Float == key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<f64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
                     Ok(lhs) => {
                         match value.parse::<f64>() {
                             Ok(rhs) => {
@@ -594,7 +581,7 @@ fn integer_math_export(key: TypeArg, operator: Operator, value: &str) -> bool {
                 }
                 return false;
             } else if let Primitive::Integer = key.kind {
-                match env::var(key.name).unwrap_or("".into()).parse::<i64>() {
+                match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
                     Ok(lhs) => {
                         match value.parse::<u32>() {
                             Ok(rhs) => {

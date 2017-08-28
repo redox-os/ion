@@ -3,7 +3,7 @@ use super::flow::FlowLogic;
 use fnv::*;
 use parser::pipelines::Pipeline;
 use parser::types::checker::{ReturnValue, value_check};
-use parser::types::parse::{Primitive, TypeArgBuf};
+use parser::types::parse::{Primitive, KeyBuf};
 use types::*;
 use types::Identifier;
 
@@ -55,7 +55,7 @@ pub enum Statement {
     Function {
         name: Identifier,
         description: Option<String>,
-        args: Vec<TypeArgBuf>,
+        args: Vec<KeyBuf>,
         statements: Vec<Statement>,
     },
     For {
@@ -124,7 +124,7 @@ impl Default for FlowControl {
 pub struct Function {
     pub description: Option<String>,
     pub name: Identifier,
-    pub args: Vec<TypeArgBuf>,
+    pub args: Vec<KeyBuf>,
     pub statements: Vec<Statement>,
 }
 

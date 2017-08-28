@@ -1,16 +1,21 @@
 use std::fmt::{self, Display, Formatter};
 
+/// Keys are used in assignments to define which variable will be set, and whether the correct
+/// types are being assigned.
 #[derive(Debug, PartialEq, Clone)]
-pub struct TypeArg<'a> {
+pub struct Key<'a> {
     pub kind: Primitive,
     pub name: &'a str,
 }
 
+/// Functions require that their keys to have a longer lifetime, and that is made possible
+/// by eliminating the lifetime requirements via allocating a `String`.
 #[derive(Debug, PartialEq, Clone)]
-pub struct TypeArgBuf {
+pub struct KeyBuf {
     pub kind: Primitive,
     pub name: String,
 }
+
 
 #[derive(Debug, PartialEq)]
 pub enum TypeError<'a> {
@@ -27,24 +32,25 @@ impl<'a> Display for TypeError<'a> {
     }
 }
 
-impl<'a> TypeArg<'a> {
-    fn new(name: &'a str, data: &'a str) -> Result<TypeArg<'a>, TypeError<'a>> {
+impl<'a> Key<'a> {
+    fn new(name: &'a str, data: &'a str) -> Result<Key<'a>, TypeError<'a>> {
         match Primitive::parse(data) {
-            Some(data) => Ok(TypeArg { kind: data, name }),
+            Some(data) => Ok(Key { kind: data, name }),
             None => Err(TypeError::Invalid(data)),
         }
     }
 }
 
-impl<'a> From<TypeArg<'a>> for TypeArgBuf {
-    fn from(typearg: TypeArg<'a>) -> TypeArgBuf {
-        TypeArgBuf {
-            kind: typearg.kind,
-            name: typearg.name.to_owned(),
+impl<'a> From<Key<'a>> for KeyBuf {
+    fn from(key: Key<'a>) -> KeyBuf {
+        KeyBuf {
+            kind: key.kind,
+            name: key.name.to_owned(),
         }
     }
 }
 
+/// A primitive defines the type that a requested value should satisfy.
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Primitive {
     Any,
@@ -93,22 +99,24 @@ impl Display for Primitive {
     }
 }
 
+/// Quite simply, an iterator that returns keys.
 #[derive(Debug, PartialEq)]
-pub struct TypeParser<'a> {
+pub struct KeyIterator<'a> {
     data: &'a str,
     read: usize,
 }
 
-impl<'a> TypeParser<'a> {
-    pub fn new(data: &'a str) -> TypeParser<'a> { TypeParser { data, read: 0 } }
+impl<'a> KeyIterator<'a> {
+    pub fn new(data: &'a str) -> KeyIterator<'a> { KeyIterator { data, read: 0 } }
 
-    fn parse_parameter(&mut self, name: &'a str) -> Result<TypeArg<'a>, TypeError<'a>> {
+    // Parameters are values that follow the semicolon (':').
+    fn parse_parameter(&mut self, name: &'a str) -> Result<Key<'a>, TypeError<'a>> {
         let mut start = self.read;
         for byte in self.data.bytes().skip(self.read) {
             self.read += 1;
             match byte {
                 b' ' if start + 1 == self.read => start += 1,
-                b' ' => return TypeArg::new(name, &self.data[start..self.read].trim()),
+                b' ' => return Key::new(name, &self.data[start..self.read].trim()),
                 _ => (),
             }
         }
@@ -116,17 +124,18 @@ impl<'a> TypeParser<'a> {
         if start == self.read {
             Err(TypeError::Invalid(""))
         } else {
-            TypeArg::new(name, &self.data[start..self.read].trim())
+            Key::new(name, &self.data[start..self.read].trim())
         }
     }
 
-    fn parse_array(&mut self, name: &'a str) -> Result<TypeArg<'a>, TypeError<'a>> {
-        let start = self.read - 1;
+    // Executes when a semicolon was not found, but an array character was.
+    fn parse_array(&mut self, name: &'a str) -> Result<Key<'a>, TypeError<'a>> {
+        let start = self.read;
         for byte in self.data.bytes().skip(self.read) {
             if byte == b' ' {
                 match &self.data[start..self.read] {
-                    "[]" => {
-                        return Ok(TypeArg {
+                    "]" => {
+                        return Ok(Key {
                             name,
                             kind: Primitive::AnyArray,
                         })
@@ -136,9 +145,10 @@ impl<'a> TypeParser<'a> {
             }
             self.read += 1;
         }
+
         match &self.data[start..] {
-            "[]" => {
-                return Ok(TypeArg {
+            "]" => {
+                return Ok(Key {
                     name,
                     kind: Primitive::AnyArray,
                 })
@@ -148,16 +158,16 @@ impl<'a> TypeParser<'a> {
     }
 }
 
-impl<'a> Iterator for TypeParser<'a> {
-    type Item = Result<TypeArg<'a>, TypeError<'a>>;
-    fn next(&mut self) -> Option<Result<TypeArg<'a>, TypeError<'a>>> {
+impl<'a> Iterator for KeyIterator<'a> {
+    type Item = Result<Key<'a>, TypeError<'a>>;
+    fn next(&mut self) -> Option<Result<Key<'a>, TypeError<'a>>> {
         let mut start = self.read;
         for byte in self.data.bytes().skip(self.read) {
             self.read += 1;
             match byte {
                 b' ' if start + 1 == self.read => start += 1,
                 b' ' => {
-                    return Some(Ok(TypeArg {
+                    return Some(Ok(Key {
                         name: &self.data[start..self.read].trim(),
                         kind: Primitive::Any,
                     }))
@@ -178,7 +188,7 @@ impl<'a> Iterator for TypeParser<'a> {
         if start == self.read {
             None
         } else {
-            Some(Ok(TypeArg {
+            Some(Ok(Key {
                 name: &self.data[start..self.read].trim(),
                 kind: Primitive::Any,
             }))

@@ -8,6 +8,7 @@ pub enum Operator {
     Add,
     Subtract,
     Divide,
+    IntegerDivide,
     Multiply,
     Exponent,
     Equal,
@@ -20,6 +21,7 @@ impl Operator {
             "+=" => Ok(Operator::Add),
             "-=" => Ok(Operator::Subtract),
             "/=" => Ok(Operator::Divide),
+            "//=" => Ok(Operator::IntegerDivide),
             "*=" => Ok(Operator::Multiply),
             "**=" => Ok(Operator::Exponent),
             _ => Err(AssignmentError::InvalidOperator(data)),
@@ -33,6 +35,7 @@ impl Display for Operator {
             Operator::Add => write!(f, "+="),
             Operator::Subtract => write!(f, "-="),
             Operator::Divide => write!(f, "/="),
+            Operator::IntegerDivide => write!(f, "//="),
             Operator::Multiply => write!(f, "*="),
             Operator::Exponent => write!(f, "**="),
             Operator::Equal => write!(f, "="),
@@ -66,8 +69,13 @@ impl<'a> Display for AssignmentError<'a> {
 }
 
 
+/// An iterator structure which returns `Action` enums which tell the shell how to enact the
+/// assignment request.
+///
+/// Each request will tell the shell whether the assignment is asking to update an array or a
+/// string, and will contain the key/value pair to assign.
 pub struct AssignmentActions<'a> {
-    keys: TypeParser<'a>,
+    keys: KeyIterator<'a>,
     operator: Operator,
     values: ArgumentSplitter<'a>,
 }
@@ -76,7 +84,7 @@ impl<'a> AssignmentActions<'a> {
     pub fn new(data: &'a str) -> Result<AssignmentActions<'a>, AssignmentError<'a>> {
         let (keys, op, vals) = split_assignment(data);
         Ok(AssignmentActions {
-            keys: keys.map(TypeParser::new).ok_or(AssignmentError::NoKeys)?,
+            keys: keys.map(KeyIterator::new).ok_or(AssignmentError::NoKeys)?,
             operator: Operator::parse(op.ok_or(AssignmentError::NoOperator)?)?,
             values: vals.map(ArgumentSplitter::new).ok_or(
                 AssignmentError::NoValues,
@@ -107,14 +115,18 @@ impl<'a> Iterator for AssignmentActions<'a> {
     }
 }
 
+/// Defines which type of assignment action is to be performed.
+///
+/// Providing the key/value pair and operator to use during assignment, this variant defines
+/// whether the assignment should set a string or array.
 #[derive(Debug, PartialEq)]
 pub enum Action<'a> {
-    UpdateString(TypeArg<'a>, Operator, &'a str),
-    UpdateArray(TypeArg<'a>, Operator, &'a str),
+    UpdateString(Key<'a>, Operator, &'a str),
+    UpdateArray(Key<'a>, Operator, &'a str),
 }
 
 impl<'a> Action<'a> {
-    fn new(var: TypeArg<'a>, operator: Operator, value: &'a str) -> Result<Action<'a>, AssignmentError<'a>> {
+    fn new(var: Key<'a>, operator: Operator, value: &'a str) -> Result<Action<'a>, AssignmentError<'a>> {
         match var.kind {
             Primitive::AnyArray | Primitive::BooleanArray | Primitive::FloatArray | Primitive::IntegerArray |
             Primitive::StrArray => {
@@ -209,7 +221,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                TypeArg {
+                Key {
                     name: "abc",
                     kind: Primitive::Any,
                 },
@@ -220,7 +232,7 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateString(
-                TypeArg {
+                Key {
                     name: "def",
                     kind: Primitive::Any,
                 },
@@ -236,7 +248,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                TypeArg {
+                Key {
                     name: "ab",
                     kind: Primitive::Integer,
                 },
@@ -252,7 +264,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                TypeArg {
+                Key {
                     name: "a",
                     kind: Primitive::Any,
                 },
@@ -263,7 +275,7 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateArray(
-                TypeArg {
+                Key {
                     name: "b",
                     kind: Primitive::AnyArray,
                 },
@@ -274,7 +286,7 @@ mod tests {
         assert_eq!(
             actions[2],
             Ok(Action::UpdateArray(
-                TypeArg {
+                Key {
                     name: "c",
                     kind: Primitive::IntegerArray,
                 },
@@ -290,7 +302,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateArray(
-                TypeArg {
+                Key {
                     name: "a",
                     kind: Primitive::AnyArray,
                 },
@@ -301,7 +313,7 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateString(
-                TypeArg {
+                Key {
                     name: "b",
                     kind: Primitive::Any,
                 },
@@ -312,7 +324,7 @@ mod tests {
         assert_eq!(
             actions[2],
             Ok(Action::UpdateArray(
-                TypeArg {
+                Key {
                     name: "c",
                     kind: Primitive::AnyArray,
                 },
