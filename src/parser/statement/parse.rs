@@ -93,13 +93,18 @@ pub fn parse(code: &str) -> Statement {
             let (value, binding, conditional) = match cmd[5..].trim_left() {
                 "_" => (None, None, None),
                 value @ _ => {
-                    let (value, binding, conditional) = case::parse_case(value);
+                    let (value, binding, conditional) = match case::parse_case(value) {
+                        Ok(values) => values,
+                        Err(why) => {
+                            eprintln!("ion: case error: {}", why);
+                            return Statement::Default;
+                        }
+                    };
                     let binding = binding.map(Into::into);
-                    let conditional = conditional.map(Into::into);
-                    if value == "_" {
-                        (None, binding, conditional)
-                    } else {
-                        (Some(value.into()), binding, conditional)
+                    match value {
+                        Some("_") => (None, binding, conditional),
+                        Some(value) => (Some(value.into()), binding, conditional),
+                        None => (None, binding, conditional),
                     }
                 }
             };

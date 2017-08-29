@@ -217,6 +217,7 @@ impl<'a> FlowLogic for Shell<'a> {
         let value = expand_string(&expression, self, false);
         let mut condition = Condition::NoOp;
         for case in cases {
+            // let pattern_is_array = is_array(&value);
             let pattern = case.value.map(|v| expand_string(&v, self, false));
             match pattern {
                 None => {
@@ -226,10 +227,18 @@ impl<'a> FlowLogic for Shell<'a> {
                             previous_bind = self.variables.get_array(bind).map(|x| {
                                 ReturnValue::Vector(x.clone())
                             });
-                            self.variables.set_array(&bind, value);
+                            self.variables.set_array(&bind, value.clone());
                         } else {
                             previous_bind = self.variables.get_var(bind).map(|x| ReturnValue::Str(x));
                             self.variables.set_var(&bind, &value.join(" "));
+                        }
+
+                    }
+
+                    if let Some(statement) = case.conditional {
+                        self.on_command(&statement);
+                        if self.previous_status != SUCCESS {
+                            continue;
                         }
                     }
 
@@ -253,10 +262,17 @@ impl<'a> FlowLogic for Shell<'a> {
                             previous_bind = self.variables.get_array(bind).map(|x| {
                                 ReturnValue::Vector(x.clone())
                             });
-                            self.variables.set_array(&bind, value);
+                            self.variables.set_array(&bind, value.clone());
                         } else {
                             previous_bind = self.variables.get_var(bind).map(|x| ReturnValue::Str(x));
                             self.variables.set_var(&bind, &value.join(" "));
+                        }
+                    }
+
+                    if let Some(statement) = case.conditional {
+                        self.on_command(&statement);
+                        if self.previous_status != SUCCESS {
+                            continue;
                         }
                     }
 
