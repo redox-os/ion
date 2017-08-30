@@ -4,8 +4,8 @@ use super::flow_control::{Case, ElseIf, Function, Statement, collect_cases, coll
 use super::job_control::JobControl;
 use super::status::*;
 use parser::{ForExpression, StatementSplitter, expand_string, parse_and_validate};
+use parser::assignments::{ReturnValue, is_array};
 use parser::pipelines::Pipeline;
-use parser::types::checker::{ReturnValue, is_array};
 use shell::assignments::VariableStore;
 use std::io::{self, Write};
 use std::mem;

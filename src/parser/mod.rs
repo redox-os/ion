@@ -1,5 +1,5 @@
 mod arguments;
-pub mod types;
+pub mod assignments;
 mod loops;
 pub mod pipelines;
 pub mod shell_expand;

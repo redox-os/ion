@@ -40,6 +40,14 @@ if test 1 -eq $len(@args); bad_arg; end
 # Rust/Cargo is required!
 if not exists -b "cargo"
     echo "${c::0xF60,bold}Error: Rust/Cargo is not installed."
+    echo "${c::0x09F}Hint: `curl https://sh.rustup.rs -sSf | sh`"
+    exit
+end
+
+# Nightly Rust is currently required
+if not exists $(rustc --version | grep nightly)
+    echo "${c::0xF60,bold}Error: Project currently requires a nightly version Rust."
+    echo "${c::0x09F}Hint: `rustup default nightly`"
     exit
 end
 

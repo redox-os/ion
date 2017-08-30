@@ -1,4 +1,3 @@
-
 use std::char;
 use std::io::{self, Write};
 use std::iter::{FromIterator, empty};
@@ -8,8 +7,8 @@ use super::{Expander, expand_string};
 use super::{is_expression, slice};
 use super::ranges::parse_index_range;
 use super::super::ArgumentSplitter;
+use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};
 use unicode_segmentation::UnicodeSegmentation;
-use shell::plugins::methods::{self, StringMethodPlugins, MethodArguments};
 
 use std::path::Path;
 use types::Array;
@@ -638,27 +637,15 @@ impl<'a> StringMethod<'a> {
                     .flat_map(|arg| expand_string(&arg, expand, false))
                     .collect::<_>();
                 let args = if variable.starts_with('@') || variable.starts_with('[') {
-                    MethodArguments::Array(
-                        expand_string(variable, expand, false).into_vec(),
-                        pattern
-                    )
+                    MethodArguments::Array(expand_string(variable, expand, false).into_vec(), pattern)
                 } else if let Some(value) = expand.variable(variable, false) {
-                    MethodArguments::StringArg(
-                        value,
-                        pattern
-                    )
+                    MethodArguments::StringArg(value, pattern)
                 } else if is_expression(variable) {
                     let expanded = expand_string(variable, expand, false);
                     match expanded.len() {
                         0 => MethodArguments::NoArgs,
-                        1 => MethodArguments::StringArg(
-                            expanded[0].clone(),
-                            pattern
-                        ),
-                        _ => MethodArguments::Array(
-                            expanded.into_vec(),
-                            pattern
-                        )
+                        1 => MethodArguments::StringArg(expanded[0].clone(), pattern),
+                        _ => MethodArguments::Array(expanded.into_vec(), pattern),
                     }
                 } else {
                     MethodArguments::NoArgs
@@ -667,7 +654,7 @@ impl<'a> StringMethod<'a> {
                 match STRING_METHODS.execute(method, args) {
                     Ok(Some(string)) => output.push_str(&string),
                     Ok(None) => (),
-                    Err(why) => eprintln!("ion: method plugin: {}", why)
+                    Err(why) => eprintln!("ion: method plugin: {}", why),
                 }
             }
         }

@@ -166,7 +166,7 @@ pub fn parse(code: &str) -> Statement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::types::parse::{KeyBuf, Primitive};
+    use parser::assignments::{KeyBuf, Primitive};
     use shell::{Job, JobKind};
     use shell::flow_control::Statement;
 

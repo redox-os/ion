@@ -7,7 +7,6 @@ pub enum CaseError<'a> {
     NoConditional,
     ExtraBind(&'a str),
     ExtraVar(&'a str),
-    Empty,
 }
 
 impl<'a> Display for CaseError<'a> {
@@ -17,7 +16,6 @@ impl<'a> Display for CaseError<'a> {
             CaseError::NoConditional => write!(f, "no conditional statement was given"),
             CaseError::ExtraBind(value) => write!(f, "extra value, '{}', was given to bind", value),
             CaseError::ExtraVar(value) => write!(f, "extra variable, '{}', was given to case", value),
-            CaseError::Empty => write!(f, "the case is empty"),
         }
     }
 }
@@ -73,10 +71,10 @@ mod tests {
     #[test]
     fn case_parsing() {
         assert_eq!(
-            Ok(("test", Some("test"), Some("exists".into()))),
+            Ok((Some("test"), Some("test"), Some("exists".into()))),
             parse_case("test @ test if exists")
         );
-        assert_eq!(Ok(("test", Some("test"), None)), parse_case("test @ test"));
-        assert_eq!(Ok(("test", None, None)), parse_case("test"));
+        assert_eq!(Ok((Some("test"), Some("test"), None)), parse_case("test @ test"));
+        assert_eq!(Ok((Some("test"), None, None)), parse_case("test"));
     }
 }

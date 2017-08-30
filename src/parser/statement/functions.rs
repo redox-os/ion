@@ -1,5 +1,5 @@
 use super::split_pattern;
-use super::super::types::parse::{KeyBuf, KeyIterator, TypeError};
+use super::super::assignments::{KeyBuf, KeyIterator, TypeError};
 
 /// The arguments expression given to a function declaration goes into here, which will be
 /// converted into a tuple consisting of a `KeyIterator` iterator, which will collect type
@@ -27,7 +27,7 @@ pub fn collect_arguments<'a>(args: KeyIterator<'a>) -> Result<Vec<KeyBuf>, TypeE
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::super::types::parse::{KeyBuf, Primitive};
+    use super::super::super::assignments::{KeyBuf, Primitive};
 
     #[test]
     fn function_parsing() {

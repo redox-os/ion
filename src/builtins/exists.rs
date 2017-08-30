@@ -217,7 +217,7 @@ fn function_is_defined(function: &str, shell: &Shell) -> bool {
 
 #[test]
 fn test_evaluate_arguments() {
-    use parser::types::parse::{Primitive, KeyBuf};
+    use parser::assignments::{KeyBuf, Primitive};
     let builtins = Builtin::map();
     let mut shell = Shell::new(&builtins);
     let mut sink = BufWriter::new(io::sink());
@@ -465,7 +465,7 @@ fn test_string_var_is_not_empty() {
 
 #[test]
 fn test_function_is_defined() {
-    use parser::types::parse::{Primitive, KeyBuf};
+    use parser::assignments::{KeyBuf, Primitive};
     let builtins = Builtin::map();
     let mut shell = Shell::new(&builtins);
 

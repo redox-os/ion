@@ -3,9 +3,7 @@ use std::io::{self, Write};
 
 use super::Shell;
 use super::status::*;
-use parser::types::assignments::*;
-use parser::types::checker::{value_check, ReturnValue};
-use parser::types::parse::*;
+use parser::assignments::*;
 use types::{ArrayVariableContext, VariableContext};
 
 fn print_vars(list: &VariableContext) {

@@ -1,47 +1,7 @@
+use super::*;
 use super::checker::*;
-use super::parse::*;
 use super::super::ArgumentSplitter;
 use std::fmt::{self, Display, Formatter};
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Operator {
-    Add,
-    Subtract,
-    Divide,
-    IntegerDivide,
-    Multiply,
-    Exponent,
-    Equal,
-}
-
-impl Operator {
-    fn parse<'a>(data: &'a str) -> Result<Operator, AssignmentError<'a>> {
-        match data {
-            "=" => Ok(Operator::Equal),
-            "+=" => Ok(Operator::Add),
-            "-=" => Ok(Operator::Subtract),
-            "/=" => Ok(Operator::Divide),
-            "//=" => Ok(Operator::IntegerDivide),
-            "*=" => Ok(Operator::Multiply),
-            "**=" => Ok(Operator::Exponent),
-            _ => Err(AssignmentError::InvalidOperator(data)),
-        }
-    }
-}
-
-impl Display for Operator {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match *self {
-            Operator::Add => write!(f, "+="),
-            Operator::Subtract => write!(f, "-="),
-            Operator::Divide => write!(f, "/="),
-            Operator::IntegerDivide => write!(f, "//="),
-            Operator::Multiply => write!(f, "*="),
-            Operator::Exponent => write!(f, "**="),
-            Operator::Equal => write!(f, "="),
-        }
-    }
-}
 
 #[derive(Debug, PartialEq)]
 pub enum AssignmentError<'a> {
@@ -67,7 +27,6 @@ impl<'a> Display for AssignmentError<'a> {
         }
     }
 }
-
 
 /// An iterator structure which returns `Action` enums which tell the shell how to enact the
 /// assignment request.
@@ -144,73 +103,10 @@ impl<'a> Action<'a> {
     }
 }
 
-/// Given an valid assignment expression, this will split it into `keys`, `operator`, `values`.
-fn split_assignment<'a>(statement: &'a str) -> (Option<&'a str>, Option<&'a str>, Option<&'a str>) {
-    let statement = statement.trim();
-    if statement.len() == 0 {
-        return (None, None, None);
-    }
-
-    let mut read = 0;
-    let mut bytes = statement.bytes();
-    let mut start = 0;
-
-    while let Some(byte) = bytes.next() {
-        if b'=' == byte {
-            if let None = statement.as_bytes().get(read + 1) {
-                return (Some(&statement[..read].trim()), Some("="), None);
-            }
-            start = read;
-            read += 1;
-            break;
-        } else if [b'+', b'-', b'/', b'*'].contains(&byte) {
-            start = read;
-            read += 1;
-            while let Some(byte) = bytes.next() {
-                read += 1;
-                if byte == b'=' {
-                    break;
-                }
-            }
-            break;
-        }
-        read += 1;
-    }
-
-    if statement.len() == read {
-        return (Some(statement.trim()), None, None);
-    }
-
-    let keys = statement[..start].trim_right();
-
-    let operator = &statement[start..read];
-    if read == statement.len() {
-        return (Some(keys), Some(operator), None);
-    }
-
-    let values = &statement[read..];
-    (Some(keys), Some(operator), Some(values.trim()))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn assignment_splitting() {
-        assert_eq!(split_assignment(""), (None, None, None));
-        assert_eq!(split_assignment("abc"), (Some("abc"), None, None));
-        assert_eq!(split_assignment("abc+=def"), (Some("abc"), Some("+="), Some("def")));
-        assert_eq!(split_assignment("abc ="), (Some("abc"), Some("="), None));
-        assert_eq!(split_assignment("abc =  "), (Some("abc"), Some("="), None));
-        assert_eq!(split_assignment("abc = def"), (Some("abc"), Some("="), Some("def")));
-        assert_eq!(split_assignment("abc=def"), (Some("abc"), Some("="), Some("def")));
-        assert_eq!(split_assignment("def ghi += 124 523"), (
-            Some("def ghi"),
-            Some("+="),
-            Some("124 523"),
-        ))
-    }
+    use super::super::*;
 
     #[test]
     fn assignment_actions() {

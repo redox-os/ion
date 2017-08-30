@@ -1,13 +1,6 @@
-use super::parse::{Primitive, TypeError};
+use super::{Primitive, ReturnValue, TypeError};
 use super::super::Expander;
 use super::super::expand_string;
-use types::{Array, Value};
-
-#[derive(Debug, PartialEq)]
-pub enum ReturnValue {
-    Str(Value),
-    Vector(Array),
-}
 
 /// Determines if the supplied value is either an array or a string.
 ///
@@ -139,6 +132,7 @@ pub fn value_check<'a, E: Expander>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use super::super::*;
 
     #[test]
     fn is_array_() {

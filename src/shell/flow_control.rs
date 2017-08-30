@@ -1,9 +1,8 @@
 use super::Shell;
 use super::flow::FlowLogic;
 use fnv::*;
+use parser::assignments::*;
 use parser::pipelines::Pipeline;
-use parser::types::checker::{ReturnValue, value_check};
-use parser::types::parse::{KeyBuf, Primitive};
 use types::*;
 use types::Identifier;
 
