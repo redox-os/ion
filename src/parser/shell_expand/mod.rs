@@ -273,7 +273,7 @@ pub fn expand_tokens<E: Expander>(
                     WordToken::Brace(ref nodes) => {
                         expand_brace(&mut output, &mut expanders, &mut tokens, nodes, expand_func, reverse_quoting)
                     }
-                    WordToken::Whitespace(_) => unreachable!(),
+                    WordToken::Whitespace(whitespace) => output.push_str(whitespace),
                     WordToken::Process(command, _, ref index) => {
                         expand_process(&mut output, command, index.clone(), expand_func);
                     }
