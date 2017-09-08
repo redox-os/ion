@@ -62,38 +62,31 @@ impl<'a> VariableStore for Shell<'a> {
                 for action in assignment_actions {
                     match action {
                         Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
-                            let values = match value_check(self, &expression, key.kind) {
-                                Ok(values) => match values {
-                                    ReturnValue::Vector(values) => values,
-                                    _ => unreachable!()
-                                }
+                            match value_check(self, &expression, key.kind) {
+                                Ok(ReturnValue::Vector(values)) => self.variables.set_array(key.name, values),
                                 Err(why) => {
                                     eprintln!("ion: assignment error: {}", why);
                                     return FAILURE;
                                 }
-                            };
-                            self.variables.set_array(key.name, values)
+                                _ => unreachable!()
+                            }
                         }
                         Ok(Action::UpdateArray(..)) => {
                             eprintln!("ion: arithmetic operators on array expressions aren't supported yet.");
                             return FAILURE;
                         }
                         Ok(Action::UpdateString(key, operator, expression)) => {
-                            let value = match value_check(self, &expression, key.kind) {
-                                Ok(value) => value,
+                            match value_check(self, &expression, key.kind) {
+                                Ok(ReturnValue::Str(value)) => {
+                                    if !integer_math(self, key, operator, &value) {
+                                        return FAILURE;
+                                    }
+                                }
                                 Err(why) => {
                                     eprintln!("ion: assignment error: {}", why);
                                     return FAILURE;
                                 }
-                            };
-
-                            let value = match value {
-                                ReturnValue::Str(value) => value,
                                 _ => unreachable!()
-                            };
-
-                            if !integer_math(self, key, operator, &value) {
-                                return FAILURE;
                             }
                         }
                         Err(why) => {
@@ -123,14 +116,12 @@ impl<'a> VariableStore for Shell<'a> {
                     match action {
                         Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
                             match value_check(self, &expression, key.kind) {
-                                Ok(values) => match values {
-                                    ReturnValue::Vector(values) => env::set_var(key.name, values.join(" ")),
-                                    _ => unreachable!()
-                                }
+                                Ok(ReturnValue::Vector(values)) => env::set_var(key.name, values.join(" ")),
                                 Err(why) => {
                                     eprintln!("ion: assignment error: {}", why);
                                     return FAILURE;
                                 }
+                                _ => unreachable!()
                             }
                         }
                         Ok(Action::UpdateArray(..)) => {
@@ -138,21 +129,17 @@ impl<'a> VariableStore for Shell<'a> {
                             return FAILURE;
                         }
                         Ok(Action::UpdateString(key, operator, expression)) => {
-                            let value = match value_check(self, &expression, key.kind) {
-                                Ok(value) => value,
+                            match value_check(self, &expression, key.kind) {
+                                Ok(ReturnValue::Str(value)) => {
+                                    if !integer_math_export(&self, key, operator, &value) {
+                                        return FAILURE;
+                                    }
+                                }
                                 Err(why) => {
                                     eprintln!("ion: assignment error: {}", why);
                                     return FAILURE;
                                 }
-                            };
-
-                            let value = match value {
-                                ReturnValue::Str(value) => value,
                                 _ => unreachable!()
-                            };
-
-                            if !integer_math_export(&self, key, operator, &value) {
-                                return FAILURE;
                             }
                         }
                         Err(why) => {
