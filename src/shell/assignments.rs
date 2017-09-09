@@ -5,6 +5,7 @@ use super::Shell;
 use super::status::*;
 use parser::assignments::*;
 use types::{ArrayVariableContext, VariableContext};
+use shell::history::ShellHistory;
 
 fn print_vars(list: &VariableContext) {
     let stdout = io::stdout();
@@ -63,7 +64,14 @@ impl<'a> VariableStore for Shell<'a> {
                     match action {
                         Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
                             match value_check(self, &expression, key.kind) {
-                                Ok(ReturnValue::Vector(values)) => self.variables.set_array(key.name, values),
+                                Ok(ReturnValue::Vector(values)) => {
+                                    // When we changed the HISTORY_IGNORE variable, update the ignore
+                                    // patterns. This happens first because `set_array` consumes 'values'
+                                    if key.name == "HISTORY_IGNORE" {
+                                        self.update_ignore_patterns(&values);
+                                    }
+                                    self.variables.set_array(key.name, values)
+                                }
                                 Err(why) => {
                                     eprintln!("ion: assignment error: {}", why);
                                     return FAILURE;
