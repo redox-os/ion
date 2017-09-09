@@ -151,13 +151,13 @@ impl<'a> ShellHistoryPrivate for Shell<'a> {
         let ignore = &self.ignore_setting.flags;
         let regexes = &self.ignore_setting.regexes;
 
-        // without the second check the command which sets the environment variable would also be
+        // without the second check the command which sets the local variable would also be
         // ignored. However, this behavior might not be wanted.
         if ignore.contains(IGNORE_ALL) && !command.contains("HISTORY_IGNORE") {
             return false;
         }
 
-        // Here we allow to also ignore the setting of the environment variable because we assume
+        // Here we allow to also ignore the setting of the local variable because we assume
         // the user entered the leading whitespace on purpose.
         if ignore.contains(IGNORE_WHITESPACE) {
             if command.chars().next().map_or(false, |b| b.is_whitespace()) {
