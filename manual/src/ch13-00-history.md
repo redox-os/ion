@@ -4,7 +4,7 @@
 - Ions history can be found at **$HOME/.local/share/ion/history**
 - The `history` builtin can be used to display the entire command history
   - If you're only interested in the last X entries, use `history | tail -n X`
-- The histories\' behavior can be changed via various environment variables (see section
+- The histories\' behavior can be changed via various local variables (see section
   **Variables**)
 - Unlike other shells, `ion` saves repeated commands only once:
 ```ion
@@ -20,7 +20,7 @@ false
 ```
 
 ## Variables
-The following environment variables can be used to modify Ions history behavior:
+The following local variables can be used to modify Ions history behavior:
 
 ### HISTORY_SIZE
 Determines how many entries of the history are kept in memory.
