@@ -78,6 +78,7 @@ pub enum Statement {
     Break,
     Continue,
     Pipeline(Pipeline),
+    Time(Box<Statement>),
     Default,
 }
 
@@ -99,6 +100,7 @@ impl Statement {
             Statement::Break => "Break",
             Statement::Continue => "Continue",
             Statement::Pipeline(_) => "Pipeline { .. }",
+            Statement::Time(_) => "Time { .. }",
             Statement::Default => "Default",
 
         }
@@ -241,6 +243,7 @@ pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usi
             Statement::Continue |
             Statement::Let { .. } |
             Statement::Pipeline(_) |
+            Statement::Time(_) |
             Statement::Break => {
                 // This is the default case with all of the other statements explicitly listed
                 add_to_case!(statement);
@@ -263,6 +266,19 @@ pub fn collect_loops<I: Iterator<Item = Statement>>(
             Statement::If { .. } |
             Statement::Function { .. } |
             Statement::Match { .. } => *level += 1,
+            Statement::Time(ref box_stmt) => match box_stmt.as_ref() {
+                &Statement::While { .. } |
+                &Statement::For { .. } |
+                &Statement::If { .. } |
+                &Statement::Function { .. } |
+                &Statement::Match { .. } => *level += 1,
+                &Statement::End if *level == 1 => {
+                    *level = 0;
+                    break;
+                }
+                &Statement::End => *level -= 1,
+                _ => (),
+            }
             Statement::End if *level == 1 => {
                 *level = 0;
                 break;

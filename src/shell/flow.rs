@@ -7,7 +7,7 @@ use parser::{ForExpression, StatementSplitter, expand_string, parse_and_validate
 use parser::assignments::{ReturnValue, is_array};
 use parser::pipelines::Pipeline;
 use shell::assignments::VariableStore;
-use std::io::{self, Write};
+use std::io::{self, Write, stdout};
 use std::mem;
 use types::Array;
 
@@ -44,6 +44,10 @@ pub trait FlowLogic {
     /// Simply executes all supplied statemnts.
     fn execute_statements(&mut self, statements: Vec<Statement>) -> Condition;
 
+    /// Executes a single statement
+    fn execute_statement<I>(&mut self, iterator: &mut I, statement: Statement) -> Condition
+        where I: Iterator<Item = Statement>;
+
     /// Expand an expression and run a branch based on the value of the expanded expression
     fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition;
 }
@@ -70,45 +74,62 @@ impl<'a> FlowLogic for Shell<'a> {
                 }
             }
         } else {
-            // Appends the newly parsed statements onto the existing statement stored in memory.
-            match self.flow_control.current_statement {
-                Statement::While { ref mut statements, .. } |
-                Statement::For { ref mut statements, .. } |
-                Statement::Function { ref mut statements, .. } => {
-                    collect_loops(&mut iterator, statements, &mut self.flow_control.level);
-                }
-                Statement::If {
-                    ref mut success,
-                    ref mut else_if,
-                    ref mut failure,
-                    ..
-                } => {
-                    self.flow_control.current_if_mode = match collect_if(
-                        &mut iterator,
-                        success,
-                        else_if,
-                        failure,
-                        &mut self.flow_control.level,
-                        self.flow_control.current_if_mode,
-                    ) {
-                        Ok(mode) => mode,
-                        Err(why) => {
+            fn append_new_commands<I: Iterator<Item = Statement>>(
+                mut iterator: &mut I,
+                current_statement: &mut Statement,
+                level: &mut usize,
+                current_if_mode: &mut u8
+            ) {
+                match current_statement {
+                    &mut Statement::While { ref mut statements, .. } |
+                    &mut Statement::For { ref mut statements, .. } |
+                    &mut Statement::Function { ref mut statements, .. } => {
+                        collect_loops(&mut iterator, statements, level);
+                    }
+                    &mut Statement::If {
+                        ref mut success,
+                        ref mut else_if,
+                        ref mut failure,
+                        ..
+                    } => {
+                        *current_if_mode = match collect_if(
+                            &mut iterator,
+                            success,
+                            else_if,
+                            failure,
+                            level,
+                            *current_if_mode,
+                        ) {
+                            Ok(mode) => mode,
+                            Err(why) => {
+                                let stderr = io::stderr();
+                                let mut stderr = stderr.lock();
+                                let _ = writeln!(stderr, "{}", why);
+                                4
+                            }
+                        };
+                    }
+                    &mut Statement::Match { ref mut cases, .. } => {
+                        if let Err(why) = collect_cases(&mut iterator, cases, level) {
                             let stderr = io::stderr();
                             let mut stderr = stderr.lock();
                             let _ = writeln!(stderr, "{}", why);
-                            4
                         }
-                    };
-                }
-                Statement::Match { ref mut cases, .. } => {
-                    if let Err(why) = collect_cases(&mut iterator, cases, &mut self.flow_control.level) {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "{}", why);
                     }
+                    &mut Statement::Time(ref mut box_stmt) => {
+                        append_new_commands(iterator,
+                                            box_stmt.as_mut(),
+                                            level,
+                                            current_if_mode);
+                    }
+                    _ => (),
                 }
-                _ => (),
             }
+
+            append_new_commands(&mut iterator,
+                                &mut self.flow_control.current_statement,
+                                &mut self.flow_control.level,
+                                &mut self.flow_control.current_if_mode);
 
             // If this is true, an error occurred during the if statement
             if self.flow_control.current_if_mode == 4 {
@@ -126,59 +147,84 @@ impl<'a> FlowLogic for Shell<'a> {
                 let mut replacement = Statement::Default;
                 mem::swap(&mut self.flow_control.current_statement, &mut replacement);
 
-                match replacement {
-                    Statement::Error(number) => self.previous_status = number,
-                    Statement::Let { expression } => {
-                        self.previous_status = self.local(&expression);
-                    }
-                    Statement::Export(expression) => {
-                        self.previous_status = self.export(&expression);
-                    }
-                    Statement::While {
-                        expression,
-                        statements,
-                    } => {
-                        if let Condition::SigInt = self.execute_while(expression, statements) {
-                            return;
+                fn execute_final(shell: &mut Shell, statement: Statement) -> Condition {
+                    match statement {
+                        Statement::Error(number) => shell.previous_status = number,
+                        Statement::Let { expression } => {
+                            shell.previous_status = shell.local(&expression);
                         }
-                    }
-                    Statement::For {
-                        variable,
-                        values,
-                        statements,
-                    } => {
-                        if let Condition::SigInt = self.execute_for(&variable, &values, statements) {
-                            return;
+                        Statement::Export(expression) => {
+                            shell.previous_status = shell.export(&expression);
                         }
+                        Statement::While {
+                            expression,
+                            statements,
+                        } => {
+                            if let Condition::SigInt = shell.execute_while(expression, statements) {
+                                return Condition::SigInt;
+                            }
+                        }
+                        Statement::For {
+                            variable,
+                            values,
+                            statements,
+                        } => {
+                            if let Condition::SigInt = shell.execute_for(&variable, &values, statements) {
+                                return Condition::SigInt;
+                            }
+                        }
+                        Statement::Function {
+                            name,
+                            args,
+                            statements,
+                            description,
+                        } => {
+                            shell.functions.insert(
+                                name.clone(),
+                                Function {
+                                    name: name,
+                                    args: args,
+                                    statements: statements,
+                                    description: description,
+                                },
+                            );
+                        }
+                        Statement::If {
+                            expression,
+                            success,
+                            else_if,
+                            failure,
+                        } => {
+                            shell.execute_if(expression, success, else_if, failure);
+                        }
+                        Statement::Match { expression, cases } => {
+                            shell.execute_match(expression, cases);
+                        }
+                        Statement::Time(box_stmt) => {
+                            let time = ::std::time::Instant::now();
+
+                            let condition = execute_final(shell, *box_stmt);
+
+                            let duration = time.elapsed();
+                            let seconds = duration.as_secs();
+                            let nanoseconds = duration.subsec_nanos();
+
+                            let stdout = stdout();
+                            let mut stdout = stdout.lock();
+                            let _ = if seconds > 60 {
+                                writeln!(stdout, "real    {}m{:02}.{:09}s", seconds / 60, seconds % 60, nanoseconds)
+                            } else {
+                                writeln!(stdout, "real    {}.{:09}s", seconds, nanoseconds)
+                            };
+                            return condition;
+                        }
+                        _ => (),
                     }
-                    Statement::Function {
-                        name,
-                        args,
-                        statements,
-                        description,
-                    } => {
-                        self.functions.insert(
-                            name.clone(),
-                            Function {
-                                name: name,
-                                args: args,
-                                statements: statements,
-                                description: description,
-                            },
-                        );
-                    }
-                    Statement::If {
-                        expression,
-                        success,
-                        else_if,
-                        failure,
-                    } => {
-                        self.execute_if(expression, success, else_if, failure);
-                    }
-                    Statement::Match { expression, cases } => {
-                        self.execute_match(expression, cases);
-                    }
-                    _ => (),
+                    Condition::NoOp
+                }
+
+                if let Condition::SigInt = execute_final(self, replacement) {
+                    return;
                 }
 
                 // Capture any leftover statements.
@@ -298,126 +344,161 @@ impl<'a> FlowLogic for Shell<'a> {
     fn execute_statements(&mut self, mut statements: Vec<Statement>) -> Condition {
         let mut iterator = statements.drain(..);
         while let Some(statement) = iterator.next() {
-            match statement {
-                Statement::Error(number) => self.previous_status = number,
-                Statement::Let { expression } => {
-                    self.previous_status = self.local(&expression);
-                }
-                Statement::Export(expression) => {
-                    self.previous_status = self.export(&expression);
-                }
-                Statement::While {
-                    expression,
-                    mut statements,
-                } => {
-                    self.flow_control.level += 1;
-                    collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
-                    if let Condition::SigInt = self.execute_while(expression, statements) {
-                        return Condition::SigInt;
-                    }
-                }
-                Statement::For {
-                    variable,
-                    values,
-                    mut statements,
-                } => {
-                    self.flow_control.level += 1;
-                    collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
-                    if let Condition::SigInt = self.execute_for(&variable, &values, statements) {
-                        return Condition::SigInt;
-                    }
-                }
-                Statement::If {
-                    expression,
-                    mut success,
-                    mut else_if,
-                    mut failure,
-                } => {
-                    self.flow_control.level += 1;
-                    if let Err(why) = collect_if(
-                        &mut iterator,
-                        &mut success,
-                        &mut else_if,
-                        &mut failure,
-                        &mut self.flow_control.level,
-                        0,
-                    )
-                    {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "{}", why);
-                        self.flow_control.level = 0;
-                        self.flow_control.current_if_mode = 0;
-                        return Condition::Break;
-                    }
-
-                    match self.execute_if(expression, success, else_if, failure) {
-                        Condition::Break => return Condition::Break,
-                        Condition::Continue => return Condition::Continue,
-                        Condition::NoOp => (),
-                        Condition::SigInt => return Condition::SigInt,
-                    }
-                }
-                Statement::Function {
-                    name,
-                    args,
-                    mut statements,
-                    description,
-                } => {
-                    self.flow_control.level += 1;
-                    collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
-                    self.functions.insert(
-                        name.clone(),
-                        Function {
-                            description: description,
-                            name: name,
-                            args: args,
-                            statements: statements,
-                        },
-                    );
-                }
-                Statement::Pipeline(mut pipeline) => {
-                    self.run_pipeline(&mut pipeline);
-                    if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
-                        let status = self.previous_status;
-                        self.exit(status);
-                    }
-                }
-                Statement::Break => return Condition::Break,
-                Statement::Continue => return Condition::Continue,
-                Statement::Match {
-                    expression,
-                    mut cases,
-                } => {
-                    self.flow_control.level += 1;
-                    if let Err(why) = collect_cases(&mut iterator, &mut cases, &mut self.flow_control.level) {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "{}", why);
-                        self.flow_control.level = 0;
-                        self.flow_control.current_if_mode = 0;
-                        return Condition::Break;
-                    }
-                    match self.execute_match(expression, cases) {
-                        Condition::Break => return Condition::Break,
-                        Condition::Continue => return Condition::Continue,
-                        Condition::NoOp => (),
-                        Condition::SigInt => return Condition::SigInt,
-                    }
-                }
-                _ => {}
-            }
-            if let Some(signal) = self.next_signal() {
-                if self.handle_signal(signal) {
-                    self.exit(get_signal_code(signal));
-                }
-                return Condition::SigInt;
-            } else if self.break_flow {
-                self.break_flow = false;
-                return Condition::SigInt;
+            match self.execute_statement(&mut iterator, statement) {
+                Condition::NoOp => {},
+                cond => return cond,
             }
         }
         Condition::NoOp
+    }
+
+    fn execute_statement<I>(&mut self, mut iterator: &mut I, statement: Statement) -> Condition
+        where I: Iterator<Item = Statement>
+    {
+        match statement {
+            Statement::Error(number) => self.previous_status = number,
+            Statement::Let { expression } => {
+                self.previous_status = self.local(&expression);
+            }
+            Statement::Export(expression) => {
+                self.previous_status = self.export(&expression);
+            }
+            Statement::While {
+                expression,
+                mut statements,
+            } => {
+                self.flow_control.level += 1;
+                collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
+                if let Condition::SigInt = self.execute_while(expression, statements) {
+                    return Condition::SigInt;
+                }
+            }
+            Statement::For {
+                variable,
+                values,
+                mut statements,
+            } => {
+                self.flow_control.level += 1;
+                collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
+                if let Condition::SigInt = self.execute_for(&variable, &values, statements) {
+                    return Condition::SigInt;
+                }
+            }
+            Statement::If {
+                expression,
+                mut success,
+                mut else_if,
+                mut failure,
+            } => {
+                self.flow_control.level += 1;
+                if let Err(why) = collect_if(
+                    &mut iterator,
+                    &mut success,
+                    &mut else_if,
+                    &mut failure,
+                    &mut self.flow_control.level,
+                    0,
+                )
+                {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "{}", why);
+                    self.flow_control.level = 0;
+                    self.flow_control.current_if_mode = 0;
+                    return Condition::Break;
+                }
+
+                match self.execute_if(expression, success, else_if, failure) {
+                    Condition::Break => return Condition::Break,
+                    Condition::Continue => return Condition::Continue,
+                    Condition::NoOp => (),
+                    Condition::SigInt => return Condition::SigInt,
+                }
+            }
+            Statement::Function {
+                name,
+                args,
+                mut statements,
+                description,
+            } => {
+                self.flow_control.level += 1;
+                collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
+                self.functions.insert(
+                    name.clone(),
+                    Function {
+                        description: description,
+                        name: name,
+                        args: args,
+                        statements: statements,
+                    },
+                );
+            }
+            Statement::Pipeline(mut pipeline) => {
+                self.run_pipeline(&mut pipeline);
+                if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
+                    let status = self.previous_status;
+                    self.exit(status);
+                }
+            }
+            Statement::Time(box_statement) => {
+                let time = ::std::time::Instant::now();
+
+                let condition = self.execute_statement(iterator, *box_statement);
+
+                let duration = time.elapsed();
+                let seconds = duration.as_secs();
+                let nanoseconds = duration.subsec_nanos();
+
+                let stdout = stdout();
+                let mut stdout = stdout.lock();
+                let _ = if seconds > 60 {
+                    writeln!(stdout, "real    {}m{:02}.{:09}s", seconds / 60, seconds % 60, nanoseconds)
+                } else {
+                    writeln!(stdout, "real    {}.{:09}s", seconds, nanoseconds)
+                };
+
+                match condition {
+                    Condition::Break => return Condition::Break,
+                    Condition::Continue => return Condition::Continue,
+                    Condition::NoOp => (),
+                    Condition::SigInt => return Condition::SigInt,
+                }
+            }
+            Statement::Break => return Condition::Break,
+            Statement::Continue => return Condition::Continue,
+            Statement::Match {
+                expression,
+                mut cases,
+            } => {
+                self.flow_control.level += 1;
+                if let Err(why) = collect_cases(&mut iterator, &mut cases, &mut self.flow_control.level) {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "{}", why);
+                    self.flow_control.level = 0;
+                    self.flow_control.current_if_mode = 0;
+                    return Condition::Break;
+                }
+                match self.execute_match(expression, cases) {
+                    Condition::Break => return Condition::Break,
+                    Condition::Continue => return Condition::Continue,
+                    Condition::NoOp => (),
+                    Condition::SigInt => return Condition::SigInt,
+                }
+            }
+            _ => {}
+        }
+        if let Some(signal) = self.next_signal() {
+            if self.handle_signal(signal) {
+                self.exit(get_signal_code(signal));
+            }
+            Condition::SigInt
+        } else if self.break_flow {
+            self.break_flow = false;
+            Condition::SigInt
+        } else {
+            Condition::NoOp
+        }
     }
 
     fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) -> Condition {
@@ -652,6 +733,37 @@ impl<'a> FlowLogic for Shell<'a> {
                     self.exit(status);
                 }
             }
+            Statement::Time(box_statement) => {
+                let time = ::std::time::Instant::now();
+
+                if let Err(why) = self.execute_toplevel(iterator, *box_statement) {
+                    let stderr = io::stderr();
+                    let mut stderr = stderr.lock();
+                    let _ = writeln!(stderr, "{}", why);
+                    self.flow_control.level = 0;
+                    self.flow_control.current_if_mode = 0;
+                }
+                // Collect timing here so we do not count anything but the execution.
+                let duration = time.elapsed();
+                let seconds = duration.as_secs();
+                let nanoseconds = duration.subsec_nanos();
+
+                if self.flow_control.level == 0 {
+                    // A statement was executed, output the time
+                    let stdout = stdout();
+                    let mut stdout = stdout.lock();
+                    let _ = if seconds > 60 {
+                        writeln!(stdout, "real    {}m{:02}.{:09}s", seconds / 60, seconds % 60, nanoseconds)
+                    } else {
+                        writeln!(stdout, "real    {}.{:09}s", seconds, nanoseconds)
+                    };
+                } else {
+                    // A statement wasn't executed , which means that current_statement has been
+                    // set to the inner statement. We fix this here.
+                    self.flow_control.current_statement = Statement::Time(
+                        Box::new(self.flow_control.current_statement.clone()));
+                }
+            },
             // At this level, else and else if keywords are forbidden.
             Statement::ElseIf { .. } |
             Statement::Else => {
