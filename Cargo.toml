@@ -23,7 +23,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Provides XDG app directory support
-app_dirs = "1.1.1"
+app_dirs = {git = "https://github.com/redox-os/app-dirs-rs.git"}
 # Provides methods for bitwise flag operations
 bitflags = "0.9.1"
 # Provides inline arithmetic expression and `calc` functionality
