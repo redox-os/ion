@@ -1,7 +1,7 @@
 use super::directory_stack::DirectoryStack;
 use super::plugins::namespaces::{self, StringNamespace};
 use super::status::{FAILURE, SUCCESS};
-use app_dirs::{AppDataType, AppInfo, app_root};
+use app_dirs::{app_root, AppDataType, AppInfo};
 use fnv::FnvHashMap;
 use liner::Context;
 use std::env;
@@ -26,10 +26,10 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct Variables {
-    pub hashmaps: HashMapVariableContext,
-    pub arrays: ArrayVariableContext,
+    pub hashmaps:  HashMapVariableContext,
+    pub arrays:    ArrayVariableContext,
     pub variables: VariableContext,
-    pub aliases: VariableContext,
+    pub aliases:   VariableContext,
 }
 
 impl Default for Variables {
@@ -43,21 +43,19 @@ impl Default for Variables {
             "${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}".into(),
         );
         // Set the PID variable to the PID of the shell
-        let pid = getpid().map(|p| p.to_string()).unwrap_or_else(
-            |e| e.to_string(),
-        );
+        let pid = getpid()
+            .map(|p| p.to_string())
+            .unwrap_or_else(|e| e.to_string());
         map.insert("PID".into(), pid.into());
 
         // Initialize the HISTFILE variable
-        if let Ok(mut home_path) =
-            app_root(
-                AppDataType::UserData,
-                &AppInfo {
-                    name: "ion",
-                    author: "Redox OS Developers",
-                },
-            )
-        {
+        if let Ok(mut home_path) = app_root(
+            AppDataType::UserData,
+            &AppInfo {
+                name:   "ion",
+                author: "Redox OS Developers",
+            },
+        ) {
             home_path.push("history");
             map.insert("HISTFILE".into(), home_path.to_str().unwrap_or("?").into());
             map.insert("HISTFILE_ENABLED".into(), "1".into());
@@ -66,20 +64,19 @@ impl Default for Variables {
         // Initialize the PWD (Present Working Directory) variable
         env::current_dir().ok().map_or_else(
             || env::set_var("PWD", "?"),
-            |path| {
-                env::set_var("PWD", path.to_str().unwrap_or("?"))
-            },
+            |path| env::set_var("PWD", path.to_str().unwrap_or("?")),
         );
 
         // Initialize the HOME variable
-        env::home_dir().map_or_else(|| env::set_var("HOME", "?"), |path| {
-            env::set_var("HOME", path.to_str().unwrap_or("?"))
-        });
+        env::home_dir().map_or_else(
+            || env::set_var("HOME", "?"),
+            |path| env::set_var("HOME", path.to_str().unwrap_or("?")),
+        );
         Variables {
-            hashmaps: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
-            arrays: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+            hashmaps:  FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+            arrays:    FnvHashMap::with_capacity_and_hasher(64, Default::default()),
             variables: map,
-            aliases: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+            aliases:   FnvHashMap::with_capacity_and_hasher(64, Default::default()),
         }
     }
 }
@@ -129,6 +126,7 @@ impl Variables {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_hashmap_value(&mut self, name: &str, key: &str, value: &str) {
         if !name.is_empty() {
             if let Some(map) = self.hashmaps.get_mut(name) {
@@ -153,10 +151,9 @@ impl Variables {
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
     fn get_simplified_directory(&self) -> Value {
-        self.get_var("PWD").unwrap().replace(
-            &self.get_var("HOME").unwrap(),
-            "~",
-        )
+        self.get_var("PWD")
+            .unwrap()
+            .replace(&self.get_var("HOME").unwrap(), "~")
     }
 
     /// Obtains the value for the **MWD** variable.
@@ -221,9 +218,10 @@ impl Variables {
             }
         } else {
             // Otherwise, it's just a simple variable name.
-            self.variables.get(name).cloned().or_else(|| {
-                env::var(name).map(Into::into).ok()
-            })
+            self.variables
+                .get(name)
+                .cloned()
+                .or_else(|| env::var(name).map(Into::into).ok())
         }
     }
 
@@ -264,23 +262,17 @@ impl Variables {
         }
 
         match tilde_prefix {
-            "" => {
-                if let Some(home) = env::home_dir() {
-                    return Some(home.to_string_lossy().to_string() + remainder);
-                }
-            }
-            "+" => {
-                if let Some(pwd) = self.get_var("PWD") {
-                    return Some(pwd.to_string() + remainder);
-                } else if let Ok(pwd) = env::current_dir() {
-                    return Some(pwd.to_string_lossy().to_string() + remainder);
-                }
-            }
-            "-" => {
-                if let Some(oldpwd) = self.get_var("OLDPWD") {
-                    return Some(oldpwd.to_string() + remainder);
-                }
-            }
+            "" => if let Some(home) = env::home_dir() {
+                return Some(home.to_string_lossy().to_string() + remainder);
+            },
+            "+" => if let Some(pwd) = self.get_var("PWD") {
+                return Some(pwd.to_string() + remainder);
+            } else if let Ok(pwd) = env::current_dir() {
+                return Some(pwd.to_string_lossy().to_string() + remainder);
+            },
+            "-" => if let Some(oldpwd) = self.get_var("OLDPWD") {
+                return Some(oldpwd.to_string() + remainder);
+            },
             _ => {
                 let neg;
                 let tilde_num;
@@ -304,17 +296,16 @@ impl Variables {
                             return Some(path.to_str().unwrap().to_string());
                         }
                     }
-                    Err(_) => {
-                        if let Some(home) = self_sys::get_user_home(tilde_prefix) {
-                            return Some(home + remainder);
-                        }
-                    }
+                    Err(_) => if let Some(home) = self_sys::get_user_home(tilde_prefix) {
+                        return Some(home + remainder);
+                    },
                 }
             }
         }
         None
     }
 
+    #[allow(dead_code)]
     pub fn command_expansion(&self, command: &str) -> Option<Value> {
         if let Ok(exe) = env::current_exe() {
             if let Ok(output) = process::Command::new(exe).arg("-c").arg(command).output() {
@@ -331,6 +322,7 @@ impl Variables {
         None
     }
 
+    #[allow(dead_code)]
     pub fn is_hashmap_reference(key: &str) -> Option<(Identifier, Key)> {
         let mut key_iter = key.split('[');
 
@@ -352,7 +344,7 @@ impl Variables {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::{Expander, expand_string};
+    use parser::{expand_string, Expander};
 
     struct VariableExpander(pub Variables);
 

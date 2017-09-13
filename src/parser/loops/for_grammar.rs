@@ -1,4 +1,4 @@
-use parser::{Expander, expand_string};
+use parser::{expand_string, Expander};
 use types::Value;
 
 #[derive(Debug, PartialEq)]
@@ -22,28 +22,28 @@ impl ForExpression {
                 while let Some((id, byte)) = bytes_iterator.next() {
                     match byte {
                         b'0'...b'9' => continue,
-                        b'.' => {
-                            match output[0..id].parse::<usize>().ok() {
-                                Some(first_number) => {
-                                    let mut dots = 1;
-                                    for (_, byte) in bytes_iterator {
-                                        if byte == b'.' { dots += 1 } else { break }
-                                    }
-
-                                    match output[id + dots..].parse::<usize>().ok() {
-                                        Some(second_number) => {
-                                            match dots {
-                                                2 => return ForExpression::Range(first_number, second_number),
-                                                3 => return ForExpression::Range(first_number, second_number + 1),
-                                                _ => break,
-                                            }
-                                        }
-                                        None => break,
+                        b'.' => match output[0..id].parse::<usize>().ok() {
+                            Some(first_number) => {
+                                let mut dots = 1;
+                                for (_, byte) in bytes_iterator {
+                                    if byte == b'.' {
+                                        dots += 1
+                                    } else {
+                                        break;
                                     }
                                 }
-                                None => break,
+
+                                match output[id + dots..].parse::<usize>().ok() {
+                                    Some(second_number) => match dots {
+                                        2 => return ForExpression::Range(first_number, second_number),
+                                        3 => return ForExpression::Range(first_number, second_number + 1),
+                                        _ => break,
+                                    },
+                                    None => break,
+                                }
                             }
-                        }
+                            None => break,
+                        },
                         _ => break,
                     }
                 }
@@ -55,6 +55,7 @@ impl ForExpression {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use shell::variables::Variables;
