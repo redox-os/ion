@@ -34,20 +34,23 @@ impl<'a> Display for AssignmentError<'a> {
 /// Each request will tell the shell whether the assignment is asking to update an array or a
 /// string, and will contain the key/value pair to assign.
 pub struct AssignmentActions<'a> {
-    keys: KeyIterator<'a>,
+    keys:     KeyIterator<'a>,
     operator: Operator,
-    values: ArgumentSplitter<'a>,
+    values:   ArgumentSplitter<'a>,
+    prevkey:  &'a str,
+    prevval:  &'a str,
 }
 
 impl<'a> AssignmentActions<'a> {
     pub fn new(data: &'a str) -> Result<AssignmentActions<'a>, AssignmentError<'a>> {
         let (keys, op, vals) = split_assignment(data);
         Ok(AssignmentActions {
-            keys: keys.map(KeyIterator::new).ok_or(AssignmentError::NoKeys)?,
+            keys:     keys.map(KeyIterator::new).ok_or(AssignmentError::NoKeys)?,
             operator: Operator::parse(op.ok_or(AssignmentError::NoOperator)?)?,
-            values: vals.map(ArgumentSplitter::new).ok_or(
-                AssignmentError::NoValues,
-            )?,
+            values:   vals.map(ArgumentSplitter::new)
+                .ok_or(AssignmentError::NoValues)?,
+            prevkey:  "",
+            prevval:  "",
         })
     }
 }
@@ -57,17 +60,24 @@ impl<'a> Iterator for AssignmentActions<'a> {
     fn next(&mut self) -> Option<Result<Action<'a>, AssignmentError<'a>>> {
         if let Some(key) = self.keys.next() {
             match key {
-                Ok(key) => {
-                    match self.values.next() {
-                        Some(value) => Some(Action::new(key, self.operator, value)),
-                        None => None,
+                Ok(key) => match self.values.next() {
+                    Some(value) => {
+                        self.prevkey = key.name;
+                        self.prevval = value;
+                        Some(Action::new(key, self.operator, value))
                     }
-                }
+                    None => None,
+                },
                 Err(why) => Some(Err(AssignmentError::TypeError(why))),
             }
         } else {
             if let Some(_) = self.values.next() {
-                eprintln!("ion: extra values were supplied and ignored");
+                eprintln!(
+                    "ion: extra values were supplied, and thus ignored. Previous \
+                     assignment: '{}' = '{}'",
+                    self.prevkey,
+                    self.prevval
+                );
             }
             None
         }
@@ -87,14 +97,15 @@ pub enum Action<'a> {
 impl<'a> Action<'a> {
     fn new(var: Key<'a>, operator: Operator, value: &'a str) -> Result<Action<'a>, AssignmentError<'a>> {
         match var.kind {
-            Primitive::AnyArray | Primitive::BooleanArray | Primitive::FloatArray | Primitive::IntegerArray |
-            Primitive::StrArray => {
-                if is_array(value) {
-                    Ok(Action::UpdateArray(var, operator, value))
-                } else {
-                    Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))
-                }
-            }
+            Primitive::AnyArray |
+            Primitive::BooleanArray |
+            Primitive::FloatArray |
+            Primitive::IntegerArray |
+            Primitive::StrArray => if is_array(value) {
+                Ok(Action::UpdateArray(var, operator, value))
+            } else {
+                Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))
+            },
             Primitive::Any if is_array(value) => Ok(Action::UpdateArray(var, operator, value)),
             Primitive::Any => Ok(Action::UpdateString(var, operator, value)),
             _ if is_array(value) => Err(AssignmentError::InvalidValue(var.kind, Primitive::AnyArray)),
@@ -123,7 +134,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "123",
-            ))
+            ),)
         );
         assert_eq!(
             actions[1],
@@ -134,7 +145,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "456",
-            ))
+            ),)
         );
 
         let actions = AssignmentActions::new("ab:int *= 3")
@@ -150,7 +161,7 @@ mod tests {
                 },
                 Operator::Multiply,
                 "3",
-            ))
+            ),)
         );
 
         let actions = AssignmentActions::new("a b[] c:int[] = one [two three] [4 5 6]")
@@ -166,7 +177,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "one",
-            ))
+            ),)
         );
         assert_eq!(
             actions[1],
@@ -177,7 +188,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "[two three]",
-            ))
+            ),)
         );
         assert_eq!(
             actions[2],
@@ -188,7 +199,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "[4 5 6]",
-            ))
+            ),)
         );
 
         let actions = AssignmentActions::new("a[] b c[] = [one two] three [four five]")
@@ -204,7 +215,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "[one two]",
-            ))
+            ),)
         );
         assert_eq!(
             actions[1],
@@ -215,7 +226,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "three",
-            ))
+            ),)
         );
         assert_eq!(
             actions[2],
@@ -226,7 +237,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "[four five]",
-            ))
+            ),)
         );
     }
 }
