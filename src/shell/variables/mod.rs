@@ -30,6 +30,7 @@ pub struct Variables {
     pub arrays:    ArrayVariableContext,
     pub variables: VariableContext,
     pub aliases:   VariableContext,
+    flags:         u8,
 }
 
 impl Default for Variables {
@@ -77,11 +78,20 @@ impl Default for Variables {
             arrays:    FnvHashMap::with_capacity_and_hasher(64, Default::default()),
             variables: map,
             aliases:   FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+            flags:     0,
         }
     }
 }
 
+const PLUGIN: u8 = 1;
+
 impl Variables {
+    pub fn has_plugin_support(&self) -> bool { self.flags & PLUGIN != 0 }
+
+    pub fn enable_plugins(&mut self) { self.flags |= PLUGIN; }
+
+    pub fn disable_plugins(&mut self) { self.flags &= 255 ^ PLUGIN; }
+
     pub fn read<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
@@ -107,6 +117,15 @@ impl Variables {
     }
 
     pub fn set_var(&mut self, name: &str, value: &str) {
+        if name == "NS_PLUGINS" {
+            match value {
+                "0" => self.disable_plugins(),
+                "1" => self.enable_plugins(),
+                _ => eprintln!("ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1."),
+            }
+            return;
+        }
+
         if !name.is_empty() {
             if value.is_empty() {
                 self.variables.remove(name);
@@ -200,6 +219,11 @@ impl Variables {
                 "c" | "color" => Colors::collect(variable).into_string(),
                 "env" => env::var(variable).map(Into::into).ok(),
                 _ => {
+                    if !self.has_plugin_support() {
+                        eprintln!("ion: plugins are disabled. Considering enabling them with `let NS_PLUGINS = 1`");
+                        return None;
+                    }
+
                     // Attempt to obtain the given namespace from our lazily-generated map of namespaces.
                     if let Some(namespace) = STRING_NAMESPACES.get(name.into()) {
                         // Attempt to execute the given function from that namespace, and map it's results.
