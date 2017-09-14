@@ -1,3 +1,5 @@
+
+use super::colors::Colors;
 use super::directory_stack::DirectoryStack;
 use super::plugins::namespaces::{self, StringNamespace};
 use super::status::{FAILURE, SUCCESS};
@@ -7,18 +9,10 @@ use liner::Context;
 use std::env;
 use std::io::{self, BufRead};
 use std::process;
+use sys::{self, getpid, is_root};
+use sys::variables as self_sys;
 use types::{Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value, VariableContext};
 use unicode_segmentation::UnicodeSegmentation;
-
-#[cfg(target_os = "redox")]
-use sys::getpid;
-
-#[cfg(all(unix, not(target_os = "unix")))]
-use sys::getpid;
-
-use super::colors::Colors;
-use sys;
-use sys::variables as self_sys;
 
 lazy_static! {
     static ref STRING_NAMESPACES: FnvHashMap<Identifier, StringNamespace> = namespaces::collect();
@@ -219,6 +213,11 @@ impl Variables {
                 "c" | "color" => Colors::collect(variable).into_string(),
                 "env" => env::var(variable).map(Into::into).ok(),
                 _ => {
+                    if is_root() {
+                        eprintln!("ion: root is not allowed to execute plugins");
+                        return None;
+                    }
+
                     if !self.has_plugin_support() {
                         eprintln!("ion: plugins are disabled. Considering enabling them with `let NS_PLUGINS = 1`");
                         return None;

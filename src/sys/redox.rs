@@ -19,6 +19,8 @@ pub const STDIN_FILENO: RawFd = 0;
 pub const STDOUT_FILENO: RawFd = 1;
 pub const STDERR_FILENO: RawFd = 2;
 
+pub fn is_root() -> bool { syscall::geteuid().map(|id| id == 0).unwrap_or(false) }
+
 pub unsafe fn fork() -> io::Result<u32> { cvt(syscall::clone(0)).map(|pid| pid as u32) }
 
 pub fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
@@ -40,8 +42,8 @@ pub fn setpgid(pid: u32, pgid: u32) -> io::Result<()> { cvt(syscall::setpgid(pid
 pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     let new = SigAction {
         sa_handler: unsafe { mem::transmute(handler) },
-        sa_mask: [0; 2],
-        sa_flags: 0,
+        sa_mask:    [0; 2],
+        sa_flags:   0,
     };
     cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
 }
@@ -49,8 +51,8 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
 pub fn reset_signal(signal: i32) -> io::Result<()> {
     let new = SigAction {
         sa_handler: unsafe { mem::transmute(syscall::flag::SIG_DFL) },
-        sa_mask: [0; 2],
-        sa_flags: 0,
+        sa_mask:    [0; 2],
+        sa_flags:   0,
     };
     cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
 }

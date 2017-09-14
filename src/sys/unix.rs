@@ -18,6 +18,8 @@ pub const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
 pub const STDERR_FILENO: i32 = libc::STDERR_FILENO;
 pub const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 
+pub fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
+
 pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
 
 pub fn getpid() -> io::Result<u32> { cvt(unsafe { libc::getpid() }).map(|pid| pid as u32) }
@@ -33,9 +35,11 @@ pub fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
 pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     let mut fds = [0; 2];
 
-    #[cfg(not(target_os = "macos"))] cvt(unsafe { libc::pipe2(fds.as_mut_ptr(), flags as c_int) })?;
+    #[cfg(not(target_os = "macos"))]
+    cvt(unsafe { libc::pipe2(fds.as_mut_ptr(), flags as c_int) })?;
 
-    #[cfg(target_os = "macos")] cvt(unsafe { libc::pipe(fds.as_mut_ptr()) })?;
+    #[cfg(target_os = "macos")]
+    cvt(unsafe { libc::pipe(fds.as_mut_ptr()) })?;
 
     Ok((fds[0], fds[1]))
 }
@@ -87,7 +91,13 @@ macro_rules! impl_is_minus_one {
 
 impl_is_minus_one! { i8 i16 i32 i64 isize }
 
-fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> { if t.is_minus_one() { Err(io::Error::last_os_error()) } else { Ok(t) } }
+fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
+    if t.is_minus_one() {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(t)
+    }
+}
 // } End of support functions
 
 pub mod signals {
@@ -136,9 +146,9 @@ pub mod job_control {
     use std::thread::sleep;
     use std::time::Duration;
 
+    use nix::sys::wait::{waitpid, WaitStatus, WNOHANG, WUNTRACED};
     #[cfg(not(target_os = "macos"))]
     use nix::sys::wait::WCONTINUED;
-    use nix::sys::wait::{WNOHANG, WUNTRACED, WaitStatus, waitpid};
 
     use nix::{Errno, Error};
     use nix::sys::signal::Signal;
@@ -224,14 +234,12 @@ pub mod job_control {
         let mut exit_status = 0;
         loop {
             match waitpid(-1, Some(WUNTRACED)) {
-                Ok(WaitStatus::Exited(pid, status)) => {
-                    if pid == (last_pid as i32) {
-                        break status as i32;
-                    } else {
-                        drop_command(pid);
-                        exit_status = status;
-                    }
-                }
+                Ok(WaitStatus::Exited(pid, status)) => if pid == (last_pid as i32) {
+                    break status as i32;
+                } else {
+                    drop_command(pid);
+                    exit_status = status;
+                },
                 Ok(WaitStatus::Signaled(_, signal, _)) => {
                     eprintln!("ion: process ended by signal");
                     if signal == Signal::SIGTERM {
