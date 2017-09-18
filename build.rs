@@ -2,12 +2,12 @@ extern crate ansi_term;
 extern crate version_check;
 
 use ansi_term::Color::{Blue, Red, White, Yellow};
-use version_check::is_min_version;
+use version_check::is_nightly;
 
 // Specifies the minimum version needed to compile Ion.
 // NOTE: 1.19 is required due to the usage of `break` with values for
 // `loop` (RFC 1624, rust-lang/rust GitHub issue #37339).
-const MIN_VERSION: &'static str = "1.19.0";
+//const MIN_VERSION: &'static str = "1.19.0";
 
 use std::env;
 use std::path::Path;
@@ -31,19 +31,19 @@ fn main() {
             White.paint("Installed version is:"),
             Yellow.paint(format!("{}", version)),
             White.paint("Minimum required:"),
-            Yellow.paint(format!("{}", MIN_VERSION))
+            Yellow.paint("nightly")
         );
     };
 
-    match is_min_version(MIN_VERSION) {
-        Some((is_minimum, _)) if is_minimum => (), // Success!
-        Some((_, ref version_string)) => {
+    match is_nightly() {
+        Some(true) => (), // Success!
+        Some(false) => {
             printerr!(
                 "{} {}",
                 Red.bold().paint("Error:"),
-                White.paint("Ion requires at least version 1.19.0 to build.")
+                White.paint("Ion requires nighlty to build.")
             );
-            print_version_err(&*version_string);
+            //print_version_err(&*version_string);
             printerr!(
                 "{}{}{}",
                 Blue.paint("Use `"),
