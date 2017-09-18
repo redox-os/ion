@@ -63,7 +63,7 @@ software evolves: iterate, deploy, study, repeat.
 
 # Compile / Install Instructions
 
-Rust 1.19 is the minimum requirement for compiling Ion. Simplest way to obtain Rust/Cargo is by
+Rust nightly is required for compiling Ion. Simplest way to obtain Rust/Cargo is by
 installing the [Rustup toolchain manager](https://rustup.rs/), in the event that your OS does
 not ship Rust natively, or if you want more flexibility in Rust compilation capabilities.
 
