@@ -104,8 +104,7 @@ pub mod job_control {
 
     use shell::Shell;
     use shell::foreground::ForegroundSignals;
-    use shell::status::TERMINATED;
-    use std::io::{self, Write};
+    use shell::status::{FAILURE, TERMINATED};
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
     use std::sync::{Arc, Mutex};
@@ -122,35 +121,53 @@ pub mod job_control {
 
 
     pub fn watch_foreground<'a, F, D>(
-        _shell: &mut Shell<'a>,
-        pid: u32,
-        _last_pid: u32,
+        shell: &mut Shell<'a>,
+        _pid: u32,
+        last_pid: u32,
         _get_command: F,
-        mut _drop_command: D,
+        mut drop_command: D,
     ) -> i32
         where F: FnOnce() -> String,
               D: FnMut(i32)
     {
+        let mut exit_status = 0;
         loop {
             let mut status_raw = 0;
-            match syscall::waitpid(pid as usize, &mut status_raw, 0) {
-                Ok(0) => (),
-                Ok(_pid) => {
+            match syscall::waitpid(0, &mut status_raw, 0) {
+                Ok(pid) => {
                     let status = ExitStatus::from_raw(status_raw as i32);
                     if let Some(code) = status.code() {
-                        break code;
+                        if pid == (last_pid as usize) {
+                            break code;
+                        } else {
+                            drop_command(pid as i32);
+                            exit_status = code;
+                        }
+                    } else if let Some(signal) = status.signal() {
+                        eprintln!("ion: process ended by signal: {}", signal);
+                        if signal == syscall::SIGTERM as i32 {
+                            shell.handle_signal(signal);
+                            shell.exit(TERMINATED);
+                        } else if signal == syscall::SIGHUP as i32 {
+                            shell.handle_signal(signal);
+                            shell.exit(TERMINATED);
+                        } else if signal == syscall::SIGINT as i32 {
+                            shell.foreground_send(signal);
+                            shell.break_flow = true;
+                        }
+                        break TERMINATED;
                     } else {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = stderr.write_all(b"ion: child ended by signal\n");
+                        eprintln!("ion: process ended with unknown status: {}", status);
                         break TERMINATED;
                     }
                 }
                 Err(err) => {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: failed to wait: {}", err);
-                    break 100; // TODO what should we return here?
+                    if err.errno == syscall::ECHILD {
+                        break exit_status;
+                    } else {
+                        eprintln!("ion: process doesn't exist: {}", err);
+                        break FAILURE;
+                    }
                 }
             }
         }
