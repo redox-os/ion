@@ -1,12 +1,4 @@
-use super::super::{LibraryIterator, config_dir, StringError};
-use fnv::FnvHashMap;
-use std::ffi::CString;
-use std::fs::read_dir;
-use std::mem::forget;
-use std::ptr;
-use std::slice;
-use std::str;
-use types::Identifier;
+use super::super::StringError;
 
 pub enum MethodArguments {
     StringArg(String, Vec<String>),
@@ -21,7 +13,7 @@ impl StringMethodPlugins {
         StringMethodPlugins
     }
 
-    pub fn execute(&self, function: &str, arguments: MethodArguments) -> Result<Option<String>, StringError> {
+    pub fn execute(&self, _function: &str, _arguments: MethodArguments) -> Result<Option<String>, StringError> {
         Ok(None)
     }
 }

@@ -112,10 +112,10 @@ pub mod job_control {
     use syscall;
 
     pub fn watch_background(
-        fg: Arc<ForegroundSignals>,
-        processes: Arc<Mutex<Vec<BackgroundProcess>>>,
-        pid: u32,
-        njob: usize,
+        _fg: Arc<ForegroundSignals>,
+        _processes: Arc<Mutex<Vec<BackgroundProcess>>>,
+        _pid: u32,
+        _njob: usize,
     ) {
         // TODO: Implement this using syscall::call::waitpid
     }
@@ -126,7 +126,7 @@ pub mod job_control {
         pid: u32,
         _last_pid: u32,
         _get_command: F,
-        mut drop_command: D,
+        mut _drop_command: D,
     ) -> i32
         where F: FnOnce() -> String,
               D: FnMut(i32)

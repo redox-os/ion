@@ -8,7 +8,7 @@ pub struct StringNamespace;
 impl StringNamespace {
     pub fn new() -> Result<StringNamespace, StringError> { Ok(StringNamespace) }
 
-    pub fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> { Ok(None) }
+    pub fn execute(&self, _function: Identifier) -> Result<Option<String>, StringError> { Ok(None) }
 }
 
 pub fn collect() -> FnvHashMap<Identifier, StringNamespace> {
