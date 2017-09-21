@@ -153,7 +153,7 @@ pub struct Key {
 }
 
 impl Key {
-    pub fn get(&self) -> &::types::Key { return &self.key }
+    pub fn get(&self) -> &::types::Key { return &self.key; }
 }
 
 /// Represents a filter on a vector-like object
@@ -187,10 +187,9 @@ impl<I, T> SelectWithSize for I
         match s {
             Select::None => empty().collect(),
             Select::All => self.collect(),
-            Select::Index(idx) => idx.resolve(size)
-                .and_then(|idx| self.nth(idx))
-                .into_iter()
-                .collect(),
+            Select::Index(idx) => {
+                idx.resolve(size).and_then(|idx| self.nth(idx)).into_iter().collect()
+            }
             Select::Range(range) => if let Some((start, length)) = range.bounds(size) {
                 self.skip(start).take(length).collect()
             } else {
@@ -205,15 +204,15 @@ impl FromStr for Select {
     type Err = ();
     fn from_str(data: &str) -> Result<Select, ()> {
         if ".." == data {
-            return Ok(Select::All)
+            return Ok(Select::All);
         }
 
         if let Ok(index) = data.parse::<isize>() {
-            return Ok(Select::Index(Index::new(index)))
+            return Ok(Select::Index(Index::new(index)));
         }
 
         if let Some(range) = parse_index_range(data) {
-            return Ok(Select::Range(range))
+            return Ok(Select::Range(range));
         }
 
         Ok(Select::Key(Key { key: data.into() }))
@@ -251,7 +250,7 @@ impl<'a> ArrayMethod<'a> {
                 } else if is_expression(self.variable) {
                     expand_string(self.variable, expand_func, false).join(" ")
                 } else {
-                    return
+                    return;
                 };
                 match (&self.pattern, self.selection.clone()) {
                     (&Pattern::StringPattern(pattern), Select::All) => current.push_str(&variable
@@ -304,10 +303,8 @@ impl<'a> ArrayMethod<'a> {
                         }
                     }
                     (&Pattern::Whitespace, Select::Range(range)) => {
-                        let len = variable
-                            .split(char::is_whitespace)
-                            .filter(|x| !x.is_empty())
-                            .count();
+                        let len =
+                            variable.split(char::is_whitespace).filter(|x| !x.is_empty()).count();
                         if let Some((start, length)) = range.bounds(len) {
                             let range = variable
                                 .split(char::is_whitespace)
@@ -397,10 +394,8 @@ impl<'a> ArrayMethod<'a> {
                         }
                     }
                     (&Pattern::Whitespace, Select::Range(range)) => {
-                        let len = variable
-                            .split(char::is_whitespace)
-                            .filter(|x| !x.is_empty())
-                            .count();
+                        let len =
+                            variable.split(char::is_whitespace).filter(|x| !x.is_empty()).count();
                         if let Some((start, length)) = range.bounds(len) {
                             variable
                                 .split(char::is_whitespace)
@@ -414,31 +409,23 @@ impl<'a> ArrayMethod<'a> {
                         }
                     }
                     (_, Select::Key(_)) => Some("".into()).into_iter().collect(),
-                }
+                };
             }
             "graphemes" => {
                 let variable = resolve_var!();
                 let graphemes = UnicodeSegmentation::graphemes(variable.as_str(), true);
                 let len = graphemes.clone().count();
-                return graphemes
-                    .map(From::from)
-                    .select(self.selection.clone(), len)
+                return graphemes.map(From::from).select(self.selection.clone(), len);
             }
             "bytes" => {
                 let variable = resolve_var!();
                 let len = variable.as_bytes().len();
-                return variable
-                    .bytes()
-                    .map(|b| b.to_string())
-                    .select(self.selection.clone(), len)
+                return variable.bytes().map(|b| b.to_string()).select(self.selection.clone(), len);
             }
             "chars" => {
                 let variable = resolve_var!();
                 let len = variable.chars().count();
-                return variable
-                    .chars()
-                    .map(|c| c.to_string())
-                    .select(self.selection.clone(), len)
+                return variable.chars().map(|c| c.to_string()).select(self.selection.clone(), len);
             }
             _ => {
                 let stderr = io::stderr();
@@ -612,7 +599,7 @@ impl<'a> StringMethod<'a> {
             method @ _ => {
                 if sys::is_root() {
                     eprintln!("ion: root is not allowed to execute plugins");
-                    return
+                    return;
                 }
 
                 let pattern = ArgumentSplitter::new(self.pattern)
@@ -692,7 +679,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             if character == b' ' {
                 self.read += 1;
             } else {
-                return WordToken::Whitespace(&self.data[start..self.read])
+                return WordToken::Whitespace(&self.data[start..self.read]);
             }
         }
 
@@ -726,7 +713,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             if character == b'}' {
                 let output = &self.data[start..self.read];
                 self.read += 1;
-                return WordToken::Variable(output, self.flags.contains(DQUOTE), Select::All)
+                return WordToken::Variable(output, self.flags.contains(DQUOTE), Select::All);
             }
             self.read += 1;
         }
@@ -775,7 +762,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                                 pattern,
                                                 selection: Select::All,
                                             })
-                                        }
+                                        };
                                     }
                                     self.read += 1;
                                 }
@@ -800,7 +787,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                         pattern: " ",
                                         selection: Select::All,
                                     })
-                                }
+                                };
                             }
                             b')' => depth -= 1,
                             b'(' => depth += 1,
@@ -823,7 +810,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                         )
                     } else {
                         WordToken::Variable(variable, self.flags.contains(DQUOTE), Select::All)
-                    }
+                    };
                 }
                 _ => (),
             }
@@ -847,7 +834,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     Err(_) => Select::None,
                 };
                 self.read += 1;
-                return selection
+                return selection;
             }
             self.read += 1;
         }
@@ -895,7 +882,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                                 pattern: Pattern::StringPattern(pattern),
                                                 selection: Select::All,
                                             })
-                                        }
+                                        };
                                     }
                                     self.read += 1;
                                 }
@@ -920,7 +907,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                         pattern: Pattern::Whitespace,
                                         selection: Select::All,
                                     })
-                                }
+                                };
                             }
                             b')' => depth -= 1,
                             b'(' => depth += 1,
@@ -958,7 +945,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         where I: Iterator<Item = u8>
     {
         let start = self.read;
-        //self.read += 1;
+        // self.read += 1;
         while let Some(character) = iterator.next() {
             match character {
                 b'[' => {
@@ -969,10 +956,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     );
                     self.read += 1;
                     if let Some(b'}') = iterator.next() {
-                        return result
+                        return result;
                     }
                     panic!(
-                        "ion: fatal with syntax validation error: unterminated braced array expression"
+                        "ion: fatal with syntax validation error: unterminated braced array \
+                         expression"
                     );
                 }
                 b'}' => {
@@ -982,7 +970,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                         output,
                         self.flags.contains(DQUOTE),
                         Select::All,
-                    )
+                    );
                 }
                 // Only alphanumerical and underscores are allowed in variable names
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {
@@ -1028,7 +1016,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                         )
                     } else {
                         WordToken::Process(output, self.flags.contains(DQUOTE), Select::All)
-                    }
+                    };
                 } else {
                     level -= 1;
                 },
@@ -1074,7 +1062,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                             self.flags.contains(DQUOTE),
                             Select::All,
                         )
-                    }
+                    };
                 } else {
                     level -= 1;
                 },
@@ -1108,7 +1096,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 b'}' if !self.flags.intersects(SQUOTE | DQUOTE) => if level == 0 {
                     elements.push(&self.data[start..self.read]);
                     self.read += 1;
-                    return WordToken::Brace(elements)
+                    return WordToken::Brace(elements);
                 } else {
                     level -= 1;
                 },
@@ -1143,7 +1131,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                         WordToken::Array(elements, self.read_selection(iterator))
                     } else {
                         WordToken::Array(elements, Select::All)
-                    }
+                    };
                 } else {
                     level -= 1;
                 },
@@ -1172,10 +1160,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 }
                 b' ' | b'"' | b'\'' | b'$' | b'{' | b'}' => break,
                 b']' => {
-                    // If the glob is less than three bytes in width, then it's empty and thus invalid.
+                    // If the glob is less than three bytes in width, then it's empty and thus
+                    // invalid.
                     if !(moves <= 3 && square_bracket == 1) {
                         glob = true;
-                        break
+                        break;
                     }
                 }
                 _ => (),
@@ -1206,7 +1195,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                         let _ = iter.next();
                         let output = &self.data[start..self.read];
                         self.read += 2;
-                        return WordToken::Arithmetic(output)
+                        return WordToken::Arithmetic(output);
                     } else {
                         paren -= 1;
                     }
@@ -1224,7 +1213,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
 
     fn next(&mut self) -> Option<WordToken<'a>> {
         if self.read == self.data.len() {
-            return None
+            return None;
         }
 
         let mut iterator = self.data.bytes().skip(self.read);
@@ -1237,7 +1226,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     _ if self.flags.contains(BACKSL) => {
                         self.read += 1;
                         self.flags ^= BACKSL;
-                        break
+                        break;
                     }
                     b'\\' => {
                         if !self.flags.intersects(DQUOTE | SQUOTE) {
@@ -1246,31 +1235,31 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                         self.read += 1;
                         self.flags ^= BACKSL;
                         if !self.flags.contains(EXPAND_PROCESSES) {
-                            return Some(WordToken::Normal("\\", glob, tilde))
+                            return Some(WordToken::Normal("\\", glob, tilde));
                         }
-                        break
+                        break;
                     }
                     b'\'' if !self.flags.contains(DQUOTE) => {
                         start += 1;
                         self.read += 1;
                         self.flags ^= SQUOTE;
                         if !self.flags.contains(EXPAND_PROCESSES) {
-                            return Some(WordToken::Normal("'", glob, tilde))
+                            return Some(WordToken::Normal("'", glob, tilde));
                         }
-                        break
+                        break;
                     }
                     b'"' if !self.flags.contains(SQUOTE) => {
                         start += 1;
                         self.read += 1;
                         if self.flags.contains(DQUOTE) {
                             self.flags -= DQUOTE;
-                            return self.next()
+                            return self.next();
                         }
                         self.flags |= DQUOTE;
                         if !self.flags.contains(EXPAND_PROCESSES) {
-                            return Some(WordToken::Normal("\"", glob, tilde))
+                            return Some(WordToken::Normal("\"", glob, tilde));
                         } else {
-                            break
+                            break;
                         }
                     }
                     b' ' if !self.flags.intersects(DQUOTE | SQUOTE) => {
@@ -1279,16 +1268,16 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     b'~' if !self.flags.intersects(DQUOTE | SQUOTE) => {
                         tilde = true;
                         self.read += 1;
-                        break
+                        break;
                     }
                     b'{' if !self.flags.intersects(DQUOTE | SQUOTE) => {
                         self.read += 1;
-                        return Some(self.braces(&mut iterator))
+                        return Some(self.braces(&mut iterator));
                     }
                     b'[' if !self.flags.contains(SQUOTE) => if self.glob_check(&mut iterator) {
                         glob = true;
                     } else {
-                        return Some(self.array(&mut iterator))
+                        return Some(self.array(&mut iterator));
                     },
                     b'@' if !self.flags.contains(SQUOTE) => match iterator.next() {
                         Some(b'(') => {
@@ -1297,15 +1286,15 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                                 Some(self.array_process(&mut iterator))
                             } else {
                                 Some(WordToken::Normal(&self.data[start..self.read], glob, tilde))
-                            }
+                            };
                         }
                         Some(b'{') => {
                             self.read += 2;
-                            return Some(self.braced_array_variable(&mut iterator))
+                            return Some(self.braced_array_variable(&mut iterator));
                         }
                         _ => {
                             self.read += 1;
-                            return Some(self.array_variable(&mut iterator))
+                            return Some(self.array_variable(&mut iterator));
                         }
                     },
                     b'$' if !self.flags.contains(SQUOTE) => {
@@ -1325,30 +1314,30 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                                         glob,
                                         tilde,
                                     ))
-                                }
+                                };
                             }
                             Some(b'{') => {
                                 self.read += 2;
-                                return Some(self.braced_variable(&mut iterator))
+                                return Some(self.braced_variable(&mut iterator));
                             }
                             _ => {
                                 self.read += 1;
-                                return Some(self.variable(&mut iterator))
+                                return Some(self.variable(&mut iterator));
                             }
                         }
                     }
                     b'*' | b'?' => {
                         self.read += 1;
                         glob = true;
-                        break
+                        break;
                     }
                     _ => {
                         self.read += 1;
-                        break
+                        break;
                     }
                 }
             } else {
-                return None
+                return None;
             }
         }
 
@@ -1370,7 +1359,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     };
                     let output = &self.data[start..end];
                     self.read += 1;
-                    return Some(WordToken::Normal(output, glob, tilde))
+                    return Some(WordToken::Normal(output, glob, tilde));
                 }
                 b'\'' if !self.flags.contains(DQUOTE) => {
                     self.flags ^= SQUOTE;
@@ -1381,7 +1370,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     };
                     let output = &self.data[start..end];
                     self.read += 1;
-                    return Some(WordToken::Normal(output, glob, tilde))
+                    return Some(WordToken::Normal(output, glob, tilde));
                 }
                 b'"' if !self.flags.contains(SQUOTE) => {
                     self.flags ^= DQUOTE;
@@ -1392,7 +1381,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     };
                     let output = &self.data[start..end];
                     self.read += 1;
-                    return Some(WordToken::Normal(output, glob, tilde))
+                    return Some(WordToken::Normal(output, glob, tilde));
                 }
                 b' ' | b'{' if !self.flags.intersects(SQUOTE | DQUOTE) => {
                     return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde))
@@ -1400,15 +1389,15 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                 b'$' | b'@' if !self.flags.contains(SQUOTE) => {
                     let output = &self.data[start..self.read];
                     if output != "" {
-                        return Some(WordToken::Normal(output, glob, tilde))
+                        return Some(WordToken::Normal(output, glob, tilde));
                     } else {
-                        return self.next()
+                        return self.next();
                     };
                 }
                 b'[' if !self.flags.contains(SQUOTE) => if self.glob_check(&mut iterator) {
                     glob = true;
                 } else {
-                    return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde))
+                    return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde));
                 },
                 b'*' | b'?' if !self.flags.contains(SQUOTE) => {
                     glob = true;
@@ -1416,9 +1405,9 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                 b'~' if !self.flags.intersects(SQUOTE | DQUOTE) => {
                     let output = &self.data[start..self.read];
                     if output != "" {
-                        return Some(WordToken::Normal(output, glob, tilde))
+                        return Some(WordToken::Normal(output, glob, tilde));
                     } else {
-                        return self.next()
+                        return self.next();
                     }
                 }
                 _ => (),

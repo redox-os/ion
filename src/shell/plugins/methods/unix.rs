@@ -159,11 +159,10 @@ impl StringMethodPlugins {
                             // Then attempt to load that symbol from the dynamic library.
                             let symbol: Symbol<
                                 unsafe extern "C" fn(RawMethodArguments) -> *mut i8,
-                            > = library
-                                .get(symbol.as_slice())
-                                .map_err(StringError::SymbolErr)?;
+                            > = library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
 
-                            // And finally add the name of the function and it's function into the map.
+                            // And finally add the name of the function and it's function into the
+                            // map.
                             self.symbols.insert(identifier, symbol.into_raw());
                             start = counter + 1;
                         }
@@ -184,9 +183,7 @@ impl StringMethodPlugins {
                     symbol.push(b'\0');
                     let symbol: Symbol<
                         unsafe extern "C" fn(RawMethodArguments) -> *mut i8,
-                    > = library
-                        .get(symbol.as_slice())
-                        .map_err(StringError::SymbolErr)?;
+                    > = library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
                     self.symbols.insert(identifier, symbol.into_raw());
                 }
             }
@@ -205,9 +202,8 @@ impl StringMethodPlugins {
         function: &str,
         arguments: MethodArguments,
     ) -> Result<Option<String>, StringError> {
-        let func = self.symbols
-            .get(function.into())
-            .ok_or(StringError::FunctionMissing(function.into()))?;
+        let func =
+            self.symbols.get(function.into()).ok_or(StringError::FunctionMissing(function.into()))?;
         unsafe {
             let data = (*func)(RawMethodArguments::from(arguments));
             if data.is_null() {

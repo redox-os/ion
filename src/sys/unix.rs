@@ -101,7 +101,8 @@ fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
 // } End of support functions
 
 pub mod signals {
-    /// Blocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so that the shell never receives them.
+    /// Blocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so that the shell never receives
+    /// them.
     pub fn block() {
         unsafe {
             use libc::*;
@@ -117,7 +118,8 @@ pub mod signals {
         }
     }
 
-    /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be controlled
+    /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
+    /// controlled
     /// by the shell.
     pub fn unblock() {
         unsafe {
@@ -183,7 +185,7 @@ pub mod job_control {
                     if fg_was_grabbed {
                         fg.reply_with(status);
                     }
-                    break
+                    break;
                 }
                 Ok(WaitStatus::Stopped(pid, _)) => {
                     if !fg_was_grabbed {
@@ -214,7 +216,7 @@ pub mod job_control {
                     if fg_was_grabbed {
                         fg.errored();
                     }
-                    break
+                    break;
                 }
             }
             sleep(Duration::from_millis(100));
@@ -235,7 +237,7 @@ pub mod job_control {
         loop {
             match waitpid(-1, Some(WUNTRACED)) {
                 Ok(WaitStatus::Exited(pid, status)) => if pid == (last_pid as i32) {
-                    break status as i32
+                    break status as i32;
                 } else {
                     drop_command(pid);
                     exit_status = status;
@@ -252,19 +254,19 @@ pub mod job_control {
                         shell.foreground_send(libc::SIGINT as i32);
                         shell.break_flow = true;
                     }
-                    break TERMINATED
+                    break TERMINATED;
                 }
                 Ok(WaitStatus::Stopped(pid, _)) => {
                     shell.send_to_background(pid as u32, ProcessState::Stopped, get_command());
                     shell.break_flow = true;
-                    break TERMINATED
+                    break TERMINATED;
                 }
                 Ok(_) => (),
                 // ECHILD signifies that all children have exited
                 Err(Error::Sys(Errno::ECHILD)) => break exit_status as i32,
                 Err(why) => {
                     eprintln!("ion: process doesn't exist: {}", why);
-                    break FAILURE
+                    break FAILURE;
                 }
             }
         }

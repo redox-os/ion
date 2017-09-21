@@ -175,12 +175,12 @@ impl<'a> Iterator for KeyIterator<'a> {
                 b':' => {
                     // NOTE: Borrowck issue?
                     let read = self.read;
-                    return Some(self.parse_parameter(&self.data[start..read - 1].trim()))
+                    return Some(self.parse_parameter(&self.data[start..read - 1].trim()));
                 }
                 b'[' => {
                     // NOTE: Borrowck issue?
                     let read = self.read;
-                    return Some(self.parse_array(&self.data[start..read - 1].trim()))
+                    return Some(self.parse_array(&self.data[start..read - 1].trim()));
                 }
                 _ => (),
             }

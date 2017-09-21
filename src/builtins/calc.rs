@@ -24,7 +24,7 @@ pub fn calc(args: &[&str]) -> Result<(), String> {
             let mut input = String::new();
             let _ = io::stdin().read_line(&mut input);
             if input.is_empty() {
-                break
+                break;
             } else {
                 match input.trim() {
                     "" => (),

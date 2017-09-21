@@ -98,7 +98,8 @@ fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
 pub mod signals {
     pub fn block() {}
 
-    /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be controlled
+    /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
+    /// controlled
     /// by the shell.
     pub fn unblock() {}
 }
@@ -142,7 +143,7 @@ pub mod job_control {
                     let status = ExitStatus::from_raw(status_raw as i32);
                     if let Some(code) = status.code() {
                         if pid == (last_pid as usize) {
-                            break code
+                            break code;
                         } else {
                             drop_command(pid as i32);
                             exit_status = code;
@@ -159,17 +160,17 @@ pub mod job_control {
                             shell.foreground_send(signal);
                             shell.break_flow = true;
                         }
-                        break TERMINATED
+                        break TERMINATED;
                     } else {
                         eprintln!("ion: process ended with unknown status: {}", status);
-                        break TERMINATED
+                        break TERMINATED;
                     }
                 }
                 Err(err) => if err.errno == syscall::ECHILD {
-                    break exit_status
+                    break exit_status;
                 } else {
                     eprintln!("ion: process doesn't exist: {}", err);
-                    break FAILURE
+                    break FAILURE;
                 },
             }
         }

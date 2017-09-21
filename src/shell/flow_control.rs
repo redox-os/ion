@@ -138,7 +138,7 @@ pub enum FunctionError {
 impl Function {
     pub fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
-            return Err(FunctionError::InvalidArgumentCount)
+            return Err(FunctionError::InvalidArgumentCount);
         }
 
         let mut variables_backup: FnvHashMap<&str, Option<Value>> =
@@ -226,33 +226,33 @@ pub fn collect_cases<I>(
             Statement::End => {
                 *level -= 1;
                 if *level == 0 {
-                    return Ok(())
+                    return Ok(());
                 }
             }
-            Statement::While { .. } |
-            Statement::For { .. } |
-            Statement::If { .. } |
-            Statement::Match { .. } |
-            Statement::Function { .. } => {
+            Statement::While { .. }
+            | Statement::For { .. }
+            | Statement::If { .. }
+            | Statement::Match { .. }
+            | Statement::Function { .. } => {
                 *level += 1;
                 add_to_case!(statement);
             }
-            Statement::Default |
-            Statement::Else |
-            Statement::ElseIf { .. } |
-            Statement::Error(_) |
-            Statement::Export(_) |
-            Statement::Continue |
-            Statement::Let { .. } |
-            Statement::Pipeline(_) |
-            Statement::Time(_) |
-            Statement::Break => {
+            Statement::Default
+            | Statement::Else
+            | Statement::ElseIf { .. }
+            | Statement::Error(_)
+            | Statement::Export(_)
+            | Statement::Continue
+            | Statement::Let { .. }
+            | Statement::Pipeline(_)
+            | Statement::Time(_)
+            | Statement::Break => {
                 // This is the default case with all of the other statements explicitly listed
                 add_to_case!(statement);
             }
         }
     }
-    return Ok(())
+    return Ok(());
 }
 
 pub fn collect_loops<I: Iterator<Item = Statement>>(
@@ -263,27 +263,27 @@ pub fn collect_loops<I: Iterator<Item = Statement>>(
     #[allow(while_let_on_iterator)]
     while let Some(statement) = iterator.next() {
         match statement {
-            Statement::While { .. } |
-            Statement::For { .. } |
-            Statement::If { .. } |
-            Statement::Function { .. } |
-            Statement::Match { .. } => *level += 1,
+            Statement::While { .. }
+            | Statement::For { .. }
+            | Statement::If { .. }
+            | Statement::Function { .. }
+            | Statement::Match { .. } => *level += 1,
             Statement::Time(ref box_stmt) => match box_stmt.as_ref() {
-                &Statement::While { .. } |
-                &Statement::For { .. } |
-                &Statement::If { .. } |
-                &Statement::Function { .. } |
-                &Statement::Match { .. } => *level += 1,
+                &Statement::While { .. }
+                | &Statement::For { .. }
+                | &Statement::If { .. }
+                | &Statement::Function { .. }
+                | &Statement::Match { .. } => *level += 1,
                 &Statement::End if *level == 1 => {
                     *level = 0;
-                    break
+                    break;
                 }
                 &Statement::End => *level -= 1,
                 _ => (),
             },
             Statement::End if *level == 1 => {
                 *level = 0;
-                break
+                break;
             }
             Statement::End => *level -= 1,
             _ => (),
@@ -305,28 +305,28 @@ pub fn collect_if<I>(
     #[allow(while_let_on_iterator)]
     while let Some(statement) = iterator.next() {
         match statement {
-            Statement::While { .. } |
-            Statement::For { .. } |
-            Statement::If { .. } |
-            Statement::Function { .. } |
-            Statement::Match { .. } => *level += 1,
+            Statement::While { .. }
+            | Statement::For { .. }
+            | Statement::If { .. }
+            | Statement::Function { .. }
+            | Statement::Match { .. } => *level += 1,
             Statement::ElseIf(ref elseif) if *level == 1 => if current_block == 1 {
-                return Err("ion: syntax error: else block already given")
+                return Err("ion: syntax error: else block already given");
             } else {
                 current_block = 2;
                 else_if.push(elseif.clone());
-                continue
+                continue;
             },
             Statement::Else if *level == 1 => {
                 current_block = 1;
-                continue
+                continue;
             }
             Statement::Else if *level == 1 && current_block == 1 => {
                 return Err("ion: syntax error: else block already given")
             }
             Statement::End if *level == 1 => {
                 *level = 0;
-                break
+                break;
             }
             Statement::End => *level -= 1,
             _ => (),

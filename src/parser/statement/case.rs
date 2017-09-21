@@ -38,7 +38,7 @@ pub fn parse_case<'a>(
                     Some("if") => {
                         let string = splitter.collect::<Vec<_>>().join(" ");
                         if string.is_empty() {
-                            return Err(CaseError::NoConditional)
+                            return Err(CaseError::NoConditional);
                         }
                         conditional = Some(string);
                     }
@@ -49,19 +49,19 @@ pub fn parse_case<'a>(
             Some("if") => {
                 let string = splitter.collect::<Vec<_>>().join(" ");
                 if string.is_empty() {
-                    return Err(CaseError::NoConditional)
+                    return Err(CaseError::NoConditional);
                 }
                 conditional = Some(string);
             }
             Some(inner) => if argument.is_none() {
                 argument = Some(inner);
-                continue
+                continue;
             } else {
-                return Err(CaseError::ExtraVar(inner))
+                return Err(CaseError::ExtraVar(inner));
             },
             None => (),
         }
-        break
+        break;
     }
 
     Ok((argument, binding, conditional))

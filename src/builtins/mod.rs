@@ -45,21 +45,21 @@ impl Builtin {
         let mut commands: FnvHashMap<&str, Self> =
             FnvHashMap::with_capacity_and_hasher(32, Default::default());
 
-        /*
-        Quick and clean way to insert a builtin, define a function named as the builtin
-        for example:
-        fn builtin_not (args: &[&str], shell: &mut Shell) -> i32 {
-            let cmd = args[1..].join(" ");
-            shell.on_command(&cmd);
-            match shell.previous_status {
-                SUCCESS => FAILURE,
-                FAILURE => SUCCESS,
-                _ => shell.previous_status
-            }
-        }
-
-        insert_builtin!("not", builtin_not, "Reverses the exit status value of the given command.");
-        */
+        // Quick and clean way to insert a builtin, define a function named as the builtin
+        // for example:
+        // fn builtin_not (args: &[&str], shell: &mut Shell) -> i32 {
+        // let cmd = args[1..].join(" ");
+        // shell.on_command(&cmd);
+        // match shell.previous_status {
+        // SUCCESS => FAILURE,
+        // FAILURE => SUCCESS,
+        // _ => shell.previous_status
+        // }
+        // }
+        //
+        // insert_builtin!("not", builtin_not, "Reverses the exit status value of the given
+        // command.");
+        //
 
         macro_rules! insert_builtin {
             ($name:expr, $func:ident, $help:expr) => {
@@ -74,23 +74,23 @@ impl Builtin {
             }
         }
 
-        /* Directories */
+        // Directories
         insert_builtin!("cd", builtin_cd, "Change the current directory\n    cd <path>");
 
         insert_builtin!("dirs", builtin_dirs, "Display the current directory stack");
         insert_builtin!("pushd", builtin_pushd, "Push a directory to the stack");
         insert_builtin!("popd", builtin_popd, "Pop a directory from the stack");
 
-        /* Aliases */
+        // Aliases
         insert_builtin!("alias", builtin_alias, "View, set or unset aliases");
         insert_builtin!("unalias", builtin_unalias, "Delete an alias");
 
-        /* Variables */
+        // Variables
         insert_builtin!("fn", builtin_fn, "Print list of functions");
         insert_builtin!("read", builtin_read, "Read some variables\n    read <variable>");
         insert_builtin!("drop", builtin_drop, "Delete a variable");
 
-        /* Misc */
+        // Misc
         insert_builtin!("matches", builtin_matches, "Checks if a string matches a given regex");
         insert_builtin!("not", builtin_not, "Reverses the exit status value of the given command.");
         insert_builtin!(
@@ -140,7 +140,8 @@ impl Builtin {
         insert_builtin!(
             "help",
             builtin_help,
-            "Display helpful information about a given command or list commands if none specified\n    help <command>"
+            "Display helpful information about a given command or list commands if none \
+             specified\n    help <command>"
         );
         insert_builtin!(
             "and",
@@ -174,7 +175,7 @@ impl Builtin {
     }
 }
 
-/* Definitions of simple builtins go here */
+// Definitions of simple builtins go here
 
 fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.directory_stack.cd(args, &shell.variables) {
@@ -372,11 +373,7 @@ fn builtin_exit(args: &[&str], shell: &mut Shell) -> i32 {
         }
     }
     let previous_status = shell.previous_status;
-    shell.exit(
-        args.get(1)
-            .and_then(|status| status.parse::<i32>().ok())
-            .unwrap_or(previous_status),
-    )
+    shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok()).unwrap_or(previous_status))
 }
 
 use regex::Regex;
@@ -385,7 +382,7 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
         let stderr = io::stderr();
         let mut stderr = stderr.lock();
         let _ = stderr.write_all(b"match takes two arguments\n");
-        return BAD_ARG
+        return BAD_ARG;
     }
     let input = args[1];
     let re = match Regex::new(args[2]) {
@@ -395,7 +392,7 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
             let mut stderr = stderr.lock();
             let _ = stderr
                 .write_all(format!("couldn't compile input regex {}: {}\n", args[2], e).as_bytes());
-            return FAILURE
+            return FAILURE;
         }
     };
 

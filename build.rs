@@ -7,7 +7,7 @@ use version_check::is_nightly;
 // Specifies the minimum version needed to compile Ion.
 // NOTE: 1.19 is required due to the usage of `break` with values for
 // `loop` (RFC 1624, rust-lang/rust GitHub issue #37339).
-//const MIN_VERSION: &'static str = "1.19.0";
+// const MIN_VERSION: &'static str = "1.19.0";
 
 use std::env;
 use std::fs::File;
@@ -43,7 +43,7 @@ fn main() {
                 Red.bold().paint("Error:"),
                 White.paint("Ion requires nighlty to build.")
             );
-            //print_version_err(&*version_string);
+            // print_version_err(&*version_string);
             printerr!(
                 "{}{}{}",
                 Blue.paint("Use `"),

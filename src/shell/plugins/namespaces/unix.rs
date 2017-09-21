@@ -72,11 +72,10 @@ impl StringNamespace {
                             // Then attempt to load that symbol from the dynamic library.
                             let symbol: Symbol<
                                 unsafe extern "C" fn() -> *mut i8,
-                            > = library
-                                .get(symbol.as_slice())
-                                .map_err(StringError::SymbolErr)?;
+                            > = library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
 
-                            // And finally add the name of the function and it's function into the map.
+                            // And finally add the name of the function and it's function into the
+                            // map.
                             symbols.insert(identifier, symbol.into_raw());
                             start = counter + 1;
                         }
@@ -95,9 +94,8 @@ impl StringNamespace {
                     symbol.reserve_exact(slice.len() + 1);
                     symbol.extend_from_slice(slice);
                     symbol.push(b'\0');
-                    let symbol: Symbol<unsafe extern "C" fn() -> *mut i8> = library
-                        .get(symbol.as_slice())
-                        .map_err(StringError::SymbolErr)?;
+                    let symbol: Symbol<unsafe extern "C" fn() -> *mut i8> =
+                        library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
                     symbols.insert(identifier, symbol.into_raw());
                 }
             }
@@ -111,9 +109,8 @@ impl StringNamespace {
     /// If the function exists, it is executed, and it's return value is then converted into a
     /// proper Rusty type.
     pub fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> {
-        let func = self.symbols
-            .get(&function)
-            .ok_or(StringError::FunctionMissing(function.clone()))?;
+        let func =
+            self.symbols.get(&function).ok_or(StringError::FunctionMissing(function.clone()))?;
         unsafe {
             let data = (*func)();
             if data.is_null() {
@@ -145,7 +142,7 @@ pub fn collect() -> FnvHashMap<Identifier, StringNamespace> {
                     }
                     Err(why) => {
                         eprintln!("ion: string namespace error: {}", why);
-                        continue
+                        continue;
                     }
                 }
             },

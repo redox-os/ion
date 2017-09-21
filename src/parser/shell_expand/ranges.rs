@@ -19,7 +19,7 @@ fn stepped_range_numeric(mut start: isize, end: isize, step: isize) -> Option<Ve
             start += step;
         }
         Some(out)
-    }
+    };
 }
 
 fn stepped_range_chars(mut start: u8, end: u8, step: u8) -> Option<Vec<String>> {
@@ -72,12 +72,12 @@ fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' &
 use std::u8;
 fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Vec<String>> {
     if !byte_is_valid_range(start) || !byte_is_valid_range(end) {
-        return None
+        return None;
     }
 
     let char_step = match step.checked_abs() {
         Some(v) => if v > u8::MAX as isize {
-            return None
+            return None;
         } else {
             v as u8
         },
@@ -88,14 +88,14 @@ fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Ve
         if inclusive {
             end += 1;
         }
-        return stepped_range_chars(start, end, char_step)
+        return stepped_range_chars(start, end, char_step);
     } else if start > end {
         if inclusive {
             end -= 1;
         }
-        return stepped_range_chars(start, end, char_step)
+        return stepped_range_chars(start, end, char_step);
     } else {
-        return Some(vec![(start as char).to_string()])
+        return Some(vec![(start as char).to_string()]);
     }
 }
 
@@ -184,7 +184,8 @@ pub fn parse_range(input: &str) -> Option<Vec<String>> {
                                 read += 1;
                                 match b {
                                     b'.' => {
-                                        // stepped range input[start..read - 1] contains the step size
+                                        // stepped range input[start..read - 1] contains the step
+                                        // size
                                         let step = match (&input[start..read - 1]).parse::<isize>()
                                         {
                                             Ok(v) => v,
@@ -235,7 +236,7 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                     if byte == b'.' {
                         dots += 1
                     } else {
-                        break
+                        break;
                     }
                 }
 
@@ -255,12 +256,12 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                             Ok(end) => Some(Range::to(Index::new(end))),
                             Err(_) => None,
                         }
-                    }
+                    };
                 } else if end.is_empty() {
                     return match first.parse::<isize>() {
                         Ok(start) => Some(Range::from(Index::new(start))),
                         Err(_) => None,
-                    }
+                    };
                 }
 
                 if let Ok(start) = first.parse::<isize>() {
@@ -269,10 +270,10 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                             Range::inclusive(Index::new(start), Index::new(end))
                         } else {
                             Range::exclusive(Index::new(start), Index::new(end))
-                        })
+                        });
                     }
                 } else {
-                    break
+                    break;
                 }
             }
             _ => break,

@@ -4,7 +4,7 @@ pub fn split_assignment<'a>(
 ) -> (Option<&'a str>, Option<&'a str>, Option<&'a str>) {
     let statement = statement.trim();
     if statement.len() == 0 {
-        return (None, None, None)
+        return (None, None, None);
     }
 
     let mut read = 0;
@@ -14,34 +14,34 @@ pub fn split_assignment<'a>(
     while let Some(byte) = bytes.next() {
         if b'=' == byte {
             if let None = statement.as_bytes().get(read + 1) {
-                return (Some(&statement[..read].trim()), Some("="), None)
+                return (Some(&statement[..read].trim()), Some("="), None);
             }
             start = read;
             read += 1;
-            break
+            break;
         } else if [b'+', b'-', b'/', b'*'].contains(&byte) {
             start = read;
             read += 1;
             while let Some(byte) = bytes.next() {
                 read += 1;
                 if byte == b'=' {
-                    break
+                    break;
                 }
             }
-            break
+            break;
         }
         read += 1;
     }
 
     if statement.len() == read {
-        return (Some(statement.trim()), None, None)
+        return (Some(statement.trim()), None, None);
     }
 
     let keys = statement[..start].trim_right();
 
     let operator = &statement[start..read];
     if read == statement.len() {
-        return (Some(keys), Some(operator), None)
+        return (Some(keys), Some(operator), None);
     }
 
     let values = &statement[read..];

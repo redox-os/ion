@@ -47,8 +47,7 @@ impl<'a> AssignmentActions<'a> {
         Ok(AssignmentActions {
             keys:     keys.map(KeyIterator::new).ok_or(AssignmentError::NoKeys)?,
             operator: Operator::parse(op.ok_or(AssignmentError::NoOperator)?)?,
-            values:   vals.map(ArgumentSplitter::new)
-                .ok_or(AssignmentError::NoValues)?,
+            values:   vals.map(ArgumentSplitter::new).ok_or(AssignmentError::NoValues)?,
             prevkey:  "",
             prevval:  "",
         })
@@ -101,11 +100,11 @@ impl<'a> Action<'a> {
         value: &'a str,
     ) -> Result<Action<'a>, AssignmentError<'a>> {
         match var.kind {
-            Primitive::AnyArray |
-            Primitive::BooleanArray |
-            Primitive::FloatArray |
-            Primitive::IntegerArray |
-            Primitive::StrArray => if is_array(value) {
+            Primitive::AnyArray
+            | Primitive::BooleanArray
+            | Primitive::FloatArray
+            | Primitive::IntegerArray
+            | Primitive::StrArray => if is_array(value) {
                 Ok(Action::UpdateArray(var, operator, value))
             } else {
                 Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))
@@ -127,9 +126,7 @@ mod tests {
 
     #[test]
     fn assignment_actions() {
-        let actions = AssignmentActions::new("abc def = 123 456")
-            .unwrap()
-            .collect::<Vec<_>>();
+        let actions = AssignmentActions::new("abc def = 123 456").unwrap().collect::<Vec<_>>();
         assert_eq!(actions.len(), 2);
         assert_eq!(
             actions[0],
@@ -154,9 +151,7 @@ mod tests {
             ),)
         );
 
-        let actions = AssignmentActions::new("ab:int *= 3")
-            .unwrap()
-            .collect::<Vec<_>>();
+        let actions = AssignmentActions::new("ab:int *= 3").unwrap().collect::<Vec<_>>();
         assert_eq!(actions.len(), 1);
         assert_eq!(
             actions[0],

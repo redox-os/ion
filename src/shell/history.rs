@@ -39,7 +39,8 @@ pub trait ShellHistory {
     /// Prints the commands contained within the history buffers to standard output.
     fn print_history(&self, _arguments: &[&str]) -> i32;
 
-    /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if it
+    /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if
+    /// it
     /// is set otherwise to a default value (1000).
     ///
     /// If the HISTFILE_ENABLED shell variable is set to 1, then HISTFILE_SIZE is synced
@@ -47,7 +48,8 @@ pub trait ShellHistory {
     /// shell context.
     ///
     /// This is called in on_command so that the history length and history file state will be
-    /// updated correctly after a command is entered that alters them and just before loading the
+    /// updated correctly after a command is entered that alters them and just before loading
+    /// the
     /// history file so that it will be loaded correctly.
     fn set_context_history_from_vars(&mut self);
 
@@ -60,7 +62,8 @@ pub trait ShellHistory {
 }
 
 trait ShellHistoryPrivate {
-    /// Returns true if the given command with the given exit status should be saved in the history
+    /// Returns true if the given command with the given exit status should be saved in the
+    /// history
     fn should_save_command(&self, command: &str) -> bool;
 }
 
@@ -82,10 +85,8 @@ impl<'a> ShellHistory for Shell<'a> {
 
     fn set_context_history_from_vars(&mut self) {
         let context = self.context.as_mut().unwrap();
-        let max_history_size = self.variables
-            .get_var_or_empty("HISTORY_SIZE")
-            .parse()
-            .unwrap_or(1000);
+        let max_history_size =
+            self.variables.get_var_or_empty("HISTORY_SIZE").parse().unwrap_or(1000);
 
         context.history.set_max_size(max_history_size);
 
@@ -93,10 +94,8 @@ impl<'a> ShellHistory for Shell<'a> {
             let file_name = self.variables.get_var("HISTFILE");
             context.history.set_file_name(file_name.map(|f| f.into()));
 
-            let max_histfile_size = self.variables
-                .get_var_or_empty("HISTFILE_SIZE")
-                .parse()
-                .unwrap_or(1000);
+            let max_histfile_size =
+                self.variables.get_var_or_empty("HISTFILE_SIZE").parse().unwrap_or(1000);
             context.history.set_max_file_size(max_histfile_size);
         } else {
             context.history.set_file_name(None);
@@ -150,19 +149,19 @@ impl<'a> ShellHistoryPrivate for Shell<'a> {
         // without the second check the command which sets the local variable would also be
         // ignored. However, this behavior might not be wanted.
         if ignore.contains(IGNORE_ALL) && !command.contains("HISTORY_IGNORE") {
-            return false
+            return false;
         }
 
         // Here we allow to also ignore the setting of the local variable because we assume
         // the user entered the leading whitespace on purpose.
         if ignore.contains(IGNORE_WHITESPACE) {
             if command.chars().next().map_or(false, |b| b.is_whitespace()) {
-                return false
+                return false;
             }
         }
 
         if ignore.contains(IGNORE_NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND {
-            return false
+            return false;
         }
 
         if let Some(ref regexes) = *regexes {
@@ -172,7 +171,7 @@ impl<'a> ShellHistoryPrivate for Shell<'a> {
             if regexes.iter().any(|regex| regex.is_match(command)) &&
                 !command.contains("HISTORY_IGNORE")
             {
-                return false
+                return false;
             }
         }
 

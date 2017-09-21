@@ -41,7 +41,7 @@ impl<'a> Collector<'a> {
                 // We return an inclusive range to keep the quote type intact
                 b'\'' => {
                     bytes.next();
-                    return Ok(&self.data[start..i + 1])
+                    return Ok(&self.data[start..i + 1]);
                 }
                 _ => (),
             }
@@ -65,7 +65,7 @@ impl<'a> Collector<'a> {
                 // We return an inclusive range to keep the quote type intact
                 b'"' => {
                     bytes.next();
-                    return Ok(&self.data[start..i + 1])
+                    return Ok(&self.data[start..i + 1]);
                 }
                 _ => (),
             }
@@ -135,7 +135,7 @@ impl<'a> Collector<'a> {
                             // argument
                             if next_byte == b'>' || next_byte == b'|' {
                                 end = Some(i);
-                                break
+                                break;
                             }
                         }
                         // Reaching this block means that either there is no next byte, or the next
@@ -165,7 +165,7 @@ impl<'a> Collector<'a> {
                 // the arguments
                 c if FOLLOW_ARGS.contains(&c) && is_toplevel!() => {
                     end = Some(i);
-                    break
+                    break;
                 }
                 // By default just pop the next byte: it will be part of the argument
                 _ => {
@@ -174,19 +174,19 @@ impl<'a> Collector<'a> {
             }
         }
         if proc_level > 0 {
-            return Err("ion: syntax error: unmatched left paren")
+            return Err("ion: syntax error: unmatched left paren");
         }
         if array_level > 0 {
-            return Err("ion: syntax error: unmatched left bracket")
+            return Err("ion: syntax error: unmatched left bracket");
         }
         if brace_level > 0 {
-            return Err("ion: syntax error: unmatched left brace")
+            return Err("ion: syntax error: unmatched left brace");
         }
         if proc_level < 0 {
-            return Err("ion: syntax error: extra right paren(s)")
+            return Err("ion: syntax error: extra right paren(s)");
         }
         if array_level < 0 {
-            return Err("ion: syntax error: extra right bracket(s)")
+            return Err("ion: syntax error: extra right bracket(s)");
         }
         match (start, end) {
             (Some(i), Some(j)) if i < j => Ok(Some(&self.data[i..j])),
@@ -313,7 +313,7 @@ impl<'a> Collector<'a> {
                             if let Some(cmd) = self.arg(&mut bytes)? {
                                 input = Some(Input::HereString(cmd.into()));
                             } else {
-                                return Err("expected string argument after '<<<'")
+                                return Err("expected string argument after '<<<'");
                             }
                         } else {
                             // Otherwise, what we have is not a herestring, but a heredoc.
@@ -337,7 +337,7 @@ impl<'a> Collector<'a> {
                         // Otherwise interpret it as stdin redirection
                         input = Some(Input::File(file.into()));
                     } else {
-                        return Err("expected file argument after redirection for input")
+                        return Err("expected file argument after redirection for input");
                     }
                 }
                 // Skip over whitespace between jobs

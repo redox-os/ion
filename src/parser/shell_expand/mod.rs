@@ -66,9 +66,7 @@ fn expand_brace<E: Expander>(
     reverse_quoting: bool,
 ) {
     let mut temp = Vec::new();
-    for word in nodes
-        .into_iter()
-        .flat_map(|node| expand_string(node, expand_func, reverse_quoting))
+    for word in nodes.into_iter().flat_map(|node| expand_string(node, expand_func, reverse_quoting))
     {
         match parse_range(&word) {
             Some(elements) => for word in elements {
@@ -93,22 +91,15 @@ fn expand_brace<E: Expander>(
 fn array_expand<E: Expander>(elements: &[&str], expand_func: &E, selection: Select) -> Array {
     match selection {
         Select::None => Array::new(),
-        Select::All => elements
-            .iter()
-            .flat_map(|e| expand_string(e, expand_func, false))
-            .collect(),
-        Select::Index(index) => array_nth(elements, expand_func, index)
-            .into_iter()
-            .collect(),
+        Select::All => elements.iter().flat_map(|e| expand_string(e, expand_func, false)).collect(),
+        Select::Index(index) => array_nth(elements, expand_func, index).into_iter().collect(),
         Select::Range(range) => array_range(elements, expand_func, range),
         Select::Key(_) => Array::new(),
     }
 }
 
 fn array_nth<E: Expander>(elements: &[&str], expand_func: &E, index: Index) -> Option<Value> {
-    let mut expanded = elements
-        .iter()
-        .flat_map(|e| expand_string(e, expand_func, false));
+    let mut expanded = elements.iter().flat_map(|e| expand_string(e, expand_func, false));
     match index {
         Index::Forward(n) => expanded.nth(n),
         Index::Backward(n) => expanded.rev().nth(n),
@@ -116,10 +107,8 @@ fn array_nth<E: Expander>(elements: &[&str], expand_func: &E, index: Index) -> O
 }
 
 fn array_range<E: Expander>(elements: &[&str], expand_func: &E, range: Range) -> Array {
-    let expanded = elements
-        .iter()
-        .flat_map(|e| expand_string(e, expand_func, false))
-        .collect::<Array>();
+    let expanded =
+        elements.iter().flat_map(|e| expand_string(e, expand_func, false)).collect::<Array>();
     let len = expanded.len();
     if let Some((start, length)) = range.bounds(len) {
         expanded.into_iter().skip(start).take(length).collect()
@@ -138,20 +127,14 @@ fn slice<S: AsRef<str>>(output: &mut String, expanded: S, selection: Select) {
             output.push_str(character);
         },
         Select::Index(Index::Backward(id)) => if let Some(character) =
-            UnicodeSegmentation::graphemes(expanded.as_ref(), true)
-                .rev()
-                .nth(id)
+            UnicodeSegmentation::graphemes(expanded.as_ref(), true).rev().nth(id)
         {
             output.push_str(character);
         },
         Select::Range(range) => {
             let graphemes = UnicodeSegmentation::graphemes(expanded.as_ref(), true);
             if let Some((start, length)) = range.bounds(graphemes.clone().count()) {
-                let substring = graphemes
-                    .skip(start)
-                    .take(length)
-                    .collect::<Vec<&str>>()
-                    .join("");
+                let substring = graphemes.skip(start).take(length).collect::<Vec<&str>>().join("");
                 output.push_str(&substring);
             }
         }
@@ -306,7 +289,7 @@ pub fn expand_tokens<E: Expander>(
                 }
             }
 
-            return expanded_words
+            return expanded_words;
         } else if token_buffer.len() == 1 {
             match token_buffer[0] {
                 WordToken::Array(ref elements, ref index) => {
@@ -325,7 +308,7 @@ pub fn expand_tokens<E: Expander>(
                     Select::None => return Array::new(),
                     Select::All => {
                         expand_process(&mut output, command, Select::All, expand_func);
-                        return output.split_whitespace().map(From::from).collect::<Array>()
+                        return output.split_whitespace().map(From::from).collect::<Array>();
                     }
                     Select::Index(Index::Forward(id)) => {
                         expand_process(&mut output, command, Select::All, expand_func);
@@ -334,7 +317,7 @@ pub fn expand_tokens<E: Expander>(
                             .nth(id)
                             .map(Into::into)
                             .into_iter()
-                            .collect()
+                            .collect();
                     }
                     Select::Index(Index::Backward(id)) => {
                         expand_process(&mut output, command, Select::All, expand_func);
@@ -344,7 +327,7 @@ pub fn expand_tokens<E: Expander>(
                             .nth(id)
                             .map(Into::into)
                             .into_iter()
-                            .collect()
+                            .collect();
                     }
                     Select::Range(range) => {
                         expand_process(&mut output, command, Select::All, expand_func);
@@ -356,9 +339,9 @@ pub fn expand_tokens<E: Expander>(
                                 .skip(start)
                                 .take(length)
                                 .map(From::from)
-                                .collect()
+                                .collect();
                         } else {
-                            return Array::new()
+                            return Array::new();
                         }
                     }
                     Select::Key(_) => (),
@@ -529,15 +512,10 @@ mod test {
     #[test]
     fn expand_braces() {
         let line = "pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
-        let expected = "prodigal programmer processed prototype procedures proficiently proving prospective projections";
+        let expected = "prodigal programmer processed prototype procedures proficiently proving \
+                        prospective projections";
         let expanded = expand_string(line, &VariableExpander, false);
-        assert_eq!(
-            expected
-                .split_whitespace()
-                .map(|x| x.to_owned())
-                .collect::<Array>(),
-            expanded
-        );
+        assert_eq!(expected.split_whitespace().map(|x| x.to_owned()).collect::<Array>(), expanded);
     }
 
     #[test]

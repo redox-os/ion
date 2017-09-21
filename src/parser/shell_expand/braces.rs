@@ -16,10 +16,7 @@ pub fn expand_braces(tokens: &[BraceToken], mut expanders: Vec<Vec<String>>) -> 
         let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
         multiple_brace_expand(&vector_of_arrays[..], tokens)
     } else if expanders.len() == 1 {
-        let elements = expanders
-            .drain(..)
-            .next()
-            .expect("there should be at least one value");
+        let elements = expanders.drain(..).next().expect("there should be at least one value");
         let elements: Vec<&str> = elements.iter().map(AsRef::as_ref).collect();
         single_brace_expand(&elements, tokens)
     } else {

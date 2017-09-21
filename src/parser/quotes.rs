@@ -28,8 +28,7 @@ impl QuoteTerminator {
 
     pub fn append(&mut self, input: String) {
         if self.eof.is_none() {
-            self.buffer
-                .push_str(if self.flags.contains(TRIM) { input.trim() } else { &input });
+            self.buffer.push_str(if self.flags.contains(TRIM) { input.trim() } else { &input });
         } else {
             self.eof_buffer.push_str(&input);
         }
@@ -65,7 +64,7 @@ impl QuoteTerminator {
                                         };
                                         self.eof = Some(eof_phrase.trim().to_owned());
                                         eof_found = true;
-                                        break
+                                        break;
                                     }
                                 }
                             }
@@ -75,7 +74,7 @@ impl QuoteTerminator {
                 }
                 if eof_found {
                     self.buffer.push('\n');
-                    return false
+                    return false;
                 }
             }
 

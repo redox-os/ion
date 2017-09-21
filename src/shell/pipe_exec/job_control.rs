@@ -21,8 +21,10 @@ pub fn set_foreground_as(pid: u32) {
 pub trait JobControl {
     /// Waits for background jobs to finish before returning.
     fn wait_for_background(&mut self);
-    /// Takes a background tasks's PID and whether or not it needs to be continued; resumes the task
-    /// and sets it as the foreground process. Once the task exits or stops, the exit status will
+    /// Takes a background tasks's PID and whether or not it needs to be continued; resumes the
+    /// task
+    /// and sets it as the foreground process. Once the task exits or stops, the exit status
+    /// will
     /// be returned, and ownership of the TTY given back to the shell.
     fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32;
     fn handle_signal(&self, signal: i32) -> bool;
@@ -65,10 +67,7 @@ pub fn add_to_background(
     command: String,
 ) -> u32 {
     let mut processes = processes.lock().unwrap();
-    match (*processes)
-        .iter()
-        .position(|x| x.state == ProcessState::Empty)
-    {
+    match (*processes).iter().position(|x| x.state == ProcessState::Empty) {
         Some(id) => {
             (*processes)[id] = BackgroundProcess {
                 pid:           pid,
@@ -139,14 +138,14 @@ impl<'a> JobControl for Shell<'a> {
                         if signal != sys::SIGTSTP {
                             self.background_send(signal);
                             sigcode = get_signal_code(signal);
-                            break 'event
+                            break 'event;
                         }
                     }
                     sleep(Duration::from_millis(100));
-                    continue 'event
+                    continue 'event;
                 }
             }
-            return
+            return;
         }
         self.exit(sigcode);
     }

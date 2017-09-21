@@ -42,13 +42,13 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                     self.flags &= 255 ^ COMM_1;
                     self.flags |= COMM_2 + ARRAY;
                     self.read += 1;
-                    continue
+                    continue;
                 }
                 b'$' if self.flags & SINGLE == 0 => {
                     self.flags &= 255 ^ COMM_2;
                     self.flags |= COMM_1 + VARIAB;
                     self.read += 1;
-                    continue
+                    continue;
                 }
                 b'[' if self.flags & SINGLE == 0 && self.flags & COMM_2 != 0 => {
                     array_process_level += 1

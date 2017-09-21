@@ -7,7 +7,8 @@ use shell::status::*;
 use std::io::{stderr, Write};
 
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
-/// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark SIGHUP ignoral.
+/// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
+/// SIGHUP ignoral.
 pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
     let stderr = stderr();
     let mut stderr = stderr.lock();
@@ -26,7 +27,7 @@ pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
                 Ok(jobspec) => jobspecs.push(jobspec),
                 Err(_) => {
                     let _ = writeln!(stderr, "ion: disown: invalid jobspec: '{}'", arg);
-                    return FAILURE
+                    return FAILURE;
                 }
             },
         }
@@ -96,7 +97,7 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
         } else {
             let stderr = stderr();
             let _ = writeln!(stderr.lock(), "ion: fg: job {} does not exist", njob);
-            return FAILURE
+            return FAILURE;
         }
 
         // Bring the process into the foreground and wait for it to finish.
@@ -141,27 +142,21 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
 /// Resumes a stopped background process, if it was stopped.
 pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
-        if let Some(job) = shell
-            .background
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .nth(njob as usize)
-        {
+        if let Some(job) = shell.background.lock().unwrap().iter_mut().nth(njob as usize) {
             match job.state {
                 ProcessState::Running => {
                     eprintln!("ion: bg: job {} is already running", njob);
-                    return true
+                    return true;
                 }
                 ProcessState::Stopped => signals::resume(job.pid),
                 ProcessState::Empty => {
                     eprintln!("ion: bg: job {} does not exist", njob);
-                    return true
+                    return true;
                 }
             }
         } else {
             eprintln!("ion: bg: job {} does not exist", njob);
-            return true
+            return true;
         }
         false
     }

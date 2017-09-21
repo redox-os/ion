@@ -39,7 +39,7 @@ OPTIONS
         \r  carriage return
         \t  horizontal tab (HT)
         \v  vertical tab (VT)
-"#; /* @MANEND */
+"#; // @MANEND
 
 pub fn echo(args: &[&str]) -> Result<(), io::Error> {
     let mut flags = Flags::empty();
@@ -63,7 +63,7 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
                         'h' => short_flags |= HELP,
                         _ => {
                             is_opts = false;
-                            break
+                            break;
                         }
                     }
                 }
@@ -84,7 +84,7 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
     if flags.contains(HELP) {
         buffer.write_all(MAN_PAGE.as_bytes())?;
         buffer.flush()?;
-        return Ok(())
+        return Ok(());
     }
 
     let mut first = true;
@@ -114,7 +114,7 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
                     }
                     b'c' if check => {
                         buffer.flush()?;
-                        return Ok(())
+                        return Ok(());
                     }
                     b'e' if check => {
                         buffer.write_all(&[27u8])?; // escape

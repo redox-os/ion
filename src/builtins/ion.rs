@@ -9,12 +9,12 @@ const DOCPATH: &str = "/usr/share/ion/docs/index.html";
 pub fn ion_docs(_: &[&str], shell: &mut Shell) -> i32 {
     if !Path::new(DOCPATH).exists() {
         eprintln!("ion: ion shell documentation is not installed");
-        return FAILURE
+        return FAILURE;
     }
 
     if let Some(cmd) = shell.variables.get_var("BROWSER".into()) {
         if let Ok(_) = Command::new(&cmd).arg(DOCPATH).spawn() {
-            return SUCCESS
+            return SUCCESS;
         }
     } else {
         eprintln!("ion: BROWSER variable isn't defined");

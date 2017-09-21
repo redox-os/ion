@@ -56,32 +56,32 @@ fn parse_alias(args: &str) -> Binding {
                     operator = Some(Operator::Plus);
                     found_key = true;
                 }
-                break
+                break;
             }
             '-' => {
                 if char_iter.next() == Some('=') {
                     operator = Some(Operator::Minus);
                     found_key = true;
                 }
-                break
+                break;
             }
             '*' => {
                 if char_iter.next() == Some('=') {
                     operator = Some(Operator::Multiply);
                     found_key = true;
                 }
-                break
+                break;
             }
             '/' => {
                 if char_iter.next() == Some('=') {
                     operator = Some(Operator::Divide);
                     found_key = true;
                 }
-                break
+                break;
             }
             '=' => {
                 found_key = true;
-                break
+                break;
             }
             _ if !found_key => key.push(character),
             _ => (),
@@ -117,7 +117,7 @@ pub fn alias(vars: &mut Variables, args: &str) -> i32 {
         Binding::InvalidKey(key) => {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: alias name, '{}', is invalid", key);
-            return FAILURE
+            return FAILURE;
         }
         Binding::KeyValue(key, value) => {
             vars.aliases.insert(key, value);
@@ -126,12 +126,12 @@ pub fn alias(vars: &mut Variables, args: &str) -> i32 {
         Binding::KeyOnly(key) => {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: please provide value for alias '{}'", key);
-            return FAILURE
+            return FAILURE;
         }
         _ => {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: invalid alias syntax");
-            return FAILURE
+            return FAILURE;
         }
     }
     SUCCESS
@@ -146,13 +146,13 @@ pub fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     if args.len() <= 1 {
         let stderr = io::stderr();
         let _ = writeln!(&mut stderr.lock(), "ion: you must specify an alias name");
-        return FAILURE
+        return FAILURE;
     }
     for alias in args.iter().skip(1) {
         if vars.aliases.remove(alias.as_ref()).is_none() {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: undefined alias: {}", alias.as_ref());
-            return FAILURE
+            return FAILURE;
         }
     }
     SUCCESS
@@ -166,20 +166,20 @@ pub fn drop_array<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     if args.len() <= 2 {
         let stderr = io::stderr();
         let _ = writeln!(&mut stderr.lock(), "ion: you must specify an array name");
-        return FAILURE
+        return FAILURE;
     }
 
     if args[1].as_ref() != "-a" {
         let stderr = io::stderr();
         let _ = writeln!(&mut stderr.lock(), "ion: drop_array must be used with -a option");
-        return FAILURE
+        return FAILURE;
     }
 
     for array in args.iter().skip(2) {
         if vars.unset_array(array.as_ref()).is_none() {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: undefined array: {}", array.as_ref());
-            return FAILURE
+            return FAILURE;
         }
     }
     SUCCESS
@@ -193,14 +193,14 @@ pub fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     if args.len() <= 1 {
         let stderr = io::stderr();
         let _ = writeln!(&mut stderr.lock(), "ion: you must specify a variable name");
-        return FAILURE
+        return FAILURE;
     }
 
     for variable in args.iter().skip(1) {
         if vars.unset_var(variable.as_ref()).is_none() {
             let stderr = io::stderr();
             let _ = writeln!(&mut stderr.lock(), "ion: undefined variable: {}", variable.as_ref());
-            return FAILURE
+            return FAILURE;
         }
     }
 

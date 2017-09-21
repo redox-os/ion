@@ -13,7 +13,8 @@ pub enum StringError {
     UTF8Function,
     /// The result from a plugin must be valid UTF-8. If it isn't, the plugin's bad.
     UTF8Result,
-    /// This infers that the user called a function that doesn't exist in the library. Bad user, bad.
+    /// This infers that the user called a function that doesn't exist in the library. Bad
+    /// user, bad.
     FunctionMissing(Identifier),
 }
 

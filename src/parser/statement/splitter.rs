@@ -127,12 +127,12 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'@' if !self.flags.contains(SQUOTE) => {
                     self.flags -= COMM_1;
                     self.flags |= COMM_2 | ARRAY;
-                    continue
+                    continue;
                 }
                 b'$' if !self.flags.contains(SQUOTE) => {
                     self.flags -= COMM_2;
                     self.flags |= COMM_1 | VARIAB;
-                    continue
+                    continue;
                 }
                 b'{' if self.flags.intersects(COMM_1 | COMM_2) => self.flags |= VBRACE,
                 b'{' if !self.flags.intersects(SQUOTE | DQUOTE) => self.brace_level += 1,
@@ -233,14 +233,14 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(output)),
-                    }
+                    };
                 }
                 b' ' if else_found => {
                     let output = &self.data[else_pos..self.read - 1].trim();
                     if !output.is_empty() {
                         if "if" != *output {
                             self.read = else_pos;
-                            return Some(Ok("else"))
+                            return Some(Ok("else"));
                         }
                     }
                     else_found = false;

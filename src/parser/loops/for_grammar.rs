@@ -29,7 +29,7 @@ impl ForExpression {
                                     if byte == b'.' {
                                         dots += 1
                                     } else {
-                                        break
+                                        break;
                                     }
                                 }
 

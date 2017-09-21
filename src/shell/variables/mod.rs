@@ -41,9 +41,7 @@ impl Default for Variables {
             "${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}".into(),
         );
         // Set the PID variable to the PID of the shell
-        let pid = getpid()
-            .map(|p| p.to_string())
-            .unwrap_or_else(|e| e.to_string());
+        let pid = getpid().map(|p| p.to_string()).unwrap_or_else(|e| e.to_string());
         map.insert("PID".into(), pid.into());
 
         // Initialize the HISTFILE variable
@@ -122,7 +120,7 @@ impl Variables {
                     eprintln!("ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1.")
                 }
             }
-            return
+            return;
         }
 
         if !name.is_empty() {
@@ -149,7 +147,7 @@ impl Variables {
         if !name.is_empty() {
             if let Some(map) = self.hashmaps.get_mut(name) {
                 map.insert(key.into(), value.into());
-                return
+                return;
             }
 
             let mut map = HashMap::with_capacity_and_hasher(4, Default::default());
@@ -169,9 +167,7 @@ impl Variables {
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
     fn get_simplified_directory(&self) -> Value {
-        self.get_var("PWD")
-            .unwrap()
-            .replace(&self.get_var("HOME").unwrap(), "~")
+        self.get_var("PWD").unwrap().replace(&self.get_var("HOME").unwrap(), "~")
     }
 
     /// Obtains the value for the **MWD** variable.
@@ -199,7 +195,7 @@ impl Variables {
                     output.push('/');
                 }
                 output.push_str(&elements[elements.len() - 1]);
-                return output
+                return output;
             }
         }
 
@@ -214,26 +210,30 @@ impl Variables {
         }
         if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..]))
         {
-            // If the parsed name contains the '::' pattern, then a namespace was designated. Find it.
+            // If the parsed name contains the '::' pattern, then a namespace was designated. Find
+            // it.
             match name {
                 "c" | "color" => Colors::collect(variable).into_string(),
                 "env" => env::var(variable).map(Into::into).ok(),
                 _ => {
                     if is_root() {
                         eprintln!("ion: root is not allowed to execute plugins");
-                        return None
+                        return None;
                     }
 
                     if !self.has_plugin_support() {
                         eprintln!(
-                            "ion: plugins are disabled. Considering enabling them with `let NS_PLUGINS = 1`"
+                            "ion: plugins are disabled. Considering enabling them with `let \
+                             NS_PLUGINS = 1`"
                         );
-                        return None
+                        return None;
                     }
 
-                    // Attempt to obtain the given namespace from our lazily-generated map of namespaces.
+                    // Attempt to obtain the given namespace from our lazily-generated map of
+                    // namespaces.
                     if let Some(namespace) = STRING_NAMESPACES.get(name.into()) {
-                        // Attempt to execute the given function from that namespace, and map it's results.
+                        // Attempt to execute the given function from that namespace, and map it's
+                        // results.
                         match namespace.execute(variable.into()) {
                             Ok(value) => value.map(Into::into),
                             Err(why) => {
@@ -249,10 +249,7 @@ impl Variables {
             }
         } else {
             // Otherwise, it's just a simple variable name.
-            self.variables
-                .get(name)
-                .cloned()
-                .or_else(|| env::var(name).map(Into::into).ok())
+            self.variables.get(name).cloned().or_else(|| env::var(name).map(Into::into).ok())
         }
     }
 
@@ -261,11 +258,7 @@ impl Variables {
     pub fn unset_var(&mut self, name: &str) -> Option<Value> { self.variables.remove(name) }
 
     pub fn get_vars(&self) -> Vec<Identifier> {
-        self.variables
-            .keys()
-            .cloned()
-            .chain(env::vars().map(|(k, _)| k.into()))
-            .collect()
+        self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k.into())).collect()
     }
 
     pub fn is_valid_variable_character(c: char) -> bool {
@@ -287,26 +280,26 @@ impl Variables {
                 if c == '/' || c == '$' {
                     tilde_prefix = &word[1..ind];
                     remainder = &word[ind..];
-                    break
+                    break;
                 }
             } else {
                 tilde_prefix = &word[1..];
                 remainder = "";
-                break
+                break;
             }
         }
 
         match tilde_prefix {
             "" => if let Some(home) = env::home_dir() {
-                return Some(home.to_string_lossy().to_string() + remainder)
+                return Some(home.to_string_lossy().to_string() + remainder);
             },
             "+" => if let Some(pwd) = self.get_var("PWD") {
-                return Some(pwd.to_string() + remainder)
+                return Some(pwd.to_string() + remainder);
             } else if let Ok(pwd) = env::current_dir() {
-                return Some(pwd.to_string_lossy().to_string() + remainder)
+                return Some(pwd.to_string_lossy().to_string() + remainder);
             },
             "-" => if let Some(oldpwd) = self.get_var("OLDPWD") {
-                return Some(oldpwd.to_string() + remainder)
+                return Some(oldpwd.to_string() + remainder);
             },
             _ => {
                 let neg;
@@ -332,11 +325,11 @@ impl Variables {
                         };
 
                         if let Some(path) = res {
-                            return Some(path.to_str().unwrap().to_string())
+                            return Some(path.to_str().unwrap().to_string());
                         }
                     }
                     Err(_) => if let Some(home) = self_sys::get_user_home(tilde_prefix) {
-                        return Some(home + remainder)
+                        return Some(home + remainder);
                     },
                 }
             }
@@ -353,7 +346,7 @@ impl Variables {
                         stdout.pop();
                     }
 
-                    return Some(stdout.into())
+                    return Some(stdout.into());
                 }
             }
         }
@@ -371,7 +364,7 @@ impl Variables {
                     if inner_key.ends_with(']') {
                         inner_key = inner_key.split(']').next().unwrap_or("");
                         inner_key = inner_key.trim_matches(|c| c == '\'' || c == '\"');
-                        return Some((map_name.into(), inner_key.into()))
+                        return Some((map_name.into(), inner_key.into()));
                     }
                 }
             }

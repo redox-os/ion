@@ -2,7 +2,7 @@ use std::fs::File;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::process::{Command, Stdio};
 
-//use glob::glob;
+// use glob::glob;
 
 use parser::{expand_string, Expander};
 use parser::pipelines::RedirectFrom;
@@ -137,11 +137,9 @@ impl RefinedJob {
     /// or builtin name
     pub fn short(&self) -> String {
         match *self {
-            RefinedJob::External(ref cmd) => format!("{:?}", cmd)
-                .split('"')
-                .nth(1)
-                .unwrap_or("")
-                .to_string(),
+            RefinedJob::External(ref cmd) => {
+                format!("{:?}", cmd).split('"').nth(1).unwrap_or("").to_string()
+            }
             RefinedJob::Builtin { ref name, .. } | RefinedJob::Function { ref name, .. } => {
                 name.to_string()
             }

@@ -45,8 +45,10 @@ use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 use types::*;
 
-/// The shell structure is a megastructure that manages all of the state of the shell throughout the entirety of the
-/// program. It is initialized at the beginning of the program, and lives until the end of the program.
+/// The shell structure is a megastructure that manages all of the state of the shell throughout
+/// the entirety of the
+/// program. It is initialized at the beginning of the program, and lives until the end of the
+/// program.
 pub struct Shell<'a> {
     /// Contains a list of built-in commands that were created when the program started.
     pub builtins: &'a FnvHashMap<&'static str, Builtin>,
@@ -69,15 +71,18 @@ pub struct Shell<'a> {
     pub flags: u8,
     /// A temporary field for storing foreground PIDs used by the pipeline execution.
     foreground: Vec<u32>,
-    /// Contains information on all of the active background processes that are being managed by the shell.
+    /// Contains information on all of the active background processes that are being managed
+    /// by the shell.
     pub background: Arc<Mutex<Vec<BackgroundProcess>>>,
     /// If set, denotes that this shell is running as a background job.
     pub is_background_shell: bool,
     /// Set when a signal is received, this will tell the flow control logic to abort.
     pub break_flow: bool,
-    /// When the `fg` command is run, this will be used to communicate with the specified background process.
+    /// When the `fg` command is run, this will be used to communicate with the specified
+    /// background process.
     pub foreground_signals: Arc<ForegroundSignals>,
-    /// Stores the patterns used to determine whether a command should be saved in the history or not
+    /// Stores the patterns used to determine whether a command should be saved in the history
+    /// or not
     ignore_setting: IgnoreSetting,
 }
 
@@ -106,7 +111,7 @@ impl<'a> Shell<'a> {
     pub fn next_signal(&self) -> Option<i32> {
         for sig in 0..32 {
             if signals::PENDING.fetch_and(!(1 << sig), Ordering::SeqCst) & (1 << sig) == 1 << sig {
-                return Some(sig)
+                return Some(sig);
             }
         }
 
@@ -121,7 +126,8 @@ impl<'a> Shell<'a> {
     }
 
     /// This function updates variables that need to be kept consistent with each iteration
-    /// of the prompt. For example, the PWD variable needs to be updated to reflect changes to the
+    /// of the prompt. For example, the PWD variable needs to be updated to reflect changes to
+    /// the
     /// the current working directory.
     fn update_variables(&mut self) {
         // Update the PWD (Present Working Directory) variable if the current working directory has
@@ -218,7 +224,8 @@ impl<'a> Shell<'a> {
                     }
                     Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
                         eprintln!(
-                            "ion: function argument has invalid type: expected {}, found value \'{}\'",
+                            "ion: function argument has invalid type: expected {}, found value \
+                             \'{}\'",
                             expected_type,
                             value
                         );
@@ -322,9 +329,7 @@ impl<'a> Expander for Shell<'a> {
         if quoted {
             self.variables.get_var(variable)
         } else {
-            self.variables
-                .get_var(variable)
-                .map(|x| x.ascii_replace('\n', ' ').into())
+            self.variables.get_var(variable).map(|x| x.ascii_replace('\n', ' ').into())
         }
     }
     /// Expand a subshell expression

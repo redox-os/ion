@@ -1,5 +1,6 @@
 //! The purpose of the pipeline execution module is to create commands from supplied pieplines, and
-//! manage their execution thereof. That includes forking, executing commands, managing process group
+//! manage their execution thereof. That includes forking, executing commands, managing process
+//! group
 //! IDs, watching foreground and background tasks, sending foreground tasks to the background,
 //! handling pipeline and conditional operators, and std{in,out,err} redirections.
 
@@ -89,7 +90,7 @@ fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKin
                 Ok(file) => command.0.stdin(file),
                 Err(e) => {
                     eprintln!("ion: failed to redirect '{}' into stdin: {}", filename, e);
-                    return true
+                    return true;
                 }
             }
         },
@@ -103,7 +104,7 @@ fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKin
                 }
                 Err(e) => {
                     eprintln!("ion: failed to redirect herestring '{}' into stdin: {}", string, e);
-                    return true
+                    return true;
                 }
             }
         },
@@ -118,11 +119,7 @@ fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKin
 fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
     if let Some(command) = piped_commands.last_mut() {
         let file = if stdout.append {
-            OpenOptions::new()
-                .create(true)
-                .write(true)
-                .append(true)
-                .open(&stdout.file)
+            OpenOptions::new().create(true).write(true).append(true).open(&stdout.file)
         } else {
             File::create(&stdout.file)
         };
@@ -139,7 +136,7 @@ fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, Jo
                             f,
                             e
                         );
-                        return true
+                        return true;
                     }
                 },
                 RedirectFrom::Stderr => command.0.stderr(f),
@@ -154,7 +151,7 @@ fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, Jo
                     stdout.file,
                     err
                 );
-                return true
+                return true;
             }
         }
     }
@@ -175,7 +172,8 @@ pub trait PipelineExecution {
     /// given foreground terminal access, and will be monitored for status changes in the event
     /// that a job was signaled to stop or killed.
     ///
-    /// If a job is stopped, the shell will add that job to a list of background jobs and continue
+    /// If a job is stopped, the shell will add that job to a list of background jobs and
+    /// continue
     /// to watch the job in the background, printing notifications on status changes of that job
     /// over time.
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32;
@@ -227,7 +225,8 @@ impl<'a> PipelineExecution for Shell<'a> {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
         // Remove any leftover foreground tasks from the last execution.
         self.foreground.clear();
-        // If the supplied pipeline is a background, a string representing the command will be stored here.
+        // If the supplied pipeline is a background, a string representing the command will be
+        // stored here.
         let possible_background_name =
             gen_background_string(&pipeline, self.flags & PRINT_COMMS != 0);
         // Generates commands for execution, differentiating between external and builtin commands.
@@ -235,13 +234,13 @@ impl<'a> PipelineExecution for Shell<'a> {
         // Redirect the inputs if a custom redirect value was given.
         if let Some(stdin) = pipeline.stdin.take() {
             if redirect_input(stdin, &mut piped_commands) {
-                return COULD_NOT_EXEC
+                return COULD_NOT_EXEC;
             }
         }
         // Redirect the outputs if a custom redirect value was given.
         if let Some(stdout) = pipeline.stdout.take() {
             if redirect_output(stdout, &mut piped_commands) {
-                return COULD_NOT_EXEC
+                return COULD_NOT_EXEC;
             }
         }
         // If the given pipeline is a background task, fork the shell.
@@ -291,11 +290,7 @@ impl<'a> PipelineExecution for Shell<'a> {
 
     fn wait(&mut self, mut children: Vec<u32>, mut commands: Vec<RefinedJob>) -> i32 {
         // TODO: Find a way to only do this when absolutely necessary.
-        let as_string = commands
-            .iter()
-            .map(RefinedJob::long)
-            .collect::<Vec<String>>()
-            .join(" | ");
+        let as_string = commands.iter().map(RefinedJob::long).collect::<Vec<String>>().join(" | ");
 
         // Each process in the pipe has the same PGID, which is the first process's PID.
         let pgid = children[0];
@@ -357,7 +352,7 @@ impl<'a> PipelineExecution for Shell<'a> {
                             redir(stdout_bk, sys::STDOUT_FILENO);
                             redir(stderr_bk, sys::STDERR_FILENO);
                             redir(stdin_bk, sys::STDIN_FILENO);
-                            return code
+                            return code;
                         }
                         let _ = sys::close(stderr_bk);
                     }
@@ -381,7 +376,7 @@ impl<'a> PipelineExecution for Shell<'a> {
                             redir(stdout_bk, sys::STDOUT_FILENO);
                             redir(stderr_bk, sys::STDERR_FILENO);
                             redir(stdin_bk, sys::STDIN_FILENO);
-                            return code
+                            return code;
                         }
                         let _ = sys::close(stderr_bk);
                     }
@@ -468,19 +463,20 @@ pub fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground:
     let mut commands = commands.into_iter();
     loop {
         if let Some((mut parent, mut kind)) = commands.next() {
-            // When an `&&` or `||` operator is utilized, execute commands based on the previous status.
+            // When an `&&` or `||` operator is utilized, execute commands based on the previous
+            // status.
             match previous_kind {
                 JobKind::And => if previous_status != SUCCESS {
                     if let JobKind::Or = kind {
                         previous_kind = kind
                     }
-                    continue
+                    continue;
                 },
                 JobKind::Or => if previous_status == SUCCESS {
                     if let JobKind::And = kind {
                         previous_kind = kind
                     }
-                    continue
+                    continue;
                 },
                 _ => (),
             }
@@ -668,14 +664,14 @@ pub fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground:
                             kind = ckind;
                             spawn_proc!(child);
                             remember.push(child);
-                            break
+                            break;
                         }
                     }
                     previous_kind = kind;
                     previous_status = shell.wait(children, remember);
                     if previous_status == TERMINATED {
                         shell.foreground_send(sys::SIGTERM);
-                        return previous_status
+                        return previous_status;
                     }
                 }
                 _ => {
@@ -684,7 +680,7 @@ pub fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground:
                 }
             }
         } else {
-            break
+            break;
         }
     }
     previous_status

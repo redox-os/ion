@@ -30,9 +30,12 @@ impl IonFileCompleter {
 
 impl Completer for IonFileCompleter {
     /// When the tab key is pressed, **Liner** will use this method to perform completions of
-    /// filenames. As our `IonFileCompleter` is a wrapper around **Liner**'s `FilenameCompleter`,
-    /// the purpose of our custom `Completer` is to expand possible `~` characters in the `start`
-    /// value that we receive from the prompt, grab completions from the inner `FilenameCompleter`,
+    /// filenames. As our `IonFileCompleter` is a wrapper around **Liner**'s
+    /// `FilenameCompleter`,
+    /// the purpose of our custom `Completer` is to expand possible `~` characters in the
+    /// `start`
+    /// value that we receive from the prompt, grab completions from the inner
+    /// `FilenameCompleter`,
     /// and then escape the resulting filenames, as well as remove the expanded form of the `~`
     /// character and re-add the `~` character in it's place.
     fn completions(&self, start: &str) -> Vec<String> {
@@ -83,15 +86,11 @@ impl Completer for IonFileCompleter {
                     }
                 }
 
-                return completions
+                return completions;
             }
         }
 
-        self.inner
-            .completions(&unescape(start))
-            .iter()
-            .map(|x| escape(x.as_str()))
-            .collect()
+        self.inner.completions(&unescape(start)).iter().map(|x| escape(x.as_str())).collect()
     }
 }
 
@@ -103,20 +102,20 @@ fn escape(input: &str) -> String {
     let mut output = Vec::with_capacity(input.len());
     for character in input.bytes() {
         match character {
-            b'(' |
-            b')' |
-            b'[' |
-            b']' |
-            b'&' |
-            b'$' |
-            b'@' |
-            b'{' |
-            b'}' |
-            b'<' |
-            b'>' |
-            b';' |
-            b'"' |
-            b'\'' => output.push(b'\\'),
+            b'('
+            | b')'
+            | b'['
+            | b']'
+            | b'&'
+            | b'$'
+            | b'@'
+            | b'{'
+            | b'}'
+            | b'<'
+            | b'>'
+            | b';'
+            | b'"'
+            | b'\'' => output.push(b'\\'),
             _ => (),
         }
         output.push(character);

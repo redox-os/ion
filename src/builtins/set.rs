@@ -45,18 +45,18 @@ pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
         if arg.starts_with("--") {
             if arg.len() == 2 {
                 positionals = Some(UnsetIfNone);
-                break
+                break;
             }
             if &arg[2..] == "help" {
                 let mut stdout = stdout.lock();
                 let _ = stdout.write(HELP.as_bytes());
             } else {
-                return 0
+                return 0;
             }
         } else if arg.starts_with('-') {
             if arg.len() == 1 {
                 positionals = Some(RetainIfNone);
-                break
+                break;
             }
             for flag in arg.bytes().skip(1) {
                 match flag {
@@ -74,11 +74,11 @@ pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
                         }
                         Some(_) => {
                             let _ = stderr.lock().write_all(b"set: invalid keymap\n");
-                            return 0
+                            return 0;
                         }
                         None => {
                             let _ = stderr.lock().write_all(b"set: no keymap given\n");
-                            return 0
+                            return 0;
                         }
                     },
                     b'x' => shell.flags |= PRINT_COMMS,
@@ -103,9 +103,7 @@ pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
             // This used to take a `&[String]` but cloned them all, so although
             // this is non-ideal and could probably be better done with `Rc`, it
             // hasn't got any slower.
-            let arguments = iter::once(command)
-                .chain(args_iter.map(|i| i.to_string()))
-                .collect();
+            let arguments = iter::once(command).chain(args_iter.map(|i| i.to_string())).collect();
             match kind {
                 UnsetIfNone => shell.variables.set_array("args", arguments),
                 RetainIfNone => if arguments.len() != 1 {

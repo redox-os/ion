@@ -12,7 +12,7 @@ fn collect<F>(arguments: &str, statement: F) -> Statement
         Ok(pipeline) => statement(pipeline),
         Err(err) => {
             eprintln!("ion: syntax error: {}", err);
-            return Statement::Default
+            return Statement::Default;
         }
     }
 }
@@ -27,7 +27,7 @@ pub fn parse(code: &str) -> Statement {
         "continue" => return Statement::Continue,
         "for" | "match" | "case" => {
             eprintln!("ion: syntax error: incomplete control flow statement");
-            return Statement::Default
+            return Statement::Default;
         }
         _ if cmd.starts_with("let ") => {
             return Statement::Let {
@@ -49,14 +49,14 @@ pub fn parse(code: &str) -> Statement {
         _ if cmd.starts_with("else") => {
             let cmd = cmd[4..].trim_left();
             if cmd.len() == 0 {
-                return Statement::Else
+                return Statement::Else;
             } else if cmd.starts_with("if ") {
                 return collect(cmd[3..].trim_left(), |pipeline| {
                     Statement::ElseIf(ElseIf {
                         expression: pipeline,
                         success:    Vec::new(),
                     })
-                })
+                });
             }
         }
         _ if cmd.starts_with("while ") => {
@@ -73,7 +73,7 @@ pub fn parse(code: &str) -> Statement {
                 Some(pos) => pos,
                 None => {
                     eprintln!("ion: syntax error: incorrect for loop syntax");
-                    return Statement::Default
+                    return Statement::Default;
                 }
             };
 
@@ -82,16 +82,14 @@ pub fn parse(code: &str) -> Statement {
 
             if !cmd.starts_with("in ") {
                 eprintln!("ion: syntax error: incorrect for loop syntax");
-                return Statement::Default
+                return Statement::Default;
             }
 
             return Statement::For {
                 variable:   variable.into(),
-                values:     ArgumentSplitter::new(cmd[3..].trim_left())
-                    .map(String::from)
-                    .collect(),
+                values:     ArgumentSplitter::new(cmd[3..].trim_left()).map(String::from).collect(),
                 statements: Vec::new(),
-            }
+            };
         }
         _ if cmd.starts_with("case ") => {
             let (value, binding, conditional) = match cmd[5..].trim_left() {
@@ -101,7 +99,7 @@ pub fn parse(code: &str) -> Statement {
                         Ok(values) => values,
                         Err(why) => {
                             eprintln!("ion: case error: {}", why);
-                            return Statement::Default
+                            return Statement::Default;
                         }
                     };
                     let binding = binding.map(Into::into);
@@ -118,7 +116,7 @@ pub fn parse(code: &str) -> Statement {
                 binding,
                 conditional,
                 statements: Vec::new(),
-            })
+            });
         }
         _ if cmd.starts_with("match ") => {
             return Statement::Match {
@@ -136,7 +134,7 @@ pub fn parse(code: &str) -> Statement {
                      Function names may only contain alphanumeric characters",
                     name
                 );
-                return Statement::Default
+                return Statement::Default;
             }
 
             let (args, description) = parse_function(&cmd[pos..]);
@@ -151,7 +149,7 @@ pub fn parse(code: &str) -> Statement {
                 }
                 Err(why) => {
                     eprintln!("ion: function argument error: {}", why);
-                    return Statement::Default
+                    return Statement::Default;
                 }
             }
         }

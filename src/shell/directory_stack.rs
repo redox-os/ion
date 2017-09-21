@@ -25,14 +25,13 @@ impl DirectoryStack {
         }
     }
 
-    /// This function will take a map of variables as input and attempt to parse the value of the
-    /// directory stack size variable. If it succeeds, it will return the value of that variable,
+    /// This function will take a map of variables as input and attempt to parse the value of
+    /// the
+    /// directory stack size variable. If it succeeds, it will return the value of that
+    /// variable,
     /// else it will return a default value of 1000.
     fn get_size(variables: &Variables) -> usize {
-        variables
-            .get_var_or_empty("DIRECTORY_STACK_SIZE")
-            .parse::<usize>()
-            .unwrap_or(1000)
+        variables.get_var_or_empty("DIRECTORY_STACK_SIZE").parse::<usize>().unwrap_or(1000)
     }
 
     /// Attempts to set the current directory to the directory stack's previous directory,
@@ -63,15 +62,15 @@ impl DirectoryStack {
 
         let len: usize = self.dirs.len();
         if len <= 1 {
-            return Err(Cow::Borrowed("ion: popd: directory stack empty\n"))
+            return Err(Cow::Borrowed("ion: popd: directory stack empty\n"));
         }
 
         let mut index: usize = if count_from_front {
             num
         } else {
-            (len - 1).checked_sub(num).ok_or_else(|| {
-                Cow::Owned(format!("ion: popd: negative directory stack index out of range\n"))
-            })?
+            (len - 1).checked_sub(num).ok_or_else(
+                || Cow::Owned(format!("ion: popd: negative directory stack index out of range\n")),
+            )?
         };
 
         // apply -n
@@ -86,9 +85,9 @@ impl DirectoryStack {
 
         // pop element
         if self.dirs.remove(index).is_none() {
-            return Err(Cow::Owned(
-                format!("ion: popd: {}: directory stack index out of range\n", index),
-            ))
+            return Err(
+                Cow::Owned(format!("ion: popd: {}: directory stack index out of range\n", index)),
+            );
         }
 
         self.print_dirs();
@@ -124,7 +123,7 @@ impl DirectoryStack {
                     None => Action::Push(PathBuf::from(arg)), // no numeric arg => `dir`-parameter
                 };
             } else {
-                return Err(Cow::Borrowed("ion: pushd: too many arguments\n"))
+                return Err(Cow::Borrowed("ion: pushd: too many arguments\n"));
             }
         }
 
@@ -132,7 +131,7 @@ impl DirectoryStack {
         match action {
             Action::Switch => {
                 if len < 2 {
-                    return Err(Cow::Borrowed("ion: pushd: no other directory\n"))
+                    return Err(Cow::Borrowed("ion: pushd: no other directory\n"));
                 }
                 if !keep_front {
                     self.set_current_dir_by_index(1, "pushd")?;
@@ -264,7 +263,8 @@ impl DirectoryStack {
                         Some((false, num)) if self.dirs.len() > num => {
                             Some(self.dirs.len() - num - 1)
                         }
-                        _ => return FAILURE, // Err(Cow::Owned(format!("ion: dirs: {}: invalid argument\n", arg)))
+                        _ => return FAILURE, /* Err(Cow::Owned(format!("ion: dirs: {}: invalid
+                                              * argument\n", arg))) */
                     };
                 }
             }
@@ -315,9 +315,10 @@ impl DirectoryStack {
     }
 
     fn print_dirs(&self) {
-        let dir = self.dirs.iter().fold(String::new(), |acc, dir| {
-            acc + " " + dir.to_str().unwrap_or("ion: no directory found")
-        });
+        let dir =
+            self.dirs.iter().fold(String::new(), |acc, dir| {
+                acc + " " + dir.to_str().unwrap_or("ion: no directory found")
+            });
         println!("{}", dir.trim_left());
     }
 
@@ -327,9 +328,9 @@ impl DirectoryStack {
         index: usize,
         caller: &str,
     ) -> Result<(), Cow<'static, str>> {
-        let dir = self.dirs.iter().nth(index).ok_or_else(|| {
-            Cow::Owned(format!("ion: {}: {}: directory stack out of range\n", caller, index))
-        })?;
+        let dir = self.dirs.iter().nth(index).ok_or_else(
+            || Cow::Owned(format!("ion: {}: {}: directory stack out of range\n", caller, index)),
+        )?;
 
         set_current_dir(dir)
             .map_err(|_| Cow::Owned(format!("ion: {}: Failed setting current dir\n", caller)))
@@ -362,10 +363,5 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
 
 // converts pbuf to an absolute path if possible
 fn try_abs_path(pbuf: &PathBuf) -> Cow<str> {
-    Cow::Owned(
-        pbuf.canonicalize()
-            .unwrap_or_else(|_| pbuf.clone())
-            .to_string_lossy()
-            .to_string(),
-    )
+    Cow::Owned(pbuf.canonicalize().unwrap_or_else(|_| pbuf.clone()).to_string_lossy().to_string())
 }

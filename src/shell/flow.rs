@@ -22,7 +22,8 @@ pub trait FlowLogic {
     /// Receives a command and attempts to execute the contents.
     fn on_command(&mut self, command_string: &str);
 
-    /// The highest layer of the flow control handling which branches into lower blocks when found.
+    /// The highest layer of the flow control handling which branches into lower blocks when
+    /// found.
     fn execute_toplevel<I>(
         &mut self,
         iterator: &mut I,
@@ -79,7 +80,7 @@ impl<'a> FlowLogic for Shell<'a> {
                     let _ = writeln!(stderr, "{}", why);
                     self.flow_control.level = 0;
                     self.flow_control.current_if_mode = 0;
-                    return
+                    return;
                 }
             }
         } else {
@@ -92,11 +93,11 @@ impl<'a> FlowLogic for Shell<'a> {
                 match current_statement {
                     &mut Statement::While {
                         ref mut statements, ..
-                    } |
-                    &mut Statement::For {
+                    }
+                    | &mut Statement::For {
                         ref mut statements, ..
-                    } |
-                    &mut Statement::Function {
+                    }
+                    | &mut Statement::Function {
                         ref mut statements, ..
                     } => {
                         collect_loops(&mut iterator, statements, level);
@@ -150,7 +151,7 @@ impl<'a> FlowLogic for Shell<'a> {
                 self.flow_control.level = 0;
                 self.flow_control.current_if_mode = 0;
                 self.flow_control.current_statement = Statement::Default;
-                return
+                return;
             }
 
             // If the level is set to 0, it means that the statement in memory is finished
@@ -175,7 +176,7 @@ impl<'a> FlowLogic for Shell<'a> {
                             statements,
                         } => if let Condition::SigInt = shell.execute_while(expression, statements)
                         {
-                            return Condition::SigInt
+                            return Condition::SigInt;
                         },
                         Statement::For {
                             variable,
@@ -184,7 +185,7 @@ impl<'a> FlowLogic for Shell<'a> {
                         } => if let Condition::SigInt =
                             shell.execute_for(&variable, &values, statements)
                         {
-                            return Condition::SigInt
+                            return Condition::SigInt;
                         },
                         Statement::Function {
                             name,
@@ -235,7 +236,7 @@ impl<'a> FlowLogic for Shell<'a> {
                             } else {
                                 writeln!(stdout, "real    {}.{:09}s", seconds, nanoseconds)
                             };
-                            return condition
+                            return condition;
                         }
                         _ => (),
                     }
@@ -243,7 +244,7 @@ impl<'a> FlowLogic for Shell<'a> {
                 }
 
                 if let Condition::SigInt = execute_final(self, replacement) {
-                    return
+                    return;
                 }
 
                 // Capture any leftover statements.
@@ -254,7 +255,7 @@ impl<'a> FlowLogic for Shell<'a> {
                         let _ = writeln!(stderr, "{}", why);
                         self.flow_control.level = 0;
                         self.flow_control.current_if_mode = 0;
-                        return
+                        return;
                     }
                 }
             }
@@ -272,7 +273,7 @@ impl<'a> FlowLogic for Shell<'a> {
         fn matches(lhs: &Array, rhs: &Array) -> bool {
             for v in lhs {
                 if rhs.contains(&v) {
-                    return true
+                    return true;
                 }
             }
             false
@@ -303,7 +304,7 @@ impl<'a> FlowLogic for Shell<'a> {
                     if let Some(statement) = case.conditional {
                         self.on_command(&statement);
                         if self.previous_status != SUCCESS {
-                            continue
+                            continue;
                         }
                     }
 
@@ -320,7 +321,7 @@ impl<'a> FlowLogic for Shell<'a> {
                         }
                     }
 
-                    break
+                    break;
                 }
                 Some(ref v) if matches(v, &value) => {
                     let mut previous_bind = None;
@@ -340,7 +341,7 @@ impl<'a> FlowLogic for Shell<'a> {
                     if let Some(statement) = case.conditional {
                         self.on_command(&statement);
                         if self.previous_status != SUCCESS {
-                            continue
+                            continue;
                         }
                     }
 
@@ -357,7 +358,7 @@ impl<'a> FlowLogic for Shell<'a> {
                         }
                     }
 
-                    break
+                    break;
                 }
                 Some(_) => (),
             }
@@ -394,7 +395,7 @@ impl<'a> FlowLogic for Shell<'a> {
                 self.flow_control.level += 1;
                 collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
                 if let Condition::SigInt = self.execute_while(expression, statements) {
-                    return Condition::SigInt
+                    return Condition::SigInt;
                 }
             }
             Statement::For {
@@ -405,7 +406,7 @@ impl<'a> FlowLogic for Shell<'a> {
                 self.flow_control.level += 1;
                 collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
                 if let Condition::SigInt = self.execute_for(&variable, &values, statements) {
-                    return Condition::SigInt
+                    return Condition::SigInt;
                 }
             }
             Statement::If {
@@ -428,7 +429,7 @@ impl<'a> FlowLogic for Shell<'a> {
                     let _ = writeln!(stderr, "{}", why);
                     self.flow_control.level = 0;
                     self.flow_control.current_if_mode = 0;
-                    return Condition::Break
+                    return Condition::Break;
                 }
 
                 match self.execute_if(expression, success, else_if, failure) {
@@ -508,7 +509,7 @@ impl<'a> FlowLogic for Shell<'a> {
                     let _ = writeln!(stderr, "{}", why);
                     self.flow_control.level = 0;
                     self.flow_control.current_if_mode = 0;
-                    return Condition::Break
+                    return Condition::Break;
                 }
                 match self.execute_match(expression, cases) {
                     Condition::Break => return Condition::Break,
@@ -613,7 +614,7 @@ impl<'a> FlowLogic for Shell<'a> {
             _ => {
                 for mut elseif in else_if {
                     if self.run_pipeline(&mut elseif.expression) == Some(SUCCESS) {
-                        return self.execute_statements(elseif.success)
+                        return self.execute_statements(elseif.success);
                     }
                 }
                 self.execute_statements(failure)

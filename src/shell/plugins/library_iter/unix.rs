@@ -27,7 +27,7 @@ impl Iterator for LibraryIterator {
                     Some(filename) => Identifier::from(filename),
                     None => {
                         eprintln!("ion: namespace plugin has invalid filename");
-                        continue
+                        continue;
                     }
                 };
 
@@ -36,11 +36,11 @@ impl Iterator for LibraryIterator {
                     Ok(library) => return Some((identifier, library)),
                     Err(why) => {
                         eprintln!("ion: failed to load library: {:?}, {:?}", path, why);
-                        continue
+                        continue;
                     }
                 }
             } else {
-                continue
+                continue;
             }
         }
         None

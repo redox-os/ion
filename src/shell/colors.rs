@@ -92,7 +92,7 @@ impl Colors {
                     foreground: None,
                     background: None,
                     attributes: Some(vec!["0"]),
-                }
+                };
             } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
                 colors.append_attribute(attribute);
             } else if let Some(color) = COLORS.get(&variable) {
@@ -123,7 +123,8 @@ impl Colors {
 
 
     /// If no matches were made, then this will attempt to parse the variable as either a
-    /// 24-bit true color color, or one of 256 colors. It supports both hexadecimal and decimals.
+    /// 24-bit true color color, or one of 256 colors. It supports both hexadecimal and
+    /// decimals.
     fn parse_colors(&mut self, variable: &str) -> bool {
         // First, determine which field we will write to.
         let (field, variable) = if variable.ends_with("bg") {
@@ -140,7 +141,7 @@ impl Colors {
                 // 256 colors: 0xF | 0xFF
                 1 | 2 => if let Ok(value) = u8::from_str_radix(variable, 16) {
                     *field = Some(Mode::Range256(value));
-                    return true
+                    return true;
                 },
                 // 24-bit Color 0xRGB
                 3 => {
@@ -149,7 +150,7 @@ impl Colors {
                         if let Some(green) = hex_char_to_u8_range(chars.next().unwrap()) {
                             if let Some(blue) = hex_char_to_u8_range(chars.next().unwrap()) {
                                 *field = Some(Mode::TrueColor(red, green, blue));
-                                return true
+                                return true;
                             }
                         }
                     }
@@ -159,7 +160,7 @@ impl Colors {
                     if let Ok(green) = u8::from_str_radix(&variable[2..4], 16) {
                         if let Ok(blue) = u8::from_str_radix(&variable[4..6], 16) {
                             *field = Some(Mode::TrueColor(red, green, blue));
-                            return true
+                            return true;
                         }
                     }
                 },
@@ -168,7 +169,7 @@ impl Colors {
         } else {
             if let Ok(value) = variable.parse::<u8>() {
                 *field = Some(Mode::Range256(value));
-                return true
+                return true;
             }
         }
 
@@ -225,7 +226,7 @@ fn hex_char_to_u8_range(character: char) -> Option<u8> {
         if character >= b'A' {
             character -= 54;
             if character < 17 {
-                return Some(character * 15 + 15)
+                return Some(character * 15 + 15);
             }
         }
         None
