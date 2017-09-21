@@ -73,7 +73,7 @@ enum Mode {
 pub struct Colors {
     foreground: Option<Mode>,
     background: Option<Mode>,
-    attributes: Option<Vec<&'static str>>
+    attributes: Option<Vec<&'static str>>,
 }
 
 impl Colors {
@@ -81,10 +81,18 @@ impl Colors {
     /// transformation into ANSI code parameters, which may be obtained by calling the
     /// `into_string()` method on the newly-created `Colors` structure.
     pub fn collect(input: &str) -> Colors {
-        let mut colors = Colors { foreground: None, background: None, attributes: None };
+        let mut colors = Colors {
+            foreground: None,
+            background: None,
+            attributes: None,
+        };
         for variable in input.split(",") {
             if variable == "reset" {
-                return Colors { foreground: None, background: None, attributes: Some(vec!["0"]) };
+                return Colors {
+                    foreground: None,
+                    background: None,
+                    attributes: Some(vec!["0"]),
+                }
             } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
                 colors.append_attribute(attribute);
             } else if let Some(color) = COLORS.get(&variable) {
@@ -101,8 +109,11 @@ impl Colors {
     /// Attributes can be stacked, so this function serves to enable that stacking.
     fn append_attribute(&mut self, attribute: &'static str) {
         let vec_exists = match self.attributes.as_mut() {
-            Some(vec) => { vec.push(attribute); true },
-            None => false
+            Some(vec) => {
+                vec.push(attribute);
+                true
+            }
+            None => false,
         };
 
         if !vec_exists {
@@ -116,7 +127,7 @@ impl Colors {
     fn parse_colors(&mut self, variable: &str) -> bool {
         // First, determine which field we will write to.
         let (field, variable) = if variable.ends_with("bg") {
-            (&mut self.background, &variable[..variable.len()-2])
+            (&mut self.background, &variable[..variable.len() - 2])
         } else {
             (&mut self.foreground, variable)
         };
@@ -129,7 +140,7 @@ impl Colors {
                 // 256 colors: 0xF | 0xFF
                 1 | 2 => if let Ok(value) = u8::from_str_radix(variable, 16) {
                     *field = Some(Mode::Range256(value));
-                    return true;
+                    return true
                 },
                 // 24-bit Color 0xRGB
                 3 => {
@@ -138,26 +149,26 @@ impl Colors {
                         if let Some(green) = hex_char_to_u8_range(chars.next().unwrap()) {
                             if let Some(blue) = hex_char_to_u8_range(chars.next().unwrap()) {
                                 *field = Some(Mode::TrueColor(red, green, blue));
-                                return true;
+                                return true
                             }
                         }
                     }
-                },
+                }
                 // 24-bit Color 0xRRGGBB
                 6 => if let Ok(red) = u8::from_str_radix(&variable[0..2], 16) {
                     if let Ok(green) = u8::from_str_radix(&variable[2..4], 16) {
                         if let Ok(blue) = u8::from_str_radix(&variable[4..6], 16) {
                             *field = Some(Mode::TrueColor(red, green, blue));
-                            return true;
+                            return true
                         }
                     }
                 },
-                _ => ()
+                _ => (),
             }
         } else {
             if let Ok(value) = variable.parse::<u8>() {
                 *field = Some(Mode::Range256(value));
-                return true;
+                return true
             }
         }
 
@@ -173,15 +184,19 @@ impl Colors {
         let foreground = match self.foreground {
             Some(Mode::Name(string)) => Some(string.to_owned()),
             Some(Mode::Range256(value)) => Some(format!("38;5;{}", value)),
-            Some(Mode::TrueColor(red, green, blue)) => Some(format!("38;2;{};{};{}", red, green, blue)),
-            None => None
+            Some(Mode::TrueColor(red, green, blue)) => {
+                Some(format!("38;2;{};{};{}", red, green, blue))
+            }
+            None => None,
         };
 
         let background = match self.background {
             Some(Mode::Name(string)) => Some(string.to_owned()),
             Some(Mode::Range256(value)) => Some(format!("48;5;{}", value)),
-            Some(Mode::TrueColor(red, green, blue)) => Some(format!("48;2;{};{};{}", red, green, blue)),
-            None => None
+            Some(Mode::TrueColor(red, green, blue)) => {
+                Some(format!("48;2;{};{};{}", red, green, blue))
+            }
+            None => None,
         };
 
         if let Some(attr) = self.attributes {
@@ -189,13 +204,13 @@ impl Colors {
             match (foreground, background) {
                 (Some(c), None) | (None, Some(c)) => Some([&output, ";", &c, "m"].concat()),
                 (None, None) => Some([&output, "m"].concat()),
-                (Some(fg), Some(bg)) => Some([&output, ";", &fg, ";", &bg, "m"].concat())
+                (Some(fg), Some(bg)) => Some([&output, ";", &fg, ";", &bg, "m"].concat()),
             }
         } else {
             match (foreground, background) {
                 (Some(c), None) | (None, Some(c)) => Some([&output, &c, "m"].concat()),
                 (None, None) => None,
-                (Some(fg), Some(bg)) => Some([&output, &fg, ";", &bg, "m"].concat())
+                (Some(fg), Some(bg)) => Some([&output, &fg, ";", &bg, "m"].concat()),
             }
         }
     }
@@ -210,7 +225,7 @@ fn hex_char_to_u8_range(character: char) -> Option<u8> {
         if character >= b'A' {
             character -= 54;
             if character < 17 {
-                return Some(character * 15 + 15);
+                return Some(character * 15 + 15)
             }
         }
         None
@@ -245,7 +260,7 @@ mod test {
         let expected = Colors {
             attributes: Some(vec!["1"]),
             background: Some(Mode::Name("107")),
-            foreground: Some(Mode::Name("35"))
+            foreground: Some(Mode::Name("35")),
         };
         let actual = Colors::collect("whitebg,magenta,bold");
         assert_eq!(actual, expected);
@@ -257,7 +272,7 @@ mod test {
         let expected = Colors {
             attributes: None,
             background: Some(Mode::Range256(77)),
-            foreground: Some(Mode::Range256(75))
+            foreground: Some(Mode::Range256(75)),
         };
         let actual = Colors::collect("0x4b,0x4dbg");
         assert_eq!(actual, expected);
@@ -269,7 +284,7 @@ mod test {
         let expected = Colors {
             attributes: None,
             background: Some(Mode::Range256(78)),
-            foreground: Some(Mode::Range256(32))
+            foreground: Some(Mode::Range256(32)),
         };
         let actual = Colors::collect("78bg,32");
         assert_eq!(actual, expected);
@@ -281,7 +296,7 @@ mod test {
         let expected = Colors {
             attributes: None,
             background: Some(Mode::TrueColor(255, 255, 255)),
-            foreground: Some(Mode::TrueColor(0, 0, 0))
+            foreground: Some(Mode::TrueColor(0, 0, 0)),
         };
         let actual = Colors::collect("0x000,0xFFFbg");
         assert_eq!(expected, actual);

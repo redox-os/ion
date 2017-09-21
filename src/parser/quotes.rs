@@ -8,31 +8,28 @@ bitflags! {
 }
 
 pub struct QuoteTerminator {
-    buffer: String,
-    eof: Option<String>,
+    buffer:     String,
+    eof:        Option<String>,
     eof_buffer: String,
-    read: usize,
-    flags: Flags,
+    read:       usize,
+    flags:      Flags,
 }
 
 impl QuoteTerminator {
     pub fn new(input: String) -> QuoteTerminator {
         QuoteTerminator {
-            buffer: input,
-            eof: None,
+            buffer:     input,
+            eof:        None,
             eof_buffer: String::new(),
-            read: 0,
-            flags: Flags::empty(),
+            read:       0,
+            flags:      Flags::empty(),
         }
     }
 
     pub fn append(&mut self, input: String) {
         if self.eof.is_none() {
-            self.buffer.push_str(if self.flags.contains(TRIM) {
-                input.trim()
-            } else {
-                &input
-            });
+            self.buffer
+                .push_str(if self.flags.contains(TRIM) { input.trim() } else { &input });
         } else {
             self.eof_buffer.push_str(&input);
         }
@@ -63,10 +60,12 @@ impl QuoteTerminator {
                                     self.read += 1;
                                     if Some(&b'<') != as_bytes.get(self.read) {
                                         use std::str;
-                                        let eof_phrase = unsafe { str::from_utf8_unchecked(&as_bytes[self.read..]) };
+                                        let eof_phrase = unsafe {
+                                            str::from_utf8_unchecked(&as_bytes[self.read..])
+                                        };
                                         self.eof = Some(eof_phrase.trim().to_owned());
                                         eof_found = true;
-                                        break;
+                                        break
                                     }
                                 }
                             }
@@ -76,7 +75,7 @@ impl QuoteTerminator {
                 }
                 if eof_found {
                     self.buffer.push('\n');
-                    return false;
+                    return false
                 }
             }
 

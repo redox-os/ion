@@ -45,44 +45,42 @@ pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
         if arg.starts_with("--") {
             if arg.len() == 2 {
                 positionals = Some(UnsetIfNone);
-                break;
+                break
             }
             if &arg[2..] == "help" {
                 let mut stdout = stdout.lock();
                 let _ = stdout.write(HELP.as_bytes());
             } else {
-                return 0;
+                return 0
             }
         } else if arg.starts_with('-') {
             if arg.len() == 1 {
                 positionals = Some(RetainIfNone);
-                break;
+                break
             }
             for flag in arg.bytes().skip(1) {
                 match flag {
                     b'e' => shell.flags |= ERR_EXIT,
-                    b'o' => {
-                        match args_iter.next() {
-                            Some(&mode) if mode == "vi" => {
-                                if let Some(context) = shell.context.as_mut() {
-                                    context.key_bindings = KeyBindings::Vi;
-                                }
-                            }
-                            Some(&mode) if mode == "emacs" => {
-                                if let Some(context) = shell.context.as_mut() {
-                                    context.key_bindings = KeyBindings::Emacs;
-                                }
-                            }
-                            Some(_) => {
-                                let _ = stderr.lock().write_all(b"set: invalid keymap\n");
-                                return 0;
-                            }
-                            None => {
-                                let _ = stderr.lock().write_all(b"set: no keymap given\n");
-                                return 0;
+                    b'o' => match args_iter.next() {
+                        Some(&mode) if mode == "vi" => {
+                            if let Some(context) = shell.context.as_mut() {
+                                context.key_bindings = KeyBindings::Vi;
                             }
                         }
-                    }
+                        Some(&mode) if mode == "emacs" => {
+                            if let Some(context) = shell.context.as_mut() {
+                                context.key_bindings = KeyBindings::Emacs;
+                            }
+                        }
+                        Some(_) => {
+                            let _ = stderr.lock().write_all(b"set: invalid keymap\n");
+                            return 0
+                        }
+                        None => {
+                            let _ = stderr.lock().write_all(b"set: no keymap given\n");
+                            return 0
+                        }
+                    },
                     b'x' => shell.flags |= PRINT_COMMS,
                     _ => return 0,
                 }
@@ -110,11 +108,9 @@ pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
                 .collect();
             match kind {
                 UnsetIfNone => shell.variables.set_array("args", arguments),
-                RetainIfNone => {
-                    if arguments.len() != 1 {
-                        shell.variables.set_array("args", arguments);
-                    }
-                }
+                RetainIfNone => if arguments.len() != 1 {
+                    shell.variables.set_array("args", arguments);
+                },
             }
         }
     }

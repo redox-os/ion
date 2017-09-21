@@ -1,4 +1,4 @@
-use super::super::{LibraryIterator, config_dir, StringError};
+use super::super::{config_dir, LibraryIterator, StringError};
 use fnv::FnvHashMap;
 use libloading::{Library, Symbol};
 use libloading::os::unix::Symbol as RawSymbol;
@@ -14,17 +14,17 @@ use types::Identifier;
 /// corresponding field to `NULL`. Libraries importing this structure should check for nullness.
 #[repr(C)]
 pub struct RawMethodArguments {
-    key_ptr: *mut i8,
+    key_ptr:       *mut i8,
     key_array_ptr: *mut *mut i8,
-    args_ptr: *mut *mut i8,
-    key_len: usize,
-    args_len: usize,
+    args_ptr:      *mut *mut i8,
+    key_len:       usize,
+    args_len:      usize,
 }
 
 pub enum MethodArguments {
     StringArg(String, Vec<String>),
     Array(Vec<String>, Vec<String>),
-    NoArgs
+    NoArgs,
 }
 
 impl From<MethodArguments> for RawMethodArguments {
@@ -32,9 +32,11 @@ impl From<MethodArguments> for RawMethodArguments {
         match arg {
             MethodArguments::StringArg(string, args) => {
                 let args_len = args.len();
-                let mut args = args.iter().map(|x| unsafe {
+                let mut args = args.iter()
+                    .map(|x| unsafe {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
-                    }).collect::<Vec<*mut i8>>();
+                    })
+                    .collect::<Vec<*mut i8>>();
                 args.shrink_to_fit();
                 let args_ptr = args.as_mut_ptr();
                 forget(args);
@@ -46,21 +48,26 @@ impl From<MethodArguments> for RawMethodArguments {
                     key_array_ptr: ptr::null_mut(),
                     args_ptr,
                     key_len: 1,
-                    args_len
+                    args_len,
                 }
-            },
+            }
             MethodArguments::Array(array, args) => {
                 let key_len = array.len();
-                let mut key_array = array.iter().map(|x| unsafe {
+                let mut key_array = array
+                    .iter()
+                    .map(|x| unsafe {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
-                    }).collect::<Vec<*mut i8>>();
+                    })
+                    .collect::<Vec<*mut i8>>();
                 let key_array_ptr = key_array.as_mut_ptr();
                 forget(key_array);
 
                 let args_len = args.len();
-                let mut args = args.iter().map(|x| unsafe {
+                let mut args = args.iter()
+                    .map(|x| unsafe {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
-                    }).collect::<Vec<*mut i8>>();
+                    })
+                    .collect::<Vec<*mut i8>>();
                 args.shrink_to_fit();
                 let args_ptr = args.as_mut_ptr();
                 forget(args);
@@ -70,19 +77,16 @@ impl From<MethodArguments> for RawMethodArguments {
                     key_array_ptr,
                     args_ptr,
                     key_len,
-                    args_len
-                }
-
-            },
-            MethodArguments::NoArgs => {
-                RawMethodArguments {
-                    key_ptr: ptr::null_mut(),
-                    key_array_ptr: ptr::null_mut(),
-                    args_ptr: ptr::null_mut(),
-                    key_len: 0,
-                    args_len: 0
+                    args_len,
                 }
             }
+            MethodArguments::NoArgs => RawMethodArguments {
+                key_ptr:       ptr::null_mut(),
+                key_array_ptr: ptr::null_mut(),
+                args_ptr:      ptr::null_mut(),
+                key_len:       0,
+                args_len:      0,
+            },
         }
     }
 }
@@ -98,12 +102,16 @@ pub struct StringMethodPlugins {
     /// Contains all of the loaded libraries from whence the symbols were obtained.
     libraries: Vec<Library>,
     /// A map of all the symbols that were collected from the above libraries.
-    pub symbols: FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn(RawMethodArguments) -> *mut i8>>,
+    pub symbols:
+        FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn(RawMethodArguments) -> *mut i8>>,
 }
 
 impl StringMethodPlugins {
     pub fn new() -> StringMethodPlugins {
-        StringMethodPlugins { libraries: Vec::new(), symbols: FnvHashMap::default() }
+        StringMethodPlugins {
+            libraries: Vec::new(),
+            symbols:   FnvHashMap::default(),
+        }
     }
 
     pub fn load(&mut self, library: Library) -> Result<(), StringError> {
@@ -137,9 +145,9 @@ impl StringMethodPlugins {
                         } else {
                             // Grab a slice and ensure that the name of the function is UTF-8.
                             let slice = &symbol_list[start..counter];
-                            let identifier = str::from_utf8(slice).map(Identifier::from).map_err(|_| {
-                                StringError::UTF8Function
-                            })?;
+                            let identifier = str::from_utf8(slice)
+                                .map(Identifier::from)
+                                .map_err(|_| StringError::UTF8Function)?;
 
                             // To obtain the symbol, we need to create a new `\0`-ended byte array.
                             // TODO: There's no need to use a vector here. An array will do fine.
@@ -149,10 +157,11 @@ impl StringMethodPlugins {
                             symbol.push(b'\0');
 
                             // Then attempt to load that symbol from the dynamic library.
-                            let symbol: Symbol<unsafe extern "C" fn(RawMethodArguments) -> *mut i8> =
-                                library.get(symbol.as_slice()).map_err(
-                                    StringError::SymbolErr,
-                                )?;
+                            let symbol: Symbol<
+                                unsafe extern "C" fn(RawMethodArguments) -> *mut i8,
+                            > = library
+                                .get(symbol.as_slice())
+                                .map_err(StringError::SymbolErr)?;
 
                             // And finally add the name of the function and it's function into the map.
                             self.symbols.insert(identifier, symbol.into_raw());
@@ -166,17 +175,18 @@ impl StringMethodPlugins {
                 // have been left over.
                 if counter != start {
                     let slice = &symbol_list[start..];
-                    let identifier = str::from_utf8(slice).map(Identifier::from).map_err(|_| {
-                        StringError::UTF8Function
-                    })?;
+                    let identifier = str::from_utf8(slice)
+                        .map(Identifier::from)
+                        .map_err(|_| StringError::UTF8Function)?;
                     let mut symbol = Vec::new();
                     symbol.reserve_exact(slice.len() + 1);
                     symbol.extend_from_slice(slice);
                     symbol.push(b'\0');
-                    let symbol: Symbol<unsafe extern "C" fn(RawMethodArguments) -> *mut i8> =
-                        library.get(symbol.as_slice()).map_err(
-                            StringError::SymbolErr,
-                        )?;
+                    let symbol: Symbol<
+                        unsafe extern "C" fn(RawMethodArguments) -> *mut i8,
+                    > = library
+                        .get(symbol.as_slice())
+                        .map_err(StringError::SymbolErr)?;
                     self.symbols.insert(identifier, symbol.into_raw());
                 }
             }
@@ -190,12 +200,14 @@ impl StringMethodPlugins {
     ///
     /// If the function exists, it is executed, and it's return value is then converted into a
     /// proper Rusty type.
-    pub fn execute(&self, function: &str, arguments: MethodArguments) -> Result<Option<String>, StringError> {
-        let func = self.symbols.get(function.into()).ok_or(
-            StringError::FunctionMissing(
-                function.into(),
-            ),
-        )?;
+    pub fn execute(
+        &self,
+        function: &str,
+        arguments: MethodArguments,
+    ) -> Result<Option<String>, StringError> {
+        let func = self.symbols
+            .get(function.into())
+            .ok_or(StringError::FunctionMissing(function.into()))?;
         unsafe {
             let data = (*func)(RawMethodArguments::from(arguments));
             if data.is_null() {
@@ -220,13 +232,11 @@ pub fn collect() -> StringMethodPlugins {
         path.push("methods");
         path.push("strings");
         match read_dir(&path).map(LibraryIterator::new) {
-            Ok(iterator) => {
-                for (_, library) in iterator {
-                    if let Err(why) = methods.load(library) {
-                        eprintln!("ion: string method error: {}", why);
-                    }
+            Ok(iterator) => for (_, library) in iterator {
+                if let Err(why) = methods.load(library) {
+                    eprintln!("ion: string method error: {}", why);
                 }
-            }
+            },
             Err(why) => {
                 eprintln!("ion: unable to read methods plugin directory: {}", why);
             }

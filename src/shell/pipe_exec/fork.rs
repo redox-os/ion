@@ -12,7 +12,11 @@ use std::process::exit;
 
 /// Forks the shell, adding the child to the parent's background list, and executing
 /// the given commands in the child fork.
-pub fn fork_pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, command_name: String) -> i32 {
+pub fn fork_pipe(
+    shell: &mut Shell,
+    commands: Vec<(RefinedJob, JobKind)>,
+    command_name: String,
+) -> i32 {
     match unsafe { sys::fork() } {
         Ok(0) => {
             shell.is_background_shell = true;

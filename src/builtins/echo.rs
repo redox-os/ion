@@ -51,32 +51,30 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
             "--escape" => flags |= ESCAPE,
             "--no-newline" => flags |= NO_NEWLINE,
             "--no-spaces" => flags |= NO_SPACES,
-            _ => {
-                if arg.starts_with('-') {
-                    let mut is_opts = true;
-                    let opts = &arg[1..];
-                    let mut short_flags = Flags::empty();
-                    for argopt in opts.chars() {
-                        match argopt {
-                            'e' => short_flags |= ESCAPE,
-                            'n' => short_flags |= NO_NEWLINE,
-                            's' => short_flags |= NO_SPACES,
-                            'h' => short_flags |= HELP,
-                            _ => {
-                                is_opts = false;
-                                break;
-                            }
+            _ => if arg.starts_with('-') {
+                let mut is_opts = true;
+                let opts = &arg[1..];
+                let mut short_flags = Flags::empty();
+                for argopt in opts.chars() {
+                    match argopt {
+                        'e' => short_flags |= ESCAPE,
+                        'n' => short_flags |= NO_NEWLINE,
+                        's' => short_flags |= NO_SPACES,
+                        'h' => short_flags |= HELP,
+                        _ => {
+                            is_opts = false;
+                            break
                         }
                     }
-                    if is_opts {
-                        flags |= short_flags;
-                    } else {
-                        data.push(arg);
-                    }
+                }
+                if is_opts {
+                    flags |= short_flags;
                 } else {
                     data.push(arg);
                 }
-            }
+            } else {
+                data.push(arg);
+            },
         }
     }
 
@@ -86,7 +84,7 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
     if flags.contains(HELP) {
         buffer.write_all(MAN_PAGE.as_bytes())?;
         buffer.flush()?;
-        return Ok(());
+        return Ok(())
     }
 
     let mut first = true;
@@ -116,7 +114,7 @@ pub fn echo(args: &[&str]) -> Result<(), io::Error> {
                     }
                     b'c' if check => {
                         buffer.flush()?;
-                        return Ok(());
+                        return Ok(())
                     }
                     b'e' if check => {
                         buffer.write_all(&[27u8])?; // escape

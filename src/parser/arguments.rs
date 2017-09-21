@@ -9,16 +9,16 @@ const METHOD: u8 = 128;
 
 /// An efficient `Iterator` structure for splitting arguments
 pub struct ArgumentSplitter<'a> {
-    data: &'a str,
-    read: usize,
+    data:  &'a str,
+    read:  usize,
     flags: u8,
 }
 
 impl<'a> ArgumentSplitter<'a> {
     pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
         ArgumentSplitter {
-            data: data,
-            read: 0,
+            data:  data,
+            read:  0,
             flags: 0,
         }
     }
@@ -42,15 +42,17 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                     self.flags &= 255 ^ COMM_1;
                     self.flags |= COMM_2 + ARRAY;
                     self.read += 1;
-                    continue;
+                    continue
                 }
                 b'$' if self.flags & SINGLE == 0 => {
                     self.flags &= 255 ^ COMM_2;
                     self.flags |= COMM_1 + VARIAB;
                     self.read += 1;
-                    continue;
+                    continue
                 }
-                b'[' if self.flags & SINGLE == 0 && self.flags & COMM_2 != 0 => array_process_level += 1,
+                b'[' if self.flags & SINGLE == 0 && self.flags & COMM_2 != 0 => {
+                    array_process_level += 1
+                }
                 b'[' if self.flags & SINGLE == 0 => array_level += 1,
                 b']' if self.flags & SINGLE == 0 && array_level != 0 => array_level -= 1,
                 b']' if self.flags & SINGLE == 0 => array_process_level -= 1,
@@ -65,16 +67,22 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b')' if self.flags & SINGLE == 0 => level -= 1,
                 b'"' if self.flags & SINGLE == 0 => self.flags ^= DOUBLE,
                 b'\'' if self.flags & DOUBLE == 0 => self.flags ^= SINGLE,
-                b' '
-                    if self.flags & (SINGLE + DOUBLE + METHOD) == 0 && level == 0 && array_level == 0 &&
-                           array_process_level == 0 => break,
+                b' ' if self.flags & (SINGLE + DOUBLE + METHOD) == 0 && level == 0 &&
+                    array_level == 0 && array_process_level == 0 =>
+                {
+                    break
+                }
                 _ => (),
             }
             self.read += 1;
             self.flags &= 255 ^ (COMM_1 + COMM_2);
         }
 
-        if start == self.read { None } else { Some(&self.data[start..self.read]) }
+        if start == self.read {
+            None
+        } else {
+            Some(&self.data[start..self.read])
+        }
     }
 }
 

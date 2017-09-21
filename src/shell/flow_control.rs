@@ -9,7 +9,7 @@ use types::Identifier;
 #[derive(Debug, PartialEq, Clone)]
 pub struct ElseIf {
     pub expression: Pipeline,
-    pub success: Vec<Statement>,
+    pub success:    Vec<Statement>,
 }
 
 /// Represents a single branch in a match statement. For example, in the expression
@@ -34,10 +34,10 @@ pub struct ElseIf {
 /// ```
 #[derive(Debug, PartialEq, Clone)]
 pub struct Case {
-    pub value: Option<String>,
-    pub binding: Option<String>,
+    pub value:       Option<String>,
+    pub binding:     Option<String>,
     pub conditional: Option<String>,
-    pub statements: Vec<Statement>,
+    pub statements:  Vec<Statement>,
 }
 
 // TODO: Enable statements and expressions to contain &str values.
@@ -48,20 +48,20 @@ pub enum Statement {
     Export(String),
     If {
         expression: Pipeline,
-        success: Vec<Statement>,
-        else_if: Vec<ElseIf>,
-        failure: Vec<Statement>,
+        success:    Vec<Statement>,
+        else_if:    Vec<ElseIf>,
+        failure:    Vec<Statement>,
     },
     ElseIf(ElseIf),
     Function {
-        name: Identifier,
+        name:        Identifier,
         description: Option<String>,
-        args: Vec<KeyBuf>,
-        statements: Vec<Statement>,
+        args:        Vec<KeyBuf>,
+        statements:  Vec<Statement>,
     },
     For {
-        variable: Identifier,
-        values: Vec<String>,
+        variable:   Identifier,
+        values:     Vec<String>,
         statements: Vec<Statement>,
     },
     While {
@@ -70,7 +70,7 @@ pub enum Statement {
     },
     Match {
         expression: String,
-        cases: Vec<Case>,
+        cases:      Vec<Case>,
     },
     Else,
     End,
@@ -102,23 +102,22 @@ impl Statement {
             Statement::Pipeline(_) => "Pipeline { .. }",
             Statement::Time(_) => "Time { .. }",
             Statement::Default => "Default",
-
         }
     }
 }
 
 pub struct FlowControl {
-    pub level: usize,
+    pub level:             usize,
     pub current_statement: Statement,
-    pub current_if_mode: u8, // { 0 = SUCCESS; 1 = FAILURE }
+    pub current_if_mode:   u8, // { 0 = SUCCESS; 1 = FAILURE }
 }
 
 impl Default for FlowControl {
     fn default() -> FlowControl {
         FlowControl {
-            level: 0,
+            level:             0,
             current_statement: Statement::Default,
-            current_if_mode: 0,
+            current_if_mode:   0,
         }
     }
 }
@@ -126,9 +125,9 @@ impl Default for FlowControl {
 #[derive(Clone)]
 pub struct Function {
     pub description: Option<String>,
-    pub name: Identifier,
-    pub args: Vec<KeyBuf>,
-    pub statements: Vec<Statement>,
+    pub name:        Identifier,
+    pub args:        Vec<KeyBuf>,
+    pub statements:  Vec<Statement>,
 }
 
 pub enum FunctionError {
@@ -139,7 +138,7 @@ pub enum FunctionError {
 impl Function {
     pub fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
-            return Err(FunctionError::InvalidArgumentCount);
+            return Err(FunctionError::InvalidArgumentCount)
         }
 
         let mut variables_backup: FnvHashMap<&str, Option<Value>> =
@@ -152,7 +151,7 @@ impl Function {
             let value = match value_check(shell, value, type_.kind) {
                 Ok(value) => value,
                 Err(_) => {
-                    return Err(FunctionError::InvalidArgumentType(type_.kind, (*value).into()));
+                    return Err(FunctionError::InvalidArgumentType(type_.kind, (*value).into()))
                 }
             };
 
@@ -193,10 +192,13 @@ impl Function {
     }
 }
 
-pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usize) -> Result<(), String>
+pub fn collect_cases<I>(
+    iterator: &mut I,
+    cases: &mut Vec<Case>,
+    level: &mut usize,
+) -> Result<(), String>
     where I: Iterator<Item = Statement>
 {
-
     macro_rules! add_to_case {
         ($statement:expr) => {
             match cases.last_mut() {
@@ -224,7 +226,7 @@ pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usi
             Statement::End => {
                 *level -= 1;
                 if *level == 0 {
-                    return Ok(());
+                    return Ok(())
                 }
             }
             Statement::While { .. } |
@@ -250,7 +252,7 @@ pub fn collect_cases<I>(iterator: &mut I, cases: &mut Vec<Case>, level: &mut usi
             }
         }
     }
-    return Ok(());
+    return Ok(())
 }
 
 pub fn collect_loops<I: Iterator<Item = Statement>>(
@@ -274,14 +276,14 @@ pub fn collect_loops<I: Iterator<Item = Statement>>(
                 &Statement::Match { .. } => *level += 1,
                 &Statement::End if *level == 1 => {
                     *level = 0;
-                    break;
+                    break
                 }
                 &Statement::End => *level -= 1,
                 _ => (),
-            }
+            },
             Statement::End if *level == 1 => {
                 *level = 0;
-                break;
+                break
             }
             Statement::End => *level -= 1,
             _ => (),
@@ -308,25 +310,23 @@ pub fn collect_if<I>(
             Statement::If { .. } |
             Statement::Function { .. } |
             Statement::Match { .. } => *level += 1,
-            Statement::ElseIf(ref elseif) if *level == 1 => {
-                if current_block == 1 {
-                    return Err("ion: syntax error: else block already given");
-                } else {
-                    current_block = 2;
-                    else_if.push(elseif.clone());
-                    continue;
-                }
-            }
+            Statement::ElseIf(ref elseif) if *level == 1 => if current_block == 1 {
+                return Err("ion: syntax error: else block already given")
+            } else {
+                current_block = 2;
+                else_if.push(elseif.clone());
+                continue
+            },
             Statement::Else if *level == 1 => {
                 current_block = 1;
-                continue;
+                continue
             }
             Statement::Else if *level == 1 && current_block == 1 => {
-                return Err("ion: syntax error: else block already given");
+                return Err("ion: syntax error: else block already given")
             }
             Statement::End if *level == 1 => {
                 *level = 0;
-                break;
+                break
             }
             Statement::End => *level -= 1,
             _ => (),

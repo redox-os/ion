@@ -34,7 +34,11 @@ fn is_integer_string(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok { Ok(value) } else { Err(()) }
+    if is_ok {
+        Ok(value)
+    } else {
+        Err(())
+    }
 }
 
 fn is_float_string(value: ReturnValue) -> Result<ReturnValue, ()> {
@@ -44,7 +48,11 @@ fn is_float_string(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok { Ok(value) } else { Err(()) }
+    if is_ok {
+        Ok(value)
+    } else {
+        Err(())
+    }
 }
 
 fn is_boolean_array(values: &mut ReturnValue) -> bool {
@@ -71,7 +79,11 @@ fn is_integer_array(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok { Ok(value) } else { Err(()) }
+    if is_ok {
+        Ok(value)
+    } else {
+        Err(())
+    }
 }
 
 fn is_float_array(value: ReturnValue) -> Result<ReturnValue, ()> {
@@ -81,7 +93,11 @@ fn is_float_array(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok { Ok(value) } else { Err(()) }
+    if is_ok {
+        Ok(value)
+    } else {
+        Err(())
+    }
 }
 
 fn get_string<E: Expander>(shell: &E, value: &str) -> ReturnValue {
@@ -108,9 +124,7 @@ pub fn value_check<'a, E: Expander>(
         Primitive::StrArray if is_array => Ok(array!()),
         Primitive::Boolean if !is_array => {
             let value = string!();
-            let value = is_boolean_string(&value).map_err(
-                |_| TypeError::BadValue(expected),
-            )?;
+            let value = is_boolean_string(&value).map_err(|_| TypeError::BadValue(expected))?;
             Ok(ReturnValue::Str(value.to_owned()))
         }
         Primitive::BooleanArray if is_array => {
@@ -121,10 +135,18 @@ pub fn value_check<'a, E: Expander>(
                 Err(TypeError::BadValue(expected))
             }
         }
-        Primitive::Integer if !is_array => is_integer_string(string!()).map_err(|_| TypeError::BadValue(expected)),
-        Primitive::IntegerArray if is_array => is_integer_array(array!()).map_err(|_| TypeError::BadValue(expected)),
-        Primitive::Float if !is_array => is_float_string(string!()).map_err(|_| TypeError::BadValue(expected)),
-        Primitive::FloatArray if is_array => is_float_array(array!()).map_err(|_| TypeError::BadValue(expected)),
+        Primitive::Integer if !is_array => {
+            is_integer_string(string!()).map_err(|_| TypeError::BadValue(expected))
+        }
+        Primitive::IntegerArray if is_array => {
+            is_integer_array(array!()).map_err(|_| TypeError::BadValue(expected))
+        }
+        Primitive::Float if !is_array => {
+            is_float_string(string!()).map_err(|_| TypeError::BadValue(expected))
+        }
+        Primitive::FloatArray if is_array => {
+            is_float_array(array!()).map_err(|_| TypeError::BadValue(expected))
+        }
         _ => Err(TypeError::BadValue(expected)),
     }
 }

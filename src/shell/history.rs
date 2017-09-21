@@ -28,7 +28,7 @@ pub struct IgnoreSetting {
 impl IgnoreSetting {
     pub fn default() -> IgnoreSetting {
         IgnoreSetting {
-            flags: IgnoreFlags::empty(),
+            flags:   IgnoreFlags::empty(),
             regexes: None,
         }
     }
@@ -137,11 +137,7 @@ impl<'a> ShellHistory for Shell<'a> {
         }
 
         self.ignore_setting.flags = flags;
-        self.ignore_setting.regexes = if regexes.len() > 0 {
-            Some(regexes)
-        } else {
-            None
-        }
+        self.ignore_setting.regexes = if regexes.len() > 0 { Some(regexes) } else { None }
     }
 }
 
@@ -154,27 +150,29 @@ impl<'a> ShellHistoryPrivate for Shell<'a> {
         // without the second check the command which sets the local variable would also be
         // ignored. However, this behavior might not be wanted.
         if ignore.contains(IGNORE_ALL) && !command.contains("HISTORY_IGNORE") {
-            return false;
+            return false
         }
 
         // Here we allow to also ignore the setting of the local variable because we assume
         // the user entered the leading whitespace on purpose.
         if ignore.contains(IGNORE_WHITESPACE) {
             if command.chars().next().map_or(false, |b| b.is_whitespace()) {
-                return false;
+                return false
             }
         }
 
         if ignore.contains(IGNORE_NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND {
-            return false;
+            return false
         }
 
         if let Some(ref regexes) = *regexes {
             // ignore command when regex is matched but only if it does not contain
             // "HISTORY_IGNORE", otherwise we would also ignore the command which
             // sets the variable, which could be annoying.
-            if regexes.iter().any(|regex| regex.is_match(command)) && !command.contains("HISTORY_IGNORE") {
-                return false;
+            if regexes.iter().any(|regex| regex.is_match(command)) &&
+                !command.contains("HISTORY_IGNORE")
+            {
+                return false
             }
         }
 

@@ -95,7 +95,11 @@ pub enum Action<'a> {
 }
 
 impl<'a> Action<'a> {
-    fn new(var: Key<'a>, operator: Operator, value: &'a str) -> Result<Action<'a>, AssignmentError<'a>> {
+    fn new(
+        var: Key<'a>,
+        operator: Operator,
+        value: &'a str,
+    ) -> Result<Action<'a>, AssignmentError<'a>> {
         match var.kind {
             Primitive::AnyArray |
             Primitive::BooleanArray |
@@ -108,7 +112,9 @@ impl<'a> Action<'a> {
             },
             Primitive::Any if is_array(value) => Ok(Action::UpdateArray(var, operator, value)),
             Primitive::Any => Ok(Action::UpdateString(var, operator, value)),
-            _ if is_array(value) => Err(AssignmentError::InvalidValue(var.kind, Primitive::AnyArray)),
+            _ if is_array(value) => {
+                Err(AssignmentError::InvalidValue(var.kind, Primitive::AnyArray))
+            }
             _ => Ok(Action::UpdateString(var, operator, value)),
         }
     }

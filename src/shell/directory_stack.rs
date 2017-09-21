@@ -54,14 +54,16 @@ impl DirectoryStack {
                         count_from_front = x;
                         num = y;
                     }
-                    None => return Err(Cow::Owned(format!("ion: popd: {}: invalid argument\n", arg))),
+                    None => {
+                        return Err(Cow::Owned(format!("ion: popd: {}: invalid argument\n", arg)))
+                    }
                 };
             }
         }
 
         let len: usize = self.dirs.len();
         if len <= 1 {
-            return Err(Cow::Borrowed("ion: popd: directory stack empty\n"));
+            return Err(Cow::Borrowed("ion: popd: directory stack empty\n"))
         }
 
         let mut index: usize = if count_from_front {
@@ -86,21 +88,25 @@ impl DirectoryStack {
         if self.dirs.remove(index).is_none() {
             return Err(Cow::Owned(
                 format!("ion: popd: {}: directory stack index out of range\n", index),
-            ));
+            ))
         }
 
         self.print_dirs();
         Ok(())
     }
 
-    pub fn pushd<I: IntoIterator>(&mut self, args: I, variables: &Variables) -> Result<(), Cow<'static, str>>
+    pub fn pushd<I: IntoIterator>(
+        &mut self,
+        args: I,
+        variables: &Variables,
+    ) -> Result<(), Cow<'static, str>>
         where I::Item: AsRef<str>
     {
         enum Action {
-            Switch, // <no arguments>
-            RotLeft(usize), // +[num]
+            Switch,          // <no arguments>
+            RotLeft(usize),  // +[num]
             RotRight(usize), // -[num]
-            Push(PathBuf), // [dir]
+            Push(PathBuf),   // [dir]
         }
 
         let mut keep_front = false; // whether the -n option is present
@@ -118,7 +124,7 @@ impl DirectoryStack {
                     None => Action::Push(PathBuf::from(arg)), // no numeric arg => `dir`-parameter
                 };
             } else {
-                return Err(Cow::Borrowed("ion: pushd: too many arguments\n"));
+                return Err(Cow::Borrowed("ion: pushd: too many arguments\n"))
             }
         }
 
@@ -126,25 +132,21 @@ impl DirectoryStack {
         match action {
             Action::Switch => {
                 if len < 2 {
-                    return Err(Cow::Borrowed("ion: pushd: no other directory\n"));
+                    return Err(Cow::Borrowed("ion: pushd: no other directory\n"))
                 }
                 if !keep_front {
                     self.set_current_dir_by_index(1, "pushd")?;
                     self.dirs.swap(0, 1);
                 }
             }
-            Action::RotLeft(num) => {
-                if !keep_front {
-                    self.set_current_dir_by_index(num, "pushd")?;
-                    self.rotate_left(num);
-                }
-            }
-            Action::RotRight(num) => {
-                if !keep_front {
-                    self.set_current_dir_by_index(len - (num % len), "pushd")?;
-                    self.rotate_right(num);
-                }
-            }
+            Action::RotLeft(num) => if !keep_front {
+                self.set_current_dir_by_index(num, "pushd")?;
+                self.rotate_left(num);
+            },
+            Action::RotRight(num) => if !keep_front {
+                self.set_current_dir_by_index(len - (num % len), "pushd")?;
+                self.rotate_right(num);
+            },
             Action::Push(dir) => {
                 let index = if keep_front { 1 } else { 0 };
                 self.insert_dir(index, dir, variables);
@@ -156,7 +158,11 @@ impl DirectoryStack {
         Ok(())
     }
 
-    pub fn cd<I: IntoIterator>(&mut self, args: I, variables: &Variables) -> Result<(), Cow<'static, str>>
+    pub fn cd<I: IntoIterator>(
+        &mut self,
+        args: I,
+        variables: &Variables,
+    ) -> Result<(), Cow<'static, str>>
         where I::Item: AsRef<str>
     {
         match args.into_iter().nth(1) {
@@ -175,21 +181,18 @@ impl DirectoryStack {
     fn switch_to_home_directory(&mut self, variables: &Variables) -> Result<(), Cow<'static, str>> {
         home_dir().map_or(Err(Cow::Borrowed("ion: failed to get home directory")), |home| {
             home.to_str().map_or(
-                Err(Cow::Borrowed(
-                    "ion: failed to convert home directory to str",
-                )),
-                |home| {
-                    self.change_and_push_dir(home, variables)
-                },
+                Err(Cow::Borrowed("ion: failed to convert home directory to str")),
+                |home| self.change_and_push_dir(home, variables),
             )
         })
     }
 
-    fn switch_to_previous_directory(&mut self, variables: &Variables) -> Result<(), Cow<'static, str>> {
+    fn switch_to_previous_directory(
+        &mut self,
+        variables: &Variables,
+    ) -> Result<(), Cow<'static, str>> {
         self.get_previous_dir().cloned().map_or_else(
-            || {
-                Err(Cow::Borrowed("ion: no previous directory to switch to"))
-            },
+            || Err(Cow::Borrowed("ion: no previous directory to switch to")),
             |prev| {
                 self.dirs.remove(1);
                 let prev = prev.to_string_lossy().to_string();
@@ -199,15 +202,27 @@ impl DirectoryStack {
         )
     }
 
-    fn get_previous_dir(&self) -> Option<&PathBuf> { if self.dirs.len() < 2 { None } else { self.dirs.get(1) } }
+    fn get_previous_dir(&self) -> Option<&PathBuf> {
+        if self.dirs.len() < 2 {
+            None
+        } else {
+            self.dirs.get(1)
+        }
+    }
 
-    pub fn change_and_push_dir(&mut self, dir: &str, variables: &Variables) -> Result<(), Cow<'static, str>> {
+    pub fn change_and_push_dir(
+        &mut self,
+        dir: &str,
+        variables: &Variables,
+    ) -> Result<(), Cow<'static, str>> {
         match (set_current_dir(dir), current_dir()) {
             (Ok(()), Ok(cur_dir)) => {
                 self.push_dir(cur_dir, variables);
                 Ok(())
             }
-            (Err(err), _) => Err(Cow::Owned(format!("ion: failed to set current dir to {}: {}\n", dir, err))),
+            (Err(err), _) => {
+                Err(Cow::Owned(format!("ion: failed to set current dir to {}: {}\n", dir, err)))
+            }
             (..) => Err(Cow::Borrowed(
                 "ion: change_and_push_dir(): error occurred that should never happen\n",
             )), // This should not happen
@@ -246,7 +261,9 @@ impl DirectoryStack {
                 arg => {
                     num_arg = match parse_numeric_arg(arg) {
                         Some((true, num)) => Some(num),
-                        Some((false, num)) if self.dirs.len() > num => Some(self.dirs.len() - num - 1),
+                        Some((false, num)) if self.dirs.len() > num => {
+                            Some(self.dirs.len() - num - 1)
+                        }
                         _ => return FAILURE, // Err(Cow::Owned(format!("ion: dirs: {}: invalid argument\n", arg)))
                     };
                 }
@@ -257,7 +274,10 @@ impl DirectoryStack {
             self.dirs.truncate(1);
         }
 
-        let mapper: fn((usize, &PathBuf)) -> Cow<str> = match (dirs_args & ABS_PATHNAMES > 0, dirs_args & INDEX > 0) {
+        let mapper: fn((usize, &PathBuf)) -> Cow<str> = match (
+            dirs_args & ABS_PATHNAMES > 0,
+            dirs_args & INDEX > 0,
+        ) {
             // ABS, INDEX
             (true, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, try_abs_path(x))),
             (true, false) => |(_, x)| try_abs_path(x),
@@ -290,7 +310,9 @@ impl DirectoryStack {
 
     pub fn dir_from_top(&self, num: usize) -> Option<&PathBuf> { self.dirs.get(num) }
 
-    pub fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> { self.dirs.iter().rev().nth(num) }
+    pub fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> {
+        self.dirs.iter().rev().nth(num)
+    }
 
     fn print_dirs(&self) {
         let dir = self.dirs.iter().fold(String::new(), |acc, dir| {
@@ -300,12 +322,17 @@ impl DirectoryStack {
     }
 
     // sets current_dir to the element referred by index
-    fn set_current_dir_by_index(&self, index: usize, caller: &str) -> Result<(), Cow<'static, str>> {
+    fn set_current_dir_by_index(
+        &self,
+        index: usize,
+        caller: &str,
+    ) -> Result<(), Cow<'static, str>> {
         let dir = self.dirs.iter().nth(index).ok_or_else(|| {
             Cow::Owned(format!("ion: {}: {}: directory stack out of range\n", caller, index))
         })?;
 
-        set_current_dir(dir).map_err(|_| Cow::Owned(format!("ion: {}: Failed setting current dir\n", caller)))
+        set_current_dir(dir)
+            .map_err(|_| Cow::Owned(format!("ion: {}: Failed setting current dir\n", caller)))
     }
 
     // pushd +<num>

@@ -26,7 +26,11 @@ pub fn split_pattern<'a>(arg: &'a str, pattern: &str) -> (&'a str, Option<&'a st
         Some(pos) => {
             let args = &arg[..pos].trim();
             let comment = &arg[pos + pattern.len()..].trim();
-            if comment.is_empty() { (args, None) } else { (args, Some(comment)) }
+            if comment.is_empty() {
+                (args, None)
+            } else {
+                (args, Some(comment))
+            }
         }
         None => (arg, None),
     }

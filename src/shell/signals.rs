@@ -2,7 +2,7 @@
 //! will be used to block signals in the shell at startup, and unblock signals for each of the forked
 //! children of the shell.
 
-use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize};
+use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 
 use sys;
 

@@ -22,10 +22,18 @@ impl<'a> Collector<'a> {
     pub fn run(data: &'a str) -> Result<Pipeline, &'static str> { Collector::new(data).parse() }
 
     fn peek(&self, index: usize) -> Option<u8> {
-        if index < self.data.len() { Some(self.data.as_bytes()[index]) } else { None }
+        if index < self.data.len() {
+            Some(self.data.as_bytes()[index])
+        } else {
+            None
+        }
     }
 
-    fn single_quoted<I>(&self, bytes: &mut Peekable<I>, start: usize) -> Result<&'a str, &'static str>
+    fn single_quoted<I>(
+        &self,
+        bytes: &mut Peekable<I>,
+        start: usize,
+    ) -> Result<&'a str, &'static str>
         where I: Iterator<Item = (usize, u8)>
     {
         while let Some(&(i, b)) = bytes.peek() {
@@ -33,7 +41,7 @@ impl<'a> Collector<'a> {
                 // We return an inclusive range to keep the quote type intact
                 b'\'' => {
                     bytes.next();
-                    return Ok(&self.data[start..i + 1]);
+                    return Ok(&self.data[start..i + 1])
                 }
                 _ => (),
             }
@@ -42,7 +50,11 @@ impl<'a> Collector<'a> {
         Err("ion: syntax error: unterminated single quote")
     }
 
-    fn double_quoted<I>(&self, bytes: &mut Peekable<I>, start: usize) -> Result<&'a str, &'static str>
+    fn double_quoted<I>(
+        &self,
+        bytes: &mut Peekable<I>,
+        start: usize,
+    ) -> Result<&'a str, &'static str>
         where I: Iterator<Item = (usize, u8)>
     {
         while let Some(&(i, b)) = bytes.peek() {
@@ -53,7 +65,7 @@ impl<'a> Collector<'a> {
                 // We return an inclusive range to keep the quote type intact
                 b'"' => {
                     bytes.next();
-                    return Ok(&self.data[start..i + 1]);
+                    return Ok(&self.data[start..i + 1])
                 }
                 _ => (),
             }
@@ -123,7 +135,7 @@ impl<'a> Collector<'a> {
                             // argument
                             if next_byte == b'>' || next_byte == b'|' {
                                 end = Some(i);
-                                break;
+                                break
                             }
                         }
                         // Reaching this block means that either there is no next byte, or the next
@@ -153,7 +165,7 @@ impl<'a> Collector<'a> {
                 // the arguments
                 c if FOLLOW_ARGS.contains(&c) && is_toplevel!() => {
                     end = Some(i);
-                    break;
+                    break
                 }
                 // By default just pop the next byte: it will be part of the argument
                 _ => {
@@ -162,19 +174,19 @@ impl<'a> Collector<'a> {
             }
         }
         if proc_level > 0 {
-            return Err("ion: syntax error: unmatched left paren");
+            return Err("ion: syntax error: unmatched left paren")
         }
         if array_level > 0 {
-            return Err("ion: syntax error: unmatched left bracket");
+            return Err("ion: syntax error: unmatched left bracket")
         }
         if brace_level > 0 {
-            return Err("ion: syntax error: unmatched left brace");
+            return Err("ion: syntax error: unmatched left brace")
         }
         if proc_level < 0 {
-            return Err("ion: syntax error: extra right paren(s)");
+            return Err("ion: syntax error: extra right paren(s)")
         }
         if array_level < 0 {
-            return Err("ion: syntax error: extra right bracket(s)");
+            return Err("ion: syntax error: extra right bracket(s)")
         }
         match (start, end) {
             (Some(i), Some(j)) if i < j => Ok(Some(&self.data[i..j])),
@@ -301,7 +313,7 @@ impl<'a> Collector<'a> {
                             if let Some(cmd) = self.arg(&mut bytes)? {
                                 input = Some(Input::HereString(cmd.into()));
                             } else {
-                                return Err("expected string argument after '<<<'");
+                                return Err("expected string argument after '<<<'")
                             }
                         } else {
                             // Otherwise, what we have is not a herestring, but a heredoc.
@@ -318,13 +330,14 @@ impl<'a> Collector<'a> {
                             };
                             let heredoc = heredoc.lines().collect::<Vec<&str>>();
                             // Then collect the heredoc from standard input.
-                            input = Some(Input::HereString(heredoc[1..heredoc.len() - 1].join("\n")));
+                            input =
+                                Some(Input::HereString(heredoc[1..heredoc.len() - 1].join("\n")));
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
                         // Otherwise interpret it as stdin redirection
                         input = Some(Input::File(file.into()));
                     } else {
-                        return Err("expected file argument after redirection for input");
+                        return Err("expected file argument after redirection for input")
                     }
                 }
                 // Skip over whitespace between jobs
@@ -354,15 +367,16 @@ mod tests {
 
     #[test]
     fn stderr_redirection() {
-        if let Statement::Pipeline(pipeline) = parse("git rev-parse --abbrev-ref HEAD ^> /dev/null") {
+        if let Statement::Pipeline(pipeline) = parse("git rev-parse --abbrev-ref HEAD ^> /dev/null")
+        {
             assert_eq!("git", pipeline.jobs[0].args[0]);
             assert_eq!("rev-parse", pipeline.jobs[0].args[1]);
             assert_eq!("--abbrev-ref", pipeline.jobs[0].args[2]);
             assert_eq!("HEAD", pipeline.jobs[0].args[3]);
 
             let expected = Redirection {
-                from: RedirectFrom::Stderr,
-                file: "/dev/null".to_owned(),
+                from:   RedirectFrom::Stderr,
+                file:   "/dev/null".to_owned(),
                 append: false,
             };
 
@@ -658,7 +672,9 @@ mod tests {
 
     #[test]
     fn mixed_quoted_and_unquoted() {
-        if let Statement::Pipeline(pipeline) = parse("echo 123 456 \"ABC 'DEF' GHI\" 789 one'  'two") {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo 123 456 \"ABC 'DEF' GHI\" 789 one'  'two")
+        {
             let jobs = pipeline.jobs;
             assert_eq!("123", jobs[0].args[1]);
             assert_eq!("456", jobs[0].args[2]);
@@ -713,15 +729,15 @@ mod tests {
     fn pipeline_with_redirection_append_stderr() {
         let input = "cat | echo hello | cat < stuff ^>> other";
         let expected = Pipeline {
-            jobs: vec![
+            jobs:   vec![
                 Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
                 Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
                 Job::new(array!["cat"], JobKind::Last),
             ],
-            stdin: Some(Input::File("stuff".into())),
+            stdin:  Some(Input::File("stuff".into())),
             stdout: Some(Redirection {
-                from: RedirectFrom::Stderr,
-                file: "other".into(),
+                from:   RedirectFrom::Stderr,
+                file:   "other".into(),
                 append: true,
             }),
         };
@@ -732,15 +748,15 @@ mod tests {
     fn pipeline_with_redirection_append_both() {
         let input = "cat | echo hello | cat < stuff &>> other";
         let expected = Pipeline {
-            jobs: vec![
+            jobs:   vec![
                 Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
                 Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
                 Job::new(array!["cat"], JobKind::Last),
             ],
-            stdin: Some(Input::File("stuff".into())),
+            stdin:  Some(Input::File("stuff".into())),
             stdout: Some(Redirection {
-                from: RedirectFrom::Both,
-                file: "other".into(),
+                from:   RedirectFrom::Both,
+                file:   "other".into(),
                 append: true,
             }),
         };
@@ -784,8 +800,8 @@ mod tests {
     fn herestring() {
         let input = "calc <<< $(cat math.txt)";
         let expected = Pipeline {
-            jobs: vec![Job::new(array!["calc"], JobKind::Last)],
-            stdin: Some(Input::HereString("$(cat math.txt)".into())),
+            jobs:   vec![Job::new(array!["calc"], JobKind::Last)],
+            stdin:  Some(Input::HereString("$(cat math.txt)".into())),
             stdout: None,
         };
         assert_eq!(Statement::Pipeline(expected), parse(input));
@@ -795,8 +811,8 @@ mod tests {
     fn heredoc() {
         let input = "calc << EOF\n1 + 2\n3 + 4\nEOF";
         let expected = Pipeline {
-            jobs: vec![Job::new(array!["calc"], JobKind::Last)],
-            stdin: Some(Input::HereString("1 + 2\n3 + 4".into())),
+            jobs:   vec![Job::new(array!["calc"], JobKind::Last)],
+            stdin:  Some(Input::HereString("1 + 2\n3 + 4".into())),
             stdout: None,
         };
         assert_eq!(Statement::Pipeline(expected), parse(input));
@@ -806,14 +822,14 @@ mod tests {
     fn piped_herestring() {
         let input = "cat | tr 'o' 'x' <<< $VAR > out.log";
         let expected = Pipeline {
-            jobs: vec![
+            jobs:   vec![
                 Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
                 Job::new(array!["tr", "'o'", "'x'"], JobKind::Last),
             ],
-            stdin: Some(Input::HereString("$VAR".into())),
+            stdin:  Some(Input::HereString("$VAR".into())),
             stdout: Some(Redirection {
-                from: RedirectFrom::Stdout,
-                file: "out.log".into(),
+                from:   RedirectFrom::Stdout,
+                file:   "out.log".into(),
                 append: false,
             }),
         };
@@ -838,16 +854,15 @@ mod tests {
     fn escaped_filenames() {
         let input = "echo zardoz >> foo\\'bar";
         let expected = Pipeline {
-            jobs: vec![Job::new(array!["echo", "zardoz"], JobKind::Last)],
-            stdin: None,
+            jobs:   vec![Job::new(array!["echo", "zardoz"], JobKind::Last)],
+            stdin:  None,
             stdout: Some(Redirection {
-                from: RedirectFrom::Stdout,
-                file: "foo\\'bar".into(),
+                from:   RedirectFrom::Stdout,
+                file:   "foo\\'bar".into(),
                 append: true,
             }),
         };
         assert_eq!(parse(input), Statement::Pipeline(expected));
-
     }
 
 }

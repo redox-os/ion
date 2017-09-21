@@ -10,10 +10,10 @@ use version_check::is_nightly;
 //const MIN_VERSION: &'static str = "1.19.0";
 
 use std::env;
-use std::path::Path;
 use std::fs::File;
-use std::io::{self, Write, Read};
-use std::process::{Command};
+use std::io::{self, Read, Write};
+use std::path::Path;
+use std::process::Command;
 
 // Convenience macro for writing to stderr.
 macro_rules! printerr {
@@ -58,7 +58,7 @@ fn main() {
         }
     }
     match write_version_file() {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => panic!("Failed to create a version file: {:?}", e),
     }
 }
@@ -68,13 +68,19 @@ fn write_version_file() -> io::Result<()> {
     let target = env::var("TARGET").unwrap();
     let version_fname = Path::new(&env::var("OUT_DIR").unwrap()).join("version_string");
     let mut version_file = File::create(&version_fname)?;
-    write!(&mut version_file, "r#\"ion {} ({})\nrev {}\"#", version, target, get_git_rev()?.trim())?;
+    write!(
+        &mut version_file,
+        "r#\"ion {} ({})\nrev {}\"#",
+        version,
+        target,
+        get_git_rev()?.trim()
+    )?;
     Ok(())
 }
 
 fn get_git_rev() -> io::Result<String> {
     let rev = match Command::new("git").arg("rev-parse").arg("master").output() {
-        Ok(out) =>  match String::from_utf8(out.stdout) {
+        Ok(out) => match String::from_utf8(out.stdout) {
             Ok(s) => s,
             Err(_) => git_rev_from_file()?,
         },

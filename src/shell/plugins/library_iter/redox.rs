@@ -17,7 +17,5 @@ impl Iterator for LibraryIterator {
     // The `Library` is a handle to dynamic library loaded into memory.
     type Item = (Identifier, Library);
 
-    fn next(&mut self) -> Option<(Identifier, Library)> {
-        None
-    }
+    fn next(&mut self) -> Option<(Identifier, Library)> { None }
 }

@@ -38,44 +38,55 @@ pub enum StatementError<'a> {
 impl<'a> Display for StatementError<'a> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
-            StatementError::IllegalCommandName(command) => writeln!(f, "illegal command name: {}", command),
-            StatementError::InvalidCharacter(character, position) => {
-                writeln!(f, "syntax error: '{}' at position {} is out of place", character, position)
+            StatementError::IllegalCommandName(command) => {
+                writeln!(f, "illegal command name: {}", command)
             }
-            StatementError::UnterminatedSubshell => writeln!(f, "syntax error: unterminated subshell"),
+            StatementError::InvalidCharacter(character, position) => writeln!(
+                f,
+                "syntax error: '{}' at position {} is out of place",
+                character,
+                position
+            ),
+            StatementError::UnterminatedSubshell => {
+                writeln!(f, "syntax error: unterminated subshell")
+            }
             StatementError::UnterminatedBrace => writeln!(f, "syntax error: unterminated brace"),
-            StatementError::UnterminatedBracedVar => writeln!(f, "syntax error: unterminated braced var"),
+            StatementError::UnterminatedBracedVar => {
+                writeln!(f, "syntax error: unterminated braced var")
+            }
             StatementError::UnterminatedMethod => writeln!(f, "syntax error: unterminated method"),
             StatementError::UnterminatedArithmetic => {
                 writeln!(f, "syntax error: unterminated arithmetic subexpression")
             }
-            StatementError::ExpectedCommandButFound(element) => writeln!(f, "expected command, but found {}", element),
+            StatementError::ExpectedCommandButFound(element) => {
+                writeln!(f, "expected command, but found {}", element)
+            }
         }
     }
 }
 
 pub struct StatementSplitter<'a> {
-    data: &'a str,
-    read: usize,
-    flags: Flags,
-    array_level: u8,
+    data:                &'a str,
+    read:                usize,
+    flags:               Flags,
+    array_level:         u8,
     array_process_level: u8,
-    process_level: u8,
-    brace_level: u8,
-    math_paren_level: i8,
+    process_level:       u8,
+    brace_level:         u8,
+    math_paren_level:    i8,
 }
 
 impl<'a> StatementSplitter<'a> {
     pub fn new(data: &'a str) -> StatementSplitter<'a> {
         StatementSplitter {
-            data: data,
-            read: 0,
-            flags: Flags::empty(),
-            array_level: 0,
+            data:                data,
+            read:                0,
+            flags:               Flags::empty(),
+            array_level:         0,
             array_process_level: 0,
-            process_level: 0,
-            brace_level: 0,
-            math_paren_level: 0,
+            process_level:       0,
+            brace_level:         0,
+            math_paren_level:    0,
         }
     }
 }
@@ -95,7 +106,9 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.flags -= POST_MATHEXPR;
                 }
                 // [^A-Za-z0-9_:,}]
-                0...43 | 45...47 | 59...64 | 91...94 | 96 | 123...124 | 126...127 if self.flags.contains(VBRACE) => {
+                0...43 | 45...47 | 59...64 | 91...94 | 96 | 123...124 | 126...127
+                    if self.flags.contains(VBRACE) =>
+                {
                     // If we are just ending the braced section continue as normal
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
@@ -114,25 +127,23 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'@' if !self.flags.contains(SQUOTE) => {
                     self.flags -= COMM_1;
                     self.flags |= COMM_2 | ARRAY;
-                    continue;
+                    continue
                 }
                 b'$' if !self.flags.contains(SQUOTE) => {
                     self.flags -= COMM_2;
                     self.flags |= COMM_1 | VARIAB;
-                    continue;
+                    continue
                 }
                 b'{' if self.flags.intersects(COMM_1 | COMM_2) => self.flags |= VBRACE,
                 b'{' if !self.flags.intersects(SQUOTE | DQUOTE) => self.brace_level += 1,
                 b'}' if self.flags.contains(VBRACE) => self.flags.toggle(VBRACE),
-                b'}' if !self.flags.intersects(SQUOTE | DQUOTE) => {
-                    if self.brace_level == 0 {
-                        if error.is_none() {
-                            error = Some(StatementError::InvalidCharacter(character as char, self.read))
-                        }
-                    } else {
-                        self.brace_level -= 1;
+                b'}' if !self.flags.intersects(SQUOTE | DQUOTE) => if self.brace_level == 0 {
+                    if error.is_none() {
+                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
-                }
+                } else {
+                    self.brace_level -= 1;
+                },
                 b'(' if self.flags.contains(MATHEXPR) => {
                     self.math_paren_level += 1;
                 }
@@ -160,70 +171,76 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.flags |= METHOD;
                 }
                 b'[' if !self.flags.contains(SQUOTE) => self.array_level += 1,
-                b']' if self.array_level == 0 && !self.flags.contains(SQUOTE) => {
-                    if error.is_none() {
-                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
-                    }
+                b']' if self.array_level == 0 && !self.flags.contains(SQUOTE) => if error.is_none()
+                {
+                    error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                },
+                b']' if !self.flags.contains(SQUOTE) && self.array_level != 0 => {
+                    self.array_level -= 1
                 }
-                b']' if !self.flags.contains(SQUOTE) && self.array_level != 0 => self.array_level -= 1,
-                b')' if self.flags.contains(MATHEXPR) => {
-                    if self.math_paren_level == 0 {
-                        if self.data.as_bytes().len() <= self.read {
-                            if error.is_none() {
-                                error = Some(StatementError::UnterminatedArithmetic)
-                            }
-                        } else {
-                            let next_character = self.data.as_bytes()[self.read] as char;
-                            if next_character == ')' {
-                                self.flags -= MATHEXPR;
-                                self.flags |= POST_MATHEXPR;
-                            } else if error.is_none() {
-                                error = Some(StatementError::InvalidCharacter(next_character, self.read));
-                            }
+                b')' if self.flags.contains(MATHEXPR) => if self.math_paren_level == 0 {
+                    if self.data.as_bytes().len() <= self.read {
+                        if error.is_none() {
+                            error = Some(StatementError::UnterminatedArithmetic)
                         }
                     } else {
-                        self.math_paren_level -= 1;
+                        let next_character = self.data.as_bytes()[self.read] as char;
+                        if next_character == ')' {
+                            self.flags -= MATHEXPR;
+                            self.flags |= POST_MATHEXPR;
+                        } else if error.is_none() {
+                            error =
+                                Some(StatementError::InvalidCharacter(next_character, self.read));
+                        }
                     }
-                }
-                b')' if !self.flags.contains(SQUOTE) && self.flags.contains(METHOD) && self.process_level == 0 => {
+                } else {
+                    self.math_paren_level -= 1;
+                },
+                b')' if !self.flags.contains(SQUOTE) && self.flags.contains(METHOD) &&
+                    self.process_level == 0 =>
+                {
                     self.flags ^= METHOD;
                 }
-                b')' if self.process_level == 0 && self.array_process_level == 0 && !self.flags.contains(SQUOTE) => {
+                b')' if self.process_level == 0 && self.array_process_level == 0 &&
+                    !self.flags.contains(SQUOTE) =>
+                {
                     if error.is_none() && !self.flags.intersects(SQUOTE | DQUOTE) {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 }
-                b')' if !self.flags.contains(SQUOTE) && self.process_level != 0 => self.process_level -= 1,
+                b')' if !self.flags.contains(SQUOTE) && self.process_level != 0 => {
+                    self.process_level -= 1
+                }
                 b')' if !self.flags.contains(SQUOTE) => self.array_process_level -= 1,
-                b';'
-                    if !self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0 &&
-                           self.array_process_level == 0 => {
+                b';' if !self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0 &&
+                    self.array_process_level == 0 =>
+                {
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(self.data[start..self.read - 1].trim())),
-                    };
+                    }
                 }
-                b'#'
-                    if self.read == 1 ||
-                           (!self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0 &&
-                                self.array_process_level == 0 &&
-                                match self.data.as_bytes()[self.read - 2] {
-                                    b' ' | b'\t' => true,
-                                    _ => false,
-                                }) => {
+                b'#' if self.read == 1 ||
+                    (!self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0 &&
+                        self.array_process_level == 0 &&
+                        match self.data.as_bytes()[self.read - 2] {
+                            b' ' | b'\t' => true,
+                            _ => false,
+                        }) =>
+                {
                     let output = self.data[start..self.read - 1].trim();
                     self.read = self.data.len();
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(output)),
-                    };
+                    }
                 }
                 b' ' if else_found => {
                     let output = &self.data[else_pos..self.read - 1].trim();
                     if !output.is_empty() {
                         if "if" != *output {
                             self.read = else_pos;
-                            return Some(Ok("else"));
+                            return Some(Ok("else"))
                         }
                     }
                     else_found = false;
@@ -253,20 +270,32 @@ impl<'a> Iterator for StatementSplitter<'a> {
             self.read = self.data.len();
             match error {
                 Some(error) => Some(Err(error)),
-                None if self.process_level != 0 || self.array_process_level != 0 || self.array_level != 0 => {
+                None if self.process_level != 0 || self.array_process_level != 0 ||
+                    self.array_level != 0 =>
+                {
                     Some(Err(StatementError::UnterminatedSubshell))
                 }
-                None if self.flags.contains(METHOD) => Some(Err(StatementError::UnterminatedMethod)),
-                None if self.flags.contains(VBRACE) => Some(Err(StatementError::UnterminatedBracedVar)),
+                None if self.flags.contains(METHOD) => {
+                    Some(Err(StatementError::UnterminatedMethod))
+                }
+                None if self.flags.contains(VBRACE) => {
+                    Some(Err(StatementError::UnterminatedBracedVar))
+                }
                 None if self.brace_level != 0 => Some(Err(StatementError::UnterminatedBrace)),
-                None if self.flags.contains(MATHEXPR) => Some(Err(StatementError::UnterminatedArithmetic)),
+                None if self.flags.contains(MATHEXPR) => {
+                    Some(Err(StatementError::UnterminatedArithmetic))
+                }
                 None => {
                     let output = self.data[start..].trim();
                     match output.as_bytes()[0] {
-                        b'>' | b'<' | b'^' => Some(Err(StatementError::ExpectedCommandButFound("redirection"))),
+                        b'>' | b'<' | b'^' => {
+                            Some(Err(StatementError::ExpectedCommandButFound("redirection")))
+                        }
                         b'|' => Some(Err(StatementError::ExpectedCommandButFound("pipe"))),
                         b'&' => Some(Err(StatementError::ExpectedCommandButFound("&"))),
-                        b'*' | b'%' | b'?' | b'{' | b'}' => Some(Err(StatementError::IllegalCommandName(output))),
+                        b'*' | b'%' | b'?' | b'{' | b'}' => {
+                            Some(Err(StatementError::IllegalCommandName(output)))
+                        }
                         _ => Some(Ok(output)),
                     }
                 }

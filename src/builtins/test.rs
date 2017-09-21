@@ -122,9 +122,9 @@ pub fn test(args: &[&str]) -> Result<bool, String> {
 fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W) -> Result<bool, String> {
     match arguments.first() {
         Some(&"--help") => {
-            buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| {
-                x.description().to_owned()
-            })?;
+            buffer
+                .write_all(MAN_PAGE.as_bytes())
+                .map_err(|x| x.description().to_owned())?;
             buffer.flush().map_err(|x| x.description().to_owned())?;
             Ok(true)
         }
@@ -142,16 +142,15 @@ fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W) -> Resul
         }
         Some(arg) => {
             // If there is no operator, check if the first argument is non-zero
-            arguments.get(1).map_or(
-                Ok(string_is_nonzero(arg)),
-                |operator| {
+            arguments
+                .get(1)
+                .map_or(Ok(string_is_nonzero(arg)), |operator| {
                     // If there is no right hand argument, a condition was expected
-                    let right_arg = arguments.get(2).ok_or_else(|| {
-                        SmallString::from("parse error: condition expected")
-                    })?;
+                    let right_arg = arguments
+                        .get(2)
+                        .ok_or_else(|| SmallString::from("parse error: condition expected"))?;
                     evaluate_expression(arg, operator, right_arg)
-                },
-            )
+                })
         }
         None => Ok(false),
     }
@@ -177,7 +176,6 @@ fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool
             }
         }
     }
-
 }
 
 /// Exits SUCCESS if both files have the same device and inode numbers
@@ -213,17 +211,18 @@ fn file_is_newer_than(first: &str, second: &str) -> bool {
 
 /// Obtain the time the file was last modified as a `SystemTime` type.
 fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
-    fs::metadata(filename).ok().and_then(
-        |file| file.modified().ok(),
-    )
+    fs::metadata(filename)
+        .ok()
+        .and_then(|file| file.modified().ok())
 }
 
 /// Attempt to parse a &str as a usize.
 fn parse_integers(left: &str, right: &str) -> Result<(Option<usize>, Option<usize>), String> {
     let parse_integer = |input: &str| -> Result<Option<usize>, String> {
-        match input.parse::<usize>().map_err(|_| {
-            format!("test: integer expression expected: {:?}", input)
-        }) {
+        match input
+            .parse::<usize>()
+            .map_err(|_| format!("test: integer expression expected: {:?}", input))
+        {
             Err(why) => Err(String::from(why)),
             Ok(res) => Ok(Some(res)),
         }
@@ -264,9 +263,9 @@ fn match_flag_argument(flag: char, argument: &str) -> bool {
 
 /// Exits SUCCESS if the file size is greather than zero.
 fn file_size_is_greater_than_zero(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| {
-        metadata.len() > 0
-    })
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.len() > 0)
 }
 
 /// Exits SUCCESS if the file has read permissions. This function is rather low level because
@@ -318,23 +317,23 @@ fn file_has_execute_permission(filepath: &str) -> bool {
 
 /// Exits SUCCESS if the file argument is a socket
 fn file_is_socket(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| {
-        metadata.file_type().is_socket()
-    })
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_socket())
 }
 
 /// Exits SUCCESS if the file argument is a block device
 fn file_is_block_device(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| {
-        metadata.file_type().is_block_device()
-    })
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_block_device())
 }
 
 /// Exits SUCCESS if the file argument is a character device
 fn file_is_character_device(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| {
-        metadata.file_type().is_char_device()
-    })
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_char_device())
 }
 
 /// Exits SUCCESS if the file exists
@@ -342,26 +341,23 @@ fn file_exists(filepath: &str) -> bool { Path::new(filepath).exists() }
 
 /// Exits SUCCESS if the file is a regular file
 fn file_is_regular(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| {
-        metadata.file_type().is_file()
-    })
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_file())
 }
 
 /// Exits SUCCESS if the file is a directory
 fn file_is_directory(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| {
-        metadata.file_type().is_dir()
-    })
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_dir())
 }
 
 /// Exits SUCCESS if the file is a symbolic link
 fn file_is_symlink(filepath: &str) -> bool {
-    fs::symlink_metadata(filepath).ok().map_or(
-        false,
-        |metadata| {
-            metadata.file_type().is_symlink()
-        },
-    )
+    fs::symlink_metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_symlink())
 }
 
 /// Exits SUCCESS if the string is not empty

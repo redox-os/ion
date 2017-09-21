@@ -11,7 +11,10 @@ use std::io::{self, BufRead};
 use std::process;
 use sys::{self, getpid, is_root};
 use sys::variables as self_sys;
-use types::{Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value, VariableContext};
+use types::{
+    Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value,
+    VariableContext,
+};
 use unicode_segmentation::UnicodeSegmentation;
 
 lazy_static! {
@@ -115,9 +118,11 @@ impl Variables {
             match value {
                 "0" => self.disable_plugins(),
                 "1" => self.enable_plugins(),
-                _ => eprintln!("ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1."),
+                _ => {
+                    eprintln!("ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1.")
+                }
             }
-            return;
+            return
         }
 
         if !name.is_empty() {
@@ -144,7 +149,7 @@ impl Variables {
         if !name.is_empty() {
             if let Some(map) = self.hashmaps.get_mut(name) {
                 map.insert(key.into(), value.into());
-                return;
+                return
             }
 
             let mut map = HashMap::with_capacity_and_hasher(4, Default::default());
@@ -194,7 +199,7 @@ impl Variables {
                     output.push('/');
                 }
                 output.push_str(&elements[elements.len() - 1]);
-                return output;
+                return output
             }
         }
 
@@ -207,7 +212,8 @@ impl Variables {
             "MWD" => return Some(self.get_minimal_directory()),
             _ => (),
         }
-        if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
+        if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..]))
+        {
             // If the parsed name contains the '::' pattern, then a namespace was designated. Find it.
             match name {
                 "c" | "color" => Colors::collect(variable).into_string(),
@@ -215,12 +221,14 @@ impl Variables {
                 _ => {
                     if is_root() {
                         eprintln!("ion: root is not allowed to execute plugins");
-                        return None;
+                        return None
                     }
 
                     if !self.has_plugin_support() {
-                        eprintln!("ion: plugins are disabled. Considering enabling them with `let NS_PLUGINS = 1`");
-                        return None;
+                        eprintln!(
+                            "ion: plugins are disabled. Considering enabling them with `let NS_PLUGINS = 1`"
+                        );
+                        return None
                     }
 
                     // Attempt to obtain the given namespace from our lazily-generated map of namespaces.
@@ -260,9 +268,13 @@ impl Variables {
             .collect()
     }
 
-    pub fn is_valid_variable_character(c: char) -> bool { c.is_alphanumeric() || c == '_' || c == '?' }
+    pub fn is_valid_variable_character(c: char) -> bool {
+        c.is_alphanumeric() || c == '_' || c == '?'
+    }
 
-    pub fn is_valid_variable_name(name: &str) -> bool { name.chars().all(Variables::is_valid_variable_character) }
+    pub fn is_valid_variable_name(name: &str) -> bool {
+        name.chars().all(Variables::is_valid_variable_character)
+    }
 
     pub fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> Option<String> {
         let mut chars = word.char_indices();
@@ -275,26 +287,26 @@ impl Variables {
                 if c == '/' || c == '$' {
                     tilde_prefix = &word[1..ind];
                     remainder = &word[ind..];
-                    break;
+                    break
                 }
             } else {
                 tilde_prefix = &word[1..];
                 remainder = "";
-                break;
+                break
             }
         }
 
         match tilde_prefix {
             "" => if let Some(home) = env::home_dir() {
-                return Some(home.to_string_lossy().to_string() + remainder);
+                return Some(home.to_string_lossy().to_string() + remainder)
             },
             "+" => if let Some(pwd) = self.get_var("PWD") {
-                return Some(pwd.to_string() + remainder);
+                return Some(pwd.to_string() + remainder)
             } else if let Ok(pwd) = env::current_dir() {
-                return Some(pwd.to_string_lossy().to_string() + remainder);
+                return Some(pwd.to_string_lossy().to_string() + remainder)
             },
             "-" => if let Some(oldpwd) = self.get_var("OLDPWD") {
-                return Some(oldpwd.to_string() + remainder);
+                return Some(oldpwd.to_string() + remainder)
             },
             _ => {
                 let neg;
@@ -313,14 +325,18 @@ impl Variables {
 
                 match tilde_num.parse() {
                     Ok(num) => {
-                        let res = if neg { dir_stack.dir_from_top(num) } else { dir_stack.dir_from_bottom(num) };
+                        let res = if neg {
+                            dir_stack.dir_from_top(num)
+                        } else {
+                            dir_stack.dir_from_bottom(num)
+                        };
 
                         if let Some(path) = res {
-                            return Some(path.to_str().unwrap().to_string());
+                            return Some(path.to_str().unwrap().to_string())
                         }
                     }
                     Err(_) => if let Some(home) = self_sys::get_user_home(tilde_prefix) {
-                        return Some(home + remainder);
+                        return Some(home + remainder)
                     },
                 }
             }
@@ -337,7 +353,7 @@ impl Variables {
                         stdout.pop();
                     }
 
-                    return Some(stdout.into());
+                    return Some(stdout.into())
                 }
             }
         }
@@ -355,7 +371,7 @@ impl Variables {
                     if inner_key.ends_with(']') {
                         inner_key = inner_key.split(']').next().unwrap_or("");
                         inner_key = inner_key.trim_matches(|c| c == '\'' || c == '\"');
-                        return Some((map_name.into(), inner_key.into()));
+                        return Some((map_name.into(), inner_key.into()))
                     }
                 }
             }

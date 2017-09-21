@@ -4,7 +4,7 @@ use std::process::{Command, Stdio};
 
 //use glob::glob;
 
-use parser::{Expander, expand_string};
+use parser::{expand_string, Expander};
 use parser::pipelines::RedirectFrom;
 use smallstring::SmallString;
 use types::*;
@@ -21,8 +21,8 @@ pub enum JobKind {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Job {
     pub command: Identifier,
-    pub args: Array,
-    pub kind: JobKind,
+    pub args:    Array,
+    pub kind:    JobKind,
 }
 
 impl Job {
@@ -42,7 +42,11 @@ impl Job {
         expanded.grow(self.args.len());
         expanded.extend(self.args.drain().flat_map(|arg| {
             let res = expand_string(&arg, expanders, false);
-            if res.is_empty() { array![""] } else { res }
+            if res.is_empty() {
+                array![""]
+            } else {
+                res
+            }
         }));
         self.args = expanded;
     }
@@ -133,15 +137,14 @@ impl RefinedJob {
     /// or builtin name
     pub fn short(&self) -> String {
         match *self {
-            RefinedJob::External(ref cmd) => {
-                format!("{:?}", cmd)
-                    .split('"')
-                    .nth(1)
-                    .unwrap_or("")
-                    .to_string()
+            RefinedJob::External(ref cmd) => format!("{:?}", cmd)
+                .split('"')
+                .nth(1)
+                .unwrap_or("")
+                .to_string(),
+            RefinedJob::Builtin { ref name, .. } | RefinedJob::Function { ref name, .. } => {
+                name.to_string()
             }
-            RefinedJob::Builtin { ref name, .. } |
-            RefinedJob::Function { ref name, .. } => name.to_string(),
         }
     }
 
@@ -163,8 +166,9 @@ impl RefinedJob {
                 }
                 output
             }
-            RefinedJob::Builtin { ref args, .. } |
-            RefinedJob::Function { ref args, .. } => format!("{}", args.join(" ")),
+            RefinedJob::Builtin { ref args, .. } | RefinedJob::Function { ref args, .. } => {
+                format!("{}", args.join(" "))
+            }
         }
     }
 }

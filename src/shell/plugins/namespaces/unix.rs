@@ -1,4 +1,4 @@
-use super::super::{LibraryIterator, config_dir, StringError};
+use super::super::{config_dir, LibraryIterator, StringError};
 use fnv::FnvHashMap;
 use libloading::{Library, Symbol};
 use libloading::os::unix::Symbol as RawSymbol;
@@ -58,9 +58,9 @@ impl StringNamespace {
                         } else {
                             // Grab a slice and ensure that the name of the function is UTF-8.
                             let slice = &symbol_list[start..counter];
-                            let identifier = str::from_utf8(slice).map(Identifier::from).map_err(|_| {
-                                StringError::UTF8Function
-                            })?;
+                            let identifier = str::from_utf8(slice)
+                                .map(Identifier::from)
+                                .map_err(|_| StringError::UTF8Function)?;
 
                             // To obtain the symbol, we need to create a new `\0`-ended byte array.
                             // TODO: There's no need to use a vector here. An array will do fine.
@@ -70,10 +70,11 @@ impl StringNamespace {
                             symbol.push(b'\0');
 
                             // Then attempt to load that symbol from the dynamic library.
-                            let symbol: Symbol<unsafe extern "C" fn() -> *mut i8> =
-                                library.get(symbol.as_slice()).map_err(
-                                    StringError::SymbolErr,
-                                )?;
+                            let symbol: Symbol<
+                                unsafe extern "C" fn() -> *mut i8,
+                            > = library
+                                .get(symbol.as_slice())
+                                .map_err(StringError::SymbolErr)?;
 
                             // And finally add the name of the function and it's function into the map.
                             symbols.insert(identifier, symbol.into_raw());
@@ -87,17 +88,16 @@ impl StringNamespace {
                 // have been left over.
                 if counter != start {
                     let slice = &symbol_list[start..];
-                    let identifier = str::from_utf8(slice).map(Identifier::from).map_err(|_| {
-                        StringError::UTF8Function
-                    })?;
+                    let identifier = str::from_utf8(slice)
+                        .map(Identifier::from)
+                        .map_err(|_| StringError::UTF8Function)?;
                     let mut symbol = Vec::new();
                     symbol.reserve_exact(slice.len() + 1);
                     symbol.extend_from_slice(slice);
                     symbol.push(b'\0');
-                    let symbol: Symbol<unsafe extern "C" fn() -> *mut i8> =
-                        library.get(symbol.as_slice()).map_err(
-                            StringError::SymbolErr,
-                        )?;
+                    let symbol: Symbol<unsafe extern "C" fn() -> *mut i8> = library
+                        .get(symbol.as_slice())
+                        .map_err(StringError::SymbolErr)?;
                     symbols.insert(identifier, symbol.into_raw());
                 }
             }
@@ -111,11 +111,9 @@ impl StringNamespace {
     /// If the function exists, it is executed, and it's return value is then converted into a
     /// proper Rusty type.
     pub fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> {
-        let func = self.symbols.get(&function).ok_or(
-            StringError::FunctionMissing(
-                function.clone(),
-            ),
-        )?;
+        let func = self.symbols
+            .get(&function)
+            .ok_or(StringError::FunctionMissing(function.clone()))?;
         unsafe {
             let data = (*func)();
             if data.is_null() {
@@ -140,19 +138,17 @@ pub fn collect() -> FnvHashMap<Identifier, StringNamespace> {
         path.push("namespaces");
         path.push("strings");
         match read_dir(&path).map(LibraryIterator::new) {
-            Ok(iterator) => {
-                for (identifier, library) in iterator {
-                    match StringNamespace::new(library) {
-                        Ok(namespace) => {
-                            hashmap.insert(identifier, namespace);
-                        }
-                        Err(why) => {
-                            eprintln!("ion: string namespace error: {}", why);
-                            continue;
-                        }
+            Ok(iterator) => for (identifier, library) in iterator {
+                match StringNamespace::new(library) {
+                    Ok(namespace) => {
+                        hashmap.insert(identifier, namespace);
+                    }
+                    Err(why) => {
+                        eprintln!("ion: string namespace error: {}", why);
+                        continue
                     }
                 }
-            }
+            },
             Err(why) => {
                 eprintln!("ion: unable to read namespaces plugin directory: {}", why);
             }

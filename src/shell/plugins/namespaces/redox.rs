@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 
-use types::Identifier;
 use super::super::StringError;
+use types::Identifier;
 
 pub struct StringNamespace;
 

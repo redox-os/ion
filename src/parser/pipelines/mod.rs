@@ -2,7 +2,7 @@ mod collector;
 
 pub use self::collector::*;
 
-use super::{Expander, expand_string};
+use super::{expand_string, Expander};
 use shell::{Job, JobKind};
 use std::fmt;
 
@@ -15,8 +15,8 @@ pub enum RedirectFrom {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Redirection {
-    pub from: RedirectFrom,
-    pub file: String,
+    pub from:   RedirectFrom,
+    pub file:   String,
     pub append: bool,
 }
 
@@ -32,9 +32,9 @@ pub enum Input {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Pipeline {
-    pub jobs: Vec<Job>,
+    pub jobs:   Vec<Job>,
     pub stdout: Option<Redirection>,
-    pub stdin: Option<Input>,
+    pub stdin:  Option<Input>,
 }
 
 impl Pipeline {
@@ -52,8 +52,12 @@ impl Pipeline {
         }
 
         let stdin = match self.stdin {
-            Some(Input::File(ref s)) => Some(Input::File(expand_string(s, expanders, false).join(" "))),
-            Some(Input::HereString(ref s)) => Some(Input::HereString(expand_string(s, expanders, true).join(" "))),
+            Some(Input::File(ref s)) => {
+                Some(Input::File(expand_string(s, expanders, false).join(" ")))
+            }
+            Some(Input::HereString(ref s)) => {
+                Some(Input::HereString(expand_string(s, expanders, true).join(" ")))
+            }
             None => None,
         };
 

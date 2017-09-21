@@ -1,4 +1,4 @@
-use calc::{CalcError, Value, eval, eval_polish};
+use calc::{eval, eval_polish, CalcError, Value};
 use std::io::{self, Write};
 
 fn calc_or_polish_calc(args: String) -> Result<Value, CalcError> {
@@ -24,7 +24,7 @@ pub fn calc(args: &[&str]) -> Result<(), String> {
             let mut input = String::new();
             let _ = io::stdin().read_line(&mut input);
             if input.is_empty() {
-                break;
+                break
             } else {
                 match input.trim() {
                     "" => (),

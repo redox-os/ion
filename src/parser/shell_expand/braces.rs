@@ -16,9 +16,10 @@ pub fn expand_braces(tokens: &[BraceToken], mut expanders: Vec<Vec<String>>) -> 
         let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
         multiple_brace_expand(&vector_of_arrays[..], tokens)
     } else if expanders.len() == 1 {
-        let elements = expanders.drain(..).next().expect(
-            "there should be at least one value",
-        );
+        let elements = expanders
+            .drain(..)
+            .next()
+            .expect("there should be at least one value");
         let elements: Vec<&str> = elements.iter().map(AsRef::as_ref).collect();
         single_brace_expand(&elements, tokens)
     } else {
@@ -59,7 +60,9 @@ fn multiple_brace_expand(expanders: &[&[&str]], tokens: &[BraceToken]) -> Vec<St
         for token in tokens {
             match *token {
                 BraceToken::Normal(ref text) => string.push_str(&escape_string(text)),
-                BraceToken::Expander => string.push_str(&escape_string(permutations.next().unwrap())),
+                BraceToken::Expander => {
+                    string.push_str(&escape_string(permutations.next().unwrap()))
+                }
             }
         }
         words.push(string.clone());
@@ -71,7 +74,9 @@ fn multiple_brace_expand(expanders: &[&[&str]], tokens: &[BraceToken]) -> Vec<St
         for token in tokens {
             match *token {
                 BraceToken::Normal(ref text) => string.push_str(&escape_string(text)),
-                BraceToken::Expander => string.push_str(&escape_string(permutations.next().unwrap())),
+                BraceToken::Expander => {
+                    string.push_str(&escape_string(permutations.next().unwrap()))
+                }
             }
         }
         words.push(string.clone());
@@ -135,7 +140,6 @@ fn test_multiple_brace_expand() {
             "AB2CD4EF6GH".to_owned(),
         ]
     );
-
 }
 
 #[test]

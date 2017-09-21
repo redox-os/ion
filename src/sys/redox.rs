@@ -25,7 +25,9 @@ pub unsafe fn fork() -> io::Result<u32> { cvt(syscall::clone(0)).map(|pid| pid a
 
 pub fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
 
-pub fn kill(pid: u32, signal: i32) -> io::Result<()> { cvt(syscall::kill(pid as usize, signal as usize)).and(Ok(())) }
+pub fn kill(pid: u32, signal: i32) -> io::Result<()> {
+    cvt(syscall::kill(pid as usize, signal as usize)).and(Ok(()))
+}
 
 pub fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
     cvt(syscall::kill(-(pgid as isize) as usize, signal as usize)).and(Ok(()))
@@ -37,7 +39,9 @@ pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     Ok((fds[0], fds[1]))
 }
 
-pub fn setpgid(pid: u32, pgid: u32) -> io::Result<()> { cvt(syscall::setpgid(pid as usize, pgid as usize)).and(Ok(())) }
+pub fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
+    cvt(syscall::setpgid(pid as usize, pgid as usize)).and(Ok(()))
+}
 
 pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     let new = SigAction {
@@ -138,7 +142,7 @@ pub mod job_control {
                     let status = ExitStatus::from_raw(status_raw as i32);
                     if let Some(code) = status.code() {
                         if pid == (last_pid as usize) {
-                            break code;
+                            break code
                         } else {
                             drop_command(pid as i32);
                             exit_status = code;
@@ -155,20 +159,18 @@ pub mod job_control {
                             shell.foreground_send(signal);
                             shell.break_flow = true;
                         }
-                        break TERMINATED;
+                        break TERMINATED
                     } else {
                         eprintln!("ion: process ended with unknown status: {}", status);
-                        break TERMINATED;
+                        break TERMINATED
                     }
                 }
-                Err(err) => {
-                    if err.errno == syscall::ECHILD {
-                        break exit_status;
-                    } else {
-                        eprintln!("ion: process doesn't exist: {}", err);
-                        break FAILURE;
-                    }
-                }
+                Err(err) => if err.errno == syscall::ECHILD {
+                    break exit_status
+                } else {
+                    eprintln!("ion: process doesn't exist: {}", err);
+                    break FAILURE
+                },
             }
         }
     }

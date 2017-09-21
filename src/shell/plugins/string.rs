@@ -23,7 +23,9 @@ impl Display for StringError {
             StringError::SymbolErr(ref error) => write!(f, "symbol error: {}", error),
             StringError::UTF8Function => write!(f, "function has invalid UTF-8 name"),
             StringError::UTF8Result => write!(f, "result is not valid UTF-8"),
-            StringError::FunctionMissing(ref func) => write!(f, "{} doesn't exist in namespace", func),
+            StringError::FunctionMissing(ref func) => {
+                write!(f, "{} doesn't exist in namespace", func)
+            }
         }
     }
 }

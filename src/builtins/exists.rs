@@ -78,13 +78,17 @@ pub fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
     evaluate_arguments(arguments, &mut buffer, shell)
 }
 
-fn evaluate_arguments<W: io::Write>(arguments: &[&str], buffer: &mut W, shell: &Shell) -> Result<bool, String> {
+fn evaluate_arguments<W: io::Write>(
+    arguments: &[&str],
+    buffer: &mut W,
+    shell: &Shell,
+) -> Result<bool, String> {
     match arguments.first() {
         Some(&"--help") => {
             // not handled by the second case, so that we don't have to pass the buffer around
-            buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| {
-                x.description().to_owned()
-            })?;
+            buffer
+                .write_all(MAN_PAGE.as_bytes())
+                .map_err(|x| x.description().to_owned())?;
             buffer.flush().map_err(|x| x.description().to_owned())?;
             Ok(true)
         }
@@ -139,16 +143,16 @@ fn match_option_argument(option: &str, argument: &str, shell: &Shell) -> bool {
 
 /// Returns true if the file is a regular file
 fn path_is_file(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| {
-        metadata.file_type().is_file()
-    })
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_file())
 }
 
 /// Returns true if the file is a directory
 fn path_is_directory(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| {
-        metadata.file_type().is_dir()
-    })
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_dir())
 }
 
 /// Returns true if the binary is found in path (and is executable)
@@ -162,7 +166,7 @@ fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
             let fname = format!("{}/{}", dir, binaryname);
             if let Ok(metadata) = fs::metadata(&fname) {
                 if metadata.is_file() && file_has_execute_permission(&fname) {
-                    return true;
+                    return true
                 }
             }
         }
@@ -242,10 +246,9 @@ fn test_evaluate_arguments() {
     // check `exists -a`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-a"], &mut sink, &shell), Ok(true));
-    shell.variables.set_array(
-        "emptyarray",
-        SmallVec::from_vec(Vec::new()),
-    );
+    shell
+        .variables
+        .set_array("emptyarray", SmallVec::from_vec(Vec::new()));
     assert_eq!(evaluate_arguments(&["-a", "emptyarray"], &mut sink, &shell), Ok(false));
     let mut vec = Vec::new();
     vec.push("element".to_owned());
@@ -258,9 +261,10 @@ fn test_evaluate_arguments() {
     // TODO: see test_binary_is_in_path()
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-b"], &mut sink, &shell), Ok(true));
-    let oldpath = shell.variables.get_var("PATH").unwrap_or(
-        "/usr/bin".to_owned(),
-    );
+    let oldpath = shell
+        .variables
+        .get_var("PATH")
+        .unwrap_or("/usr/bin".to_owned());
     shell.variables.set_var("PATH", "testing/");
 
     assert_eq!(evaluate_arguments(&["-b", "executable_file"], &mut sink, &shell), Ok(true));
@@ -316,9 +320,9 @@ fn test_evaluate_arguments() {
     shell.functions.insert(
         name.clone(),
         Function {
-            name: name,
-            args: args,
-            statements: statements,
+            name:        name,
+            args:        args,
+            statements:  statements,
             description: Some(description),
         },
     );
@@ -415,18 +419,16 @@ fn test_array_var_is_not_empty() {
     let builtins = Builtin::map();
     let mut shell = Shell::new(&builtins);
 
-    shell.variables.set_array(
-        "EMPTY_ARRAY",
-        SmallVec::from_vec(Vec::new()),
-    );
+    shell
+        .variables
+        .set_array("EMPTY_ARRAY", SmallVec::from_vec(Vec::new()));
     assert_eq!(array_var_is_not_empty("EMPTY_ARRAY", &shell), false);
 
     let mut not_empty_vec = Vec::new();
     not_empty_vec.push("array not empty".to_owned());
-    shell.variables.set_array(
-        "NOT_EMPTY_ARRAY",
-        SmallVec::from_vec(not_empty_vec),
-    );
+    shell
+        .variables
+        .set_array("NOT_EMPTY_ARRAY", SmallVec::from_vec(not_empty_vec));
     assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), true);
 
     // test for array which does not even exist
@@ -452,10 +454,9 @@ fn test_string_var_is_not_empty() {
     // string_var_is_not_empty should NOT match for arrays with the same name
     let mut vec = Vec::new();
     vec.push("not-empty".to_owned());
-    shell.variables.set_array(
-        "ARRAY_NOT_EMPTY",
-        SmallVec::from_vec(vec),
-    );
+    shell
+        .variables
+        .set_array("ARRAY_NOT_EMPTY", SmallVec::from_vec(vec));
     assert_eq!(string_var_is_not_empty("ARRAY_NOT_EMPTY", &shell), false);
 
     // test for a variable which does not even exist
@@ -484,9 +485,9 @@ fn test_function_is_defined() {
     shell.functions.insert(
         name.clone(),
         Function {
-            name: name,
-            args: args,
-            statements: statements,
+            name:        name,
+            args:        args,
+            statements:  statements,
             description: Some(description),
         },
     );

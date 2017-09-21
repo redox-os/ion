@@ -9,5 +9,5 @@ mod quotes;
 pub use self::arguments::ArgumentSplitter;
 pub use self::loops::for_grammar::ForExpression;
 pub use self::quotes::QuoteTerminator;
-pub use self::shell_expand::{Expander, Index, Range, Select, WordIterator, WordToken, expand_string, expand_tokens};
-pub use self::statement::{StatementError, StatementSplitter, parse_and_validate};
+pub use self::shell_expand::{expand_string, expand_tokens, Expander, Index, Range, Select, WordIterator, WordToken};
+pub use self::statement::{parse_and_validate, StatementError, StatementSplitter};

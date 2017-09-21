@@ -4,7 +4,7 @@ use shell::Shell;
 use shell::job_control::{JobControl, ProcessState};
 use shell::signals;
 use shell::status::*;
-use std::io::{Write, stderr};
+use std::io::{stderr, Write};
 
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark SIGHUP ignoral.
@@ -22,15 +22,13 @@ pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
             "-a" => flags |= ALL_JOBS,
             "-h" => flags |= NO_SIGHUP,
             "-r" => flags |= RUN_JOBS,
-            _ => {
-                match arg.parse::<u32>() {
-                    Ok(jobspec) => jobspecs.push(jobspec),
-                    Err(_) => {
-                        let _ = writeln!(stderr, "ion: disown: invalid jobspec: '{}'", arg);
-                        return FAILURE;
-                    }
+            _ => match arg.parse::<u32>() {
+                Ok(jobspec) => jobspecs.push(jobspec),
+                Err(_) => {
+                    let _ = writeln!(stderr, "ion: disown: invalid jobspec: '{}'", arg);
+                    return FAILURE
                 }
-            }
+            },
         }
     }
 
@@ -81,7 +79,8 @@ pub fn jobs(shell: &mut Shell) {
     let mut stderr = stderr.lock();
     for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
         if process.state != ProcessState::Empty {
-            let _ = writeln!(stderr, "[{}] {} {}\t{}", id, process.pid, process.state, process.name);
+            let _ =
+                writeln!(stderr, "[{}] {} {}\t{}", id, process.pid, process.state, process.name);
         }
     }
 }
@@ -97,7 +96,7 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
         } else {
             let stderr = stderr();
             let _ = writeln!(stderr.lock(), "ion: fg: job {} does not exist", njob);
-            return FAILURE;
+            return FAILURE
         }
 
         // Bring the process into the foreground and wait for it to finish.
@@ -142,24 +141,27 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
 /// Resumes a stopped background process, if it was stopped.
 pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
-        if let Some(job) = shell.background.lock().unwrap().iter_mut().nth(
-            njob as usize,
-        )
+        if let Some(job) = shell
+            .background
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .nth(njob as usize)
         {
             match job.state {
                 ProcessState::Running => {
                     eprintln!("ion: bg: job {} is already running", njob);
-                    return true;
+                    return true
                 }
                 ProcessState::Stopped => signals::resume(job.pid),
                 ProcessState::Empty => {
                     eprintln!("ion: bg: job {} does not exist", njob);
-                    return true;
+                    return true
                 }
             }
         } else {
             eprintln!("ion: bg: job {} does not exist", njob);
-            return true;
+            return true
         }
         false
     }
@@ -183,5 +185,9 @@ pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
             };
         }
     }
-    if error { FAILURE } else { SUCCESS }
+    if error {
+        FAILURE
+    } else {
+        SUCCESS
+    }
 }

@@ -1,6 +1,6 @@
 use super::case;
 use super::functions::{collect_arguments, parse_function};
-use super::super::{ArgumentSplitter, pipelines};
+use super::super::{pipelines, ArgumentSplitter};
 use super::super::pipelines::Pipeline;
 use shell::flow_control::{Case, ElseIf, Statement};
 use std::char;
@@ -12,7 +12,7 @@ fn collect<F>(arguments: &str, statement: F) -> Statement
         Ok(pipeline) => statement(pipeline),
         Err(err) => {
             eprintln!("ion: syntax error: {}", err);
-            return Statement::Default;
+            return Statement::Default
         }
     }
 }
@@ -27,32 +27,36 @@ pub fn parse(code: &str) -> Statement {
         "continue" => return Statement::Continue,
         "for" | "match" | "case" => {
             eprintln!("ion: syntax error: incomplete control flow statement");
-            return Statement::Default;
+            return Statement::Default
         }
-        _ if cmd.starts_with("let ") => return Statement::Let { expression: cmd[4..].trim_left().into() },
+        _ if cmd.starts_with("let ") => {
+            return Statement::Let {
+                expression: cmd[4..].trim_left().into(),
+            }
+        }
         _ if cmd.starts_with("export ") => return Statement::Export(cmd[7..].trim_left().into()),
         _ if cmd.starts_with("if ") => {
             return collect(cmd[3..].trim_left(), |pipeline| {
                 Statement::If {
                     expression: pipeline,
-                    success: Vec::new(),
-                    else_if: Vec::new(),
-                    failure: Vec::new(),
+                    success:    Vec::new(),
+                    else_if:    Vec::new(),
+                    failure:    Vec::new(),
                 }
-            });
+            })
         }
         "else" => return Statement::Else,
         _ if cmd.starts_with("else") => {
             let cmd = cmd[4..].trim_left();
             if cmd.len() == 0 {
-                return Statement::Else;
+                return Statement::Else
             } else if cmd.starts_with("if ") {
                 return collect(cmd[3..].trim_left(), |pipeline| {
                     Statement::ElseIf(ElseIf {
                         expression: pipeline,
-                        success: Vec::new(),
+                        success:    Vec::new(),
                     })
-                });
+                })
             }
         }
         _ if cmd.starts_with("while ") => {
@@ -61,7 +65,7 @@ pub fn parse(code: &str) -> Statement {
                     expression: pipeline,
                     statements: Vec::new(),
                 }
-            });
+            })
         }
         _ if cmd.starts_with("for ") => {
             let mut cmd = cmd[4..].trim_left();
@@ -69,7 +73,7 @@ pub fn parse(code: &str) -> Statement {
                 Some(pos) => pos,
                 None => {
                     eprintln!("ion: syntax error: incorrect for loop syntax");
-                    return Statement::Default;
+                    return Statement::Default
                 }
             };
 
@@ -78,16 +82,16 @@ pub fn parse(code: &str) -> Statement {
 
             if !cmd.starts_with("in ") {
                 eprintln!("ion: syntax error: incorrect for loop syntax");
-                return Statement::Default;
+                return Statement::Default
             }
 
             return Statement::For {
-                variable: variable.into(),
-                values: ArgumentSplitter::new(cmd[3..].trim_left())
+                variable:   variable.into(),
+                values:     ArgumentSplitter::new(cmd[3..].trim_left())
                     .map(String::from)
                     .collect(),
                 statements: Vec::new(),
-            };
+            }
         }
         _ if cmd.starts_with("case ") => {
             let (value, binding, conditional) = match cmd[5..].trim_left() {
@@ -97,7 +101,7 @@ pub fn parse(code: &str) -> Statement {
                         Ok(values) => values,
                         Err(why) => {
                             eprintln!("ion: case error: {}", why);
-                            return Statement::Default;
+                            return Statement::Default
                         }
                     };
                     let binding = binding.map(Into::into);
@@ -114,13 +118,13 @@ pub fn parse(code: &str) -> Statement {
                 binding,
                 conditional,
                 statements: Vec::new(),
-            });
+            })
         }
         _ if cmd.starts_with("match ") => {
             return Statement::Match {
                 expression: cmd[6..].trim_left().into(),
-                cases: Vec::new(),
-            };
+                cases:      Vec::new(),
+            }
         }
         _ if cmd.starts_with("fn ") => {
             let cmd = cmd[3..].trim_left();
@@ -129,10 +133,10 @@ pub fn parse(code: &str) -> Statement {
             if !is_valid_name(name) {
                 eprintln!(
                     "ion: syntax error: '{}' is not a valid function name\n     \
-                    Function names may only contain alphanumeric characters",
+                     Function names may only contain alphanumeric characters",
                     name
                 );
-                return Statement::Default;
+                return Statement::Default
             }
 
             let (args, description) = parse_function(&cmd[pos..]);
@@ -147,11 +151,13 @@ pub fn parse(code: &str) -> Statement {
                 }
                 Err(why) => {
                     eprintln!("ion: function argument error: {}", why);
-                    return Statement::Default;
+                    return Statement::Default
                 }
             }
         }
-        _ if cmd.starts_with("time ") => return Statement::Time(Box::new(parse(cmd[4..].trim_left()))),
+        _ if cmd.starts_with("time ") => {
+            return Statement::Time(Box::new(parse(cmd[4..].trim_left())))
+        }
         _ if cmd.eq("time") => return Statement::Time(Box::new(Statement::Default)),
         _ => (),
     }
@@ -162,7 +168,6 @@ pub fn parse(code: &str) -> Statement {
     } else {
         collect(cmd, Statement::Pipeline)
     }
-
 }
 
 #[cfg(test)]
@@ -187,15 +192,15 @@ mod tests {
                             "2".to_owned(),
                         ].into_iter()
                             .collect(),
-                        JobKind::Last
+                        JobKind::Last,
                     ),
                 ],
                 None,
                 None,
             ),
-            success: vec![],
-            else_if: vec![],
-            failure: vec![],
+            success:    vec![],
+            else_if:    vec![],
+            failure:    vec![],
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -244,9 +249,9 @@ mod tests {
         let parsed_if = parse("fn bob");
         let correct_parse = Statement::Function {
             description: None,
-            name: "bob".into(),
-            args: Default::default(),
-            statements: Default::default(),
+            name:        "bob".into(),
+            args:        Default::default(),
+            statements:  Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -261,8 +266,8 @@ mod tests {
         let parsed_if = parse("fn bob a b");
         let correct_parse = Statement::Function {
             description: None,
-            name: "bob".into(),
-            args: vec![
+            name:        "bob".into(),
+            args:        vec![
                 KeyBuf {
                     name: "a".into(),
                     kind: Primitive::Any,
@@ -272,7 +277,7 @@ mod tests {
                     kind: Primitive::Any,
                 },
             ],
-            statements: Default::default(),
+            statements:  Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -283,8 +288,8 @@ mod tests {
         let parsed_if = parse("fn bob a b --bob is a nice function");
         let correct_parse = Statement::Function {
             description: Some("bob is a nice function".to_string()),
-            name: "bob".into(),
-            args: vec![
+            name:        "bob".into(),
+            args:        vec![
                 KeyBuf {
                     name: "a".into(),
                     kind: Primitive::Any,
@@ -294,7 +299,7 @@ mod tests {
                     kind: Primitive::Any,
                 },
             ],
-            statements: vec![],
+            statements:  vec![],
         };
         assert_eq!(correct_parse, parsed_if);
         let parsed_if = parse("fn bob a b --          bob is a nice function");

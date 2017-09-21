@@ -15,11 +15,15 @@ pub struct IonFileCompleter {
 }
 
 impl IonFileCompleter {
-    pub fn new(path: Option<&str>, dir_stack: *const DirectoryStack, vars: *const Variables) -> IonFileCompleter {
+    pub fn new(
+        path: Option<&str>,
+        dir_stack: *const DirectoryStack,
+        vars: *const Variables,
+    ) -> IonFileCompleter {
         IonFileCompleter {
-            inner: FilenameCompleter::new(path),
+            inner:     FilenameCompleter::new(path),
             dir_stack: dir_stack,
-            vars: vars,
+            vars:      vars,
         }
     }
 }
@@ -37,7 +41,8 @@ impl Completer for IonFileCompleter {
             // Dereferencing the raw pointers here should be entirely safe, theoretically,
             // because no changes will occur to either of the underlying references in the
             // duration between creation of the completers and execution of their completions.
-            if let Some(expanded) = unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) } {
+            if let Some(expanded) = unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) }
+            {
                 // Now we obtain completions for the `expanded` form of the `start` value.
                 let completions = self.inner.completions(&expanded);
                 let mut iterator = completions.iter();
@@ -78,7 +83,7 @@ impl Completer for IonFileCompleter {
                     }
                 }
 
-                return completions;
+                return completions
             }
         }
 
@@ -98,9 +103,20 @@ fn escape(input: &str) -> String {
     let mut output = Vec::with_capacity(input.len());
     for character in input.bytes() {
         match character {
-            b'(' | b')' | b'[' | b']' | b'&' | b'$' | b'@' | b'{' | b'}' | b'<' | b'>' | b';' | b'"' | b'\'' => {
-                output.push(b'\\')
-            }
+            b'(' |
+            b')' |
+            b'[' |
+            b']' |
+            b'&' |
+            b'$' |
+            b'@' |
+            b'{' |
+            b'}' |
+            b'<' |
+            b'>' |
+            b';' |
+            b'"' |
+            b'\'' => output.push(b'\\'),
             _ => (),
         }
         output.push(character);
@@ -114,13 +130,11 @@ fn unescape(input: &str) -> String {
     let mut bytes = input.bytes();
     while let Some(b) = bytes.next() {
         match b {
-            b'\\' => {
-                if let Some(next) = bytes.next() {
-                    output.push(next);
-                } else {
-                    output.push(b'\\')
-                }
-            }
+            b'\\' => if let Some(next) = bytes.next() {
+                output.push(next);
+            } else {
+                output.push(b'\\')
+            },
             _ => output.push(b),
         }
     }

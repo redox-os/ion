@@ -16,7 +16,7 @@ pub mod variables;
 
 pub use self::binary::Binary;
 pub use self::flow::FlowLogic;
-pub use self::history::{ShellHistory, IgnoreSetting};
+pub use self::history::{IgnoreSetting, ShellHistory};
 pub use self::job::{Job, JobKind};
 pub use self::pipe_exec::{foreground, job_control};
 
@@ -28,7 +28,7 @@ use self::job_control::{BackgroundProcess, JobControl};
 use self::pipe_exec::PipelineExecution;
 use self::status::*;
 use self::variables::Variables;
-use app_dirs::{AppDataType, AppInfo, app_root};
+use app_dirs::{app_root, AppDataType, AppInfo};
 use builtins::*;
 use fnv::FnvHashMap;
 use liner::Context;
@@ -85,28 +85,28 @@ impl<'a> Shell<'a> {
     /// Panics if DirectoryStack construction fails
     pub fn new(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
         Shell {
-            builtins: builtins,
-            context: None,
-            variables: Variables::default(),
-            flow_control: FlowControl::default(),
-            directory_stack: DirectoryStack::new(),
-            functions: FnvHashMap::default(),
-            previous_job: !0,
-            previous_status: 0,
-            flags: 0,
-            foreground: Vec::new(),
-            background: Arc::new(Mutex::new(Vec::new())),
+            builtins:            builtins,
+            context:             None,
+            variables:           Variables::default(),
+            flow_control:        FlowControl::default(),
+            directory_stack:     DirectoryStack::new(),
+            functions:           FnvHashMap::default(),
+            previous_job:        !0,
+            previous_status:     0,
+            flags:               0,
+            foreground:          Vec::new(),
+            background:          Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
-            break_flow: false,
-            foreground_signals: Arc::new(ForegroundSignals::new()),
-            ignore_setting: IgnoreSetting::default(),
+            break_flow:          false,
+            foreground_signals:  Arc::new(ForegroundSignals::new()),
+            ignore_setting:      IgnoreSetting::default(),
         }
     }
 
     pub fn next_signal(&self) -> Option<i32> {
         for sig in 0..32 {
             if signals::PENDING.fetch_and(!(1 << sig), Ordering::SeqCst) & (1 << sig) == 1 << sig {
-                return Some(sig);
+                return Some(sig)
             }
         }
 
@@ -145,7 +145,7 @@ impl<'a> Shell<'a> {
         match app_root(
             AppDataType::UserConfig,
             &AppInfo {
-                name: "ion",
+                name:   "ion",
                 author: "Redox OS Developers",
             },
         ) {
@@ -178,8 +178,7 @@ impl<'a> Shell<'a> {
             if let Some(alias) = {
                 let key: &str = pipeline.jobs[job_no].command.as_ref();
                 self.variables.aliases.get(key)
-            }
-            {
+            } {
                 let new_args = ArgumentSplitter::new(alias)
                     .map(String::from)
                     .chain(pipeline.jobs[job_no].args.drain().skip(1))
@@ -193,8 +192,7 @@ impl<'a> Shell<'a> {
         let exit_status = if let Some(command) = {
             let key: &str = pipeline.jobs[0].command.as_ref();
             builtins.get(key)
-        }
-        {
+        } {
             pipeline.expand(self);
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
@@ -265,56 +263,54 @@ impl<'a> Shell<'a> {
 }
 
 impl<'a> Expander for Shell<'a> {
-    fn tilde(&self, input: &str) -> Option<String> { self.variables.tilde_expansion(input, &self.directory_stack) }
+    fn tilde(&self, input: &str) -> Option<String> {
+        self.variables.tilde_expansion(input, &self.directory_stack)
+    }
 
     /// Expand an array variable with some selection
     fn array(&self, array: &str, selection: Select) -> Option<Array> {
         use std::iter::FromIterator;
         let mut found = match self.variables.get_array(array) {
-            Some(array) => {
-                match selection {
-                    Select::None => None,
-                    Select::All => Some(array.clone()),
-                    Select::Index(id) => {
-                        id.resolve(array.len()).and_then(|n| array.get(n)).map(
-                            |x| {
-                                Array::from_iter(Some(x.to_owned()))
-                            },
-                        )
+            Some(array) => match selection {
+                Select::None => None,
+                Select::All => Some(array.clone()),
+                Select::Index(id) => id.resolve(array.len())
+                    .and_then(|n| array.get(n))
+                    .map(|x| Array::from_iter(Some(x.to_owned()))),
+                Select::Range(range) => if let Some((start, length)) = range.bounds(array.len()) {
+                    let array = array
+                        .iter()
+                        .skip(start)
+                        .take(length)
+                        .map(|x| x.to_owned())
+                        .collect::<Array>();
+                    if array.is_empty() {
+                        None
+                    } else {
+                        Some(array)
                     }
-                    Select::Range(range) => {
-                        if let Some((start, length)) = range.bounds(array.len()) {
-                            let array = array
-                                .iter()
-                                .skip(start)
-                                .take(length)
-                                .map(|x| x.to_owned())
-                                .collect::<Array>();
-                            if array.is_empty() { None } else { Some(array) }
-                        } else {
-                            None
-                        }
-                    }
-                    Select::Key(_) => None,
-                }
-            }
+                } else {
+                    None
+                },
+                Select::Key(_) => None,
+            },
             None => None,
         };
         if found.is_none() {
             found = match self.variables.get_map(array) {
-                Some(map) => {
-                    match selection {
-                        Select::All => {
-                            let mut arr = Array::new();
-                            for (_, value) in map {
-                                arr.push(value.clone());
-                            }
-                            Some(arr)
+                Some(map) => match selection {
+                    Select::All => {
+                        let mut arr = Array::new();
+                        for (_, value) in map {
+                            arr.push(value.clone());
                         }
-                        Select::Key(ref key) => Some(array![map.get(key.get()).unwrap_or(&"".into()).clone()]),
-                        _ => None,
+                        Some(arr)
                     }
-                }
+                    Select::Key(ref key) => {
+                        Some(array![map.get(key.get()).unwrap_or(&"".into()).clone()])
+                    }
+                    _ => None,
+                },
                 None => None,
             }
         }
@@ -326,9 +322,9 @@ impl<'a> Expander for Shell<'a> {
         if quoted {
             self.variables.get_var(variable)
         } else {
-            self.variables.get_var(variable).map(|x| {
-                x.ascii_replace('\n', ' ').into()
-            })
+            self.variables
+                .get_var(variable)
+                .map(|x| x.ascii_replace('\n', ' ').into())
         }
     }
     /// Expand a subshell expression

@@ -42,7 +42,8 @@ pub struct Builtin {
 impl Builtin {
     /// Return the map from command names to commands
     pub fn map() -> FnvHashMap<&'static str, Self> {
-        let mut commands: FnvHashMap<&str, Self> = FnvHashMap::with_capacity_and_hasher(32, Default::default());
+        let mut commands: FnvHashMap<&str, Self> =
+            FnvHashMap::with_capacity_and_hasher(32, Default::default());
 
         /*
         Quick and clean way to insert a builtin, define a function named as the builtin
@@ -104,16 +105,28 @@ impl Builtin {
             builtin_wait,
             "Waits until all running background processes have completed"
         );
-        insert_builtin!("jobs", builtin_jobs, "Displays all jobs that are attached to the background");
+        insert_builtin!(
+            "jobs",
+            builtin_jobs,
+            "Displays all jobs that are attached to the background"
+        );
         insert_builtin!("bg", builtin_bg, "Resumes a stopped background process");
-        insert_builtin!("fg", builtin_fg, "Resumes and sets a background process as the active process");
+        insert_builtin!(
+            "fg",
+            builtin_fg,
+            "Resumes and sets a background process as the active process"
+        );
         insert_builtin!("suspend", builtin_suspend, "Suspends the shell with a SIGTSTOP signal");
         insert_builtin!(
             "disown",
             builtin_disown,
             "Disowning a process removes that process from the shell's background process table."
         );
-        insert_builtin!("history", builtin_history, "Display a log of all commands previously executed");
+        insert_builtin!(
+            "history",
+            builtin_history,
+            "Display a log of all commands previously executed"
+        );
         insert_builtin!(
             "source",
             builtin_source,
@@ -206,7 +219,9 @@ fn builtin_alias(args: &[&str], shell: &mut Shell) -> i32 {
     alias(&mut shell.variables, &args_str)
 }
 
-fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 { drop_alias(&mut shell.variables, args) }
+fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 {
+    drop_alias(&mut shell.variables, args)
+}
 
 fn builtin_fn(_: &[&str], shell: &mut Shell) -> i32 { fn_(&mut shell.functions) }
 
@@ -256,7 +271,6 @@ fn builtin_source(args: &[&str], shell: &mut Shell) -> i32 {
             FAILURE
         }
     }
-
 }
 
 fn builtin_echo(args: &[&str], _: &mut Shell) -> i32 {
@@ -319,7 +333,9 @@ fn builtin_suspend(_: &[&str], _: &mut Shell) -> i32 {
     SUCCESS
 }
 
-fn builtin_disown(args: &[&str], shell: &mut Shell) -> i32 { job_control::disown(shell, &args[1..]) }
+fn builtin_disown(args: &[&str], shell: &mut Shell) -> i32 {
+    job_control::disown(shell, &args[1..])
+}
 
 fn builtin_help(args: &[&str], shell: &mut Shell) -> i32 {
     let builtins = shell.builtins;
@@ -369,7 +385,7 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
         let stderr = io::stderr();
         let mut stderr = stderr.lock();
         let _ = stderr.write_all(b"match takes two arguments\n");
-        return BAD_ARG;
+        return BAD_ARG
     }
     let input = args[1];
     let re = match Regex::new(args[2]) {
@@ -377,12 +393,17 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
         Err(e) => {
             let stderr = io::stderr();
             let mut stderr = stderr.lock();
-            let _ = stderr.write_all(format!("couldn't compile input regex {}: {}\n", args[2], e).as_bytes());
-            return FAILURE;
+            let _ = stderr
+                .write_all(format!("couldn't compile input regex {}: {}\n", args[2], e).as_bytes());
+            return FAILURE
         }
     };
 
-    if re.is_match(input) { SUCCESS } else { FAILURE }
+    if re.is_match(input) {
+        SUCCESS
+    } else {
+        FAILURE
+    }
 }
 
 fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {

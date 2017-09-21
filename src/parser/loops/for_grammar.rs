@@ -29,14 +29,21 @@ impl ForExpression {
                                     if byte == b'.' {
                                         dots += 1
                                     } else {
-                                        break;
+                                        break
                                     }
                                 }
 
                                 match output[id + dots..].parse::<usize>().ok() {
                                     Some(second_number) => match dots {
-                                        2 => return ForExpression::Range(first_number, second_number),
-                                        3 => return ForExpression::Range(first_number, second_number + 1),
+                                        2 => {
+                                            return ForExpression::Range(first_number, second_number)
+                                        }
+                                        3 => {
+                                            return ForExpression::Range(
+                                                first_number,
+                                                second_number + 1,
+                                            )
+                                        }
                                         _ => break,
                                     },
                                     None => break,
