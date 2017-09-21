@@ -4,35 +4,35 @@ use libc::{c_int, pid_t, sighandler_t};
 use std::io;
 use std::os::unix::io::RawFd;
 
-pub const PATH_SEPARATOR: &str = ":";
+pub(crate) const PATH_SEPARATOR: &str = ":";
 
-pub const O_CLOEXEC: usize = libc::O_CLOEXEC as usize;
-pub const SIGHUP: i32 = libc::SIGHUP;
-pub const SIGINT: i32 = libc::SIGINT;
-pub const SIGTERM: i32 = libc::SIGTERM;
-pub const SIGCONT: i32 = libc::SIGCONT;
-pub const SIGSTOP: i32 = libc::SIGSTOP;
-pub const SIGTSTP: i32 = libc::SIGTSTP;
+pub(crate) const O_CLOEXEC: usize = libc::O_CLOEXEC as usize;
+pub(crate) const SIGHUP: i32 = libc::SIGHUP;
+pub(crate) const SIGINT: i32 = libc::SIGINT;
+pub(crate) const SIGTERM: i32 = libc::SIGTERM;
+pub(crate) const SIGCONT: i32 = libc::SIGCONT;
+pub(crate) const SIGSTOP: i32 = libc::SIGSTOP;
+pub(crate) const SIGTSTP: i32 = libc::SIGTSTP;
 
-pub const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
-pub const STDERR_FILENO: i32 = libc::STDERR_FILENO;
-pub const STDIN_FILENO: i32 = libc::STDIN_FILENO;
+pub(crate) const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
+pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
+pub(crate) const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 
-pub fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
+pub(crate) fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
 
 pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
 
-pub fn getpid() -> io::Result<u32> { cvt(unsafe { libc::getpid() }).map(|pid| pid as u32) }
+pub(crate) fn getpid() -> io::Result<u32> { cvt(unsafe { libc::getpid() }).map(|pid| pid as u32) }
 
-pub fn kill(pid: u32, signal: i32) -> io::Result<()> {
+pub(crate) fn kill(pid: u32, signal: i32) -> io::Result<()> {
     cvt(unsafe { libc::kill(pid as pid_t, signal as c_int) }).and(Ok(()))
 }
 
-pub fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
+pub(crate) fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
     cvt(unsafe { libc::kill(-(pgid as pid_t), signal as c_int) }).and(Ok(()))
 }
 
-pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
+pub(crate) fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     let mut fds = [0; 2];
 
     #[cfg(not(target_os = "macos"))]
@@ -44,11 +44,11 @@ pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     Ok((fds[0], fds[1]))
 }
 
-pub fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
+pub(crate) fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
     cvt(unsafe { libc::setpgid(pid as pid_t, pgid as pid_t) }).and(Ok(()))
 }
 
-pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
+pub(crate) fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     if unsafe { libc::signal(signal as c_int, handler as sighandler_t) } == libc::SIG_ERR {
         Err(io::Error::last_os_error())
     } else {
@@ -56,7 +56,7 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     }
 }
 
-pub fn reset_signal(signal: i32) -> io::Result<()> {
+pub(crate) fn reset_signal(signal: i32) -> io::Result<()> {
     if unsafe { libc::signal(signal as c_int, libc::SIG_DFL) } == libc::SIG_ERR {
         Err(io::Error::last_os_error())
     } else {
@@ -64,17 +64,17 @@ pub fn reset_signal(signal: i32) -> io::Result<()> {
     }
 }
 
-pub fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
+pub(crate) fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
     cvt(unsafe { libc::tcsetpgrp(fd as c_int, pgrp as pid_t) }).and(Ok(()))
 }
 
-pub fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup(fd) }) }
+pub(crate) fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup(fd) }) }
 
-pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup2(old, new) }) }
+pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup2(old, new) }) }
 
-pub fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
+pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
 
-pub fn isatty(fd: RawFd) -> bool { unsafe { libc::isatty(fd) == 1 } }
+pub(crate) fn isatty(fd: RawFd) -> bool { unsafe { libc::isatty(fd) == 1 } }
 
 // Support functions for converting libc return values to io errors {
 trait IsMinusOne {
@@ -103,7 +103,7 @@ fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
 pub mod signals {
     /// Blocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so that the shell never receives
     /// them.
-    pub fn block() {
+    pub(crate) fn block() {
         unsafe {
             use libc::*;
             use std::mem;
@@ -121,7 +121,7 @@ pub mod signals {
     /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
     /// controlled
     /// by the shell.
-    pub fn unblock() {
+    pub(crate) fn unblock() {
         unsafe {
             use libc::*;
             use std::mem;
@@ -155,7 +155,7 @@ pub mod job_control {
     use nix::{Errno, Error};
     use nix::sys::signal::Signal;
 
-    pub fn watch_background(
+    pub(crate) fn watch_background(
         fg: Arc<ForegroundSignals>,
         processes: Arc<Mutex<Vec<BackgroundProcess>>>,
         pid: u32,
@@ -223,7 +223,7 @@ pub mod job_control {
         }
     }
 
-    pub fn watch_foreground<'a, F, D>(
+    pub(crate) fn watch_foreground<'a, F, D>(
         shell: &mut Shell<'a>,
         _pid: u32,
         last_pid: u32,
@@ -277,7 +277,7 @@ pub mod variables {
     use users_unix::get_user_by_name;
     use users_unix::os::unix::UserExt;
 
-    pub fn get_user_home(username: &str) -> Option<String> {
+    pub(crate) fn get_user_home(username: &str) -> Option<String> {
         match get_user_by_name(username) {
             Some(user) => Some(user.home_dir().to_string_lossy().into_owned()),
             None => None,

@@ -1,15 +1,15 @@
 use std::fs::ReadDir;
 use types::Identifier;
 
-pub struct Library;
+pub(crate) struct Library;
 
 /// Grabs all `Library` entries found within a given directory
-pub struct LibraryIterator {
+pub(crate) struct LibraryIterator {
     directory: ReadDir,
 }
 
 impl LibraryIterator {
-    pub fn new(directory: ReadDir) -> LibraryIterator { LibraryIterator { directory } }
+    pub(crate) fn new(directory: ReadDir) -> LibraryIterator { LibraryIterator { directory } }
 }
 
 impl Iterator for LibraryIterator {

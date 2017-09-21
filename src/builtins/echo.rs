@@ -41,7 +41,7 @@ OPTIONS
         \v  vertical tab (VT)
 "#; // @MANEND
 
-pub fn echo(args: &[&str]) -> Result<(), io::Error> {
+pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
     let mut flags = Flags::empty();
     let mut data: Vec<&str> = vec![];
 

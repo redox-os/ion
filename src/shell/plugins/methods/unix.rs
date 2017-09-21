@@ -13,7 +13,7 @@ use types::Identifier;
 /// Either one or the other will be set. Optional status can be conveyed by setting the
 /// corresponding field to `NULL`. Libraries importing this structure should check for nullness.
 #[repr(C)]
-pub struct RawMethodArguments {
+pub(crate) struct RawMethodArguments {
     key_ptr:       *mut i8,
     key_array_ptr: *mut *mut i8,
     args_ptr:      *mut *mut i8,
@@ -21,7 +21,7 @@ pub struct RawMethodArguments {
     args_len:      usize,
 }
 
-pub enum MethodArguments {
+pub(crate) enum MethodArguments {
     StringArg(String, Vec<String>),
     Array(Vec<String>, Vec<String>),
     NoArgs,
@@ -97,7 +97,7 @@ impl From<MethodArguments> for RawMethodArguments {
 /// plugin to ensure that the plugin remains loaded in memory, and it's contained symbols
 /// remain validly-executable; and B) holds a map of functions that may be executed within
 /// the namespace.
-pub struct StringMethodPlugins {
+pub(crate) struct StringMethodPlugins {
     #[allow(dead_code)]
     /// Contains all of the loaded libraries from whence the symbols were obtained.
     libraries: Vec<Library>,
@@ -107,14 +107,14 @@ pub struct StringMethodPlugins {
 }
 
 impl StringMethodPlugins {
-    pub fn new() -> StringMethodPlugins {
+    pub(crate) fn new() -> StringMethodPlugins {
         StringMethodPlugins {
             libraries: Vec::new(),
             symbols:   FnvHashMap::default(),
         }
     }
 
-    pub fn load(&mut self, library: Library) -> Result<(), StringError> {
+    pub(crate) fn load(&mut self, library: Library) -> Result<(), StringError> {
         unsafe {
             {
                 // The `index` function contains a list of functions provided by the library.
@@ -197,7 +197,7 @@ impl StringMethodPlugins {
     ///
     /// If the function exists, it is executed, and it's return value is then converted into a
     /// proper Rusty type.
-    pub fn execute(
+    pub(crate) fn execute(
         &self,
         function: &str,
         arguments: MethodArguments,
@@ -222,7 +222,7 @@ impl StringMethodPlugins {
 ///
 /// This function is meant to be called with `lazy_static` to ensure that there isn't a
 /// cost to collecting all this information when the shell never uses it in the first place!
-pub fn collect() -> StringMethodPlugins {
+pub(crate) fn collect() -> StringMethodPlugins {
     let mut methods = StringMethodPlugins::new();
     if let Some(mut path) = config_dir() {
         path.push("methods");

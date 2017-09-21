@@ -5,13 +5,13 @@ use std::collections::VecDeque;
 use std::env::{current_dir, home_dir, set_current_dir};
 use std::path::PathBuf;
 
-pub struct DirectoryStack {
+pub(crate) struct DirectoryStack {
     dirs: VecDeque<PathBuf>, // The top is always the current directory
 }
 
 impl DirectoryStack {
     /// Create a new `DirectoryStack` containing the current working directory, if available.
-    pub fn new() -> DirectoryStack {
+    pub(crate) fn new() -> DirectoryStack {
         let mut dirs: VecDeque<PathBuf> = VecDeque::new();
         match current_dir() {
             Ok(curr_dir) => {
@@ -36,7 +36,7 @@ impl DirectoryStack {
 
     /// Attempts to set the current directory to the directory stack's previous directory,
     /// and then removes the front directory from the stack.
-    pub fn popd<I: IntoIterator>(&mut self, args: I) -> Result<(), Cow<'static, str>>
+    pub(crate) fn popd<I: IntoIterator>(&mut self, args: I) -> Result<(), Cow<'static, str>>
         where I::Item: AsRef<str>
     {
         let mut keep_front = false; // whether the -n option is present
@@ -94,7 +94,7 @@ impl DirectoryStack {
         Ok(())
     }
 
-    pub fn pushd<I: IntoIterator>(
+    pub(crate) fn pushd<I: IntoIterator>(
         &mut self,
         args: I,
         variables: &Variables,
@@ -157,7 +157,7 @@ impl DirectoryStack {
         Ok(())
     }
 
-    pub fn cd<I: IntoIterator>(
+    pub(crate) fn cd<I: IntoIterator>(
         &mut self,
         args: I,
         variables: &Variables,
@@ -209,7 +209,7 @@ impl DirectoryStack {
         }
     }
 
-    pub fn change_and_push_dir(
+    pub(crate) fn change_and_push_dir(
         &mut self,
         dir: &str,
         variables: &Variables,
@@ -239,7 +239,7 @@ impl DirectoryStack {
         self.dirs.truncate(DirectoryStack::get_size(variables));
     }
 
-    pub fn dirs<I: IntoIterator>(&mut self, args: I) -> i32
+    pub(crate) fn dirs<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
         const CLEAR: u8 = 1; // -c
@@ -308,9 +308,9 @@ impl DirectoryStack {
         SUCCESS
     }
 
-    pub fn dir_from_top(&self, num: usize) -> Option<&PathBuf> { self.dirs.get(num) }
+    pub(crate) fn dir_from_top(&self, num: usize) -> Option<&PathBuf> { self.dirs.get(num) }
 
-    pub fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> {
+    pub(crate) fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> {
         self.dirs.iter().rev().nth(num)
     }
 

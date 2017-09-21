@@ -11,14 +11,14 @@ use std::io::{self, stdout, Write};
 use std::mem;
 use types::Array;
 
-pub enum Condition {
+pub(crate) enum Condition {
     Continue,
     Break,
     NoOp,
     SigInt,
 }
 
-pub trait FlowLogic {
+pub(crate) trait FlowLogic {
     /// Receives a command and attempts to execute the contents.
     fn on_command(&mut self, command_string: &str);
 

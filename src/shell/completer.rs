@@ -5,7 +5,7 @@ use liner::{Completer, FilenameCompleter};
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
 /// when a special character is contained within an expanded filename.
-pub struct IonFileCompleter {
+pub(crate) struct IonFileCompleter {
     /// The completer that this completer is  handling.
     inner: FilenameCompleter,
     /// A pointer to the directory stack in the shell.
@@ -15,7 +15,7 @@ pub struct IonFileCompleter {
 }
 
 impl IonFileCompleter {
-    pub fn new(
+    pub(crate) fn new(
         path: Option<&str>,
         dir_stack: *const DirectoryStack,
         vars: *const Variables,
@@ -142,7 +142,7 @@ fn unescape(input: &str) -> String {
 
 /// A completer that combines suggestions from multiple completers.
 #[derive(Clone, Eq, PartialEq)]
-pub struct MultiCompleter<A, B>
+pub(crate) struct MultiCompleter<A, B>
     where A: Completer,
           B: Completer
 {
@@ -154,7 +154,7 @@ impl<A, B> MultiCompleter<A, B>
     where A: Completer,
           B: Completer
 {
-    pub fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> { MultiCompleter { a: a, b: b } }
+    pub(crate) fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> { MultiCompleter { a: a, b: b } }
 }
 
 impl<A, B> Completer for MultiCompleter<A, B>

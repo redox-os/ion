@@ -5,45 +5,45 @@ use std::os::unix::io::RawFd;
 
 use syscall::SigAction;
 
-pub const PATH_SEPARATOR: &str = ";";
+pub(crate) const PATH_SEPARATOR: &str = ";";
 
-pub const O_CLOEXEC: usize = syscall::O_CLOEXEC;
-pub const SIGHUP: i32 = syscall::SIGHUP as i32;
-pub const SIGINT: i32 = syscall::SIGINT as i32;
-pub const SIGTERM: i32 = syscall::SIGTERM as i32;
-pub const SIGCONT: i32 = syscall::SIGCONT as i32;
-pub const SIGSTOP: i32 = syscall::SIGSTOP as i32;
-pub const SIGTSTP: i32 = syscall::SIGTSTP as i32;
+pub(crate) const O_CLOEXEC: usize = syscall::O_CLOEXEC;
+pub(crate) const SIGHUP: i32 = syscall::SIGHUP as i32;
+pub(crate) const SIGINT: i32 = syscall::SIGINT as i32;
+pub(crate) const SIGTERM: i32 = syscall::SIGTERM as i32;
+pub(crate) const SIGCONT: i32 = syscall::SIGCONT as i32;
+pub(crate) const SIGSTOP: i32 = syscall::SIGSTOP as i32;
+pub(crate) const SIGTSTP: i32 = syscall::SIGTSTP as i32;
 
-pub const STDIN_FILENO: RawFd = 0;
-pub const STDOUT_FILENO: RawFd = 1;
-pub const STDERR_FILENO: RawFd = 2;
+pub(crate) const STDIN_FILENO: RawFd = 0;
+pub(crate) const STDOUT_FILENO: RawFd = 1;
+pub(crate) const STDERR_FILENO: RawFd = 2;
 
-pub fn is_root() -> bool { syscall::geteuid().map(|id| id == 0).unwrap_or(false) }
+pub(crate) fn is_root() -> bool { syscall::geteuid().map(|id| id == 0).unwrap_or(false) }
 
 pub unsafe fn fork() -> io::Result<u32> { cvt(syscall::clone(0)).map(|pid| pid as u32) }
 
-pub fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
+pub(crate) fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
 
-pub fn kill(pid: u32, signal: i32) -> io::Result<()> {
+pub(crate) fn kill(pid: u32, signal: i32) -> io::Result<()> {
     cvt(syscall::kill(pid as usize, signal as usize)).and(Ok(()))
 }
 
-pub fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
+pub(crate) fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
     cvt(syscall::kill(-(pgid as isize) as usize, signal as usize)).and(Ok(()))
 }
 
-pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
+pub(crate) fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     let mut fds = [0; 2];
     cvt(syscall::pipe2(&mut fds, flags))?;
     Ok((fds[0], fds[1]))
 }
 
-pub fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
+pub(crate) fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
     cvt(syscall::setpgid(pid as usize, pgid as usize)).and(Ok(()))
 }
 
-pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
+pub(crate) fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     let new = SigAction {
         sa_handler: unsafe { mem::transmute(handler) },
         sa_mask:    [0; 2],
@@ -52,7 +52,7 @@ pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
 }
 
-pub fn reset_signal(signal: i32) -> io::Result<()> {
+pub(crate) fn reset_signal(signal: i32) -> io::Result<()> {
     let new = SigAction {
         sa_handler: unsafe { mem::transmute(syscall::flag::SIG_DFL) },
         sa_mask:    [0; 2],
@@ -61,7 +61,7 @@ pub fn reset_signal(signal: i32) -> io::Result<()> {
     cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
 }
 
-pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
+pub(crate) fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
     let fd = cvt(syscall::dup(tty_fd, b"pgrp"))?;
 
     let pgid_usize = pgid as usize;
@@ -74,13 +74,13 @@ pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
     cvt(res).and(Ok(()))
 }
 
-pub fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(syscall::dup(fd, &[])) }
+pub(crate) fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(syscall::dup(fd, &[])) }
 
-pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(syscall::dup2(old, new, &[])) }
+pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(syscall::dup2(old, new, &[])) }
 
-pub fn close(fd: RawFd) -> io::Result<()> { cvt(syscall::close(fd)).and(Ok(())) }
+pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(syscall::close(fd)).and(Ok(())) }
 
-pub fn isatty(fd: RawFd) -> bool {
+pub(crate) fn isatty(fd: RawFd) -> bool {
     if let Ok(tfd) = syscall::dup(fd, b"termios") {
         let _ = syscall::close(tfd);
         true
@@ -96,12 +96,12 @@ fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
 
 // TODO
 pub mod signals {
-    pub fn block() {}
+    pub(crate) fn block() {}
 
     /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
     /// controlled
     /// by the shell.
-    pub fn unblock() {}
+    pub(crate) fn unblock() {}
 }
 
 pub mod job_control {
@@ -115,7 +115,7 @@ pub mod job_control {
     use std::sync::{Arc, Mutex};
     use syscall;
 
-    pub fn watch_background(
+    pub(crate) fn watch_background(
         _fg: Arc<ForegroundSignals>,
         _processes: Arc<Mutex<Vec<BackgroundProcess>>>,
         _pid: u32,
@@ -125,7 +125,7 @@ pub mod job_control {
     }
 
 
-    pub fn watch_foreground<'a, F, D>(
+    pub(crate) fn watch_foreground<'a, F, D>(
         shell: &mut Shell<'a>,
         _pid: u32,
         last_pid: u32,
@@ -178,7 +178,7 @@ pub mod job_control {
 }
 
 pub mod variables {
-    pub fn get_user_home(_username: &str) -> Option<String> {
+    pub(crate) fn get_user_home(_username: &str) -> Option<String> {
         // TODO
         None
     }

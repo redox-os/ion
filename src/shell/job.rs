@@ -10,7 +10,7 @@ use smallstring::SmallString;
 use types::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum JobKind {
+pub(crate) enum JobKind {
     And,
     Background,
     Last,
@@ -19,14 +19,14 @@ pub enum JobKind {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Job {
+pub(crate) struct Job {
     pub command: Identifier,
     pub args:    Array,
     pub kind:    JobKind,
 }
 
 impl Job {
-    pub fn new(args: Array, kind: JobKind) -> Self {
+    pub(crate) fn new(args: Array, kind: JobKind) -> Self {
         let command = SmallString::from_str(&args[0]);
         Job {
             command,
@@ -37,7 +37,7 @@ impl Job {
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand<E: Expander>(&mut self, expanders: &E) {
+    pub(crate) fn expand<E: Expander>(&mut self, expanders: &E) {
         let mut expanded = Array::new();
         expanded.grow(self.args.len());
         expanded.extend(self.args.drain().flat_map(|arg| {
@@ -54,7 +54,7 @@ impl Job {
 
 /// This represents a job that has been processed and expanded to be run
 /// as part of some pipeline
-pub enum RefinedJob {
+pub(crate) enum RefinedJob {
     /// An external program that is executed by this shell
     External(Command),
     /// A procedure embedded into Ion
@@ -101,7 +101,7 @@ macro_rules! set_field {
 }
 
 impl RefinedJob {
-    pub fn builtin(name: Identifier, args: Array) -> Self {
+    pub(crate) fn builtin(name: Identifier, args: Array) -> Self {
         RefinedJob::Builtin {
             name,
             args,
@@ -111,7 +111,7 @@ impl RefinedJob {
         }
     }
 
-    pub fn function(name: Identifier, args: Array) -> Self {
+    pub(crate) fn function(name: Identifier, args: Array) -> Self {
         RefinedJob::Function {
             name,
             args,
@@ -121,21 +121,21 @@ impl RefinedJob {
         }
     }
 
-    pub fn stdin(&mut self, file: File) {
+    pub(crate) fn stdin(&mut self, file: File) {
         set_field!(self, stdin, file);
     }
 
-    pub fn stdout(&mut self, file: File) {
+    pub(crate) fn stdout(&mut self, file: File) {
         set_field!(self, stdout, file);
     }
 
-    pub fn stderr(&mut self, file: File) {
+    pub(crate) fn stderr(&mut self, file: File) {
         set_field!(self, stderr, file);
     }
 
     /// Returns a short description of this job: often just the command
     /// or builtin name
-    pub fn short(&self) -> String {
+    pub(crate) fn short(&self) -> String {
         match *self {
             RefinedJob::External(ref cmd) => {
                 format!("{:?}", cmd).split('"').nth(1).unwrap_or("").to_string()
@@ -147,7 +147,7 @@ impl RefinedJob {
     }
 
     /// Returns a long description of this job: the commands and arguments
-    pub fn long(&self) -> String {
+    pub(crate) fn long(&self) -> String {
         match *self {
             RefinedJob::External(ref cmd) => {
                 let command = format!("{:?}", cmd);

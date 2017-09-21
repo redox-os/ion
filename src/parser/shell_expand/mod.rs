@@ -10,20 +10,20 @@ mod ranges;
 mod words;
 use self::braces::BraceToken;
 use self::ranges::parse_range;
-pub use self::words::{Index, Range, Select, WordIterator, WordToken};
+pub(crate) use self::words::{Index, Range, Select, WordIterator, WordToken};
 use glob::glob;
 use types::*;
 
 /// Determines whether an input string is expression-like as compared to a
 /// bare word. For example, strings starting with '"', '\'', '@', or '$' are
 /// all expressions
-pub fn is_expression(s: &str) -> bool {
+pub(crate) fn is_expression(s: &str) -> bool {
     s.starts_with('@') || s.starts_with('[') || s.starts_with('$') || s.starts_with('"') ||
         s.starts_with('\'')
 }
 
 /// Trait representing different elements of string expansion
-pub trait Expander {
+pub(crate) trait Expander {
     /// Expand a tilde form to the correct directory
     fn tilde(&self, &str) -> Option<String> { None }
     /// Expand an array variable with some selection
@@ -145,7 +145,7 @@ fn slice<S: AsRef<str>>(output: &mut String, expanded: S, selection: Select) {
 /// Performs shell expansions to an input string, efficiently returning the final
 /// expanded form. Shells must provide their own batteries for expanding tilde
 /// and variable words.
-pub fn expand_string<E: Expander>(original: &str, expand_func: &E, reverse_quoting: bool) -> Array {
+pub(crate) fn expand_string<E: Expander>(original: &str, expand_func: &E, reverse_quoting: bool) -> Array {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
 
@@ -160,7 +160,7 @@ pub fn expand_string<E: Expander>(original: &str, expand_func: &E, reverse_quoti
 }
 
 #[allow(cyclomatic_complexity)]
-pub fn expand_tokens<E: Expander>(
+pub(crate) fn expand_tokens<E: Expander>(
     token_buffer: &[WordToken],
     expand_func: &E,
     reverse_quoting: bool,

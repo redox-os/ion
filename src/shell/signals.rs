@@ -7,22 +7,22 @@ use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 
 use sys;
 
-pub use sys::signals::{block, unblock};
+pub(crate) use sys::signals::{block, unblock};
 
 pub static PENDING: AtomicUsize = ATOMIC_USIZE_INIT;
 
 /// Suspends a given process by it's process ID.
-pub fn suspend(pid: u32) { let _ = sys::killpg(pid, sys::SIGSTOP); }
+pub(crate) fn suspend(pid: u32) { let _ = sys::killpg(pid, sys::SIGSTOP); }
 
 /// Resumes a given process by it's process ID.
-pub fn resume(pid: u32) { let _ = sys::killpg(pid, sys::SIGCONT); }
+pub(crate) fn resume(pid: u32) { let _ = sys::killpg(pid, sys::SIGCONT); }
 
 /// The purpose of the signal handler is to ignore signals when it is active, and then continue
 /// listening to signals once the handler is dropped.
-pub struct SignalHandler;
+pub(crate) struct SignalHandler;
 
 impl SignalHandler {
-    pub fn new() -> SignalHandler {
+    pub(crate) fn new() -> SignalHandler {
         block();
         SignalHandler
     }

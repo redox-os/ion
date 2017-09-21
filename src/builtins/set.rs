@@ -35,7 +35,7 @@ enum PositionalArgs {
 
 use self::PositionalArgs::*;
 
-pub fn set(args: &[&str], shell: &mut Shell) -> i32 {
+pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
     let stdout = io::stdout();
     let stderr = io::stderr();
     let mut args_iter = args.iter();

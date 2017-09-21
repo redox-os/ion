@@ -7,7 +7,7 @@ use super::{Input, Pipeline, RedirectFrom, Redirection};
 use shell::{Job, JobKind};
 use types::*;
 
-pub struct Collector<'a> {
+pub(crate) struct Collector<'a> {
     data: &'a str,
 }
 
@@ -17,9 +17,9 @@ lazy_static! {
 }
 
 impl<'a> Collector<'a> {
-    pub fn new(data: &'a str) -> Self { Collector { data } }
+    pub(crate) fn new(data: &'a str) -> Self { Collector { data } }
 
-    pub fn run(data: &'a str) -> Result<Pipeline, &'static str> { Collector::new(data).parse() }
+    pub(crate) fn run(data: &'a str) -> Result<Pipeline, &'static str> { Collector::new(data).parse() }
 
     fn peek(&self, index: usize) -> Option<u8> {
         if index < self.data.len() {
@@ -195,7 +195,7 @@ impl<'a> Collector<'a> {
         }
     }
 
-    pub fn parse(&self) -> Result<Pipeline, &'static str> {
+    pub(crate) fn parse(&self) -> Result<Pipeline, &'static str> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Array::new();
         let mut jobs: Vec<Job> = Vec::new();

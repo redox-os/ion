@@ -70,7 +70,7 @@ AUTHOR
     Heavily based on implementation of the test builtin, which was written by Michael Murph.
 "#; // @MANEND
 
-pub fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
+pub(crate) fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
 

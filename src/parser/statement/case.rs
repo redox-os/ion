@@ -2,7 +2,7 @@ use super::super::ArgumentSplitter;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
-pub enum CaseError<'a> {
+pub(crate) enum CaseError<'a> {
     NoBindVariable,
     NoConditional,
     ExtraBind(&'a str),
@@ -22,7 +22,7 @@ impl<'a> Display for CaseError<'a> {
     }
 }
 
-pub fn parse_case<'a>(
+pub(crate) fn parse_case<'a>(
     data: &'a str,
 ) -> Result<(Option<&'a str>, Option<&'a str>, Option<String>), CaseError<'a>> {
     let mut splitter = ArgumentSplitter::new(data);

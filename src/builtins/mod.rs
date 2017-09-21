@@ -33,7 +33,7 @@ use sys;
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the
 /// functionnality associated to this one, with zero, one or several argument(s).
-pub struct Builtin {
+pub(crate) struct Builtin {
     pub name: &'static str,
     pub help: &'static str,
     pub main: fn(&[&str], &mut Shell) -> i32,
@@ -41,7 +41,7 @@ pub struct Builtin {
 
 impl Builtin {
     /// Return the map from command names to commands
-    pub fn map() -> FnvHashMap<&'static str, Self> {
+    pub(crate) fn map() -> FnvHashMap<&'static str, Self> {
         let mut commands: FnvHashMap<&str, Self> =
             FnvHashMap::with_capacity_and_hasher(32, Default::default());
 

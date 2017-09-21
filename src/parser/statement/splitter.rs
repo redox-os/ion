@@ -24,7 +24,7 @@ bitflags! {
 
 
 #[derive(Debug, PartialEq)]
-pub enum StatementError<'a> {
+pub(crate) enum StatementError<'a> {
     IllegalCommandName(&'a str),
     InvalidCharacter(char, usize),
     UnterminatedSubshell,
@@ -65,7 +65,7 @@ impl<'a> Display for StatementError<'a> {
     }
 }
 
-pub struct StatementSplitter<'a> {
+pub(crate) struct StatementSplitter<'a> {
     data:                &'a str,
     read:                usize,
     flags:               Flags,
@@ -77,7 +77,7 @@ pub struct StatementSplitter<'a> {
 }
 
 impl<'a> StatementSplitter<'a> {
-    pub fn new(data: &'a str) -> StatementSplitter<'a> {
+    pub(crate) fn new(data: &'a str) -> StatementSplitter<'a> {
         StatementSplitter {
             data:                data,
             read:                0,

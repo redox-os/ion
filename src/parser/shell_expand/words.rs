@@ -36,7 +36,7 @@ bitflags! {
 
 /// Index into a vector-like object
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub enum Index {
+pub(crate) enum Index {
     /// Index starting from the beginning of the vector, where `Forward(0)`
     /// is the first element
     Forward(usize),
@@ -52,7 +52,7 @@ impl Index {
     /// ```
     /// assert_eq!(Index::new(-1), Index::Backward(0))
     /// ```
-    pub fn new(input: isize) -> Index {
+    pub(crate) fn new(input: isize) -> Index {
         if input < 0 {
             Index::Backward((input.abs() as usize) - 1)
         } else {
@@ -60,7 +60,7 @@ impl Index {
         }
     }
 
-    pub fn resolve(&self, vector_length: usize) -> Option<usize> {
+    pub(crate) fn resolve(&self, vector_length: usize) -> Option<usize> {
         match *self {
             Index::Forward(n) => Some(n),
             Index::Backward(n) => if n >= vector_length {
@@ -74,7 +74,7 @@ impl Index {
 
 /// A range of values in a vector-like object
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub struct Range {
+pub(crate) struct Range {
     /// Starting index
     start: Index,
     /// Ending index
@@ -85,7 +85,7 @@ pub struct Range {
 }
 
 impl Range {
-    pub fn to(end: Index) -> Range {
+    pub(crate) fn to(end: Index) -> Range {
         Range {
             start: Index::new(0),
             end,
@@ -93,7 +93,7 @@ impl Range {
         }
     }
 
-    pub fn from(start: Index) -> Range {
+    pub(crate) fn from(start: Index) -> Range {
         Range {
             start,
             end: Index::new(-1),
@@ -101,7 +101,7 @@ impl Range {
         }
     }
 
-    pub fn inclusive(start: Index, end: Index) -> Range {
+    pub(crate) fn inclusive(start: Index, end: Index) -> Range {
         Range {
             start,
             end,
@@ -109,7 +109,7 @@ impl Range {
         }
     }
 
-    pub fn exclusive(start: Index, end: Index) -> Range {
+    pub(crate) fn exclusive(start: Index, end: Index) -> Range {
         Range {
             start,
             end,
@@ -128,7 +128,7 @@ impl Range {
     /// let selection = vec.iter().skip(start).take(size).collect::<Vec<_>>();
     /// assert_eq!(expected, selection);
     /// ```
-    pub fn bounds(&self, vector_length: usize) -> Option<(usize, usize)> {
+    pub(crate) fn bounds(&self, vector_length: usize) -> Option<(usize, usize)> {
         if let Some(start) = self.start.resolve(vector_length) {
             if let Some(end) = self.end.resolve(vector_length) {
                 if end < start {
@@ -148,17 +148,17 @@ impl Range {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Key {
+pub(crate) struct Key {
     key: ::types::Key,
 }
 
 impl Key {
-    pub fn get(&self) -> &::types::Key { return &self.key; }
+    pub(crate) fn get(&self) -> &::types::Key { return &self.key; }
 }
 
 /// Represents a filter on a vector-like object
 #[derive(Debug, PartialEq, Clone)]
-pub enum Select {
+pub(crate) enum Select {
     /// Select no elements
     None,
     /// Select all elements
@@ -171,7 +171,7 @@ pub enum Select {
     Key(Key),
 }
 
-pub trait SelectWithSize {
+pub(crate) trait SelectWithSize {
     type Item;
     fn select<O>(&mut self, Select, usize) -> O
         where O: FromIterator<Self::Item>;
@@ -227,7 +227,7 @@ enum Pattern<'a> {
 
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct ArrayMethod<'a> {
+pub(crate) struct ArrayMethod<'a> {
     method:    &'a str,
     variable:  &'a str,
     pattern:   Pattern<'a>,
@@ -235,14 +235,14 @@ pub struct ArrayMethod<'a> {
 }
 
 impl<'a> ArrayMethod<'a> {
-    pub fn returns_array(&self) -> bool {
+    pub(crate) fn returns_array(&self) -> bool {
         match self.method {
             "split" | "chars" | "bytes" | "graphemes" => true,
             _ => false,
         }
     }
 
-    pub fn handle<E: Expander>(&self, current: &mut String, expand_func: &E) {
+    pub(crate) fn handle<E: Expander>(&self, current: &mut String, expand_func: &E) {
         match self.method {
             "split" => {
                 let variable = if let Some(variable) = expand_func.variable(self.variable, false) {
@@ -327,7 +327,7 @@ impl<'a> ArrayMethod<'a> {
         }
     }
 
-    pub fn handle_as_array<E: Expander>(&self, expand_func: &E) -> Array {
+    pub(crate) fn handle_as_array<E: Expander>(&self, expand_func: &E) -> Array {
         macro_rules! resolve_var {
             () => {
                 if let Some(variable) = expand_func.variable(self.variable, false) {
@@ -440,7 +440,7 @@ impl<'a> ArrayMethod<'a> {
 
 /// Represents a method that operates on and returns a string
 #[derive(Debug, PartialEq, Clone)]
-pub struct StringMethod<'a> {
+pub(crate) struct StringMethod<'a> {
     /// Name of this method: currently `join`, `len`, and `len_bytes` are the
     /// supported methods
     method: &'a str,
@@ -455,7 +455,7 @@ pub struct StringMethod<'a> {
 }
 
 impl<'a> StringMethod<'a> {
-    pub fn handle<E: Expander>(&self, output: &mut String, expand: &E) {
+    pub(crate) fn handle<E: Expander>(&self, output: &mut String, expand: &E) {
         let (variable, pattern) = (self.variable, self.pattern);
 
         macro_rules! string_eval {
@@ -634,7 +634,7 @@ impl<'a> StringMethod<'a> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum WordToken<'a> {
+pub(crate) enum WordToken<'a> {
     /// Represents a normal string who may contain a globbing character
     /// (the second element) or a tilde expression (the third element)
     Normal(&'a str, bool, bool),
@@ -651,7 +651,7 @@ pub enum WordToken<'a> {
     Arithmetic(&'a str), // Glob(&'a str)
 }
 
-pub struct WordIterator<'a, E: Expander + 'a> {
+pub(crate) struct WordIterator<'a, E: Expander + 'a> {
     data:      &'a str,
     read:      usize,
     flags:     Flags,
@@ -659,7 +659,7 @@ pub struct WordIterator<'a, E: Expander + 'a> {
 }
 
 impl<'a, E: Expander + 'a> WordIterator<'a, E> {
-    pub fn new(data: &'a str, expand_processes: bool, expanders: &'a E) -> WordIterator<'a, E> {
+    pub(crate) fn new(data: &'a str, expand_processes: bool, expanders: &'a E) -> WordIterator<'a, E> {
         let flags = if expand_processes { EXPAND_PROCESSES } else { Flags::empty() };
         WordIterator {
             data,

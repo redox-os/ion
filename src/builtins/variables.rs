@@ -112,7 +112,7 @@ fn parse_alias(args: &str) -> Binding {
 
 /// The `alias` command will define an alias for another command, and thus may be used as a
 /// command itself.
-pub fn alias(vars: &mut Variables, args: &str) -> i32 {
+pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
     match parse_alias(args) {
         Binding::InvalidKey(key) => {
             let stderr = io::stderr();
@@ -139,7 +139,7 @@ pub fn alias(vars: &mut Variables, args: &str) -> i32 {
 
 
 /// Dropping an alias will erase it from the shell.
-pub fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
+pub(crate) fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     where I::Item: AsRef<str>
 {
     let args = args.into_iter().collect::<Vec<I::Item>>();
@@ -159,7 +159,7 @@ pub fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
 }
 
 /// Dropping an array will erase it from the shell.
-pub fn drop_array<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
+pub(crate) fn drop_array<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     where I::Item: AsRef<str>
 {
     let args = args.into_iter().collect::<Vec<I::Item>>();
@@ -186,7 +186,7 @@ pub fn drop_array<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
 }
 
 /// Dropping a variable will erase it from the shell.
-pub fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
+pub(crate) fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     where I::Item: AsRef<str>
 {
     let args = args.into_iter().collect::<Vec<I::Item>>();

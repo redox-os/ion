@@ -18,7 +18,7 @@ OPTIONS
         display this help and exit
 "#;
 
-pub fn time(args: &[&str]) -> Result<(), String> {
+pub(crate) fn time(args: &[&str]) -> Result<(), String> {
     let stdout = stdout();
     let mut stdout = stdout.lock();
 

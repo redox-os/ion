@@ -14,11 +14,11 @@ pub mod signals;
 pub mod status;
 pub mod variables;
 
-pub use self::binary::Binary;
-pub use self::flow::FlowLogic;
-pub use self::history::{IgnoreSetting, ShellHistory};
-pub use self::job::{Job, JobKind};
-pub use self::pipe_exec::{foreground, job_control};
+pub(crate) use self::binary::Binary;
+pub(crate) use self::flow::FlowLogic;
+pub(crate) use self::history::{IgnoreSetting, ShellHistory};
+pub(crate) use self::job::{Job, JobKind};
+pub(crate) use self::pipe_exec::{foreground, job_control};
 
 use self::directory_stack::DirectoryStack;
 use self::flags::*;
@@ -49,7 +49,7 @@ use types::*;
 /// the entirety of the
 /// program. It is initialized at the beginning of the program, and lives until the end of the
 /// program.
-pub struct Shell<'a> {
+pub(crate) struct Shell<'a> {
     /// Contains a list of built-in commands that were created when the program started.
     pub builtins: &'a FnvHashMap<&'static str, Builtin>,
     /// Contains the history, completions, and manages writes to the history file.
@@ -88,7 +88,7 @@ pub struct Shell<'a> {
 
 impl<'a> Shell<'a> {
     /// Panics if DirectoryStack construction fails
-    pub fn new(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
+    pub(crate) fn new(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
         Shell {
             builtins:            builtins,
             context:             None,
@@ -108,7 +108,7 @@ impl<'a> Shell<'a> {
         }
     }
 
-    pub fn next_signal(&self) -> Option<i32> {
+    pub(crate) fn next_signal(&self) -> Option<i32> {
         for sig in 0..32 {
             if signals::PENDING.fetch_and(!(1 << sig), Ordering::SeqCst) & (1 << sig) == 1 << sig {
                 return Some(sig);
@@ -118,7 +118,7 @@ impl<'a> Shell<'a> {
         None
     }
 
-    pub fn exit(&mut self, status: i32) -> ! {
+    pub(crate) fn exit(&mut self, status: i32) -> ! {
         if let Some(context) = self.context.as_mut() {
             context.history.commit_history();
         }
@@ -147,7 +147,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Evaluates the source init file in the user's home directory.
-    pub fn evaluate_init_file(&mut self) {
+    pub(crate) fn evaluate_init_file(&mut self) {
         match app_root(
             AppDataType::UserConfig,
             &AppInfo {

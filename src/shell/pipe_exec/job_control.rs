@@ -9,16 +9,16 @@ use std::time::Duration;
 use sys;
 
 use sys::job_control as self_sys;
-pub use sys::job_control::watch_background;
+pub(crate) use sys::job_control::watch_background;
 
 /// When given a process ID, that process's group will be assigned as the foreground process group.
-pub fn set_foreground_as(pid: u32) {
+pub(crate) fn set_foreground_as(pid: u32) {
     signals::block();
     let _ = sys::tcsetpgrp(0, pid);
     signals::unblock();
 }
 
-pub trait JobControl {
+pub(crate) trait JobControl {
     /// Waits for background jobs to finish before returning.
     fn wait_for_background(&mut self);
     /// Takes a background tasks's PID and whether or not it needs to be continued; resumes the
@@ -44,7 +44,7 @@ pub trait JobControl {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 /// Defines whether the background process is running or stopped.
-pub enum ProcessState {
+pub(crate) enum ProcessState {
     Running,
     Stopped,
     Empty,
@@ -60,7 +60,7 @@ impl fmt::Display for ProcessState {
     }
 }
 
-pub fn add_to_background(
+pub(crate) fn add_to_background(
     processes: Arc<Mutex<Vec<BackgroundProcess>>>,
     pid: u32,
     state: ProcessState,
@@ -95,7 +95,7 @@ pub fn add_to_background(
 /// by the shell. The shell will only retain information about the process, such
 /// as the process ID, state that the process is in, and the command that the
 /// process is executing.
-pub struct BackgroundProcess {
+pub(crate) struct BackgroundProcess {
     pub pid:           u32,
     pub ignore_sighup: bool,
     pub state:         ProcessState,

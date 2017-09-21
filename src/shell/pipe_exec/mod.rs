@@ -158,7 +158,7 @@ fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, Jo
     false
 }
 
-pub trait PipelineExecution {
+pub(crate) trait PipelineExecution {
     /// Given a pipeline, generates commands and executes them.
     ///
     /// The `Pipeline` structure contains a vector of `Job`s, and redirections to perform on the
@@ -449,7 +449,7 @@ impl<'a> PipelineExecution for Shell<'a> {
 }
 
 /// This function will panic if called with an empty slice
-pub fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground: bool) -> i32 {
+pub(crate) fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground: bool) -> i32 {
     fn close(file: &Option<File>) {
         if let &Some(ref file) = file {
             if let Err(e) = sys::close(file.as_raw_fd()) {

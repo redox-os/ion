@@ -9,7 +9,7 @@ use std::io::{stderr, Write};
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
 /// SIGHUP ignoral.
-pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
+pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
     let stderr = stderr();
     let mut stderr = stderr.lock();
     const NO_SIGHUP: u8 = 1;
@@ -75,7 +75,7 @@ pub fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
 }
 
 /// Display a list of all jobs running in the background.
-pub fn jobs(shell: &mut Shell) {
+pub(crate) fn jobs(shell: &mut Shell) {
     let stderr = stderr();
     let mut stderr = stderr.lock();
     for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
@@ -89,7 +89,7 @@ pub fn jobs(shell: &mut Shell) {
 /// Hands control of the foreground process to the specified jobs, recording their exit status.
 /// If the job is stopped, the job will be resumed.
 /// If multiple jobs are given, then only the last job's exit status will be returned.
-pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
+pub(crate) fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
     fn fg_job(shell: &mut Shell, njob: u32) -> i32 {
         let job;
         if let Some(borrowed_job) = shell.background.lock().unwrap().iter().nth(njob as usize) {
@@ -140,7 +140,7 @@ pub fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
 }
 
 /// Resumes a stopped background process, if it was stopped.
-pub fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
+pub(crate) fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
         if let Some(job) = shell.background.lock().unwrap().iter_mut().nth(njob as usize) {
             match job.state {

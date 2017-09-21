@@ -19,14 +19,14 @@ bitflags! {
     }
 }
 
-pub struct IgnoreSetting {
+pub(crate) struct IgnoreSetting {
     flags: IgnoreFlags,
     // Yes, a bad heap-based Vec, however unfortunately its not possible to store Regex'es in Array
     regexes: Option<Vec<Regex>>,
 }
 
 impl IgnoreSetting {
-    pub fn default() -> IgnoreSetting {
+    pub(crate) fn default() -> IgnoreSetting {
         IgnoreSetting {
             flags:   IgnoreFlags::empty(),
             regexes: None,
@@ -35,7 +35,7 @@ impl IgnoreSetting {
 }
 
 /// Contains all history-related functionality for the `Shell`.
-pub trait ShellHistory {
+pub(crate) trait ShellHistory {
     /// Prints the commands contained within the history buffers to standard output.
     fn print_history(&self, _arguments: &[&str]) -> i32;
 

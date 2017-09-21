@@ -19,7 +19,7 @@ fn collect<F>(arguments: &str, statement: F) -> Statement
 
 fn is_valid_name(name: &str) -> bool { !name.chars().any(|c| !(c.is_alphanumeric() || c == '_')) }
 
-pub fn parse(code: &str) -> Statement {
+pub(crate) fn parse(code: &str) -> Statement {
     let cmd = code.trim();
     match cmd {
         "end" => return Statement::End,

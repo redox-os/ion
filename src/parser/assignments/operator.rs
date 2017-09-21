@@ -2,7 +2,7 @@ use super::AssignmentError;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Operator {
+pub(crate) enum Operator {
     Add,
     Subtract,
     Divide,
@@ -13,7 +13,7 @@ pub enum Operator {
 }
 
 impl Operator {
-    pub fn parse<'a>(data: &'a str) -> Result<Operator, AssignmentError<'a>> {
+    pub(crate) fn parse<'a>(data: &'a str) -> Result<Operator, AssignmentError<'a>> {
         match data {
             "=" => Ok(Operator::Equal),
             "+=" => Ok(Operator::Add),

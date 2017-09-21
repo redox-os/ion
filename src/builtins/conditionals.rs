@@ -3,7 +3,7 @@ use shell::status::*;
 
 macro_rules! string_function {
     ($method:tt) => (
-        pub fn $method(args: &[&str], _: &mut Shell) -> i32 {
+        pub(crate) fn $method(args: &[&str], _: &mut Shell) -> i32 {
             match args.len() {
                 0...2 => {
                     eprintln!("ion: {}: two arguments must be supplied", args[0]);

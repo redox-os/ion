@@ -2,14 +2,14 @@ use parser::{expand_string, Expander};
 use types::Value;
 
 #[derive(Debug, PartialEq)]
-pub enum ForExpression {
+pub(crate) enum ForExpression {
     Multiple(Vec<Value>),
     Normal(Value),
     Range(usize, usize),
 }
 
 impl ForExpression {
-    pub fn new<E: Expander>(expression: &[String], expanders: &E) -> ForExpression {
+    pub(crate) fn new<E: Expander>(expression: &[String], expanders: &E) -> ForExpression {
         let output: Vec<_> = expression
             .iter()
             .flat_map(|expression| expand_string(expression, expanders, true))

@@ -1,7 +1,7 @@
 use sys;
 
 /// Ensures that the forked child is given a unique process ID.
-pub fn create_process_group(pgid: u32) { let _ = sys::setpgid(0, pgid); }
+pub(crate) fn create_process_group(pgid: u32) { let _ = sys::setpgid(0, pgid); }
 
 use super::job_control::{JobControl, ProcessState};
 use super::pipe;
@@ -12,7 +12,7 @@ use std::process::exit;
 
 /// Forks the shell, adding the child to the parent's background list, and executing
 /// the given commands in the child fork.
-pub fn fork_pipe(
+pub(crate) fn fork_pipe(
     shell: &mut Shell,
     commands: Vec<(RefinedJob, JobKind)>,
     command_name: String,

@@ -111,7 +111,7 @@ AUTHOR
     Written by Michael Murphy.
 "#; // @MANEND
 
-pub fn test(args: &[&str]) -> Result<bool, String> {
+pub(crate) fn test(args: &[&str]) -> Result<bool, String> {
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
 

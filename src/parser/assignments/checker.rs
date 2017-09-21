@@ -7,9 +7,9 @@ use super::super::expand_string;
 /// - `[ 1 2 3 ]` = Array
 /// - `[ 1 2 3 ][1]` = String
 /// - `string` = String
-pub fn is_array(value: &str) -> bool { value.starts_with('[') && value.ends_with(']') }
+pub(crate) fn is_array(value: &str) -> bool { value.starts_with('[') && value.ends_with(']') }
 
-pub fn is_boolean(value: &str) -> Result<&str, ()> {
+pub(crate) fn is_boolean(value: &str) -> Result<&str, ()> {
     if ["true", "1", "y"].contains(&value) {
         Ok("true")
     } else if ["false", "0", "n"].contains(&value) {
@@ -108,7 +108,7 @@ fn get_array<E: Expander>(shell: &E, value: &str) -> ReturnValue {
     ReturnValue::Vector(expand_string(value, shell, false))
 }
 
-pub fn value_check<'a, E: Expander>(
+pub(crate) fn value_check<'a, E: Expander>(
     shell: &E,
     value: &'a str,
     expected: Primitive,

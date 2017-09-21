@@ -2,12 +2,12 @@ use super::permutate::Permutator;
 
 #[derive(Debug)]
 /// A token primitive for the `expand_braces` function.
-pub enum BraceToken {
+pub(crate) enum BraceToken {
     Normal(String),
     Expander,
 }
 
-pub fn expand_braces(tokens: &[BraceToken], mut expanders: Vec<Vec<String>>) -> Vec<String> {
+pub(crate) fn expand_braces(tokens: &[BraceToken], mut expanders: Vec<Vec<String>>) -> Vec<String> {
     if expanders.len() > 1 {
         let tmp: Vec<Vec<&str>> = expanders
             .iter()

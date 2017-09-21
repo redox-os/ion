@@ -5,11 +5,11 @@ use std::ops::DerefMut;
 // TODO: These could be generalised to work on non-ASCII characters (and even
 //       strings!) as long as the byte size of the needle and haystack match.
 
-pub trait AsciiReplaceInPlace {
+pub(crate) trait AsciiReplaceInPlace {
     fn ascii_replace_in_place(&mut self, needle: char, haystack: char);
 }
 
-pub trait AsciiReplace: Sized {
+pub(crate) trait AsciiReplace: Sized {
     fn ascii_replace(self, needle: char, haystack: char) -> Self;
 }
 

@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 /// Keys are used in assignments to define which variable will be set, and whether the correct
 /// types are being assigned.
 #[derive(Debug, PartialEq, Clone)]
-pub struct Key<'a> {
+pub(crate) struct Key<'a> {
     pub kind: Primitive,
     pub name: &'a str,
 }
@@ -11,14 +11,14 @@ pub struct Key<'a> {
 /// Functions require that their keys to have a longer lifetime, and that is made possible
 /// by eliminating the lifetime requirements via allocating a `String`.
 #[derive(Debug, PartialEq, Clone)]
-pub struct KeyBuf {
+pub(crate) struct KeyBuf {
     pub kind: Primitive,
     pub name: String,
 }
 
 
 #[derive(Debug, PartialEq)]
-pub enum TypeError<'a> {
+pub(crate) enum TypeError<'a> {
     Invalid(&'a str),
     BadValue(Primitive),
 }
@@ -52,7 +52,7 @@ impl<'a> From<Key<'a>> for KeyBuf {
 
 /// A primitive defines the type that a requested value should satisfy.
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub enum Primitive {
+pub(crate) enum Primitive {
     Any,
     AnyArray,
     Str,
@@ -101,13 +101,13 @@ impl Display for Primitive {
 
 /// Quite simply, an iterator that returns keys.
 #[derive(Debug, PartialEq)]
-pub struct KeyIterator<'a> {
+pub(crate) struct KeyIterator<'a> {
     data: &'a str,
     read: usize,
 }
 
 impl<'a> KeyIterator<'a> {
-    pub fn new(data: &'a str) -> KeyIterator<'a> { KeyIterator { data, read: 0 } }
+    pub(crate) fn new(data: &'a str) -> KeyIterator<'a> { KeyIterator { data, read: 0 } }
 
     // Parameters are values that follow the semicolon (':').
     fn parse_parameter(&mut self, name: &'a str) -> Result<Key<'a>, TypeError<'a>> {

@@ -45,7 +45,7 @@ fn print_arrays(list: &ArrayVariableContext) {
 
 /// Represents: A variable store capable of setting local variables or
 /// exporting variables to some global environment
-pub trait VariableStore {
+pub(crate) trait VariableStore {
     /// Set a local variable given a binding
     fn local(&mut self, &str) -> i32;
     /// Export a variable to the process environment given a binding

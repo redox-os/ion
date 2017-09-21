@@ -7,7 +7,7 @@ use types::*;
 use types::Identifier;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct ElseIf {
+pub(crate) struct ElseIf {
     pub expression: Pipeline,
     pub success:    Vec<Statement>,
 }
@@ -33,7 +33,7 @@ pub struct ElseIf {
 /// Case { value: None, ... }
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct Case {
+pub(crate) struct Case {
     pub value:       Option<String>,
     pub binding:     Option<String>,
     pub conditional: Option<String>,
@@ -42,7 +42,7 @@ pub struct Case {
 
 // TODO: Enable statements and expressions to contain &str values.
 #[derive(Debug, PartialEq, Clone)]
-pub enum Statement {
+pub(crate) enum Statement {
     Let { expression: String },
     Case(Case),
     Export(String),
@@ -83,7 +83,7 @@ pub enum Statement {
 }
 
 impl Statement {
-    pub fn short(&self) -> &'static str {
+    pub(crate) fn short(&self) -> &'static str {
         match *self {
             Statement::Let { .. } => "Let { .. }",
             Statement::Case(_) => "Case { .. }",
@@ -106,7 +106,7 @@ impl Statement {
     }
 }
 
-pub struct FlowControl {
+pub(crate) struct FlowControl {
     pub level:             usize,
     pub current_statement: Statement,
     pub current_if_mode:   u8, // { 0 = SUCCESS; 1 = FAILURE }
@@ -123,20 +123,20 @@ impl Default for FlowControl {
 }
 
 #[derive(Clone)]
-pub struct Function {
+pub(crate) struct Function {
     pub description: Option<String>,
     pub name:        Identifier,
     pub args:        Vec<KeyBuf>,
     pub statements:  Vec<Statement>,
 }
 
-pub enum FunctionError {
+pub(crate) enum FunctionError {
     InvalidArgumentCount,
     InvalidArgumentType(Primitive, String),
 }
 
 impl Function {
-    pub fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
+    pub(crate) fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
             return Err(FunctionError::InvalidArgumentCount);
         }
@@ -192,7 +192,7 @@ impl Function {
     }
 }
 
-pub fn collect_cases<I>(
+pub(crate) fn collect_cases<I>(
     iterator: &mut I,
     cases: &mut Vec<Case>,
     level: &mut usize,
@@ -255,7 +255,7 @@ pub fn collect_cases<I>(
     return Ok(());
 }
 
-pub fn collect_loops<I: Iterator<Item = Statement>>(
+pub(crate) fn collect_loops<I: Iterator<Item = Statement>>(
     iterator: &mut I,
     statements: &mut Vec<Statement>,
     level: &mut usize,
@@ -292,7 +292,7 @@ pub fn collect_loops<I: Iterator<Item = Statement>>(
     }
 }
 
-pub fn collect_if<I>(
+pub(crate) fn collect_if<I>(
     iterator: &mut I,
     success: &mut Vec<Statement>,
     else_if: &mut Vec<ElseIf>,

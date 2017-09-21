@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::Read;
 
 /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
-pub fn source(shell: &mut Shell, arguments: &[&str]) -> Result<(), String> {
+pub(crate) fn source(shell: &mut Shell, arguments: &[&str]) -> Result<(), String> {
     match arguments.get(1) {
         Some(argument) => if let Ok(mut file) = File::open(&argument) {
             let capacity = file.metadata().map(|x| x.len()).unwrap_or(0) as usize;

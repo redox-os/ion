@@ -1,2 +1,2 @@
-pub const ERR_EXIT: u8 = 1;
-pub const PRINT_COMMS: u8 = 2;
+pub(crate) const ERR_EXIT: u8 = 1;
+pub(crate) const PRINT_COMMS: u8 = 2;

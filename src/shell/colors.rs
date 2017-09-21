@@ -70,7 +70,7 @@ enum Mode {
 
 #[derive(Debug, PartialEq)]
 /// Stores a reprensetation of text formatting data which can be used to get an ANSI color code.
-pub struct Colors {
+pub(crate) struct Colors {
     foreground: Option<Mode>,
     background: Option<Mode>,
     attributes: Option<Vec<&'static str>>,
@@ -80,7 +80,7 @@ impl Colors {
     /// Parses the given input and returns a structure obtaining the text data needed for proper
     /// transformation into ANSI code parameters, which may be obtained by calling the
     /// `into_string()` method on the newly-created `Colors` structure.
-    pub fn collect(input: &str) -> Colors {
+    pub(crate) fn collect(input: &str) -> Colors {
         let mut colors = Colors {
             foreground: None,
             background: None,
@@ -179,7 +179,7 @@ impl Colors {
     /// Attempts to transform the data in the structure into the corresponding ANSI code
     /// representation. It would very ugly to require shell scripters to have to interface
     /// with these codes directly.
-    pub fn into_string(self) -> Option<String> {
+    pub(crate) fn into_string(self) -> Option<String> {
         let mut output = String::from("\x1b[");
 
         let foreground = match self.foreground {

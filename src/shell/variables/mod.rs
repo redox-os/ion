@@ -22,7 +22,7 @@ lazy_static! {
 }
 
 #[derive(Debug)]
-pub struct Variables {
+pub(crate) struct Variables {
     pub hashmaps:  HashMapVariableContext,
     pub arrays:    ArrayVariableContext,
     pub variables: VariableContext,
@@ -81,13 +81,13 @@ impl Default for Variables {
 const PLUGIN: u8 = 1;
 
 impl Variables {
-    pub fn has_plugin_support(&self) -> bool { self.flags & PLUGIN != 0 }
+    pub(crate) fn has_plugin_support(&self) -> bool { self.flags & PLUGIN != 0 }
 
-    pub fn enable_plugins(&mut self) { self.flags |= PLUGIN; }
+    pub(crate) fn enable_plugins(&mut self) { self.flags |= PLUGIN; }
 
-    pub fn disable_plugins(&mut self) { self.flags &= 255 ^ PLUGIN; }
+    pub(crate) fn disable_plugins(&mut self) { self.flags &= 255 ^ PLUGIN; }
 
-    pub fn read<I: IntoIterator>(&mut self, args: I) -> i32
+    pub(crate) fn read<I: IntoIterator>(&mut self, args: I) -> i32
         where I::Item: AsRef<str>
     {
         if sys::isatty(sys::STDIN_FILENO) {
@@ -111,7 +111,7 @@ impl Variables {
         SUCCESS
     }
 
-    pub fn set_var(&mut self, name: &str, value: &str) {
+    pub(crate) fn set_var(&mut self, name: &str, value: &str) {
         if name == "NS_PLUGINS" {
             match value {
                 "0" => self.disable_plugins(),
@@ -132,7 +132,7 @@ impl Variables {
         }
     }
 
-    pub fn set_array(&mut self, name: &str, value: Array) {
+    pub(crate) fn set_array(&mut self, name: &str, value: Array) {
         if !name.is_empty() {
             if value.is_empty() {
                 self.arrays.remove(name);
@@ -143,7 +143,7 @@ impl Variables {
     }
 
     #[allow(dead_code)]
-    pub fn set_hashmap_value(&mut self, name: &str, key: &str, value: &str) {
+    pub(crate) fn set_hashmap_value(&mut self, name: &str, key: &str, value: &str) {
         if !name.is_empty() {
             if let Some(map) = self.hashmaps.get_mut(name) {
                 map.insert(key.into(), value.into());
@@ -156,11 +156,11 @@ impl Variables {
         }
     }
 
-    pub fn get_map(&self, name: &str) -> Option<&HashMap> { self.hashmaps.get(name) }
+    pub(crate) fn get_map(&self, name: &str) -> Option<&HashMap> { self.hashmaps.get(name) }
 
-    pub fn get_array(&self, name: &str) -> Option<&Array> { self.arrays.get(name) }
+    pub(crate) fn get_array(&self, name: &str) -> Option<&Array> { self.arrays.get(name) }
 
-    pub fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
+    pub(crate) fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
 
     /// Obtains the value for the **SWD** variable.
     ///
@@ -202,7 +202,7 @@ impl Variables {
         swd
     }
 
-    pub fn get_var(&self, name: &str) -> Option<Value> {
+    pub(crate) fn get_var(&self, name: &str) -> Option<Value> {
         match name {
             "SWD" => return Some(self.get_simplified_directory()),
             "MWD" => return Some(self.get_minimal_directory()),
@@ -253,23 +253,23 @@ impl Variables {
         }
     }
 
-    pub fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
+    pub(crate) fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
 
-    pub fn unset_var(&mut self, name: &str) -> Option<Value> { self.variables.remove(name) }
+    pub(crate) fn unset_var(&mut self, name: &str) -> Option<Value> { self.variables.remove(name) }
 
-    pub fn get_vars(&self) -> Vec<Identifier> {
+    pub(crate) fn get_vars(&self) -> Vec<Identifier> {
         self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k.into())).collect()
     }
 
-    pub fn is_valid_variable_character(c: char) -> bool {
+    pub(crate) fn is_valid_variable_character(c: char) -> bool {
         c.is_alphanumeric() || c == '_' || c == '?'
     }
 
-    pub fn is_valid_variable_name(name: &str) -> bool {
+    pub(crate) fn is_valid_variable_name(name: &str) -> bool {
         name.chars().all(Variables::is_valid_variable_character)
     }
 
-    pub fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> Option<String> {
+    pub(crate) fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> Option<String> {
         let mut chars = word.char_indices();
 
         let tilde_prefix;
@@ -338,7 +338,7 @@ impl Variables {
     }
 
     #[allow(dead_code)]
-    pub fn command_expansion(&self, command: &str) -> Option<Value> {
+    pub(crate) fn command_expansion(&self, command: &str) -> Option<Value> {
         if let Ok(exe) = env::current_exe() {
             if let Ok(output) = process::Command::new(exe).arg("-c").arg(command).output() {
                 if let Ok(mut stdout) = String::from_utf8(output.stdout) {
@@ -355,7 +355,7 @@ impl Variables {
     }
 
     #[allow(dead_code)]
-    pub fn is_hashmap_reference(key: &str) -> Option<(Identifier, Key)> {
+    pub(crate) fn is_hashmap_reference(key: &str) -> Option<(Identifier, Key)> {
         let mut key_iter = key.split('[');
 
         if let Some(map_name) = key_iter.next() {

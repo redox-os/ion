@@ -3,13 +3,13 @@ pub mod namespaces;
 mod library_iter;
 mod string;
 
-pub use self::library_iter::*;
-pub use self::string::StringError;
+pub(crate) use self::library_iter::*;
+pub(crate) use self::string::StringError;
 
 use app_dirs::{app_root, AppDataType, AppInfo};
 use std::path::PathBuf;
 
-pub fn config_dir() -> Option<PathBuf> {
+pub(crate) fn config_dir() -> Option<PathBuf> {
     match app_root(
         AppDataType::UserConfig,
         &AppInfo {

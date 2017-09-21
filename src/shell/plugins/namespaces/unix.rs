@@ -14,7 +14,7 @@ use types::Identifier;
 /// plugin to ensure that the plugin remains loaded in memory, and it's contained symbols
 /// remain validly-executable; and B) holds a map of functions that may be executed within
 /// the namespace.
-pub struct StringNamespace {
+pub(crate) struct StringNamespace {
     /// This field, although never used directly, is required to exist in order to ensure
     /// that each element in the `symbols` field remains relevant. When Rust can support
     /// self-referencing lifetimes, we won't need to hold raw symbols anymore.
@@ -26,7 +26,7 @@ pub struct StringNamespace {
 }
 
 impl StringNamespace {
-    pub fn new(library: Library) -> Result<StringNamespace, StringError> {
+    pub(crate) fn new(library: Library) -> Result<StringNamespace, StringError> {
         unsafe {
             let mut symbols = FnvHashMap::default();
             {
@@ -108,7 +108,7 @@ impl StringNamespace {
     ///
     /// If the function exists, it is executed, and it's return value is then converted into a
     /// proper Rusty type.
-    pub fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> {
+    pub(crate) fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> {
         let func =
             self.symbols.get(&function).ok_or(StringError::FunctionMissing(function.clone()))?;
         unsafe {
@@ -129,7 +129,7 @@ impl StringNamespace {
 ///
 /// This function is meant to be called with `lazy_static` to ensure that there isn't a
 /// cost to collecting all this information when the shell never uses it in the first place!
-pub fn collect() -> FnvHashMap<Identifier, StringNamespace> {
+pub(crate) fn collect() -> FnvHashMap<Identifier, StringNamespace> {
     let mut hashmap = FnvHashMap::default();
     if let Some(mut path) = config_dir() {
         path.push("namespaces");

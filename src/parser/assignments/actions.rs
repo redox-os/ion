@@ -4,7 +4,7 @@ use super::super::ArgumentSplitter;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
-pub enum AssignmentError<'a> {
+pub(crate) enum AssignmentError<'a> {
     NoKeys,
     NoOperator,
     NoValues,
@@ -33,7 +33,7 @@ impl<'a> Display for AssignmentError<'a> {
 ///
 /// Each request will tell the shell whether the assignment is asking to update an array or a
 /// string, and will contain the key/value pair to assign.
-pub struct AssignmentActions<'a> {
+pub(crate) struct AssignmentActions<'a> {
     keys:     KeyIterator<'a>,
     operator: Operator,
     values:   ArgumentSplitter<'a>,
@@ -42,7 +42,7 @@ pub struct AssignmentActions<'a> {
 }
 
 impl<'a> AssignmentActions<'a> {
-    pub fn new(data: &'a str) -> Result<AssignmentActions<'a>, AssignmentError<'a>> {
+    pub(crate) fn new(data: &'a str) -> Result<AssignmentActions<'a>, AssignmentError<'a>> {
         let (keys, op, vals) = split_assignment(data);
         Ok(AssignmentActions {
             keys:     keys.map(KeyIterator::new).ok_or(AssignmentError::NoKeys)?,
@@ -88,7 +88,7 @@ impl<'a> Iterator for AssignmentActions<'a> {
 /// Providing the key/value pair and operator to use during assignment, this variant defines
 /// whether the assignment should set a string or array.
 #[derive(Debug, PartialEq)]
-pub enum Action<'a> {
+pub(crate) enum Action<'a> {
     UpdateString(Key<'a>, Operator, &'a str),
     UpdateArray(Key<'a>, Operator, &'a str),
 }

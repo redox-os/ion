@@ -18,7 +18,7 @@ fn print_functions(functions: &FnvHashMap<Identifier, Function>) {
     }
 }
 
-pub fn fn_(functions: &mut FnvHashMap<Identifier, Function>) -> i32 {
+pub(crate) fn fn_(functions: &mut FnvHashMap<Identifier, Function>) -> i32 {
     print_functions(functions);
     SUCCESS
 }

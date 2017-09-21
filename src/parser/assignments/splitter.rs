@@ -1,5 +1,5 @@
 /// Given an valid assignment expression, this will split it into `keys`, `operator`, `values`.
-pub fn split_assignment<'a>(
+pub(crate) fn split_assignment<'a>(
     statement: &'a str,
 ) -> (Option<&'a str>, Option<&'a str>, Option<&'a str>) {
     let statement = statement.trim();

@@ -1,20 +1,20 @@
 mod collector;
 
-pub use self::collector::*;
+pub(crate) use self::collector::*;
 
 use super::{expand_string, Expander};
 use shell::{Job, JobKind};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum RedirectFrom {
+pub(crate) enum RedirectFrom {
     Stdout,
     Stderr,
     Both,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Redirection {
+pub(crate) struct Redirection {
     pub from:   RedirectFrom,
     pub file:   String,
     pub append: bool,
@@ -22,7 +22,7 @@ pub struct Redirection {
 
 /// Represents input that a process could initially receive from `stdin`
 #[derive(Debug, PartialEq, Clone)]
-pub enum Input {
+pub(crate) enum Input {
     /// A file; the contents of said file will be written to the `stdin` of a process
     File(String),
     /// A string literal that is written to the `stdin` of a process.
@@ -31,14 +31,14 @@ pub enum Input {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Pipeline {
+pub(crate) struct Pipeline {
     pub jobs:   Vec<Job>,
     pub stdout: Option<Redirection>,
     pub stdin:  Option<Input>,
 }
 
 impl Pipeline {
-    pub fn new(jobs: Vec<Job>, stdin: Option<Input>, stdout: Option<Redirection>) -> Self {
+    pub(crate) fn new(jobs: Vec<Job>, stdin: Option<Input>, stdout: Option<Redirection>) -> Self {
         Pipeline {
             jobs,
             stdin,
@@ -46,7 +46,7 @@ impl Pipeline {
         }
     }
 
-    pub fn expand<E: Expander>(&mut self, expanders: &E) {
+    pub(crate) fn expand<E: Expander>(&mut self, expanders: &E) {
         for job in &mut self.jobs {
             job.expand(expanders);
         }
@@ -68,7 +68,7 @@ impl Pipeline {
         }
     }
 
-    pub fn requires_piping(&self) -> bool {
+    pub(crate) fn requires_piping(&self) -> bool {
         self.jobs.len() > 1 || self.stdin != None || self.stdout != None ||
             self.jobs.last().unwrap().kind == JobKind::Background
     }

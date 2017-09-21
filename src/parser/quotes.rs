@@ -7,7 +7,7 @@ bitflags! {
     }
 }
 
-pub struct QuoteTerminator {
+pub(crate) struct QuoteTerminator {
     buffer:     String,
     eof:        Option<String>,
     eof_buffer: String,
@@ -16,7 +16,7 @@ pub struct QuoteTerminator {
 }
 
 impl QuoteTerminator {
-    pub fn new(input: String) -> QuoteTerminator {
+    pub(crate) fn new(input: String) -> QuoteTerminator {
         QuoteTerminator {
             buffer:     input,
             eof:        None,
@@ -26,7 +26,7 @@ impl QuoteTerminator {
         }
     }
 
-    pub fn append(&mut self, input: String) {
+    pub(crate) fn append(&mut self, input: String) {
         if self.eof.is_none() {
             self.buffer.push_str(if self.flags.contains(TRIM) { input.trim() } else { &input });
         } else {
@@ -34,7 +34,7 @@ impl QuoteTerminator {
         }
     }
 
-    pub fn check_termination(&mut self) -> bool {
+    pub(crate) fn check_termination(&mut self) -> bool {
         let mut eof_line = None;
         let eof = self.eof.clone();
         let status = if let Some(ref eof) = eof {
@@ -119,5 +119,5 @@ impl QuoteTerminator {
         status
     }
 
-    pub fn consume(self) -> String { self.buffer }
+    pub(crate) fn consume(self) -> String { self.buffer }
 }

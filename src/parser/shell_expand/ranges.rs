@@ -117,7 +117,7 @@ fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize)> {
 //      Inclusive nonstepped: {start...end}
 //      Exclusive stepped: {start..step..end}
 //      Inclusive stepped: {start..step...end}
-pub fn parse_range(input: &str) -> Option<Vec<String>> {
+pub(crate) fn parse_range(input: &str) -> Option<Vec<String>> {
     let mut read = 0;
     let mut bytes_iterator = input.bytes();
     while let Some(byte) = bytes_iterator.next() {
@@ -223,7 +223,7 @@ pub fn parse_range(input: &str) -> Option<Vec<String>> {
     None
 }
 
-pub fn parse_index_range(input: &str) -> Option<Range> {
+pub(crate) fn parse_index_range(input: &str) -> Option<Range> {
     let mut bytes_iterator = input.bytes().enumerate();
     while let Some((id, byte)) = bytes_iterator.next() {
         match byte {

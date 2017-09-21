@@ -19,7 +19,7 @@ use std::process;
 use sys;
 use types::*;
 
-pub trait Binary {
+pub(crate) trait Binary {
     /// Launches the shell, parses arguments, and then diverges into one of the `execution`
     /// paths.
     fn main(self);

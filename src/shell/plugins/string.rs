@@ -5,7 +5,7 @@ use types::Identifier;
 #[derive(Debug)]
 /// A possible error that can be caused when attempting to obtain or execute a
 /// function that is supposed to return a string from across the FFI boundaries.
-pub enum StringError {
+pub(crate) enum StringError {
     /// This occurs when a symbol could not be loaded from the library in question. It is an
     /// error that infers that the problem is with the plugin, not Ion itself.
     SymbolErr(io::Error),
