@@ -8,15 +8,16 @@ use std::mem::forget;
 use std::ptr;
 use std::slice;
 use std::str;
+use std::os::raw::c_char;
 use types::Identifier;
 
 /// Either one or the other will be set. Optional status can be conveyed by setting the
 /// corresponding field to `NULL`. Libraries importing this structure should check for nullness.
 #[repr(C)]
 pub(crate) struct RawMethodArguments {
-    key_ptr:       *mut i8,
-    key_array_ptr: *mut *mut i8,
-    args_ptr:      *mut *mut i8,
+    key_ptr:       *mut c_char,
+    key_array_ptr: *mut *mut c_char,
+    args_ptr:      *mut *mut c_char,
     key_len:       usize,
     args_len:      usize,
 }
@@ -36,7 +37,7 @@ impl From<MethodArguments> for RawMethodArguments {
                     .map(|x| unsafe {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
                     })
-                    .collect::<Vec<*mut i8>>();
+                    .collect::<Vec<*mut c_char>>();
                 args.shrink_to_fit();
                 let args_ptr = args.as_mut_ptr();
                 forget(args);
@@ -58,7 +59,7 @@ impl From<MethodArguments> for RawMethodArguments {
                     .map(|x| unsafe {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
                     })
-                    .collect::<Vec<*mut i8>>();
+                    .collect::<Vec<*mut c_char>>();
                 let key_array_ptr = key_array.as_mut_ptr();
                 forget(key_array);
 
@@ -67,7 +68,7 @@ impl From<MethodArguments> for RawMethodArguments {
                     .map(|x| unsafe {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
                     })
-                    .collect::<Vec<*mut i8>>();
+                    .collect::<Vec<*mut c_char>>();
                 args.shrink_to_fit();
                 let args_ptr = args.as_mut_ptr();
                 forget(args);
@@ -103,7 +104,7 @@ pub(crate) struct StringMethodPlugins {
     libraries: Vec<Library>,
     /// A map of all the symbols that were collected from the above libraries.
     pub symbols:
-        FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn(RawMethodArguments) -> *mut i8>>,
+        FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn(RawMethodArguments) -> *mut c_char>>,
 }
 
 impl StringMethodPlugins {
@@ -158,7 +159,7 @@ impl StringMethodPlugins {
 
                             // Then attempt to load that symbol from the dynamic library.
                             let symbol: Symbol<
-                                unsafe extern "C" fn(RawMethodArguments) -> *mut i8,
+                                unsafe extern "C" fn(RawMethodArguments) -> *mut c_char,
                             > = library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
 
                             // And finally add the name of the function and it's function into the
@@ -182,7 +183,7 @@ impl StringMethodPlugins {
                     symbol.extend_from_slice(slice);
                     symbol.push(b'\0');
                     let symbol: Symbol<
-                        unsafe extern "C" fn(RawMethodArguments) -> *mut i8,
+                        unsafe extern "C" fn(RawMethodArguments) -> *mut c_char,
                     > = library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
                     self.symbols.insert(identifier, symbol.into_raw());
                 }
@@ -209,7 +210,7 @@ impl StringMethodPlugins {
             if data.is_null() {
                 Ok(None)
             } else {
-                match CString::from_raw(data).to_str() {
+                match CString::from_raw(data as *mut c_char).to_str() {
                     Ok(string) => Ok(Some(string.to_owned())),
                     Err(_) => Err(StringError::UTF8Result),
                 }

@@ -6,6 +6,7 @@ use std::ffi::CString;
 use std::fs::read_dir;
 use std::slice;
 use std::str;
+use std::os::raw::c_char;
 use types::Identifier;
 
 /// A dynamically-loaded string namespace from an external library.
@@ -22,7 +23,7 @@ pub(crate) struct StringNamespace {
     library: Library,
     /// A hash map of symbols collected from the `Library` stored in the `library` field.
     /// These are considered raw because they have their lifetimes erased.
-    symbols: FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn() -> *mut i8>>,
+    symbols: FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn() -> *mut c_char>>,
 }
 
 impl StringNamespace {
@@ -71,7 +72,7 @@ impl StringNamespace {
 
                             // Then attempt to load that symbol from the dynamic library.
                             let symbol: Symbol<
-                                unsafe extern "C" fn() -> *mut i8,
+                                unsafe extern "C" fn() -> *mut c_char,
                             > = library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
 
                             // And finally add the name of the function and it's function into the
@@ -94,7 +95,7 @@ impl StringNamespace {
                     symbol.reserve_exact(slice.len() + 1);
                     symbol.extend_from_slice(slice);
                     symbol.push(b'\0');
-                    let symbol: Symbol<unsafe extern "C" fn() -> *mut i8> =
+                    let symbol: Symbol<unsafe extern "C" fn() -> *mut c_char> =
                         library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
                     symbols.insert(identifier, symbol.into_raw());
                 }
@@ -116,7 +117,7 @@ impl StringNamespace {
             if data.is_null() {
                 Ok(None)
             } else {
-                match CString::from_raw(data).to_str() {
+                match CString::from_raw(data as *mut c_char).to_str() {
                     Ok(string) => Ok(Some(string.to_owned())),
                     Err(_) => Err(StringError::UTF8Result),
                 }
