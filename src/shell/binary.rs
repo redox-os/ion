@@ -4,6 +4,7 @@ use super::{DirectoryStack, FlowLogic, JobControl, Shell, ShellHistory, Variable
 use super::completer::*;
 use super::flow_control::Statement;
 use super::status::*;
+use super::library::IonLibrary;
 use liner::{BasicCompleter, Buffer, Context, CursorPosition, Event, EventKind};
 use parser::*;
 use parser::QuoteTerminator;
@@ -11,7 +12,7 @@ use smallstring::SmallString;
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
-use std::io::{self, ErrorKind, Read, Write};
+use std::io::{self, ErrorKind, Write};
 use std::iter::{self, FromIterator};
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -27,8 +28,6 @@ pub(crate) trait Binary {
     fn execute_arguments<A: Iterator<Item = String>>(&mut self, args: A);
     /// Creates an interactive session that reads from a prompt provided by Liner.
     fn execute_interactive(self);
-    /// Executes all of the statements contained within a given script.
-    fn execute_script<P: AsRef<Path>>(&mut self, path: P);
     /// Ensures that read statements from a script are terminated.
     fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I);
     /// Ensures that read statements from the interactive prompt is terminated.
@@ -300,7 +299,9 @@ impl<'a> Binary for Shell<'a> {
                         array.push(arg.into());
                     }
                     self.variables.set_array("args", array);
-                    self.execute_script(&path);
+                    if let Err(err) = self.execute_script(&path) {
+                        eprintln!("ion: {}", err);
+                    }
                 }
             }
 
@@ -315,31 +316,6 @@ impl<'a> Binary for Shell<'a> {
     fn display_version(&self) {
         println!("{}", include!(concat!(env!("OUT_DIR"), "/version_string")));
         process::exit(0);
-    }
-
-    fn execute_script<P: AsRef<Path>>(&mut self, path: P) {
-        let path = path.as_ref();
-        match File::open(path) {
-            Ok(mut file) => {
-                let capacity = file.metadata().ok().map_or(0, |x| x.len());
-                let mut command_list = String::with_capacity(capacity as usize);
-                match file.read_to_string(&mut command_list) {
-                    Ok(_) => {
-                        self.terminate_script_quotes(command_list.lines().map(|x| x.to_owned()))
-                    }
-                    Err(err) => {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: failed to read {:?}: {}", path, err);
-                    }
-                }
-            }
-            Err(err) => {
-                let stderr = io::stderr();
-                let mut stderr = stderr.lock();
-                let _ = writeln!(stderr, "ion: failed to open {:?}: {}", path, err);
-            }
-        }
     }
 }
 

@@ -5,7 +5,7 @@ use std::collections::VecDeque;
 use std::env::{current_dir, home_dir, set_current_dir};
 use std::path::PathBuf;
 
-pub(crate) struct DirectoryStack {
+pub struct DirectoryStack {
     dirs: VecDeque<PathBuf>, // The top is always the current directory
 }
 

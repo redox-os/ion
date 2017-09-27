@@ -22,7 +22,7 @@ lazy_static! {
 }
 
 #[derive(Debug)]
-pub(crate) struct Variables {
+pub struct Variables {
     pub hashmaps:  HashMapVariableContext,
     pub arrays:    ArrayVariableContext,
     pub variables: VariableContext,
@@ -111,7 +111,7 @@ impl Variables {
         SUCCESS
     }
 
-    pub(crate) fn set_var(&mut self, name: &str, value: &str) {
+    pub fn set_var(&mut self, name: &str, value: &str) {
         if name == "NS_PLUGINS" {
             match value {
                 "0" => self.disable_plugins(),
@@ -132,7 +132,7 @@ impl Variables {
         }
     }
 
-    pub(crate) fn set_array(&mut self, name: &str, value: Array) {
+    pub fn set_array(&mut self, name: &str, value: Array) {
         if !name.is_empty() {
             if value.is_empty() {
                 self.arrays.remove(name);
@@ -156,11 +156,11 @@ impl Variables {
         }
     }
 
-    pub(crate) fn get_map(&self, name: &str) -> Option<&HashMap> { self.hashmaps.get(name) }
+    pub fn get_map(&self, name: &str) -> Option<&HashMap> { self.hashmaps.get(name) }
 
-    pub(crate) fn get_array(&self, name: &str) -> Option<&Array> { self.arrays.get(name) }
+    pub fn get_array(&self, name: &str) -> Option<&Array> { self.arrays.get(name) }
 
-    pub(crate) fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
+    pub fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
 
     /// Obtains the value for the **SWD** variable.
     ///
@@ -202,7 +202,7 @@ impl Variables {
         swd
     }
 
-    pub(crate) fn get_var(&self, name: &str) -> Option<Value> {
+    pub fn get_var(&self, name: &str) -> Option<Value> {
         match name {
             "SWD" => return Some(self.get_simplified_directory()),
             "MWD" => return Some(self.get_minimal_directory()),
@@ -253,11 +253,11 @@ impl Variables {
         }
     }
 
-    pub(crate) fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
+    pub fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
 
-    pub(crate) fn unset_var(&mut self, name: &str) -> Option<Value> { self.variables.remove(name) }
+    pub fn unset_var(&mut self, name: &str) -> Option<Value> { self.variables.remove(name) }
 
-    pub(crate) fn get_vars(&self) -> Vec<Identifier> {
+    pub fn get_vars(&self) -> Vec<Identifier> {
         self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k.into())).collect()
     }
 

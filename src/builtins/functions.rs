@@ -9,7 +9,7 @@ fn print_functions(functions: &FnvHashMap<Identifier, Function>) {
     let stdout = &mut stdout.lock();
     let _ = writeln!(stdout, "# Functions");
     for fn_name in functions.keys() {
-        let description = &functions.get(fn_name).unwrap().description;
+        let description = &functions.get(fn_name).unwrap().get_description();
         if let Some(ref description) = *description {
             let _ = writeln!(stdout, "    {} -- {}", fn_name, description);
         } else {

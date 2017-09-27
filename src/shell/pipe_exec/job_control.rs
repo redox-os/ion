@@ -44,7 +44,7 @@ pub(crate) trait JobControl {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 /// Defines whether the background process is running or stopped.
-pub(crate) enum ProcessState {
+pub enum ProcessState {
     Running,
     Stopped,
     Empty,
@@ -95,7 +95,7 @@ pub(crate) fn add_to_background(
 /// by the shell. The shell will only retain information about the process, such
 /// as the process ID, state that the process is in, and the command that the
 /// process is executing.
-pub(crate) struct BackgroundProcess {
+pub struct BackgroundProcess {
     pub pid:           u32,
     pub ignore_sighup: bool,
     pub state:         ProcessState,

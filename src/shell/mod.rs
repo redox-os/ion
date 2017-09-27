@@ -5,14 +5,15 @@ mod flow;
 mod history;
 mod job;
 mod pipe_exec;
-pub mod colors;
-pub mod directory_stack;
+pub(crate) mod colors;
+pub(crate) mod directory_stack;
 pub mod flags;
-pub mod plugins;
-pub mod flow_control;
-pub mod signals;
+pub(crate) mod plugins;
+pub(crate) mod flow_control;
+pub(crate) mod signals;
 pub mod status;
 pub mod variables;
+pub mod library;
 
 pub(crate) use self::binary::Binary;
 pub(crate) use self::flow::FlowLogic;
@@ -25,6 +26,7 @@ use self::flags::*;
 use self::flow_control::{FlowControl, Function, FunctionError};
 use self::foreground::ForegroundSignals;
 use self::job_control::{BackgroundProcess, JobControl};
+use self::library::IonLibrary;
 use self::pipe_exec::PipelineExecution;
 use self::status::*;
 use self::variables::Variables;
@@ -49,7 +51,7 @@ use types::*;
 /// the entirety of the
 /// program. It is initialized at the beginning of the program, and lives until the end of the
 /// program.
-pub(crate) struct Shell<'a> {
+pub struct Shell<'a> {
     /// Contains a list of built-in commands that were created when the program started.
     pub builtins: &'a FnvHashMap<&'static str, Builtin>,
     /// Contains the history, completions, and manages writes to the history file.
@@ -80,7 +82,7 @@ pub(crate) struct Shell<'a> {
     pub break_flow: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
-    pub foreground_signals: Arc<ForegroundSignals>,
+    foreground_signals: Arc<ForegroundSignals>,
     /// Stores the patterns used to determine whether a command should be saved in the history
     /// or not
     ignore_setting: IgnoreSetting,
@@ -88,7 +90,7 @@ pub(crate) struct Shell<'a> {
 
 impl<'a> Shell<'a> {
     /// Panics if DirectoryStack construction fails
-    pub(crate) fn new(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
+    pub fn new(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
         Shell {
             builtins:            builtins,
             context:             None,
@@ -147,7 +149,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Evaluates the source init file in the user's home directory.
-    pub(crate) fn evaluate_init_file(&mut self) {
+    pub fn evaluate_init_file(&mut self) {
         match app_root(
             AppDataType::UserConfig,
             &AppInfo {
@@ -158,7 +160,9 @@ impl<'a> Shell<'a> {
             Ok(mut initrc) => {
                 initrc.push("initrc");
                 if initrc.exists() {
-                    self.execute_script(&initrc);
+                    if let Err(err) = self.execute_script(&initrc) {
+                        eprintln!("ion: {}", err);
+                    }
                 } else {
                     eprintln!("ion: creating initrc file at {:?}", initrc);
                     if let Err(why) = File::create(initrc) {

@@ -195,12 +195,7 @@ impl<'a> FlowLogic for Shell<'a> {
                         } => {
                             shell.functions.insert(
                                 name.clone(),
-                                Function {
-                                    name:        name,
-                                    args:        args,
-                                    statements:  statements,
-                                    description: description,
-                                },
+                                Function::new(description, name, args, statements),
                             );
                         }
                         Statement::If {
@@ -449,12 +444,7 @@ impl<'a> FlowLogic for Shell<'a> {
                 collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
                 self.functions.insert(
                     name.clone(),
-                    Function {
-                        description: description,
-                        name:        name,
-                        args:        args,
-                        statements:  statements,
-                    },
+                    Function::new(description, name, args, statements),
                 );
             }
             Statement::Pipeline(mut pipeline) => {
@@ -737,12 +727,7 @@ impl<'a> FlowLogic for Shell<'a> {
                     // All blocks were read, thus we can add it to the list
                     self.functions.insert(
                         name.clone(),
-                        Function {
-                            description: description,
-                            name:        name,
-                            args:        args,
-                            statements:  statements,
-                        },
+                        Function::new(description, name, args, statements),
                     );
                 } else {
                     // Store the partial function declaration in memory.

@@ -123,11 +123,11 @@ impl Default for FlowControl {
 }
 
 #[derive(Clone)]
-pub(crate) struct Function {
-    pub description: Option<String>,
-    pub name:        Identifier,
-    pub args:        Vec<KeyBuf>,
-    pub statements:  Vec<Statement>,
+pub struct Function {
+    description: Option<String>,
+    name:        Identifier,
+    args:        Vec<KeyBuf>,
+    statements:  Vec<Statement>,
 }
 
 pub(crate) enum FunctionError {
@@ -136,6 +136,19 @@ pub(crate) enum FunctionError {
 }
 
 impl Function {
+    pub(crate) fn new(
+        description: Option<String>,
+        name: Identifier,
+        args: Vec<KeyBuf>,
+        statements: Vec<Statement>
+    ) -> Function {
+        Function { description, name, args, statements }
+    }
+
+    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> {
+        self.description.as_ref()
+    }
+
     pub(crate) fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
             return Err(FunctionError::InvalidArgumentCount);
