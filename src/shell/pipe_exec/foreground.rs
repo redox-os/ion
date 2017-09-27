@@ -28,7 +28,9 @@ impl ForegroundSignals {
         }
     }
 
-    pub(crate) fn signal_to_grab(&self, pid: u32) { self.grab.store(pid as usize, Ordering::Relaxed); }
+    pub(crate) fn signal_to_grab(&self, pid: u32) {
+        self.grab.store(pid as usize, Ordering::Relaxed);
+    }
 
     pub(crate) fn reply_with(&self, status: i8) {
         self.grab.store(0, Ordering::Relaxed);

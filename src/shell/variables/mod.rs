@@ -21,7 +21,7 @@ lazy_static! {
     static ref STRING_NAMESPACES: FnvHashMap<Identifier, StringNamespace> = namespaces::collect();
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Variables {
     pub hashmaps:  HashMapVariableContext,
     pub arrays:    ArrayVariableContext,

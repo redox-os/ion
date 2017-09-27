@@ -4,9 +4,9 @@ use libloading::{Library, Symbol};
 use libloading::os::unix::Symbol as RawSymbol;
 use std::ffi::CString;
 use std::fs::read_dir;
+use std::os::raw::c_char;
 use std::slice;
 use std::str;
-use std::os::raw::c_char;
 use types::Identifier;
 
 /// A dynamically-loaded string namespace from an external library.

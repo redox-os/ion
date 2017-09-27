@@ -145,7 +145,11 @@ fn slice<S: AsRef<str>>(output: &mut String, expanded: S, selection: Select) {
 /// Performs shell expansions to an input string, efficiently returning the final
 /// expanded form. Shells must provide their own batteries for expanding tilde
 /// and variable words.
-pub(crate) fn expand_string<E: Expander>(original: &str, expand_func: &E, reverse_quoting: bool) -> Array {
+pub(crate) fn expand_string<E: Expander>(
+    original: &str,
+    expand_func: &E,
+    reverse_quoting: bool,
+) -> Array {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
 

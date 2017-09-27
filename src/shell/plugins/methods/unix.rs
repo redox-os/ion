@@ -5,10 +5,10 @@ use libloading::os::unix::Symbol as RawSymbol;
 use std::ffi::CString;
 use std::fs::read_dir;
 use std::mem::forget;
+use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
 use std::str;
-use std::os::raw::c_char;
 use types::Identifier;
 
 /// Either one or the other will be set. Optional status can be conveyed by setting the
@@ -159,7 +159,8 @@ impl StringMethodPlugins {
 
                             // Then attempt to load that symbol from the dynamic library.
                             let symbol: Symbol<
-                                unsafe extern "C" fn(RawMethodArguments) -> *mut c_char,
+                                unsafe extern "C" fn(RawMethodArguments)
+                                    -> *mut c_char,
                             > = library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
 
                             // And finally add the name of the function and it's function into the

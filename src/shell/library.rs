@@ -1,6 +1,6 @@
-use super::{FlowLogic, Binary, Shell};
-use std::io::{self, Read};
+use super::{Binary, FlowLogic, Shell};
 use std::fs::File;
+use std::io::{self, Read};
 use std::path::Path;
 
 pub trait IonLibrary {

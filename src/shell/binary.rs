@@ -3,8 +3,8 @@
 use super::{DirectoryStack, FlowLogic, JobControl, Shell, ShellHistory, Variables};
 use super::completer::*;
 use super::flow_control::Statement;
-use super::status::*;
 use super::library::IonLibrary;
+use super::status::*;
 use liner::{BasicCompleter, Buffer, Context, CursorPosition, Event, EventKind};
 use parser::*;
 use parser::QuoteTerminator;

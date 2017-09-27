@@ -449,7 +449,11 @@ impl<'a> PipelineExecution for Shell<'a> {
 }
 
 /// This function will panic if called with an empty slice
-pub(crate) fn pipe(shell: &mut Shell, commands: Vec<(RefinedJob, JobKind)>, foreground: bool) -> i32 {
+pub(crate) fn pipe(
+    shell: &mut Shell,
+    commands: Vec<(RefinedJob, JobKind)>,
+    foreground: bool,
+) -> i32 {
     fn close(file: &Option<File>) {
         if let &Some(ref file) = file {
             if let Err(e) = sys::close(file.as_raw_fd()) {

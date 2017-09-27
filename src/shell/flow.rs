@@ -442,10 +442,8 @@ impl<'a> FlowLogic for Shell<'a> {
             } => {
                 self.flow_control.level += 1;
                 collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
-                self.functions.insert(
-                    name.clone(),
-                    Function::new(description, name, args, statements),
-                );
+                self.functions
+                    .insert(name.clone(), Function::new(description, name, args, statements));
             }
             Statement::Pipeline(mut pipeline) => {
                 self.run_pipeline(&mut pipeline);
@@ -725,10 +723,8 @@ impl<'a> FlowLogic for Shell<'a> {
 
                 if self.flow_control.level == 0 {
                     // All blocks were read, thus we can add it to the list
-                    self.functions.insert(
-                        name.clone(),
-                        Function::new(description, name, args, statements),
-                    );
+                    self.functions
+                        .insert(name.clone(), Function::new(description, name, args, statements));
                 } else {
                     // Store the partial function declaration in memory.
                     self.flow_control.current_statement = Statement::Function {

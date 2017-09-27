@@ -19,7 +19,9 @@ lazy_static! {
 impl<'a> Collector<'a> {
     pub(crate) fn new(data: &'a str) -> Self { Collector { data } }
 
-    pub(crate) fn run(data: &'a str) -> Result<Pipeline, &'static str> { Collector::new(data).parse() }
+    pub(crate) fn run(data: &'a str) -> Result<Pipeline, &'static str> {
+        Collector::new(data).parse()
+    }
 
     fn peek(&self, index: usize) -> Option<u8> {
         if index < self.data.len() {

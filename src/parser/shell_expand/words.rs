@@ -659,7 +659,11 @@ pub(crate) struct WordIterator<'a, E: Expander + 'a> {
 }
 
 impl<'a, E: Expander + 'a> WordIterator<'a, E> {
-    pub(crate) fn new(data: &'a str, expand_processes: bool, expanders: &'a E) -> WordIterator<'a, E> {
+    pub(crate) fn new(
+        data: &'a str,
+        expand_processes: bool,
+        expanders: &'a E,
+    ) -> WordIterator<'a, E> {
         let flags = if expand_processes { EXPAND_PROCESSES } else { Flags::empty() };
         WordIterator {
             data,

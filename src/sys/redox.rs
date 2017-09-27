@@ -76,7 +76,9 @@ pub(crate) fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
 
 pub(crate) fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(syscall::dup(fd, &[])) }
 
-pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(syscall::dup2(old, new, &[])) }
+pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
+    cvt(syscall::dup2(old, new, &[]))
+}
 
 pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(syscall::close(fd)).and(Ok(())) }
 
@@ -96,12 +98,16 @@ fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
 
 // TODO
 pub mod signals {
-    pub(crate) fn block() {}
+    pub(crate) fn block() // fn block() // fn block()
+    {
+    }
 
     /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
     /// controlled
     /// by the shell.
-    pub(crate) fn unblock() {}
+    pub(crate) fn unblock() // fn unblock() // fn unblock()
+    {
+    }
 }
 
 pub mod job_control {

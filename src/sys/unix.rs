@@ -70,7 +70,9 @@ pub(crate) fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
 
 pub(crate) fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup(fd) }) }
 
-pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup2(old, new) }) }
+pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
+    cvt(unsafe { libc::dup2(old, new) })
+}
 
 pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
 
@@ -103,7 +105,8 @@ fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
 pub mod signals {
     /// Blocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so that the shell never receives
     /// them.
-    pub(crate) fn block() {
+    pub(crate) fn block() // fn block() // fn block()
+    {
         unsafe {
             use libc::*;
             use std::mem;
@@ -121,7 +124,8 @@ pub mod signals {
     /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
     /// controlled
     /// by the shell.
-    pub(crate) fn unblock() {
+    pub(crate) fn unblock() // fn unblock() // fn unblock()
+    {
         unsafe {
             use libc::*;
             use std::mem;

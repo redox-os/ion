@@ -140,14 +140,17 @@ impl Function {
         description: Option<String>,
         name: Identifier,
         args: Vec<KeyBuf>,
-        statements: Vec<Statement>
+        statements: Vec<Statement>,
     ) -> Function {
-        Function { description, name, args, statements }
+        Function {
+            description,
+            name,
+            args,
+            statements,
+        }
     }
 
-    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> {
-        self.description.as_ref()
-    }
+    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> { self.description.as_ref() }
 
     pub(crate) fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
