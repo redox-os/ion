@@ -308,12 +308,7 @@ fn test_evaluate_arguments() {
 
     shell.functions.insert(
         name.clone(),
-        Function {
-            name:        name,
-            args:        args,
-            statements:  statements,
-            description: Some(description),
-        },
+        Function::new(Some(description), name, args, statements)
     );
 
     assert_eq!(evaluate_arguments(&["--fn", name_str], &mut sink, &shell), Ok(true));
@@ -461,12 +456,7 @@ fn test_function_is_defined() {
 
     shell.functions.insert(
         name.clone(),
-        Function {
-            name:        name,
-            args:        args,
-            statements:  statements,
-            description: Some(description),
-        },
+        Function::new(Some(description), name, args, statements)
     );
 
     assert_eq!(function_is_defined(name_str, &shell), true);

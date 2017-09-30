@@ -259,6 +259,7 @@ mod tests {
 
         // Leading spaces after final value
         let parsed_if = parse("         fn bob");
+        assert_eq!(correct_parse, parsed_if);
 
         // Default case where spaced normally
         let parsed_if = parse("fn bob a b");

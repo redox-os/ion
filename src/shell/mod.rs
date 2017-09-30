@@ -80,6 +80,8 @@ pub struct Shell<'a> {
     pub is_background_shell: bool,
     /// Set when a signal is received, this will tell the flow control logic to abort.
     pub break_flow: bool,
+    // Useful for disabling the execution of the `tcsetpgrp` call.
+    pub is_library: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,
@@ -89,7 +91,30 @@ pub struct Shell<'a> {
 }
 
 impl<'a> Shell<'a> {
+    #[allow(dead_code)]
     /// Panics if DirectoryStack construction fails
+    pub(crate) fn new_bin(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
+        Shell {
+            builtins:            builtins,
+            context:             None,
+            variables:           Variables::default(),
+            flow_control:        FlowControl::default(),
+            directory_stack:     DirectoryStack::new(),
+            functions:           FnvHashMap::default(),
+            previous_job:        !0,
+            previous_status:     0,
+            flags:               0,
+            foreground:          Vec::new(),
+            background:          Arc::new(Mutex::new(Vec::new())),
+            is_background_shell: false,
+            is_library:          false,
+            break_flow:          false,
+            foreground_signals:  Arc::new(ForegroundSignals::new()),
+            ignore_setting:      IgnoreSetting::default(),
+        }
+    }
+
+    #[allow(dead_code)]
     pub fn new(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
         Shell {
             builtins:            builtins,
@@ -104,6 +129,7 @@ impl<'a> Shell<'a> {
             foreground:          Vec::new(),
             background:          Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
+            is_library:          true,
             break_flow:          false,
             foreground_signals:  Arc::new(ForegroundSignals::new()),
             ignore_setting:      IgnoreSetting::default(),

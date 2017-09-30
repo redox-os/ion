@@ -71,6 +71,6 @@ fn main() {
     }
 
     let builtins = Builtin::map();
-    let shell = Shell::new(&builtins);
+    let shell = Shell::new_bin(&builtins);
     shell.main();
 }

@@ -253,7 +253,7 @@ impl<'a> PipelineExecution for Shell<'a> {
             // Execute each command in the pipeline, giving each command the foreground.
             let exit_status = pipe(self, piped_commands, foreground);
             // Set the shell as the foreground process again to regain the TTY.
-            if foreground {
+            if foreground && !self.is_library {
                 let _ = sys::tcsetpgrp(0, sys::getpid().unwrap());
             }
             exit_status
@@ -324,7 +324,7 @@ impl<'a> PipelineExecution for Shell<'a> {
                     .spawn()
             } {
                 Ok(child) => {
-                    if foreground {
+                    if foreground && !self.is_library {
                         let _ = sys::tcsetpgrp(0, child.id());
                     }
                     self.watch_foreground(child.id(), child.id(), move || long, |_| ())
@@ -513,7 +513,7 @@ pub(crate) fn pipe(
                                         Ok(child) => {
                                             if pgid == 0 {
                                                 pgid = child.id();
-                                                if foreground {
+                                                if foreground && !shell.is_library {
                                                     let _ = sys::tcsetpgrp(0, pgid);
                                                 }
                                             }
@@ -560,7 +560,7 @@ pub(crate) fn pipe(
                                         Ok(pid) => {
                                             if pgid == 0 {
                                                 pgid = pid;
-                                                if foreground {
+                                                if foreground && !shell.is_library {
                                                     let _ = sys::tcsetpgrp(0, pgid);
                                                 }
                                             }
@@ -603,7 +603,7 @@ pub(crate) fn pipe(
                                         Ok(pid) => {
                                             if pgid == 0 {
                                                 pgid = pid;
-                                                if foreground {
+                                                if foreground && !shell.is_library {
                                                     let _ = sys::tcsetpgrp(0, pgid);
                                                 }
                                             }
