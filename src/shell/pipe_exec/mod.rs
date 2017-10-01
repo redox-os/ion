@@ -182,7 +182,7 @@ pub(crate) trait PipelineExecution {
     ///
     /// Each generated command will either be a builtin or external command, and will be
     /// associated will be marked as an `&&`, `||`, `|`, or final job.
-    fn generate_commands(&self, pipeline: &mut Pipeline) -> Vec<(RefinedJob, JobKind)>;
+    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<(RefinedJob, JobKind)>, i32>;
 
     /// Waits for all of the children within a pipe to finish exuecting, returning the
     /// exit status of the last process in the queue.
@@ -230,7 +230,10 @@ impl<'a> PipelineExecution for Shell<'a> {
         let possible_background_name =
             gen_background_string(&pipeline, self.flags & PRINT_COMMS != 0);
         // Generates commands for execution, differentiating between external and builtin commands.
-        let mut piped_commands = self.generate_commands(pipeline);
+        let mut piped_commands = match self.generate_commands(pipeline) {
+            Ok(commands) => commands,
+            Err(error) => return error
+        };
         // Redirect the inputs if a custom redirect value was given.
         if let Some(stdin) = pipeline.stdin.take() {
             if redirect_input(stdin, &mut piped_commands) {
@@ -260,32 +263,33 @@ impl<'a> PipelineExecution for Shell<'a> {
         }
     }
 
-    fn generate_commands(&self, pipeline: &mut Pipeline) -> Vec<(RefinedJob, JobKind)> {
-        pipeline
-            .jobs
-            .drain(..)
-            .map(|mut job| {
-                let refined = {
-                    if is_implicit_cd(&job.args[0]) {
-                        RefinedJob::builtin(
-                            "cd".into(),
-                            iter::once("cd".into()).chain(job.args.drain()).collect(),
-                        )
-                    } else if self.functions.contains_key::<str>(job.command.as_ref()) {
-                        RefinedJob::function(job.command, job.args.drain().collect())
-                    } else if self.builtins.contains_key::<str>(job.command.as_ref()) {
-                        RefinedJob::builtin(job.command, job.args.drain().collect())
-                    } else {
-                        let mut command = Command::new(job.command);
-                        for arg in job.args.drain().skip(1) {
-                            command.arg(arg);
-                        }
-                        RefinedJob::External(command)
+    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<(RefinedJob, JobKind)>, i32> {
+        let mut results = Vec::new();
+        for mut job in pipeline.jobs.drain(..) {
+            let refined = {
+                if is_implicit_cd(&job.args[0]) {
+                    RefinedJob::builtin(
+                        "cd".into(),
+                        iter::once("cd".into()).chain(job.args.drain()).collect(),
+                    )
+                } else if Path::new(&job.args[0]).is_dir() {
+                    eprintln!("ion: cannot execute directory as command");
+                    return Err(FAILURE);
+                } else if self.functions.contains_key::<str>(job.command.as_ref()) {
+                    RefinedJob::function(job.command, job.args.drain().collect())
+                } else if self.builtins.contains_key::<str>(job.command.as_ref()) {
+                    RefinedJob::builtin(job.command, job.args.drain().collect())
+                } else {
+                    let mut command = Command::new(job.command);
+                    for arg in job.args.drain().skip(1) {
+                        command.arg(arg);
                     }
-                };
-                (refined, job.kind)
-            })
-            .collect()
+                    RefinedJob::External(command)
+                }
+            };
+            results.push((refined, job.kind));
+        }
+        Ok(results)
     }
 
     fn wait(&mut self, mut children: Vec<u32>, mut commands: Vec<RefinedJob>) -> i32 {
