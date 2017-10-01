@@ -164,6 +164,11 @@ impl<'a> VariableStore for Shell<'a> {
                     }
                 }
             },
+            Err(AssignmentError::NoOperator) => for var in expression.split_whitespace() {
+                if let Some(value) = self.variables.get_var(var) {
+                    env::set_var(var, value);
+                }
+            },
             Err(AssignmentError::NoKeys) => {
                 let stdout = io::stdout();
                 let stdout = &mut stdout.lock();
