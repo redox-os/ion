@@ -12,11 +12,13 @@ use smallstring::SmallString;
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
-use std::io::{self, ErrorKind, Write};
+use std::io::{self, ErrorKind, Read, Write};
 use std::iter::{self, FromIterator};
 use std::mem;
+use std::os::unix::io::FromRawFd;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::process::exit;
 use sys;
 use types::*;
 
@@ -36,18 +38,61 @@ pub(crate) trait Binary {
     /// rendering, controlling, and getting input from the prompt.
     fn readln(&mut self) -> Option<String>;
     /// Generates the prompt that will be used by Liner.
-    fn prompt(&self) -> String;
+    fn prompt(&mut self) -> String;
     /// Display version information and exit
     fn display_version(&self);
+    // Executes the PROMPT function, if it exists, and returns the output.
+    fn prompt_fn(&mut self) -> Option<String>;
 }
 
 impl<'a> Binary for Shell<'a> {
-    fn prompt(&self) -> String {
+    fn prompt(&mut self) -> String {
         if self.flow_control.level == 0 {
-            let prompt_var = self.variables.get_var_or_empty("PROMPT");
-            expand_string(&prompt_var, self, false).join(" ")
+            let rprompt = match self.prompt_fn() {
+                Some(prompt) => prompt,
+                None => self.variables.get_var_or_empty("PROMPT"),
+            };
+            expand_string(&rprompt, self, false).join(" ")
         } else {
             "    ".repeat(self.flow_control.level as usize)
+        }
+    }
+
+    fn prompt_fn(&mut self) -> Option<String> {
+        let function = match self.functions.get("PROMPT") {
+            Some(func) => func.clone(),
+            None => return None,
+        };
+
+        let (read_fd, write_fd) = match sys::pipe2(0) {
+            Ok(fds) => fds,
+            Err(why) => {
+                eprintln!("ion: unable to create pipe: {}", why);
+                return None;
+            }
+        };
+
+        match unsafe { sys::fork() } {
+            Ok(0) => {
+                let _ = sys::dup2(write_fd, sys::STDOUT_FILENO);
+                let _ = sys::close(read_fd);
+                let _ = sys::close(write_fd);
+                let _ = function.execute(self, &["ion"]);
+                exit(0);
+            }
+            Ok(_) => {
+                let _ = sys::close(write_fd);
+                let mut child_stdout = unsafe { File::from_raw_fd(read_fd) };
+                let mut output = String::new();
+                let _ = child_stdout.read_to_string(&mut output);
+                Some(output)
+            }
+            Err(why) => {
+                let _ = sys::close(read_fd);
+                let _ = sys::close(write_fd);
+                eprintln!("ion: fork error: {}", why);
+                None
+            }
         }
     }
 
@@ -55,9 +100,6 @@ impl<'a> Binary for Shell<'a> {
         {
             let vars_ptr = &self.variables as *const Variables;
             let dirs_ptr = &self.directory_stack as *const DirectoryStack;
-            let funcs = &self.functions;
-            let vars = &self.variables;
-            let builtins = self.builtins;
 
             // Collects the current list of values from history for completion.
             let history = &self.context.as_ref().unwrap().history.buffers.iter()
@@ -68,6 +110,10 @@ impl<'a> Binary for Shell<'a> {
 
             loop {
                 let prompt = self.prompt();
+                let funcs = &self.functions;
+                let vars = &self.variables;
+                let builtins = self.builtins;
+
                 let line = self.context.as_mut().unwrap().read_line(
                     prompt,
                     &mut move |Event {

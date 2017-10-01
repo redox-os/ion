@@ -8,3 +8,4 @@ These are features of Ion that don't belong to any specific category:
 - [Multi-line Arguments](ch03-04-multiargs.html)
 - [Multi-line Comments](ch03-05-multicomments.html)
 - [General Tips](ch03-06-general.html)
+- [Prompt Function](ch03-07-prompt_fn.html)
