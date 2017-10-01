@@ -69,8 +69,8 @@ impl Pipeline {
     }
 
     pub(crate) fn requires_piping(&self) -> bool {
-        self.jobs.len() > 1 || self.stdin != None || self.stdout != None ||
-            self.jobs.last().unwrap().kind == JobKind::Background
+        self.jobs.len() > 1 || self.stdin != None || self.stdout != None
+            || self.jobs.last().unwrap().kind == JobKind::Background
     }
 }
 

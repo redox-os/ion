@@ -67,8 +67,8 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b')' if self.flags & SINGLE == 0 => level -= 1,
                 b'"' if self.flags & SINGLE == 0 => self.flags ^= DOUBLE,
                 b'\'' if self.flags & DOUBLE == 0 => self.flags ^= SINGLE,
-                b' ' if self.flags & (SINGLE + DOUBLE + METHOD) == 0 && level == 0 &&
-                    array_level == 0 && array_process_level == 0 =>
+                b' ' if self.flags & (SINGLE + DOUBLE + METHOD) == 0 && level == 0
+                    && array_level == 0 && array_process_level == 0 =>
                 {
                     break
                 }

@@ -306,10 +306,7 @@ fn test_evaluate_arguments() {
     statements.push(Statement::End);
     let description = "description".to_owned();
 
-    shell.functions.insert(
-        name.clone(),
-        Function::new(Some(description), name, args, statements)
-    );
+    shell.functions.insert(name.clone(), Function::new(Some(description), name, args, statements));
 
     assert_eq!(evaluate_arguments(&["--fn", name_str], &mut sink, &shell), Ok(true));
     shell.functions.remove(name_str);
@@ -454,10 +451,7 @@ fn test_function_is_defined() {
     statements.push(Statement::End);
     let description = "description".to_owned();
 
-    shell.functions.insert(
-        name.clone(),
-        Function::new(Some(description), name, args, statements)
-    );
+    shell.functions.insert(name.clone(), Function::new(Some(description), name, args, statements));
 
     assert_eq!(function_is_defined(name_str, &shell), true);
     shell.functions.remove(name_str);

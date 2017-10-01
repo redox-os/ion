@@ -196,13 +196,13 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 } else {
                     self.math_paren_level -= 1;
                 },
-                b')' if !self.flags.contains(SQUOTE) && self.flags.contains(METHOD) &&
-                    self.process_level == 0 =>
+                b')' if !self.flags.contains(SQUOTE) && self.flags.contains(METHOD)
+                    && self.process_level == 0 =>
                 {
                     self.flags ^= METHOD;
                 }
-                b')' if self.process_level == 0 && self.array_process_level == 0 &&
-                    !self.flags.contains(SQUOTE) =>
+                b')' if self.process_level == 0 && self.array_process_level == 0
+                    && !self.flags.contains(SQUOTE) =>
                 {
                     if error.is_none() && !self.flags.intersects(SQUOTE | DQUOTE) {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
@@ -212,18 +212,18 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.process_level -= 1
                 }
                 b')' if !self.flags.contains(SQUOTE) => self.array_process_level -= 1,
-                b';' if !self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0 &&
-                    self.array_process_level == 0 =>
+                b';' if !self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0
+                    && self.array_process_level == 0 =>
                 {
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(self.data[start..self.read - 1].trim())),
                     }
                 }
-                b'#' if self.read == 1 ||
-                    (!self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0 &&
-                        self.array_process_level == 0 &&
-                        match self.data.as_bytes()[self.read - 2] {
+                b'#' if self.read == 1
+                    || (!self.flags.intersects(SQUOTE | DQUOTE) && self.process_level == 0
+                        && self.array_process_level == 0
+                        && match self.data.as_bytes()[self.read - 2] {
                             b' ' | b'\t' => true,
                             _ => false,
                         }) =>
@@ -270,8 +270,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
             self.read = self.data.len();
             match error {
                 Some(error) => Some(Err(error)),
-                None if self.process_level != 0 || self.array_process_level != 0 ||
-                    self.array_level != 0 =>
+                None if self.process_level != 0 || self.array_process_level != 0
+                    || self.array_level != 0 =>
                 {
                     Some(Err(StatementError::UnterminatedSubshell))
                 }

@@ -74,8 +74,8 @@ fn gen_background_string(pipeline: &Pipeline, print_comm: bool) -> Option<String
 /// directory path.
 #[inline(always)]
 fn is_implicit_cd(argument: &str) -> bool {
-    (argument.starts_with('.') || argument.starts_with('/') || argument.ends_with('/')) &&
-        Path::new(argument).is_dir()
+    (argument.starts_with('.') || argument.starts_with('/') || argument.ends_with('/'))
+        && Path::new(argument).is_dir()
 }
 
 /// This function is to be executed when a stdin value is supplied to a pipeline job.

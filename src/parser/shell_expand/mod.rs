@@ -18,8 +18,8 @@ use types::*;
 /// bare word. For example, strings starting with '"', '\'', '@', or '$' are
 /// all expressions
 pub(crate) fn is_expression(s: &str) -> bool {
-    s.starts_with('@') || s.starts_with('[') || s.starts_with('$') || s.starts_with('"') ||
-        s.starts_with('\'')
+    s.starts_with('@') || s.starts_with('[') || s.starts_with('$') || s.starts_with('"')
+        || s.starts_with('\'')
 }
 
 /// Trait representing different elements of string expansion

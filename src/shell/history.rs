@@ -168,8 +168,8 @@ impl<'a> ShellHistoryPrivate for Shell<'a> {
             // ignore command when regex is matched but only if it does not contain
             // "HISTORY_IGNORE", otherwise we would also ignore the command which
             // sets the variable, which could be annoying.
-            if regexes.iter().any(|regex| regex.is_match(command)) &&
-                !command.contains("HISTORY_IGNORE")
+            if regexes.iter().any(|regex| regex.is_match(command))
+                && !command.contains("HISTORY_IGNORE")
             {
                 return false;
             }
