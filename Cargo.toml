@@ -72,5 +72,5 @@ version_check = "0.1.3"
 [profile.release]
 # debug = true
 # rustflags = [ "-C", "target-cpu=native"]
-lto = true
+# lto = true
 panic = "abort"

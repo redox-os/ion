@@ -1179,7 +1179,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             for _ in 0..moves {
                 iterator.next();
             }
-            self.read += moves + 1;
+            self.read += moves;
             true
         } else {
             self.read += 1;
@@ -1278,7 +1278,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                         self.read += 1;
                         return Some(self.braces(&mut iterator));
                     }
-                    b'[' if !self.flags.contains(SQUOTE) => if self.glob_check(&mut iterator) {
+                    b'[' if !self.flags.contains(SQUOTE | DQUOTE) => if self.glob_check(&mut iterator) {
                         glob = true;
                     } else {
                         return Some(self.array(&mut iterator));
@@ -1398,7 +1398,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                         return self.next();
                     };
                 }
-                b'[' if !self.flags.contains(SQUOTE) => if self.glob_check(&mut iterator) {
+                b'[' if !self.flags.contains(SQUOTE | DQUOTE) => if self.glob_check(&mut iterator) {
                     glob = true;
                 } else {
                     return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde));

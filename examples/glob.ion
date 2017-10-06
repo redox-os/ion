@@ -6,6 +6,8 @@ echo Cargo.*
 echo Cargo?toml
 echo Cargo.[tqr]oml
 echo examples/[ef]*.ion
+echo "[]"
+echo "[] []"
 mkdir glob_test
 touch glob_test/{one,two,three}
 cd glob_test
