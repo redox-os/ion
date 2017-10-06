@@ -314,10 +314,17 @@ impl<'a> Binary for Shell<'a> {
             if let Some(command) = self.readln() {
                 if !command.is_empty() {
                     if let Ok(command) = self.terminate_quotes(command) {
-                        // Parse and potentially execute the command.
-                        self.on_command(command.trim());
-                        // save command in history (or maybe not, depending on HISTORY_IGNORE)
-                        self.save_command_in_history(&command);
+                        let cmd = command.trim();
+                        self.on_command(cmd);
+                        match self.variables.tilde_expansion(cmd, &self.directory_stack) {
+                            Some(ref cmd) if Path::new(cmd).is_dir() & !cmd.ends_with('/') => {
+                                self.save_command_in_history(&[cmd, "/"].concat());
+                            },
+                            None if Path::new(cmd).is_dir() & !cmd.ends_with('/') => {
+                                self.save_command_in_history(&[cmd, "/"].concat());
+                            }
+                            _ => self.save_command_in_history(cmd)
+                        }
                     } else {
                         self.flow_control.level = 0;
                         self.flow_control.current_if_mode = 0;
