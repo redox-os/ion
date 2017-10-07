@@ -1,6 +1,6 @@
 Cargo.toml
 examples/braces.ion examples/braces.out examples/break.ion examples/break.out
-Cargo.toml l
+Cargo.toml
 Cargo.toml
 Cargo.lock Cargo.toml
 Cargo.toml
@@ -10,4 +10,4 @@ examples/else_if.ion examples/exists.ion examples/fail.ion examples/fibonacci.io
 [] []
 one three two
 three two
-three two one three two
+three two
