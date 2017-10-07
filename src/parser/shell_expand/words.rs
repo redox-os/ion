@@ -1277,11 +1277,13 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                         self.read += 1;
                         return Some(self.braces(&mut iterator));
                     }
-                    b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => if self.glob_check(&mut iterator) {
-                        glob = true;
-                    } else {
-                        return Some(self.array(&mut iterator));
-                    },
+                    b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                        if self.glob_check(&mut iterator) {
+                            glob = true;
+                        } else {
+                            return Some(self.array(&mut iterator));
+                        }
+                    }
                     b'@' if !self.flags.contains(SQUOTE) => match iterator.next() {
                         Some(b'(') => {
                             self.read += 2;
@@ -1397,11 +1399,13 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                         return self.next();
                     };
                 }
-                b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => if self.glob_check(&mut iterator) {
-                    glob = true;
-                } else {
-                    return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde));
-                },
+                b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                    if self.glob_check(&mut iterator) {
+                        glob = true;
+                    } else {
+                        return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde));
+                    }
+                }
                 b'*' | b'?' if !self.flags.contains(SQUOTE) => {
                     glob = true;
                 }

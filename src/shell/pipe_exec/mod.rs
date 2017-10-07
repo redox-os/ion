@@ -182,7 +182,8 @@ pub(crate) trait PipelineExecution {
     ///
     /// Each generated command will either be a builtin or external command, and will be
     /// associated will be marked as an `&&`, `||`, `|`, or final job.
-    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<(RefinedJob, JobKind)>, i32>;
+    fn generate_commands(&self, pipeline: &mut Pipeline)
+        -> Result<Vec<(RefinedJob, JobKind)>, i32>;
 
     /// Waits for all of the children within a pipe to finish exuecting, returning the
     /// exit status of the last process in the queue.
@@ -232,8 +233,14 @@ impl<'a> PipelineExecution for Shell<'a> {
         // Generates commands for execution, differentiating between external and builtin commands.
         let mut piped_commands = match self.generate_commands(pipeline) {
             Ok(commands) => commands,
-            Err(error) => return error
+            Err(error) => return error,
         };
+
+        // Don't execute commands when the `-n` flag is passed.
+        if self.flags & NO_EXEC != 0 {
+            return SUCCESS;
+        }
+
         // Redirect the inputs if a custom redirect value was given.
         if let Some(stdin) = pipeline.stdin.take() {
             if redirect_input(stdin, &mut piped_commands) {
@@ -263,7 +270,10 @@ impl<'a> PipelineExecution for Shell<'a> {
         }
     }
 
-    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<(RefinedJob, JobKind)>, i32> {
+    fn generate_commands(
+        &self,
+        pipeline: &mut Pipeline,
+    ) -> Result<Vec<(RefinedJob, JobKind)>, i32> {
         let mut results = Vec::new();
         for mut job in pipeline.jobs.drain(..) {
             let refined = {

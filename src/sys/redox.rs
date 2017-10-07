@@ -43,6 +43,7 @@ pub(crate) fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
     cvt(syscall::setpgid(pid as usize, pgid as usize)).and(Ok(()))
 }
 
+#[allow(dead_code)]
 pub(crate) fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     let new = SigAction {
         sa_handler: unsafe { mem::transmute(handler) },
@@ -98,14 +99,14 @@ fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
 
 // TODO
 pub mod signals {
-    pub(crate) fn block() // fn block() // fn block() // fn block() // fn block()
+    pub(crate) fn block() // fn block() // fn block()
     {
     }
 
     /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
     /// controlled
     /// by the shell.
-    pub(crate) fn unblock() // fn unblock() // fn unblock() // fn unblock() // fn unblock()
+    pub(crate) fn unblock() // fn unblock() // fn unblock()
     {
     }
 }

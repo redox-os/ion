@@ -48,6 +48,7 @@ pub(crate) fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
     cvt(unsafe { libc::setpgid(pid as pid_t, pgid as pid_t) }).and(Ok(()))
 }
 
+#[allow(dead_code)]
 pub(crate) fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     if unsafe { libc::signal(signal as c_int, handler as sighandler_t) } == libc::SIG_ERR {
         Err(io::Error::last_os_error())
@@ -105,7 +106,9 @@ fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
 pub mod signals {
     /// Blocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so that the shell never receives
     /// them.
-    pub(crate) fn block() // fn block() // fn block() // fn block() // fn block()
+    pub(crate) fn block()
+    // fn block() // fn block() // fn block() // fn block() // fn block() //
+    // fn block()
     {
         unsafe {
             use libc::*;
@@ -124,7 +127,10 @@ pub mod signals {
     /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
     /// controlled
     /// by the shell.
-    pub(crate) fn unblock() // fn unblock() // fn unblock() // fn unblock() // fn unblock()
+    pub(crate) fn unblock()
+    // fn unblock()
+    // fn unblock() // fn unblock() // fn unblock() // fn unblock() // fn
+    // unblock()
     {
         unsafe {
             use libc::*;

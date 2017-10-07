@@ -237,7 +237,11 @@ impl<'a> Shell<'a> {
                 }
                 let borrowed = &pipeline.jobs[0].args;
                 let small: SmallVec<[&str; 4]> = borrowed.iter().map(|x| x as &str).collect();
-                Some((command.main)(&small, self))
+                if self.flags & NO_EXEC != 0 {
+                    Some(SUCCESS)
+                } else {
+                    Some((command.main)(&small, self))
+                }
             } else {
                 Some(self.execute_pipeline(pipeline))
             }

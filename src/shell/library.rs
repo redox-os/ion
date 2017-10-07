@@ -1,4 +1,5 @@
 use super::{Binary, FlowLogic, Shell};
+use super::status::*;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
@@ -23,7 +24,9 @@ impl<'a> IonLibrary for Shell<'a> {
         let capacity = file.metadata().ok().map_or(0, |x| x.len());
         let mut command_list = String::with_capacity(capacity as usize);
         let _ = file.read_to_string(&mut command_list)?;
-        self.terminate_script_quotes(command_list.lines().map(|x| x.to_owned()));
+        if FAILURE == self.terminate_script_quotes(command_list.lines().map(|x| x.to_owned())) {
+            self.previous_status = FAILURE;
+        }
         Ok(self.previous_status)
     }
 }

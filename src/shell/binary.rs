@@ -1,7 +1,7 @@
 //! Contains the binary logic of Ion.
-
 use super::{DirectoryStack, FlowLogic, JobControl, Shell, ShellHistory, Variables};
 use super::completer::*;
+use super::flags::*;
 use super::flow_control::Statement;
 use super::library::IonLibrary;
 use super::status::*;
@@ -31,7 +31,7 @@ pub(crate) trait Binary {
     /// Creates an interactive session that reads from a prompt provided by Liner.
     fn execute_interactive(self);
     /// Ensures that read statements from a script are terminated.
-    fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I);
+    fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I) -> i32;
     /// Ensures that read statements from the interactive prompt is terminated.
     fn terminate_quotes(&mut self, command: String) -> Result<String, ()>;
     /// Ion's interface to Liner's `read_line` method, which handles everything related to
@@ -214,7 +214,7 @@ impl<'a> Binary for Shell<'a> {
         self.exit(previous_status);
     }
 
-    fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, mut lines: I) {
+    fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, mut lines: I) -> i32 {
         while let Some(command) = lines.next() {
             let mut buffer = QuoteTerminator::new(command);
             while !buffer.check_termination() {
@@ -225,12 +225,13 @@ impl<'a> Binary for Shell<'a> {
                     } else {
                         let stderr = io::stderr();
                         let _ = writeln!(stderr.lock(), "ion: unterminated quote in script");
-                        self.exit(FAILURE);
+                        return FAILURE;
                     }
                 }
             }
             self.on_command(&buffer.consume());
         }
+
         // The flow control level being non zero means that we have a statement that has
         // only been partially parsed.
         if self.flow_control.level != 0 {
@@ -238,7 +239,10 @@ impl<'a> Binary for Shell<'a> {
                 "ion: unexpected end of script: expected end block for `{}`",
                 self.flow_control.current_statement.short()
             );
+            return FAILURE;
         }
+
+        SUCCESS
     }
 
     fn terminate_quotes(&mut self, command: String) -> Result<String, ()> {
@@ -273,6 +277,14 @@ impl<'a> Binary for Shell<'a> {
             let stderr = io::stderr();
             let mut stderr = stderr.lock();
             let _ = writeln!(stderr, "ion: -c requires an argument");
+            self.exit(FAILURE);
+        }
+
+        if self.flow_control.level != 0 {
+            eprintln!(
+                "ion: unexpected end of arguments: expected end block for `{}`",
+                self.flow_control.current_statement.short()
+            );
             self.exit(FAILURE);
         }
     }
@@ -319,11 +331,11 @@ impl<'a> Binary for Shell<'a> {
                         match self.variables.tilde_expansion(cmd, &self.directory_stack) {
                             Some(ref cmd) if Path::new(cmd).is_dir() & !cmd.ends_with('/') => {
                                 self.save_command_in_history(&[cmd, "/"].concat());
-                            },
+                            }
                             None if Path::new(cmd).is_dir() & !cmd.ends_with('/') => {
                                 self.save_command_in_history(&[cmd, "/"].concat());
                             }
-                            _ => self.save_command_in_history(cmd)
+                            _ => self.save_command_in_history(cmd),
                         }
                     } else {
                         self.flow_control.level = 0;
@@ -342,8 +354,12 @@ impl<'a> Binary for Shell<'a> {
 
     fn main(mut self) {
         let mut args = env::args().skip(1);
-        if let Some(path) = args.next() {
+        while let Some(path) = args.next() {
             match path.as_str() {
+                "-n" => {
+                    self.flags |= NO_EXEC;
+                    continue;
+                }
                 "-c" => self.execute_arguments(args),
                 "--version" => self.display_version(),
                 _ => {
@@ -361,9 +377,9 @@ impl<'a> Binary for Shell<'a> {
             self.wait_for_background();
             let previous_status = self.previous_status;
             self.exit(previous_status);
-        } else {
-            self.execute_interactive();
         }
+
+        self.execute_interactive();
     }
 
     fn display_version(&self) {
