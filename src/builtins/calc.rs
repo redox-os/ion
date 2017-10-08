@@ -18,9 +18,10 @@ pub(crate) fn calc(args: &[&str]) -> Result<(), String> {
             Err(e) => writeln!(stdout, "{}", e),
         };
     } else {
-        let prompt = b"[]> ";
+        let prompt = b"ion-calc: ";
         loop {
             let _ = stdout.write(prompt);
+            let _ = stdout.flush();
             let mut input = String::new();
             let _ = io::stdin().read_line(&mut input);
             if input.is_empty() {
