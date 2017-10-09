@@ -27,7 +27,7 @@ app_dirs = {git = "https://github.com/redox-os/app-dirs-rs.git"}
 # Provides methods for bitwise flag operations
 bitflags = "0.9.1"
 # Provides inline arithmetic expression and `calc` functionality
-calculate = {git = "https://github.com/mmstick/calc.git", branch="decimal"}
+calculate = {git = "https://github.com/redox-os/calc.git"}
 # A faster hashing algorithm for the hash maps in the shell.
 fnv = "1.0"
 # Performs globbing on words that are detected to be potentially globbable.

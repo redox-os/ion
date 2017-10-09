@@ -5,7 +5,7 @@ dependencies = [
  "ansi_term 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "app_dirs 1.1.1 (git+https://github.com/redox-os/app-dirs-rs.git)",
  "bitflags 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "calculate 0.3.0 (git+https://github.com/mmstick/calc.git?branch=decimal)",
+ "calculate 0.3.0 (git+https://github.com/redox-os/calc.git)",
  "fnv 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "glob 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -70,7 +70,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "calculate"
 version = "0.3.0"
-source = "git+https://github.com/mmstick/calc.git?branch=decimal#448b06dd19b6c22d7be6b2ead129ae253a6cf6ff"
+source = "git+https://github.com/redox-os/calc.git#9e1ddfe012d488f7a0659e9d77e011f49b184ea8"
 dependencies = [
  "decimal 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -335,7 +335,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum bitflags 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4efd02e230a02e18f92fc2735f44597385ed02ad8f831e7c1c1156ee5e1ab3a5"
 "checksum bitflags 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f5cde24d1b2e2216a726368b2363a273739c91f4e3eb4e0dd12d672d396ad989"
 "checksum bytecount 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "4bbeb7c30341fce29f6078b4bdf876ea4779600866e98f5b2d203a534f195050"
-"checksum calculate 0.3.0 (git+https://github.com/mmstick/calc.git?branch=decimal)" = "<none>"
+"checksum calculate 0.3.0 (git+https://github.com/redox-os/calc.git)" = "<none>"
 "checksum cfg-if 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d4c819a1287eb618df47cc647173c5c4c66ba19d888a6e50d605672aed3140de"
 "checksum decimal 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a8e3bfe070d7876527c8f901afc27b4190a715b6e52c8961f72fb35430960e80"
 "checksum fnv 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "6cc484842f1e2884faf56f529f960cc12ad8c71ce96cc7abba0a067c98fee344"
