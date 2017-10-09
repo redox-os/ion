@@ -328,14 +328,18 @@ impl<'a> Binary for Shell<'a> {
                     if let Ok(command) = self.terminate_quotes(command) {
                         let cmd = command.trim();
                         self.on_command(cmd);
-                        match self.variables.tilde_expansion(cmd, &self.directory_stack) {
-                            Some(ref cmd) if Path::new(cmd).is_dir() & !cmd.ends_with('/') => {
+                        
+                        if cmd.starts_with('~') {
+                            if let Some(ref cmd) = self.variables.tilde_expansion(cmd, &self.directory_stack) {
                                 self.save_command_in_history(&[cmd, "/"].concat());
+                                continue
                             }
-                            None if Path::new(cmd).is_dir() & !cmd.ends_with('/') => {
-                                self.save_command_in_history(&[cmd, "/"].concat());
-                            }
-                            _ => self.save_command_in_history(cmd),
+                        }
+
+                        if Path::new(cmd).is_dir() & !cmd.ends_with('/') {
+                            self.save_command_in_history(&[cmd, "/"].concat());
+                        } else {
+                            self.save_command_in_history(cmd);
                         }
                     } else {
                         self.flow_control.level = 0;
