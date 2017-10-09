@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::iter::Peekable;
 
-use super::{Input, Pipeline, RedirectFrom, Redirection};
+use super::{Input, Pipeline, RedirectFrom, Redirection, RedirectKind};
 use shell::{Job, JobKind};
 use types::*;
 
@@ -202,7 +202,7 @@ impl<'a> Collector<'a> {
         let mut args = Array::new();
         let mut jobs: Vec<Job> = Vec::new();
         let mut input: Option<Input> = None;
-        let mut outfile: Option<Redirection> = None;
+        let mut output: RedirectKind = RedirectKind::None;
 
         /// Attempt to create a new job given a list of collected arguments
         macro_rules! try_add_job {
@@ -226,15 +226,27 @@ impl<'a> Collector<'a> {
                     false
                 };
                 if let Some(file) = self.arg(&mut bytes)? {
-                    outfile = Some(Redirection {
-                        from: $from,
-                        file: file.into(),
-                        append
-                    });
+                    if let RedirectKind::None = output {
+                        output = RedirectKind::Single(Redirection {
+                            from: $from,
+                            file: file.into(),
+                            append,
+                        })
+                    } else if let RedirectKind::Single(out) = output {
+                        output = RedirectKind::Multiple(
+                            vec![out, Redirection { from: $from, file: file.into(), append }]
+                        );
+                    } else if let RedirectKind::Multiple(ref mut outs) = output {
+                        outs.push(Redirection {
+                            from: $from,
+                            file: file.into(),
+                            append,
+                        });
+                    }
                 } else {
                     return Err("expected file argument after redirection for output");
                 }
-            }}
+            }};
         }
 
         /// Add a new argument that is re
@@ -355,17 +367,34 @@ impl<'a> Collector<'a> {
             jobs.push(Job::new(args, JobKind::Last));
         }
 
-        Ok(Pipeline::new(jobs, input, outfile))
+        Ok(Pipeline::new(jobs, input, output))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use parser::pipelines::{Input, Pipeline, RedirectFrom, Redirection};
+    use parser::pipelines::{Input, Pipeline, RedirectFrom, Redirection, RedirectKind};
     use parser::statement::parse;
     use shell::{Job, JobKind};
     use shell::flow_control::Statement;
     use types::Array;
+
+    /// Helper function like unwrap for RedirectKind, used for testing only
+    trait RdkTest {
+        /// Used for testing only, unwraps a `RedirectKind::Single` value
+        /// panicking otherwise.
+        fn single(self) -> Redirection;
+    }
+
+    impl RdkTest for RedirectKind {
+        fn single(self) -> Redirection {
+            if let RedirectKind::Single(r) = self {
+                r
+            } else {
+                panic!()
+            }
+        }
+    }
 
     #[test]
     fn stderr_redirection() {
@@ -382,7 +411,7 @@ mod tests {
                 append: false,
             };
 
-            assert_eq!(Some(expected), pipeline.stdout);
+            assert_eq!(RedirectKind::Single(expected), pipeline.output);
         } else {
             assert!(false);
         }
@@ -707,8 +736,8 @@ mod tests {
             assert_eq!("hello", &pipeline.clone().jobs[1].args[1]);
             assert_eq!("cat", &pipeline.clone().jobs[2].args[0]);
             assert_eq!(Some(Input::File("stuff".into())), pipeline.stdin);
-            assert_eq!("other", &pipeline.clone().stdout.unwrap().file);
-            assert!(!pipeline.clone().stdout.unwrap().append);
+            assert_eq!("other", &pipeline.clone().output.single().file);
+            assert!(!pipeline.clone().output.single().append);
             assert_eq!(input.to_owned(), pipeline.to_string());
         } else {
             assert!(false);
@@ -720,8 +749,8 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat < stuff >> other") {
             assert_eq!(3, pipeline.jobs.len());
             assert_eq!(Some(Input::File("stuff".into())), pipeline.stdin);
-            assert_eq!("other", &pipeline.clone().stdout.unwrap().file);
-            assert!(pipeline.clone().stdout.unwrap().append);
+            assert_eq!("other", &pipeline.clone().output.single().file);
+            assert!(pipeline.clone().output.single().append);
         } else {
             assert!(false);
         }
@@ -737,7 +766,7 @@ mod tests {
                 Job::new(array!["cat"], JobKind::Last),
             ],
             stdin:  Some(Input::File("stuff".into())),
-            stdout: Some(Redirection {
+            output: RedirectKind::Single(Redirection {
                 from:   RedirectFrom::Stderr,
                 file:   "other".into(),
                 append: true,
@@ -756,7 +785,7 @@ mod tests {
                 Job::new(array!["cat"], JobKind::Last),
             ],
             stdin:  Some(Input::File("stuff".into())),
-            stdout: Some(Redirection {
+            output: RedirectKind::Single(Redirection {
                 from:   RedirectFrom::Both,
                 file:   "other".into(),
                 append: true,
@@ -770,7 +799,7 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat > stuff < other") {
             assert_eq!(3, pipeline.jobs.len());
             assert_eq!(Some(Input::File("other".into())), pipeline.stdin);
-            assert_eq!("stuff", &pipeline.clone().stdout.unwrap().file);
+            assert_eq!("stuff", &pipeline.clone().output.single().file);
         } else {
             assert!(false);
         }
@@ -804,7 +833,7 @@ mod tests {
         let expected = Pipeline {
             jobs:   vec![Job::new(array!["calc"], JobKind::Last)],
             stdin:  Some(Input::HereString("$(cat math.txt)".into())),
-            stdout: None,
+            output: RedirectKind::None,
         };
         assert_eq!(Statement::Pipeline(expected), parse(input));
     }
@@ -815,7 +844,7 @@ mod tests {
         let expected = Pipeline {
             jobs:   vec![Job::new(array!["calc"], JobKind::Last)],
             stdin:  Some(Input::HereString("1 + 2\n3 + 4".into())),
-            stdout: None,
+            output: RedirectKind::None,
         };
         assert_eq!(Statement::Pipeline(expected), parse(input));
     }
@@ -829,7 +858,7 @@ mod tests {
                 Job::new(array!["tr", "'o'", "'x'"], JobKind::Last),
             ],
             stdin:  Some(Input::HereString("$VAR".into())),
-            stdout: Some(Redirection {
+            output: RedirectKind::Single(Redirection {
                 from:   RedirectFrom::Stdout,
                 file:   "out.log".into(),
                 append: false,
@@ -858,7 +887,7 @@ mod tests {
         let expected = Pipeline {
             jobs:   vec![Job::new(array!["echo", "zardoz"], JobKind::Last)],
             stdin:  None,
-            stdout: Some(Redirection {
+            output: RedirectKind::Single(Redirection {
                 from:   RedirectFrom::Stdout,
                 file:   "foo\\'bar".into(),
                 append: true,
@@ -867,4 +896,29 @@ mod tests {
         assert_eq!(parse(input), Statement::Pipeline(expected));
     }
 
+    #[test]
+    fn multiple_redirects() {
+        let input = "cat file1 file2 > out ^> err &> both";
+        let redir_out = Redirection {
+            from: RedirectFrom::Stdout,
+            file: "out".into(),
+            append: false,
+        };
+        let redir_err = Redirection {
+            from: RedirectFrom::Stderr,
+            file: "err".into(),
+            append: false,
+        };
+        let redir_both = Redirection {
+            from: RedirectFrom::Both,
+            file: "both".into(),
+            append: false,
+        };
+        let expected = Pipeline {
+            jobs:   vec![Job::new(array!["cat", "file1", "file2"], JobKind::Last)],
+            stdin:  None,
+            output: RedirectKind::Multiple(vec![redir_out, redir_err, redir_both]),
+        };
+        assert_eq!(parse(input), Statement::Pipeline(expected));
+    }
 }

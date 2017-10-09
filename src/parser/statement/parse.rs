@@ -194,7 +194,7 @@ mod tests {
                     ),
                 ],
                 None,
-                None,
+                ::parser::pipelines::RedirectKind::None,
             ),
             success:    vec![],
             else_if:    vec![],

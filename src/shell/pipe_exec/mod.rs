@@ -16,7 +16,7 @@ use super::flow_control::FunctionError;
 use super::job::RefinedJob;
 use super::signals::{self, SignalHandler};
 use super::status::*;
-use parser::pipelines::{Input, Pipeline, RedirectFrom, Redirection};
+use parser::pipelines::{Input, Pipeline, RedirectFrom, Redirection, RedirectKind};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Error, Write};
 use std::iter;
@@ -116,8 +116,9 @@ fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKin
 ///
 /// Using that value, the stdout and/or stderr of the last command will be redirected accordingly
 /// to the designated output. Returns `true` if the outputs couldn't be redirected.
-fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
-    if let Some(command) = piped_commands.last_mut() {
+fn redirect_output(stdout: Redirection,
+                   piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
+   if let Some(command) = piped_commands.last_mut() {
         let file = if stdout.append {
             OpenOptions::new().create(true).write(true).append(true).open(&stdout.file)
         } else {
@@ -155,6 +156,46 @@ fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, Jo
             }
         }
     }
+    false
+}
+
+/// This fucntion is executed when multiple stdout/stderr values are supplied to a pipeline job.
+///
+/// Returns true if the outputs couldn't be redirected.
+#[cfg(all(unix, not(target_os = "redox")))]
+fn redirect_multiple_outputs(outputs: Vec<Redirection>,
+                             piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
+    use ::nix::sys::memfd::{memfd_create, MemFdCreateFlag};
+
+    if let Some(command) = piped_commands.last_mut() {
+        let name_out = ::std::ffi::CString::new("ion_stdout").unwrap();
+        let name_err = ::std::ffi::CString::new("ion_stderr").unwrap();
+        // Create two file descriptors, one for standard output and one for standard error in general,
+        // these will be redirected to files so we set the appropriate flags.
+        let fd_out = memfd_create(&name_out, MemFdCreateFlag::all());
+        let fd_out = if let Err(e) = fd_out {
+            eprintln!("ion: failed to redirect command: {}", e);
+            return true;
+        } else {
+            fd_out.unwrap()
+        };
+        let fd_err = memfd_create(&name_err, MemFdCreateFlag::all());
+        let fd_err = if let Err(e) = fd_err {
+            eprintln!("ion: failed to redirect command: {}", e);
+            return true;
+        } else {
+            fd_err.unwrap()
+        };
+        command.0.stdout(unsafe{ File::from_raw_fd(fd_out) });
+        command.0.stderr(unsafe{ File::from_raw_fd(fd_err) });
+    }
+
+    false
+}
+
+#[cfg(target_os = "redox")]
+fn redirect_multiple_outputs(outputs: Vec<Redirection>,
+                             piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
     false
 }
 
@@ -248,8 +289,12 @@ impl<'a> PipelineExecution for Shell<'a> {
             }
         }
         // Redirect the outputs if a custom redirect value was given.
-        if let Some(stdout) = pipeline.stdout.take() {
-            if redirect_output(stdout, &mut piped_commands) {
+        if let RedirectKind::Single(output) = pipeline.output.take() {
+            if redirect_output(output, &mut piped_commands) {
+                return COULD_NOT_EXEC;
+            }
+        } else if let RedirectKind::Multiple(outputs) = pipeline.output.take() {
+            if redirect_multiple_outputs(outputs, &mut piped_commands) {
                 return COULD_NOT_EXEC;
             }
         }
