@@ -1,22 +1,28 @@
 # Method Expansions
 
-There are two forms of methods within Ion: array and string methods. Array methods are methods which return arrays,
-and string methods are methods which return strings. Invoking an array method requires denoting that the method
-is an array method with the '@' character, whereas using '$' for string methods -- same as process and variable
-expansions. The general syntax of a method is '<sigil><name_of_method>(<input>, <arg1> <arg2> <args>...)'.
+There are two forms of methods within Ion: array methods, and string methods. Array methods are
+methods which return arrays, and string methods are methods which return strings. The distinction
+is made between the two by the sigil that is invoked when calling a method. For example, if the
+method is denoted by the `$` sigil, then it is a string method. Otherwise, if it is denoted by the
+`@` sigil, then it is an array method. Example as follows:
 
-Methods are executed at the same time as other expansions, so this leads to a performance optimization when combining
-methods with other methods or expansions. Ion includes a number of these methods for common use cases, but it is
-possible to create and/or install new methods to enhance the functionality of Ion. Just ensure that systems executing
-your Ion scripts that require those plugins are equipped with and have those plugins enabled.
+```ion
+echo $method_name(variable)
+for elem in @method_name(variable); echo $elem; end
+```
+
+Methods are executed at the same time as other expansions, so this leads to a performance
+optimization when combining methods with other methods or expansions. Ion includes a number of these
+methods for common use cases, but it is possible to create and/or install new methods to enhance the
+functionality of Ion. Just ensure that systems executing your Ion scripts that require those plugins
+are equipped with and have those plugins enabled. If you have ideas for useful methods that would
+be worth including in Ion by default, feel free to open a feature request to discuss the idea.
 
 ## Methods Support Inline Expressions
 
-When parsing the input element, if the element is a literal that is not defined as an expression, the given value
-will be treated as the name of a variable that corresponds to the default input type for that method. Basically,
-`array` would indicate to the parser that we are calling a variable of that name, whereas `"array"`, `'array'`,
-`@array`, `$array`, `$(cmd)`, etc. would indicate to the parser that we are evaluating and using the expression's
-output as the input.
+So we heard that you like methods, so we put methods in your methods. Ion methods accept taking
+expressions as their arguments -- both for the input parameter, and any supplied arguments to
+control the behavior of the method.
 
 ```ion
 echo $method($(cmd...), arg)
@@ -25,6 +31,31 @@ let string_var = "value in variable"
 echo $method(string_var)
 
 echo $method("actual value", arg)
+```
+
+## Overloaded Methods
+
+Some methods may also perform different actions when supplied a different type. The `$len()` method,
+for example, will report the number of graphemes within a string, or the number of elements within
+an array. Ion is able to determine which of the two were provided based on the first character
+in the expression. Quoted expressions, and expressions with start with `$`, are strings; whereas
+expressions that start with either `[` or `@` are treated as arrays.
+
+```ion
+echo $len("a string")
+echo $len([1 2 3 4 5])
+```
+
+## Method Arguments
+
+Some methods may have their behavior tweaked by supplying some additional arguments. The `@split()`
+method, for example, may be optionally supplied a pattern for splitting. At the moment, a comma
+is used to specify that arguments are to follow the input, but each argument supplied after that
+is space-delimited.
+
+```ion
+for elem in @split("some space-delimited values"); echo $elem; end
+for elem in @split("some, comma-separated, values", ", "); echo $elem; end
 ```
 
 ## String Methods
@@ -44,6 +75,78 @@ The following are the currently-supported string methods:
 - [reverse](#reverse)
 - [to_lowercase](#to_lowercase)
 - [to_uppercase](#to_uppercase)
+
+### basename
+
+Defaults to string variables. When given a path-like string as input, this will return the
+basename (complete filename, extension included). IE: `/parent/filename.ext` -> `filename.ext`
+
+#### Examples
+
+```ion
+echo $basename("/parent/filename.ext")
+```
+
+#### Output
+
+```
+filename.ext
+```
+
+### extension
+
+Defaults to string variables. When given a path-like string as input, this will return the
+extension of the complete filename. IE: `/parent/filename.ext` -> `ext`.
+
+#### Examples
+
+```ion
+echo $extension("/parent/filename.ext")
+```
+
+#### Output
+
+```
+ext
+```
+
+### filename
+
+Defaults to string variables. When given a path-like string as input, this will return the
+file name portion of the complete filename. IE: `/parent/filename.ext` -> `filename`.
+
+#### Examples
+
+```ion
+echo $filename("/parent/filename.ext")
+```
+
+#### Output
+
+```
+filename
+```
+
+### join
+
+Defaults to array variables. When given an array as input, the join string method will concatenate
+each element in the array and return a string. If no argument is given, then those elements will
+be joined by a single space. Otherwise, each element will be joined with a given pattern.
+
+#### Examples
+
+```ion
+let array = [1 2 3 4 5]
+echo $join(array)
+echo $join(array, ", ")
+```
+
+#### Output
+
+```
+1 2 3 4 5
+1, 2, 3, 4, 5
+```
 
 ### len
 
@@ -118,80 +221,6 @@ echo $repeat("abc, ", 3)
 ```
 abc, abc, abc
 ```
-
-### basename
-
-Defaults to string variables. When given a path-like string as input, this will return the
-basename (complete filename, extension included). IE: `/parent/filename.ext` -> `filename.ext`
-
-#### Examples
-
-```ion
-echo $basename("/parent/filename.ext")
-```
-
-#### Output
-
-```
-filename.ext
-```
-
-### extension
-
-Defaults to string variables. When given a path-like string as input, this will return the
-extension of the complete filename. IE: `/parent/filename.ext` -> `ext`.
-
-#### Examples
-
-```ion
-echo $extension("/parent/filename.ext")
-```
-
-#### Output
-
-```
-ext
-```
-
-### filename
-
-Defaults to string variables. When given a path-like string as input, this will return the
-file stem of the complete filename. IE: `/parent/filename.ext` -> `filename`.
-
-#### Examples
-
-```ion
-echo $filename("/parent/filename.ext")
-```
-
-#### Output
-
-```
-filename
-```
-
-### join
-
-Defaults to array variables. When given an array as input, the join string method will concatenate
-each element in the array and return a string. If no argument is given, then those elements will
-be joined by a single space. Otherwise, each element will be joined with a given pattern.
-
-#### Examples
-
-```ion
-let array = [1 2 3 4 5]
-echo $join(array)
-echo $join(array, ", ")
-```
-
-#### Output
-
-```
-1 2 3 4 5
-1, 2, 3, 4, 5
-```
-
-###
 
 ### replace
 
