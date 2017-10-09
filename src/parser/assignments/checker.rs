@@ -4,12 +4,11 @@ use super::super::expand_string;
 
 use std::iter::Iterator;
 
-#[derive(PartialEq,Clone)]
-enum IsArrayHelper
-{
+#[derive(PartialEq, Clone, Copy)]
+enum IsArrayHelper {
     Valid(usize),
     RootBracketClosed,
-    Invalid
+    Invalid,
 }
 
 /// Determines if the supplied value is either an array or a string.
@@ -17,40 +16,37 @@ enum IsArrayHelper
 /// - `[ 1 2 3 ]` = Array
 /// - `[ 1 2 3 ][1]` = String
 /// - `string` = String
-pub(crate) fn is_array(value: &str) -> bool { 
-    if value.starts_with('[') && value.ends_with(']') 
-    {
-        !value.chars()
+pub(crate) fn is_array(value: &str) -> bool {
+    if value.starts_with('[') && value.ends_with(']') {
+        !value
+            .chars()
             .scan(IsArrayHelper::Valid(0), |state, x| {
                 // If previous iteration was RootBracketClosed or Invalid then indicate invalid
                 if *state == IsArrayHelper::RootBracketClosed || *state == IsArrayHelper::Invalid {
                     *state = IsArrayHelper::Invalid;
-                    return Some(state.clone());
+                    return Some(*state);
                 }
 
                 if x == '[' {
                     if let IsArrayHelper::Valid(open) = *state {
-                        *state = IsArrayHelper::Valid(open+1);
+                        *state = IsArrayHelper::Valid(open + 1);
                     }
-                }
-                else if x == ']' {
+                } else if x == ']' {
                     if let IsArrayHelper::Valid(open) = *state {
-                        *state = IsArrayHelper::Valid(open-1);
+                        *state = IsArrayHelper::Valid(open - 1);
                     }
                 }
 
-                // if true, root bracket was closed 
+                // if true, root bracket was closed
                 // => any characters after this one indicate invalid array
                 if *state == IsArrayHelper::Valid(0) {
                     *state = IsArrayHelper::RootBracketClosed;
                 }
 
-                Some(state.clone())
+                Some(*state)
             })
-            .any(| x| x == IsArrayHelper::Invalid)
-    }
-    else
-    {
+            .any(|x| x == IsArrayHelper::Invalid)
+    } else {
         false
     }
 }
@@ -80,11 +76,7 @@ fn is_integer_string(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok {
-        Ok(value)
-    } else {
-        Err(())
-    }
+    if is_ok { Ok(value) } else { Err(()) }
 }
 
 fn is_float_string(value: ReturnValue) -> Result<ReturnValue, ()> {
@@ -94,11 +86,7 @@ fn is_float_string(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok {
-        Ok(value)
-    } else {
-        Err(())
-    }
+    if is_ok { Ok(value) } else { Err(()) }
 }
 
 fn is_boolean_array(values: &mut ReturnValue) -> bool {
@@ -125,11 +113,7 @@ fn is_integer_array(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok {
-        Ok(value)
-    } else {
-        Err(())
-    }
+    if is_ok { Ok(value) } else { Err(()) }
 }
 
 fn is_float_array(value: ReturnValue) -> Result<ReturnValue, ()> {
@@ -139,11 +123,7 @@ fn is_float_array(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok {
-        Ok(value)
-    } else {
-        Err(())
-    }
+    if is_ok { Ok(value) } else { Err(()) }
 }
 
 fn get_string<E: Expander>(shell: &E, value: &str) -> ReturnValue {
