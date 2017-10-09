@@ -2,12 +2,58 @@ use super::{Primitive, ReturnValue, TypeError};
 use super::super::Expander;
 use super::super::expand_string;
 
+use std::iter::Iterator;
+
+#[derive(PartialEq,Clone)]
+enum IsArrayHelper
+{
+    Valid(usize),
+    RootBracketClosed,
+    Invalid
+}
+
 /// Determines if the supplied value is either an array or a string.
 ///
 /// - `[ 1 2 3 ]` = Array
 /// - `[ 1 2 3 ][1]` = String
 /// - `string` = String
-pub(crate) fn is_array(value: &str) -> bool { value.starts_with('[') && value.ends_with(']') }
+pub(crate) fn is_array(value: &str) -> bool { 
+    if value.starts_with('[') && value.ends_with(']') 
+    {
+        !value.chars()
+            .scan(IsArrayHelper::Valid(0), |state, x| {
+                // If previous iteration was RootBracketClosed or Invalid then indicate invalid
+                if *state == IsArrayHelper::RootBracketClosed || *state == IsArrayHelper::Invalid {
+                    *state = IsArrayHelper::Invalid;
+                    return Some(state.clone());
+                }
+
+                if x == '[' {
+                    if let IsArrayHelper::Valid(open) = *state {
+                        *state = IsArrayHelper::Valid(open+1);
+                    }
+                }
+                else if x == ']' {
+                    if let IsArrayHelper::Valid(open) = *state {
+                        *state = IsArrayHelper::Valid(open-1);
+                    }
+                }
+
+                // if true, root bracket was closed 
+                // => any characters after this one indicate invalid array
+                if *state == IsArrayHelper::Valid(0) {
+                    *state = IsArrayHelper::RootBracketClosed;
+                }
+
+                Some(state.clone())
+            })
+            .any(| x| x == IsArrayHelper::Invalid)
+    }
+    else
+    {
+        false
+    }
+}
 
 pub(crate) fn is_boolean(value: &str) -> Result<&str, ()> {
     if ["true", "1", "y"].contains(&value) {
@@ -159,8 +205,7 @@ mod test {
     #[test]
     fn is_array_() {
         assert!(is_array("[1 2 3]"));
-        // TODO: Fix This
-        // assert!(!is_array("[1 2 3][0]"));
+        assert!(!is_array("[1 2 3][0]"));
         assert!(!is_array("string"));
         assert!(is_array("[1  [2 3]  4 [5 6]]"))
     }
