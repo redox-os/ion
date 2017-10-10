@@ -1,4 +1,5 @@
 use super::Select;
+use super::pattern::unescape;
 use super::super::super::{expand_string, Expander};
 use super::super::super::{is_expression, slice};
 use super::super::super::super::ArgumentSplitter;
@@ -33,7 +34,7 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! string_eval {
             ($variable:ident $method:tt $pattern:ident) => {{
-                let pattern = expand_string($pattern, expand, false).join(" ");
+                let pattern = unescape(expand_string($pattern, expand, false).join(" "));
                 let is_true = if let Some(value) = expand.variable($variable, false) {
                     value.$method(&pattern)
                 } else if is_expression($variable) {
@@ -81,7 +82,7 @@ impl<'a> StringMethod<'a> {
             "to_lowercase" => string_case!(to_lowercase),
             "to_uppercase" => string_case!(to_uppercase),
             "repeat" => {
-                let pattern = expand_string(pattern, expand, false).join(" ");
+                let pattern = unescape(expand_string(pattern, expand, false).join(" "));
                 match pattern.parse::<usize>() {
                     Ok(repeat) => if let Some(value) = expand.variable(variable, false) {
                         output.push_str(&value.repeat(repeat));
@@ -96,7 +97,8 @@ impl<'a> StringMethod<'a> {
             }
             "replace" => {
                 let pattern = ArgumentSplitter::new(pattern)
-                    .map(|x| expand_string(x, expand, false).join(" "))
+                    .map(|x| unescape(expand_string(x, expand, false).join(" ")))
+                    .take(2)
                     .collect::<Vec<_>>();
                 if pattern.len() == 2 {
                     if let Some(value) = expand.variable(variable, false) {
@@ -111,7 +113,8 @@ impl<'a> StringMethod<'a> {
             }
             "replacen" => {
                 let pattern = ArgumentSplitter::new(pattern)
-                    .map(|x| expand_string(x, expand, false).join(" "))
+                    .map(|x| unescape(expand_string(x, expand, false).join(" ")))
+                    .take(3)
                     .collect::<Vec<_>>();
                 if pattern.len() == 3 {
                     if let Ok(nth) = pattern[2].as_str().parse::<usize>() {
@@ -133,7 +136,7 @@ impl<'a> StringMethod<'a> {
                 }
             }
             "join" => {
-                let pattern = expand_string(pattern, expand, false).join(" ");
+                let pattern = unescape(expand_string(pattern, expand, false).join(" "));
                 if let Some(array) = expand.array(variable, Select::All) {
                     slice(output, array.join(&pattern), self.selection.clone());
                 } else if is_expression(variable) {
@@ -177,6 +180,7 @@ impl<'a> StringMethod<'a> {
 
                 let pattern = ArgumentSplitter::new(self.pattern)
                     .flat_map(|arg| expand_string(&arg, expand, false))
+                    .map(unescape)
                     .collect::<_>();
                 let args = if variable.starts_with('@') || variable.starts_with('[') {
                     MethodArguments::Array(

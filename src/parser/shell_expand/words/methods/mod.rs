@@ -1,8 +1,10 @@
 mod arrays;
+mod pattern;
 mod strings;
 
 pub(crate) use self::arrays::ArrayMethod;
 pub(crate) use self::strings::StringMethod;
+pub(crate) use self::pattern::Pattern;
 
 use super::{Index, Range};
 use super::super::ranges::parse_index_range;
@@ -18,12 +20,6 @@ impl Key {
     #[cfg(test)]
     pub(crate) fn new<K: Into<::types::Key>>(key: K) -> Key { Key { key: key.into() } }
     pub(crate) fn get(&self) -> &::types::Key { return &self.key; }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Pattern<'a> {
-    StringPattern(&'a str),
-    Whitespace,
 }
 
 /// Represents a filter on a vector-like object

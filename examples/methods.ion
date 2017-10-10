@@ -27,3 +27,8 @@ echo $ends_with("one two", two)
 echo $contains("one two three", two)
 echo $contains("one two three", four)
 echo $repeat("one ", 5)
+
+echo $join([one two three], "\n")
+echo $join([one two three], "\t")
+echo $join([one two three], "\\n")
+echo $replace($join([one two three], "\n"), "\n" "\t")
