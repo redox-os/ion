@@ -330,15 +330,16 @@ impl<'a> Binary for Shell<'a> {
                         self.on_command(cmd);
 
                         if cmd.starts_with('~') {
-                            if !cmd.ends_with('/') && self.variables
-                                .tilde_expansion(cmd, &self.directory_stack)
-                                .map_or(false, |ref path| Path::new(path).is_dir())
+                            if !cmd.ends_with('/')
+                                && self.variables
+                                    .tilde_expansion(cmd, &self.directory_stack)
+                                    .map_or(false, |ref path| Path::new(path).is_dir())
                             {
                                 self.save_command_in_history(&[cmd, "/"].concat());
                             } else {
                                 self.save_command_in_history(cmd);
                             }
-                            continue
+                            continue;
                         }
 
                         if Path::new(cmd).is_dir() & !cmd.ends_with('/') {

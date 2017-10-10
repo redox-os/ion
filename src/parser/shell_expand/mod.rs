@@ -1,18 +1,17 @@
 // TODO: Handle Runtime Errors
 extern crate calc;
 extern crate permutate;
-use unicode_segmentation::UnicodeSegmentation;
-
-use types::Array;
 
 mod braces;
 mod ranges;
 mod words;
+
 use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub(crate) use self::words::{Index, Range, Select, WordIterator, WordToken};
 use glob::glob;
 use types::*;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Determines whether an input string is expression-like as compared to a
 /// bare word. For example, strings starting with '"', '\'', '@', or '$' are

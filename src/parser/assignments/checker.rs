@@ -76,7 +76,11 @@ fn is_integer_string(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok { Ok(value) } else { Err(()) }
+    if is_ok {
+        Ok(value)
+    } else {
+        Err(())
+    }
 }
 
 fn is_float_string(value: ReturnValue) -> Result<ReturnValue, ()> {
@@ -86,7 +90,11 @@ fn is_float_string(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok { Ok(value) } else { Err(()) }
+    if is_ok {
+        Ok(value)
+    } else {
+        Err(())
+    }
 }
 
 fn is_boolean_array(values: &mut ReturnValue) -> bool {
@@ -113,7 +121,11 @@ fn is_integer_array(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok { Ok(value) } else { Err(()) }
+    if is_ok {
+        Ok(value)
+    } else {
+        Err(())
+    }
 }
 
 fn is_float_array(value: ReturnValue) -> Result<ReturnValue, ()> {
@@ -123,7 +135,11 @@ fn is_float_array(value: ReturnValue) -> Result<ReturnValue, ()> {
         unreachable!()
     };
 
-    if is_ok { Ok(value) } else { Err(()) }
+    if is_ok {
+        Ok(value)
+    } else {
+        Err(())
+    }
 }
 
 fn get_string<E: Expander>(shell: &E, value: &str) -> ReturnValue {

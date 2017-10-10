@@ -99,14 +99,19 @@ fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
 
 // TODO
 pub mod signals {
-    pub(crate) fn block() // fn block() // fn block()
+    pub(crate) fn block()
+    // fn block() // fn block() // fn block() // fn block() // fn block() //
+    // fn block()
     {
     }
 
     /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
     /// controlled
     /// by the shell.
-    pub(crate) fn unblock() // fn unblock() // fn unblock()
+    pub(crate) fn unblock()
+    // fn unblock()
+    // fn unblock() // fn unblock() // fn unblock() // fn unblock() // fn
+    // unblock()
     {
     }
 }

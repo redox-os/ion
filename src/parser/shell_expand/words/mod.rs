@@ -1,0 +1,809 @@
+#[cfg(test)]
+mod tests;
+mod index;
+mod methods;
+mod range;
+
+pub(crate) use self::index::Index;
+pub(crate) use self::methods::{ArrayMethod, Pattern, Select, StringMethod};
+#[cfg(test)]
+pub(crate) use self::methods::Key;
+pub(crate) use self::range::Range;
+use super::{expand_string, Expander};
+use super::super::ArgumentSplitter;
+
+// Bit Twiddling Guide:
+// var & FLAG != 0 checks if FLAG is enabled
+// var & FLAG == 0 checks if FLAG is disabled
+// var |= FLAG enables the FLAG
+// var &= 255 ^ FLAG disables the FLAG
+// var ^= FLAG swaps the state of FLAG
+
+bitflags! {
+    pub struct Flags : u8 {
+        const BACKSL = 1;
+        const SQUOTE = 2;
+        const DQUOTE = 4;
+        const EXPAND_PROCESSES = 8;
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum WordToken<'a> {
+    /// Represents a normal string who may contain a globbing character
+    /// (the second element) or a tilde expression (the third element)
+    Normal(&'a str, bool, bool),
+    Whitespace(&'a str),
+    // Tilde(&'a str),
+    Brace(Vec<&'a str>),
+    Array(Vec<&'a str>, Select),
+    Variable(&'a str, bool, Select),
+    ArrayVariable(&'a str, bool, Select),
+    ArrayProcess(&'a str, bool, Select),
+    Process(&'a str, bool, Select),
+    StringMethod(StringMethod<'a>),
+    ArrayMethod(ArrayMethod<'a>),
+    Arithmetic(&'a str), // Glob(&'a str)
+}
+
+pub(crate) struct WordIterator<'a, E: Expander + 'a> {
+    data:      &'a str,
+    read:      usize,
+    flags:     Flags,
+    expanders: &'a E,
+}
+
+impl<'a, E: Expander + 'a> WordIterator<'a, E> {
+    pub(crate) fn new(
+        data: &'a str,
+        expand_processes: bool,
+        expanders: &'a E,
+    ) -> WordIterator<'a, E> {
+        let flags = if expand_processes { EXPAND_PROCESSES } else { Flags::empty() };
+        WordIterator {
+            data,
+            read: 0,
+            flags,
+            expanders,
+        }
+    }
+
+    // Contains the grammar for collecting whitespace characters
+    fn whitespaces<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        self.read += 1;
+        while let Some(character) = iterator.next() {
+            if character == b' ' {
+                self.read += 1;
+            } else {
+                return WordToken::Whitespace(&self.data[start..self.read]);
+            }
+        }
+
+        WordToken::Whitespace(&self.data[start..self.read])
+    }
+
+    // Contains the logic for parsing braced variables
+    fn braced_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        while let Some(character) = iterator.next() {
+            if character == b'}' {
+                let output = &self.data[start..self.read];
+                self.read += 1;
+                return WordToken::Variable(output, self.flags.contains(DQUOTE), Select::All);
+            }
+            self.read += 1;
+        }
+
+        // The validator at the frontend should catch unterminated braced variables.
+        panic!("ion: fatal error with syntax validation parsing: unterminated braced variable");
+    }
+
+    /// Contains the logic for parsing variable syntax
+    fn variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let mut start = self.read;
+        self.read += 1;
+        while let Some(character) = iterator.next() {
+            match character {
+                b'(' => {
+                    let method = &self.data[start..self.read];
+                    self.read += 1;
+                    start = self.read;
+                    let mut depth = 0;
+                    while let Some(character) = iterator.next() {
+                        match character {
+                            b',' if depth == 0 => {
+                                let variable = &self.data[start..self.read];
+                                self.read += 1;
+                                start = self.read;
+                                while let Some(character) = iterator.next() {
+                                    if character == b')' {
+                                        let pattern = &self.data[start..self.read].trim();
+                                        self.read += 1;
+                                        return if let Some(&b'[') =
+                                            self.data.as_bytes().get(self.read)
+                                        {
+                                            let _ = iterator.next();
+                                            WordToken::StringMethod(StringMethod {
+                                                method,
+                                                variable: variable.trim(),
+                                                pattern,
+                                                selection: self.read_selection(iterator),
+                                            })
+                                        } else {
+                                            WordToken::StringMethod(StringMethod {
+                                                method,
+                                                variable: variable.trim(),
+                                                pattern,
+                                                selection: Select::All,
+                                            })
+                                        };
+                                    }
+                                    self.read += 1;
+                                }
+                            }
+                            b')' if depth == 0 => {
+                                // If no pattern is supplied, the default is a space.
+                                let variable = &self.data[start..self.read];
+                                self.read += 1;
+
+                                return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                                    let _ = iterator.next();
+                                    WordToken::StringMethod(StringMethod {
+                                        method,
+                                        variable: variable.trim(),
+                                        pattern: " ",
+                                        selection: self.read_selection(iterator),
+                                    })
+                                } else {
+                                    WordToken::StringMethod(StringMethod {
+                                        method,
+                                        variable: variable.trim(),
+                                        pattern: " ",
+                                        selection: Select::All,
+                                    })
+                                };
+                            }
+                            b')' => depth -= 1,
+                            b'(' => depth += 1,
+                            _ => (),
+                        }
+                        self.read += 1;
+                    }
+
+                    panic!("ion: fatal error with syntax validation parsing: unterminated method");
+                }
+                // Only alphanumerical and underscores are allowed in variable names
+                0...47 | 58...64 | 91...94 | 96 | 123...127 => {
+                    let variable = &self.data[start..self.read];
+
+                    return if character == b'[' {
+                        WordToken::Variable(
+                            variable,
+                            self.flags.contains(DQUOTE),
+                            self.read_selection(iterator),
+                        )
+                    } else {
+                        WordToken::Variable(variable, self.flags.contains(DQUOTE), Select::All)
+                    };
+                }
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        WordToken::Variable(&self.data[start..], self.flags.contains(DQUOTE), Select::All)
+    }
+
+    fn read_selection<I>(&mut self, iterator: &mut I) -> Select
+        where I: Iterator<Item = u8>
+    {
+        self.read += 1;
+        let start = self.read;
+        while let Some(character) = iterator.next() {
+            if let b']' = character {
+                let value =
+                    expand_string(&self.data[start..self.read], self.expanders, false).join(" ");
+                let selection = match value.parse::<Select>() {
+                    Ok(selection) => selection,
+                    Err(_) => Select::None,
+                };
+                self.read += 1;
+                return selection;
+            }
+            self.read += 1;
+        }
+
+        panic!()
+    }
+
+    /// Contains the logic for parsing array variable syntax
+    fn array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let mut start = self.read;
+        self.read += 1;
+        while let Some(character) = iterator.next() {
+            match character {
+                b'(' => {
+                    let method = &self.data[start..self.read];
+                    self.read += 1;
+                    start = self.read;
+                    let mut depth = 0;
+                    while let Some(character) = iterator.next() {
+                        match character {
+                            b',' if depth == 0 => {
+                                let variable = &self.data[start..self.read];
+                                self.read += 1;
+                                start = self.read;
+                                while let Some(character) = iterator.next() {
+                                    if character == b')' {
+                                        let pattern = &self.data[start..self.read].trim();
+                                        self.read += 1;
+                                        return if let Some(&b'[') =
+                                            self.data.as_bytes().get(self.read)
+                                        {
+                                            let _ = iterator.next();
+                                            WordToken::ArrayMethod(ArrayMethod {
+                                                method,
+                                                variable: variable.trim(),
+                                                pattern: Pattern::StringPattern(pattern),
+                                                selection: self.read_selection(iterator),
+                                            })
+                                        } else {
+                                            WordToken::ArrayMethod(ArrayMethod {
+                                                method,
+                                                variable: variable.trim(),
+                                                pattern: Pattern::StringPattern(pattern),
+                                                selection: Select::All,
+                                            })
+                                        };
+                                    }
+                                    self.read += 1;
+                                }
+                            }
+                            b')' if depth == 0 => {
+                                // If no pattern is supplied, the default is a space.
+                                let variable = &self.data[start..self.read];
+                                self.read += 1;
+
+                                return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                                    let _ = iterator.next();
+                                    WordToken::ArrayMethod(ArrayMethod {
+                                        method,
+                                        variable: variable.trim(),
+                                        pattern: Pattern::Whitespace,
+                                        selection: self.read_selection(iterator),
+                                    })
+                                } else {
+                                    WordToken::ArrayMethod(ArrayMethod {
+                                        method,
+                                        variable: variable.trim(),
+                                        pattern: Pattern::Whitespace,
+                                        selection: Select::All,
+                                    })
+                                };
+                            }
+                            b')' => depth -= 1,
+                            b'(' => depth += 1,
+                            _ => (),
+                        }
+                        self.read += 1;
+                    }
+
+                    panic!("ion: fatal error with syntax validation parsing: unterminated method");
+                }
+                b'[' => {
+                    return WordToken::ArrayVariable(
+                        &self.data[start..self.read],
+                        self.flags.contains(DQUOTE),
+                        self.read_selection(iterator),
+                    )
+                }
+                // Only alphanumerical and underscores are allowed in variable names
+                0...47 | 58...64 | 91...94 | 96 | 123...127 => {
+                    return WordToken::ArrayVariable(
+                        &self.data[start..self.read],
+                        self.flags.contains(DQUOTE),
+                        Select::All,
+                    )
+                }
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        WordToken::ArrayVariable(&self.data[start..], self.flags.contains(DQUOTE), Select::All)
+    }
+
+    fn braced_array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        // self.read += 1;
+        while let Some(character) = iterator.next() {
+            match character {
+                b'[' => {
+                    let result = WordToken::ArrayVariable(
+                        &self.data[start..self.read],
+                        self.flags.contains(DQUOTE),
+                        self.read_selection(iterator),
+                    );
+                    self.read += 1;
+                    if let Some(b'}') = iterator.next() {
+                        return result;
+                    }
+                    panic!(
+                        "ion: fatal with syntax validation error: unterminated braced array \
+                         expression"
+                    );
+                }
+                b'}' => {
+                    let output = &self.data[start..self.read];
+                    self.read += 1;
+                    return WordToken::ArrayVariable(
+                        output,
+                        self.flags.contains(DQUOTE),
+                        Select::All,
+                    );
+                }
+                // Only alphanumerical and underscores are allowed in variable names
+                0...47 | 58...64 | 91...94 | 96 | 123...127 => {
+                    return WordToken::ArrayVariable(
+                        &self.data[start..self.read],
+                        self.flags.contains(DQUOTE),
+                        Select::All,
+                    )
+                }
+                _ => (),
+            }
+            self.read += 1;
+        }
+        WordToken::ArrayVariable(&self.data[start..], self.flags.contains(DQUOTE), Select::All)
+    }
+
+    /// Contains the logic for parsing subshell syntax.
+    fn process<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        let mut level = 0;
+        while let Some(character) = iterator.next() {
+            match character {
+                _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
+                b'\\' => self.flags ^= BACKSL,
+                b'\'' if !self.flags.contains(DQUOTE) => self.flags ^= SQUOTE,
+                b'"' if !self.flags.contains(SQUOTE) => self.flags ^= DQUOTE,
+                b'$' if !self.flags.contains(SQUOTE) => {
+                    if self.data.as_bytes()[self.read + 1] == b'(' {
+                        level += 1;
+                    }
+                }
+                b')' if !self.flags.contains(SQUOTE) => if level == 0 {
+                    let output = &self.data[start..self.read];
+                    self.read += 1;
+                    return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                        let _ = iterator.next();
+                        WordToken::Process(
+                            output,
+                            self.flags.contains(DQUOTE),
+                            self.read_selection(iterator),
+                        )
+                    } else {
+                        WordToken::Process(output, self.flags.contains(DQUOTE), Select::All)
+                    };
+                } else {
+                    level -= 1;
+                },
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        // The validator at the frontend should catch unterminated processes.
+        panic!("ion: fatal error with syntax validation: unterminated process");
+    }
+
+    /// Contains the logic for parsing array subshell syntax.
+    fn array_process<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        let mut level = 0;
+        while let Some(character) = iterator.next() {
+            match character {
+                _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
+                b'\\' => self.flags ^= BACKSL,
+                b'\'' if !self.flags.contains(DQUOTE) => self.flags ^= SQUOTE,
+                b'"' if !self.flags.contains(SQUOTE) => self.flags ^= DQUOTE,
+                b'@' if !self.flags.contains(SQUOTE) => {
+                    if self.data.as_bytes()[self.read + 1] == b'(' {
+                        level += 1;
+                    }
+                }
+                b')' if !self.flags.contains(SQUOTE) => if level == 0 {
+                    let array_process_contents = &self.data[start..self.read];
+                    self.read += 1;
+                    return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                        let _ = iterator.next();
+                        WordToken::ArrayProcess(
+                            array_process_contents,
+                            self.flags.contains(DQUOTE),
+                            self.read_selection(iterator),
+                        )
+                    } else {
+                        WordToken::ArrayProcess(
+                            array_process_contents,
+                            self.flags.contains(DQUOTE),
+                            Select::All,
+                        )
+                    };
+                } else {
+                    level -= 1;
+                },
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        // The validator at the frontend should catch unterminated processes.
+        panic!("ion: fatal error with syntax validation: unterminated array process");
+    }
+
+    /// Contains the grammar for parsing brace expansion syntax
+    fn braces<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let mut start = self.read;
+        let mut level = 0;
+        let mut elements = Vec::new();
+        while let Some(character) = iterator.next() {
+            match character {
+                _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
+                b'\\' => self.flags ^= BACKSL,
+                b'\'' if !self.flags.contains(DQUOTE) => self.flags ^= SQUOTE,
+                b'"' if !self.flags.contains(SQUOTE) => self.flags ^= DQUOTE,
+                b',' if !self.flags.intersects(SQUOTE | DQUOTE) && level == 0 => {
+                    elements.push(&self.data[start..self.read]);
+                    start = self.read + 1;
+                }
+                b'{' if !self.flags.intersects(SQUOTE | DQUOTE) => level += 1,
+                b'}' if !self.flags.intersects(SQUOTE | DQUOTE) => if level == 0 {
+                    elements.push(&self.data[start..self.read]);
+                    self.read += 1;
+                    return WordToken::Brace(elements);
+                } else {
+                    level -= 1;
+                },
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        panic!("ion: fatal error with syntax validation: unterminated brace")
+    }
+
+    /// Contains the grammar for parsing array expression syntax
+    fn array<I>(&mut self, iterator: &mut I) -> WordToken<'a>
+        where I: Iterator<Item = u8>
+    {
+        let start = self.read;
+        let mut level = 0;
+        while let Some(character) = iterator.next() {
+            match character {
+                _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
+                b'\\' => self.flags ^= BACKSL,
+                b'\'' if !self.flags.contains(DQUOTE) => self.flags ^= SQUOTE,
+                b'"' if !self.flags.contains(SQUOTE) => self.flags ^= DQUOTE,
+                b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => level += 1,
+                b']' if !self.flags.intersects(SQUOTE | DQUOTE) => if level == 0 {
+                    let elements =
+                        ArgumentSplitter::new(&self.data[start..self.read]).collect::<Vec<&str>>();
+                    self.read += 1;
+
+                    return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
+                        let _ = iterator.next();
+                        WordToken::Array(elements, self.read_selection(iterator))
+                    } else {
+                        WordToken::Array(elements, Select::All)
+                    };
+                } else {
+                    level -= 1;
+                },
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        panic!("ion: fatal error with syntax validation: unterminated array expression")
+    }
+
+    fn glob_check<I>(&mut self, iterator: &mut I) -> bool
+        where I: Iterator<Item = u8> + Clone
+    {
+        // Clone the iterator and scan for illegal characters until the corresponding ] is
+        // discovered. If none are found, then it's a valid glob signature.
+        let mut moves = 0;
+        let mut glob = false;
+        let mut square_bracket = 0;
+        let mut iter = iterator.clone();
+        while let Some(character) = iter.next() {
+            moves += 1;
+            match character {
+                b'[' => {
+                    square_bracket += 1;
+                }
+                b' ' | b'"' | b'\'' | b'$' | b'{' | b'}' => break,
+                b']' => {
+                    // If the glob is less than three bytes in width, then it's empty and thus
+                    // invalid.
+                    if !(moves <= 3 && square_bracket == 1) {
+                        glob = true;
+                        break;
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        if glob {
+            for _ in 0..moves {
+                iterator.next();
+            }
+            self.read += moves + 1;
+            true
+        } else {
+            self.read += 1;
+            false
+        }
+    }
+
+    fn arithmetic_expression<I: Iterator<Item = u8>>(&mut self, iter: &mut I) -> WordToken<'a> {
+        let mut paren: i8 = 0;
+        let start = self.read;
+        while let Some(character) = iter.next() {
+            match character {
+                b'(' => paren += 1,
+                b')' => {
+                    if paren == 0 {
+                        // Skip the incoming ); we have validated this syntax so it should be OK
+                        let _ = iter.next();
+                        let output = &self.data[start..self.read];
+                        self.read += 2;
+                        return WordToken::Arithmetic(output);
+                    } else {
+                        paren -= 1;
+                    }
+                }
+                _ => (),
+            }
+            self.read += 1;
+        }
+        panic!("ion: fatal syntax error: unterminated arithmetic expression");
+    }
+}
+
+impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
+    type Item = WordToken<'a>;
+
+    fn next(&mut self) -> Option<WordToken<'a>> {
+        if self.read == self.data.len() {
+            return None;
+        }
+
+        let mut iterator = self.data.bytes().skip(self.read);
+        let mut start = self.read;
+        let mut glob = false;
+        let mut tilde = false;
+        loop {
+            if let Some(character) = iterator.next() {
+                match character {
+                    _ if self.flags.contains(BACKSL) => {
+                        self.read += 1;
+                        self.flags ^= BACKSL;
+                        break;
+                    }
+                    b'\\' => {
+                        if !self.flags.intersects(DQUOTE | SQUOTE) {
+                            start += 1;
+                        }
+                        self.read += 1;
+                        self.flags ^= BACKSL;
+                        if !self.flags.contains(EXPAND_PROCESSES) {
+                            return Some(WordToken::Normal("\\", glob, tilde));
+                        }
+                        break;
+                    }
+                    b'\'' if !self.flags.contains(DQUOTE) => {
+                        start += 1;
+                        self.read += 1;
+                        self.flags ^= SQUOTE;
+                        if !self.flags.contains(EXPAND_PROCESSES) {
+                            return Some(WordToken::Normal("'", glob, tilde));
+                        }
+                        break;
+                    }
+                    b'"' if !self.flags.contains(SQUOTE) => {
+                        start += 1;
+                        self.read += 1;
+                        if self.flags.contains(DQUOTE) {
+                            self.flags -= DQUOTE;
+                            return self.next();
+                        }
+                        self.flags |= DQUOTE;
+                        if !self.flags.contains(EXPAND_PROCESSES) {
+                            return Some(WordToken::Normal("\"", glob, tilde));
+                        } else {
+                            break;
+                        }
+                    }
+                    b' ' if !self.flags.intersects(DQUOTE | SQUOTE) => {
+                        return Some(self.whitespaces(&mut iterator))
+                    }
+                    b'~' if !self.flags.intersects(DQUOTE | SQUOTE) => {
+                        tilde = true;
+                        self.read += 1;
+                        break;
+                    }
+                    b'{' if !self.flags.intersects(DQUOTE | SQUOTE) => {
+                        self.read += 1;
+                        return Some(self.braces(&mut iterator));
+                    }
+                    b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                        if self.glob_check(&mut iterator) {
+                            glob = true;
+                        } else {
+                            return Some(self.array(&mut iterator));
+                        }
+                    }
+                    b'@' if !self.flags.contains(SQUOTE) => match iterator.next() {
+                        Some(b'(') => {
+                            self.read += 2;
+                            return if self.flags.contains(EXPAND_PROCESSES) {
+                                Some(self.array_process(&mut iterator))
+                            } else {
+                                Some(WordToken::Normal(&self.data[start..self.read], glob, tilde))
+                            };
+                        }
+                        Some(b'{') => {
+                            self.read += 2;
+                            return Some(self.braced_array_variable(&mut iterator));
+                        }
+                        _ => {
+                            self.read += 1;
+                            return Some(self.array_variable(&mut iterator));
+                        }
+                    },
+                    b'$' if !self.flags.contains(SQUOTE) => {
+                        match iterator.next() {
+                            Some(b'(') => {
+                                self.read += 2;
+                                return if self.data.as_bytes()[self.read] == b'(' {
+                                    // Pop the incoming left paren
+                                    let _ = iterator.next();
+                                    self.read += 1;
+                                    Some(self.arithmetic_expression(&mut iterator))
+                                } else if self.flags.contains(EXPAND_PROCESSES) {
+                                    Some(self.process(&mut iterator))
+                                } else {
+                                    Some(WordToken::Normal(
+                                        &self.data[start..self.read],
+                                        glob,
+                                        tilde,
+                                    ))
+                                };
+                            }
+                            Some(b'{') => {
+                                self.read += 2;
+                                return Some(self.braced_variable(&mut iterator));
+                            }
+                            _ => {
+                                self.read += 1;
+                                return Some(self.variable(&mut iterator));
+                            }
+                        }
+                    }
+                    b'*' | b'?' => {
+                        self.read += 1;
+                        glob = true;
+                        break;
+                    }
+                    _ => {
+                        self.read += 1;
+                        break;
+                    }
+                }
+            } else {
+                return None;
+            }
+        }
+
+        while let Some(character) = iterator.next() {
+            match character {
+                _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
+                b'\\' => {
+                    self.flags ^= BACKSL;
+                    let end = if !self.flags.contains(EXPAND_PROCESSES) {
+                        if self.flags.intersects(DQUOTE | SQUOTE) {
+                            self.read + 2
+                        } else {
+                            self.read + 1
+                        }
+                    } else if self.flags.intersects(DQUOTE | SQUOTE) {
+                        self.read + 1
+                    } else {
+                        self.read
+                    };
+                    let output = &self.data[start..end];
+                    self.read += 1;
+                    return Some(WordToken::Normal(output, glob, tilde));
+                }
+                b'\'' if !self.flags.contains(DQUOTE) => {
+                    self.flags ^= SQUOTE;
+                    let end = if !self.flags.contains(EXPAND_PROCESSES) {
+                        self.read + 1
+                    } else {
+                        self.read
+                    };
+                    let output = &self.data[start..end];
+                    self.read += 1;
+                    return Some(WordToken::Normal(output, glob, tilde));
+                }
+                b'"' if !self.flags.contains(SQUOTE) => {
+                    self.flags ^= DQUOTE;
+                    let end = if !self.flags.contains(EXPAND_PROCESSES) {
+                        self.read + 1
+                    } else {
+                        self.read
+                    };
+                    let output = &self.data[start..end];
+                    self.read += 1;
+                    return Some(WordToken::Normal(output, glob, tilde));
+                }
+                b' ' | b'{' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                    return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde))
+                }
+                b'$' | b'@' if !self.flags.contains(SQUOTE) => {
+                    let output = &self.data[start..self.read];
+                    if output != "" {
+                        return Some(WordToken::Normal(output, glob, tilde));
+                    } else {
+                        return self.next();
+                    };
+                }
+                b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                    if self.glob_check(&mut iterator) {
+                        glob = true;
+                    } else {
+                        return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde));
+                    }
+                }
+                b'*' | b'?' if !self.flags.contains(SQUOTE) => {
+                    glob = true;
+                }
+                b'~' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                    let output = &self.data[start..self.read];
+                    if output != "" {
+                        return Some(WordToken::Normal(output, glob, tilde));
+                    } else {
+                        return self.next();
+                    }
+                }
+                _ => (),
+            }
+            self.read += 1;
+        }
+
+        if start == self.read {
+            None
+        } else {
+            Some(WordToken::Normal(&self.data[start..], glob, tilde))
+        }
+    }
+}
