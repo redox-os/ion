@@ -32,3 +32,7 @@ echo $join([one two three], "\n")
 echo $join([one two three], "\t")
 echo $join([one two three], "\\n")
 echo $replace($join([one two three], "\n"), "\n" "\t")
+let a = "applesauce"
+let pos = $find(a, "s")
+let array = [@split_at(a, $pos)]
+echo $join(array, "\n")

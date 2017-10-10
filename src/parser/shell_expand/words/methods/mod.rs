@@ -3,8 +3,8 @@ mod pattern;
 mod strings;
 
 pub(crate) use self::arrays::ArrayMethod;
-pub(crate) use self::strings::StringMethod;
 pub(crate) use self::pattern::Pattern;
+pub(crate) use self::strings::StringMethod;
 
 use super::{Index, Range};
 use super::super::ranges::parse_index_range;

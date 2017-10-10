@@ -350,13 +350,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                     Select::Key(_) => (),
                 },
                 WordToken::ArrayMethod(ref array_method) => {
-                    return if array_method.returns_array() {
-                        array_method.handle_as_array(expand_func)
-                    } else {
-                        let mut output = String::new();
-                        array_method.handle(&mut output, expand_func);
-                        array!(output)
-                    }
+                    return array_method.handle_as_array(expand_func)
                 }
                 _ => (),
             }

@@ -1,7 +1,9 @@
 use super::{Pattern, Select, SelectWithSize};
+use super::pattern::unescape;
 use super::super::Index;
 use super::super::super::{expand_string, Expander};
 use super::super::super::is_expression;
+use smallstring::SmallString;
 use std::char;
 use std::io::{self, Write};
 use types::Array;
@@ -16,13 +18,6 @@ pub(crate) struct ArrayMethod<'a> {
 }
 
 impl<'a> ArrayMethod<'a> {
-    pub(crate) fn returns_array(&self) -> bool {
-        match self.method {
-            "split" | "chars" | "bytes" | "graphemes" => true,
-            _ => false,
-        }
-    }
-
     pub(crate) fn handle<E: Expander>(&self, current: &mut String, expand_func: &E) {
         match self.method {
             "split" => {
@@ -35,7 +30,7 @@ impl<'a> ArrayMethod<'a> {
                 };
                 match (&self.pattern, self.selection.clone()) {
                     (&Pattern::StringPattern(pattern), Select::All) => current.push_str(&variable
-                        .split(&expand_string(pattern, expand_func, false).join(" "))
+                        .split(&unescape(expand_string(pattern, expand_func, false).join(" ")))
                         .collect::<Vec<&str>>()
                         .join(" ")),
                     (&Pattern::Whitespace, Select::All) => current.push_str(&variable
@@ -47,7 +42,9 @@ impl<'a> ArrayMethod<'a> {
                     (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => {
                         current.push_str(
                             variable
-                                .split(&expand_string(pattern, expand_func, false).join(" "))
+                                .split(
+                                    &unescape(expand_string(pattern, expand_func, false).join(" ")),
+                                )
                                 .nth(id)
                                 .unwrap_or_default(),
                         )
@@ -62,7 +59,9 @@ impl<'a> ArrayMethod<'a> {
                     (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => {
                         current.push_str(
                             variable
-                                .rsplit(&expand_string(pattern, expand_func, false).join(" "))
+                                .rsplit(
+                                    &unescape(expand_string(pattern, expand_func, false).join(" ")),
+                                )
                                 .nth(id)
                                 .unwrap_or_default(),
                         )
@@ -76,7 +75,9 @@ impl<'a> ArrayMethod<'a> {
                                 .unwrap_or_default(),
                         ),
                     (&Pattern::StringPattern(pattern), Select::Range(range)) => {
-                        let expansion = expand_string(pattern, expand_func, false).join(" ");
+                        let expansion = unescape(
+                            unescape(expand_string(pattern, expand_func, false).join(" ")),
+                        );
                         let iter = variable.split(&expansion);
                         if let Some((start, length)) = range.bounds(iter.clone().count()) {
                             let range = iter.skip(start).take(length).collect::<Vec<_>>().join(" ");
@@ -127,7 +128,7 @@ impl<'a> ArrayMethod<'a> {
                 return match (&self.pattern, self.selection.clone()) {
                     (_, Select::None) => Some("".into()).into_iter().collect(),
                     (&Pattern::StringPattern(pattern), Select::All) => variable
-                        .split(&expand_string(pattern, expand_func, false).join(" "))
+                        .split(&unescape(expand_string(pattern, expand_func, false).join(" ")))
                         .map(From::from)
                         .collect(),
                     (&Pattern::Whitespace, Select::All) => variable
@@ -137,7 +138,7 @@ impl<'a> ArrayMethod<'a> {
                         .collect(),
                     (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => {
                         variable
-                            .split(&expand_string(pattern, expand_func, false).join(" "))
+                            .split(&unescape(expand_string(pattern, expand_func, false).join(" ")))
                             .nth(id)
                             .map(From::from)
                             .into_iter()
@@ -152,7 +153,7 @@ impl<'a> ArrayMethod<'a> {
                         .collect(),
                     (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => {
                         variable
-                            .rsplit(&expand_string(pattern, expand_func, false).join(" "))
+                            .rsplit(&unescape(expand_string(pattern, expand_func, false).join(" ")))
                             .nth(id)
                             .map(From::from)
                             .into_iter()
@@ -166,7 +167,8 @@ impl<'a> ArrayMethod<'a> {
                         .into_iter()
                         .collect(),
                     (&Pattern::StringPattern(pattern), Select::Range(range)) => {
-                        let expansion = expand_string(pattern, expand_func, false).join(" ");
+                        let expansion =
+                            unescape(expand_string(pattern, expand_func, false).join(" "));
                         let iter = variable.split(&expansion);
                         if let Some((start, length)) = range.bounds(iter.clone().count()) {
                             iter.skip(start).take(length).map(From::from).collect()
@@ -191,6 +193,25 @@ impl<'a> ArrayMethod<'a> {
                     }
                     (_, Select::Key(_)) => Some("".into()).into_iter().collect(),
                 };
+            }
+            "split_at" => {
+                let variable = resolve_var!();
+                match self.pattern {
+                    Pattern::StringPattern(string) => if let Ok(value) =
+                        expand_string(string, expand_func, false).join(" ").parse::<usize>()
+                    {
+                        if value < variable.len() {
+                            let (l, r) = variable.split_at(value);
+                            return array![SmallString::from(l), SmallString::from(r)];
+                        }
+                        eprintln!("ion: split_at: value is out of bounds");
+                    } else {
+                        eprintln!("ion: split_at: requires a valid number as an argument");
+                    },
+                    Pattern::Whitespace => {
+                        eprintln!("ion: split_at: requires an argument");
+                    }
+                }
             }
             "graphemes" => {
                 let variable = resolve_var!();

@@ -13,10 +13,19 @@ pub(crate) fn unescape(input: String) -> String {
             output += &input[start..id];
             if let Some((_, character)) = characters.next() {
                 start = match character {
-                    'n' => {output.push('\n'); id + 2},
-                    '\\' => {output.push('\\'); id + 2},
-                    't' => {output.push('\t'); id + 2},
-                    _ => id + 1
+                    'n' => {
+                        output.push('\n');
+                        id + 2
+                    }
+                    '\\' => {
+                        output.push('\\');
+                        id + 2
+                    }
+                    't' => {
+                        output.push('\t');
+                        id + 2
+                    }
+                    _ => id + 1,
                 };
             }
         }

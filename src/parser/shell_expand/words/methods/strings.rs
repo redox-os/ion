@@ -3,6 +3,7 @@ use super::pattern::unescape;
 use super::super::super::{expand_string, Expander};
 use super::super::super::{is_expression, slice};
 use super::super::super::super::ArgumentSplitter;
+use parser::assignments::is_array;
 use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};
 use std::path::Path;
 use sys;
@@ -172,6 +173,17 @@ impl<'a> StringMethod<'a> {
                 let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
                 output.push_str(rev_graphs.collect::<String>().as_str());
             },
+            "find" => {
+                let pattern = unescape(expand_string(pattern, expand, false).join(" "));
+                let out = if let Some(value) = expand.variable(variable, false) {
+                    value.find(&pattern)
+                } else if is_expression(variable) {
+                    expand_string(variable, expand, false).join(" ").find(&pattern)
+                } else {
+                    None
+                };
+                output.push_str(&out.unwrap_or(0).to_string());
+            }
             method @ _ => {
                 if sys::is_root() {
                     eprintln!("ion: root is not allowed to execute plugins");
