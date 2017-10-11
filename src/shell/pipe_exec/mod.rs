@@ -16,7 +16,7 @@ use super::flow_control::FunctionError;
 use super::job::RefinedJob;
 use super::signals::{self, SignalHandler};
 use super::status::*;
-use parser::pipelines::{Input, Pipeline, RedirectFrom, Redirection};
+use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Error, Write};
 use std::iter;
@@ -25,6 +25,8 @@ use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{exit, Command};
 use sys;
+
+type RefinedItem = (RefinedJob, JobKind, Vec<Redirection>, Vec<Input>);
 
 /// Use dup2 to replace `old` with `new` using `old`s file descriptor ID
 fn redir(old: RawFd, new: RawFd) {
@@ -53,7 +55,7 @@ pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<RawFd, Error> {
 /// 2. The value stored within `Some` will be that background job's command name.
 /// 3. If `set -x` was set, print the command.
 fn gen_background_string(pipeline: &Pipeline, print_comm: bool) -> Option<String> {
-    if pipeline.jobs[pipeline.jobs.len() - 1].kind == JobKind::Background {
+    if pipeline.items[pipeline.items.len() - 1].job.kind == JobKind::Background {
         let command = pipeline.to_string();
         if print_comm {
             eprintln!("> {}", command);
@@ -83,31 +85,52 @@ fn is_implicit_cd(argument: &str) -> bool {
 /// Using that value, the stdin of the first command will be mapped to either a `File`,
 /// or `HereString`, which may be either a herestring or heredoc. Returns `true` if
 /// the input error occurred.
-fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
-    match input {
-        Input::File(ref filename) => if let Some(command) = piped_commands.first_mut() {
-            match File::open(filename) {
-                Ok(file) => command.0.stdin(file),
-                Err(e) => {
-                    eprintln!("ion: failed to redirect '{}' into stdin: {}", filename, e);
-                    return true;
+fn redirect_input(piped_commands: &mut Vec<RefinedItem>) -> bool {
+    // let mut prev_kind = None; // TODO: Piping?
+    for &mut (ref mut job, ref _kind, _, ref mut inputs) in piped_commands {
+        // TODO: Determine if we need to care about piping
+        match inputs.len() {
+            0 => continue,
+            1 => {
+                match inputs[0] {
+                    Input::File(ref filename) => match File::open(filename) {
+                        Ok(file) => job.stdin(file),
+                        Err(e) => {
+                            eprintln!("ion: failed to redirect '{}' to stdin: {}", filename, e);
+                            return true;
+                        }
+                    },
+                    Input::HereString(ref mut string) => match unsafe { stdin_of(&string) } {
+                        Ok(stdio) => job.stdin(unsafe { File::from_raw_fd(stdio) }),
+                        Err(e) => {
+                            eprintln!("ion: failed to redirect herestring '{}' to stdin: {}",
+                                      string, e);
+                            return true;
+                        }
+                    }
+                }
+            },
+            _ => {
+                match inputs[0] {
+                    Input::File(ref filename) => match File::open(filename) {
+                        Ok(file) => job.stdin(file),
+                        Err(e) => {
+                            eprintln!("ion: failed to redirect '{}' to stdin: {}", filename, e);
+                            return true;
+                        }
+                    },
+                    Input::HereString(ref mut string) => match unsafe { stdin_of(&string) } {
+                        Ok(stdio) => job.stdin(unsafe { File::from_raw_fd(stdio) }),
+                        Err(e) => {
+                            eprintln!("ion: failed to redirect herestring '{}' to stdin: {}",
+                                      string, e);
+                            return true;
+                        }
+                    }
                 }
             }
-        },
-        Input::HereString(ref mut string) => if let Some(command) = piped_commands.first_mut() {
-            if !string.ends_with('\n') {
-                string.push('\n');
-            }
-            match unsafe { stdin_of(&string) } {
-                Ok(stdio) => {
-                    command.0.stdin(unsafe { File::from_raw_fd(stdio) });
-                }
-                Err(e) => {
-                    eprintln!("ion: failed to redirect herestring '{}' into stdin: {}", string, e);
-                    return true;
-                }
-            }
-        },
+        }
+        // prev_kind = Some(*kind); TODO: Piping
     }
     false
 }
@@ -116,42 +139,36 @@ fn redirect_input(mut input: Input, piped_commands: &mut Vec<(RefinedJob, JobKin
 ///
 /// Using that value, the stdout and/or stderr of the last command will be redirected accordingly
 /// to the designated output. Returns `true` if the outputs couldn't be redirected.
-fn redirect_output(stdout: Redirection, piped_commands: &mut Vec<(RefinedJob, JobKind)>) -> bool {
-    if let Some(command) = piped_commands.last_mut() {
-        let file = if stdout.append {
-            OpenOptions::new().create(true).write(true).append(true).open(&stdout.file)
-        } else {
-            File::create(&stdout.file)
-        };
-        match file {
-            Ok(f) => match stdout.from {
-                RedirectFrom::Both => match f.try_clone() {
-                    Ok(f_copy) => {
-                        command.0.stdout(f);
-                        command.0.stderr(f_copy);
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "ion: failed to redirect both stderr and stdout into file '{:?}': {}",
-                            f,
-                            e
-                        );
-                        return true;
+fn redirect_output(piped_commands: &mut Vec<RefinedItem>) -> bool {
+    // TODO: Redirect more than just the last one.
+    for &mut (ref mut job, ref _kind, ref outputs, _) in piped_commands {
+        for output in outputs {
+            match if output.append {
+                OpenOptions::new().create(true).write(true).append(true).open(&output.file)
+            } else {
+                File::create(&output.file)
+            } {
+                Ok(f) => match output.from {
+                    RedirectFrom::Stderr => job.stderr(f),
+                    RedirectFrom::Stdout => job.stdout(f),
+                    RedirectFrom::Both => match f.try_clone() {
+                        Ok(f_copy) => {
+                            job.stdout(f);
+                            job.stderr(f_copy);
+                        },
+                        Err(e) => {
+                            eprintln!(
+                                "ion: failed to redirect both stdout and stderr to file '{:?}': {}",
+                                f,
+                                e);
+                            return true;
+                        }
                     }
                 },
-                RedirectFrom::Stderr => command.0.stderr(f),
-                RedirectFrom::Stdout => command.0.stdout(f),
-            },
-            Err(err) => {
-                let stderr = io::stderr();
-                let mut stderr = stderr.lock();
-                let _ = writeln!(
-                    stderr,
-                    "ion: failed to redirect stdout into {}: {}",
-                    stdout.file,
-                    err
-                );
-                return true;
+                Err(e) => {
+                    eprintln!("ion: failed to redirect output into {}: {}", output.file, e);
+                    return true;
+                }
             }
         }
     }
@@ -183,7 +200,7 @@ pub(crate) trait PipelineExecution {
     /// Each generated command will either be a builtin or external command, and will be
     /// associated will be marked as an `&&`, `||`, `|`, or final job.
     fn generate_commands(&self, pipeline: &mut Pipeline)
-        -> Result<Vec<(RefinedJob, JobKind)>, i32>;
+        -> Result<Vec<RefinedItem>, i32>;
 
     /// Waits for all of the children within a pipe to finish exuecting, returning the
     /// exit status of the last process in the queue.
@@ -241,17 +258,14 @@ impl<'a> PipelineExecution for Shell<'a> {
             return SUCCESS;
         }
 
-        // Redirect the inputs if a custom redirect value was given.
-        if let Some(stdin) = pipeline.stdin.take() {
-            if redirect_input(stdin, &mut piped_commands) {
-                return COULD_NOT_EXEC;
-            }
+        if redirect_input(&mut piped_commands) {
+            return COULD_NOT_EXEC;
         }
+
         // Redirect the outputs if a custom redirect value was given.
-        if let Some(stdout) = pipeline.stdout.take() {
-            if redirect_output(stdout, &mut piped_commands) {
-                return COULD_NOT_EXEC;
-            }
+        // TODO fix redirection
+        if redirect_output(&mut piped_commands) {
+            return COULD_NOT_EXEC;
         }
         // If the given pipeline is a background task, fork the shell.
         if let Some(command_name) = possible_background_name {
@@ -273,9 +287,10 @@ impl<'a> PipelineExecution for Shell<'a> {
     fn generate_commands(
         &self,
         pipeline: &mut Pipeline,
-    ) -> Result<Vec<(RefinedJob, JobKind)>, i32> {
+    ) -> Result<Vec<RefinedItem>, i32> {
         let mut results = Vec::new();
-        for mut job in pipeline.jobs.drain(..) {
+        for item in pipeline.items.drain(..) {
+            let PipeItem { mut job, outputs, inputs } = item;
             let refined = {
                 if is_implicit_cd(&job.args[0]) {
                     RefinedJob::builtin(
@@ -297,7 +312,7 @@ impl<'a> PipelineExecution for Shell<'a> {
                     RefinedJob::External(command)
                 }
             };
-            results.push((refined, job.kind));
+            results.push((refined, job.kind, outputs, inputs));
         }
         Ok(results)
     }
@@ -465,7 +480,7 @@ impl<'a> PipelineExecution for Shell<'a> {
 /// This function will panic if called with an empty slice
 pub(crate) fn pipe(
     shell: &mut Shell,
-    commands: Vec<(RefinedJob, JobKind)>,
+    commands: Vec<RefinedItem>,
     foreground: bool,
 ) -> i32 {
     fn close(file: &Option<File>) {
@@ -480,7 +495,8 @@ pub(crate) fn pipe(
     let mut previous_kind = JobKind::And;
     let mut commands = commands.into_iter();
     loop {
-        if let Some((mut parent, mut kind)) = commands.next() {
+        // TODO: RedirectKind
+        if let Some((mut parent, mut kind, _, _)) = commands.next() {
             // When an `&&` or `||` operator is utilized, execute commands based on the previous
             // status.
             match previous_kind {
@@ -635,8 +651,9 @@ pub(crate) fn pipe(
                         };
                     }
 
+                    // TODO: RedirectKind
                     // Append other jobs until all piped jobs are running
-                    while let Some((mut child, ckind)) = commands.next() {
+                    while let Some((mut child, ckind, _, _)) = commands.next() {
                         match sys::pipe2(sys::O_CLOEXEC) {
                             Err(e) => {
                                 eprintln!("ion: failed to create pipe: {:?}", e);

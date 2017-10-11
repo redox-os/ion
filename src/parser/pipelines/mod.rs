@@ -20,6 +20,7 @@ pub(crate) struct Redirection {
     pub append: bool,
 }
 
+
 /// Represents input that a process could initially receive from `stdin`
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Input {
@@ -32,54 +33,97 @@ pub(crate) enum Input {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Pipeline {
-    pub jobs:   Vec<Job>,
-    pub stdout: Option<Redirection>,
-    pub stdin:  Option<Input>,
+    pub items: Vec<PipeItem>,
 }
 
-impl Pipeline {
-    pub(crate) fn new(jobs: Vec<Job>, stdin: Option<Input>, stdout: Option<Redirection>) -> Self {
-        Pipeline {
-            jobs,
-            stdin,
-            stdout,
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct PipeItem {
+    pub job: Job,
+    pub outputs: Vec<Redirection>,
+    pub inputs: Vec<Input>,
+}
+
+impl PipeItem {
+    pub(crate) fn new(job: Job, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
+        PipeItem {
+            job,
+            outputs,
+            inputs,
         }
     }
 
     pub(crate) fn expand<E: Expander>(&mut self, expanders: &E) {
-        for job in &mut self.jobs {
-            job.expand(expanders);
+        self.job.expand(expanders);
+
+        for input in self.inputs.iter_mut() {
+            *input = match input {
+                &mut Input::File(ref s) =>
+                    Input::File(expand_string(s, expanders, false).join(" ")),
+                &mut Input::HereString(ref s) =>
+                    Input::HereString(expand_string(s, expanders, true).join(" ")),
+            };
         }
 
-        let stdin = match self.stdin {
-            Some(Input::File(ref s)) => {
-                Some(Input::File(expand_string(s, expanders, false).join(" ")))
-            }
-            Some(Input::HereString(ref s)) => {
-                Some(Input::HereString(expand_string(s, expanders, true).join(" ")))
-            }
-            None => None,
-        };
+        for output in self.outputs.iter_mut() {
+            output.file = expand_string(output.file.as_str(), expanders, false).join(" ");
+        }
+    }
+}
 
-        self.stdin = stdin;
-
-        if let Some(stdout) = self.stdout.iter_mut().next() {
-            stdout.file = expand_string(stdout.file.as_str(), expanders, false).join(" ");
+impl Pipeline {
+    pub(crate) fn new() -> Self {
+        Pipeline {
+            items: Vec::new(),
         }
     }
 
+    pub(crate) fn expand<E: Expander>(&mut self, expanders: &E) {
+        self.items.iter_mut().for_each(|i| i.expand(expanders));
+    }
+
     pub(crate) fn requires_piping(&self) -> bool {
-        self.jobs.len() > 1 || self.stdin != None || self.stdout != None
-            || self.jobs.last().unwrap().kind == JobKind::Background
+        self.items.len() > 1 || self.items.iter().any(|it| it.outputs.len() > 0)
+            || self.items.iter().any(|it| it.inputs.len() > 0)
+            || self.items.last().unwrap().job.kind == JobKind::Background
     }
 }
 
 impl fmt::Display for Pipeline {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut tokens: Vec<String> = Vec::with_capacity(self.jobs.len());
-        for job in &self.jobs {
-            tokens.extend(job.args.clone().into_iter());
-            match job.kind {
+        let mut tokens: Vec<String> = Vec::with_capacity(self.items.len());
+        for item in &self.items {
+            let job = &item.job;
+            let kind = job.kind;
+            let inputs = &item.inputs;
+            let outputs = &item.outputs;
+            tokens.extend(item.job.args.clone().into_iter());
+            for input in inputs {
+                match input {
+                    &Input::File(ref file) => {
+                        tokens.push("<".into());
+                        tokens.push(file.clone());
+                    },
+                    &Input::HereString(ref string) => {
+                        tokens.push("<<<".into());
+                        tokens.push(string.clone());
+                    },
+                }
+            }
+            for output in outputs {
+                match output.from {
+                    RedirectFrom::Stdout => {
+                        tokens.push((if output.append { ">>" } else { ">" }).into());
+                    }
+                    RedirectFrom::Stderr => {
+                        tokens.push((if output.append { "^>>" } else { "^>" }).into());
+                    }
+                    RedirectFrom::Both => {
+                        tokens.push((if output.append { "&>>" } else { "&>" }).into());
+                    }
+                }
+                tokens.push(output.file.clone());
+            }
+            match kind {
                 JobKind::Last => (),
                 JobKind::And => tokens.push("&&".into()),
                 JobKind::Or => tokens.push("||".into()),
@@ -88,31 +132,6 @@ impl fmt::Display for Pipeline {
                 JobKind::Pipe(RedirectFrom::Stderr) => tokens.push("^|".into()),
                 JobKind::Pipe(RedirectFrom::Both) => tokens.push("&|".into()),
             }
-        }
-        match self.stdin {
-            None => (),
-            Some(Input::File(ref file)) => {
-                tokens.push("<".into());
-                tokens.push(file.clone());
-            }
-            Some(Input::HereString(ref string)) => {
-                tokens.push("<<<".into());
-                tokens.push(string.clone());
-            }
-        }
-        if let Some(ref outfile) = self.stdout {
-            match outfile.from {
-                RedirectFrom::Stdout => {
-                    tokens.push((if outfile.append { ">>" } else { ">" }).into());
-                }
-                RedirectFrom::Stderr => {
-                    tokens.push((if outfile.append { "^>>" } else { "^>" }).into());
-                }
-                RedirectFrom::Both => {
-                    tokens.push((if outfile.append { "&>>" } else { "&>" }).into());
-                }
-            }
-            tokens.push(outfile.file.clone());
         }
 
         write!(f, "{}", tokens.join(" "))

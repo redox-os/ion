@@ -1,5 +1,4 @@
 use std::fs::File;
-use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::process::{Command, Stdio};
 
 // use glob::glob;
@@ -89,9 +88,7 @@ macro_rules! set_field {
     ($self:expr, $field:ident, $arg:expr) => {
         match *$self {
             RefinedJob::External(ref mut command) => {
-                unsafe {
-                    command.$field(Stdio::from_raw_fd($arg.into_raw_fd()));
-                }
+                command.$field(Stdio::from($arg));
             }
             RefinedJob::Builtin { ref mut $field,  .. } | RefinedJob::Function { ref mut $field, .. } => {
                 *$field = Some($arg);

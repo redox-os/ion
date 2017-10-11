@@ -210,23 +210,23 @@ impl<'a> Shell<'a> {
         let builtins = self.builtins;
 
         // Expand any aliases found
-        for job_no in 0..pipeline.jobs.len() {
+        for job_no in 0..pipeline.items.len() {
             if let Some(alias) = {
-                let key: &str = pipeline.jobs[job_no].command.as_ref();
+                let key: &str = pipeline.items[job_no].job.command.as_ref();
                 self.variables.aliases.get(key)
             } {
                 let new_args = ArgumentSplitter::new(alias)
                     .map(String::from)
-                    .chain(pipeline.jobs[job_no].args.drain().skip(1))
+                    .chain(pipeline.items[job_no].job.args.drain().skip(1))
                     .collect::<SmallVec<[String; 4]>>();
-                pipeline.jobs[job_no].command = new_args[0].clone().into();
-                pipeline.jobs[job_no].args = new_args;
+                pipeline.items[job_no].job.command = new_args[0].clone().into();
+                pipeline.items[job_no].job.args = new_args;
             }
         }
 
         // Branch if -> input == shell command i.e. echo
         let exit_status = if let Some(command) = {
-            let key: &str = pipeline.jobs[0].command.as_ref();
+            let key: &str = pipeline.items[0].job.command.as_ref();
             builtins.get(key)
         } {
             pipeline.expand(self);
@@ -235,7 +235,7 @@ impl<'a> Shell<'a> {
                 if self.flags & PRINT_COMMS != 0 {
                     eprintln!("> {}", pipeline.to_string());
                 }
-                let borrowed = &pipeline.jobs[0].args;
+                let borrowed = &pipeline.items[0].job.args;
                 let small: SmallVec<[&str; 4]> = borrowed.iter().map(|x| x as &str).collect();
                 if self.flags & NO_EXEC != 0 {
                     Some(SUCCESS)
@@ -246,9 +246,9 @@ impl<'a> Shell<'a> {
                 Some(self.execute_pipeline(pipeline))
             }
         // Branch else if -> input == shell function and set the exit_status
-        } else if let Some(function) = self.functions.get(&pipeline.jobs[0].command).cloned() {
+        } else if let Some(function) = self.functions.get(&pipeline.items[0].job.command).cloned() {
             if !pipeline.requires_piping() {
-                let args: &[String] = pipeline.jobs[0].args.deref();
+                let args: &[String] = pipeline.items[0].job.args.deref();
                 let args: Vec<&str> = args.iter().map(AsRef::as_ref).collect();
                 match function.execute(self, &args) {
                     Ok(()) => None,

@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::iter::Peekable;
 
-use super::{Input, Pipeline, RedirectFrom, Redirection};
+use super::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use shell::{Job, JobKind};
 use types::*;
 
@@ -200,48 +200,58 @@ impl<'a> Collector<'a> {
     pub(crate) fn parse(&self) -> Result<Pipeline, &'static str> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Array::new();
-        let mut jobs: Vec<Job> = Vec::new();
-        let mut input: Option<Input> = None;
-        let mut outfile: Option<Redirection> = None;
-
-        /// Attempt to create a new job given a list of collected arguments
-        macro_rules! try_add_job {
-            ($kind:expr) => {{
-                if ! args.is_empty() {
-                    jobs.push(Job::new(args.clone(), $kind));
-                    args.clear();
-                }
-            }}
-        }
-
-        /// Attempt to create a job that redirects to some output file
-        macro_rules! try_redir_out {
-            ($from:expr) => {{
-                try_add_job!(JobKind::Last);
-                let append = if let Some(&(_, b'>')) = bytes.peek() {
-                    // Consume the next byte if it is part of the redirection
-                    bytes.next();
-                    true
-                } else {
-                    false
-                };
-                if let Some(file) = self.arg(&mut bytes)? {
-                    outfile = Some(Redirection {
-                        from: $from,
-                        file: file.into(),
-                        append
-                    });
-                } else {
-                    return Err("expected file argument after redirection for output");
-                }
-            }}
-        }
+        let mut pipeline = Pipeline::new();
+        let mut outputs: Option<Vec<Redirection>> = None;
+        let mut inputs: Option<Vec<Input>> = None;
 
         /// Add a new argument that is re
         macro_rules! push_arg {
             () => {{
                 if let Some(v) = self.arg(&mut bytes)? {
                     args.push(v.into());
+                }
+            }}
+        }
+
+        /// Attempt to add a redirection
+        macro_rules! try_redir_out {
+            ($from:expr) => {{
+                if let None = outputs { outputs = Some(Vec::new()); }
+                let append = if let Some(&(_, b'>')) = bytes.peek() {
+                    bytes.next();
+                    true
+                } else {
+                    false
+                };
+                if let Some(file) = self.arg(&mut bytes)? {
+                    outputs.as_mut().map(|o| o.push(Redirection {
+                        from: $from,
+                        file: file.into(),
+                        append
+                    }));
+                } else {
+                    return Err("expected file argument after redirection for output");
+                }
+            }}
+        };
+
+        /// Attempt to create a pipeitem and append it to the pipeline
+        macro_rules! try_add_item {
+            ($job_kind:expr) => {{
+                if ! args.is_empty() {
+                    let job = Job::new(args.clone(), $job_kind);
+                    args.clear();
+                    let item_out = if let Some(out_tmp) = outputs.take() {
+                        out_tmp
+                    } else {
+                        Vec::new()
+                    };
+                    let item_in = if let Some(in_tmp) = inputs.take() {
+                        in_tmp
+                    } else {
+                        Vec::new()
+                    };
+                    pipeline.items.push(PipeItem::new(job, item_out, item_in));
                 }
             }}
         }
@@ -260,14 +270,14 @@ impl<'a> Collector<'a> {
                         }
                         Some(&(_, b'|')) => {
                             bytes.next();
-                            try_add_job!(JobKind::Pipe(RedirectFrom::Both));
+                            try_add_item!(JobKind::Pipe(RedirectFrom::Both));
                         }
                         Some(&(_, b'&')) => {
                             bytes.next();
-                            try_add_job!(JobKind::And);
+                            try_add_item!(JobKind::And);
                         }
                         Some(_) | None => {
-                            try_add_job!(JobKind::Background);
+                            try_add_item!(JobKind::Background);
                         }
                     }
                 }
@@ -283,7 +293,7 @@ impl<'a> Collector<'a> {
                         Some(b'|') => {
                             bytes.next();
                             bytes.next();
-                            try_add_job!(JobKind::Pipe(RedirectFrom::Stderr));
+                            try_add_item!(JobKind::Pipe(RedirectFrom::Stderr));
                         }
                         Some(_) | None => push_arg!(),
                     }
@@ -293,10 +303,10 @@ impl<'a> Collector<'a> {
                     match bytes.peek() {
                         Some(&(_, b'|')) => {
                             bytes.next();
-                            try_add_job!(JobKind::Or);
+                            try_add_item!(JobKind::Or);
                         }
                         Some(_) | None => {
-                            try_add_job!(JobKind::Pipe(RedirectFrom::Stdout));
+                            try_add_item!(JobKind::Pipe(RedirectFrom::Stdout));
                         }
                     }
                 }
@@ -305,6 +315,7 @@ impl<'a> Collector<'a> {
                     try_redir_out!(RedirectFrom::Stdout);
                 }
                 b'<' => {
+                    if let None = inputs { inputs = Some(Vec::new()); }
                     bytes.next();
                     if Some(b'<') == self.peek(i + 1) {
                         if Some(b'<') == self.peek(i + 2) {
@@ -313,7 +324,7 @@ impl<'a> Collector<'a> {
                             bytes.next();
                             bytes.next();
                             if let Some(cmd) = self.arg(&mut bytes)? {
-                                input = Some(Input::HereString(cmd.into()));
+                                inputs.as_mut().map(|x| x.push(Input::HereString(cmd.into())));
                             } else {
                                 return Err("expected string argument after '<<<'");
                             }
@@ -332,12 +343,12 @@ impl<'a> Collector<'a> {
                             };
                             let heredoc = heredoc.lines().collect::<Vec<&str>>();
                             // Then collect the heredoc from standard input.
-                            input =
-                                Some(Input::HereString(heredoc[1..heredoc.len() - 1].join("\n")));
+                            inputs.as_mut().map(|x|
+                                x.push(Input::HereString(heredoc[1..heredoc.len() - 1].join("\n"))));
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
                         // Otherwise interpret it as stdin redirection
-                        input = Some(Input::File(file.into()));
+                        inputs.as_mut().map(|x| x.push(Input::File(file.into())));
                     } else {
                         return Err("expected file argument after redirection for input");
                     }
@@ -352,10 +363,10 @@ impl<'a> Collector<'a> {
         }
 
         if !args.is_empty() {
-            jobs.push(Job::new(args, JobKind::Last));
+            try_add_item!(JobKind::Last);
         }
 
-        Ok(Pipeline::new(jobs, input, outfile))
+        Ok(pipeline)
     }
 }
 

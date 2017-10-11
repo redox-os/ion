@@ -8,13 +8,16 @@ use super::pipe;
 use super::super::Shell;
 use super::super::job::{JobKind, RefinedJob};
 use super::super::status::*;
+use ::parser::pipelines::{Input, Redirection};
 use std::process::exit;
+
+type RefinedItem = (RefinedJob, JobKind, Vec<Redirection>, Vec<Input>);
 
 /// Forks the shell, adding the child to the parent's background list, and executing
 /// the given commands in the child fork.
 pub(crate) fn fork_pipe(
     shell: &mut Shell,
-    commands: Vec<(RefinedJob, JobKind)>,
+    commands: Vec<RefinedItem>,
     command_name: String,
 ) -> i32 {
     match unsafe { sys::fork() } {
