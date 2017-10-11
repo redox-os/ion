@@ -124,8 +124,12 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                 start = self.read;
                                 while let Some(character) = iterator.next() {
                                     if character == b')' {
-                                        let pattern = &self.data[start..self.read].trim();
                                         self.read += 1;
+                                        if depth != 0 {
+                                            depth -= 1;
+                                            continue;
+                                        }
+                                        let pattern = &self.data[start..self.read - 1].trim();
                                         return if let Some(&b'[') =
                                             self.data.as_bytes().get(self.read)
                                         {
@@ -144,6 +148,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                                 selection: Select::All,
                                             })
                                         };
+                                    } else if character == b'(' {
+                                        depth += 1;
+                                    } else if character == b'\\' {
+                                        self.read += 1;
+                                        let _ = iterator.next();
                                     }
                                     self.read += 1;
                                 }

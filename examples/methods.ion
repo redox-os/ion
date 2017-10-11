@@ -36,3 +36,7 @@ let a = "applesauce"
 let pos = $find(a, "s")
 let array = [@split_at(a, $pos)]
 echo $join(array, "\n")
+
+let a = [1 2 3 4 5]
+let a = "1 2 3 4 5"
+echo $join(@split(a, " "), $join(a, " "))

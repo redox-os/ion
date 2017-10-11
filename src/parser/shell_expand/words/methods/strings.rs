@@ -148,7 +148,7 @@ impl<'a> StringMethod<'a> {
                     );
                 }
             }
-            "len" => if variable.starts_with('@') || variable.starts_with('[') {
+            "len" => if variable.starts_with('@') || is_array(variable) {
                 let expanded = expand_string(variable, expand, false);
                 output.push_str(&expanded.len().to_string());
             } else if let Some(value) = expand.variable(variable, false) {
