@@ -339,6 +339,7 @@ impl<'a> Binary for Shell<'a> {
                             } else {
                                 self.save_command_in_history(cmd);
                             }
+                            self.update_variables();
                             continue;
                         }
 
