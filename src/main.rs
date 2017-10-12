@@ -1,5 +1,6 @@
 #![allow(unknown_lints)]
 #![allow(while_let_on_iterator)]
+#![feature(conservative_impl_trait)]
 
 // For a performance boost on Linux
 // #![feature(alloc_system)]
