@@ -249,13 +249,11 @@ impl<'a> Binary for Shell<'a> {
         let mut buffer = QuoteTerminator::new(command);
         self.flow_control.level += 1;
         while !buffer.check_termination() {
-            loop {
-                if let Some(command) = self.readln() {
-                    buffer.append(command);
-                    break;
-                } else {
-                    return Err(());
-                }
+            if let Some(command) = self.readln() {
+                buffer.append(command);
+                break;
+            } else {
+                return Err(());
             }
         }
         self.flow_control.level -= 1;
@@ -325,7 +323,7 @@ impl<'a> Binary for Shell<'a> {
         loop {
             if let Some(command) = self.readln() {
                 if !command.is_empty() {
-                    if let Ok(command) = self.terminate_quotes(command) {
+                    if let Ok(command) = self.terminate_quotes(command.replace("\\\n", "")) {
                         let cmd = command.trim();
                         self.on_command(cmd);
 
