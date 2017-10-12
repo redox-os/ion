@@ -161,7 +161,7 @@ impl<'a> Binary for Shell<'a> {
                                 // Add the list of available variables to the completer's definitions.
                                 // TODO: We should make it free to do String->SmallString
                                 //       and mostly free to go back (free if allocated)
-                                .chain(vars.get_vars().into_iter().map(|s| ["$", &s].concat().into()))
+                                .chain(vars.get_vars().map(|s| ["$", &s].concat().into()))
                                 .collect();
 
                                 // Initialize a new completer from the definitions collected.
@@ -441,11 +441,11 @@ fn complete_as_file(current_dir: PathBuf, filename: String, index: usize) -> boo
     let mut file = current_dir.clone();
     file.push(&filename);
     // If the user explicitly requests a file through this syntax then complete as a file
-    if filename.trim().starts_with(".") {
+    if filename.starts_with(".") {
         return true;
     }
     // If the file starts with a dollar sign, it's a variable, not a file
-    if filename.trim().starts_with("$") {
+    if filename.starts_with("$") {
         return false;
     }
     // Once we are beyond the first string, assume its a file

@@ -257,8 +257,8 @@ impl Variables {
 
     pub fn unset_var(&mut self, name: &str) -> Option<Value> { self.variables.remove(name) }
 
-    pub fn get_vars(&self) -> Vec<Identifier> {
-        self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k.into())).collect()
+    pub fn get_vars<'a>(&'a self) -> impl Iterator<Item = Identifier> + 'a {
+        self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k.into()))
     }
 
     pub(crate) fn is_valid_variable_character(c: char) -> bool {
