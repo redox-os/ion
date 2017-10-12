@@ -1,18 +1,17 @@
 // TODO: Handle Runtime Errors
 extern crate calc;
 extern crate permutate;
-use unicode_segmentation::UnicodeSegmentation;
-
-use types::Array;
 
 mod braces;
 mod ranges;
 mod words;
+
 use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub(crate) use self::words::{Index, Range, Select, WordIterator, WordToken};
 use glob::glob;
 use types::*;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Determines whether an input string is expression-like as compared to a
 /// bare word. For example, strings starting with '"', '\'', '@', or '$' are
@@ -351,13 +350,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                     Select::Key(_) => (),
                 },
                 WordToken::ArrayMethod(ref array_method) => {
-                    return if array_method.returns_array() {
-                        array_method.handle_as_array(expand_func)
-                    } else {
-                        let mut output = String::new();
-                        array_method.handle(&mut output, expand_func);
-                        array!(output)
-                    }
+                    return array_method.handle_as_array(expand_func)
                 }
                 _ => (),
             }

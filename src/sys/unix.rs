@@ -107,6 +107,10 @@ pub mod signals {
     /// Blocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so that the shell never receives
     /// them.
     pub(crate) fn block()
+    // fn block()
+    // fn block()
+    // fn block()
+    // fn block()
     // fn block() // fn block() // fn block() // fn block() // fn block() //
     // fn block()
     {
@@ -128,6 +132,10 @@ pub mod signals {
     /// controlled
     /// by the shell.
     pub(crate) fn unblock()
+    // fn unblock()
+    // fn unblock()
+    // fn unblock()
+    // fn unblock()
     // fn unblock()
     // fn unblock() // fn unblock() // fn unblock() // fn unblock() // fn
     // unblock()
