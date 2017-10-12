@@ -170,12 +170,19 @@ impl Builtin {
         );
         insert_builtin!("exists", builtin_exists, "Performs tests on files and text");
         insert_builtin!("ion-docs", ion_docs, "Opens the Ion manual");
-
+        insert_builtin!("let", list_vars, "Displays a list of local variables");
         commands
     }
 }
 
 // Definitions of simple builtins go here
+
+fn list_vars(_: &[&str], shell: &mut Shell) -> i32 {
+    shell.variables.variables.iter().for_each(
+        |(key, val)| println!("{} = {}", key, val)
+    );
+    SUCCESS
+}
 
 fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.directory_stack.cd(args, &shell.variables) {
