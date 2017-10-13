@@ -22,7 +22,7 @@ use self::variables::{alias, drop_alias, drop_array, drop_variable};
 
 use fnv::FnvHashMap;
 use std::error::Error;
-use std::io::{self, Write};
+use std::io::{self, Write, BufWriter};
 
 use parser::QuoteTerminator;
 use shell::{self, FlowLogic, Shell, ShellHistory};
@@ -178,9 +178,40 @@ impl Builtin {
 // Definitions of simple builtins go here
 
 fn list_vars(_: &[&str], shell: &mut Shell) -> i32 {
+    let stdout = io::stdout();
+    let mut buffer = BufWriter::new(stdout.lock());
+
+    // Small function for formatting and append an array entry to a string buffer.
+    fn print_array<W: Write>(buffer: &mut W, key: &str, array: &[String]) {
+        let _ = buffer.write([key, " = [ "].concat().as_bytes());
+        if array.len() > 1 {
+            let mut vars = array.iter();
+            if let Some(ref var) = vars.next() {
+                let _ = buffer.write(["'", var, "', "].concat().as_bytes());
+                vars.for_each(|ref var| {
+                    let _ = buffer.write(["'", var, "' "].concat().as_bytes());
+                });
+            }
+            let _ = buffer.write(b"]\n");
+        } else {
+            let _ = buffer.write(["'", &array[0], "' ]\n"].concat().as_bytes());
+        }
+    }
+
+    // Write all the string variables to the buffer.
+    let _ = buffer.write(b"# String Variables\n");
     shell.variables.variables.iter().for_each(
-        |(key, val)| println!("{} = {}", key, val)
+        |(key, val)| {
+            let _ = buffer.write([key, " = ", val.as_str(), "\n"].concat().as_bytes());
+        }
     );
+
+    // Then immediately follow that with a list of array variables.
+    let _ = buffer.write(b"\n# Array Variables\n");
+    shell.variables.arrays.iter().for_each(
+        |(key, val)| print_array(&mut buffer, &key, &val)
+    );
+
     SUCCESS
 }
 
