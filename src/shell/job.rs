@@ -82,7 +82,25 @@ pub(crate) enum RefinedJob {
         /// A file corresponding to the standard error for this builtin
         stderr: Option<File>,
     },
+    /// Represents redirection into stdin from more than one source
+    Cat {
+        sources: Vec<File>,
+        /// Indicates that we need to read from a pipe in addition to all the sources
+        piped: bool,
+    },
+    Tee {
+        /// 0 for stdout, 1 for stderr
+        items: [Option<TeeItem>; 2]
+    },
 }
+
+pub struct TeeItem {
+    /// Where to read from for this tee. Generally only necessary if we need to tee both
+    /// stdout and stderr.
+    pub source: Option<File>,
+    pub sinks: Vec<File>,
+}
+
 
 macro_rules! set_field {
     ($self:expr, $field:ident, $arg:expr) => {
@@ -90,9 +108,12 @@ macro_rules! set_field {
             RefinedJob::External(ref mut command) => {
                 command.$field(Stdio::from($arg));
             }
-            RefinedJob::Builtin { ref mut $field,  .. } | RefinedJob::Function { ref mut $field, .. } => {
+            RefinedJob::Builtin { ref mut $field,  .. } |
+                RefinedJob::Function { ref mut $field, .. } => {
                 *$field = Some($arg);
             }
+            // no-op for Tee and Cat
+            _ => {}
         }
     }
 }
@@ -140,6 +161,9 @@ impl RefinedJob {
             RefinedJob::Builtin { ref name, .. } | RefinedJob::Function { ref name, .. } => {
                 name.to_string()
             }
+            // TODO: Print for real
+            RefinedJob::Cat { .. } => "multi-input".into(),
+            RefinedJob::Tee { .. } => "multi-output".into(),
         }
     }
 
@@ -163,6 +187,10 @@ impl RefinedJob {
             }
             RefinedJob::Builtin { ref args, .. } | RefinedJob::Function { ref args, .. } => {
                 format!("{}", args.join(" "))
+            }
+            // TODO: Figure out real printing
+            RefinedJob::Cat { .. } | RefinedJob::Tee { .. } => {
+                "".into()
             }
         }
     }
