@@ -150,12 +150,17 @@ fn do_redirection(piped_commands: Vec<RefinedItem>)
                         None
                     }
                 },
-                Input::HereString(ref mut string) => match unsafe { stdin_of(&string) } {
-                    Ok(stdio) => Some(unsafe { File::from_raw_fd(stdio) }),
-                    Err(e) => {
-                        eprintln!("ion: failed to redirect herestring '{}' to stdin: {}",
-                                  string, e);
-                        None
+                Input::HereString(ref mut string) => {
+                    if !string.ends_with('\n') {
+                        string.push('\n');
+                    }
+                    match unsafe { stdin_of(&string) } {
+                        Ok(stdio) => Some(unsafe { File::from_raw_fd(stdio) }),
+                        Err(e) => {
+                            eprintln!("ion: failed to redirect herestring '{}' to stdin: {}",
+                                      string, e);
+                            None
+                        }
                     }
                 }
             }
