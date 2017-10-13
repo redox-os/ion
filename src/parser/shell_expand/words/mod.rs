@@ -3,12 +3,14 @@ mod tests;
 mod index;
 mod methods;
 mod range;
+mod select;
 
 pub(crate) use self::index::Index;
-pub(crate) use self::methods::{ArrayMethod, Pattern, Select, StringMethod};
+pub(crate) use self::methods::{ArrayMethod, Pattern, StringMethod};
 #[cfg(test)]
 pub(crate) use self::methods::Key;
 pub(crate) use self::range::Range;
+pub(crate) use self::select::{Select, SelectWithSize};
 use super::{expand_string, Expander};
 use super::super::ArgumentSplitter;
 

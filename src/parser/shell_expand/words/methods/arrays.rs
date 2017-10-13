@@ -1,8 +1,7 @@
-use super::{Pattern, Select, SelectWithSize};
+use super::Pattern;
 use super::pattern::unescape;
-use super::super::Index;
-use super::super::super::{expand_string, Expander};
-use super::super::super::is_expression;
+use super::super::{Index, Select, SelectWithSize};
+use super::super::super::{expand_string, Expander, is_expression};
 use smallstring::SmallString;
 use std::char;
 use std::io::{self, Write};

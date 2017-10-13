@@ -1,6 +1,6 @@
-use super::{Select, MethodArgs};
-use super::super::super::{expand_string, Expander};
-use super::super::super::{is_expression, slice};
+use super::MethodArgs;
+use super::super::Select;
+use super::super::super::{expand_string, Expander, is_expression, slice};
 use parser::assignments::is_array;
 use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};
 use std::path::Path;
