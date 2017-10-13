@@ -266,10 +266,16 @@ fn do_redirection(piped_commands: Vec<RefinedItem>)
                 }
             }
             $new.push(($job, JobKind::Pipe(RedirectFrom::$teed)));
-            let tee = if RedirectFrom::Stdout == RedirectFrom::$teed {
-                RefinedJob::Tee { items: [Some(tee), None] }
+            let items = if RedirectFrom::Stdout == RedirectFrom::$teed {
+                [Some(tee), None]
             } else {
-                RefinedJob::Tee { items: [None, Some(tee)] }
+                [None, Some(tee)]
+            };
+            let tee = RefinedJob::Tee {
+                items: items,
+                stdin: None,
+                stdout: None,
+                stderr: None,
             };
             $new.push((tee, $kind));
         }}
@@ -283,16 +289,10 @@ fn do_redirection(piped_commands: Vec<RefinedItem>)
         match (inputs.len(), prev_kind) {
             (0, _) => {},
             (1, JobKind::Pipe(_)) => {
-                let file = if let Some(f) = get_infile!(inputs[0]) {
-                    f
-                } else {
-                    return None;
-                };
-                new_commands.push((RefinedJob::Cat {
-                    piped: true,
-                    sources: vec![file],
-                }, JobKind::Pipe(RedirectFrom::Stdout)));
-            }
+                let sources = vec![get_infile!(inputs[0])?];
+                new_commands.push((RefinedJob::cat(sources, true),
+                                   JobKind::Pipe(RedirectFrom::Stdout)));
+            },
             (1, _) => job.stdin(get_infile!(inputs[0])?),
             (_, p) => {
                 let mut sources = Vec::new();
@@ -303,11 +303,15 @@ fn do_redirection(piped_commands: Vec<RefinedItem>)
                         return None;
                     });
                 }
-                new_commands.push((RefinedJob::Cat {
-                    piped: if let JobKind::Pipe(_) = p { true } else { false },
-                    sources: sources
-                }, JobKind::Pipe(RedirectFrom::Stdout)));
+                let piped = if let JobKind::Pipe(_) = p { true } else { false };
+                new_commands.push((RefinedJob::cat(sources, piped),
+                                   JobKind::Pipe(RedirectFrom::Stdout)));
             },
+        }
+        prev_kind = kind;
+        if outputs.is_empty() {
+            new_commands.push((job, kind));
+            continue;
         }
         match need_tee(&outputs, kind) {
             // No tees
@@ -352,12 +356,16 @@ fn do_redirection(piped_commands: Vec<RefinedItem>)
                         }
                     }
                 }
-                let tee = RefinedJob::Tee { items: [Some(tee_out), Some(tee_err)] };
+                let tee = RefinedJob::Tee {
+                    items: [Some(tee_out), Some(tee_err)],
+                    stdin: None,
+                    stdout: None,
+                    stderr: None,
+                };
                 new_commands.push((job, JobKind::Pipe(RedirectFrom::Stdout)));
                 new_commands.push((tee, kind));
             }
         }
-        prev_kind = kind;
     }
     Some(new_commands)
 }
@@ -464,6 +472,14 @@ pub(crate) trait PipelineExecution {
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
+    ) -> i32;
+
+    /// For cat jobs
+    fn exec_multi_in(&mut self,
+                     sources: &mut [File],
+                     piped: bool,
+                     stdin: &Option<File>,
+                     stdout: &Option<File>,
     ) -> i32;
 }
 
@@ -701,6 +717,65 @@ impl<'a> PipelineExecution for Shell<'a> {
             }
         }
     }
+
+    fn exec_multi_in(
+        &mut self,
+        sources: &mut [File],
+        piped: bool,
+        stdout: &Option<File>,
+        stdin: &Option<File>,
+    ) -> i32 {
+        if let Some(ref file) = *stdin {
+            redir(file.as_raw_fd(), sys::STDIN_FILENO)
+        }
+        if let Some(ref file) = *stdout {
+            redir(file.as_raw_fd(), sys::STDOUT_FILENO)
+        }
+
+        fn read_and_write<R: io::Read>(src: &mut R, stdout: &mut io::StdoutLock)
+            -> io::Result<()> {
+            let mut buf = [0; 4096];
+            loop {
+                let len = src.read(&mut buf)?;
+                if len == 0 { return Ok(()) };
+                let mut total = 0;
+                loop {
+                    let wrote = stdout.write(&buf[total..len])?;
+                    total += wrote;
+                    if total == len { break; }
+                }
+            }
+        };
+        let stdout = io::stdout();
+        let mut stdout = stdout.lock();
+        if piped {
+            let stdin = io::stdin();
+            let stdin = &mut stdin.lock();
+            match read_and_write(stdin, &mut stdout) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!(
+                        "ion: error in multiple input redirect process: {:?}",
+                        e
+                    );
+                    return FAILURE;
+                }
+            }
+        }
+        for file in sources {
+            match read_and_write(file, &mut stdout) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!(
+                        "ion: error in multiple input redirect process: {:?}",
+                        e
+                    );
+                    return FAILURE;
+                }
+            }
+        }
+        SUCCESS
+    }
 }
 
 /// This function will panic if called with an empty slice
@@ -872,9 +947,25 @@ pub(crate) fn pipe(
                                         }
                                     }
                                 }
-                                RefinedJob::Cat { ref sources, piped } => {
+                                RefinedJob::Cat { ref mut sources,
+                                                  piped,
+                                                  ref stdin,
+                                                  ref stdout} => {
                                     match unsafe { sys::fork() } {
                                         Ok(0) => {
+                                            let _ = sys::reset_signal(sys::SIGINT);
+                                            let _ = sys::reset_signal(sys::SIGHUP);
+                                            let _ = sys::reset_signal(sys::SIGTERM);
+                                            create_process_group(pgid);
+                                            let ret = shell.exec_multi_in(
+                                                sources,
+                                                piped,
+                                                stdin,
+                                                stdout,
+                                            );
+                                            close(stdout);
+                                            close(stdin);
+                                            exit(ret);
                                         }
                                         Ok(pid) => {
                                             if pgid == 0 {

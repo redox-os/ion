@@ -85,12 +85,16 @@ pub(crate) enum RefinedJob {
     /// Represents redirection into stdin from more than one source
     Cat {
         sources: Vec<File>,
-        /// Indicates that we need to read from a pipe in addition to all the sources
-        piped: bool,
+        stdin: Option<File>,
+        stdout: Option<File>,
+        piped: bool
     },
     Tee {
         /// 0 for stdout, 1 for stderr
-        items: [Option<TeeItem>; 2]
+        items: [Option<TeeItem>; 2],
+        stdin: Option<File>,
+        stdout: Option<File>,
+        stderr: Option<File>,
     },
 }
 
@@ -109,10 +113,11 @@ macro_rules! set_field {
                 command.$field(Stdio::from($arg));
             }
             RefinedJob::Builtin { ref mut $field,  .. } |
-                RefinedJob::Function { ref mut $field, .. } => {
+                RefinedJob::Function { ref mut $field, .. } |
+                RefinedJob::Tee { ref mut $field, .. } => {
                 *$field = Some($arg);
             }
-            // no-op for Tee and Cat
+            // Do nothing for Cat
             _ => {}
         }
     }
@@ -139,12 +144,29 @@ impl RefinedJob {
         }
     }
 
+    pub(crate) fn cat(sources: Vec<File>, piped: bool) -> Self {
+        RefinedJob::Cat {
+            sources,
+            piped,
+            stdin: None,
+            stdout: None,
+        }
+    }
+
     pub(crate) fn stdin(&mut self, file: File) {
-        set_field!(self, stdin, file);
+        if let &mut RefinedJob::Cat { ref mut stdin, .. } = self {
+            *stdin = Some(file);
+        } else {
+            set_field!(self, stdin, file);
+        }
     }
 
     pub(crate) fn stdout(&mut self, file: File) {
-        set_field!(self, stdout, file);
+        if let &mut RefinedJob::Cat { ref mut stdout, .. } = self {
+            *stdout = Some(file);
+        } else {
+            set_field!(self, stdout, file);
+        }
     }
 
     pub(crate) fn stderr(&mut self, file: File) {
