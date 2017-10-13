@@ -279,6 +279,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 None => {
                     let output = self.data[start..].trim();
+                    if output.is_empty() { return Some(Ok(output)); }
                     match output.as_bytes()[0] {
                         b'>' | b'<' | b'^' => {
                             Some(Err(StatementError::ExpectedCommandButFound("redirection")))

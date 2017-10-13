@@ -78,8 +78,16 @@ impl QuoteTerminator {
                                 self.flags -= ARRAY;
                             }
                             b'#' if !self.flags.intersects(DQUOTE | SQUOTE) => {
-                                comment = true;
-                                break
+                                if self.read > 1 {
+                                    let character = self.buffer.as_bytes().get(self.read - 2).unwrap();
+                                    if [b' ', b'\n'].contains(character) {
+                                        comment = true;
+                                        break
+                                    }
+                                } else {
+                                    comment = true;
+                                    break
+                                }
                             }
                             _ => (),
                         }
@@ -90,7 +98,7 @@ impl QuoteTerminator {
                     return false;
                 } else if comment {
                     self.buffer.truncate(self.read - 1);
-                    return false;
+                    return !self.flags.intersects(SQUOTE | DQUOTE | ARRAY);
                 }
             }
 
