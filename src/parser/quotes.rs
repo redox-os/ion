@@ -2,11 +2,12 @@ use std::str;
 
 bitflags! {
     pub struct Flags : u8 {
-        const BACKSL = 1;
-        const SQUOTE = 2;
-        const DQUOTE = 4;
-        const TRIM   = 8;
-        const ARRAY  = 16;
+        const SQUOTE = 1;
+        const DQUOTE = 2;
+        const TRIM   = 4;
+        const ARRAY  = 8;
+        const COMM   = 16;
+        const EOF    = 32;
     }
 }
 
@@ -14,6 +15,7 @@ pub(crate) struct QuoteTerminator {
     buffer:     String,
     eof:        Option<String>,
     eof_buffer: String,
+    array:      usize,
     read:       usize,
     flags:      Flags,
 }
@@ -24,6 +26,7 @@ impl QuoteTerminator {
             buffer:     input,
             eof:        None,
             eof_buffer: String::new(),
+            array:      0,
             read:       0,
             flags:      Flags::empty(),
         }
@@ -46,15 +49,13 @@ impl QuoteTerminator {
             line.trim() == eof
         } else {
             {
-                let mut eof_found = false;
-                let mut comment = false;
+                let mut instance = Flags::empty();
                 {
                     let mut bytes = self.buffer.bytes().skip(self.read);
                     while let Some(character) = bytes.next() {
                         self.read += 1;
                         match character {
-                            _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
-                            b'\\' => self.flags ^= BACKSL,
+                            b'\\' => { let _ = bytes.next(); },
                             b'\'' if !self.flags.intersects(DQUOTE) => self.flags ^= SQUOTE,
                             b'"' if !self.flags.intersects(SQUOTE) => self.flags ^= DQUOTE,
                             b'<' if !self.flags.contains(SQUOTE | DQUOTE) => {
@@ -66,26 +67,28 @@ impl QuoteTerminator {
                                             str::from_utf8_unchecked(&as_bytes[self.read..])
                                         };
                                         self.eof = Some(eof_phrase.trim().to_owned());
-                                        eof_found = true;
+                                        instance |= EOF;
                                         break;
                                     }
                                 }
                             }
                             b'[' if !self.flags.intersects(DQUOTE | SQUOTE) => {
                                 self.flags |= ARRAY;
+                                self.array += 1;
                             }
                             b']' if !self.flags.intersects(DQUOTE | SQUOTE) => {
-                                self.flags -= ARRAY;
+                                self.array -= 1;
+                                if self.array == 0 { self.flags -= ARRAY }
                             }
                             b'#' if !self.flags.intersects(DQUOTE | SQUOTE) => {
                                 if self.read > 1 {
                                     let character = self.buffer.as_bytes().get(self.read - 2).unwrap();
                                     if [b' ', b'\n'].contains(character) {
-                                        comment = true;
+                                        instance |= COMM;
                                         break
                                     }
                                 } else {
-                                    comment = true;
+                                    instance |= COMM;
                                     break
                                 }
                             }
@@ -93,10 +96,10 @@ impl QuoteTerminator {
                         }
                     }
                 }
-                if eof_found {
+                if instance.contains(EOF) {
                     self.buffer.push('\n');
                     return false;
-                } else if comment {
+                } else if instance.contains(COMM) {
                     self.buffer.truncate(self.read - 1);
                     return !self.flags.intersects(SQUOTE | DQUOTE | ARRAY);
                 }
