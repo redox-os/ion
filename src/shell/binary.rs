@@ -251,13 +251,13 @@ impl<'a> Binary for Shell<'a> {
         while !buffer.check_termination() {
             if let Some(command) = self.readln() {
                 buffer.append(command);
-                break;
             } else {
                 return Err(());
             }
         }
         self.flow_control.level -= 1;
-        Ok(buffer.consume())
+        let terminated = buffer.consume();
+        Ok(terminated)
     }
 
     fn execute_arguments<A: Iterator<Item = String>>(&mut self, mut args: A) {

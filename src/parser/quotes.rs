@@ -1,9 +1,12 @@
+use std::str;
+
 bitflags! {
     pub struct Flags : u8 {
         const BACKSL = 1;
         const SQUOTE = 2;
         const DQUOTE = 4;
         const TRIM   = 8;
+        const ARRAY  = 16;
     }
 }
 
@@ -44,6 +47,7 @@ impl QuoteTerminator {
         } else {
             {
                 let mut eof_found = false;
+                let mut comment = false;
                 {
                     let mut bytes = self.buffer.bytes().skip(self.read);
                     while let Some(character) = bytes.next() {
@@ -58,7 +62,6 @@ impl QuoteTerminator {
                                 if Some(&b'<') == as_bytes.get(self.read) {
                                     self.read += 1;
                                     if Some(&b'<') != as_bytes.get(self.read) {
-                                        use std::str;
                                         let eof_phrase = unsafe {
                                             str::from_utf8_unchecked(&as_bytes[self.read..])
                                         };
@@ -68,6 +71,16 @@ impl QuoteTerminator {
                                     }
                                 }
                             }
+                            b'[' if !self.flags.intersects(DQUOTE | SQUOTE) => {
+                                self.flags |= ARRAY;
+                            }
+                            b']' if !self.flags.intersects(DQUOTE | SQUOTE) => {
+                                self.flags -= ARRAY;
+                            }
+                            b'#' if !self.flags.intersects(DQUOTE | SQUOTE) => {
+                                comment = true;
+                                break
+                            }
                             _ => (),
                         }
                     }
@@ -75,17 +88,20 @@ impl QuoteTerminator {
                 if eof_found {
                     self.buffer.push('\n');
                     return false;
+                } else if comment {
+                    self.buffer.truncate(self.read - 1);
+                    return false;
                 }
             }
 
-            if self.flags.intersects(SQUOTE | DQUOTE) {
+            if self.flags.intersects(SQUOTE | DQUOTE | ARRAY) {
                 if let Some(b'\\') = self.buffer.bytes().last() {
                     let _ = self.buffer.pop();
                     self.read -= 1;
                     self.flags |= TRIM;
                 } else {
                     self.read += 1;
-                    self.buffer.push('\n');
+                    self.buffer.push(if self.flags.contains(ARRAY) { ' ' } else { '\n' });
                 }
                 false
             } else {

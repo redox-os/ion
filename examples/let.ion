@@ -32,3 +32,12 @@ let a b c = 6 3 5
 echo $a $b $c
 let a b c -= 2 2 4
 echo $a $b $c
+
+let a = [
+    one # a comment
+    two # another comment
+    three
+    four five six
+
+]
+echo $join(a, "\n")

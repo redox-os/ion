@@ -170,14 +170,6 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.flags -= VARIAB | ARRAY;
                     self.flags |= METHOD;
                 }
-                b'[' if !self.flags.contains(SQUOTE) => self.array_level += 1,
-                b']' if self.array_level == 0 && !self.flags.contains(SQUOTE) => if error.is_none()
-                {
-                    error = Some(StatementError::InvalidCharacter(character as char, self.read))
-                },
-                b']' if !self.flags.contains(SQUOTE) && self.array_level != 0 => {
-                    self.array_level -= 1
-                }
                 b')' if self.flags.contains(MATHEXPR) => if self.math_paren_level == 0 {
                     if self.data.as_bytes().len() <= self.read {
                         if error.is_none() {
