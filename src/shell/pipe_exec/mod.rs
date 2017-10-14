@@ -80,63 +80,8 @@ fn is_implicit_cd(argument: &str) -> bool {
         && Path::new(argument).is_dir()
 }
 
-/// This function is to be executed when a stdin value is supplied to a pipeline job.
-///
-/// Using that value, the stdin of the first command will be mapped to either a `File`,
-/// or `HereString`, which may be either a herestring or heredoc. Returns `true` if
-/// the input error occurred.
-#[allow(dead_code)]
-fn redirect_input(piped_commands: &mut Vec<RefinedItem>) -> bool {
-    // let mut prev_kind = None; // TODO: Piping?
-    for &mut (ref mut job, ref _kind, _, ref mut inputs) in piped_commands {
-        // TODO: Determine if we need to care about piping
-        match inputs.len() {
-            0 => continue,
-            1 => {
-                match inputs[0] {
-                    Input::File(ref filename) => match File::open(filename) {
-                        Ok(file) => job.stdin(file),
-                        Err(e) => {
-                            eprintln!("ion: failed to redirect '{}' to stdin: {}", filename, e);
-                            return true;
-                        }
-                    },
-                    Input::HereString(ref mut string) => match unsafe { stdin_of(&string) } {
-                        Ok(stdio) => job.stdin(unsafe { File::from_raw_fd(stdio) }),
-                        Err(e) => {
-                            eprintln!("ion: failed to redirect herestring '{}' to stdin: {}",
-                                      string, e);
-                            return true;
-                        }
-                    }
-                }
-            },
-            _ => {
-                match inputs[0] {
-                    Input::File(ref filename) => match File::open(filename) {
-                        Ok(file) => job.stdin(file),
-                        Err(e) => {
-                            eprintln!("ion: failed to redirect '{}' to stdin: {}", filename, e);
-                            return true;
-                        }
-                    },
-                    Input::HereString(ref mut string) => match unsafe { stdin_of(&string) } {
-                        Ok(stdio) => job.stdin(unsafe { File::from_raw_fd(stdio) }),
-                        Err(e) => {
-                            eprintln!("ion: failed to redirect herestring '{}' to stdin: {}",
-                                      string, e);
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        // prev_kind = Some(*kind); TODO: Piping
-    }
-    false
-}
-
-/// Insert the multiple redirects as pipelines if necessary.
+/// Insert the multiple redirects as pipelines if necessary. Handle both input and output
+/// redirection if necessary.
 fn do_redirection(piped_commands: Vec<RefinedItem>)
     -> Option<Vec<(RefinedJob, JobKind)>> {
     macro_rules! get_infile {
@@ -362,47 +307,6 @@ fn do_redirection(piped_commands: Vec<RefinedItem>)
         }
     }
     Some(new_commands)
-}
-
-/// This function is to be executed when a stdout/stderr value is supplied to a pipeline job.
-///
-/// Using that value, the stdout and/or stderr of the last command will be redirected accordingly
-/// to the designated output. Returns `true` if the outputs couldn't be redirected.
-#[allow(dead_code)]
-fn redirect_output(piped_commands: &mut Vec<RefinedItem>) -> bool {
-    // TODO: Redirect more than just the last one.
-    for &mut (ref mut job, ref _kind, ref outputs, _) in piped_commands {
-        for output in outputs {
-            match if output.append {
-                OpenOptions::new().create(true).write(true).append(true).open(&output.file)
-            } else {
-                File::create(&output.file)
-            } {
-                Ok(f) => match output.from {
-                    RedirectFrom::Stderr => job.stderr(f),
-                    RedirectFrom::Stdout => job.stdout(f),
-                    RedirectFrom::Both => match f.try_clone() {
-                        Ok(f_copy) => {
-                            job.stdout(f);
-                            job.stderr(f_copy);
-                        },
-                        Err(e) => {
-                            eprintln!(
-                                "ion: failed to redirect both stdout and stderr to file '{:?}': {}",
-                                f,
-                                e);
-                            return true;
-                        }
-                    }
-                },
-                Err(e) => {
-                    eprintln!("ion: failed to redirect output into {}: {}", output.file, e);
-                    return true;
-                }
-            }
-        }
-    }
-    false
 }
 
 pub(crate) trait PipelineExecution {
