@@ -91,7 +91,7 @@ pub(crate) enum RefinedJob {
     },
     Tee {
         /// 0 for stdout, 1 for stderr
-        items: [Option<TeeItem>; 2],
+        items: (Option<TeeItem>, Option<TeeItem>),
         stdin: Option<File>,
         stdout: Option<File>,
         stderr: Option<File>,
@@ -105,6 +105,53 @@ pub struct TeeItem {
     pub sinks: Vec<File>,
 }
 
+impl TeeItem {
+    /// Writes out to all destinations of a Tee. Takes an extra `RedirectFrom` argument in order to
+    /// handle piping. `RedirectFrom` paradoxically indicates where we are piping **to**. It should
+    /// never be `RedirectFrom`::Both`
+    pub(crate) fn write_to_all(&mut self, extra: Option<RedirectFrom>) -> ::std::io::Result<()> {
+        use ::std::io::{self, Write, Read};
+        use ::std::os::unix::io::*;
+        fn write_out<R>(source: &mut R, sinks: &mut [File])
+            -> io::Result<()>
+        where
+            R: Read
+        {
+            let mut buf = [0; 4096];
+            loop {
+                let len = source.read(&mut buf)?;
+                if len == 0 { return Ok(()); }
+                for file in sinks.iter_mut() {
+                    let mut total = 0;
+                    loop {
+                        let wrote = file.write(&buf[total..len])?;
+                        total += wrote;
+                        if total == len { break; }
+                    }
+                }
+            }
+        }
+        let stdout = io::stdout();
+        let stderr = io::stderr();
+        match extra {
+            None => {},
+            Some(RedirectFrom::Stdout) => unsafe {
+                self.sinks.push(File::from_raw_fd(stdout.as_raw_fd()))
+            },
+            Some(RedirectFrom::Stderr) => unsafe {
+                self.sinks.push(File::from_raw_fd(stderr.as_raw_fd()))
+            },
+            Some(RedirectFrom::Both) => panic!("logic error! extra should never be RedirectFrom::Both"),
+        };
+        if let Some(ref mut file) = self.source {
+            write_out(file, &mut self.sinks)
+        } else {
+            let stdin = io::stdin();
+            let mut stdin = stdin.lock();
+            write_out(&mut stdin, &mut self.sinks)
+        }
+    }
+}
 
 macro_rules! set_field {
     ($self:expr, $field:ident, $arg:expr) => {
@@ -150,6 +197,15 @@ impl RefinedJob {
             piped,
             stdin: None,
             stdout: None,
+        }
+    }
+
+    pub(crate) fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
+        RefinedJob::Tee {
+            items: (tee_out, tee_err),
+            stdin: None,
+            stdout: None,
+            stderr: None,
         }
     }
 

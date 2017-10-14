@@ -136,10 +136,9 @@ fn redirect_input(piped_commands: &mut Vec<RefinedItem>) -> bool {
     false
 }
 
-/// Insert the multiple redirects as pipelines if necessary. 
+/// Insert the multiple redirects as pipelines if necessary.
 fn do_redirection(piped_commands: Vec<RefinedItem>)
-    -> Option<Vec<(RefinedJob, JobKind)>>
-{
+    -> Option<Vec<(RefinedJob, JobKind)>> {
     macro_rules! get_infile {
         ($input:expr) => {
             match $input {
@@ -272,16 +271,11 @@ fn do_redirection(piped_commands: Vec<RefinedItem>)
             }
             $new.push(($job, JobKind::Pipe(RedirectFrom::$teed)));
             let items = if RedirectFrom::Stdout == RedirectFrom::$teed {
-                [Some(tee), None]
+                (Some(tee), None)
             } else {
-                [None, Some(tee)]
+                (None, Some(tee))
             };
-            let tee = RefinedJob::Tee {
-                items: items,
-                stdin: None,
-                stdout: None,
-                stderr: None,
-            };
+            let tee = RefinedJob::tee(items.0, items.1);
             $new.push((tee, $kind));
         }}
     }
@@ -361,12 +355,7 @@ fn do_redirection(piped_commands: Vec<RefinedItem>)
                         }
                     }
                 }
-                let tee = RefinedJob::Tee {
-                    items: [Some(tee_out), Some(tee_err)],
-                    stdin: None,
-                    stdout: None,
-                    stderr: None,
-                };
+                let tee = RefinedJob::tee(Some(tee_out), Some(tee_err));
                 new_commands.push((job, JobKind::Pipe(RedirectFrom::Stdout)));
                 new_commands.push((tee, kind));
             }
@@ -486,6 +475,14 @@ pub(crate) trait PipelineExecution {
                      stdin: &Option<File>,
                      stdout: &Option<File>,
     ) -> i32;
+
+    fn exec_multi_out(&mut self,
+                      items: &mut (Option<TeeItem>, Option<TeeItem>),
+                      stdin: &Option<File>,
+                      stdout: &Option<File>,
+                      stderr: &Option<File>,
+                      kind: JobKind
+    ) -> i32;
 }
 
 impl<'a> PipelineExecution for Shell<'a> {
@@ -507,7 +504,7 @@ impl<'a> PipelineExecution for Shell<'a> {
             return SUCCESS;
         }
 
-        let mut piped_commands = if let Some(c) = do_redirection(piped_commands) {
+        let piped_commands = if let Some(c) = do_redirection(piped_commands) {
             c
         } else {
             return COULD_NOT_EXEC;
@@ -781,6 +778,53 @@ impl<'a> PipelineExecution for Shell<'a> {
         }
         SUCCESS
     }
+
+    fn exec_multi_out(&mut self,
+                      items: &mut (Option<TeeItem>, Option<TeeItem>),
+                      stdin: &Option<File>,
+                      stdout: &Option<File>,
+                      stderr: &Option<File>,
+                      kind: JobKind
+    ) -> i32 {
+        use ::std::time::Duration;
+        ::std::thread::sleep(Duration::from_secs(30));
+        if let Some(ref file) = *stdin {
+            redir(file.as_raw_fd(), sys::STDIN_FILENO);
+        }
+        if let Some(ref file) = *stdout {
+            redir(file.as_raw_fd(), sys::STDOUT_FILENO);
+        }
+        if let Some(ref file) = *stderr {
+            redir(file.as_raw_fd(), sys::STDERR_FILENO);
+        }
+        let res = match items {
+            &mut (None, None) => panic!("There must be at least one TeeItem, this is a bug"),
+            &mut (Some(ref mut tee_out), None) => match kind {
+                JobKind::Pipe(RedirectFrom::Stderr) => tee_out.write_to_all(None),
+                JobKind::Pipe(_) => tee_out.write_to_all(Some(RedirectFrom::Stdout)),
+                _ => tee_out.write_to_all(None),
+            }
+            &mut (None, Some(ref mut tee_err)) => match kind {
+                JobKind::Pipe(RedirectFrom::Stdout) => tee_err.write_to_all(None),
+                JobKind::Pipe(_) => tee_err.write_to_all(Some(RedirectFrom::Stderr)),
+                _ => tee_err.write_to_all(None),
+            }
+            &mut (Some(ref mut tee_out), Some(ref mut tee_err)) => {
+                 // TODO Make it work with pipes
+                 if let Err(e) = tee_out.write_to_all(None) {
+                     Err(e)
+                 } else {
+                    tee_err.write_to_all(None)
+                 }
+            }
+        };
+        if let Err(e) = res {
+            eprintln!("ion: error in multiple output redirection process: {:?}", e);
+            FAILURE
+        } else {
+            SUCCESS
+        }
+    }
 }
 
 /// This function will panic if called with an empty slice
@@ -954,8 +998,8 @@ pub(crate) fn pipe(
                                 }
                                 RefinedJob::Cat { ref mut sources,
                                                   piped,
-                                                  ref stdin,
-                                                  ref stdout} => {
+                                                  ref stdout,
+                                                  ref stdin } => {
                                     match unsafe { sys::fork() } {
                                         Ok(0) => {
                                             let _ = sys::reset_signal(sys::SIGINT);
@@ -985,39 +1029,93 @@ pub(crate) fn pipe(
                                         Err(e) => eprintln!("ion: failed to fork {}: {}", short, e),
                                     }
                                 },
-                                RefinedJob::Tee { .. } => {}
+                                RefinedJob::Tee { ref mut items,
+                                                  ref stdin,
+                                                  ref stdout,
+                                                  ref stderr } => {
+                                    match unsafe { sys::fork() } {
+                                        Ok(0) => {
+                                            let _ = sys::reset_signal(sys::SIGINT);
+                                            let _ = sys::reset_signal(sys::SIGHUP);
+                                            let _ = sys::reset_signal(sys::SIGTERM);
+                                            let ret = shell.exec_multi_out(
+                                                items,
+                                                stdin,
+                                                stdout,
+                                                stderr,
+                                                kind,
+                                            );
+                                            close(stdout);
+                                            close(stderr);
+                                            close(stdin);
+                                            exit(ret);
+                                        },
+                                        Ok(pid) => {
+                                            if pgid == 0 {
+                                                pgid = pid;
+                                                if foreground && !shell.is_library {
+                                                    let _ = sys::tcsetpgrp(0, pgid);
+                                                }
+                                            }
+                                            shell.foreground.push(pid);
+                                            children.push(pid);
+                                        }
+                                        Err(e) => eprintln!("ion: failed to fork {}: {}", short, e),
+                                    }
+                                }
                             }
                         };
                     }
 
-                    // TODO: RedirectKind
                     // Append other jobs until all piped jobs are running
                     while let Some((mut child, ckind)) = commands.next() {
-                        match sys::pipe2(sys::O_CLOEXEC) {
-                            Err(e) => {
-                                eprintln!("ion: failed to create pipe: {:?}", e);
+                        // If we need to tee both stdout and stderr, we directly connect pipes to
+                        // the relevant sources in both of them.
+                        if let RefinedJob::Tee {
+                            items: (Some(ref mut tee_out), Some(ref mut tee_err)),
+                            ..
+                        } = child {
+                            match sys::pipe2(sys::O_CLOEXEC) {
+                                Err(e) => eprintln!("ion: failed to create pipe: {:?}", e),
+                                Ok((out_reader, out_writer)) => {
+                                    (*tee_out).source = Some(unsafe { File::from_raw_fd(out_reader) });
+                                    parent.stdout(unsafe { File::from_raw_fd(out_writer) });
+                                }
                             }
-                            Ok((reader, writer)) => {
-                                child.stdin(unsafe { File::from_raw_fd(reader) });
-                                match mode {
-                                    RedirectFrom::Stderr => {
-                                        parent.stderr(unsafe { File::from_raw_fd(writer) });
-                                    }
-                                    RedirectFrom::Stdout => {
-                                        parent.stdout(unsafe { File::from_raw_fd(writer) });
-                                    }
-                                    RedirectFrom::Both => {
-                                        let temp = unsafe { File::from_raw_fd(writer) };
-                                        match temp.try_clone() {
-                                            Err(e) => {
-                                                eprintln!(
-                                                    "ion: failed to redirect stdout and stderr: {}",
-                                                    e
-                                                );
-                                            }
-                                            Ok(duped) => {
-                                                parent.stderr(temp);
-                                                parent.stdout(duped);
+                            match sys::pipe2(sys::O_CLOEXEC) {
+                                Err(e) => eprintln!("ion: failed to create pipe: {:?}", e),
+                                Ok((err_reader, err_writer)) => {
+                                    (*tee_err).source = Some(unsafe { File::from_raw_fd(err_reader) });
+                                    parent.stderr(unsafe { File::from_raw_fd(err_writer) });
+                                }
+                            }
+                        } else {
+                            match sys::pipe2(sys::O_CLOEXEC) {
+                                Err(e) => {
+                                    eprintln!("ion: failed to create pipe: {:?}", e);
+                                }
+                                Ok((reader, writer)) => {
+                                    child.stdin(unsafe { File::from_raw_fd(reader) });
+                                    match mode {
+                                        RedirectFrom::Stderr => {
+                                            parent.stderr(unsafe { File::from_raw_fd(writer) });
+                                        }
+                                        RedirectFrom::Stdout => {
+                                            parent.stdout(unsafe { File::from_raw_fd(writer) });
+                                        }
+                                        RedirectFrom::Both => {
+                                            let temp = unsafe { File::from_raw_fd(writer) };
+                                            match temp.try_clone() {
+                                                Err(e) => {
+                                                    eprintln!(
+                                                        "ion: failed to redirect stdout and stderr: {}",
+                                                        e
+                                                    );
+                                                }
+                                                Ok(duped) => {
+                                                    parent.stderr(temp);
+                                                    parent.stdout(duped);
+                                                }
                                             }
                                         }
                                     }
