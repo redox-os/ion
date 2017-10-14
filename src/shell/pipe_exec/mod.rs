@@ -380,6 +380,7 @@ pub(crate) trait PipelineExecution {
                      stdout: &Option<File>,
     ) -> i32;
 
+    /// For tee jobs
     fn exec_multi_out(&mut self,
                       items: &mut (Option<TeeItem>, Option<TeeItem>),
                       stdin: &Option<File>,
@@ -690,8 +691,6 @@ impl<'a> PipelineExecution for Shell<'a> {
                       stderr: &Option<File>,
                       kind: JobKind
     ) -> i32 {
-        use ::std::time::Duration;
-        ::std::thread::sleep(Duration::from_secs(30));
         if let Some(ref file) = *stdin {
             redir(file.as_raw_fd(), sys::STDIN_FILENO);
         }

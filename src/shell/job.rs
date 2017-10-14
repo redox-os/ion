@@ -119,6 +119,7 @@ impl TeeItem {
         {
             let mut buf = [0; 4096];
             loop {
+                // TODO: Figure out how to not block on this read
                 let len = source.read(&mut buf)?;
                 if len == 0 { return Ok(()); }
                 for file in sinks.iter_mut() {
