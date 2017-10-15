@@ -922,6 +922,7 @@ pub(crate) fn pipe(
                                             let _ = sys::reset_signal(sys::SIGINT);
                                             let _ = sys::reset_signal(sys::SIGHUP);
                                             let _ = sys::reset_signal(sys::SIGTERM);
+                                            create_process_group(pgid);
                                             let ret = shell.exec_multi_out(
                                                 items,
                                                 stdout,
