@@ -234,11 +234,11 @@ fn do_redirection(piped_commands: Vec<RefinedItem>)
             (0, _) => {},
             (1, JobKind::Pipe(_)) => {
                 let sources = vec![get_infile!(inputs[0])?];
-                new_commands.push((RefinedJob::cat(sources, true),
+                new_commands.push((RefinedJob::cat(sources),
                                    JobKind::Pipe(RedirectFrom::Stdout)));
             },
             (1, _) => job.stdin(get_infile!(inputs[0])?),
-            (_, p) => {
+            _ => {
                 let mut sources = Vec::new();
                 for mut input in inputs {
                     sources.push(if let Some(f) = get_infile!(input) {
@@ -247,8 +247,7 @@ fn do_redirection(piped_commands: Vec<RefinedItem>)
                         return None;
                     });
                 }
-                let piped = if let JobKind::Pipe(_) = p { true } else { false };
-                new_commands.push((RefinedJob::cat(sources, piped),
+                new_commands.push((RefinedJob::cat(sources),
                                    JobKind::Pipe(RedirectFrom::Stdout)));
             },
         }
@@ -375,17 +374,16 @@ pub(crate) trait PipelineExecution {
     /// For cat jobs
     fn exec_multi_in(&mut self,
                      sources: &mut [File],
-                     piped: bool,
-                     stdin: &Option<File>,
                      stdout: &Option<File>,
+                     stdin: &mut Option<File>,
     ) -> i32;
 
     /// For tee jobs
     fn exec_multi_out(&mut self,
                       items: &mut (Option<TeeItem>, Option<TeeItem>),
-                      stdin: &Option<File>,
                       stdout: &Option<File>,
                       stderr: &Option<File>,
+                      stdin: &Option<File>,
                       kind: JobKind
     ) -> i32;
 }
@@ -628,9 +626,8 @@ impl<'a> PipelineExecution for Shell<'a> {
     fn exec_multi_in(
         &mut self,
         sources: &mut [File],
-        piped: bool,
         stdout: &Option<File>,
-        stdin: &Option<File>,
+        stdin: &mut Option<File>,
     ) -> i32 {
         if let Some(ref file) = *stdin {
             redir(file.as_raw_fd(), sys::STDIN_FILENO)
@@ -655,21 +652,7 @@ impl<'a> PipelineExecution for Shell<'a> {
         };
         let stdout = io::stdout();
         let mut stdout = stdout.lock();
-        if piped {
-            let stdin = io::stdin();
-            let stdin = &mut stdin.lock();
-            match read_and_write(stdin, &mut stdout) {
-                Ok(_) => {}
-                Err(e) => {
-                    eprintln!(
-                        "ion: error in multiple input redirect process: {:?}",
-                        e
-                    );
-                    return FAILURE;
-                }
-            }
-        }
-        for file in sources {
+        for file in stdin.iter_mut().chain(sources) {
             match read_and_write(file, &mut stdout) {
                 Ok(_) => {}
                 Err(e) => {
@@ -686,9 +669,9 @@ impl<'a> PipelineExecution for Shell<'a> {
 
     fn exec_multi_out(&mut self,
                       items: &mut (Option<TeeItem>, Option<TeeItem>),
-                      stdin: &Option<File>,
                       stdout: &Option<File>,
                       stderr: &Option<File>,
+                      stdin: &Option<File>,
                       kind: JobKind
     ) -> i32 {
         if let Some(ref file) = *stdin {
@@ -900,9 +883,8 @@ pub(crate) fn pipe(
                                     }
                                 }
                                 RefinedJob::Cat { ref mut sources,
-                                                  piped,
                                                   ref stdout,
-                                                  ref stdin } => {
+                                                  ref mut stdin } => {
                                     match unsafe { sys::fork() } {
                                         Ok(0) => {
                                             let _ = sys::reset_signal(sys::SIGINT);
@@ -911,9 +893,8 @@ pub(crate) fn pipe(
                                             create_process_group(pgid);
                                             let ret = shell.exec_multi_in(
                                                 sources,
-                                                piped,
-                                                stdin,
                                                 stdout,
+                                                stdin,
                                             );
                                             close(stdout);
                                             close(stdin);
@@ -933,9 +914,9 @@ pub(crate) fn pipe(
                                     }
                                 },
                                 RefinedJob::Tee { ref mut items,
-                                                  ref stdin,
                                                   ref stdout,
-                                                  ref stderr } => {
+                                                  ref stderr,
+                                                  ref stdin } => {
                                     match unsafe { sys::fork() } {
                                         Ok(0) => {
                                             let _ = sys::reset_signal(sys::SIGINT);
@@ -943,9 +924,9 @@ pub(crate) fn pipe(
                                             let _ = sys::reset_signal(sys::SIGTERM);
                                             let ret = shell.exec_multi_out(
                                                 items,
-                                                stdin,
                                                 stdout,
                                                 stderr,
+                                                stdin,
                                                 kind,
                                             );
                                             close(stdout);

@@ -87,7 +87,6 @@ pub(crate) enum RefinedJob {
         sources: Vec<File>,
         stdin: Option<File>,
         stdout: Option<File>,
-        piped: bool
     },
     Tee {
         /// 0 for stdout, 1 for stderr
@@ -192,10 +191,9 @@ impl RefinedJob {
         }
     }
 
-    pub(crate) fn cat(sources: Vec<File>, piped: bool) -> Self {
+    pub(crate) fn cat(sources: Vec<File>) -> Self {
         RefinedJob::Cat {
             sources,
-            piped,
             stdin: None,
             stdout: None,
         }
