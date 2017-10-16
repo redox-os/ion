@@ -3,6 +3,7 @@ use super::super::Select;
 use super::super::super::{expand_string, Expander, is_expression, slice};
 use parser::assignments::is_array;
 use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};
+use regex::Regex;
 use std::path::Path;
 use sys;
 use unicode_segmentation::UnicodeSegmentation;
@@ -116,6 +117,22 @@ impl<'a> StringMethod<'a> {
                         eprintln!("ion: replacen: third argument isn't a valid integer");
                     },
                     _ => eprintln!("ion: replacen: three arguments required")
+                }
+            }
+            "regex_replace" => {
+                let mut args = pattern.array();
+                match (args.next(),args.next()) {
+                    (Some(replace),Some(with)) => {
+                        match Regex::new(&replace){
+                            Ok(re) => {
+                                let inp = &get_var!();
+                                let res = re.replace_all(&inp,&with[..]);
+                                output.push_str(&res);
+                            }
+                            Err(_) => eprintln!("ion: regex_replace: error in regular expression {}",&replace)
+                        }
+                    }
+                    _ => eprintln!("ion: regex_replace: two arguments required")
                 }
             }
             "join" => {
