@@ -40,3 +40,5 @@ echo $join(array, "\n")
 let a = [1 2 3 4 5]
 let a = "1 2 3 4 5"
 echo $join(@split(a, " "), $join(a, " "))
+
+echo $regex_replace("one two onemy anemy town", "\ o|\ a" "\ e")
