@@ -1,6 +1,7 @@
 #![allow(unknown_lints)]
 #![allow(while_let_on_iterator)]
 #![feature(conservative_impl_trait)]
+#![feature(integer_atomics)]
 
 extern crate app_dirs;
 #[macro_use]
