@@ -208,7 +208,8 @@ pub(crate) fn expand_tokens<E: Expander>(
             for word in token_buffer {
                 match *word {
                     WordToken::Array(ref elements, ref index) => {
-                        output.push_str(&array_expand(elements, expand_func, index.clone()).join(" "));
+                        output
+                            .push_str(&array_expand(elements, expand_func, index.clone()).join(" "));
                     }
                     WordToken::ArrayVariable(array, _, ref index) => {
                         if let Some(array) = expand_func.array(array, index.clone()) {
@@ -231,7 +232,8 @@ pub(crate) fn expand_tokens<E: Expander>(
                         Select::Index(Index::Backward(id)) => {
                             let mut temp = String::new();
                             expand_process(&mut temp, command, Select::All, expand_func);
-                            output.push_str(temp.split_whitespace().rev().nth(id).unwrap_or_default());
+                            output
+                                .push_str(temp.split_whitespace().rev().nth(id).unwrap_or_default());
                         }
                         Select::Range(range) => {
                             let mut temp = String::new();

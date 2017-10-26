@@ -1,7 +1,7 @@
-use super::super::ranges::parse_index_range;
 use super::{Index, Range};
-use std::iter::{empty, FromIterator};
 use super::methods::Key;
+use super::super::ranges::parse_index_range;
+use std::iter::{empty, FromIterator};
 use std::str::FromStr;
 
 

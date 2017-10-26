@@ -22,7 +22,7 @@ use self::variables::{alias, drop_alias, drop_array, drop_variable};
 
 use fnv::FnvHashMap;
 use std::error::Error;
-use std::io::{self, Write, BufWriter};
+use std::io::{self, BufWriter, Write};
 
 use parser::QuoteTerminator;
 use shell::{self, FlowLogic, Shell, ShellHistory};
@@ -200,17 +200,13 @@ fn list_vars(_: &[&str], shell: &mut Shell) -> i32 {
 
     // Write all the string variables to the buffer.
     let _ = buffer.write(b"# String Variables\n");
-    shell.variables.variables.iter().for_each(
-        |(key, val)| {
-            let _ = buffer.write([key, " = ", val.as_str(), "\n"].concat().as_bytes());
-        }
-    );
+    shell.variables.variables.iter().for_each(|(key, val)| {
+        let _ = buffer.write([key, " = ", val.as_str(), "\n"].concat().as_bytes());
+    });
 
     // Then immediately follow that with a list of array variables.
     let _ = buffer.write(b"\n# Array Variables\n");
-    shell.variables.arrays.iter().for_each(
-        |(key, val)| print_array(&mut buffer, &key, &val)
-    );
+    shell.variables.arrays.iter().for_each(|(key, val)| print_array(&mut buffer, &key, &val));
 
     SUCCESS
 }

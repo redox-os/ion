@@ -116,10 +116,7 @@ impl<'a> Binary for Shell<'a> {
 
                 let line = self.context.as_mut().unwrap().read_line(
                     prompt,
-                    &mut move |Event {
-                                   editor,
-                                   kind,
-                               }| {
+                    &mut move |Event { editor, kind }| {
                         if let EventKind::BeforeComplete = kind {
                             let (words, pos) = editor.get_words_and_cursor_position();
 
@@ -131,7 +128,8 @@ impl<'a> Binary for Shell<'a> {
                                 CursorPosition::OnWordRightEdge(index) => {
                                     match (words.into_iter().nth(index), env::current_dir()) {
                                         (Some((start, end)), Ok(file)) => {
-                                            let filename = editor.current_buffer().range(start, end);
+                                            let filename =
+                                                editor.current_buffer().range(start, end);
                                             complete_as_file(file, filename, index)
                                         }
                                         _ => false,
@@ -142,12 +140,17 @@ impl<'a> Binary for Shell<'a> {
                             if filename {
                                 if let Ok(current_dir) = env::current_dir() {
                                     if let Some(url) = current_dir.to_str() {
-                                        let completer = IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr);
-                                        mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                                        let completer =
+                                            IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr);
+                                        mem::replace(
+                                            &mut editor.context().completer,
+                                            Some(Box::new(completer)),
+                                        );
                                     }
                                 }
                             } else {
-                                // Creates a list of definitions from the shell environment that will be used
+                                // Creates a list of definitions from the shell environment that
+                                // will be used
                                 // in the creation of a custom completer.
                                 let words = builtins.iter()
                                 // Add built-in commands to the completer's definitions.
@@ -167,7 +170,8 @@ impl<'a> Binary for Shell<'a> {
                                 // Initialize a new completer from the definitions collected.
                                 let custom_completer = BasicCompleter::new(words);
 
-                                // Creates completers containing definitions from all directories listed
+                                // Creates completers containing definitions from all directories
+                                // listed
                                 // in the environment's **$PATH** variable.
                                 let mut file_completers = if let Ok(val) = env::var("PATH") {
                                     val.split(sys::PATH_SEPARATOR)
@@ -177,18 +181,26 @@ impl<'a> Binary for Shell<'a> {
                                     vec![IonFileCompleter::new(Some("/bin/"), dirs_ptr, vars_ptr)]
                                 };
 
-                                // Also add files/directories in the current directory to the completion list.
+                                // Also add files/directories in the current directory to the
+                                // completion list.
                                 if let Ok(current_dir) = env::current_dir() {
                                     if let Some(url) = current_dir.to_str() {
-                                        file_completers.push(IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr));
+                                        file_completers.push(
+                                            IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr),
+                                        );
                                     }
                                 }
 
                                 // Merge the collected definitions with the file path definitions.
-                                let completer = MultiCompleter::new(file_completers, custom_completer);
+                                let completer =
+                                    MultiCompleter::new(file_completers, custom_completer);
 
-                                // Replace the shell's current completer with the newly-created completer.
-                                mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
+                                // Replace the shell's current completer with the newly-created
+                                // completer.
+                                mem::replace(
+                                    &mut editor.context().completer,
+                                    Some(Box::new(completer)),
+                                );
                             }
                         }
                     },

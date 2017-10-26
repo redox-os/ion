@@ -6,9 +6,9 @@ pub(crate) use self::arrays::ArrayMethod;
 pub(crate) use self::pattern::Pattern;
 pub(crate) use self::strings::StringMethod;
 
-use super::{Expander, expand_string};
-use super::super::super::ArgumentSplitter;
 use self::pattern::unescape;
+use super::{expand_string, Expander};
+use super::super::super::ArgumentSplitter;
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Key {

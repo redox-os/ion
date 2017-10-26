@@ -1,9 +1,9 @@
 use super::MethodArgs;
 use super::super::Select;
-use super::super::super::{expand_string, Expander, is_expression, slice};
+use super::super::super::{expand_string, is_expression, slice, Expander};
 use parser::assignments::is_array;
-use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};
 use regex::Regex;
+use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};
 use std::path::Path;
 use sys;
 use unicode_segmentation::UnicodeSegmentation;
@@ -103,36 +103,38 @@ impl<'a> StringMethod<'a> {
                     (Some(replace), Some(with)) => {
                         let res = &get_var!().replace(&replace, &with);
                         output.push_str(res);
-                    },
-                    _ => eprintln!("ion: replace: two arguments are required")
+                    }
+                    _ => eprintln!("ion: replace: two arguments are required"),
                 }
             }
             "replacen" => {
                 let mut args = pattern.array();
                 match (args.next(), args.next(), args.next()) {
-                    (Some(replace), Some(with), Some(nth)) => if let Ok(nth) = nth.parse::<usize>() {
+                    (Some(replace), Some(with), Some(nth)) => if let Ok(nth) = nth.parse::<usize>()
+                    {
                         let res = &get_var!().replacen(&replace, &with, nth);
                         output.push_str(res);
                     } else {
                         eprintln!("ion: replacen: third argument isn't a valid integer");
                     },
-                    _ => eprintln!("ion: replacen: three arguments required")
+                    _ => eprintln!("ion: replacen: three arguments required"),
                 }
             }
             "regex_replace" => {
                 let mut args = pattern.array();
-                match (args.next(),args.next()) {
-                    (Some(replace),Some(with)) => {
-                        match Regex::new(&replace){
-                            Ok(re) => {
-                                let inp = &get_var!();
-                                let res = re.replace_all(&inp,&with[..]);
-                                output.push_str(&res);
-                            }
-                            Err(_) => eprintln!("ion: regex_replace: error in regular expression {}",&replace)
+                match (args.next(), args.next()) {
+                    (Some(replace), Some(with)) => match Regex::new(&replace) {
+                        Ok(re) => {
+                            let inp = &get_var!();
+                            let res = re.replace_all(&inp, &with[..]);
+                            output.push_str(&res);
                         }
-                    }
-                    _ => eprintln!("ion: regex_replace: two arguments required")
+                        Err(_) => eprintln!(
+                            "ion: regex_replace: error in regular expression {}",
+                            &replace
+                        ),
+                    },
+                    _ => eprintln!("ion: regex_replace: two arguments required"),
                 }
             }
             "join" => {

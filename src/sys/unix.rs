@@ -106,14 +106,7 @@ fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
 pub mod signals {
     /// Blocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so that the shell never receives
     /// them.
-    pub(crate) fn block()
-    // fn block()
-    // fn block()
-    // fn block()
-    // fn block()
-    // fn block() // fn block() // fn block() // fn block() // fn block() //
-    // fn block()
-    {
+    pub(crate) fn block() {
         unsafe {
             use libc::*;
             use std::mem;
@@ -131,15 +124,7 @@ pub mod signals {
     /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
     /// controlled
     /// by the shell.
-    pub(crate) fn unblock()
-    // fn unblock()
-    // fn unblock()
-    // fn unblock()
-    // fn unblock()
-    // fn unblock()
-    // fn unblock() // fn unblock() // fn unblock() // fn unblock() // fn
-    // unblock()
-    {
+    pub(crate) fn unblock() {
         unsafe {
             use libc::*;
             use std::mem;

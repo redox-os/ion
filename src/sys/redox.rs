@@ -100,6 +100,10 @@ fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
 // TODO
 pub mod signals {
     pub(crate) fn block()
+    // fn block()
+    // fn block()
+    // fn block()
+    // fn block()
     // fn block() // fn block() // fn block() // fn block() // fn block() //
     // fn block()
     {
@@ -109,6 +113,10 @@ pub mod signals {
     /// controlled
     /// by the shell.
     pub(crate) fn unblock()
+    // fn unblock()
+    // fn unblock()
+    // fn unblock()
+    // fn unblock()
     // fn unblock()
     // fn unblock() // fn unblock() // fn unblock() // fn unblock() // fn
     // unblock()

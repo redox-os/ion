@@ -55,7 +55,9 @@ impl QuoteTerminator {
                     while let Some(character) = bytes.next() {
                         self.read += 1;
                         match character {
-                            b'\\' => { let _ = bytes.next(); },
+                            b'\\' => {
+                                let _ = bytes.next();
+                            }
                             b'\'' if !self.flags.intersects(DQUOTE) => self.flags ^= SQUOTE,
                             b'"' if !self.flags.intersects(SQUOTE) => self.flags ^= DQUOTE,
                             b'<' if !self.flags.contains(SQUOTE | DQUOTE) => {
@@ -78,20 +80,20 @@ impl QuoteTerminator {
                             }
                             b']' if !self.flags.intersects(DQUOTE | SQUOTE) => {
                                 self.array -= 1;
-                                if self.array == 0 { self.flags -= ARRAY }
-                            }
-                            b'#' if !self.flags.intersects(DQUOTE | SQUOTE) => {
-                                if self.read > 1 {
-                                    let character = self.buffer.as_bytes().get(self.read - 2).unwrap();
-                                    if [b' ', b'\n'].contains(character) {
-                                        instance |= COMM;
-                                        break
-                                    }
-                                } else {
-                                    instance |= COMM;
-                                    break
+                                if self.array == 0 {
+                                    self.flags -= ARRAY
                                 }
                             }
+                            b'#' if !self.flags.intersects(DQUOTE | SQUOTE) => if self.read > 1 {
+                                let character = self.buffer.as_bytes().get(self.read - 2).unwrap();
+                                if [b' ', b'\n'].contains(character) {
+                                    instance |= COMM;
+                                    break;
+                                }
+                            } else {
+                                instance |= COMM;
+                                break;
+                            },
                             _ => (),
                         }
                     }
