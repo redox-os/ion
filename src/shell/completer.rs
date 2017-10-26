@@ -76,7 +76,7 @@ impl Completer for IonFileCompleter {
                     // search pattern begins, and re-use that index to slice the completions so
                     // that we may re-add the tilde character with the completion that follows.
                     if let Some(completion) = iterator.next() {
-                        if let Some(e_index) = completion.find(search) {
+                        if let Some(e_index) = completion.rfind(search) {
                             completions.push(escape(&[tilde, &completion[e_index..]].concat()));
                             for completion in iterator {
                                 let expanded = &completion[e_index..];
