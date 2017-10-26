@@ -25,6 +25,7 @@ pub(crate) fn fork_pipe(
             let _ = sys::reset_signal(sys::SIGTERM);
             // This ensures that the child fork has a unique PGID.
             create_process_group(0);
+            sys::close_stdin();
             // After execution of it's commands, exit with the last command's status.
             exit(pipe(shell, commands, false));
         }

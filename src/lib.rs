@@ -7,6 +7,8 @@ extern crate app_dirs;
 #[macro_use]
 extern crate bitflags;
 extern crate calc;
+#[cfg(all(unix, not(target_os = "redox")))]
+extern crate errno;
 extern crate fnv;
 extern crate glob;
 #[macro_use]
@@ -16,8 +18,6 @@ extern crate libc;
 #[cfg(all(unix, not(target_os = "redox")))]
 extern crate libloading;
 extern crate liner;
-#[cfg(all(unix, not(target_os = "redox")))]
-extern crate nix;
 extern crate regex;
 extern crate smallstring;
 extern crate smallvec;
@@ -32,7 +32,7 @@ extern crate users as users_unix;
 mod sys;
 
 #[cfg(unix)]
-#[path = "sys/unix.rs"]
+#[path = "sys/unix/mod.rs"]
 mod sys;
 
 #[macro_use]

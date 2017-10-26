@@ -1,76 +1,54 @@
 [package]
-name = "ion-shell"
-description = "The Ion Shell"
-repository = "https://github.com/redox-os/ion"
-version = "1.0.5"
-license-file = "LICENSE"
-readme = "README.md"
 authors = [
-  "Michael Aaron Murphy <mmstickman@gmail.com>",
-  "Hunter Goldstein <hunter.d.goldstein@gmail.com>",
-  "Skyler Berg <skylertheberg@gmail.com>",
-  "Jeremy Soller <jackpot51@gmail.com>",
-  "Michael Gattozzi <mgattozzi@gmail.com>",
-  "Łukasz Niemier <lukasz@niemier.pl>",
+    "Michael Aaron Murphy <mmstickman@gmail.com>",
+    "Hunter Goldstein <hunter.d.goldstein@gmail.com>",
+    "Skyler Berg <skylertheberg@gmail.com>",
+    "Jeremy Soller <jackpot51@gmail.com>",
+    "Michael Gattozzi <mgattozzi@gmail.com>",
+    "Łukasz Niemier <lukasz@niemier.pl>",
 ]
 build = "build.rs"
+description = "The Ion Shell"
+license-file = "LICENSE"
+name = "ion-shell"
+readme = "README.md"
+repository = "https://github.com/redox-os/ion"
+version = "1.0.5"
 
 [[bin]]
 name = "ion"
 path = "src/main.rs"
 
-## Shared Dependencies
-
-[dependencies]
-# Provides XDG app directory support
-app_dirs = {git = "https://github.com/redox-os/app-dirs-rs.git"}
-# Provides methods for bitwise flag operations
-bitflags = "0.9.1"
-# Provides inline arithmetic expression and `calc` functionality
-calculate = {git = "https://github.com/redox-os/calc.git"}
-# A faster hashing algorithm for the hash maps in the shell.
-fnv = "1.0"
-# Performs globbing on words that are detected to be potentially globbable.
-glob = "0.2"
-# Provides a macro for lazily-evalulated statics
-lazy_static = "0.2"
-# Provides the line editor / prompt for the shell
-liner = "0.4"
-# Provides permutations of strings in brace expansions
-permutate = "0.3"
-# Enables strings to be stored inline on the stack, when possible.
-smallstring = "0.1"
-# Same as the above, but for vectors.
-smallvec = "0.4"
-# Provides grapheme-based string iterators.
-unicode-segmentation = "1.2"
-# Rusts regex crate
-regex = "0.2"
-
-## Redox Dependencies
-
-[target.'cfg(target_os = "redox")'.dependencies]
-# Provides access to Redox syscalls for signals/job control.
-redox_syscall = "0.1"
-
-## *nix Dependencies (Linux, Mac OS, BSDs)
-
-[target.'cfg(all(unix, not(target_os = "redox")))'.dependencies]
-# Required to access some *nix-specific syscalls for signals/job control.
-libc = "0.2"
-# A higher level abstraction of libc-acquired syscalls for signals/job control.
-nix = "0.8"
-# Obtains user directories
-users = "0.5.1"
-# Enables loading plugins
-libloading = "0.4"
-
 [build-dependencies]
 ansi_term = "0.9"
 version_check = "0.1.3"
 
+[dependencies]
+bitflags = "0.9.1"
+fnv = "1.0"
+glob = "0.2"
+lazy_static = "0.2"
+liner = "0.4"
+permutate = "0.3"
+regex = "0.2"
+smallstring = "0.1"
+smallvec = "0.4"
+unicode-segmentation = "1.2"
+
+[dependencies.app_dirs]
+git = "https://github.com/redox-os/app-dirs-rs.git"
+
+[dependencies.calculate]
+git = "https://github.com/redox-os/calc.git"
+
 [profile.release]
-# debug = true
-# rustflags = [ "-C", "target-cpu=native"]
-# lto = true
 panic = "abort"
+
+[target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
+errno = "0.2.3"
+libc = "0.2"
+libloading = "0.4"
+users = "0.5.1"
+
+[target."cfg(target_os = \"redox\")".dependencies]
+redox_syscall = "0.1"
