@@ -282,9 +282,6 @@ impl<'a> PipelineExecution for Shell<'a> {
                         "cd".into(),
                         iter::once("cd".into()).chain(job.args.drain()).collect(),
                     )
-                } else if Path::new(&job.args[0]).is_dir() {
-                    eprintln!("ion: cannot execute directory as command");
-                    return Err(FAILURE);
                 } else if self.functions.contains_key::<str>(job.args[0].as_ref()) {
                     RefinedJob::function(job.args[0].clone().into(), job.args.drain().collect())
                 } else if self.builtins.contains_key::<str>(job.args[0].as_ref()) {
