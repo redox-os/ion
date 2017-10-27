@@ -20,6 +20,20 @@ pub(crate) struct Redirection {
     pub append: bool,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum RedirectKind {
+    None,
+    Single(Redirection),
+    Multiple(Vec<Redirection>),
+}
+
+impl RedirectKind {
+    /// Analogue to `Option::take` for `RedirectKind`
+    pub(crate) fn take(&mut self) -> RedirectKind {
+        ::std::mem::replace(self, RedirectKind::None)
+    }
+}
+
 /// Represents input that a process could initially receive from `stdin`
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Input {
@@ -33,16 +47,18 @@ pub(crate) enum Input {
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Pipeline {
     pub jobs:   Vec<Job>,
-    pub stdout: Option<Redirection>,
+    pub output: RedirectKind,
     pub stdin:  Option<Input>,
 }
 
 impl Pipeline {
-    pub(crate) fn new(jobs: Vec<Job>, stdin: Option<Input>, stdout: Option<Redirection>) -> Self {
+    pub(crate) fn new(jobs: Vec<Job>,
+                      stdin: Option<Input>,
+                      output: RedirectKind) -> Self {
         Pipeline {
             jobs,
             stdin,
-            stdout,
+            output,
         }
     }
 
@@ -63,13 +79,19 @@ impl Pipeline {
 
         self.stdin = stdin;
 
-        if let Some(stdout) = self.stdout.iter_mut().next() {
-            stdout.file = expand_string(stdout.file.as_str(), expanders, false).join(" ");
+        match self.output {
+            RedirectKind::None => {},
+            RedirectKind::Single(ref mut out) =>
+                out.file = expand_string(out.file.as_str(), expanders, false).join(" "),
+            RedirectKind::Multiple(ref mut outs) =>
+                outs.iter_mut().for_each(|out| {
+                    out.file = expand_string(out.file.as_str(), expanders, false).join(" ");
+                }),
         }
     }
 
     pub(crate) fn requires_piping(&self) -> bool {
-        self.jobs.len() > 1 || self.stdin != None || self.stdout != None
+        self.jobs.len() > 1 || self.stdin != None || self.output != RedirectKind::None
             || self.jobs.last().unwrap().kind == JobKind::Background
     }
 }
@@ -100,21 +122,25 @@ impl fmt::Display for Pipeline {
                 tokens.push(string.clone());
             }
         }
-        if let Some(ref outfile) = self.stdout {
-            match outfile.from {
+        let append_redirect = |tokens: &mut Vec<String>, redirect: &Redirection| {
+            match redirect.from {
                 RedirectFrom::Stdout => {
-                    tokens.push((if outfile.append { ">>" } else { ">" }).into());
+                    tokens.push((if redirect.append { ">>" } else { ">" }).into());
                 }
                 RedirectFrom::Stderr => {
-                    tokens.push((if outfile.append { "^>>" } else { "^>" }).into());
+                    tokens.push((if redirect.append { "^>>" } else { "^>" }).into());
                 }
                 RedirectFrom::Both => {
-                    tokens.push((if outfile.append { "&>>" } else { "&>" }).into());
+                    tokens.push((if redirect.append { "&>>" } else { "&>" }).into());
                 }
             }
-            tokens.push(outfile.file.clone());
+            tokens.push(redirect.file.clone());
+        };
+        match self.output {
+            RedirectKind::None => {},
+            RedirectKind::Single(ref out) => append_redirect(&mut tokens, out),
+            RedirectKind::Multiple(ref outs) => outs.iter().for_each(|out| append_redirect(&mut tokens, out)),
         }
-
         write!(f, "{}", tokens.join(" "))
     }
 }
