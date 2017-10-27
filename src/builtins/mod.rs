@@ -30,7 +30,7 @@ use shell::status::*;
 use sys;
 
 macro_rules! map {
-    ($($name:expr, $func:ident, $help:expr),+) => {{
+    ($($name:expr => $func:ident: $help:expr),+) => {{
         BuiltinMap {
             name: &[$($name),+],
             help: &[$($help),+],
@@ -39,56 +39,46 @@ macro_rules! map {
     }
 }}
 
-pub const BUILTINS: &'static BuiltinMap =
-    &map!(
-    "let", list_vars, "Displays a list of local variables",
-    "echo", builtin_echo, "Display a line of text",
-    "cd", builtin_cd, "Change the current directory\n    cd <path>",
-    "dirs", builtin_dirs, "Display the current directory stack",
-    "pushd", builtin_pushd, "Push a directory to the stack",
-    "popd", builtin_popd, "Pop a directory from the stack",
-    "alias", builtin_alias, "View, set or unset aliases",
-    "unalias", builtin_unalias, "Delete an alias",
-    "fn", builtin_fn, "Print list of functions",
-    "read", builtin_read, "Read some variables\n    read <variable>",
-    "drop", builtin_drop, "Delete a variable",
-    "matches", builtin_matches, "Checks if a string matches a given regex",
-    "not", builtin_not, "Reverses the exit status value of the given command.",
-    "set", builtin_set, "Set or unset values of shell options and positional parameters.",
-    "eval", builtin_eval, "evaluates the evaluated expression",
-    "exit", builtin_exit, "Exits the current session",
-    "wait", builtin_wait, "Waits until all running background processes have completed",
-    "jobs", builtin_jobs, "Displays all jobs that are attached to the background",
-    "bg", builtin_bg, "Resumes a stopped background process",
-    "fg",builtin_fg, "Resumes and sets a background process as the active process",
-    "suspend", builtin_suspend, "Suspends the shell with a SIGTSTOP signal",
-    "disown", builtin_disown, "Disowning a process removes that process from the shell's background process table.",
-    "history", builtin_history,"Display a log of all commands previously executed",
-    "source", builtin_source, "Evaluate the file following the command or re-initialize the init file",
-    "test", builtin_test, "Performs tests on files and text",
-    "calc", builtin_calc, "Calculate a mathematical expression",
-    "true", builtin_true, "Do nothing, successfully",
-    "false", builtin_false, "Do nothing, unsuccessfully",
-    "help", builtin_help,
-    "Display helpful information about a given command or list commands if none \
-        specified\n    help <command>",
-    "and",
-    builtin_and,
-    "Execute the command if the shell's previous status is success",
-    "or",
-    builtin_or,
-    "Execute the command if the shell's previous status is failure",
-    "starts-with",
-    starts_with,
-    "Evaluates if the supplied argument starts with a given string",
-    "ends-with",
-    ends_with,
-    "Evaluates if the supplied argument ends with a given string",
-    "contains",
-    contains,
-    "Evaluates if the supplied argument contains a given string",
-    "exists", builtin_exists, "Performs tests on files and text",
-    "ion-docs", ion_docs, "Opens the Ion manual"
+pub const BUILTINS: &'static BuiltinMap = &map!(
+    "let" => list_vars : "Displays a list of local variables",
+    "echo" => builtin_echo : "Display a line of text",
+    "cd" => builtin_cd : "Change the current directory\n    cd <path>",
+    "dirs" => builtin_dirs : "Display the current directory stack",
+    "pushd" => builtin_pushd : "Push a directory to the stack",
+    "popd" => builtin_popd : "Pop a directory from the stack",
+    "alias" => builtin_alias : "View, set or unset aliases",
+    "unalias" => builtin_unalias : "Delete an alias",
+    "fn" => builtin_fn : "Print list of functions",
+    "read" => builtin_read : "Read some variables\n    read <variable>",
+    "drop" => builtin_drop : "Delete a variable",
+    "matches" => builtin_matches : "Checks if a string matches a given regex",
+    "not" => builtin_not : "Reverses the exit status value of the given command.",
+    "set" => builtin_set : "Set or unset values of shell options and positional parameters.",
+    "eval" => builtin_eval : "evaluates the evaluated expression",
+    "exit" => builtin_exit : "Exits the current session",
+    "wait" => builtin_wait : "Waits until all running background processes have completed",
+    "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
+    "bg" => builtin_bg : "Resumes a stopped background process",
+    "fg" => builtin_fg : "Resumes and sets a background process as the active process",
+    "suspend" => builtin_suspend : "Suspends the shell with a SIGTSTOP signal",
+    "disown" => builtin_disown : "Disowning a process removes that process from the shell's \
+        background process table.",
+    "history" => builtin_history : "Display a log of all commands previously executed",
+    "source" => builtin_source : "Evaluate the file following the command or re-initialize the \
+        init file",
+    "test" => builtin_test : "Performs tests on files and text",
+    "calc" => builtin_calc : "Calculate a mathematical expression",
+    "true" => builtin_true : "Do nothing, successfully",
+    "false" => builtin_false : "Do nothing, unsuccessfully",
+    "help" => builtin_help : "Display helpful information about a given command or list commands \
+        if none specified\n    help <command>",
+    "and" => builtin_and : "Execute the command if the shell's previous status is success",
+    "or" => builtin_or : "Execute the command if the shell's previous status is failure",
+    "starts-with" => starts_with : "Evaluates if the supplied argument starts with a given string",
+    "ends-with" => ends_with :"Evaluates if the supplied argument ends with a given string",
+    "contains" => contains : "Evaluates if the supplied argument contains a given string",
+    "exists" => builtin_exists : "Performs tests on files and text",
+    "ion-docs" => ion_docs : "Opens the Ion manual"
 );
 
 /// Structure which represents a Terminal's command.
