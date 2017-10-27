@@ -81,8 +81,8 @@ pub(crate) fn watch_background(
 const FIRST: u8 = 1;
 const LAST: u8 = 2;
 
-pub(crate) fn watch_foreground<'a, F, D>(
-    shell: &mut Shell<'a>,
+pub(crate) fn watch_foreground<F, D>(
+    shell: &mut Shell,
     first_pid: u32,
     last_pid: u32,
     get_command: F,

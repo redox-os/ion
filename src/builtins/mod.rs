@@ -20,7 +20,6 @@ use self::source::source;
 use self::test::test;
 use self::variables::{alias, drop_alias, drop_array, drop_variable};
 
-use fnv::FnvHashMap;
 use std::error::Error;
 use std::io::{self, BufWriter, Write};
 
@@ -29,6 +28,68 @@ use shell::{self, FlowLogic, Shell, ShellHistory};
 use shell::job_control::{JobControl, ProcessState};
 use shell::status::*;
 use sys;
+
+macro_rules! map {
+    ($($name:expr, $func:ident, $help:expr),+) => {{
+        BuiltinMap {
+            name: &[$($name),+],
+            help: &[$($help),+],
+            functions: &[$($func),+],
+        }
+    }
+}}
+
+pub const BUILTINS: &'static BuiltinMap =
+    &map!(
+    "let", list_vars, "Displays a list of local variables",
+    "echo", builtin_echo, "Display a line of text",
+    "cd", builtin_cd, "Change the current directory\n    cd <path>",
+    "dirs", builtin_dirs, "Display the current directory stack",
+    "pushd", builtin_pushd, "Push a directory to the stack",
+    "popd", builtin_popd, "Pop a directory from the stack",
+    "alias", builtin_alias, "View, set or unset aliases",
+    "unalias", builtin_unalias, "Delete an alias",
+    "fn", builtin_fn, "Print list of functions",
+    "read", builtin_read, "Read some variables\n    read <variable>",
+    "drop", builtin_drop, "Delete a variable",
+    "matches", builtin_matches, "Checks if a string matches a given regex",
+    "not", builtin_not, "Reverses the exit status value of the given command.",
+    "set", builtin_set, "Set or unset values of shell options and positional parameters.",
+    "eval", builtin_eval, "evaluates the evaluated expression",
+    "exit", builtin_exit, "Exits the current session",
+    "wait", builtin_wait, "Waits until all running background processes have completed",
+    "jobs", builtin_jobs, "Displays all jobs that are attached to the background",
+    "bg", builtin_bg, "Resumes a stopped background process",
+    "fg",builtin_fg, "Resumes and sets a background process as the active process",
+    "suspend", builtin_suspend, "Suspends the shell with a SIGTSTOP signal",
+    "disown", builtin_disown, "Disowning a process removes that process from the shell's background process table.",
+    "history", builtin_history,"Display a log of all commands previously executed",
+    "source", builtin_source, "Evaluate the file following the command or re-initialize the init file",
+    "test", builtin_test, "Performs tests on files and text",
+    "calc", builtin_calc, "Calculate a mathematical expression",
+    "true", builtin_true, "Do nothing, successfully",
+    "false", builtin_false, "Do nothing, unsuccessfully",
+    "help", builtin_help,
+    "Display helpful information about a given command or list commands if none \
+        specified\n    help <command>",
+    "and",
+    builtin_and,
+    "Execute the command if the shell's previous status is success",
+    "or",
+    builtin_or,
+    "Execute the command if the shell's previous status is failure",
+    "starts-with",
+    starts_with,
+    "Evaluates if the supplied argument starts with a given string",
+    "ends-with",
+    ends_with,
+    "Evaluates if the supplied argument ends with a given string",
+    "contains",
+    contains,
+    "Evaluates if the supplied argument contains a given string",
+    "exists", builtin_exists, "Performs tests on files and text",
+    "ion-docs", ion_docs, "Opens the Ion manual"
+);
 
 /// Structure which represents a Terminal's command.
 /// This command structure contains a name, and the code which run the
@@ -39,140 +100,26 @@ pub struct Builtin {
     pub main: fn(&[&str], &mut Shell) -> i32,
 }
 
-impl Builtin {
-    /// Return the map from command names to commands
-    pub fn map() -> FnvHashMap<&'static str, Self> {
-        let mut commands: FnvHashMap<&str, Self> =
-            FnvHashMap::with_capacity_and_hasher(32, Default::default());
+pub struct BuiltinMap {
+    pub(crate) name:      &'static [&'static str],
+    pub(crate) help:      &'static [&'static str],
+    pub(crate) functions: &'static [fn(&[&str], &mut Shell) -> i32],
+}
 
-        // Quick and clean way to insert a builtin, define a function named as the builtin
-        // for example:
-        // fn builtin_not (args: &[&str], shell: &mut Shell) -> i32 {
-        // let cmd = args[1..].join(" ");
-        // shell.on_command(&cmd);
-        // match shell.previous_status {
-        // SUCCESS => FAILURE,
-        // FAILURE => SUCCESS,
-        // _ => shell.previous_status
-        // }
-        // }
-        //
-        // insert_builtin!("not", builtin_not, "Reverses the exit status value of the given
-        // command.");
-        //
-
-        macro_rules! insert_builtin {
-            ($name:expr, $func:ident, $help:expr) => {
-                commands.insert(
-                    $name,
-                    Builtin {
-                        name: $name,
-                        help: $help,
-                        main: $func,
-                    }
-                );
+impl BuiltinMap {
+    pub fn get(&self, func: &str) -> Option<Builtin> {
+        self.name.iter().position(|&name| name == func).map(|pos| unsafe {
+            Builtin {
+                name: *self.name.get_unchecked(pos),
+                help: *self.help.get_unchecked(pos),
+                main: *self.functions.get_unchecked(pos),
             }
-        }
-
-        // Directories
-        insert_builtin!("cd", builtin_cd, "Change the current directory\n    cd <path>");
-
-        insert_builtin!("dirs", builtin_dirs, "Display the current directory stack");
-        insert_builtin!("pushd", builtin_pushd, "Push a directory to the stack");
-        insert_builtin!("popd", builtin_popd, "Pop a directory from the stack");
-
-        // Aliases
-        insert_builtin!("alias", builtin_alias, "View, set or unset aliases");
-        insert_builtin!("unalias", builtin_unalias, "Delete an alias");
-
-        // Variables
-        insert_builtin!("fn", builtin_fn, "Print list of functions");
-        insert_builtin!("read", builtin_read, "Read some variables\n    read <variable>");
-        insert_builtin!("drop", builtin_drop, "Delete a variable");
-
-        // Misc
-        insert_builtin!("matches", builtin_matches, "Checks if a string matches a given regex");
-        insert_builtin!("not", builtin_not, "Reverses the exit status value of the given command.");
-        insert_builtin!(
-            "set",
-            builtin_set,
-            "Set or unset values of shell options and positional parameters."
-        );
-        insert_builtin!("eval", builtin_eval, "evaluates the evaluated expression");
-        insert_builtin!("exit", builtin_exit, "Exits the current session");
-        insert_builtin!(
-            "wait",
-            builtin_wait,
-            "Waits until all running background processes have completed"
-        );
-        insert_builtin!(
-            "jobs",
-            builtin_jobs,
-            "Displays all jobs that are attached to the background"
-        );
-        insert_builtin!("bg", builtin_bg, "Resumes a stopped background process");
-        insert_builtin!(
-            "fg",
-            builtin_fg,
-            "Resumes and sets a background process as the active process"
-        );
-        insert_builtin!("suspend", builtin_suspend, "Suspends the shell with a SIGTSTOP signal");
-        insert_builtin!(
-            "disown",
-            builtin_disown,
-            "Disowning a process removes that process from the shell's background process table."
-        );
-        insert_builtin!(
-            "history",
-            builtin_history,
-            "Display a log of all commands previously executed"
-        );
-        insert_builtin!(
-            "source",
-            builtin_source,
-            "Evaluate the file following the command or re-initialize the init file"
-        );
-        insert_builtin!("echo", builtin_echo, "Display a line of text");
-        insert_builtin!("test", builtin_test, "Performs tests on files and text");
-        insert_builtin!("calc", builtin_calc, "Calculate a mathematical expression");
-        insert_builtin!("true", builtin_true, "Do nothing, successfully");
-        insert_builtin!("false", builtin_false, "Do nothing, unsuccessfully");
-        insert_builtin!(
-            "help",
-            builtin_help,
-            "Display helpful information about a given command or list commands if none \
-             specified\n    help <command>"
-        );
-        insert_builtin!(
-            "and",
-            builtin_and,
-            "Execute the command if the shell's previous status is success"
-        );
-        insert_builtin!(
-            "or",
-            builtin_or,
-            "Execute the command if the shell's previous status is failure"
-        );
-        insert_builtin!(
-            "starts-with",
-            starts_with,
-            "Evaluates if the supplied argument starts with a given string"
-        );
-        insert_builtin!(
-            "ends-with",
-            ends_with,
-            "Evaluates if the supplied argument ends with a given string"
-        );
-        insert_builtin!(
-            "contains",
-            contains,
-            "Evaluates if the supplied argument contains a given string"
-        );
-        insert_builtin!("exists", builtin_exists, "Performs tests on files and text");
-        insert_builtin!("ion-docs", ion_docs, "Opens the Ion manual");
-        insert_builtin!("let", list_vars, "Displays a list of local variables");
-        commands
+        })
     }
+
+    pub fn keys(&self) -> &'static [&'static str] { self.name }
+
+    pub fn contains_key(&self, func: &str) -> bool { self.name.iter().any(|&name| name == func) }
 }
 
 // Definitions of simple builtins go here
@@ -387,8 +334,7 @@ fn builtin_help(args: &[&str], shell: &mut Shell) -> i32 {
             let _ = stdout.write_all(b"\n");
         }
     } else {
-        let mut commands = builtins.keys().cloned().collect::<Vec<&str>>();
-        commands.sort();
+        let mut commands = builtins.keys();
 
         let mut buffer: Vec<u8> = Vec::new();
         for command in commands {

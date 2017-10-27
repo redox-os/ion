@@ -47,7 +47,6 @@ mod builtins;
 mod shell;
 mod ascii_helpers;
 
-use builtins::Builtin;
 use shell::{signals, Binary, Shell};
 use std::sync::atomic::Ordering;
 
@@ -72,7 +71,6 @@ fn main() {
         }
     }
 
-    let builtins = Builtin::map();
-    let shell = Shell::new_bin(&builtins);
+    let shell = Shell::new_bin();
     shell.main();
 }

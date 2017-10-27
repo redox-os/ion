@@ -12,7 +12,7 @@ pub trait IonLibrary {
     fn execute_script<P: AsRef<Path>>(&mut self, path: P) -> io::Result<i32>;
 }
 
-impl<'a> IonLibrary for Shell<'a> {
+impl IonLibrary for Shell {
     fn execute_command(&mut self, command: &str) -> i32 {
         self.on_command(command);
         self.previous_status

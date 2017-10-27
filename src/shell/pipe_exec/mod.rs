@@ -391,7 +391,7 @@ pub(crate) trait PipelineExecution {
     ) -> i32;
 }
 
-impl<'a> PipelineExecution for Shell<'a> {
+impl PipelineExecution for Shell {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
         // Remove any leftover foreground tasks from the last execution.
         self.foreground.clear();
@@ -447,9 +447,9 @@ impl<'a> PipelineExecution for Shell<'a> {
                         "cd".into(),
                         iter::once("cd".into()).chain(job.args.drain()).collect(),
                     )
-                } else if self.functions.contains_key::<str>(job.args[0].as_ref()) {
+                } else if self.functions.contains_key(job.args[0].as_str()) {
                     RefinedJob::function(job.args[0].clone().into(), job.args.drain().collect())
-                } else if self.builtins.contains_key::<str>(job.args[0].as_ref()) {
+                } else if self.builtins.contains_key(job.args[0].as_str()) {
                     RefinedJob::builtin(job.args[0].clone().into(), job.args.drain().collect())
                 } else {
                     let mut command = Command::new(job.args[0].clone());

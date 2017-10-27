@@ -67,7 +67,7 @@ trait ShellHistoryPrivate {
     fn should_save_command(&self, command: &str) -> bool;
 }
 
-impl<'a> ShellHistory for Shell<'a> {
+impl ShellHistory for Shell {
     fn print_history(&self, _arguments: &[&str]) -> i32 {
         if let Some(context) = self.context.as_ref() {
             let mut buffer = Vec::with_capacity(8 * 1024);
@@ -140,7 +140,7 @@ impl<'a> ShellHistory for Shell<'a> {
     }
 }
 
-impl<'a> ShellHistoryPrivate for Shell<'a> {
+impl ShellHistoryPrivate for Shell {
     fn should_save_command(&self, command: &str) -> bool {
         // just for convenience and to make the code look a bit cleaner
         let ignore = &self.ignore_setting.flags;

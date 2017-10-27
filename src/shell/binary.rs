@@ -45,7 +45,7 @@ pub(crate) trait Binary {
     fn prompt_fn(&mut self) -> Option<String>;
 }
 
-impl<'a> Binary for Shell<'a> {
+impl Binary for Shell {
     fn prompt(&mut self) -> String {
         if self.flow_control.level == 0 {
             let rprompt = match self.prompt_fn() {
@@ -112,7 +112,7 @@ impl<'a> Binary for Shell<'a> {
                 let prompt = self.prompt();
                 let funcs = &self.functions;
                 let vars = &self.variables;
-                let builtins = self.builtins;
+                let builtins = &self.builtins;
 
                 let line = self.context.as_mut().unwrap().read_line(
                     prompt,
@@ -152,9 +152,9 @@ impl<'a> Binary for Shell<'a> {
                                 // Creates a list of definitions from the shell environment that
                                 // will be used
                                 // in the creation of a custom completer.
-                                let words = builtins.iter()
+                                let words = builtins.keys().iter()
                                 // Add built-in commands to the completer's definitions.
-                                .map(|(&s, _)| Identifier::from(s))
+                                .map(|&s| Identifier::from(s))
                                 // Add the history list to the completer's definitions.
                                 .chain(history.iter().cloned())
                                 // Add the aliases to the completer's definitions.

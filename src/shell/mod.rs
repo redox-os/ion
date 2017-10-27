@@ -31,7 +31,7 @@ use self::pipe_exec::PipelineExecution;
 use self::status::*;
 use self::variables::Variables;
 use app_dirs::{app_root, AppDataType, AppInfo};
-use builtins::*;
+use builtins::{BuiltinMap, BUILTINS};
 use fnv::FnvHashMap;
 use liner::Context;
 use parser::{ArgumentSplitter, Expander, Select};
@@ -51,9 +51,9 @@ use types::*;
 /// the entirety of the
 /// program. It is initialized at the beginning of the program, and lives until the end of the
 /// program.
-pub struct Shell<'a> {
+pub struct Shell {
     /// Contains a list of built-in commands that were created when the program started.
-    pub builtins: &'a FnvHashMap<&'static str, Builtin>,
+    pub builtins: &'static BuiltinMap,
     /// Contains the history, completions, and manages writes to the history file.
     /// Note that the context is only available in an interactive session.
     pub context: Option<Context>,
@@ -90,12 +90,12 @@ pub struct Shell<'a> {
     ignore_setting: IgnoreSetting,
 }
 
-impl<'a> Shell<'a> {
+impl<'a> Shell {
     #[allow(dead_code)]
     /// Panics if DirectoryStack construction fails
-    pub(crate) fn new_bin(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
+    pub(crate) fn new_bin() -> Shell {
         Shell {
-            builtins:            builtins,
+            builtins:            BUILTINS,
             context:             None,
             variables:           Variables::default(),
             flow_control:        FlowControl::default(),
@@ -115,9 +115,9 @@ impl<'a> Shell<'a> {
     }
 
     #[allow(dead_code)]
-    pub fn new(builtins: &'a FnvHashMap<&'static str, Builtin>) -> Shell<'a> {
+    pub fn new() -> Shell {
         Shell {
-            builtins:            builtins,
+            builtins:            BUILTINS,
             context:             None,
             variables:           Variables::default(),
             flow_control:        FlowControl::default(),
@@ -303,7 +303,7 @@ impl<'a> Shell<'a> {
     }
 }
 
-impl<'a> Expander for Shell<'a> {
+impl<'a> Expander for Shell {
     fn tilde(&self, input: &str) -> Option<String> {
         self.variables.tilde_expansion(input, &self.directory_stack)
     }

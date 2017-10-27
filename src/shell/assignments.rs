@@ -52,7 +52,7 @@ pub(crate) trait VariableStore {
     fn export(&mut self, &str) -> i32;
 }
 
-impl<'a> VariableStore for Shell<'a> {
+impl VariableStore for Shell {
     fn local(&mut self, expression: &str) -> i32 {
         match AssignmentActions::new(expression) {
             Ok(assignment_actions) => {

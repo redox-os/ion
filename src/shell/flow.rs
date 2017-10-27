@@ -62,7 +62,7 @@ pub(crate) trait FlowLogic {
     fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition;
 }
 
-impl<'a> FlowLogic for Shell<'a> {
+impl FlowLogic for Shell {
     fn on_command(&mut self, command_string: &str) {
         self.break_flow = false;
         let mut iterator = StatementSplitter::new(command_string).map(parse_and_validate);

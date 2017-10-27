@@ -102,7 +102,7 @@ pub struct BackgroundProcess {
     pub name:          String,
 }
 
-impl<'a> JobControl for Shell<'a> {
+impl JobControl for Shell {
     fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32 {
         // Resume the background task, if needed.
         if cont {

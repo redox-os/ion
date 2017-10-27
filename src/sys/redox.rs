@@ -83,7 +83,10 @@ pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
 
 pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(syscall::close(fd)).and(Ok(())) }
 
-pub(crate) fn close_stdin() {
+pub(crate) fn close_stdin()
+// fn close_stdin() // fn close_stdin() // fn close_stdin() // fn
+// close_stdin()
+{
     syscall::close(STDIN_FILENO);
 }
 
@@ -103,12 +106,16 @@ fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
 
 // TODO
 pub mod signals {
-    pub(crate) fn block() { }
+    pub(crate) fn block() // fn block() // fn block() // fn block() // fn block()
+    {
+    }
 
     /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
     /// controlled
     /// by the shell.
-    pub(crate) fn unblock() { }
+    pub(crate) fn unblock() // fn unblock() // fn unblock() // fn unblock() // fn unblock()
+    {
+    }
 }
 
 pub mod job_control {
@@ -132,8 +139,8 @@ pub mod job_control {
     }
 
 
-    pub(crate) fn watch_foreground<'a, F, D>(
-        shell: &mut Shell<'a>,
+    pub(crate) fn watch_foreground<F, D>(
+        shell: &mut Shell,
         _pid: u32,
         last_pid: u32,
         _get_command: F,

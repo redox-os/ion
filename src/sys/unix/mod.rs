@@ -80,8 +80,13 @@ pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
 
 pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
 
-pub(crate) fn close_stdin() {
-    unsafe { libc::close(STDIN_FILENO); }
+pub(crate) fn close_stdin()
+// fn close_stdin() // fn close_stdin() // fn close_stdin() // fn
+// close_stdin()
+{
+    unsafe {
+        libc::close(STDIN_FILENO);
+    }
 }
 
 pub(crate) fn isatty(fd: RawFd) -> bool { unsafe { libc::isatty(fd) == 1 } }
