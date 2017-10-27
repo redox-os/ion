@@ -3,13 +3,16 @@
 //! forked
 //! children of the shell.
 
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+use std::sync::atomic::{AtomicU8, ATOMIC_U8_INIT};
 
 use sys;
 
 pub(crate) use sys::signals::{block, unblock};
 
-pub static PENDING: AtomicUsize = ATOMIC_USIZE_INIT;
+pub static PENDING: AtomicU8 = ATOMIC_U8_INIT;
+pub const SIGINT: u8 = 1;
+pub const SIGHUP: u8 = 2;
+pub const SIGTERM: u8 = 4;
 
 /// Suspends a given process by it's process ID.
 pub(crate) fn suspend(pid: u32) { let _ = sys::killpg(pid, sys::SIGSTOP); }

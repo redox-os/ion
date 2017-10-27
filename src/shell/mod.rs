@@ -138,13 +138,13 @@ impl<'a> Shell {
     }
 
     pub(crate) fn next_signal(&self) -> Option<i32> {
-        for &sig in &[sys::SIGINT, sys::SIGHUP, sys::SIGTERM] {
-            if signals::PENDING.fetch_and(!(1 << sig), Ordering::SeqCst) & (1 << sig) == 1 << sig {
-                return Some(sig);
-            }
+        match signals::PENDING.swap(0, Ordering::SeqCst) {
+            0 => None,
+            signals::SIGINT => Some(sys::SIGINT),
+            signals::SIGHUP => Some(sys::SIGHUP),
+            signals::SIGTERM => Some(sys::SIGTERM),
+            _ => unreachable!()
         }
-
-        None
     }
 
     pub(crate) fn exit(&mut self, status: i32) -> ! {

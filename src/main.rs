@@ -51,9 +51,14 @@ use shell::{signals, Binary, Shell};
 use std::sync::atomic::Ordering;
 
 extern "C" fn handler(signal: i32) {
-    if signal < 32 {
-        signals::PENDING.fetch_or(1 << signal, Ordering::SeqCst);
-    }
+    let signal = match signal {
+        sys::SIGINT  => signals::SIGINT,
+        sys::SIGHUP  => signals::SIGHUP,
+        sys::SIGTERM => signals::SIGTERM,
+        _ => unreachable!()
+    };
+
+    signals::PENDING.store(signal, Ordering::SeqCst);
 }
 
 fn main() {
