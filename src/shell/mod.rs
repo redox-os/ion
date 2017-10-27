@@ -46,6 +46,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 use types::*;
+use sys;
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
 /// the entirety of the
@@ -137,7 +138,7 @@ impl<'a> Shell {
     }
 
     pub(crate) fn next_signal(&self) -> Option<i32> {
-        for sig in 0..32 {
+        for &sig in &[sys::SIGINT, sys::SIGHUP, sys::SIGTERM] {
             if signals::PENDING.fetch_and(!(1 << sig), Ordering::SeqCst) & (1 << sig) == 1 << sig {
                 return Some(sig);
             }
