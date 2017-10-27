@@ -171,6 +171,7 @@ pub(crate) fn parse(code: &str) -> Statement {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use self::pipelines::PipeItem;
     use parser::assignments::{KeyBuf, Primitive};
     use shell::{Job, JobKind};
     use shell::flow_control::Statement;
@@ -180,9 +181,9 @@ mod tests {
         // Default case where spaced normally
         let parsed_if = parse("if test 1 -eq 2");
         let correct_parse = Statement::If {
-            expression: Pipeline::new(
-                vec![
-                    Job::new(
+            expression: Pipeline {
+                items: vec![PipeItem {
+                    job: Job::new(
                         vec![
                             "test".to_owned(),
                             "1".to_owned(),
@@ -192,10 +193,10 @@ mod tests {
                             .collect(),
                         JobKind::Last,
                     ),
-                ],
-                None,
-                None,
-            ),
+                    outputs: Vec::new(),
+                    inputs: Vec::new(),
+                }],
+            },
             success:    vec![],
             else_if:    vec![],
             failure:    vec![],
