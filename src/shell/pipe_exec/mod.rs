@@ -730,6 +730,10 @@ pub(crate) fn pipe(
     let mut previous_status = SUCCESS;
     let mut previous_kind = JobKind::And;
     let mut commands = commands.into_iter();
+    // A vector to hold possible external command stdout/stderr pipes.
+    // If it is Some, then we close the various file descriptors after
+    // spawning a child job.
+    let mut ext_stdio: Option<Vec<RawFd>> = None;
     loop {
         if let Some((mut parent, mut kind)) = commands.next() {
             // When an `&&` or `||` operator is utilized, execute commands based on the previous
@@ -823,6 +827,8 @@ pub(crate) fn pipe(
                                             exit(ret)
                                         },
                                         Ok(pid) => {
+                                            close(stdout);
+                                            close(stderr);
                                             if pgid == 0 {
                                                 pgid = pid;
                                                 if foreground && !shell.is_library {
@@ -866,6 +872,8 @@ pub(crate) fn pipe(
                                             exit(ret)
                                         },
                                         Ok(pid) => {
+                                            close(stdout);
+                                            close(stderr);
                                             if pgid == 0 {
                                                 pgid = pid;
                                                 if foreground && !shell.is_library {
@@ -901,6 +909,7 @@ pub(crate) fn pipe(
                                             exit(ret);
                                         }
                                         Ok(pid) => {
+                                            close(stdout);
                                             if pgid == 0 {
                                                 pgid = pid;
                                                 if foreground && !shell.is_library {
@@ -936,6 +945,8 @@ pub(crate) fn pipe(
                                             exit(ret);
                                         },
                                         Ok(pid) => {
+                                            close(stdout);
+                                            close(stderr);
                                             if pgid == 0 {
                                                 pgid = pid;
                                                 if foreground && !shell.is_library {
@@ -954,6 +965,15 @@ pub(crate) fn pipe(
 
                     // Append other jobs until all piped jobs are running
                     while let Some((mut child, ckind)) = commands.next() {
+                        // If parent is a RefindJob::External, then we need to keep track of the
+                        // output pipes, so we can properly close them after the job has been
+                        // spawned.
+                        let is_external = if let RefinedJob::External(..) = parent {
+                            true
+                        } else {
+                            false
+                        };
+
                         // If we need to tee both stdout and stderr, we directly connect pipes to
                         // the relevant sources in both of them.
                         if let RefinedJob::Tee {
@@ -965,6 +985,9 @@ pub(crate) fn pipe(
                                 Ok((out_reader, out_writer)) => {
                                     (*tee_out).source = Some(unsafe { File::from_raw_fd(out_reader) });
                                     parent.stdout(unsafe { File::from_raw_fd(out_writer) });
+                                    if is_external {
+                                        ext_stdio.get_or_insert(vec![]).push(out_writer);
+                                    }
                                 }
                             }
                             match sys::pipe2(sys::O_CLOEXEC) {
@@ -972,6 +995,9 @@ pub(crate) fn pipe(
                                 Ok((err_reader, err_writer)) => {
                                     (*tee_err).source = Some(unsafe { File::from_raw_fd(err_reader) });
                                     parent.stderr(unsafe { File::from_raw_fd(err_writer) });
+                                    if is_external {
+                                        ext_stdio.get_or_insert(vec![]).push(err_writer);
+                                    }
                                 }
                             }
                         } else {
@@ -980,6 +1006,9 @@ pub(crate) fn pipe(
                                     eprintln!("ion: failed to create pipe: {:?}", e);
                                 }
                                 Ok((reader, writer)) => {
+                                    if is_external {
+                                        ext_stdio.get_or_insert(vec![]).push(writer);
+                                    }
                                     child.stdin(unsafe { File::from_raw_fd(reader) });
                                     match mode {
                                         RedirectFrom::Stderr => {
@@ -1009,6 +1038,13 @@ pub(crate) fn pipe(
                         }
                         spawn_proc!(parent);
                         remember.push(parent);
+                        if let Some(fds) = ext_stdio.take() {
+                            for fd in fds {
+                                if let Err(e) = sys::close(fd) {
+                                    eprintln!("ion: failed to close file '{:?}': {}", fd, e);
+                                }
+                            }
+                        }
                         if let JobKind::Pipe(m) = ckind {
                             parent = child;
                             mode = m;
