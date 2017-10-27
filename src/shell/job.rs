@@ -85,8 +85,8 @@ pub(crate) enum RefinedJob {
     /// Represents redirection into stdin from more than one source
     Cat {
         sources: Vec<File>,
-        stdin: Option<File>,
-        stdout: Option<File>,
+        stdin:   Option<File>,
+        stdout:  Option<File>,
     },
     Tee {
         /// 0 for stdout, 1 for stderr
@@ -105,28 +105,32 @@ pub struct TeeItem {
 }
 
 impl TeeItem {
-    /// Writes out to all destinations of a Tee. Takes an extra `RedirectFrom` argument in order to
-    /// handle piping. `RedirectFrom` paradoxically indicates where we are piping **to**. It should
+    /// Writes out to all destinations of a Tee. Takes an extra `RedirectFrom` argument in
+    /// order to
+    /// handle piping. `RedirectFrom` paradoxically indicates where we are piping **to**. It
+    /// should
     /// never be `RedirectFrom`::Both`
     pub(crate) fn write_to_all(&mut self, extra: Option<RedirectFrom>) -> ::std::io::Result<()> {
-        use ::std::io::{self, Write, Read};
-        use ::std::os::unix::io::*;
-        fn write_out<R>(source: &mut R, sinks: &mut [File])
-            -> io::Result<()>
-        where
-            R: Read
+        use std::io::{self, Read, Write};
+        use std::os::unix::io::*;
+        fn write_out<R>(source: &mut R, sinks: &mut [File]) -> io::Result<()>
+            where R: Read
         {
             let mut buf = [0; 4096];
             loop {
                 // TODO: Figure out how to not block on this read
                 let len = source.read(&mut buf)?;
-                if len == 0 { return Ok(()); }
+                if len == 0 {
+                    return Ok(());
+                }
                 for file in sinks.iter_mut() {
                     let mut total = 0;
                     loop {
                         let wrote = file.write(&buf[total..len])?;
                         total += wrote;
-                        if total == len { break; }
+                        if total == len {
+                            break;
+                        }
                     }
                 }
             }
@@ -134,14 +138,16 @@ impl TeeItem {
         let stdout = io::stdout();
         let stderr = io::stderr();
         match extra {
-            None => {},
+            None => {}
             Some(RedirectFrom::Stdout) => unsafe {
                 self.sinks.push(File::from_raw_fd(stdout.as_raw_fd()))
             },
             Some(RedirectFrom::Stderr) => unsafe {
                 self.sinks.push(File::from_raw_fd(stderr.as_raw_fd()))
             },
-            Some(RedirectFrom::Both) => panic!("logic error! extra should never be RedirectFrom::Both"),
+            Some(RedirectFrom::Both) => {
+                panic!("logic error! extra should never be RedirectFrom::Both")
+            }
         };
         if let Some(ref mut file) = self.source {
             write_out(file, &mut self.sinks)
@@ -201,8 +207,8 @@ impl RefinedJob {
 
     pub(crate) fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
         RefinedJob::Tee {
-            items: (tee_out, tee_err),
-            stdin: None,
+            items:  (tee_out, tee_err),
+            stdin:  None,
             stdout: None,
             stderr: None,
         }
@@ -266,9 +272,7 @@ impl RefinedJob {
                 format!("{}", args.join(" "))
             }
             // TODO: Figure out real printing
-            RefinedJob::Cat { .. } | RefinedJob::Tee { .. } => {
-                "".into()
-            }
+            RefinedJob::Cat { .. } | RefinedJob::Tee { .. } => "".into(),
         }
     }
 }
