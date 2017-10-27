@@ -38,9 +38,9 @@ pub(crate) struct Pipeline {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct PipeItem {
-    pub job: Job,
+    pub job:     Job,
     pub outputs: Vec<Redirection>,
-    pub inputs: Vec<Input>,
+    pub inputs:  Vec<Input>,
 }
 
 impl PipeItem {
@@ -57,10 +57,12 @@ impl PipeItem {
 
         for input in self.inputs.iter_mut() {
             *input = match input {
-                &mut Input::File(ref s) =>
-                    Input::File(expand_string(s, expanders, false).join(" ")),
-                &mut Input::HereString(ref s) =>
-                    Input::HereString(expand_string(s, expanders, true).join(" ")),
+                &mut Input::File(ref s) => {
+                    Input::File(expand_string(s, expanders, false).join(" "))
+                }
+                &mut Input::HereString(ref s) => {
+                    Input::HereString(expand_string(s, expanders, true).join(" "))
+                }
             };
         }
 
@@ -71,11 +73,7 @@ impl PipeItem {
 }
 
 impl Pipeline {
-    pub(crate) fn new() -> Self {
-        Pipeline {
-            items: Vec::new(),
-        }
-    }
+    pub(crate) fn new() -> Self { Pipeline { items: Vec::new() } }
 
     pub(crate) fn expand<E: Expander>(&mut self, expanders: &E) {
         self.items.iter_mut().for_each(|i| i.expand(expanders));
@@ -102,11 +100,11 @@ impl fmt::Display for Pipeline {
                     &Input::File(ref file) => {
                         tokens.push("<".into());
                         tokens.push(file.clone());
-                    },
+                    }
                     &Input::HereString(ref string) => {
                         tokens.push("<<<".into());
                         tokens.push(string.clone());
-                    },
+                    }
                 }
             }
             for output in outputs {

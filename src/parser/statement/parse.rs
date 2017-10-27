@@ -170,8 +170,8 @@ pub(crate) fn parse(code: &str) -> Statement {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use self::pipelines::PipeItem;
+    use super::*;
     use parser::assignments::{KeyBuf, Primitive};
     use shell::{Job, JobKind};
     use shell::flow_control::Statement;
@@ -182,20 +182,22 @@ mod tests {
         let parsed_if = parse("if test 1 -eq 2");
         let correct_parse = Statement::If {
             expression: Pipeline {
-                items: vec![PipeItem {
-                    job: Job::new(
-                        vec![
-                            "test".to_owned(),
-                            "1".to_owned(),
-                            "-eq".to_owned(),
-                            "2".to_owned(),
-                        ].into_iter()
-                            .collect(),
-                        JobKind::Last,
-                    ),
-                    outputs: Vec::new(),
-                    inputs: Vec::new(),
-                }],
+                items: vec![
+                    PipeItem {
+                        job:     Job::new(
+                            vec![
+                                "test".to_owned(),
+                                "1".to_owned(),
+                                "-eq".to_owned(),
+                                "2".to_owned(),
+                            ].into_iter()
+                                .collect(),
+                            JobKind::Last,
+                        ),
+                        outputs: Vec::new(),
+                        inputs:  Vec::new(),
+                    },
+                ],
             },
             success:    vec![],
             else_if:    vec![],

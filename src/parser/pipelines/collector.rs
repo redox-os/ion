@@ -315,7 +315,9 @@ impl<'a> Collector<'a> {
                     try_redir_out!(RedirectFrom::Stdout);
                 }
                 b'<' => {
-                    if let None = inputs { inputs = Some(Vec::new()); }
+                    if let None = inputs {
+                        inputs = Some(Vec::new());
+                    }
                     bytes.next();
                     if Some(b'<') == self.peek(i + 1) {
                         if Some(b'<') == self.peek(i + 2) {
@@ -343,8 +345,9 @@ impl<'a> Collector<'a> {
                             };
                             let heredoc = heredoc.lines().collect::<Vec<&str>>();
                             // Then collect the heredoc from standard input.
-                            inputs.as_mut().map(|x|
-                                x.push(Input::HereString(heredoc[1..heredoc.len() - 1].join("\n"))));
+                            inputs.as_mut().map(|x| {
+                                x.push(Input::HereString(heredoc[1..heredoc.len() - 1].join("\n")))
+                            });
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
                         // Otherwise interpret it as stdin redirection
@@ -387,11 +390,13 @@ mod tests {
             assert_eq!("--abbrev-ref", pipeline.items[0].job.args[2]);
             assert_eq!("HEAD", pipeline.items[0].job.args[3]);
 
-            let expected = vec![Redirection {
-                from:   RedirectFrom::Stderr,
-                file:   "/dev/null".to_owned(),
-                append: false,
-            }];
+            let expected = vec![
+                Redirection {
+                    from:   RedirectFrom::Stderr,
+                    file:   "/dev/null".to_owned(),
+                    append: false,
+                },
+            ];
 
             assert_eq!(expected, pipeline.items[0].outputs);
         } else {
@@ -749,37 +754,39 @@ mod tests {
     // the input redirection shoud be associated with.
     fn multiple_redirect() {
         let input = "cat < file1 <<< \"herestring\" | tr 'x' 'y' ^>> err &> both > out";
-        let expected = Pipeline { items: vec![
-            PipeItem {
-                job: Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
-                inputs: vec![
-                    Input::File("file1".into()),
-                    Input::HereString("\"herestring\"".into()),
-                ],
-                outputs: Vec::new(),
-            },
-            PipeItem {
-                job: Job::new(array!["tr","'x'","'y'"], JobKind::Last),
-                inputs: Vec::new(),
-                outputs: vec![
-                    Redirection {
-                        from: RedirectFrom::Stderr,
-                        file: "err".into(),
-                        append: true,
-                    },
-                    Redirection {
-                        from: RedirectFrom::Both,
-                        file: "both".into(),
-                        append: false,
-                    },
-                    Redirection {
-                        from: RedirectFrom::Stdout,
-                        file: "out".into(),
-                        append: false,
-                    },
-                ]
-            }
-        ]};
+        let expected = Pipeline {
+            items: vec![
+                PipeItem {
+                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs:  vec![
+                        Input::File("file1".into()),
+                        Input::HereString("\"herestring\"".into()),
+                    ],
+                    outputs: Vec::new(),
+                },
+                PipeItem {
+                    job:     Job::new(array!["tr", "'x'", "'y'"], JobKind::Last),
+                    inputs:  Vec::new(),
+                    outputs: vec![
+                        Redirection {
+                            from:   RedirectFrom::Stderr,
+                            file:   "err".into(),
+                            append: true,
+                        },
+                        Redirection {
+                            from:   RedirectFrom::Both,
+                            file:   "both".into(),
+                            append: false,
+                        },
+                        Redirection {
+                            from:   RedirectFrom::Stdout,
+                            file:   "out".into(),
+                            append: false,
+                        },
+                    ],
+                },
+            ],
+        };
         assert_eq!(parse(input), Statement::Pipeline(expected));
     }
 
@@ -788,27 +795,31 @@ mod tests {
     // the input redirection shoud be associated with.
     fn pipeline_with_redirection_append_stderr() {
         let input = "cat | echo hello | cat < stuff ^>> other";
-        let expected = Pipeline { items: vec![
-            PipeItem {
-                job: Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
-                inputs: Vec::new(),
-                outputs: Vec::new(),
-            },
-            PipeItem {
-                job: Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
-                inputs: Vec::new(),
-                outputs: Vec::new(),
-            },
-            PipeItem {
-                job: Job::new(array!["cat"], JobKind::Last),
-                inputs: vec![Input::File("stuff".into())],
-                outputs: vec![Redirection {
-                    from:   RedirectFrom::Stderr,
-                    file:   "other".into(),
-                    append: true,
-                }],
-            },
-        ]};
+        let expected = Pipeline {
+            items: vec![
+                PipeItem {
+                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs:  Vec::new(),
+                    outputs: Vec::new(),
+                },
+                PipeItem {
+                    job:     Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs:  Vec::new(),
+                    outputs: Vec::new(),
+                },
+                PipeItem {
+                    job:     Job::new(array!["cat"], JobKind::Last),
+                    inputs:  vec![Input::File("stuff".into())],
+                    outputs: vec![
+                        Redirection {
+                            from:   RedirectFrom::Stderr,
+                            file:   "other".into(),
+                            append: true,
+                        },
+                    ],
+                },
+            ],
+        };
         assert_eq!(parse(input), Statement::Pipeline(expected));
     }
 
@@ -817,27 +828,31 @@ mod tests {
     // the input redirection shoud be associated with.
     fn pipeline_with_redirection_append_both() {
         let input = "cat | echo hello | cat < stuff &>> other";
-        let expected = Pipeline { items: vec![
-            PipeItem {
-                job: Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
-                inputs: Vec::new(),
-                outputs: Vec::new(),
-            },
-            PipeItem {
-                job: Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
-                inputs: Vec::new(),
-                outputs: Vec::new(),
-            },
-            PipeItem {
-                job: Job::new(array!["cat"], JobKind::Last),
-                inputs: vec![Input::File("stuff".into())],
-                outputs: vec![Redirection {
-                    from:   RedirectFrom::Both,
-                    file:   "other".into(),
-                    append: true,
-                }],
-            },
-        ]};
+        let expected = Pipeline {
+            items: vec![
+                PipeItem {
+                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs:  Vec::new(),
+                    outputs: Vec::new(),
+                },
+                PipeItem {
+                    job:     Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs:  Vec::new(),
+                    outputs: Vec::new(),
+                },
+                PipeItem {
+                    job:     Job::new(array!["cat"], JobKind::Last),
+                    inputs:  vec![Input::File("stuff".into())],
+                    outputs: vec![
+                        Redirection {
+                            from:   RedirectFrom::Both,
+                            file:   "other".into(),
+                            append: true,
+                        },
+                    ],
+                },
+            ],
+        };
         assert_eq!(parse(input), Statement::Pipeline(expected));
     }
 
@@ -880,11 +895,13 @@ mod tests {
     fn herestring() {
         let input = "calc <<< $(cat math.txt)";
         let expected = Pipeline {
-            items: vec![PipeItem {
-                job: Job::new(array!["calc"], JobKind::Last),
-                inputs: vec![Input::HereString("$(cat math.txt)".into())],
-                outputs: vec![],
-            }]
+            items: vec![
+                PipeItem {
+                    job:     Job::new(array!["calc"], JobKind::Last),
+                    inputs:  vec![Input::HereString("$(cat math.txt)".into())],
+                    outputs: vec![],
+                },
+            ],
         };
         assert_eq!(Statement::Pipeline(expected), parse(input));
     }
@@ -893,11 +910,13 @@ mod tests {
     fn heredoc() {
         let input = "calc << EOF\n1 + 2\n3 + 4\nEOF";
         let expected = Pipeline {
-                items: vec![PipeItem {
-                    job: Job::new(array!["calc"], JobKind::Last),
-                    inputs: vec![Input::HereString("1 + 2\n3 + 4".into())],
+            items: vec![
+                PipeItem {
+                    job:     Job::new(array!["calc"], JobKind::Last),
+                    inputs:  vec![Input::HereString("1 + 2\n3 + 4".into())],
                     outputs: vec![],
-                }]
+                },
+            ],
         };
         assert_eq!(Statement::Pipeline(expected), parse(input));
     }
@@ -907,22 +926,26 @@ mod tests {
     // the input redirection shoud be associated with.
     fn piped_herestring() {
         let input = "cat | tr 'o' 'x' <<< $VAR > out.log";
-        let expected = Pipeline { items: vec![
-            PipeItem {
-                job: Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
-                inputs: Vec::new(),
-                outputs: Vec::new(),
-            },
-            PipeItem {
-            job: Job::new(array!["tr", "'o'", "'x'"], JobKind::Last),
-                inputs:  vec![Input::HereString("$VAR".into())],
-                outputs: vec![Redirection {
-                    from:   RedirectFrom::Stdout,
-                    file:   "out.log".into(),
-                    append: false,
-                }],
-            }
-        ]};
+        let expected = Pipeline {
+            items: vec![
+                PipeItem {
+                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs:  Vec::new(),
+                    outputs: Vec::new(),
+                },
+                PipeItem {
+                    job:     Job::new(array!["tr", "'o'", "'x'"], JobKind::Last),
+                    inputs:  vec![Input::HereString("$VAR".into())],
+                    outputs: vec![
+                        Redirection {
+                            from:   RedirectFrom::Stdout,
+                            file:   "out.log".into(),
+                            append: false,
+                        },
+                    ],
+                },
+            ],
+        };
         assert_eq!(Statement::Pipeline(expected), parse(input));
     }
 
@@ -946,14 +969,16 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job: Job::new(array!["echo", "zardoz"], JobKind::Last),
-                    inputs: Vec::new(),
-                    outputs: vec![Redirection {
-                        from: RedirectFrom::Stdout,
-                        file: "foo\\'bar".into(),
-                        append: true,
-                    }],
-                }
+                    job:     Job::new(array!["echo", "zardoz"], JobKind::Last),
+                    inputs:  Vec::new(),
+                    outputs: vec![
+                        Redirection {
+                            from:   RedirectFrom::Stdout,
+                            file:   "foo\\'bar".into(),
+                            append: true,
+                        },
+                    ],
+                },
             ],
         };
         assert_eq!(parse(input), Statement::Pipeline(expected));
