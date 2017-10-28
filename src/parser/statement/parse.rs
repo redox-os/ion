@@ -1,8 +1,9 @@
 use super::case;
 use super::functions::{collect_arguments, parse_function};
 use super::super::{pipelines, ArgumentSplitter};
+use super::super::assignments::{split_assignment, Operator};
 use super::super::pipelines::Pipeline;
-use shell::flow_control::{Case, ElseIf, Statement};
+use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};
 use std::char;
 
 fn collect<F>(arguments: &str, statement: F) -> Statement
@@ -29,12 +30,72 @@ pub(crate) fn parse(code: &str) -> Statement {
             eprintln!("ion: syntax error: incomplete control flow statement");
             return Statement::Default;
         }
+        "let" => {
+            return Statement::Let(LocalAction::List);
+        }
         _ if cmd.starts_with("let ") => {
-            return Statement::Let {
-                expression: cmd[4..].trim_left().into(),
+            // Split the let expression and ensure that the statement is valid.
+            let (keys, op, vals) = split_assignment(cmd[4..].trim_left());
+            let (keys, op, values) = match vals {
+                Some(vals) => {
+                    // If the values exist, then the keys and operator also exists.
+                    (keys.unwrap().into(), op.unwrap(), vals.into())
+                }
+                None => {
+                    if op.is_none() {
+                        eprintln!("ion: assignment error: no operator supplied.");
+                    } else {
+                        eprintln!("ion: assignment error: no values supplied.")
+                    }
+                    return Statement::Default;
+                }
+            };
+
+            // After also ensuring the the operator is a valid operator, create the let statement.
+            match Operator::parse(op) {
+                Ok(operator) => {
+                    return Statement::Let(LocalAction::Assign(keys, operator, values));
+                }
+                Err(why) => {
+                    eprintln!("ion: assignment error: {}", why);
+                    return Statement::Default;
+                }
             }
         }
-        _ if cmd.starts_with("export ") => return Statement::Export(cmd[7..].trim_left().into()),
+        "export" => {
+            return Statement::Export(ExportAction::List);
+        }
+        _ if cmd.starts_with("export ") => {
+            // Split the let expression and ensure that the statement is valid.
+            let (keys, op, vals) = split_assignment(cmd[7..].trim_left());
+            let (keys, op, values) = match vals {
+                Some(vals) => {
+                    // If the values exist, then the keys and operator also exists.
+                    (keys.unwrap().into(), op.unwrap(), vals.into())
+                }
+                None => {
+                    if keys.is_none() {
+                        eprintln!("ion: assignment error: no keys supplied.")
+                    } else if op.is_some() {
+                        eprintln!("ion: assignment error: no values supplied.")
+                    } else {
+                        return Statement::Export(ExportAction::LocalExport(keys.unwrap().into()));
+                    }
+                    return Statement::Default;
+                }
+            };
+
+            // After also ensuring the the operator is a valid operator, create the let statement.
+            match Operator::parse(op) {
+                Ok(operator) => {
+                    return Statement::Export(ExportAction::Assign(keys, operator, values));
+                }
+                Err(why) => {
+                    eprintln!("ion: assignment error: {}", why);
+                    return Statement::Default;
+                }
+            }
+        }
         _ if cmd.starts_with("if ") => {
             return collect(cmd[3..].trim_left(), |pipeline| {
                 Statement::If {

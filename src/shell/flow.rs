@@ -165,11 +165,11 @@ impl FlowLogic for Shell {
                 fn execute_final(shell: &mut Shell, statement: Statement) -> Condition {
                     match statement {
                         Statement::Error(number) => shell.previous_status = number,
-                        Statement::Let { expression } => {
-                            shell.previous_status = shell.local(&expression);
+                        Statement::Let(action) => {
+                            shell.previous_status = shell.local(action);
                         }
-                        Statement::Export(expression) => {
-                            shell.previous_status = shell.export(&expression);
+                        Statement::Export(action) => {
+                            shell.previous_status = shell.export(action);
                         }
                         Statement::While {
                             expression,
@@ -377,11 +377,11 @@ impl FlowLogic for Shell {
     {
         match statement {
             Statement::Error(number) => self.previous_status = number,
-            Statement::Let { expression } => {
-                self.previous_status = self.local(&expression);
+            Statement::Let(action) => {
+                self.previous_status = self.local(action);
             }
-            Statement::Export(expression) => {
-                self.previous_status = self.export(&expression);
+            Statement::Export(action) => {
+                self.previous_status = self.export(action);
             }
             Statement::While {
                 expression,
@@ -620,11 +620,11 @@ impl FlowLogic for Shell {
         match statement {
             Statement::Error(number) => self.previous_status = number,
             // Execute a Let Statement
-            Statement::Let { expression } => {
-                self.previous_status = self.local(&expression);
+            Statement::Let(action) => {
+                self.previous_status = self.local(action);
             }
-            Statement::Export(expression) => {
-                self.previous_status = self.export(&expression);
+            Statement::Export(action) => {
+                self.previous_status = self.export(action);
             }
             // Collect the statements for the while loop, and if the loop is complete,
             // execute the while loop with the provided expression.

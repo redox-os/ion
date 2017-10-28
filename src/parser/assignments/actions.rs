@@ -5,9 +5,6 @@ use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum AssignmentError<'a> {
-    NoKeys,
-    NoOperator,
-    NoValues,
     InvalidOperator(&'a str),
     InvalidValue(Primitive, Primitive),
     TypeError(TypeError<'a>),
@@ -16,9 +13,6 @@ pub(crate) enum AssignmentError<'a> {
 impl<'a> Display for AssignmentError<'a> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
-            AssignmentError::NoKeys => write!(f, "no keys supplied"),
-            AssignmentError::NoOperator => write!(f, "no operator supplied"),
-            AssignmentError::NoValues => write!(f, "no values supplied"),
             AssignmentError::InvalidOperator(op) => write!(f, "invalid operator supplied: {}", op),
             AssignmentError::InvalidValue(expected, actual) => {
                 write!(f, "expected {}, but received {}", expected, actual)
@@ -42,15 +36,14 @@ pub(crate) struct AssignmentActions<'a> {
 }
 
 impl<'a> AssignmentActions<'a> {
-    pub(crate) fn new(data: &'a str) -> Result<AssignmentActions<'a>, AssignmentError<'a>> {
-        let (keys, op, vals) = split_assignment(data);
-        Ok(AssignmentActions {
-            keys:     keys.map(KeyIterator::new).ok_or(AssignmentError::NoKeys)?,
-            operator: Operator::parse(op.ok_or(AssignmentError::NoOperator)?)?,
-            values:   vals.map(ArgumentSplitter::new).ok_or(AssignmentError::NoValues)?,
-            prevkey:  "",
-            prevval:  "",
-        })
+    pub(crate) fn new(keys: &'a str, operator: Operator, values: &'a str) -> AssignmentActions<'a> {
+        AssignmentActions {
+            keys: KeyIterator::new(keys),
+            operator,
+            values: ArgumentSplitter::new(values),
+            prevkey: "",
+            prevval: "",
+        }
     }
 }
 

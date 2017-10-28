@@ -40,12 +40,25 @@ pub(crate) struct Case {
     pub statements:  Vec<Statement>,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum LocalAction {
+    List,
+    Assign(String, Operator, String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum ExportAction {
+    List,
+    LocalExport(String),
+    Assign(String, Operator, String),
+}
+
 // TODO: Enable statements and expressions to contain &str values.
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Statement {
-    Let { expression: String },
+    Let(LocalAction),
     Case(Case),
-    Export(String),
+    Export(ExportAction),
     If {
         expression: Pipeline,
         success:    Vec<Statement>,
