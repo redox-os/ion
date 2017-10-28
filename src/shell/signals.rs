@@ -3,7 +3,7 @@
 //! forked
 //! children of the shell.
 
-use std::sync::atomic::{AtomicU8, ATOMIC_U8_INIT};
+use std::sync::atomic::{ATOMIC_U8_INIT, AtomicU8};
 
 use sys;
 

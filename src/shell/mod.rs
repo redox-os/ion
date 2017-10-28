@@ -45,8 +45,8 @@ use std::process;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
-use types::*;
 use sys;
+use types::*;
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
 /// the entirety of the
@@ -143,7 +143,7 @@ impl<'a> Shell {
             signals::SIGINT => Some(sys::SIGINT),
             signals::SIGHUP => Some(sys::SIGHUP),
             signals::SIGTERM => Some(sys::SIGTERM),
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 

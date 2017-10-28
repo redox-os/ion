@@ -52,10 +52,10 @@ use std::sync::atomic::Ordering;
 
 extern "C" fn handler(signal: i32) {
     let signal = match signal {
-        sys::SIGINT  => signals::SIGINT,
-        sys::SIGHUP  => signals::SIGHUP,
+        sys::SIGINT => signals::SIGINT,
+        sys::SIGHUP => signals::SIGHUP,
         sys::SIGTERM => signals::SIGTERM,
-        _ => unreachable!()
+        _ => unreachable!(),
     };
 
     signals::PENDING.store(signal, Ordering::SeqCst);

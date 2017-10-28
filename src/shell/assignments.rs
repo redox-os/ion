@@ -1,10 +1,13 @@
-use std::env;
-use std::io::{self, Write};
-
 use super::Shell;
 use super::status::*;
 use parser::assignments::*;
 use shell::history::ShellHistory;
+use std::borrow::Cow;
+use std::env;
+use std::ffi::OsStr;
+use std::fmt::{self, Display};
+use std::io::{self, Write};
+use std::os::unix::ffi::OsStrExt;
 use types::{ArrayVariableContext, VariableContext};
 
 fn print_vars(list: &VariableContext) {
@@ -91,8 +94,13 @@ impl VariableStore for Shell {
 
                             match value_check(self, &expression, key.kind) {
                                 Ok(ReturnValue::Str(value)) => {
-                                    if !integer_math(self, key, operator, &value) {
-                                        return FAILURE;
+                                    let lhs = self.variables.get_var_or_empty(&key.name);
+                                    match math(&lhs, key.kind, operator, &value) {
+                                        Ok(value) => self.variables.set_var(&key.name, &value),
+                                        Err(why) => {
+                                            eprintln!("ion: assignment error: {}", why);
+                                            return FAILURE;
+                                        }
                                     }
                                 }
                                 Err(why) => {
@@ -147,8 +155,16 @@ impl VariableStore for Shell {
                     Ok(Action::UpdateString(key, operator, expression)) => {
                         match value_check(self, &expression, key.kind) {
                             Ok(ReturnValue::Str(value)) => {
-                                if !integer_math_export(&self, key, operator, &value) {
-                                    return FAILURE;
+                                let lhs = self.variables.get_var_or_empty(&key.name);
+                                match math(&lhs, key.kind, operator, &value) {
+                                    Ok(value) => {
+                                        let value = OsStr::from_bytes(&value.as_bytes());
+                                        env::set_var(&key.name, &value)
+                                    }
+                                    Err(why) => {
+                                        eprintln!("ion: assignment error: {}", why);
+                                        return FAILURE;
+                                    }
                                 }
                             }
                             Err(why) => {
@@ -190,356 +206,85 @@ impl VariableStore for Shell {
     }
 }
 
-// NOTE: Here there be excessively long functions.
+enum MathError {
+    RHS,
+    LHS,
+    Unsupported,
+}
 
-fn integer_math(shell: &mut Shell, key: Key, operator: Operator, value: &str) -> bool {
-    match operator {
-        Operator::Add => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
-                Ok(lhs) => match value.parse::<f64>() {
-                    Ok(rhs) => {
-                        let value = (lhs + rhs).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else if let Primitive::Integer = key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<i64>() {
-                    Ok(rhs) => {
-                        let value = (lhs + rhs).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
-        },
-        Operator::Divide => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
-                Ok(lhs) => match value.parse::<f64>() {
-                    Ok(rhs) => {
-                        let value = (lhs / rhs).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else if let Primitive::Integer = key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<i64>() {
-                    Ok(rhs) => {
-                        let value = (lhs / rhs).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
-        },
-        Operator::IntegerDivide => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<i64>() {
-                    Ok(rhs) => {
-                        let value = (lhs / rhs).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
-        },
-        Operator::Subtract => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
-                Ok(lhs) => match value.parse::<f64>() {
-                    Ok(rhs) => {
-                        let value = (lhs - rhs).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else if let Primitive::Integer = key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<i64>() {
-                    Ok(rhs) => {
-                        let value = (lhs - rhs).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
-        },
-        Operator::Multiply => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
-                Ok(lhs) => match value.parse::<f64>() {
-                    Ok(rhs) => {
-                        let value = (lhs * rhs).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else if let Primitive::Integer = key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<i64>() {
-                    Ok(rhs) => {
-                        let value = (lhs * rhs).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
-        },
-        Operator::Exponent => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
-                Ok(lhs) => match value.parse::<f64>() {
-                    Ok(rhs) => {
-                        let value = (lhs.powf(rhs)).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else if let Primitive::Integer = key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<u32>() {
-                    Ok(rhs) => {
-                        let value = (lhs.pow(rhs)).to_string();
-                        shell.variables.set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
-        },
-        Operator::Equal => {
-            shell.variables.set_var(key.name, &value);
-            true
+impl Display for MathError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            MathError::RHS => write!(fmt, "right hand side has invalid type"),
+            MathError::LHS => write!(fmt, "left hand side has invalid type"),
+            MathError::Unsupported => write!(fmt, "type does not support operation"),
         }
     }
 }
 
-fn integer_math_export(shell: &Shell, key: Key, operator: Operator, value: &str) -> bool {
-    match operator {
-        Operator::Add => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
-                Ok(lhs) => match value.parse::<f64>() {
-                    Ok(rhs) => {
-                        let value = (lhs + rhs).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else if let Primitive::Integer = key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<i64>() {
-                    Ok(rhs) => {
-                        let value = (lhs + rhs).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
+fn parse_f64<F: Fn(f64, f64) -> f64>(lhs: &str, rhs: &str, operation: F) -> Result<f64, MathError> {
+    lhs.parse::<f64>().map_err(|_| MathError::LHS).and_then(
+        |lhs| rhs.parse::<f64>().map_err(|_| MathError::RHS).map(|rhs| operation(lhs, rhs)),
+    )
+}
+
+fn parse_i64<F: Fn(i64, i64) -> i64>(lhs: &str, rhs: &str, operation: F) -> Result<i64, MathError> {
+    lhs.parse::<i64>().map_err(|_| MathError::LHS).and_then(
+        |lhs| rhs.parse::<i64>().map_err(|_| MathError::RHS).map(|rhs| operation(lhs, rhs)),
+    )
+}
+
+fn math<'a>(
+    lhs: &str,
+    key: Primitive,
+    operator: Operator,
+    value: &'a str,
+) -> Result<Cow<'a, str>, MathError> {
+    let value: String = match operator {
+        Operator::Add => if Primitive::Any == key || Primitive::Float == key {
+            parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?.to_string()
+        } else if let Primitive::Integer = key {
+            parse_i64(lhs, value, |lhs, rhs| lhs + rhs)?.to_string()
         } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
+            return Err(MathError::Unsupported);
         },
-        Operator::Divide => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
-                Ok(lhs) => match value.parse::<f64>() {
-                    Ok(rhs) => {
-                        let value = (lhs / rhs).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
+        Operator::Divide => {
+            if Primitive::Any == key || Primitive::Float == key || Primitive::Integer == key {
+                parse_f64(lhs, value, |lhs, rhs| lhs / rhs)?.to_string()
+            } else {
+                return Err(MathError::Unsupported);
             }
-            return false;
-        } else if let Primitive::Integer = key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<i64>() {
-                    Ok(rhs) => {
-                        let value = (lhs / rhs).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
+        }
+        Operator::IntegerDivide => if Primitive::Any == key || Primitive::Float == key {
+            parse_i64(lhs, value, |lhs, rhs| lhs / rhs)?.to_string()
         } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
+            return Err(MathError::Unsupported);
         },
-        Operator::IntegerDivide => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<i64>() {
-                    Ok(rhs) => {
-                        let value = (lhs / rhs).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
+        Operator::Subtract => if Primitive::Any == key || Primitive::Float == key {
+            parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?.to_string()
+        } else if let Primitive::Integer = key {
+            parse_i64(lhs, value, |lhs, rhs| lhs - rhs)?.to_string()
         } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
+            return Err(MathError::Unsupported);
         },
-        Operator::Subtract => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
-                Ok(lhs) => match value.parse::<f64>() {
-                    Ok(rhs) => {
-                        let value = (lhs - rhs).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else if let Primitive::Integer = key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<i64>() {
-                    Ok(rhs) => {
-                        let value = (lhs - rhs).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
+        Operator::Multiply => if Primitive::Any == key || Primitive::Float == key {
+            parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?.to_string()
+        } else if let Primitive::Integer = key {
+            parse_i64(lhs, value, |lhs, rhs| lhs * rhs)?.to_string()
         } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
+            return Err(MathError::Unsupported);
         },
-        Operator::Multiply => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
-                Ok(lhs) => match value.parse::<f64>() {
-                    Ok(rhs) => {
-                        let value = (lhs * rhs).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else if let Primitive::Integer = key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<i64>() {
-                    Ok(rhs) => {
-                        let value = (lhs * rhs).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
+        Operator::Exponent => if Primitive::Any == key || Primitive::Float == key {
+            parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?.to_string()
+        } else if let Primitive::Integer = key {
+            parse_i64(lhs, value, |lhs, rhs| lhs.pow(rhs as u32))?.to_string()
         } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
-        },
-        Operator::Exponent => if Primitive::Any == key.kind || Primitive::Float == key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<f64>() {
-                Ok(lhs) => match value.parse::<f64>() {
-                    Ok(rhs) => {
-                        let value = (lhs.powf(rhs)).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else if let Primitive::Integer = key.kind {
-            match shell.variables.get_var_or_empty(key.name).parse::<i64>() {
-                Ok(lhs) => match value.parse::<u32>() {
-                    Ok(rhs) => {
-                        let value = (lhs.pow(rhs)).to_string();
-                        env::set_var(key.name, &value);
-                        return true;
-                    }
-                    Err(_) => eprintln!("ion: right hand side has invalid value type"),
-                },
-                Err(_) => eprintln!("ion: variable has invalid value type"),
-            }
-            return false;
-        } else {
-            eprintln!("ion: variable does not support this operation");
-            return false;
+            return Err(MathError::Unsupported);
         },
         Operator::Equal => {
-            env::set_var(key.name, &value);
-            true
+            return Ok(Cow::Borrowed(value));
         }
-    }
+    };
+
+    Ok(Cow::Owned(value))
 }
