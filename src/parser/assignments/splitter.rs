@@ -19,7 +19,7 @@ pub(crate) fn split_assignment<'a>(
             start = read;
             read += 1;
             break;
-        } else if [b'+', b'-', b'/', b'*'].contains(&byte) {
+        } else if is_operator(byte) {
             start = read;
             read += 1;
             while let Some(byte) = bytes.next() {
@@ -47,6 +47,8 @@ pub(crate) fn split_assignment<'a>(
     let values = &statement[read..];
     (Some(keys), Some(operator), Some(values.trim()))
 }
+
+fn is_operator(byte: u8) -> bool { byte == b'+' || byte == b'-' || byte == b'*' || byte == b'/' }
 
 #[cfg(test)]
 mod tests {

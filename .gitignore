@@ -1,2 +1,5 @@
+.*
+cachegrind.*
+perf.*
 target
 manual/book

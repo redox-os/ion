@@ -1,11 +1,9 @@
 const DOUBLE: u8 = 1;
-const SINGLE: u8 = 2;
-const BACK: u8 = 4;
-const COMM_1: u8 = 8;
-const COMM_2: u8 = 16;
-const VARIAB: u8 = 32;
-const ARRAY: u8 = 64;
-const METHOD: u8 = 128;
+const COMM_1: u8 = 2;
+const COMM_2: u8 = 4;
+const VARIAB: u8 = 8;
+const ARRAY: u8 = 16;
+const METHOD: u8 = 32;
 
 /// An efficient `Iterator` structure for splitting arguments
 pub(crate) struct ArgumentSplitter<'a> {
@@ -24,54 +22,79 @@ impl<'a> ArgumentSplitter<'a> {
     }
 }
 
+impl<'a> ArgumentSplitter<'a> {
+    fn scan_singlequotes<B: Iterator<Item = u8>>(&mut self, bytes: &mut B) {
+        while let Some(character) = bytes.next() {
+            match character {
+                b'\\' => {
+                    self.read += 2;
+                    let _ = bytes.next();
+                    continue;
+                }
+                b'\'' => break,
+                _ => (),
+            }
+            self.read += 1;
+        }
+    }
+}
+
 impl<'a> Iterator for ArgumentSplitter<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<&'a str> {
-        while let Some(&b' ') = self.data.as_bytes().get(self.read) {
+        let data = self.data.as_bytes();
+        while let Some(&b' ') = data.get(self.read) {
             self.read += 1;
         }
         let start = self.read;
 
-        let (mut level, mut array_level, mut array_process_level) = (0, 0, 0);
-        for character in self.data.bytes().skip(self.read) {
+        let (mut level, mut alevel) = (0, 0);
+        let mut bytes = data.iter().cloned().skip(self.read);
+        while let Some(character) = bytes.next() {
             match character {
-                _ if self.flags & BACK != 0 => self.flags ^= BACK,
-                b'\\' => self.flags ^= BACK,
-                b'@' if self.flags & SINGLE == 0 => {
-                    self.flags &= 255 ^ COMM_1;
-                    self.flags |= COMM_2 + ARRAY;
+                // Skip the next byte.
+                b'\\' => {
+                    self.read += 2;
+                    let _ = bytes.next();
+                    continue;
+                }
+                // Disable COMM_1 and enable COMM_2 + ARRAY.
+                b'@' => {
+                    self.flags = (self.flags & (255 ^ COMM_1)) | (COMM_2 + ARRAY);
                     self.read += 1;
                     continue;
                 }
-                b'$' if self.flags & SINGLE == 0 => {
-                    self.flags &= 255 ^ COMM_2;
-                    self.flags |= COMM_1 + VARIAB;
+                // Disable COMM_2 and enable COMM_1 + VARIAB.
+                b'$' => {
+                    self.flags = (self.flags & (255 ^ COMM_2)) | (COMM_1 + VARIAB);
                     self.read += 1;
                     continue;
                 }
-                b'[' if self.flags & SINGLE == 0 && self.flags & COMM_2 != 0 => {
-                    array_process_level += 1
+                // Increment the array level
+                b'[' => alevel += 1,
+                // Decrement the array level
+                b']' => alevel -= 1,
+                // Increment the parenthesis level.
+                b'(' if self.flags & COMM_1 != 0 => level += 1,
+                // Disable VARIAB + ARRAY and enable METHOD.
+                b'(' if self.flags & (VARIAB + ARRAY) != 0 => {
+                    self.flags = (self.flags & (255 ^ (VARIAB + ARRAY))) | METHOD;
                 }
-                b'[' if self.flags & SINGLE == 0 => array_level += 1,
-                b']' if self.flags & SINGLE == 0 && array_level != 0 => array_level -= 1,
-                b']' if self.flags & SINGLE == 0 => array_process_level -= 1,
-                b'(' if self.flags & SINGLE == 0 && self.flags & COMM_1 != 0 => level += 1,
-                b'(' if self.flags & SINGLE == 0 && self.flags & (VARIAB + ARRAY) != 0 => {
-                    self.flags |= METHOD;
-                    self.flags &= 255 ^ (VARIAB + ARRAY);
+                // Disable METHOD if enabled.
+                b')' if self.flags & METHOD != 0 => self.flags ^= METHOD,
+                // Otherwise decrement the parenthesis level.
+                b')' => level -= 1,
+                // Toggle double quote rules.
+                b'"' => self.flags ^= DOUBLE,
+                // Loop through characters until single quote rules are completed.
+                b'\'' if self.flags & DOUBLE == 0 => {
+                    self.scan_singlequotes(&mut bytes);
+                    self.read += 2;
+                    continue;
                 }
-                b')' if self.flags & SINGLE == 0 && self.flags & METHOD != 0 => {
-                    self.flags &= 255 ^ METHOD;
-                }
-                b')' if self.flags & SINGLE == 0 => level -= 1,
-                b'"' if self.flags & SINGLE == 0 => self.flags ^= DOUBLE,
-                b'\'' if self.flags & DOUBLE == 0 => self.flags ^= SINGLE,
-                b' ' if self.flags & (SINGLE + DOUBLE + METHOD) == 0 && level == 0
-                    && array_level == 0 && array_process_level == 0 =>
-                {
-                    break
-                }
+                // Break from the loop once a root-level space is found.
+                b' ' if (self.flags & (DOUBLE + METHOD)) + level + alevel == 0 => break,
                 _ => (),
             }
             self.read += 1;
