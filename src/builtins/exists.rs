@@ -7,8 +7,6 @@ use std::fs;
 use std::io::{self, BufWriter};
 use std::os::unix::fs::PermissionsExt;
 
-#[cfg(test)]
-use builtins::Builtin;
 use shell::Shell;
 #[cfg(test)]
 use shell::flow_control::{Function, Statement};
@@ -216,8 +214,7 @@ fn function_is_defined(function: &str, shell: &Shell) -> bool {
 #[test]
 fn test_evaluate_arguments() {
     use parser::assignments::{KeyBuf, Primitive};
-    let builtins = Builtin::map();
-    let mut shell = Shell::new(&builtins);
+    let mut shell = Shell::new();
     let mut sink = BufWriter::new(io::sink());
 
     // assert_eq!(evaluate_arguments(&[], &mut sink, &shell), Ok(false));
@@ -319,8 +316,7 @@ fn test_evaluate_arguments() {
 
 #[test]
 fn test_match_flag_argument() {
-    let builtins = Builtin::map();
-    let shell = Shell::new(&builtins);
+    let shell = Shell::new();
 
     // we don't really care about the passed values, as long as both sited return the same value
     assert_eq!(match_flag_argument('a', "ARRAY", &shell), array_var_is_not_empty("ARRAY", &shell));
@@ -335,8 +331,7 @@ fn test_match_flag_argument() {
 
 #[test]
 fn test_match_option_argument() {
-    let builtins = Builtin::map();
-    let shell = Shell::new(&builtins);
+    let shell = Shell::new();
 
     // we don't really care about the passed values, as long as both sited return the same value
     assert_eq!(match_option_argument("fn", "FUN", &shell), array_var_is_not_empty("FUN", &shell));
@@ -359,8 +354,7 @@ fn test_path_is_directory() {
 
 #[test]
 fn test_binary_is_in_path() {
-    let builtins = Builtin::map();
-    let mut shell = Shell::new(&builtins);
+    let mut shell = Shell::new();
 
     // TODO: We should probably also test with more complex PATH-variables:
     // TODO: multiple/:directories/
@@ -391,8 +385,7 @@ fn test_string_is_nonzero() {
 
 #[test]
 fn test_array_var_is_not_empty() {
-    let builtins = Builtin::map();
-    let mut shell = Shell::new(&builtins);
+    let mut shell = Shell::new();
 
     shell.variables.set_array("EMPTY_ARRAY", SmallVec::from_vec(Vec::new()));
     assert_eq!(array_var_is_not_empty("EMPTY_ARRAY", &shell), false);
@@ -413,8 +406,7 @@ fn test_array_var_is_not_empty() {
 
 #[test]
 fn test_string_var_is_not_empty() {
-    let builtins = Builtin::map();
-    let mut shell = Shell::new(&builtins);
+    let mut shell = Shell::new();
 
     shell.variables.set_var("EMPTY", "");
     assert_eq!(string_var_is_not_empty("EMPTY", &shell), false);
@@ -436,8 +428,7 @@ fn test_string_var_is_not_empty() {
 #[test]
 fn test_function_is_defined() {
     use parser::assignments::{KeyBuf, Primitive};
-    let builtins = Builtin::map();
-    let mut shell = Shell::new(&builtins);
+    let mut shell = Shell::new();
 
     // create a simple dummy function
     let name_str = "test_function";

@@ -116,9 +116,15 @@ impl<'a> Action<'a> {
 mod tests {
     use super::*;
 
+    fn split(input: &str) -> (String, Operator, String) {
+        let (keys, op, vals) = split_assignment(input);
+        (keys.unwrap().into(), Operator::parse(op.unwrap()).unwrap(), vals.unwrap().into())
+    }
+
     #[test]
     fn assignment_actions() {
-        let actions = AssignmentActions::new("abc def = 123 456").unwrap().collect::<Vec<_>>();
+        let (keys, op, vals) = split("abc def = 123 456");
+        let actions = AssignmentActions::new(&keys, op, &vals).collect::<Vec<_>>();
         assert_eq!(actions.len(), 2);
         assert_eq!(
             actions[0],
@@ -143,7 +149,8 @@ mod tests {
             ),)
         );
 
-        let actions = AssignmentActions::new("ab:int *= 3").unwrap().collect::<Vec<_>>();
+        let (keys, op, vals) = split("ab:int *= 3");
+        let actions = AssignmentActions::new(&keys, op, &vals).collect::<Vec<_>>();
         assert_eq!(actions.len(), 1);
         assert_eq!(
             actions[0],
@@ -157,8 +164,8 @@ mod tests {
             ),)
         );
 
-        let actions = AssignmentActions::new("a b[] c:int[] = one [two three] [4 5 6]")
-            .unwrap()
+        let (keys, op, vals) = split("a b[] c:int[] = one [two three] [4 5 6]");
+        let actions = AssignmentActions::new(&keys, op, &vals)
             .collect::<Vec<_>>();
         assert_eq!(actions.len(), 3);
         assert_eq!(
@@ -195,8 +202,8 @@ mod tests {
             ),)
         );
 
-        let actions = AssignmentActions::new("a[] b c[] = [one two] three [four five]")
-            .unwrap()
+        let (keys, op, values) = split("a[] b c[] = [one two] three [four five]");
+        let actions = AssignmentActions::new(&keys, op, &values)
             .collect::<Vec<_>>();
         assert_eq!(actions.len(), 3);
         assert_eq!(
