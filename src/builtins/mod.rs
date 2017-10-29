@@ -21,7 +21,9 @@ use self::test::test;
 use self::variables::{alias, drop_alias, drop_array, drop_variable};
 
 use std::error::Error;
+use std::env;
 use std::io::{self, Write};
+use std::path::Path;
 
 use parser::QuoteTerminator;
 use shell::{self, FlowLogic, Shell, ShellHistory};
@@ -77,6 +79,7 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "ends-with" => ends_with :"Evaluates if the supplied argument ends with a given string",
     "contains" => contains : "Evaluates if the supplied argument contains a given string",
     "exists" => builtin_exists : "Performs tests on files and text",
+    "which" => builtin_which : "Shows the full path of commands",
     "ion-docs" => ion_docs : "Opens the Ion manual"
 );
 
@@ -370,5 +373,40 @@ fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
             let _ = writeln!(stderr, "{}", why);
             FAILURE
         }
+    }
+}
+
+fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
+    if args[1..].len() != 1 {
+        let stderr = io::stderr();
+        let mut stderr = stderr.lock();
+        let _ = stderr.write_all(b"which takes one argument\n");
+        return BAD_ARG;
+    }
+
+    let command = args[1];
+
+    if let Some(alias) = shell.variables.aliases.get(command) {
+        println!("{}: alias to {}", command, alias);
+        SUCCESS
+    } else if shell.builtins.contains_key(command) {
+        println!("{}: built-in shell command", command);
+        SUCCESS
+    } else if shell.functions.contains_key(command) {
+        println!("{}: function", command);
+        SUCCESS
+    } else {
+        for path in env::var("PATH").unwrap_or("/bin".to_string())
+                                    .split(sys::PATH_SEPARATOR) {
+            let executable = Path::new(path).join(command);
+            if executable.is_file() {
+                println!("{}", executable.display());
+                return SUCCESS;
+            }
+
+        }
+
+        println!("{} not found", command);
+        FAILURE
     }
 }
