@@ -686,6 +686,11 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                             self.read += 2;
                             return Some(self.braced_array_variable(&mut iterator));
                         }
+                        Some(b' ') | None => {
+                            self.read += 1;
+                            let output = &self.data[start..self.read];
+                            return Some(WordToken::Normal(output, glob, tilde));
+                        }
                         _ => {
                             self.read += 1;
                             return Some(self.array_variable(&mut iterator));
@@ -713,6 +718,11 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                             Some(b'{') => {
                                 self.read += 2;
                                 return Some(self.braced_variable(&mut iterator));
+                            }
+                            Some(b' ') | None => {
+                                self.read += 1;
+                                let output = &self.data[start..self.read];
+                                return Some(WordToken::Normal(output, glob, tilde));
                             }
                             _ => {
                                 self.read += 1;
@@ -781,6 +791,13 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde))
                 }
                 b'$' | b'@' if !self.flags.contains(SQUOTE) => {
+                    if let Some(&character) = self.data.as_bytes().get(self.read) {
+                        if character == b' ' {
+                            self.read += 1;
+                            let output = &self.data[start..self.read];
+                            return Some(WordToken::Normal(output, glob, tilde));
+                        }
+                    }
                     let output = &self.data[start..self.read];
                     if output != "" {
                         return Some(WordToken::Normal(output, glob, tilde));

@@ -2,8 +2,8 @@ mod collector;
 
 pub(crate) use self::collector::*;
 
-use super::{expand_string, Expander};
-use shell::{Job, JobKind};
+use super::expand_string;
+use shell::{Job, JobKind, Shell};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -52,22 +52,20 @@ impl PipeItem {
         }
     }
 
-    pub(crate) fn expand<E: Expander>(&mut self, expanders: &E) {
-        self.job.expand(expanders);
+    pub(crate) fn expand(&mut self, shell: &Shell) {
+        self.job.expand(shell);
 
         for input in self.inputs.iter_mut() {
             *input = match input {
-                &mut Input::File(ref s) => {
-                    Input::File(expand_string(s, expanders, false).join(" "))
-                }
+                &mut Input::File(ref s) => Input::File(expand_string(s, shell, false).join(" ")),
                 &mut Input::HereString(ref s) => {
-                    Input::HereString(expand_string(s, expanders, true).join(" "))
+                    Input::HereString(expand_string(s, shell, true).join(" "))
                 }
             };
         }
 
         for output in self.outputs.iter_mut() {
-            output.file = expand_string(output.file.as_str(), expanders, false).join(" ");
+            output.file = expand_string(output.file.as_str(), shell, false).join(" ");
         }
     }
 }
@@ -75,8 +73,8 @@ impl PipeItem {
 impl Pipeline {
     pub(crate) fn new() -> Self { Pipeline { items: Vec::new() } }
 
-    pub(crate) fn expand<E: Expander>(&mut self, expanders: &E) {
-        self.items.iter_mut().for_each(|i| i.expand(expanders));
+    pub(crate) fn expand(&mut self, shell: &Shell) {
+        self.items.iter_mut().for_each(|i| i.expand(shell));
     }
 
     pub(crate) fn requires_piping(&self) -> bool {

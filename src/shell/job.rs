@@ -3,9 +3,11 @@ use std::process::{Command, Stdio};
 
 // use glob::glob;
 
-use parser::{expand_string, Expander};
+use super::Shell;
+use parser::expand_string;
 use parser::pipelines::RedirectFrom;
 use smallstring::SmallString;
+use std::str;
 use types::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -36,18 +38,57 @@ impl Job {
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub(crate) fn expand<E: Expander>(&mut self, expanders: &E) {
+    pub(crate) fn expand(&mut self, shell: &Shell) {
         let mut expanded = Array::new();
         expanded.grow(self.args.len());
-        expanded.extend(self.args.drain().flat_map(|arg| {
-            let res = expand_string(&arg, expanders, false);
-            if res.is_empty() {
-                array![""]
-            } else {
-                res
-            }
+        expanded.extend(self.args.drain().flat_map(|arg| if arg == "!!" {
+            expand_last_command(shell, false)
+        } else if arg == "!$" {
+            expand_last_command(shell, true)
+        } else {
+            expand_arg(&arg, shell)
         }));
         self.args = expanded;
+    }
+}
+
+/// Expands the last command that was provided to the shell.
+///
+/// If `args_only` is set to `true`, then only the arguments of
+/// the last command will be expanded.
+fn expand_last_command(shell: &Shell, args_only: bool) -> Array {
+    // Strips the command from the supplied buffer.
+    fn get_args(buffer: &[u8]) -> &[u8] {
+        if let Some(pos) = buffer.iter().position(|&x| x == b' ') {
+            let buffer = &buffer[pos + 1..];
+            if let Some(pos) = buffer.iter().position(|&x| x != b' ') {
+                return &buffer[pos..];
+            }
+        }
+
+        &buffer
+    }
+
+    if let Some(ref context) = shell.context {
+        if let Some(buffer) = context.history.buffers.iter().last() {
+            let buffer = buffer.as_bytes();
+            let last_arg = unsafe {
+                str::from_utf8_unchecked(if args_only { get_args(&buffer) } else { &buffer })
+            };
+            return expand_arg(&last_arg, shell);
+        }
+    }
+
+    array![""]
+}
+
+/// Expands a given argument and returns it as an `Array`.
+fn expand_arg(arg: &str, shell: &Shell) -> Array {
+    let res = expand_string(&arg, shell, false);
+    if res.is_empty() {
+        array![""]
+    } else {
+        res
     }
 }
 
@@ -288,9 +329,10 @@ mod tests {
 
     #[test]
     fn preserve_empty_arg() {
+        let shell = Shell::new();
         let job = Job::new(array!("rename", "", "0", "a"), JobKind::Last);
         let mut expanded = job.clone();
-        expanded.expand(&Empty);
+        expanded.expand(&shell);
         assert_eq!(job, expanded);
     }
 

@@ -83,12 +83,7 @@ pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
 
 pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(syscall::close(fd)).and(Ok(())) }
 
-pub(crate) fn close_stdin()
-// fn close_stdin() // fn close_stdin() // fn close_stdin() // fn
-// close_stdin()
-{
-    syscall::close(STDIN_FILENO);
-}
+pub(crate) fn close_stdin() { syscall::close(STDIN_FILENO); }
 
 pub(crate) fn isatty(fd: RawFd) -> bool {
     if let Ok(tfd) = syscall::dup(fd, b"termios") {
@@ -106,16 +101,12 @@ fn cvt(result: Result<usize, syscall::Error>) -> io::Result<usize> {
 
 // TODO
 pub mod signals {
-    pub(crate) fn block() // fn block() // fn block() // fn block() // fn block()
-    {
-    }
+    pub(crate) fn block() {}
 
     /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
     /// controlled
     /// by the shell.
-    pub(crate) fn unblock() // fn unblock() // fn unblock() // fn unblock() // fn unblock()
-    {
-    }
+    pub(crate) fn unblock() {}
 }
 
 pub mod job_control {
