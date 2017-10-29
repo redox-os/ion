@@ -25,6 +25,7 @@ version_check = "0.1.3"
 
 [dependencies]
 bitflags = "0.9.1"
+calculate = "0.5"
 fnv = "1.0"
 glob = "0.2"
 lazy_static = "0.2"
@@ -37,9 +38,6 @@ unicode-segmentation = "1.2"
 
 [dependencies.app_dirs]
 git = "https://github.com/redox-os/app-dirs-rs.git"
-
-[dependencies.calculate]
-git = "https://github.com/redox-os/calc.git"
 
 [profile.release]
 panic = "abort"

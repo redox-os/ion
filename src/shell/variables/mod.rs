@@ -112,21 +112,20 @@ impl Variables {
     }
 
     pub fn set_var(&mut self, name: &str, value: &str) {
-        if name == "NS_PLUGINS" {
-            match value {
-                "0" => self.disable_plugins(),
-                "1" => self.enable_plugins(),
-                _ => {
-                    eprintln!("ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1.")
-                }
-            }
-            return;
-        }
-
         if !name.is_empty() {
             if value.is_empty() {
                 self.variables.remove(name);
             } else {
+                if name == "NS_PLUGINS" {
+                    match value {
+                        "0" => self.disable_plugins(),
+                        "1" => self.enable_plugins(),
+                        _ => eprintln!(
+                            "ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1."
+                        ),
+                    }
+                    return;
+                }
                 self.variables.insert(name.into(), value.into());
             }
         }

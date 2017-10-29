@@ -165,8 +165,7 @@ mod tests {
         );
 
         let (keys, op, vals) = split("a b[] c:int[] = one [two three] [4 5 6]");
-        let actions = AssignmentActions::new(&keys, op, &vals)
-            .collect::<Vec<_>>();
+        let actions = AssignmentActions::new(&keys, op, &vals).collect::<Vec<_>>();
         assert_eq!(actions.len(), 3);
         assert_eq!(
             actions[0],
@@ -203,8 +202,7 @@ mod tests {
         );
 
         let (keys, op, values) = split("a[] b c[] = [one two] three [four five]");
-        let actions = AssignmentActions::new(&keys, op, &values)
-            .collect::<Vec<_>>();
+        let actions = AssignmentActions::new(&keys, op, &values).collect::<Vec<_>>();
         assert_eq!(actions.len(), 3);
         assert_eq!(
             actions[0],
