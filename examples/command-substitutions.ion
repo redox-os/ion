@@ -1,1 +1,5 @@
 echo $(echo "one   two    three"    "four 'five' six")
+echo 0 "$(echo -e ' one  two  three ')" 1
+echo 0 "$(echo -e '  one\ntwo\nthree  ')" 1
+echo 0 $(echo -e ' one  two  three ') 1
+echo 0 $(echo -e '  one\ntwo\nthree  ') 1

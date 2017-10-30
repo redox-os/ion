@@ -20,8 +20,8 @@ use self::source::source;
 use self::test::test;
 use self::variables::{alias, drop_alias, drop_array, drop_variable};
 
-use std::error::Error;
 use std::env;
+use std::error::Error;
 use std::io::{self, Write};
 use std::path::Path;
 
@@ -396,14 +396,12 @@ fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
         println!("{}: function", command);
         SUCCESS
     } else {
-        for path in env::var("PATH").unwrap_or("/bin".to_string())
-                                    .split(sys::PATH_SEPARATOR) {
+        for path in env::var("PATH").unwrap_or("/bin".to_string()).split(sys::PATH_SEPARATOR) {
             let executable = Path::new(path).join(command);
             if executable.is_file() {
                 println!("{}", executable.display());
                 return SUCCESS;
             }
-
         }
 
         println!("{} not found", command);

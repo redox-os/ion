@@ -42,6 +42,7 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::ops::Deref;
 use std::process;
+use std::ptr;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
@@ -89,6 +90,8 @@ pub struct Shell {
     /// Stores the patterns used to determine whether a command should be saved in the history
     /// or not
     ignore_setting: IgnoreSetting,
+    /// A pointer to itself which should only be used when performing a subshell expansion.
+    pointer: *mut Shell,
 }
 
 impl<'a> Shell {
@@ -112,6 +115,7 @@ impl<'a> Shell {
             break_flow:          false,
             foreground_signals:  Arc::new(ForegroundSignals::new()),
             ignore_setting:      IgnoreSetting::default(),
+            pointer:             ptr::null_mut(),
         }
     }
 
@@ -134,6 +138,7 @@ impl<'a> Shell {
             break_flow:          false,
             foreground_signals:  Arc::new(ForegroundSignals::new()),
             ignore_setting:      IgnoreSetting::default(),
+            pointer:             ptr::null_mut(),
         }
     }
 
@@ -207,6 +212,14 @@ impl<'a> Shell {
     /// To avoid infinite recursion when using aliases, the noalias boolean will be set the true
     /// if an alias branch was executed.
     fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
+        // TODO: Find a way to only need to execute this once, without
+        // complicating our public API.
+        //
+        // Ensure that the shell pointer is set before executing.
+        // This is needed for subprocess expansions to function.
+        let pointer = self as *mut Shell;
+        self.pointer = pointer;
+
         let command_start_time = SystemTime::now();
         let builtins = self.builtins;
 
@@ -367,6 +380,56 @@ impl<'a> Expander for Shell {
             self.variables.get_var(variable).map(|x| x.ascii_replace('\n', ' ').into())
         }
     }
-    /// Expand a subshell expression
-    fn command(&self, command: &str) -> Option<Value> { self.variables.command_expansion(command) }
+    /// Uses a subshell to expand a given command.
+    fn command(&self, command: &str) -> Option<Value> {
+        use std::io::Read;
+        use std::os::unix::io::{AsRawFd, FromRawFd};
+        use std::process::exit;
+        use sys;
+
+        let (mut out_read, out_write) = match sys::pipe2(sys::O_CLOEXEC) {
+            Ok(fds) => unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) },
+            Err(why) => {
+                eprintln!("ion: unable to create pipe: {}", why);
+                return None;
+            }
+        };
+
+        match unsafe { sys::fork() } {
+            Ok(0) => {
+                // TODO: Figure out how to properly enable stdin in the child.
+                // Without this line, the parent will hang. Can test with:
+                //     echo $(read x)
+                sys::close_stdin();
+
+                // Redirect stdout in the child to the write end of the pipe.
+                // Also close the read end of the pipe because we don't need it.
+                let _ = sys::dup2(out_write.as_raw_fd(), sys::STDOUT_FILENO);
+                drop(out_write);
+                drop(out_read);
+
+                // Now obtain ownership of the child's shell through a mutable pointer,
+                // and then use that shell to execute the command.
+                let shell: &mut Shell = unsafe { &mut *self.pointer };
+                shell.on_command(command);
+
+                // Reap the child, enabling the parent to get EOF from the read end of the pipe.
+                exit(0);
+            }
+            Ok(_pid) => {
+                // Drop the write end of the pipe, because the parent will not use it.
+                drop(out_write);
+
+                // Read from the read end of the pipe into a String.
+                let mut output = String::new();
+                let _ = out_read.read_to_string(&mut output);
+
+                Some(output)
+            }
+            Err(why) => {
+                eprintln!("ion: fork error: {}", why);
+                None
+            }
+        }
+    }
 }

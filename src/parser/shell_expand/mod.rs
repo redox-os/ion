@@ -10,6 +10,7 @@ use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub(crate) use self::words::{Index, Range, Select, WordIterator, WordToken};
 use glob::glob;
+use std::str;
 use types::*;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -37,22 +38,28 @@ fn expand_process<E: Expander>(
     current: &mut String,
     command: &str,
     selection: Select,
-    expand_func: &E,
+    expander: &E,
+    quoted: bool,
 ) {
-    let mut tokens = Vec::new();
-    let mut contains_brace = false;
-
-    for token in WordIterator::new(command, false, expand_func) {
-        if let WordToken::Brace(_) = token {
-            contains_brace = true;
+    if let Some(output) = expander.command(command) {
+        if quoted {
+            let output: &str = if let Some(pos) = output.rfind(|x| x != '\n') {
+                &output[..pos + 1]
+            } else {
+                &output
+            };
+            slice(current, output, selection)
+        } else {
+            // TODO: Complete this so that we don't need any heap allocations.
+            //       All that we need is to shift bytes to the left when extra spaces are found.
+            //
+            // unsafe {
+            //     let bytes: &mut [u8] = output.as_bytes_mut();
+            //     bytes.iter_mut().filter(|b| **b == b'\n').for_each(|b| *b = b' ');
+            //     slice(current, str::from_utf8_unchecked(&bytes).trim(), selection)
+            // }
+            slice(current, &output.split_whitespace().collect::<Vec<&str>>().join(" "), selection)
         }
-        tokens.push(token);
-    }
-
-    let expanded = expand_tokens(&tokens, expand_func, false, contains_brace).join(" ");
-
-    if let Some(result) = expand_func.command(&expanded) {
-        slice(current, result, selection);
     }
 }
 
@@ -220,24 +227,24 @@ pub(crate) fn expand_tokens<E: Expander>(
                         Select::None => (),
                         Select::All => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, Select::All, expand_func);
+                            expand_process(&mut temp, command, Select::All, expand_func, false);
                             let temp = temp.split_whitespace().collect::<Vec<&str>>();
                             output.push_str(&temp.join(" "));
                         }
                         Select::Index(Index::Forward(id)) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, Select::All, expand_func);
+                            expand_process(&mut temp, command, Select::All, expand_func, false);
                             output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
                         }
                         Select::Index(Index::Backward(id)) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, Select::All, expand_func);
+                            expand_process(&mut temp, command, Select::All, expand_func, false);
                             output
                                 .push_str(temp.split_whitespace().rev().nth(id).unwrap_or_default());
                         }
                         Select::Range(range) => {
                             let mut temp = String::new();
-                            expand_process(&mut temp, command, Select::All, expand_func);
+                            expand_process(&mut temp, command, Select::All, expand_func, false);
                             let len = temp.split_whitespace().count();
                             if let Some((start, length)) = range.bounds(len) {
                                 let res = temp.split_whitespace()
@@ -264,8 +271,9 @@ pub(crate) fn expand_tokens<E: Expander>(
                         reverse_quoting,
                     ),
                     WordToken::Whitespace(whitespace) => output.push_str(whitespace),
-                    WordToken::Process(command, _, ref index) => {
-                        expand_process(&mut output, command, index.clone(), expand_func);
+                    WordToken::Process(command, quoted, ref index) => {
+                        let quoted = if reverse_quoting { !quoted } else { quoted };
+                        expand_process(&mut output, command, index.clone(), expand_func, quoted);
                     }
                     WordToken::Variable(text, quoted, ref index) => {
                         let quoted = if reverse_quoting { !quoted } else { quoted };
@@ -312,11 +320,11 @@ pub(crate) fn expand_tokens<E: Expander>(
                 WordToken::ArrayProcess(command, _, ref index) => match *index {
                     Select::None => return Array::new(),
                     Select::All => {
-                        expand_process(&mut output, command, Select::All, expand_func);
+                        expand_process(&mut output, command, Select::All, expand_func, false);
                         return output.split_whitespace().map(From::from).collect::<Array>();
                     }
                     Select::Index(Index::Forward(id)) => {
-                        expand_process(&mut output, command, Select::All, expand_func);
+                        expand_process(&mut output, command, Select::All, expand_func, false);
                         return output
                             .split_whitespace()
                             .nth(id)
@@ -325,7 +333,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                             .collect();
                     }
                     Select::Index(Index::Backward(id)) => {
-                        expand_process(&mut output, command, Select::All, expand_func);
+                        expand_process(&mut output, command, Select::All, expand_func, false);
                         return output
                             .split_whitespace()
                             .rev()
@@ -335,7 +343,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                             .collect();
                     }
                     Select::Range(range) => {
-                        expand_process(&mut output, command, Select::All, expand_func);
+                        expand_process(&mut output, command, Select::All, expand_func, false);
                         if let Some((start, length)) =
                             range.bounds(output.split_whitespace().count())
                         {
@@ -372,23 +380,23 @@ pub(crate) fn expand_tokens<E: Expander>(
                     Select::None => (),
                     Select::All => {
                         let mut temp = String::new();
-                        expand_process(&mut temp, command, Select::All, expand_func);
+                        expand_process(&mut temp, command, Select::All, expand_func, false);
                         let temp = temp.split_whitespace().collect::<Vec<&str>>();
                         output.push_str(&temp.join(" "));
                     }
                     Select::Index(Index::Forward(id)) => {
                         let mut temp = String::new();
-                        expand_process(&mut temp, command, Select::All, expand_func);
+                        expand_process(&mut temp, command, Select::All, expand_func, false);
                         output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
                     }
                     Select::Index(Index::Backward(id)) => {
                         let mut temp = String::new();
-                        expand_process(&mut temp, command, Select::All, expand_func);
+                        expand_process(&mut temp, command, Select::All, expand_func, false);
                         output.push_str(temp.split_whitespace().rev().nth(id).unwrap_or_default());
                     }
                     Select::Range(range) => {
                         let mut temp = String::new();
-                        expand_process(&mut temp, command, Select::All, expand_func);
+                        expand_process(&mut temp, command, Select::All, expand_func, false);
                         if let Some((start, length)) = range.bounds(temp.split_whitespace().count())
                         {
                             let temp = temp.split_whitespace()
@@ -413,8 +421,9 @@ pub(crate) fn expand_tokens<E: Expander>(
                 WordToken::Whitespace(text) => {
                     output.push_str(text);
                 }
-                WordToken::Process(command, _, ref index) => {
-                    expand_process(&mut output, command, index.clone(), expand_func);
+                WordToken::Process(command, quoted, ref index) => {
+                    let quoted = if reverse_quoting { !quoted } else { quoted };
+                    expand_process(&mut output, command, index.clone(), expand_func, quoted);
                 }
                 WordToken::Variable(text, quoted, ref index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };

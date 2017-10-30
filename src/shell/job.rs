@@ -321,11 +321,6 @@ impl RefinedJob {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::Expander;
-
-    struct Empty;
-
-    impl Expander for Empty {}
 
     #[test]
     fn preserve_empty_arg() {
