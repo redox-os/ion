@@ -176,35 +176,6 @@ fn expand_braces<E: Expander>(
 ) -> Array {
     let mut expanded_words = Array::new();
     let mut output = String::new();
-
-    macro_rules! expand {
-        ($text:expr, $do_glob:expr, $tilde:expr) => {{
-            let expanded: String = if $tilde {
-                match expand_func.tilde($text) {
-                    Some(s) => s,
-                    None => $text.into()
-                }
-            } else {
-                $text.into()
-            };
-            if $do_glob {
-                match glob(&expanded) {
-                    Ok(var) => {
-                        let mut globs_found = false;
-                        for path in var.filter_map(Result::ok) {
-                            globs_found = true;
-                            expanded_words.push(path.to_string_lossy().into_owned());
-                        }
-                        if !globs_found { expanded_words.push(expanded); }
-                    }
-                    Err(_) => expanded_words.push(expanded)
-                }
-            } else {
-                output.push_str(&expanded);
-            }
-        }}
-    }
-
     let tokens: &mut Vec<BraceToken> = &mut Vec::new();
     let mut expanders: Vec<Vec<String>> = Vec::new();
 
@@ -277,7 +248,7 @@ fn expand_braces<E: Expander>(
                 slice(&mut output, expanded, index.clone());
             }
             WordToken::Normal(text, do_glob, tilde) => {
-                expand!(text, do_glob, tilde);
+                expand(&mut output, &mut expanded_words, expand_func, text, do_glob, tilde);
             }
             WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
         }
@@ -346,6 +317,84 @@ fn expand_single_array_token<E: Expander>(token: &WordToken, expand_func: &E) ->
     }
 }
 
+fn expand_single_string_token<E: Expander>(
+    token: &WordToken,
+    expand_func: &E,
+    reverse_quoting: bool,
+) -> Array {
+    let mut output = String::new();
+    let mut expanded_words = Array::new();
+
+    match *token {
+        WordToken::StringMethod(ref method) => method.handle(&mut output, expand_func),
+        WordToken::Normal(text, do_glob, tilde) => {
+            expand(&mut output, &mut expanded_words, expand_func, text, do_glob, tilde);
+        }
+        WordToken::Whitespace(text) => output.push_str(text),
+        WordToken::Process(command, quoted, ref index) => {
+            let quoted = if reverse_quoting { !quoted } else { quoted };
+            expand_process(&mut output, command, index.clone(), expand_func, quoted);
+        }
+        WordToken::Variable(text, quoted, ref index) => {
+            let quoted = if reverse_quoting { !quoted } else { quoted };
+            let expanded = match expand_func.variable(text, quoted) {
+                Some(var) => var,
+                None => {
+                    if output != "" {
+                        expanded_words.push(output.into());
+                    }
+                    return expanded_words;
+                }
+            };
+
+            slice(&mut output, expanded, index.clone());
+        }
+        WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
+        _ => unreachable!(),
+    }
+
+    if output != "" {
+        expanded_words.push(output.into());
+    }
+    expanded_words
+}
+
+fn expand<E: Expander>(
+    output: &mut String,
+    expanded_words: &mut Array,
+    expand_func: &E,
+    text: &str,
+    do_glob: bool,
+    tilde: bool,
+) {
+    let expanded: String = if tilde {
+        match expand_func.tilde(text) {
+            Some(s) => s,
+            None => text.into(),
+        }
+    } else {
+        text.into()
+    };
+
+    if do_glob {
+        match glob(&expanded) {
+            Ok(var) => {
+                let mut globs_found = false;
+                for path in var.filter_map(Result::ok) {
+                    globs_found = true;
+                    expanded_words.push(path.to_string_lossy().into_owned());
+                }
+                if !globs_found {
+                    expanded_words.push(expanded);
+                }
+            }
+            Err(_) => expanded_words.push(expanded),
+        }
+    } else {
+        output.push_str(&expanded);
+    }
+}
+
 pub(crate) fn expand_tokens<E: Expander>(
     token_buffer: &[WordToken],
     expand_func: &E,
@@ -356,41 +405,15 @@ pub(crate) fn expand_tokens<E: Expander>(
         if contains_brace {
             return expand_braces(&token_buffer, expand_func, reverse_quoting);
         } else if token_buffer.len() == 1 {
-            if let Some(array) = expand_single_array_token(&token_buffer[0], expand_func) {
-                return array;
-            }
+            let token = &token_buffer[0];
+            return match expand_single_array_token(token, expand_func) {
+                Some(array) => array,
+                None => expand_single_string_token(token, expand_func, reverse_quoting),
+            };
         }
 
         let mut output = String::new();
         let mut expanded_words = Array::new();
-
-        macro_rules! expand {
-            ($text:expr, $do_glob:expr, $tilde:expr) => {{
-                let expanded: String = if $tilde {
-                    match expand_func.tilde($text) {
-                        Some(s) => s,
-                        None => $text.into()
-                    }
-                } else {
-                    $text.into()
-                };
-                if $do_glob {
-                    match glob(&expanded) {
-                        Ok(var) => {
-                            let mut globs_found = false;
-                            for path in var.filter_map(Result::ok) {
-                                globs_found = true;
-                                expanded_words.push(path.to_string_lossy().into_owned());
-                            }
-                            if !globs_found { expanded_words.push(expanded); }
-                        }
-                        Err(_) => expanded_words.push(expanded)
-                    }
-                } else {
-                    output.push_str(&expanded);
-                }
-            }}
-        }
 
         for word in token_buffer {
             match *word {
@@ -442,7 +465,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                 }
                 WordToken::Brace(_) => unreachable!(),
                 WordToken::Normal(text, do_glob, tilde) => {
-                    expand!(text, do_glob, tilde);
+                    expand(&mut output, &mut expanded_words, expand_func, text, do_glob, tilde);
                 }
                 WordToken::Whitespace(text) => {
                     output.push_str(text);
