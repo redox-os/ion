@@ -26,7 +26,6 @@ bitflags! {
         const BACKSL = 1;
         const SQUOTE = 2;
         const DQUOTE = 4;
-        const EXPAND_PROCESSES = 8;
     }
 }
 
@@ -56,16 +55,11 @@ pub(crate) struct WordIterator<'a, E: Expander + 'a> {
 }
 
 impl<'a, E: Expander + 'a> WordIterator<'a, E> {
-    pub(crate) fn new(
-        data: &'a str,
-        expand_processes: bool,
-        expanders: &'a E,
-    ) -> WordIterator<'a, E> {
-        let flags = if expand_processes { EXPAND_PROCESSES } else { Flags::empty() };
+    pub(crate) fn new(data: &'a str, expanders: &'a E) -> WordIterator<'a, E> {
         WordIterator {
             data,
             read: 0,
-            flags,
+            flags: Flags::empty(),
             expanders,
         }
     }
@@ -626,18 +620,12 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                         }
                         self.read += 1;
                         self.flags ^= BACKSL;
-                        if !self.flags.contains(EXPAND_PROCESSES) {
-                            return Some(WordToken::Normal("\\", glob, tilde));
-                        }
                         break;
                     }
                     b'\'' if !self.flags.contains(DQUOTE) => {
                         start += 1;
                         self.read += 1;
                         self.flags ^= SQUOTE;
-                        if !self.flags.contains(EXPAND_PROCESSES) {
-                            return Some(WordToken::Normal("'", glob, tilde));
-                        }
                         break;
                     }
                     b'"' if !self.flags.contains(SQUOTE) => {
@@ -648,11 +636,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                             return self.next();
                         }
                         self.flags |= DQUOTE;
-                        if !self.flags.contains(EXPAND_PROCESSES) {
-                            return Some(WordToken::Normal("\"", glob, tilde));
-                        } else {
-                            break;
-                        }
+                        break;
                     }
                     b' ' if !self.flags.intersects(DQUOTE | SQUOTE) => {
                         return Some(self.whitespaces(&mut iterator))
@@ -676,11 +660,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     b'@' if !self.flags.contains(SQUOTE) => match iterator.next() {
                         Some(b'(') => {
                             self.read += 2;
-                            return if self.flags.contains(EXPAND_PROCESSES) {
-                                Some(self.array_process(&mut iterator))
-                            } else {
-                                Some(WordToken::Normal(&self.data[start..self.read], glob, tilde))
-                            };
+                            return Some(self.array_process(&mut iterator));
                         }
                         Some(b'{') => {
                             self.read += 2;
@@ -705,14 +685,8 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                                     let _ = iterator.next();
                                     self.read += 1;
                                     Some(self.arithmetic_expression(&mut iterator))
-                                } else if self.flags.contains(EXPAND_PROCESSES) {
-                                    Some(self.process(&mut iterator))
                                 } else {
-                                    Some(WordToken::Normal(
-                                        &self.data[start..self.read],
-                                        glob,
-                                        tilde,
-                                    ))
+                                    Some(self.process(&mut iterator))
                                 };
                             }
                             Some(b'{') => {
@@ -750,13 +724,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                 _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
                 b'\\' => {
                     self.flags ^= BACKSL;
-                    let end = if !self.flags.contains(EXPAND_PROCESSES) {
-                        if self.flags.intersects(DQUOTE | SQUOTE) {
-                            self.read + 2
-                        } else {
-                            self.read + 1
-                        }
-                    } else if self.flags.intersects(DQUOTE | SQUOTE) {
+                    let end = if self.flags.intersects(DQUOTE | SQUOTE) {
                         self.read + 1
                     } else {
                         self.read
@@ -767,23 +735,13 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                 }
                 b'\'' if !self.flags.contains(DQUOTE) => {
                     self.flags ^= SQUOTE;
-                    let end = if !self.flags.contains(EXPAND_PROCESSES) {
-                        self.read + 1
-                    } else {
-                        self.read
-                    };
-                    let output = &self.data[start..end];
+                    let output = &self.data[start..self.read];
                     self.read += 1;
                     return Some(WordToken::Normal(output, glob, tilde));
                 }
                 b'"' if !self.flags.contains(SQUOTE) => {
                     self.flags ^= DQUOTE;
-                    let end = if !self.flags.contains(EXPAND_PROCESSES) {
-                        self.read + 1
-                    } else {
-                        self.read
-                    };
-                    let output = &self.data[start..end];
+                    let output = &self.data[start..self.read];
                     self.read += 1;
                     return Some(WordToken::Normal(output, glob, tilde));
                 }

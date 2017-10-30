@@ -159,7 +159,7 @@ pub(crate) fn expand_string<E: Expander>(
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
 
-    for word in WordIterator::new(original, true, expand_func) {
+    for word in WordIterator::new(original, expand_func) {
         if let WordToken::Brace(_) = word {
             contains_brace = true;
         }
