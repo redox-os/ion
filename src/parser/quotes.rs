@@ -34,7 +34,7 @@ impl QuoteTerminator {
 
     pub(crate) fn append(&mut self, input: String) {
         if self.eof.is_none() {
-            self.buffer.push_str(if self.flags.contains(TRIM) { input.trim() } else { &input });
+            self.buffer.push_str(if self.flags.contains(Flags::TRIM) { input.trim() } else { &input });
         } else {
             self.eof_buffer.push_str(&input);
         }
@@ -58,9 +58,9 @@ impl QuoteTerminator {
                             b'\\' => {
                                 let _ = bytes.next();
                             }
-                            b'\'' if !self.flags.intersects(DQUOTE) => self.flags ^= SQUOTE,
-                            b'"' if !self.flags.intersects(SQUOTE) => self.flags ^= DQUOTE,
-                            b'<' if !self.flags.contains(SQUOTE | DQUOTE) => {
+                            b'\'' if !self.flags.intersects(Flags::DQUOTE) => self.flags ^= Flags::SQUOTE,
+                            b'"' if !self.flags.intersects(Flags::SQUOTE) => self.flags ^= Flags::DQUOTE,
+                            b'<' if !self.flags.contains(Flags::SQUOTE | Flags::DQUOTE) => {
                                 let as_bytes = self.buffer.as_bytes();
                                 if Some(&b'<') == as_bytes.get(self.read) {
                                     self.read += 1;
@@ -69,59 +69,59 @@ impl QuoteTerminator {
                                             str::from_utf8_unchecked(&as_bytes[self.read..])
                                         };
                                         self.eof = Some(eof_phrase.trim().to_owned());
-                                        instance |= EOF;
+                                        instance |= Flags::EOF;
                                         break;
                                     }
                                 }
                             }
-                            b'[' if !self.flags.intersects(DQUOTE | SQUOTE) => {
-                                self.flags |= ARRAY;
+                            b'[' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
+                                self.flags |= Flags::ARRAY;
                                 self.array += 1;
                             }
-                            b']' if !self.flags.intersects(DQUOTE | SQUOTE) => {
+                            b']' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
                                 self.array -= 1;
                                 if self.array == 0 {
-                                    self.flags -= ARRAY
+                                    self.flags -= Flags::ARRAY
                                 }
                             }
-                            b'#' if !self.flags.intersects(DQUOTE | SQUOTE) => if self.read > 1 {
+                            b'#' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => if self.read > 1 {
                                 let character = self.buffer.as_bytes().get(self.read - 2).unwrap();
                                 if [b' ', b'\n'].contains(character) {
-                                    instance |= COMM;
+                                    instance |= Flags::COMM;
                                     break;
                                 }
                             } else {
-                                instance |= COMM;
+                                instance |= Flags::COMM;
                                 break;
                             },
                             _ => (),
                         }
                     }
                 }
-                if instance.contains(EOF) {
+                if instance.contains(Flags::EOF) {
                     self.buffer.push('\n');
                     return false;
-                } else if instance.contains(COMM) {
+                } else if instance.contains(Flags::COMM) {
                     self.buffer.truncate(self.read - 1);
-                    return !self.flags.intersects(SQUOTE | DQUOTE | ARRAY);
+                    return !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE | Flags::ARRAY);
                 }
             }
 
-            if self.flags.intersects(SQUOTE | DQUOTE | ARRAY) {
+            if self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE | Flags::ARRAY) {
                 if let Some(b'\\') = self.buffer.bytes().last() {
                     let _ = self.buffer.pop();
                     self.read -= 1;
-                    self.flags |= TRIM;
+                    self.flags |= Flags::TRIM;
                 } else {
                     self.read += 1;
-                    self.buffer.push(if self.flags.contains(ARRAY) { ' ' } else { '\n' });
+                    self.buffer.push(if self.flags.contains(Flags::ARRAY) { ' ' } else { '\n' });
                 }
                 false
             } else {
                 if let Some(b'\\') = self.buffer.bytes().last() {
                     let _ = self.buffer.pop();
                     self.read -= 1;
-                    self.flags |= TRIM;
+                    self.flags |= Flags::TRIM;
                     false
                 } else {
                     // If the last two bytes are either '&&' or '||', we aren't terminated yet.

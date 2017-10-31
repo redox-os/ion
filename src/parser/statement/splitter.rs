@@ -125,68 +125,68 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.read += 1;
                     bytes.next();
                 }
-                _ if self.flags.contains(POST_MATHEXPR) => {
-                    self.flags -= POST_MATHEXPR;
+                _ if self.flags.contains(Flags::POST_MATHEXPR) => {
+                    self.flags -= Flags::POST_MATHEXPR;
                 }
                 // [^A-Za-z0-9_:,}]
                 0...43 | 45...47 | 59...64 | 91...94 | 96 | 123...124 | 126...127
-                    if self.flags.contains(VBRACE) =>
+                    if self.flags.contains(Flags::VBRACE) =>
                 {
                     // If we are just ending the braced section continue as normal
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 }
-                b'\'' if !self.flags.contains(DQUOTE) => {
-                    self.flags -= VARIAB | ARRAY;
+                b'\'' if !self.flags.contains(Flags::DQUOTE) => {
+                    self.flags -= Flags::VARIAB | Flags::ARRAY;
                     self.read += self.single_quote(&mut bytes);
                 }
-                // Toggle DQUOTE and disable VARIAB + ARRAY.
-                b'"' => self.flags = (self.flags ^ DQUOTE) - (VARIAB | ARRAY),
-                // Disable COMM_1 and enable COMM_2 + ARRAY.
+                // Toggle Flags::DQUOTE and disable Flags::VARIAB + Flags::ARRAY.
+                b'"' => self.flags = (self.flags ^ Flags::DQUOTE) - (Flags::VARIAB | Flags::ARRAY),
+                // Disable Flags::COMM_1 and enable Flags::COMM_2 + Flags::ARRAY.
                 b'@' => {
-                    self.flags = (self.flags - COMM_1) | (COMM_2 | ARRAY);
+                    self.flags = (self.flags - Flags::COMM_1) | (Flags::COMM_2 | Flags::ARRAY);
                     continue;
                 }
                 b'$' => {
-                    self.flags = (self.flags - COMM_2) | (COMM_1 | VARIAB);
+                    self.flags = (self.flags - Flags::COMM_2) | (Flags::COMM_1 | Flags::VARIAB);
                     continue;
                 }
-                b'{' if self.flags.intersects(COMM_1 | COMM_2) => self.flags |= VBRACE,
-                b'{' if !self.flags.contains(DQUOTE) => self.brace_level += 1,
-                b'}' if self.flags.contains(VBRACE) => self.flags.toggle(VBRACE),
-                b'}' if !self.flags.contains(DQUOTE) => if self.brace_level == 0 {
+                b'{' if self.flags.intersects(Flags::COMM_1 | Flags::COMM_2) => self.flags |= Flags::VBRACE,
+                b'{' if !self.flags.contains(Flags::DQUOTE) => self.brace_level += 1,
+                b'}' if self.flags.contains(Flags::VBRACE) => self.flags.toggle(Flags::VBRACE),
+                b'}' if !self.flags.contains(Flags::DQUOTE) => if self.brace_level == 0 {
                     if error.is_none() {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 } else {
                     self.brace_level -= 1;
                 },
-                b'(' if self.flags.contains(MATHEXPR) => {
+                b'(' if self.flags.contains(Flags::MATHEXPR) => {
                     self.math_paren_level += 1;
                 }
-                b'(' if !self.flags.intersects(COMM_1 | VARIAB | ARRAY) => {
-                    if error.is_none() && !self.flags.contains(DQUOTE) {
+                b'(' if !self.flags.intersects(Flags::COMM_1 | Flags::VARIAB | Flags::ARRAY) => {
+                    if error.is_none() && !self.flags.contains(Flags::DQUOTE) {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 }
-                b'(' if self.flags.intersects(COMM_1 | METHOD) => {
-                    self.flags -= VARIAB | ARRAY;
+                b'(' if self.flags.intersects(Flags::COMM_1 | Flags::METHOD) => {
+                    self.flags -= Flags::VARIAB | Flags::ARRAY;
                     if self.data.as_bytes()[self.read] == b'(' {
-                        self.flags = (self.flags - COMM_1) | MATHEXPR;
+                        self.flags = (self.flags - Flags::COMM_1) | Flags::MATHEXPR;
                         // The next character will always be a left paren in this branch;
                         self.math_paren_level = -1;
                     } else {
                         self.p_level += 1;
                     }
                 }
-                b'(' if self.flags.contains(COMM_2) => {
+                b'(' if self.flags.contains(Flags::COMM_2) => {
                     self.ap_level += 1;
                 }
-                b'(' if self.flags.intersects(VARIAB | ARRAY) => {
-                    self.flags = (self.flags - (VARIAB | ARRAY)) | METHOD;
+                b'(' if self.flags.intersects(Flags::VARIAB | Flags::ARRAY) => {
+                    self.flags = (self.flags - (Flags::VARIAB | Flags::ARRAY)) | Flags::METHOD;
                 }
-                b')' if self.flags.contains(MATHEXPR) => if self.math_paren_level == 0 {
+                b')' if self.flags.contains(Flags::MATHEXPR) => if self.math_paren_level == 0 {
                     if self.data.as_bytes().len() <= self.read {
                         if error.is_none() {
                             error = Some(StatementError::UnterminatedArithmetic)
@@ -194,7 +194,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     } else {
                         let next_character = self.data.as_bytes()[self.read] as char;
                         if next_character == ')' {
-                            self.flags = (self.flags - MATHEXPR) | POST_MATHEXPR;
+                            self.flags = (self.flags - Flags::MATHEXPR) | Flags::POST_MATHEXPR;
                         } else if error.is_none() {
                             error =
                                 Some(StatementError::InvalidCharacter(next_character, self.read));
@@ -203,24 +203,24 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 } else {
                     self.math_paren_level -= 1;
                 },
-                b')' if self.flags.contains(METHOD) && self.p_level == 0 => {
-                    self.flags ^= METHOD;
+                b')' if self.flags.contains(Flags::METHOD) && self.p_level == 0 => {
+                    self.flags ^= Flags::METHOD;
                 }
                 b')' if self.p_level + self.ap_level == 0 => {
-                    if error.is_none() && !self.flags.contains(DQUOTE) {
+                    if error.is_none() && !self.flags.contains(Flags::DQUOTE) {
                         error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 }
                 b')' if self.p_level != 0 => self.p_level -= 1,
                 b')' => self.ap_level -= 1,
-                b';' if !self.flags.contains(DQUOTE) && self.p_level == 0 && self.ap_level == 0 => {
+                b';' if !self.flags.contains(Flags::DQUOTE) && self.p_level == 0 && self.ap_level == 0 => {
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(self.data[start..self.read - 1].trim())),
                     }
                 }
                 b'#' if self.read == 1
-                    || (!self.flags.contains(DQUOTE) && self.p_level + self.ap_level == 0
+                    || (!self.flags.contains(Flags::DQUOTE) && self.p_level + self.ap_level == 0
                         && match self.data.as_bytes()[self.read - 2] {
                             b' ' | b'\t' => true,
                             _ => false,
@@ -256,11 +256,11 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     }
                 }
                 // [^A-Za-z0-9_]
-                byte => if self.flags.intersects(VARIAB | ARRAY) {
-                    self.flags -= if is_invalid(byte) { VARIAB | ARRAY } else { Flags::empty() };
+                byte => if self.flags.intersects(Flags::VARIAB | Flags::ARRAY) {
+                    self.flags -= if is_invalid(byte) { Flags::VARIAB | Flags::ARRAY } else { Flags::empty() };
                 },
             }
-            self.flags -= COMM_1 | COMM_2;
+            self.flags -= Flags::COMM_1 | Flags::COMM_2;
         }
 
         if start == self.read {
@@ -272,14 +272,14 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 None if self.p_level != 0 || self.ap_level != 0 || self.a_level != 0 => {
                     Some(Err(StatementError::UnterminatedSubshell))
                 }
-                None if self.flags.contains(METHOD) => {
+                None if self.flags.contains(Flags::METHOD) => {
                     Some(Err(StatementError::UnterminatedMethod))
                 }
-                None if self.flags.contains(VBRACE) => {
+                None if self.flags.contains(Flags::VBRACE) => {
                     Some(Err(StatementError::UnterminatedBracedVar))
                 }
                 None if self.brace_level != 0 => Some(Err(StatementError::UnterminatedBrace)),
-                None if self.flags.contains(MATHEXPR) => {
+                None if self.flags.contains(Flags::MATHEXPR) => {
                     Some(Err(StatementError::UnterminatedArithmetic))
                 }
                 None => {

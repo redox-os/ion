@@ -9,13 +9,13 @@ bitflags! {
     struct IgnoreFlags: u8 {
         // Macro definition fails if last flag has a comment at the end of the line.
         /// ignore all commands ("all")
-        const IGNORE_ALL                = (0b1 << 0);
+        const ALL                = (0b1 << 0);
         /// ignore commands with leading whitespace ("whitespace")
-        const IGNORE_WHITESPACE         = (0x1 << 1);
+        const WHITESPACE         = (0x1 << 1);
         /// ignore commands with status code 127 ("no_such_command")
-        const IGNORE_NO_SUCH_COMMAND    = (0b1 << 2);
+        const NO_SUCH_COMMAND    = (0b1 << 2);
         /// used if regexes are defined.
-        const IGNORE_BASED_ON_REGEX     = (0b1 << 3);
+        const BASED_ON_REGEX     = (0b1 << 3);
     }
 }
 
@@ -119,12 +119,12 @@ impl ShellHistory for Shell {
         let regex_prefix = "regex:";
         for pattern in patterns {
             match pattern.as_ref() {
-                "all" => flags |= IGNORE_ALL,
-                "no_such_command" => flags |= IGNORE_NO_SUCH_COMMAND,
-                "whitespace" => flags |= IGNORE_WHITESPACE,
+                "all" => flags |= IgnoreFlags::ALL,
+                "no_such_command" => flags |= IgnoreFlags::NO_SUCH_COMMAND,
+                "whitespace" => flags |= IgnoreFlags::WHITESPACE,
                 // The length check is there to just ignore empty regex definitions
                 _ if pattern.starts_with(regex_prefix) && pattern.len() > regex_prefix.len() => {
-                    flags |= IGNORE_BASED_ON_REGEX;
+                    flags |= IgnoreFlags::BASED_ON_REGEX;
                     let regex_string = &pattern[regex_prefix.len()..];
                     // We save the compiled regexes, as compiling them can be  an expensive task
                     if let Ok(regex) = Regex::new(regex_string) {
@@ -148,19 +148,19 @@ impl ShellHistoryPrivate for Shell {
 
         // without the second check the command which sets the local variable would also be
         // ignored. However, this behavior might not be wanted.
-        if ignore.contains(IGNORE_ALL) && !command.contains("HISTORY_IGNORE") {
+        if ignore.contains(IgnoreFlags::ALL) && !command.contains("HISTORY_IGNORE") {
             return false;
         }
 
         // Here we allow to also ignore the setting of the local variable because we assume
         // the user entered the leading whitespace on purpose.
-        if ignore.contains(IGNORE_WHITESPACE) {
+        if ignore.contains(IgnoreFlags::WHITESPACE) {
             if command.chars().next().map_or(false, |b| b.is_whitespace()) {
                 return false;
             }
         }
 
-        if ignore.contains(IGNORE_NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND {
+        if ignore.contains(IgnoreFlags::NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND {
             return false;
         }
 
