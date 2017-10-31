@@ -47,20 +47,20 @@ pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
 
     for arg in args {
         match *arg {
-            "--help" => flags |= HELP,
-            "--escape" => flags |= ESCAPE,
-            "--no-newline" => flags |= NO_NEWLINE,
-            "--no-spaces" => flags |= NO_SPACES,
+            "--help" => flags |= Flags::HELP,
+            "--escape" => flags |= Flags::ESCAPE,
+            "--no-newline" => flags |= Flags::NO_NEWLINE,
+            "--no-spaces" => flags |= Flags::NO_SPACES,
             _ => if arg.starts_with('-') {
                 let mut is_opts = true;
                 let opts = &arg[1..];
                 let mut short_flags = Flags::empty();
                 for argopt in opts.chars() {
                     match argopt {
-                        'e' => short_flags |= ESCAPE,
-                        'n' => short_flags |= NO_NEWLINE,
-                        's' => short_flags |= NO_SPACES,
-                        'h' => short_flags |= HELP,
+                        'e' => short_flags |= Flags::ESCAPE,
+                        'n' => short_flags |= Flags::NO_NEWLINE,
+                        's' => short_flags |= Flags::NO_SPACES,
+                        'h' => short_flags |= Flags::HELP,
                         _ => {
                             is_opts = false;
                             break;
@@ -81,7 +81,7 @@ pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
 
-    if flags.contains(HELP) {
+    if flags.contains(Flags::HELP) {
         buffer.write_all(MAN_PAGE.as_bytes())?;
         buffer.flush()?;
         return Ok(());
@@ -91,11 +91,11 @@ pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
     for arg in data[1..].iter().map(|x| x.as_bytes()) {
         if first {
             first = false;
-        } else if !flags.contains(NO_SPACES) {
+        } else if !flags.contains(Flags::NO_SPACES) {
             buffer.write_all(&[b' '])?;
         }
 
-        if flags.contains(ESCAPE) {
+        if flags.contains(Flags::ESCAPE) {
             let mut check = false;
             for &byte in arg {
                 match byte {
@@ -154,7 +154,7 @@ pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
         }
     }
 
-    if !flags.contains(NO_NEWLINE) {
+    if !flags.contains(Flags::NO_NEWLINE) {
         buffer.write_all(&[b'\n'])?;
     }
 
