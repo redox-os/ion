@@ -42,14 +42,19 @@ impl Job {
     pub(crate) fn expand(&mut self, shell: &Shell) {
         let mut expanded = Array::new();
         expanded.grow(self.args.len());
-        expanded.extend(self.args.drain().flat_map(|arg| match arg.as_str() {
-            "!!" => expand_last_command(shell, Operation::All),
-            "!$" => expand_last_command(shell, Operation::LastArg),
-            "!0" => expand_last_command(shell, Operation::Command),
-            "!^" => expand_last_command(shell, Operation::FirstArg),
-            "!*" => expand_last_command(shell, Operation::NoCommand),
-            _ => expand_arg(&arg, shell),
-        }));
+        expanded.extend(
+            self.args
+                .drain()
+                .flat_map(|arg| match arg.as_str() {
+                    "!!" => expand_last_command(shell, Operation::All),
+                    "!$" => expand_last_command(shell, Operation::LastArg),
+                    "!0" => expand_last_command(shell, Operation::Command),
+                    "!^" => expand_last_command(shell, Operation::FirstArg),
+                    "!*" => expand_last_command(shell, Operation::NoCommand),
+                    _ => expand_arg(&arg, shell),
+                })
+                .filter(|x| !x.is_empty()),
+        );
         self.args = expanded;
     }
 }
