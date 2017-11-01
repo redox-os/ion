@@ -1,16 +1,17 @@
 //! Contains the binary logic of Ion.
 mod prompt;
 mod readln;
+mod terminate;
 
 use self::prompt::{prompt, prompt_fn};
 use self::readln::readln;
+use self::terminate::{terminate_quotes, terminate_script_quotes};
 use super::{FlowLogic, JobControl, Shell, ShellHistory};
 use super::flags::*;
 use super::flow_control::Statement;
 use super::library::IonLibrary;
 use super::status::*;
 use liner::{Buffer, Context};
-use parser::QuoteTerminator;
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
@@ -49,50 +50,12 @@ impl Binary for Shell {
 
     fn readln(&mut self) -> Option<String> { readln(self) }
 
-    fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, mut lines: I) -> i32 {
-        while let Some(command) = lines.next() {
-            let mut buffer = QuoteTerminator::new(command);
-            while !buffer.check_termination() {
-                loop {
-                    if let Some(command) = lines.next() {
-                        buffer.append(command);
-                        break;
-                    } else {
-                        let stderr = io::stderr();
-                        let _ = writeln!(stderr.lock(), "ion: unterminated quote in script");
-                        return FAILURE;
-                    }
-                }
-            }
-            self.on_command(&buffer.consume());
-        }
-
-        // The flow control level being non zero means that we have a statement that has
-        // only been partially parsed.
-        if self.flow_control.level != 0 {
-            eprintln!(
-                "ion: unexpected end of script: expected end block for `{}`",
-                self.flow_control.current_statement.short()
-            );
-            return FAILURE;
-        }
-
-        SUCCESS
+    fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I) -> i32 {
+        terminate_script_quotes(self, lines)
     }
 
     fn terminate_quotes(&mut self, command: String) -> Result<String, ()> {
-        let mut buffer = QuoteTerminator::new(command);
-        self.flow_control.level += 1;
-        while !buffer.check_termination() {
-            if let Some(command) = self.readln() {
-                buffer.append(command);
-            } else {
-                return Err(());
-            }
-        }
-        self.flow_control.level -= 1;
-        let terminated = buffer.consume();
-        Ok(terminated)
+        terminate_quotes(self, command)
     }
 
     fn execute_arguments<A: Iterator<Item = String>>(&mut self, mut args: A) {
