@@ -195,7 +195,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                             self.read_selection(iterator),
                         )
                     } else {
-                        WordToken::Variable(variable, self.flags.contains(Flags::DQUOTE), Select::All)
+                        WordToken::Variable(
+                            variable,
+                            self.flags.contains(Flags::DQUOTE),
+                            Select::All,
+                        )
                     };
                 }
                 _ => (),
@@ -324,7 +328,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             self.read += 1;
         }
 
-        WordToken::ArrayVariable(&self.data[start..], self.flags.contains(Flags::DQUOTE), Select::All)
+        WordToken::ArrayVariable(
+            &self.data[start..],
+            self.flags.contains(Flags::DQUOTE),
+            Select::All,
+        )
     }
 
     fn braced_array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
@@ -370,7 +378,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             }
             self.read += 1;
         }
-        WordToken::ArrayVariable(&self.data[start..], self.flags.contains(Flags::DQUOTE), Select::All)
+        WordToken::ArrayVariable(
+            &self.data[start..],
+            self.flags.contains(Flags::DQUOTE),
+            Select::All,
+        )
     }
 
     /// Contains the logic for parsing subshell syntax.

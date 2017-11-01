@@ -160,7 +160,8 @@ impl ShellHistoryPrivate for Shell {
             }
         }
 
-        if ignore.contains(IgnoreFlags::NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND {
+        if ignore.contains(IgnoreFlags::NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND
+        {
             return false;
         }
 

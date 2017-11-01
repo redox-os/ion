@@ -34,7 +34,8 @@ impl QuoteTerminator {
 
     pub(crate) fn append(&mut self, input: String) {
         if self.eof.is_none() {
-            self.buffer.push_str(if self.flags.contains(Flags::TRIM) { input.trim() } else { &input });
+            self.buffer
+                .push_str(if self.flags.contains(Flags::TRIM) { input.trim() } else { &input });
         } else {
             self.eof_buffer.push_str(&input);
         }
@@ -58,8 +59,12 @@ impl QuoteTerminator {
                             b'\\' => {
                                 let _ = bytes.next();
                             }
-                            b'\'' if !self.flags.intersects(Flags::DQUOTE) => self.flags ^= Flags::SQUOTE,
-                            b'"' if !self.flags.intersects(Flags::SQUOTE) => self.flags ^= Flags::DQUOTE,
+                            b'\'' if !self.flags.intersects(Flags::DQUOTE) => {
+                                self.flags ^= Flags::SQUOTE
+                            }
+                            b'"' if !self.flags.intersects(Flags::SQUOTE) => {
+                                self.flags ^= Flags::DQUOTE
+                            }
                             b'<' if !self.flags.contains(Flags::SQUOTE | Flags::DQUOTE) => {
                                 let as_bytes = self.buffer.as_bytes();
                                 if Some(&b'<') == as_bytes.get(self.read) {
@@ -84,16 +89,19 @@ impl QuoteTerminator {
                                     self.flags -= Flags::ARRAY
                                 }
                             }
-                            b'#' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => if self.read > 1 {
-                                let character = self.buffer.as_bytes().get(self.read - 2).unwrap();
-                                if [b' ', b'\n'].contains(character) {
+                            b'#' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
+                                if self.read > 1 {
+                                    let character =
+                                        self.buffer.as_bytes().get(self.read - 2).unwrap();
+                                    if [b' ', b'\n'].contains(character) {
+                                        instance |= Flags::COMM;
+                                        break;
+                                    }
+                                } else {
                                     instance |= Flags::COMM;
                                     break;
                                 }
-                            } else {
-                                instance |= Flags::COMM;
-                                break;
-                            },
+                            }
                             _ => (),
                         }
                     }

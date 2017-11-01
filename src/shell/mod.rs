@@ -40,6 +40,7 @@ use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
 use std::io::{self, Write};
+use std::iter::FromIterator;
 use std::ops::Deref;
 use std::process;
 use std::ptr;
@@ -315,6 +316,57 @@ impl<'a> Shell {
         }
         exit_status
     }
+
+    fn fork_and_output<F: FnMut(&mut Shell)>(&self, mut child_func: F) -> Option<String> {
+        use std::io::Read;
+        use std::os::unix::io::{AsRawFd, FromRawFd};
+        use std::process::exit;
+        use sys;
+
+        let (mut out_read, out_write) = match sys::pipe2(sys::O_CLOEXEC) {
+            Ok(fds) => unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) },
+            Err(why) => {
+                eprintln!("ion: unable to create pipe: {}", why);
+                return None;
+            }
+        };
+
+        match unsafe { sys::fork() } {
+            Ok(0) => {
+                // Redirect stdout in the child to the write end of the pipe.
+                // Also close the read end of the pipe because we don't need it.
+                let _ = sys::dup2(out_write.as_raw_fd(), sys::STDOUT_FILENO);
+                drop(out_write);
+                drop(out_read);
+
+                // Then execute the required functionality in the child shell.
+                child_func(unsafe { &mut *self.pointer });
+
+                // Reap the child, enabling the parent to get EOF from the read end of the pipe.
+                exit(0);
+            }
+            Ok(_pid) => {
+                // Drop the write end of the pipe, because the parent will not use it.
+                drop(out_write);
+
+                // Read from the read end of the pipe into a String.
+                let mut output = String::new();
+                if let Err(why) = out_read.read_to_string(&mut output) {
+                    eprintln!("ion: unable read child's output: {}", why);
+                    return None;
+                }
+
+                // Ensure that the parent retains ownership of the terminal before exiting.
+                let _ = sys::tcsetpgrp(sys::STDIN_FILENO, sys::getpid().unwrap());
+
+                Some(output)
+            }
+            Err(why) => {
+                eprintln!("ion: fork error: {}", why);
+                None
+            }
+        }
+    }
 }
 
 impl<'a> Expander for Shell {
@@ -324,7 +376,6 @@ impl<'a> Expander for Shell {
 
     /// Expand an array variable with some selection
     fn array(&self, array: &str, selection: Select) -> Option<Array> {
-        use std::iter::FromIterator;
         let mut found = match self.variables.get_array(array) {
             Some(array) => match selection {
                 Select::None => None,
@@ -333,16 +384,17 @@ impl<'a> Expander for Shell {
                     .and_then(|n| array.get(n))
                     .map(|x| Array::from_iter(Some(x.to_owned()))),
                 Select::Range(range) => if let Some((start, length)) = range.bounds(array.len()) {
-                    let array = array
-                        .iter()
-                        .skip(start)
-                        .take(length)
-                        .map(|x| x.to_owned())
-                        .collect::<Array>();
-                    if array.is_empty() {
+                    if array.len() <= start {
                         None
                     } else {
-                        Some(array)
+                        Some(
+                            array
+                                .iter()
+                                .skip(start)
+                                .take(length)
+                                .map(|x| x.to_owned())
+                                .collect::<Array>(),
+                        )
                     }
                 } else {
                     None
@@ -380,58 +432,11 @@ impl<'a> Expander for Shell {
             self.variables.get_var(variable).map(|x| x.ascii_replace('\n', ' ').into())
         }
     }
+
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<Value> {
-        use std::io::Read;
-        use std::os::unix::io::{AsRawFd, FromRawFd};
-        use std::process::exit;
-        use sys;
-
-        let (mut out_read, out_write) = match sys::pipe2(sys::O_CLOEXEC) {
-            Ok(fds) => unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) },
-            Err(why) => {
-                eprintln!("ion: unable to create pipe: {}", why);
-                return None;
-            }
-        };
-
-        match unsafe { sys::fork() } {
-            Ok(0) => {
-                // Redirect stdout in the child to the write end of the pipe.
-                // Also close the read end of the pipe because we don't need it.
-                let _ = sys::dup(sys::STDIN_FILENO);
-                let _ = sys::dup2(out_write.as_raw_fd(), sys::STDOUT_FILENO);
-                drop(out_write);
-                drop(out_read);
-
-                // Now obtain ownership of the child's shell through a mutable pointer,
-                // and then use that shell to execute the command.
-                let shell: &mut Shell = unsafe { &mut *self.pointer };
-                shell.on_command(command);
-
-                // Reap the child, enabling the parent to get EOF from the read end of the pipe.
-                exit(0);
-            }
-            Ok(_pid) => {
-                // Drop the write end of the pipe, because the parent will not use it.
-                drop(out_write);
-
-                // Read from the read end of the pipe into a String.
-                let mut output = String::new();
-                if let Err(why) = out_read.read_to_string(&mut output) {
-                    eprintln!("ion: unable read child's output: {}", why);
-                    return None;
-                }
-
-                // Ensure that the parent retains ownership of the terminal before exiting.
-                let _ = sys::tcsetpgrp(sys::STDIN_FILENO, sys::getpid().unwrap());
-
-                Some(output)
-            }
-            Err(why) => {
-                eprintln!("ion: fork error: {}", why);
-                None
-            }
-        }
+        self.fork_and_output(move |shell| {
+            shell.on_command(command);
+        })
     }
 }

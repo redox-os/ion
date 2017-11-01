@@ -152,7 +152,9 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.flags = (self.flags - Flags::COMM_2) | (Flags::COMM_1 | Flags::VARIAB);
                     continue;
                 }
-                b'{' if self.flags.intersects(Flags::COMM_1 | Flags::COMM_2) => self.flags |= Flags::VBRACE,
+                b'{' if self.flags.intersects(Flags::COMM_1 | Flags::COMM_2) => {
+                    self.flags |= Flags::VBRACE
+                }
                 b'{' if !self.flags.contains(Flags::DQUOTE) => self.brace_level += 1,
                 b'}' if self.flags.contains(Flags::VBRACE) => self.flags.toggle(Flags::VBRACE),
                 b'}' if !self.flags.contains(Flags::DQUOTE) => if self.brace_level == 0 {
@@ -213,7 +215,9 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b')' if self.p_level != 0 => self.p_level -= 1,
                 b')' => self.ap_level -= 1,
-                b';' if !self.flags.contains(Flags::DQUOTE) && self.p_level == 0 && self.ap_level == 0 => {
+                b';' if !self.flags.contains(Flags::DQUOTE) && self.p_level == 0
+                    && self.ap_level == 0 =>
+                {
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(self.data[start..self.read - 1].trim())),
@@ -257,7 +261,11 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 // [^A-Za-z0-9_]
                 byte => if self.flags.intersects(Flags::VARIAB | Flags::ARRAY) {
-                    self.flags -= if is_invalid(byte) { Flags::VARIAB | Flags::ARRAY } else { Flags::empty() };
+                    self.flags -= if is_invalid(byte) {
+                        Flags::VARIAB | Flags::ARRAY
+                    } else {
+                        Flags::empty()
+                    };
                 },
             }
             self.flags -= Flags::COMM_1 | Flags::COMM_2;

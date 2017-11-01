@@ -2,6 +2,7 @@
 #![allow(while_let_on_iterator)]
 #![feature(conservative_impl_trait)]
 #![feature(integer_atomics)]
+#![feature(pointer_methods)]
 
 extern crate app_dirs;
 #[macro_use]

@@ -1,5 +1,7 @@
 //! Contains the binary logic of Ion.
+mod prompt;
 
+use self::prompt::{prompt, prompt_fn};
 use super::{DirectoryStack, FlowLogic, JobControl, Shell, ShellHistory, Variables};
 use super::completer::*;
 use super::flags::*;
@@ -7,19 +9,16 @@ use super::flow_control::Statement;
 use super::library::IonLibrary;
 use super::status::*;
 use liner::{BasicCompleter, Buffer, Context, CursorPosition, Event, EventKind};
-use parser::*;
 use parser::QuoteTerminator;
 use smallstring::SmallString;
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
-use std::io::{self, ErrorKind, Read, Write};
+use std::io::{self, ErrorKind, Write};
 use std::iter::{self, FromIterator};
 use std::mem;
-use std::os::unix::io::FromRawFd;
 use std::path::{Path, PathBuf};
 use std::process;
-use std::process::exit;
 use sys;
 use types::*;
 
@@ -47,55 +46,9 @@ pub(crate) trait Binary {
 }
 
 impl Binary for Shell {
-    fn prompt(&mut self) -> String {
-        if self.flow_control.level == 0 {
-            let rprompt = match self.prompt_fn() {
-                Some(prompt) => prompt,
-                None => self.variables.get_var_or_empty("PROMPT"),
-            };
-            expand_string(&rprompt, self, false).join(" ")
-        } else {
-            "    ".repeat(self.flow_control.level as usize)
-        }
-    }
+    fn prompt(&mut self) -> String { prompt(self) }
 
-    fn prompt_fn(&mut self) -> Option<String> {
-        let function = match self.functions.get("PROMPT") {
-            Some(func) => func.clone(),
-            None => return None,
-        };
-
-        let (read_fd, write_fd) = match sys::pipe2(0) {
-            Ok(fds) => fds,
-            Err(why) => {
-                eprintln!("ion: unable to create pipe: {}", why);
-                return None;
-            }
-        };
-
-        match unsafe { sys::fork() } {
-            Ok(0) => {
-                let _ = sys::dup2(write_fd, sys::STDOUT_FILENO);
-                let _ = sys::close(read_fd);
-                let _ = sys::close(write_fd);
-                let _ = function.execute(self, &["ion"]);
-                exit(0);
-            }
-            Ok(_) => {
-                let _ = sys::close(write_fd);
-                let mut child_stdout = unsafe { File::from_raw_fd(read_fd) };
-                let mut output = String::new();
-                let _ = child_stdout.read_to_string(&mut output);
-                Some(output)
-            }
-            Err(why) => {
-                let _ = sys::close(read_fd);
-                let _ = sys::close(write_fd);
-                eprintln!("ion: fork error: {}", why);
-                None
-            }
-        }
-    }
+    fn prompt_fn(&mut self) -> Option<String> { prompt_fn(self) }
 
     fn readln(&mut self) -> Option<String> {
         {
