@@ -1,4 +1,5 @@
 //! Contains the binary logic of Ion.
+
 use super::{DirectoryStack, FlowLogic, JobControl, Shell, ShellHistory, Variables};
 use super::completer::*;
 use super::flags::*;

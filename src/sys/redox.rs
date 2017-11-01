@@ -83,8 +83,6 @@ pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
 
 pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(syscall::close(fd)).and(Ok(())) }
 
-pub(crate) fn close_stdin() { syscall::close(STDIN_FILENO); }
-
 pub(crate) fn isatty(fd: RawFd) -> bool {
     if let Ok(tfd) = syscall::dup(fd, b"termios") {
         let _ = syscall::close(tfd);

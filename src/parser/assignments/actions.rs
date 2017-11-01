@@ -135,7 +135,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "123",
-            ),)
+            ))
         );
         assert_eq!(
             actions[1],
@@ -146,7 +146,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "456",
-            ),)
+            ))
         );
 
         let (keys, op, vals) = split("ab:int *= 3");
@@ -161,7 +161,7 @@ mod tests {
                 },
                 Operator::Multiply,
                 "3",
-            ),)
+            ))
         );
 
         let (keys, op, vals) = split("a b[] c:int[] = one [two three] [4 5 6]");
@@ -176,7 +176,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "one",
-            ),)
+            ))
         );
         assert_eq!(
             actions[1],
@@ -187,7 +187,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "[two three]",
-            ),)
+            ))
         );
         assert_eq!(
             actions[2],
@@ -198,7 +198,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "[4 5 6]",
-            ),)
+            ))
         );
 
         let (keys, op, values) = split("a[] b c[] = [one two] three [four five]");
@@ -213,7 +213,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "[one two]",
-            ),)
+            ))
         );
         assert_eq!(
             actions[1],
@@ -224,7 +224,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "three",
-            ),)
+            ))
         );
         assert_eq!(
             actions[2],
@@ -235,7 +235,7 @@ mod tests {
                 },
                 Operator::Equal,
                 "[four five]",
-            ),)
+            ))
         );
     }
 }

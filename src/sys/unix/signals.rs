@@ -4,10 +4,7 @@ use std::ptr;
 
 /// Blocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so that the shell never receives
 /// them.
-pub(crate) fn block()
-// fn block() // fn block() // fn block() // fn block() // fn block() // fn
-// block()
-{
+pub(crate) fn block() {
     unsafe {
         let mut sigset = mem::uninitialized::<sigset_t>();
         sigemptyset(&mut sigset as *mut sigset_t);
@@ -22,11 +19,7 @@ pub(crate) fn block()
 /// Unblocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so children processes can be
 /// controlled
 /// by the shell.
-pub(crate) fn unblock()
-// fn unblock()
-// fn unblock() // fn unblock() // fn unblock() // fn unblock() // fn
-// unblock()
-{
+pub(crate) fn unblock() {
     unsafe {
         let mut sigset = mem::uninitialized::<sigset_t>();
         sigemptyset(&mut sigset as *mut sigset_t);

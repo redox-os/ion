@@ -65,7 +65,7 @@ mod tests {
         assert_eq!(split_assignment("abc=def"), (Some("abc"), Some("="), Some("def")));
         assert_eq!(
             split_assignment("def ghi += 124 523"),
-            (Some("def ghi"), Some("+="), Some("124 523"),)
+            (Some("def ghi"), Some("+="), Some("124 523"))
         )
     }
 }

@@ -397,13 +397,9 @@ impl<'a> Expander for Shell {
 
         match unsafe { sys::fork() } {
             Ok(0) => {
-                // TODO: Figure out how to properly enable stdin in the child.
-                // Without this line, the parent will hang. Can test with:
-                //     echo $(read x)
-                sys::close_stdin();
-
                 // Redirect stdout in the child to the write end of the pipe.
                 // Also close the read end of the pipe because we don't need it.
+                let _ = sys::dup(sys::STDIN_FILENO);
                 let _ = sys::dup2(out_write.as_raw_fd(), sys::STDOUT_FILENO);
                 drop(out_write);
                 drop(out_read);
@@ -422,7 +418,13 @@ impl<'a> Expander for Shell {
 
                 // Read from the read end of the pipe into a String.
                 let mut output = String::new();
-                let _ = out_read.read_to_string(&mut output);
+                if let Err(why) = out_read.read_to_string(&mut output) {
+                    eprintln!("ion: unable read child's output: {}", why);
+                    return None;
+                }
+
+                // Ensure that the parent retains ownership of the terminal before exiting.
+                let _ = sys::tcsetpgrp(sys::STDIN_FILENO, sys::getpid().unwrap());
 
                 Some(output)
             }

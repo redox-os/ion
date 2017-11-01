@@ -1,4 +1,3 @@
-
 use super::colors::Colors;
 use super::directory_stack::DirectoryStack;
 use super::plugins::namespaces::{self, StringNamespace};

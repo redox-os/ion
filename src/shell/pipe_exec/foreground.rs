@@ -1,4 +1,5 @@
 //! Contains the logic for enabling foreground management.
+
 use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
 
 pub(crate) enum BackgroundResult {

@@ -1,7 +1,7 @@
 extern crate ansi_term;
 extern crate version_check;
 
-use ansi_term::Color::{Blue, Red, White, Yellow};
+use ansi_term::Color::{Blue, Red, White};
 use version_check::is_nightly;
 
 // Specifies the minimum version needed to compile Ion.
@@ -15,36 +15,17 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::Command;
 
-// Convenience macro for writing to stderr.
-macro_rules! printerr {
-    ($($arg:tt)*) => ({
-        use std::io::prelude::*;
-        write!(&mut ::std::io::stderr(), "{}\n", format_args!($($arg)*))
-            .expect("Failed to write to stderr.")
-    })
-}
-
 fn main() {
-    let print_version_err = |version: &str| {
-        printerr!(
-            "{} {}. {} {}.",
-            White.paint("Installed version is:"),
-            Yellow.paint(format!("{}", version)),
-            White.paint("Minimum required:"),
-            Yellow.paint("nightly")
-        );
-    };
-
     match is_nightly() {
         Some(true) => (), // Success!
         Some(false) => {
-            printerr!(
+            eprintln!(
                 "{} {}",
                 Red.bold().paint("Error:"),
                 White.paint("Ion requires nighlty to build.")
             );
             // print_version_err(&*version_string);
-            printerr!(
+            eprintln!(
                 "{}{}{}",
                 Blue.paint("Use `"),
                 White.paint("rustup update"),
@@ -53,8 +34,8 @@ fn main() {
             panic!("Aborting compilation due to incompatible compiler.")
         }
         _ => {
-            println!("cargo:warning={}", "Ion was unable to check rustc compatibility.");
-            println!("cargo:warning={}", "Build may fail due to incompatible rustc version.");
+            eprintln!("cargo:warning={}", "Ion was unable to check rustc compatibility.");
+            eprintln!("cargo:warning={}", "Build may fail due to incompatible rustc version.");
         }
     }
     match write_version_file() {
