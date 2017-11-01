@@ -90,7 +90,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             if character == b'}' {
                 let output = &self.data[start..self.read];
                 self.read += 1;
-                return WordToken::Variable(output, self.flags.contains(DQUOTE), Select::All);
+                return WordToken::Variable(output, self.flags.contains(Flags::DQUOTE), Select::All);
             }
             self.read += 1;
         }
@@ -191,11 +191,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     return if character == b'[' {
                         WordToken::Variable(
                             variable,
-                            self.flags.contains(DQUOTE),
+                            self.flags.contains(Flags::DQUOTE),
                             self.read_selection(iterator),
                         )
                     } else {
-                        WordToken::Variable(variable, self.flags.contains(DQUOTE), Select::All)
+                        WordToken::Variable(variable, self.flags.contains(Flags::DQUOTE), Select::All)
                     };
                 }
                 _ => (),
@@ -203,7 +203,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             self.read += 1;
         }
 
-        WordToken::Variable(&self.data[start..], self.flags.contains(DQUOTE), Select::All)
+        WordToken::Variable(&self.data[start..], self.flags.contains(Flags::DQUOTE), Select::All)
     }
 
     fn read_selection<I>(&mut self, iterator: &mut I) -> Select
@@ -307,7 +307,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 b'[' => {
                     return WordToken::ArrayVariable(
                         &self.data[start..self.read],
-                        self.flags.contains(DQUOTE),
+                        self.flags.contains(Flags::DQUOTE),
                         self.read_selection(iterator),
                     )
                 }
@@ -315,7 +315,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {
                     return WordToken::ArrayVariable(
                         &self.data[start..self.read],
-                        self.flags.contains(DQUOTE),
+                        self.flags.contains(Flags::DQUOTE),
                         Select::All,
                     )
                 }
@@ -324,7 +324,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             self.read += 1;
         }
 
-        WordToken::ArrayVariable(&self.data[start..], self.flags.contains(DQUOTE), Select::All)
+        WordToken::ArrayVariable(&self.data[start..], self.flags.contains(Flags::DQUOTE), Select::All)
     }
 
     fn braced_array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
@@ -337,7 +337,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 b'[' => {
                     let result = WordToken::ArrayVariable(
                         &self.data[start..self.read],
-                        self.flags.contains(DQUOTE),
+                        self.flags.contains(Flags::DQUOTE),
                         self.read_selection(iterator),
                     );
                     self.read += 1;
@@ -354,7 +354,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     self.read += 1;
                     return WordToken::ArrayVariable(
                         output,
-                        self.flags.contains(DQUOTE),
+                        self.flags.contains(Flags::DQUOTE),
                         Select::All,
                     );
                 }
@@ -362,7 +362,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => {
                     return WordToken::ArrayVariable(
                         &self.data[start..self.read],
-                        self.flags.contains(DQUOTE),
+                        self.flags.contains(Flags::DQUOTE),
                         Select::All,
                     )
                 }
@@ -370,7 +370,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             }
             self.read += 1;
         }
-        WordToken::ArrayVariable(&self.data[start..], self.flags.contains(DQUOTE), Select::All)
+        WordToken::ArrayVariable(&self.data[start..], self.flags.contains(Flags::DQUOTE), Select::All)
     }
 
     /// Contains the logic for parsing subshell syntax.
@@ -381,27 +381,27 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         let mut level = 0;
         while let Some(character) = iterator.next() {
             match character {
-                _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
-                b'\\' => self.flags ^= BACKSL,
-                b'\'' if !self.flags.contains(DQUOTE) => self.flags ^= SQUOTE,
-                b'"' if !self.flags.contains(SQUOTE) => self.flags ^= DQUOTE,
-                b'$' if !self.flags.contains(SQUOTE) => {
+                _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
+                b'\\' => self.flags ^= Flags::BACKSL,
+                b'\'' if !self.flags.contains(Flags::DQUOTE) => self.flags ^= Flags::SQUOTE,
+                b'"' if !self.flags.contains(Flags::SQUOTE) => self.flags ^= Flags::DQUOTE,
+                b'$' if !self.flags.contains(Flags::SQUOTE) => {
                     if self.data.as_bytes()[self.read + 1] == b'(' {
                         level += 1;
                     }
                 }
-                b')' if !self.flags.contains(SQUOTE) => if level == 0 {
+                b')' if !self.flags.contains(Flags::SQUOTE) => if level == 0 {
                     let output = &self.data[start..self.read];
                     self.read += 1;
                     return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                         let _ = iterator.next();
                         WordToken::Process(
                             output,
-                            self.flags.contains(DQUOTE),
+                            self.flags.contains(Flags::DQUOTE),
                             self.read_selection(iterator),
                         )
                     } else {
-                        WordToken::Process(output, self.flags.contains(DQUOTE), Select::All)
+                        WordToken::Process(output, self.flags.contains(Flags::DQUOTE), Select::All)
                     };
                 } else {
                     level -= 1;
@@ -423,29 +423,29 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         let mut level = 0;
         while let Some(character) = iterator.next() {
             match character {
-                _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
-                b'\\' => self.flags ^= BACKSL,
-                b'\'' if !self.flags.contains(DQUOTE) => self.flags ^= SQUOTE,
-                b'"' if !self.flags.contains(SQUOTE) => self.flags ^= DQUOTE,
-                b'@' if !self.flags.contains(SQUOTE) => {
+                _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
+                b'\\' => self.flags ^= Flags::BACKSL,
+                b'\'' if !self.flags.contains(Flags::DQUOTE) => self.flags ^= Flags::SQUOTE,
+                b'"' if !self.flags.contains(Flags::SQUOTE) => self.flags ^= Flags::DQUOTE,
+                b'@' if !self.flags.contains(Flags::SQUOTE) => {
                     if self.data.as_bytes()[self.read + 1] == b'(' {
                         level += 1;
                     }
                 }
-                b')' if !self.flags.contains(SQUOTE) => if level == 0 {
+                b')' if !self.flags.contains(Flags::SQUOTE) => if level == 0 {
                     let array_process_contents = &self.data[start..self.read];
                     self.read += 1;
                     return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                         let _ = iterator.next();
                         WordToken::ArrayProcess(
                             array_process_contents,
-                            self.flags.contains(DQUOTE),
+                            self.flags.contains(Flags::DQUOTE),
                             self.read_selection(iterator),
                         )
                     } else {
                         WordToken::ArrayProcess(
                             array_process_contents,
-                            self.flags.contains(DQUOTE),
+                            self.flags.contains(Flags::DQUOTE),
                             Select::All,
                         )
                     };
@@ -470,16 +470,16 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         let mut elements = Vec::new();
         while let Some(character) = iterator.next() {
             match character {
-                _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
-                b'\\' => self.flags ^= BACKSL,
-                b'\'' if !self.flags.contains(DQUOTE) => self.flags ^= SQUOTE,
-                b'"' if !self.flags.contains(SQUOTE) => self.flags ^= DQUOTE,
-                b',' if !self.flags.intersects(SQUOTE | DQUOTE) && level == 0 => {
+                _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
+                b'\\' => self.flags ^= Flags::BACKSL,
+                b'\'' if !self.flags.contains(Flags::DQUOTE) => self.flags ^= Flags::SQUOTE,
+                b'"' if !self.flags.contains(Flags::SQUOTE) => self.flags ^= Flags::DQUOTE,
+                b',' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) && level == 0 => {
                     elements.push(&self.data[start..self.read]);
                     start = self.read + 1;
                 }
-                b'{' if !self.flags.intersects(SQUOTE | DQUOTE) => level += 1,
-                b'}' if !self.flags.intersects(SQUOTE | DQUOTE) => if level == 0 {
+                b'{' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => level += 1,
+                b'}' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => if level == 0 {
                     elements.push(&self.data[start..self.read]);
                     self.read += 1;
                     return WordToken::Brace(elements);
@@ -502,12 +502,12 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         let mut level = 0;
         while let Some(character) = iterator.next() {
             match character {
-                _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
-                b'\\' => self.flags ^= BACKSL,
-                b'\'' if !self.flags.contains(DQUOTE) => self.flags ^= SQUOTE,
-                b'"' if !self.flags.contains(SQUOTE) => self.flags ^= DQUOTE,
-                b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => level += 1,
-                b']' if !self.flags.intersects(SQUOTE | DQUOTE) => if level == 0 {
+                _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
+                b'\\' => self.flags ^= Flags::BACKSL,
+                b'\'' if !self.flags.contains(Flags::DQUOTE) => self.flags ^= Flags::SQUOTE,
+                b'"' if !self.flags.contains(Flags::SQUOTE) => self.flags ^= Flags::DQUOTE,
+                b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => level += 1,
+                b']' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => if level == 0 {
                     let elements =
                         ArgumentSplitter::new(&self.data[start..self.read]).collect::<Vec<&str>>();
                     self.read += 1;
@@ -609,55 +609,55 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
         loop {
             if let Some(character) = iterator.next() {
                 match character {
-                    _ if self.flags.contains(BACKSL) => {
+                    _ if self.flags.contains(Flags::BACKSL) => {
                         self.read += 1;
-                        self.flags ^= BACKSL;
+                        self.flags ^= Flags::BACKSL;
                         break;
                     }
                     b'\\' => {
-                        if !self.flags.intersects(DQUOTE | SQUOTE) {
+                        if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) {
                             start += 1;
                         }
                         self.read += 1;
-                        self.flags ^= BACKSL;
+                        self.flags ^= Flags::BACKSL;
                         break;
                     }
-                    b'\'' if !self.flags.contains(DQUOTE) => {
+                    b'\'' if !self.flags.contains(Flags::DQUOTE) => {
                         start += 1;
                         self.read += 1;
-                        self.flags ^= SQUOTE;
+                        self.flags ^= Flags::SQUOTE;
                         break;
                     }
-                    b'"' if !self.flags.contains(SQUOTE) => {
+                    b'"' if !self.flags.contains(Flags::SQUOTE) => {
                         start += 1;
                         self.read += 1;
-                        if self.flags.contains(DQUOTE) {
-                            self.flags -= DQUOTE;
+                        if self.flags.contains(Flags::DQUOTE) {
+                            self.flags -= Flags::DQUOTE;
                             return self.next();
                         }
-                        self.flags |= DQUOTE;
+                        self.flags |= Flags::DQUOTE;
                         break;
                     }
-                    b' ' if !self.flags.intersects(DQUOTE | SQUOTE) => {
+                    b' ' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
                         return Some(self.whitespaces(&mut iterator))
                     }
-                    b'~' if !self.flags.intersects(DQUOTE | SQUOTE) => {
+                    b'~' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
                         tilde = true;
                         self.read += 1;
                         break;
                     }
-                    b'{' if !self.flags.intersects(DQUOTE | SQUOTE) => {
+                    b'{' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
                         self.read += 1;
                         return Some(self.braces(&mut iterator));
                     }
-                    b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                    b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                         if self.glob_check(&mut iterator) {
                             glob = true;
                         } else {
                             return Some(self.array(&mut iterator));
                         }
                     }
-                    b'@' if !self.flags.contains(SQUOTE) => match iterator.next() {
+                    b'@' if !self.flags.contains(Flags::SQUOTE) => match iterator.next() {
                         Some(b'(') => {
                             self.read += 2;
                             return Some(self.array_process(&mut iterator));
@@ -676,7 +676,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                             return Some(self.array_variable(&mut iterator));
                         }
                     },
-                    b'$' if !self.flags.contains(SQUOTE) => {
+                    b'$' if !self.flags.contains(Flags::SQUOTE) => {
                         match iterator.next() {
                             Some(b'(') => {
                                 self.read += 2;
@@ -721,10 +721,10 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
 
         while let Some(character) = iterator.next() {
             match character {
-                _ if self.flags.contains(BACKSL) => self.flags ^= BACKSL,
+                _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
                 b'\\' => {
-                    self.flags ^= BACKSL;
-                    let end = if self.flags.intersects(DQUOTE | SQUOTE) {
+                    self.flags ^= Flags::BACKSL;
+                    let end = if self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) {
                         self.read + 1
                     } else {
                         self.read
@@ -733,22 +733,22 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     self.read += 1;
                     return Some(WordToken::Normal(output, glob, tilde));
                 }
-                b'\'' if !self.flags.contains(DQUOTE) => {
-                    self.flags ^= SQUOTE;
+                b'\'' if !self.flags.contains(Flags::DQUOTE) => {
+                    self.flags ^= Flags::SQUOTE;
                     let output = &self.data[start..self.read];
                     self.read += 1;
                     return Some(WordToken::Normal(output, glob, tilde));
                 }
-                b'"' if !self.flags.contains(SQUOTE) => {
-                    self.flags ^= DQUOTE;
+                b'"' if !self.flags.contains(Flags::SQUOTE) => {
+                    self.flags ^= Flags::DQUOTE;
                     let output = &self.data[start..self.read];
                     self.read += 1;
                     return Some(WordToken::Normal(output, glob, tilde));
                 }
-                b' ' | b'{' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                b' ' | b'{' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                     return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde))
                 }
-                b'$' | b'@' if !self.flags.contains(SQUOTE) => {
+                b'$' | b'@' if !self.flags.contains(Flags::SQUOTE) => {
                     if let Some(&character) = self.data.as_bytes().get(self.read) {
                         if character == b' ' {
                             self.read += 1;
@@ -763,17 +763,17 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                         return self.next();
                     };
                 }
-                b'[' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                     if self.glob_check(&mut iterator) {
                         glob = true;
                     } else {
                         return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde));
                     }
                 }
-                b'*' | b'?' if !self.flags.contains(SQUOTE) => {
+                b'*' | b'?' if !self.flags.contains(Flags::SQUOTE) => {
                     glob = true;
                 }
-                b'~' if !self.flags.intersects(SQUOTE | DQUOTE) => {
+                b'~' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                     let output = &self.data[start..self.read];
                     if output != "" {
                         return Some(WordToken::Normal(output, glob, tilde));
