@@ -280,18 +280,3 @@ impl RefinedJob {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn preserve_empty_arg() {
-        let shell = Shell::new();
-        let job = Job::new(array!("rename", "", "0", "a"), JobKind::Last);
-        let mut expanded = job.clone();
-        expanded.expand(&shell);
-        assert_eq!(job, expanded);
-    }
-
-}
