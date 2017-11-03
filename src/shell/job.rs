@@ -1,13 +1,9 @@
-use std::fs::File;
-use std::process::{Command, Stdio};
-
-// use glob::glob;
-
 use super::Shell;
-use parser::ArgumentSplitter;
 use parser::expand_string;
 use parser::pipelines::RedirectFrom;
 use smallstring::SmallString;
+use std::fs::File;
+use std::process::{Command, Stdio};
 use std::str;
 use types::*;
 
@@ -43,74 +39,10 @@ impl Job {
         let mut expanded = Array::new();
         expanded.grow(self.args.len());
         expanded.extend(
-            self.args
-                .drain()
-                .flat_map(|arg| match arg.as_str() {
-                    "!!" => expand_last_command(shell, Operation::All),
-                    "!$" => expand_last_command(shell, Operation::LastArg),
-                    "!0" => expand_last_command(shell, Operation::Command),
-                    "!^" => expand_last_command(shell, Operation::FirstArg),
-                    "!*" => expand_last_command(shell, Operation::NoCommand),
-                    _ => expand_arg(&arg, shell),
-                })
-                .filter(|x| !x.is_empty()),
+            self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).filter(|x| !x.is_empty()),
         );
         self.args = expanded;
     }
-}
-
-pub(crate) enum Operation {
-    LastArg,
-    FirstArg,
-    Command,
-    NoCommand,
-    All,
-}
-
-/// Expands the last command that was provided to the shell.
-///
-/// If `last_arg` is set to `true`, then only the last argument of
-/// the last command will be expanded.
-pub(crate) fn expand_last_command(shell: &Shell, operation: Operation) -> Array {
-    fn get_last_arg(buffer: &str) -> &str { ArgumentSplitter::new(buffer).last().unwrap_or(buffer) }
-
-    fn get_first_arg(buffer: &str) -> &str {
-        ArgumentSplitter::new(buffer).skip(1).next().unwrap_or(buffer)
-    }
-
-    fn get_command(buffer: &str) -> &str { ArgumentSplitter::new(buffer).next().unwrap_or(buffer) }
-
-    fn get_args(buffer: &str) -> &str {
-        let bbuffer = buffer.as_bytes();
-        if let Some(pos) = bbuffer.iter().position(|&x| x == b' ') {
-            let buffer = &bbuffer[pos + 1..];
-            if let Some(pos) = buffer.iter().position(|&x| x != b' ') {
-                return unsafe { str::from_utf8_unchecked(&buffer[pos..]) };
-            }
-        }
-
-        buffer
-    }
-
-    fn expand_args(buffer: &str, shell: &Shell) -> Array {
-        ArgumentSplitter::new(buffer).flat_map(|b| expand_arg(b, shell)).collect::<Array>()
-    }
-
-    if let Some(ref context) = shell.context {
-        if let Some(buffer) = context.history.buffers.iter().last() {
-            let buffer = buffer.as_bytes();
-            let buffer = unsafe { str::from_utf8_unchecked(&buffer) };
-            return match operation {
-                Operation::LastArg => expand_arg(get_last_arg(buffer), shell),
-                Operation::FirstArg => expand_arg(get_first_arg(buffer), shell),
-                Operation::Command => expand_arg(get_command(buffer), shell),
-                Operation::NoCommand => expand_args(get_args(buffer), shell),
-                Operation::All => expand_args(buffer, shell),
-            };
-        }
-    }
-
-    array![""]
 }
 
 /// Expands a given argument and returns it as an `Array`.

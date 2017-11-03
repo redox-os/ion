@@ -5,13 +5,27 @@
 [![crates.io](http://meritbadge.herokuapp.com/ion-shell)](https://crates.io/crates/ion-shell)
 ![LOC](https://tokei.rs/b1/github/redox-os/ion)
 
-# New Ion MdBook
+> Ion is still a WIP, and both it's syntax and rules are subject to change over time. It is
+> still quite a ways from becoming stabilized, but we are getting close. Changes to the
+> syntax at this time are likely to be minimal.
+
+# Ion Manual
 
 We are providing our manual for Ion in the form of a markdown-based book, which is accessible via:
 
 - The official page for Ion's manual on Redox's website: https://doc.redox-os.org/ion-manual/
 - Installing the mdbook via our `setup.ion` script and having Ion open an offline copy via `ion-docs`.
 - Building and serving the book in the **manual** directory yourself with [mdBook](https://github.com/azerupi/mdBook)
+
+> Note, however, that the manual is incomplete, and does not cover all of Ion's functionality
+> at this time. Anyone willing to help with documentation should request to do so in the chatroom.
+
+# Contributors
+
+Send an email to [info@redox-os.org](mailto:info@redox-os.org) to request invitation for joining
+the developer chatroom for Ion. Experience with Rust is not required for contributing to Ion. There
+are ways to contribute to Ion at all levels of experience, from writing scripts in Ion and reporting
+issues, to seeking mentorship on how to implement solutions for specific issues on the issue board.
 
 # Introduction
 
@@ -40,27 +54,6 @@ class variables with their own unique **@** sigil. Strings are also treated as f
 variables with their own unique **$** sigil. Both support being sliced with **[range]**, and they
 each have their own supply of methods.
 
-# Why Not POSIX?
-
-If Ion had to follow POSIX specifications, it wouldn't be half the shell that it is today, and
-there'd be no solid reason to use Ion over any other existing shell, given that it'd basically be
-the same as every other POSIX shell. Redox OS itself doesn't follow POSIX specifications, and
-neither does it require a POSIX shell for developing Redox's userspace. It's therefore not meant
-to be used as a drop-in replacement for Dash or Bash. You should retain Dash/Bash on your system
-for execution of Dash/Bash scripts, but you're free to write new scripts for Ion, or use Ion as
-the interactive shell for your user session. Redox OS, for example, also contains Dash for
-compatibility with software that depends on POSIX scripts.
-
-That said, Ion's foundations are heavily inspired by POSIX shell syntax. If you have experience
-with POSIX shells, then you already have a good idea of how most of Ion's core features operate. A
-quick sprint through this documentation will bring you up to speed on the differences between our
-shell and POSIX shells. Namely, we carry a lot of the same operators: **$**, **|**, **||**, **&**,
-**&&**, **>**, **<**, **<<**, **<<<**, **$()**, **$(())**.  Yet we also offer some functionality
-of our own, such as **@**, **@()**, **$method()**, **@method()**, **^|**, **^>**, **&>**, **&|**.
-Essentially, we have taken the best components of the POSIX shell specifications, removed the bad
-parts, and implemented even better features on top of the best parts. That's how open source
-software evolves: iterate, deploy, study, repeat.
-
 # Compile / Install Instructions
 
 Rust nightly is required for compiling Ion. Simplest way to obtain Rust/Cargo is by
@@ -68,14 +61,6 @@ installing the [Rustup toolchain manager](https://rustup.rs/), in the event that
 not ship Rust natively, or if you want more flexibility in Rust compilation capabilities.
 
 Then, it's just a matter of performing one of the following methods:
-
-## Install Latest Stable Version From Crates.io
-
-Use the `--force` flag when updating a binary that's already installed with cargo.
-
-```sh
-cargo install ion-shell
-```
 
 ## Install Direct From Git
 
@@ -87,8 +72,7 @@ cargo install --git https://github.com/redox-os/ion/
 
 ```sh
 git clone https://github.com/redox-os/ion/
-cd ion
-cargo build --release
+cd ion && cargo build --release
 ```
 
 # Git Plugin

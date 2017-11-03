@@ -1,4 +1,5 @@
 //! Contains the binary logic of Ion.
+mod designators;
 mod prompt;
 mod readln;
 mod terminate;
@@ -122,8 +123,8 @@ impl Binary for Shell {
             if let Some(command) = self.readln() {
                 if !command.is_empty() {
                     if let Ok(command) = self.terminate_quotes(command.replace("\\\n", "")) {
-                        let cmd = command.trim();
-                        self.on_command(cmd);
+                        let cmd: &str = &designators::expand_designators(&self, command.trim());
+                        self.on_command(&cmd);
 
                         if cmd.starts_with('~') {
                             if !cmd.ends_with('/')
