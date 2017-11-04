@@ -43,7 +43,6 @@ use std::io::{self, Write};
 use std::iter::FromIterator;
 use std::ops::Deref;
 use std::process;
-use std::ptr;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
@@ -91,8 +90,6 @@ pub struct Shell {
     /// Stores the patterns used to determine whether a command should be saved in the history
     /// or not
     ignore_setting: IgnoreSetting,
-    /// A pointer to itself which should only be used when performing a subshell expansion.
-    pointer: *mut Shell,
 }
 
 impl<'a> Shell {
@@ -116,7 +113,6 @@ impl<'a> Shell {
             break_flow:          false,
             foreground_signals:  Arc::new(ForegroundSignals::new()),
             ignore_setting:      IgnoreSetting::default(),
-            pointer:             ptr::null_mut(),
         }
     }
 
@@ -139,7 +135,6 @@ impl<'a> Shell {
             break_flow:          false,
             foreground_signals:  Arc::new(ForegroundSignals::new()),
             ignore_setting:      IgnoreSetting::default(),
-            pointer:             ptr::null_mut(),
         }
     }
 
@@ -213,14 +208,6 @@ impl<'a> Shell {
     /// To avoid infinite recursion when using aliases, the noalias boolean will be set the true
     /// if an alias branch was executed.
     fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
-        // TODO: Find a way to only need to execute this once, without
-        // complicating our public API.
-        //
-        // Ensure that the shell pointer is set before executing.
-        // This is needed for subprocess expansions to function.
-        let pointer = self as *mut Shell;
-        self.pointer = pointer;
-
         let command_start_time = SystemTime::now();
         let builtins = self.builtins;
 
@@ -340,7 +327,8 @@ impl<'a> Shell {
                 drop(out_read);
 
                 // Then execute the required functionality in the child shell.
-                child_func(unsafe { &mut *self.pointer });
+                let mut shell: Shell = unsafe { (self as *const Shell).read() };
+                child_func(&mut shell);
 
                 // Reap the child, enabling the parent to get EOF from the read end of the pipe.
                 exit(0);
