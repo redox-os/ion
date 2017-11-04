@@ -24,7 +24,7 @@ builtin, which may be convenient to use in conjuction with other commands in ord
 the exit status; and a `matches` builtin that performs a regex-based boolean match.
 
 ```sh
-if test "foo" -eq $foo
+if test "foo" = $foo
     echo "Found foo"
 else if matches $foo '[A-Ma-m]\w+'
     echo "we found a word that starts with A-M"
@@ -72,7 +72,7 @@ can be skipped over and conditionally-executed based on return status. This enab
 expressing some patterns better than could be done with an if statement.
 
 ```ion
-if test $foo -eq "foo" && test $bar -eq "bar"
+if test $foo = "foo" && test $bar = "bar"
     echo "foobar was found"
 else
     echo "either foo or bar was not found"
@@ -80,7 +80,7 @@ end
 ```
 
 ```ion
-test $foo -eq "foo" && test $bar -eq "bar" &&
+test $foo = "foo" && test $bar = "bar" &&
     echo "foobar was found" ||
     echo "either foo or bar was not found"
 ```
