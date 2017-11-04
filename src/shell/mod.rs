@@ -54,12 +54,18 @@ use types::*;
 #[derive(Debug)]
 pub enum IonError {
     Fork(io::Error),
+    DoesNotExist,
+    Unterminated,
+    Function(FunctionError),
 }
 
 impl Display for IonError {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
         match *self {
             IonError::Fork(ref why) => writeln!(fmt, "failed to fork: {}", why),
+            IonError::DoesNotExist => writeln!(fmt, "element does not exist"),
+            IonError::Function(ref why) => writeln!(fmt, "function error: {}", why),
+            IonError::Unterminated => writeln!(fmt, "input was not terminated"),
         }
     }
 }
@@ -343,7 +349,7 @@ impl<'a> Shell {
     /// Takes command(s) as a string argument, parses them, and executes them the same as it
     /// would if you had executed the command(s) in the command line REPL interface for Ion.
     /// If the supplied command is not terminated, then an error will be returned.
-    pub fn execute_command<CMD>(&mut self, command: CMD) -> Result<i32, &'static str>
+    pub fn execute_command<CMD>(&mut self, command: CMD) -> Result<i32, IonError>
         where CMD: Into<Terminator>
     {
         let mut terminator = command.into();
@@ -351,7 +357,7 @@ impl<'a> Shell {
             self.on_command(&terminator.consume());
             Ok(self.previous_status)
         } else {
-            Err("input is not terminated")
+            Err(IonError::Unterminated)
         }
     }
 
@@ -369,6 +375,22 @@ impl<'a> Shell {
             self.previous_status = FAILURE;
         }
         Ok(self.previous_status)
+    }
+
+    #[allow(dead_code)]
+    /// A method for executing a function with the given `name`, using `args` as the input.
+    /// If the function does not exist, an `IonError::DoesNotExist` is returned.
+    pub fn execute_function(&mut self, name: &str, args: &[&str]) -> Result<i32, IonError> {
+        self.functions
+            .get_mut(name.into())
+            .ok_or(IonError::DoesNotExist)
+            .map(|fnc| fnc.clone())
+            .and_then(|function| {
+                function
+                    .execute(self, args)
+                    .map(|_| self.previous_status)
+                    .map_err(IonError::Function)
+            })
     }
 
     /// A method for capturing the output of the shell, and performing actions without modifying

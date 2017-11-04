@@ -3,6 +3,7 @@ use super::flow::FlowLogic;
 use fnv::*;
 use parser::assignments::*;
 use parser::pipelines::Pipeline;
+use std::fmt::{self, Display, Formatter};
 use types::*;
 use types::Identifier;
 
@@ -143,9 +144,20 @@ pub struct Function {
     statements:  Vec<Statement>,
 }
 
-pub(crate) enum FunctionError {
+#[derive(Debug, PartialEq, Clone)]
+pub enum FunctionError {
     InvalidArgumentCount,
     InvalidArgumentType(Primitive, String),
+}
+
+impl Display for FunctionError {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        use self::FunctionError::*;
+        match *self {
+            InvalidArgumentCount => write!(fmt, "invalid number of arguments"),
+            InvalidArgumentType(t, ref value) => write!(fmt, "{} is not of type {}", value, t),
+        }
+    }
 }
 
 impl Function {

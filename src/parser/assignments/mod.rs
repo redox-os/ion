@@ -6,7 +6,8 @@ mod operator;
 
 pub(crate) use self::actions::{Action, AssignmentActions, AssignmentError};
 pub(crate) use self::checker::{is_array, value_check};
-pub(crate) use self::keys::{Key, KeyBuf, KeyIterator, Primitive, TypeError};
+pub(crate) use self::keys::{Key, KeyBuf, KeyIterator, TypeError};
+pub use self::keys::Primitive;
 pub(crate) use self::operator::Operator;
 pub(crate) use self::splitter::split_assignment;
 

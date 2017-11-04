@@ -52,7 +52,7 @@ impl<'a> From<Key<'a>> for KeyBuf {
 
 /// A primitive defines the type that a requested value should satisfy.
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub(crate) enum Primitive {
+pub enum Primitive {
     Any,
     AnyArray,
     Str,
