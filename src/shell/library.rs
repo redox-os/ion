@@ -39,6 +39,12 @@ pub trait IonLibrary {
     /// the stdout and stderr of the child.
     fn fork<F>(&self, child_func: F) -> Result<IonResult, IonError>
         where F: FnMut(&mut Shell);
+
+    /// Sets a variable.
+    fn set_var(&mut self, name: &str, value: &str);
+
+    /// Gets the value of a variable.
+    fn get_var(&self, name: &str) -> Option<String>;
 }
 
 impl IonLibrary for Shell {
@@ -106,5 +112,13 @@ impl IonLibrary for Shell {
             }
             Err(why) => Err(IonError::Fork(why)),
         }
+    }
+
+    fn set_var(&mut self, name: &str, value: &str) {
+        self.variables.set_var(name, value);
+    }
+
+    fn get_var(&self, name: &str) -> Option<String> {
+        self.variables.get_var(name)
     }
 }
