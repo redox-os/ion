@@ -12,7 +12,7 @@ pub(crate) fn ion_docs(_: &[&str], shell: &mut Shell) -> i32 {
         return FAILURE;
     }
 
-    if let Some(cmd) = shell.variables.get_var("BROWSER".into()) {
+    if let Some(cmd) = shell.get_var("BROWSER".into()) {
         if let Ok(_) = Command::new(&cmd).arg(DOCPATH).spawn() {
             return SUCCESS;
         }

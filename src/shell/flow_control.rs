@@ -191,8 +191,8 @@ impl Function {
                     shell.variables.set_array(&type_.name, vector);
                 }
                 ReturnValue::Str(string) => {
-                    variables_backup.insert(&type_.name, shell.variables.get_var(&type_.name));
-                    shell.variables.set_var(&type_.name, &string);
+                    variables_backup.insert(&type_.name, shell.get_var(&type_.name));
+                    shell.set_var(&type_.name, &string);
                 }
             }
         }
@@ -201,7 +201,7 @@ impl Function {
 
         for (name, value_option) in &variables_backup {
             match *value_option {
-                Some(ref value) => shell.variables.set_var(name, value),
+                Some(ref value) => shell.set_var(name, value),
                 None => {
                     shell.variables.unset_var(name);
                 }

@@ -10,7 +10,6 @@ use self::terminate::{terminate_quotes, terminate_script_quotes};
 use super::{FlowLogic, JobControl, Shell, ShellHistory};
 use super::flags::*;
 use super::flow_control::Statement;
-use super::library::IonLibrary;
 use super::status::*;
 use liner::{Buffer, Context};
 use smallvec::SmallVec;
@@ -90,8 +89,8 @@ impl Binary for Shell {
         self.context = Some({
             let mut context = Context::new();
             context.word_divider_fn = Box::new(word_divide);
-            if "1" == self.variables.get_var_or_empty("HISTFILE_ENABLED") {
-                let path = self.variables.get_var("HISTFILE").expect("shell didn't set HISTFILE");
+            if "1" == self.get_var_or_empty("HISTFILE_ENABLED") {
+                let path = self.get_var("HISTFILE").expect("shell didn't set HISTFILE");
                 context.history.set_file_name(Some(path.clone()));
                 if !Path::new(path.as_str()).exists() {
                     eprintln!("ion: creating history file at \"{}\"", path);
@@ -104,7 +103,7 @@ impl Binary for Shell {
                         // pass
                     }
                     Err(ref err) if err.kind() == ErrorKind::NotFound => {
-                        let history_filename = self.variables.get_var_or_empty("HISTFILE");
+                        let history_filename = self.get_var_or_empty("HISTFILE");
                         eprintln!("ion: failed to find history file {}: {}", history_filename, err);
                     }
                     Err(err) => {

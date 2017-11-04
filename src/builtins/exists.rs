@@ -153,7 +153,7 @@ fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
     // TODO: Right now they use an entirely different logic which means that it *might* be possible
     // TODO: that `exists` reports a binary to be in the path, while the shell cannot find it or
     // TODO: vice-versa
-    if let Some(path) = shell.variables.get_var("PATH") {
+    if let Some(path) = shell.get_var("PATH") {
         for dir in path.split(":") {
             let fname = format!("{}/{}", dir, binaryname);
             if let Ok(metadata) = fs::metadata(&fname) {
@@ -197,7 +197,7 @@ fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
 
 /// Returns true if the variable is a string and the string is not empty
 fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
-    match shell.variables.get_var(stringvar) {
+    match shell.get_var(stringvar) {
         Some(string) => !string.is_empty(),
         None => false,
     }
@@ -250,8 +250,8 @@ fn test_evaluate_arguments() {
     // TODO: see test_binary_is_in_path()
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-b"], &mut sink, &shell), Ok(true));
-    let oldpath = shell.variables.get_var("PATH").unwrap_or("/usr/bin".to_owned());
-    shell.variables.set_var("PATH", "testing/");
+    let oldpath = shell.get_var("PATH").unwrap_or("/usr/bin".to_owned());
+    shell.set_var("PATH", "testing/");
 
     assert_eq!(evaluate_arguments(&["-b", "executable_file"], &mut sink, &shell), Ok(true));
     assert_eq!(evaluate_arguments(&["-b", "empty_file"], &mut sink, &shell), Ok(false));
@@ -259,7 +259,7 @@ fn test_evaluate_arguments() {
 
     // restore original PATH. Not necessary for the currently defined test cases but this might
     // change in the future? Better safe than sorry!
-    shell.variables.set_var("PATH", &oldpath);
+    shell.set_var("PATH", &oldpath);
 
     // check `exists -d`
     // no argument means we treat it as a string
@@ -278,9 +278,9 @@ fn test_evaluate_arguments() {
     // check `exists -s`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-s"], &mut sink, &shell), Ok(true));
-    shell.variables.set_var("emptyvar", "");
+    shell.set_var("emptyvar", "");
     assert_eq!(evaluate_arguments(&["-s", "emptyvar"], &mut sink, &shell), Ok(false));
-    shell.variables.set_var("testvar", "foobar");
+    shell.set_var("testvar", "foobar");
     assert_eq!(evaluate_arguments(&["-s", "testvar"], &mut sink, &shell), Ok(true));
     shell.variables.unset_var("testvar");
     assert_eq!(evaluate_arguments(&["-s", "testvar"], &mut sink, &shell), Ok(false));
@@ -362,7 +362,7 @@ fn test_binary_is_in_path() {
     // TODO: PATH containing directories without read permission (for user)
     // TODO: PATH containing directories without execute ("enter") permission (for user)
     // TODO: empty PATH?
-    shell.variables.set_var("PATH", "testing/");
+    shell.set_var("PATH", "testing/");
 
     assert_eq!(binary_is_in_path("executable_file", &shell), true);
     assert_eq!(binary_is_in_path("empty_file", &shell), false);
@@ -400,7 +400,7 @@ fn test_array_var_is_not_empty() {
     assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), false);
 
     // array_var_is_not_empty should NOT match for non-array variables with the same name
-    shell.variables.set_var("VARIABLE", "notempty-variable");
+    shell.set_var("VARIABLE", "notempty-variable");
     assert_eq!(array_var_is_not_empty("VARIABLE", &shell), false);
 }
 
@@ -408,10 +408,10 @@ fn test_array_var_is_not_empty() {
 fn test_string_var_is_not_empty() {
     let mut shell = Shell::new();
 
-    shell.variables.set_var("EMPTY", "");
+    shell.set_var("EMPTY", "");
     assert_eq!(string_var_is_not_empty("EMPTY", &shell), false);
 
-    shell.variables.set_var("NOT_EMPTY", "notempty");
+    shell.set_var("NOT_EMPTY", "notempty");
     assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), true);
 
     // string_var_is_not_empty should NOT match for arrays with the same name

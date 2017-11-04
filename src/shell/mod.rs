@@ -13,7 +13,6 @@ pub(crate) mod flow_control;
 pub(crate) mod signals;
 pub mod status;
 pub mod variables;
-pub mod library;
 
 pub(crate) use self::binary::Binary;
 pub(crate) use self::flow::FlowLogic;
@@ -26,7 +25,6 @@ use self::flags::*;
 use self::flow_control::{FlowControl, Function, FunctionError};
 use self::foreground::ForegroundSignals;
 use self::job_control::{BackgroundProcess, JobControl};
-use self::library::IonLibrary;
 use self::pipe_exec::PipelineExecution;
 use self::status::*;
 use self::variables::Variables;
@@ -35,19 +33,43 @@ use builtins::{BuiltinMap, BUILTINS};
 use fnv::FnvHashMap;
 use liner::Context;
 use parser::{ArgumentSplitter, Expander, Select};
+use parser::Terminator;
 use parser::pipelines::Pipeline;
 use smallvec::SmallVec;
 use std::env;
+use std::fmt::{self, Display, Formatter};
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::iter::FromIterator;
 use std::ops::Deref;
+use std::path::Path;
 use std::process;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 use sys;
 use types::*;
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum IonError {
+    Fork(io::Error),
+}
+
+impl Display for IonError {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        match *self {
+            IonError::Fork(ref why) => writeln!(fmt, "failed to fork: {}", why),
+        }
+    }
+}
+
+#[allow(dead_code)]
+pub struct IonResult {
+    pub pid:    u32,
+    pub stdout: File,
+    pub stderr: File,
+}
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
 /// the entirety of the
@@ -165,7 +187,7 @@ impl<'a> Shell {
         env::current_dir().ok().map_or_else(
             || env::set_var("PWD", "?"),
             |path| {
-                let pwd = self.variables.get_var_or_empty("PWD");
+                let pwd = self.get_var_or_empty("PWD");
                 let pwd: &str = &pwd;
                 let current_dir = path.to_str().unwrap_or("?");
                 if pwd != current_dir {
@@ -298,61 +320,106 @@ impl<'a> Shell {
 
         // Retrieve the exit_status and set the $? variable and history.previous_status
         if let Some(code) = exit_status {
-            self.variables.set_var("?", &code.to_string());
+            self.set_var("?", &code.to_string());
             self.previous_status = code;
         }
         exit_status
     }
 
-    fn fork_and_output<F: FnMut(&mut Shell)>(&self, mut child_func: F) -> Option<String> {
-        use std::io::Read;
+    /// Sets a variable.
+    pub fn set_var(&mut self, name: &str, value: &str) { self.variables.set_var(name, value); }
+
+    /// Gets a variable, if it exists.
+    pub fn get_var(&self, name: &str) -> Option<String> { self.variables.get_var(name) }
+
+    /// Obtains a variable, returning an empty string if it does not exist.
+    pub(crate) fn get_var_or_empty(&self, name: &str) -> String {
+        self.variables.get_var_or_empty(name)
+    }
+
+    #[allow(dead_code)]
+    /// A method for executing commands in the Ion shell without capturing.
+    ///
+    /// Takes command(s) as a string argument, parses them, and executes them the same as it
+    /// would if you had executed the command(s) in the command line REPL interface for Ion.
+    /// If the supplied command is not terminated, then an error will be returned.
+    pub fn execute_command<CMD>(&mut self, command: CMD) -> Result<i32, &'static str>
+        where CMD: Into<Terminator>
+    {
+        let mut terminator = command.into();
+        if terminator.is_terminated() {
+            self.on_command(&terminator.consume());
+            Ok(self.previous_status)
+        } else {
+            Err("input is not terminated")
+        }
+    }
+
+    #[allow(dead_code)]
+    /// A method for executing scripts in the Ion shell without capturing.
+    ///
+    /// Given a `Path`, this method will attempt to execute that file as a script, and then
+    /// returns the final exit status of the evaluated script.
+    pub fn execute_script<SCRIPT: AsRef<Path>>(&mut self, script: SCRIPT) -> io::Result<i32> {
+        let mut script = File::open(script.as_ref())?;
+        let capacity = script.metadata().ok().map_or(0, |x| x.len());
+        let mut command_list = String::with_capacity(capacity as usize);
+        let _ = script.read_to_string(&mut command_list)?;
+        if FAILURE == self.terminate_script_quotes(command_list.lines().map(|x| x.to_owned())) {
+            self.previous_status = FAILURE;
+        }
+        Ok(self.previous_status)
+    }
+
+    /// A method for capturing the output of the shell, and performing actions without modifying
+    /// the state of the original shell. This performs a fork, taking a closure that controls
+    /// the
+    /// shell in the child of the fork.
+    ///
+    /// The method is non-blocking, and therefore will immediately return file handles to the
+    /// stdout and stderr of the child. The PID of the child is returned, which may be used to
+    /// wait for and obtain the exit status.
+    pub fn fork<F: FnMut(&mut Shell)>(&self, mut child_func: F) -> Result<IonResult, IonError> {
         use std::os::unix::io::{AsRawFd, FromRawFd};
         use std::process::exit;
         use sys;
 
-        let (mut out_read, out_write) = match sys::pipe2(sys::O_CLOEXEC) {
-            Ok(fds) => unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) },
-            Err(why) => {
-                eprintln!("ion: unable to create pipe: {}", why);
-                return None;
-            }
-        };
+        let (stdout_read, stdout_write) = sys::pipe2(sys::O_CLOEXEC)
+            .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
+            .map_err(IonError::Fork)?;
+
+        let (stderr_read, stderr_write) = sys::pipe2(sys::O_CLOEXEC)
+            .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
+            .map_err(IonError::Fork)?;
 
         match unsafe { sys::fork() } {
             Ok(0) => {
-                // Redirect stdout in the child to the write end of the pipe.
-                // Also close the read end of the pipe because we don't need it.
-                let _ = sys::dup2(out_write.as_raw_fd(), sys::STDOUT_FILENO);
-                drop(out_write);
-                drop(out_read);
+                let _ = sys::dup2(stdout_write.as_raw_fd(), sys::STDOUT_FILENO);
+                let _ = sys::dup2(stderr_write.as_raw_fd(), sys::STDERR_FILENO);
 
-                // Then execute the required functionality in the child shell.
+                drop(stdout_write);
+                drop(stdout_read);
+                drop(stderr_write);
+                drop(stderr_read);
+
                 let mut shell: Shell = unsafe { (self as *const Shell).read() };
                 child_func(&mut shell);
 
                 // Reap the child, enabling the parent to get EOF from the read end of the pipe.
-                exit(0);
+                exit(shell.previous_status);
             }
-            Ok(_pid) => {
+            Ok(pid) => {
                 // Drop the write end of the pipe, because the parent will not use it.
-                drop(out_write);
+                drop(stdout_write);
+                drop(stderr_write);
 
-                // Read from the read end of the pipe into a String.
-                let mut output = String::new();
-                if let Err(why) = out_read.read_to_string(&mut output) {
-                    eprintln!("ion: unable read child's output: {}", why);
-                    return None;
-                }
-
-                // Ensure that the parent retains ownership of the terminal before exiting.
-                let _ = sys::tcsetpgrp(sys::STDIN_FILENO, sys::getpid().unwrap());
-
-                Some(output)
+                Ok(IonResult {
+                    pid,
+                    stdout: stdout_read,
+                    stderr: stderr_read,
+                })
             }
-            Err(why) => {
-                eprintln!("ion: fork error: {}", why);
-                None
-            }
+            Err(why) => Err(IonError::Fork(why)),
         }
     }
 }
@@ -415,16 +482,32 @@ impl<'a> Expander for Shell {
     fn variable(&self, variable: &str, quoted: bool) -> Option<Value> {
         use ascii_helpers::AsciiReplace;
         if quoted {
-            self.variables.get_var(variable)
+            self.get_var(variable)
         } else {
-            self.variables.get_var(variable).map(|x| x.ascii_replace('\n', ' ').into())
+            self.get_var(variable).map(|x| x.ascii_replace('\n', ' ').into())
         }
     }
 
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<Value> {
-        self.fork_and_output(move |shell| {
-            shell.on_command(command);
-        })
+        let mut output = None;
+        match self.fork(move |shell| shell.on_command(command)) {
+            Ok(mut result) => {
+                let mut string = String::new();
+                match result.stdout.read_to_string(&mut string) {
+                    Ok(_) => output = Some(string),
+                    Err(why) => {
+                        eprintln!("ion: error reading stdout of child: {}", why);
+                    }
+                }
+            }
+            Err(why) => {
+                eprintln!("ion: fork error: {}", why);
+            }
+        }
+
+        // Ensure that the parent retains ownership of the terminal before exiting.
+        let _ = sys::tcsetpgrp(sys::STDIN_FILENO, sys::getpid().unwrap());
+        output
     }
 }

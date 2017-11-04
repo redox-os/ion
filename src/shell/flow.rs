@@ -290,9 +290,8 @@ impl FlowLogic for Shell {
                                 .map(|x| ReturnValue::Vector(x.clone()));
                             self.variables.set_array(&bind, value.clone());
                         } else {
-                            previous_bind =
-                                self.variables.get_var(bind).map(|x| ReturnValue::Str(x));
-                            self.variables.set_var(&bind, &value.join(" "));
+                            previous_bind = self.get_var(bind).map(|x| ReturnValue::Str(x));
+                            self.set_var(&bind, &value.join(" "));
                         }
                     }
 
@@ -308,7 +307,7 @@ impl FlowLogic for Shell {
                     if let Some(ref bind) = case.binding {
                         if let Some(value) = previous_bind {
                             match value {
-                                ReturnValue::Str(value) => self.variables.set_var(bind, &value),
+                                ReturnValue::Str(value) => self.set_var(bind, &value),
                                 ReturnValue::Vector(values) => {
                                     self.variables.set_array(bind, values)
                                 }
@@ -327,9 +326,8 @@ impl FlowLogic for Shell {
                                 .map(|x| ReturnValue::Vector(x.clone()));
                             self.variables.set_array(&bind, value.clone());
                         } else {
-                            previous_bind =
-                                self.variables.get_var(bind).map(|x| ReturnValue::Str(x));
-                            self.variables.set_var(&bind, &value.join(" "));
+                            previous_bind = self.get_var(bind).map(|x| ReturnValue::Str(x));
+                            self.set_var(&bind, &value.join(" "));
                         }
                     }
 
@@ -345,7 +343,7 @@ impl FlowLogic for Shell {
                     if let Some(ref bind) = case.binding {
                         if let Some(value) = previous_bind {
                             match value {
-                                ReturnValue::Str(value) => self.variables.set_var(bind, &value),
+                                ReturnValue::Str(value) => self.set_var(bind, &value),
                                 ReturnValue::Vector(values) => {
                                     self.variables.set_array(bind, values)
                                 }
@@ -549,7 +547,7 @@ impl FlowLogic for Shell {
                 }
             },
             ForExpression::Multiple(values) => for value in values.iter() {
-                self.variables.set_var(variable, &value);
+                self.set_var(variable, &value);
                 match self.execute_statements(statements.clone()) {
                     Condition::Break => break,
                     Condition::SigInt => return Condition::SigInt,
@@ -564,7 +562,7 @@ impl FlowLogic for Shell {
                 }
             },
             ForExpression::Normal(values) => for value in values.lines() {
-                self.variables.set_var(variable, &value);
+                self.set_var(variable, &value);
                 match self.execute_statements(statements.clone()) {
                     Condition::Break => break,
                     Condition::SigInt => return Condition::SigInt,
@@ -579,7 +577,7 @@ impl FlowLogic for Shell {
                 }
             },
             ForExpression::Range(start, end) => for value in (start..end).map(|x| x.to_string()) {
-                self.variables.set_var(variable, &value);
+                self.set_var(variable, &value);
                 match self.execute_statements(statements.clone()) {
                     Condition::Break => break,
                     Condition::SigInt => return Condition::SigInt,

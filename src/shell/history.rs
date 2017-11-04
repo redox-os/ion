@@ -85,17 +85,17 @@ impl ShellHistory for Shell {
 
     fn set_context_history_from_vars(&mut self) {
         let context = self.context.as_mut().unwrap();
-        let max_history_size =
-            self.variables.get_var_or_empty("HISTORY_SIZE").parse().unwrap_or(1000);
+        let variables = &self.variables;
+        let max_history_size = variables.get_var_or_empty("HISTORY_SIZE").parse().unwrap_or(1000);
 
         context.history.set_max_size(max_history_size);
 
-        if &*self.variables.get_var_or_empty("HISTFILE_ENABLED") == "1" {
-            let file_name = self.variables.get_var("HISTFILE");
+        if &*variables.get_var_or_empty("HISTFILE_ENABLED") == "1" {
+            let file_name = variables.get_var("HISTFILE");
             context.history.set_file_name(file_name.map(|f| f.into()));
 
             let max_histfile_size =
-                self.variables.get_var_or_empty("HISTFILE_SIZE").parse().unwrap_or(1000);
+                variables.get_var_or_empty("HISTFILE_SIZE").parse().unwrap_or(1000);
             context.history.set_max_file_size(max_histfile_size);
         } else {
             context.history.set_file_name(None);

@@ -96,9 +96,9 @@ impl VariableStore for Shell {
 
                     match value_check(self, &expression, key.kind) {
                         Ok(ReturnValue::Str(value)) => {
-                            let lhs = self.variables.get_var_or_empty(&key.name);
+                            let lhs = self.get_var_or_empty(&key.name);
                             match math(&lhs, key.kind, operator, &value) {
-                                Ok(value) => self.variables.set_var(&key.name, &value),
+                                Ok(value) => self.set_var(&key.name, &value),
                                 Err(why) => {
                                     eprintln!("ion: assignment error: {}", why);
                                     return FAILURE;
@@ -125,7 +125,7 @@ impl VariableStore for Shell {
     fn export(&mut self, action: ExportAction) -> i32 {
         let actions = match action {
             ExportAction::Assign(ref keys, op, ref vals) => AssignmentActions::new(keys, op, vals),
-            ExportAction::LocalExport(ref key) => match self.variables.get_var(key) {
+            ExportAction::LocalExport(ref key) => match self.get_var(key) {
                 Some(var) => {
                     env::set_var(key, &var);
                     return SUCCESS;
@@ -166,7 +166,7 @@ impl VariableStore for Shell {
                 Ok(Action::UpdateString(key, operator, expression)) => {
                     match value_check(self, &expression, key.kind) {
                         Ok(ReturnValue::Str(value)) => {
-                            let lhs = self.variables.get_var_or_empty(&key.name);
+                            let lhs = self.get_var_or_empty(&key.name);
                             match math(&lhs, key.kind, operator, &value) {
                                 Ok(value) => {
                                     let value = OsStr::from_bytes(&value.as_bytes());
