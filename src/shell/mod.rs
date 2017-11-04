@@ -55,35 +55,35 @@ use types::*;
 /// program.
 pub struct Shell {
     /// Contains a list of built-in commands that were created when the program started.
-    pub builtins: &'static BuiltinMap,
+    pub(crate) builtins: &'static BuiltinMap,
     /// Contains the history, completions, and manages writes to the history file.
     /// Note that the context is only available in an interactive session.
-    pub context: Option<Context>,
+    pub(crate) context: Option<Context>,
     /// Contains the aliases, strings, and array variable maps.
-    pub variables: Variables,
+    pub(crate) variables: Variables,
     /// Contains the current state of flow control parameters.
     flow_control: FlowControl,
     /// Contains the directory stack parameters.
-    pub directory_stack: DirectoryStack,
+    pub(crate) directory_stack: DirectoryStack,
     /// Contains all of the user-defined functions that have been created.
-    pub functions: FnvHashMap<Identifier, Function>,
+    pub(crate) functions: FnvHashMap<Identifier, Function>,
     /// When a command is executed, the final result of that command is stored here.
     pub previous_status: i32,
     /// The job ID of the previous command sent to the background.
-    pub previous_job: u32,
+    pub(crate) previous_job: u32,
     /// Contains all the boolean flags that control shell behavior.
     pub flags: u8,
     /// A temporary field for storing foreground PIDs used by the pipeline execution.
     foreground: Vec<u32>,
     /// Contains information on all of the active background processes that are being managed
     /// by the shell.
-    pub background: Arc<Mutex<Vec<BackgroundProcess>>>,
+    pub(crate) background: Arc<Mutex<Vec<BackgroundProcess>>>,
     /// If set, denotes that this shell is running as a background job.
-    pub is_background_shell: bool,
+    pub(crate) is_background_shell: bool,
     /// Set when a signal is received, this will tell the flow control logic to abort.
-    pub break_flow: bool,
+    pub(crate) break_flow: bool,
     // Useful for disabling the execution of the `tcsetpgrp` call.
-    pub is_library: bool,
+    pub(crate) is_library: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,

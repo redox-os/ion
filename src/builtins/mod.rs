@@ -25,7 +25,7 @@ use std::error::Error;
 use std::io::{self, Write};
 use std::path::Path;
 
-use parser::QuoteTerminator;
+use parser::Terminator;
 use shell::{self, FlowLogic, Shell, ShellHistory};
 use shell::job_control::{JobControl, ProcessState};
 use shell::status::*;
@@ -193,8 +193,8 @@ fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
 fn builtin_set(args: &[&str], shell: &mut Shell) -> i32 { set::set(args, shell) }
 fn builtin_eval(args: &[&str], shell: &mut Shell) -> i32 {
     let evaluated_command = args[1..].join(" ");
-    let mut buffer = QuoteTerminator::new(evaluated_command);
-    if buffer.check_termination() {
+    let mut buffer = Terminator::new(evaluated_command);
+    if buffer.is_terminated() {
         shell.on_command(&buffer.consume());
         shell.previous_status
     } else {

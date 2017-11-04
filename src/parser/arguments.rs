@@ -6,14 +6,14 @@ const ARRAY: u8 = 16;
 const METHOD: u8 = 32;
 
 /// An efficient `Iterator` structure for splitting arguments
-pub(crate) struct ArgumentSplitter<'a> {
+pub struct ArgumentSplitter<'a> {
     data:  &'a str,
     read:  usize,
     flags: u8,
 }
 
 impl<'a> ArgumentSplitter<'a> {
-    pub(crate) fn new(data: &'a str) -> ArgumentSplitter<'a> {
+    pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
         ArgumentSplitter {
             data:  data,
             read:  0,

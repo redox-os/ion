@@ -1,17 +1,17 @@
 use super::super::{Binary, FlowLogic, Shell};
 use super::super::status::*;
-use parser::QuoteTerminator;
+use parser::Terminator;
 
 pub(crate) fn terminate_script_quotes<I: Iterator<Item = String>>(
     shell: &mut Shell,
     mut lines: I,
 ) -> i32 {
     while let Some(command) = lines.next() {
-        let mut buffer = QuoteTerminator::new(command);
-        while !buffer.check_termination() {
+        let mut buffer = Terminator::new(command);
+        while !buffer.is_terminated() {
             loop {
                 if let Some(command) = lines.next() {
-                    buffer.append(command);
+                    buffer.append(&command);
                     break;
                 } else {
                     eprintln!("ion: unterminated quote in script");
@@ -36,11 +36,11 @@ pub(crate) fn terminate_script_quotes<I: Iterator<Item = String>>(
 }
 
 pub(crate) fn terminate_quotes(shell: &mut Shell, command: String) -> Result<String, ()> {
-    let mut buffer = QuoteTerminator::new(command);
+    let mut buffer = Terminator::new(command);
     shell.flow_control.level += 1;
-    while !buffer.check_termination() {
+    while !buffer.is_terminated() {
         if let Some(command) = shell.readln() {
-            buffer.append(command);
+            buffer.append(&command);
         } else {
             return Err(());
         }

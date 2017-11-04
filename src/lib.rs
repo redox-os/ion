@@ -39,7 +39,7 @@ mod sys;
 #[macro_use]
 mod types;
 #[macro_use]
-mod parser;
+pub mod parser;
 mod builtins;
 pub mod shell;
 mod ascii_helpers;

@@ -11,7 +11,13 @@ bitflags! {
     }
 }
 
-pub struct QuoteTerminator {
+/// Serves as a buffer for storing a string until that string can be terminated.
+///
+/// # Examples
+///
+/// This example comes from the shell's REPL, which ensures that the user's input
+/// will only be submitted for execution once a terminated command is supplied.
+pub struct Terminator {
     buffer:     String,
     eof:        Option<String>,
     eof_buffer: String,
@@ -20,17 +26,17 @@ pub struct QuoteTerminator {
     flags:      Flags,
 }
 
-impl<'a> From<&'a str> for QuoteTerminator {
-    fn from(string: &'a str) -> QuoteTerminator { QuoteTerminator::new(string.to_owned()) }
+impl<'a> From<&'a str> for Terminator {
+    fn from(string: &'a str) -> Terminator { Terminator::new(string.to_owned()) }
 }
 
-impl From<String> for QuoteTerminator {
-    fn from(string: String) -> QuoteTerminator { QuoteTerminator::new(string) }
+impl From<String> for Terminator {
+    fn from(string: String) -> Terminator { Terminator::new(string) }
 }
 
-impl QuoteTerminator {
-    pub fn new(input: String) -> QuoteTerminator {
-        QuoteTerminator {
+impl Terminator {
+    pub fn new(input: String) -> Terminator {
+        Terminator {
             buffer:     input,
             eof:        None,
             eof_buffer: String::new(),
@@ -40,16 +46,18 @@ impl QuoteTerminator {
         }
     }
 
-    pub fn append(&mut self, input: String) {
+    /// Appends a string to the internal buffer.
+    pub fn append(&mut self, input: &str) {
         if self.eof.is_none() {
             self.buffer
-                .push_str(if self.flags.contains(Flags::TRIM) { input.trim() } else { &input });
+                .push_str(if self.flags.contains(Flags::TRIM) { input.trim() } else { input });
         } else {
-            self.eof_buffer.push_str(&input);
+            self.eof_buffer.push_str(input);
         }
     }
 
-    pub fn check_termination(&mut self) -> bool {
+
+    pub fn is_terminated(&mut self) -> bool {
         let mut eof_line = None;
         let eof = self.eof.clone();
         let status = if let Some(ref eof) = eof {
@@ -164,5 +172,6 @@ impl QuoteTerminator {
         status
     }
 
+    /// Consumes the `Terminator`, and returns the underlying `String`.
     pub fn consume(self) -> String { self.buffer }
 }

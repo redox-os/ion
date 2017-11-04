@@ -1,6 +1,6 @@
 use super::{Binary, FlowLogic, Shell};
 use super::status::*;
-use parser::QuoteTerminator;
+use parser::Terminator;
 use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::{self, Read};
@@ -28,7 +28,7 @@ pub trait IonLibrary {
     /// not
     /// terminated, an error will be returned.
     fn execute_command<CMD>(&mut self, command: CMD) -> Result<i32, &'static str>
-        where CMD: Into<QuoteTerminator>;
+        where CMD: Into<Terminator>;
 
     /// Executes all of the statements contained within a given script,
     /// returning the final exit status.
@@ -43,10 +43,10 @@ pub trait IonLibrary {
 
 impl IonLibrary for Shell {
     fn execute_command<CMD>(&mut self, command: CMD) -> Result<i32, &'static str>
-        where CMD: Into<QuoteTerminator>
+        where CMD: Into<Terminator>
     {
         let mut terminator = command.into();
-        if terminator.check_termination() {
+        if terminator.is_terminated() {
             self.on_command(&terminator.consume());
             Ok(self.previous_status)
         } else {
