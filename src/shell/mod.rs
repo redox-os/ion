@@ -343,6 +343,11 @@ impl<'a> Shell {
         self.variables.get_var_or_empty(name)
     }
 
+    /// Gets an array, if it exists.
+    pub fn get_array(&self, name: &str) -> Option<&[String]> {
+        self.variables.get_array(name).map(SmallVec::as_ref)
+    }
+
     #[allow(dead_code)]
     /// A method for executing commands in the Ion shell without capturing.
     ///
