@@ -1,6 +1,7 @@
 use super::super::{Function, Shell};
 use parser::shell_expand::expand_string;
 use std::io::Read;
+use std::process;
 use sys;
 
 pub(crate) fn prompt(shell: &mut Shell) -> String {
@@ -41,6 +42,6 @@ pub(crate) fn prompt_fn(shell: &mut Shell) -> Option<String> {
     }
 
     // Ensure that the parent retains ownership of the terminal before exiting.
-    let _ = sys::tcsetpgrp(sys::STDIN_FILENO, sys::getpid().unwrap());
+    let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
     output
 }

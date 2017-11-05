@@ -6,6 +6,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 use std::thread::{sleep, spawn};
 use std::time::Duration;
+use std::process;
 use sys;
 
 use sys::job_control as self_sys;
@@ -123,7 +124,7 @@ impl JobControl for Shell {
             }
         };
         // Have the shell reclaim the TTY
-        set_foreground_as(sys::getpid().unwrap());
+        set_foreground_as(process::id());
         status
     }
 

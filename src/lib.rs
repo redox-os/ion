@@ -3,6 +3,7 @@
 #![feature(conservative_impl_trait)]
 #![feature(integer_atomics)]
 #![feature(pointer_methods)]
+#![feature(getpid)]
 
 extern crate app_dirs;
 #[macro_use]

@@ -3,6 +3,7 @@
 #![feature(conservative_impl_trait)]
 #![feature(integer_atomics)]
 #![feature(pointer_methods)]
+#![feature(getpid)]
 
 // For a performance boost on Linux
 // #![feature(alloc_system)]

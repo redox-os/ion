@@ -25,7 +25,7 @@ use std::iter;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
-use std::process::{exit, Command};
+use std::process::{self, exit, Command};
 use sys;
 
 type RefinedItem = (RefinedJob, JobKind, Vec<Redirection>, Vec<Input>);
@@ -427,7 +427,7 @@ impl PipelineExecution for Shell {
             let exit_status = pipe(self, piped_commands, foreground);
             // Set the shell as the foreground process again to regain the TTY.
             if foreground && !self.is_library {
-                let _ = sys::tcsetpgrp(0, sys::getpid().unwrap());
+                let _ = sys::tcsetpgrp(0, process::id());
             }
             exit_status
         }

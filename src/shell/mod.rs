@@ -534,7 +534,7 @@ impl<'a> Expander for Shell {
         }
 
         // Ensure that the parent retains ownership of the terminal before exiting.
-        let _ = sys::tcsetpgrp(sys::STDIN_FILENO, sys::getpid().unwrap());
+        let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
         output
     }
 }
