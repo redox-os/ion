@@ -106,9 +106,19 @@ pub(crate) fn expand_designators<'a>(shell: &Shell, cmd: &'a str) -> Cow<'a, str
 
 fn command<'a>(text: &'a str) -> &'a str { ArgumentSplitter::new(text).next().unwrap_or(text) }
 
-// TODO: do this without allocating a string.
-fn args(text: &str) -> String {
-    ArgumentSplitter::new(text).skip(1).collect::<Vec<&str>>().join(" ")
+fn args(text: &str) -> &str {
+    let bytes = text.as_bytes();
+    bytes.iter()
+        // Obtain position of the first space character,
+        .position(|&x| x == b' ')
+        // and then obtain the arguments to the command.
+        .and_then(|fp| bytes[fp+1..].iter()
+            // Find the position of the first character in the first argument.
+            .position(|&x| x != b' ')
+            // Then slice the argument string from the original command.
+            .map(|sp| &text[fp+sp+1..]))
+        // Unwrap the arguments string if it exists, else return the original string.
+        .unwrap_or(text)
 }
 
 fn first_arg<'a>(text: &'a str) -> &'a str { ArgumentSplitter::new(text).nth(1).unwrap_or(text) }
