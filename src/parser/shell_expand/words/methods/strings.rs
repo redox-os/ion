@@ -183,7 +183,22 @@ impl<'a> StringMethod<'a> {
                     None
                 };
                 output.push_str(&out.unwrap_or(0).to_string());
-            }
+            },
+            "escape" => {
+                let word = if let Some(value) = expand.variable(variable, false) {
+                    Some(value)
+                } else if is_expression(variable) {
+                    Some(expand_string(variable, expand, false).join(" "))
+                } else {
+                    None
+                };
+                let out: Vec<String> = word
+                    .unwrap_or(String::from(""))
+                    .chars()
+                    .map(|c| c.escape_default().to_string())
+                    .collect();
+                output.push_str(&out.join(""));
+            },
             method @ _ => {
                 if sys::is_root() {
                     eprintln!("ion: root is not allowed to execute plugins");
