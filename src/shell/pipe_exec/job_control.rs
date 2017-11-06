@@ -3,10 +3,10 @@ use super::super::Shell;
 use super::super::signals;
 use super::super::status::*;
 use std::fmt;
+use std::process;
 use std::sync::{Arc, Mutex};
 use std::thread::{sleep, spawn};
 use std::time::Duration;
-use std::process;
 use sys;
 
 use sys::job_control as self_sys;

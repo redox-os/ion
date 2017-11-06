@@ -411,6 +411,8 @@ impl<'a> Shell {
         use std::process::exit;
         use sys;
 
+        sys::signals::block();
+
         let (stdout_read, stdout_write) = sys::pipe2(sys::O_CLOEXEC)
             .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
             .map_err(IonError::Fork)?;
@@ -421,6 +423,8 @@ impl<'a> Shell {
 
         match unsafe { sys::fork() } {
             Ok(0) => {
+                sys::signals::unblock();
+
                 let _ = sys::dup2(stdout_write.as_raw_fd(), sys::STDOUT_FILENO);
                 let _ = sys::dup2(stderr_write.as_raw_fd(), sys::STDERR_FILENO);
 
