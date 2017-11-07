@@ -1,14 +1,16 @@
 use super::Shell;
 use super::flow_control::{ExportAction, LocalAction};
 use super::status::*;
+use itoa;
 use parser::assignments::*;
 use shell::history::ShellHistory;
-use std::borrow::Cow;
 use std::env;
 use std::ffi::OsStr;
 use std::fmt::{self, Display};
 use std::io::{self, BufWriter, Write};
+use std::mem;
 use std::os::unix::ffi::OsStrExt;
+use std::str;
 
 fn list_vars(shell: &Shell) {
     let stdout = io::stdout();
@@ -96,13 +98,24 @@ impl VariableStore for Shell {
 
                     match value_check(self, &expression, key.kind) {
                         Ok(ReturnValue::Str(value)) => {
-                            let lhs = self.get_var_or_empty(&key.name);
-                            match math(&lhs, key.kind, operator, &value) {
-                                Ok(value) => self.set_var(&key.name, &value),
-                                Err(why) => {
-                                    eprintln!("ion: assignment error: {}", why);
-                                    return FAILURE;
-                                }
+                            let key_name: &str = &key.name;
+                            let lhs = self.variables
+                                .variables
+                                .get(key_name)
+                                .map(|x| x.as_str())
+                                .unwrap_or("0") as *const str;
+
+                            let result = math(
+                                unsafe { &*lhs },
+                                key.kind,
+                                operator,
+                                &value,
+                                |value| self.set_var(key_name, unsafe { str::from_utf8_unchecked(value) }),
+                            );
+
+                            if let Err(why) = result {
+                                eprintln!("ion: assignment error: {}", why);
+                                return FAILURE;
                             }
                         }
                         Err(why) => {
@@ -166,16 +179,20 @@ impl VariableStore for Shell {
                 Ok(Action::UpdateString(key, operator, expression)) => {
                     match value_check(self, &expression, key.kind) {
                         Ok(ReturnValue::Str(value)) => {
-                            let lhs = self.get_var_or_empty(&key.name);
-                            match math(&lhs, key.kind, operator, &value) {
-                                Ok(value) => {
-                                    let value = OsStr::from_bytes(&value.as_bytes());
-                                    env::set_var(&key.name, &value)
-                                }
-                                Err(why) => {
-                                    eprintln!("ion: assignment error: {}", why);
-                                    return FAILURE;
-                                }
+                            let key_name: &str = &key.name;
+                            let lhs = self.variables
+                                .variables
+                                .get(key_name)
+                                .map(|x| x.as_str())
+                                .unwrap_or("0");
+
+                            let result = math(&lhs, key.kind, operator, &value, |value| {
+                                env::set_var(key_name, &OsStr::from_bytes(value))
+                            });
+
+                            if let Err(why) = result {
+                                eprintln!("ion: assignment error: {}", why);
+                                return FAILURE;
                             }
                         }
                         Err(why) => {
@@ -224,57 +241,62 @@ fn parse_i64<F: Fn(i64, i64) -> i64>(lhs: &str, rhs: &str, operation: F) -> Resu
     )
 }
 
-fn math<'a>(
+fn write_integer<F: FnMut(&[u8])>(integer: i64, mut func: F) {
+    let mut buffer: [u8; 20] = unsafe { mem::uninitialized() };
+    let capacity = itoa::write(&mut buffer[..], integer).unwrap();
+    func(&buffer[..capacity]);
+}
+
+fn math<'a, F: FnMut(&[u8])>(
     lhs: &str,
     key: Primitive,
     operator: Operator,
     value: &'a str,
-) -> Result<Cow<'a, str>, MathError> {
-    let value: String = match operator {
+    mut writefn: F,
+) -> Result<(), MathError> {
+    match operator {
         Operator::Add => if Primitive::Any == key || Primitive::Float == key {
-            parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?.to_string()
+            writefn(parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?.to_string().as_bytes());
         } else if let Primitive::Integer = key {
-            parse_i64(lhs, value, |lhs, rhs| lhs + rhs)?.to_string()
+            write_integer(parse_i64(lhs, value, |lhs, rhs| lhs + rhs)?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
         Operator::Divide => {
             if Primitive::Any == key || Primitive::Float == key || Primitive::Integer == key {
-                parse_f64(lhs, value, |lhs, rhs| lhs / rhs)?.to_string()
+                writefn(parse_f64(lhs, value, |lhs, rhs| lhs / rhs)?.to_string().as_bytes());
             } else {
                 return Err(MathError::Unsupported);
             }
         }
         Operator::IntegerDivide => if Primitive::Any == key || Primitive::Float == key {
-            parse_i64(lhs, value, |lhs, rhs| lhs / rhs)?.to_string()
+            write_integer(parse_i64(lhs, value, |lhs, rhs| lhs / rhs)?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
         Operator::Subtract => if Primitive::Any == key || Primitive::Float == key {
-            parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?.to_string()
+            writefn(parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?.to_string().as_bytes());
         } else if let Primitive::Integer = key {
-            parse_i64(lhs, value, |lhs, rhs| lhs - rhs)?.to_string()
+            write_integer(parse_i64(lhs, value, |lhs, rhs| lhs - rhs)?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
         Operator::Multiply => if Primitive::Any == key || Primitive::Float == key {
-            parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?.to_string()
+            writefn(parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?.to_string().as_bytes());
         } else if let Primitive::Integer = key {
-            parse_i64(lhs, value, |lhs, rhs| lhs * rhs)?.to_string()
+            write_integer(parse_i64(lhs, value, |lhs, rhs| lhs * rhs)?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
         Operator::Exponent => if Primitive::Any == key || Primitive::Float == key {
-            parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?.to_string()
+            writefn(parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?.to_string().as_bytes());
         } else if let Primitive::Integer = key {
-            parse_i64(lhs, value, |lhs, rhs| lhs.pow(rhs as u32))?.to_string()
+            write_integer(parse_i64(lhs, value, |lhs, rhs| lhs.pow(rhs as u32))?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
-        Operator::Equal => {
-            return Ok(Cow::Borrowed(value));
-        }
+        Operator::Equal => writefn(value.as_bytes()),
     };
 
-    Ok(Cow::Owned(value))
+    Ok(())
 }

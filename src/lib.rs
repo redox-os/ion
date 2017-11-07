@@ -13,6 +13,7 @@ extern crate calc;
 extern crate errno;
 extern crate fnv;
 extern crate glob;
+extern crate itoa;
 #[macro_use]
 extern crate lazy_static;
 #[cfg(all(unix, not(target_os = "redox")))]
