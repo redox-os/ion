@@ -15,7 +15,7 @@ use liner::{Buffer, Context};
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
-use std::io::{self, ErrorKind, Write};
+use std::io::ErrorKind;
 use std::iter::{self, FromIterator};
 use std::path::Path;
 use std::process;
@@ -41,6 +41,10 @@ pub(crate) trait Binary {
     fn display_version(&self);
     // Executes the PROMPT function, if it exists, and returns the output.
     fn prompt_fn(&mut self) -> Option<String>;
+    // Handles commands given by the REPL, and saves them to history.
+    fn save_command(&mut self, command: &str);
+    // Resets the flow control fields to their default values.
+    fn reset_flow(&mut self);
 }
 
 impl Binary for Shell {
@@ -70,9 +74,7 @@ impl Binary for Shell {
             }
             self.on_command(&arg);
         } else {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "ion: -c requires an argument");
+            eprintln!("ion: -c requires an argument");
             self.exit(FAILURE);
         }
 
@@ -124,38 +126,43 @@ impl Binary for Shell {
                     if let Ok(command) = self.terminate_quotes(command.replace("\\\n", "")) {
                         let cmd: &str = &designators::expand_designators(&self, command.trim());
                         self.on_command(&cmd);
-
-                        if cmd.starts_with('~') {
-                            if !cmd.ends_with('/')
-                                && self.variables
-                                    .tilde_expansion(cmd, &self.directory_stack)
-                                    .map_or(false, |ref path| Path::new(path).is_dir())
-                            {
-                                self.save_command_in_history(&[cmd, "/"].concat());
-                            } else {
-                                self.save_command_in_history(cmd);
-                            }
-                            self.update_variables();
-                            continue;
-                        }
-
-                        if Path::new(cmd).is_dir() & !cmd.ends_with('/') {
-                            self.save_command_in_history(&[cmd, "/"].concat());
-                        } else {
-                            self.save_command_in_history(cmd);
-                        }
+                        self.save_command(&cmd);
                     } else {
-                        self.flow_control.level = 0;
-                        self.flow_control.current_if_mode = 0;
-                        self.flow_control.current_statement = Statement::Default;
+                        self.reset_flow();
                     }
                 }
                 self.update_variables();
             } else {
-                self.flow_control.level = 0;
-                self.flow_control.current_if_mode = 0;
-                self.flow_control.current_statement = Statement::Default;
+                self.reset_flow();
             }
+        }
+    }
+
+    fn reset_flow(&mut self) {
+        self.flow_control.level = 0;
+        self.flow_control.current_if_mode = 0;
+        self.flow_control.current_statement = Statement::Default;
+    }
+
+    fn save_command(&mut self, cmd: &str) {
+        if cmd.starts_with('~') {
+            if !cmd.ends_with('/')
+                && self.variables
+                    .tilde_expansion(cmd, &self.directory_stack)
+                    .map_or(false, |ref path| Path::new(path).is_dir())
+            {
+                self.save_command_in_history(&[cmd, "/"].concat());
+            } else {
+                self.save_command_in_history(cmd);
+            }
+            self.update_variables();
+            return;
+        }
+
+        if Path::new(cmd).is_dir() & !cmd.ends_with('/') {
+            self.save_command_in_history(&[cmd, "/"].concat());
+        } else {
+            self.save_command_in_history(cmd);
         }
     }
 
@@ -195,6 +202,7 @@ impl Binary for Shell {
     }
 }
 
+// TODO: Convert this into an iterator to eliminate heap allocations.
 fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
     let mut res = Vec::new();
     let mut word_start = None;
