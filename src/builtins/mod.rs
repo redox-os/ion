@@ -2,6 +2,7 @@ pub mod source;
 pub mod variables;
 pub mod functions;
 pub mod calc;
+pub mod random;
 
 mod conditionals;
 mod job_control;
@@ -76,6 +77,7 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "or" => builtin_or : "Execute the command if the shell's previous status is failure",
     "popd" => builtin_popd : "Pop a directory from the stack",
     "pushd" => builtin_pushd : "Push a directory to the stack",
+    "random" => builtin_random : "Outputs a random u64",
     "read" => builtin_read : "Read some variables\n    read <variable>",
     "set" => builtin_set : "Set or unset values of shell options and positional parameters.",
     "source" => builtin_source : SOURCE_DESC,
@@ -245,6 +247,18 @@ fn builtin_test(args: &[&str], _: &mut Shell) -> i32 {
 
 fn builtin_calc(args: &[&str], _: &mut Shell) -> i32 {
     match calc::calc(&args[1..]) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "{}", why);
+            FAILURE
+        }
+    }
+}
+
+fn builtin_random(_: &[&str], _: &mut Shell) -> i32 {
+    match random::random() {
         Ok(()) => SUCCESS,
         Err(why) => {
             let stderr = io::stderr();

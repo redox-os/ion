@@ -36,6 +36,7 @@ regex = "0.2"
 smallstring = "0.1"
 smallvec = "0.4"
 unicode-segmentation = "1.2"
+rand = "0.3"
 
 [dependencies.app_dirs]
 git = "https://github.com/redox-os/app-dirs-rs.git"
