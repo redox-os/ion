@@ -184,6 +184,80 @@ impl<'a> StringMethod<'a> {
                 };
                 output.push_str(&out.unwrap_or(0).to_string());
             },
+            "unescape" => {
+                let word = if let Some(value) = expand.variable(variable, false) {
+                    Some(value)
+                } else if is_expression(variable) {
+                    Some(expand_string(variable, expand, false).join(" "))
+                } else {
+                    None
+                };
+                let mut out = String::from("");
+                let mut check = false;
+                let input = word
+                    .unwrap_or(String::from(""))
+                    .to_string();
+                for c in input.chars() {
+                    match c {
+                        '\\' if check => {
+                            out.push(c);
+                            check = false;
+                        }
+                        '\\' => check = true,
+                        '\'' if check => {
+                            out.push(c);
+                            check = false;
+                        }
+                        '\"' if check => {
+                            out.push(c);
+                            check = false;
+                        }
+                        'a' if check => {
+                            out.push('\u{0007}');
+                            check = false;
+                        }
+                        'b' if check => {
+                            out.push('\u{0008}');
+                            check = false;
+                        }
+                        'c' if check => {
+                            out = String::from("");
+                            break;
+                        }
+                        'e' if check => {
+                            out.push('\u{001B}');
+                            check = false;
+                        }
+                        'f' if check => {
+                            out.push('\u{000C}');
+                            check = false;
+                        }
+                        'n' if check => {
+                            out.push('\n');
+                            check = false;
+                        }
+                        'r' if check => {
+                            out.push('\r');
+                            check = false;
+                        }
+                        't' if check => {
+                            out.push('\t');
+                            check = false;
+                        }
+                        'v' if check => {
+                            out.push('\u{000B}');
+                            check = false;
+                        }
+                        _ if check => {
+                            out.push('\\');
+                            out.push(c);
+                            check = false;
+                        }
+                        _ => { out.push(c); }
+                    }
+                }
+                output.push_str(&out);
+            },
             "escape" => {
                 let word = if let Some(value) = expand.variable(variable, false) {
                     Some(value)
