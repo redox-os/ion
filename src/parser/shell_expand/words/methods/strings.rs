@@ -257,14 +257,13 @@ impl<'a> StringMethod<'a> {
             },
             "escape" => {
                 let word = if let Some(value) = expand.variable(variable, false) {
-                    Some(value)
+                    value
                 } else if is_expression(variable) {
-                    Some(expand_string(variable, expand, false).join(" "))
+                    expand_string(variable, expand, false).join(" ")
                 } else {
-                    None
+                    return;
                 };
                 let out: Vec<String> = word
-                    .unwrap_or(String::from(""))
                     .chars()
                     .map(|c| c.escape_default().to_string())
                     .collect();
