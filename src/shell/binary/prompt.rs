@@ -1,4 +1,4 @@
-use super::super::{Function, Shell};
+use super::super::{Capture, Function, Shell};
 use parser::shell_expand::expand_string;
 use std::io::Read;
 use std::process;
@@ -24,12 +24,12 @@ pub(crate) fn prompt_fn(shell: &mut Shell) -> Option<String> {
 
     let mut output = None;
 
-    match shell.fork(|child| unsafe {
+    match shell.fork(Capture::Stdout, |child| unsafe {
         let _ = function.read().execute(child, &["ion"]);
     }) {
-        Ok(mut result) => {
+        Ok(result) => {
             let mut string = String::new();
-            match result.stdout.read_to_string(&mut string) {
+            match result.stdout.unwrap().read_to_string(&mut string) {
                 Ok(_) => output = Some(string),
                 Err(why) => {
                     eprintln!("ion: error reading stdout of child: {}", why);

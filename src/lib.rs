@@ -43,8 +43,9 @@ mod types;
 #[macro_use]
 pub mod parser;
 mod builtins;
-pub mod shell;
+mod shell;
 mod ascii_helpers;
 
-pub use builtins::Builtin;
-pub use shell::Shell;
+pub use shell::{Capture, Fork, IonError, IonResult, Shell};
+pub use shell::flags;
+pub use shell::status;

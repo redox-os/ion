@@ -2,6 +2,7 @@ mod assignments;
 mod binary;
 mod completer;
 mod flow;
+mod fork;
 mod history;
 mod job;
 mod pipe_exec;
@@ -16,6 +17,7 @@ pub mod variables;
 
 pub(crate) use self::binary::Binary;
 pub(crate) use self::flow::FlowLogic;
+pub use self::fork::{Capture, Fork, IonResult};
 pub(crate) use self::history::{IgnoreSetting, ShellHistory};
 pub(crate) use self::job::{Job, JobKind};
 pub(crate) use self::pipe_exec::{foreground, job_control};
@@ -68,13 +70,6 @@ impl Display for IonError {
             IonError::Unterminated => writeln!(fmt, "input was not terminated"),
         }
     }
-}
-
-#[allow(dead_code)]
-pub struct IonResult {
-    pub pid:    u32,
-    pub stdout: File,
-    pub stderr: File,
 }
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
@@ -145,6 +140,7 @@ impl<'a> Shell {
     }
 
     #[allow(dead_code)]
+    /// Creates a new shell within memory.
     pub fn new() -> Shell {
         Shell {
             builtins:            BUILTINS,
@@ -332,10 +328,10 @@ impl<'a> Shell {
         exit_status
     }
 
-    /// Sets a variable.
+    /// Sets a variable of `name` with the given `value` in the shell's variable map.
     pub fn set_var(&mut self, name: &str, value: &str) { self.variables.set_var(name, value); }
 
-    /// Gets a variable, if it exists.
+    /// Gets a string variable, if it exists within the shell's variable map.
     pub fn get_var(&self, name: &str) -> Option<String> { self.variables.get_var(name) }
 
     /// Obtains a variable, returning an empty string if it does not exist.
@@ -343,17 +339,19 @@ impl<'a> Shell {
         self.variables.get_var_or_empty(name)
     }
 
-    /// Gets an array, if it exists.
+    /// Gets an array variable, if it exists within the shell's array map.
     pub fn get_array(&self, name: &str) -> Option<&[String]> {
         self.variables.get_array(name).map(SmallVec::as_ref)
     }
 
     #[allow(dead_code)]
-    /// A method for executing commands in the Ion shell without capturing.
-    ///
-    /// Takes command(s) as a string argument, parses them, and executes them the same as it
-    /// would if you had executed the command(s) in the command line REPL interface for Ion.
-    /// If the supplied command is not terminated, then an error will be returned.
+    /// A method for executing commands in the Ion shell without capturing. It takes command(s)
+    /// as
+    /// a string argument, parses them, and executes them the same as it would if you had
+    /// executed
+    /// the command(s) in the command line REPL interface for Ion. If the supplied command is
+    /// not
+    /// terminated, then an error will be returned.
     pub fn execute_command<CMD>(&mut self, command: CMD) -> Result<i32, IonError>
         where CMD: Into<Terminator>
     {
@@ -367,10 +365,9 @@ impl<'a> Shell {
     }
 
     #[allow(dead_code)]
-    /// A method for executing scripts in the Ion shell without capturing.
-    ///
-    /// Given a `Path`, this method will attempt to execute that file as a script, and then
-    /// returns the final exit status of the evaluated script.
+    /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
+    /// method will attempt to execute that file as a script, and then returns the final exit
+    /// status of the evaluated script.
     pub fn execute_script<SCRIPT: AsRef<Path>>(&mut self, script: SCRIPT) -> io::Result<i32> {
         let mut script = File::open(script.as_ref())?;
         let capacity = script.metadata().ok().map_or(0, |x| x.len());
@@ -400,58 +397,17 @@ impl<'a> Shell {
 
     /// A method for capturing the output of the shell, and performing actions without modifying
     /// the state of the original shell. This performs a fork, taking a closure that controls
-    /// the
-    /// shell in the child of the fork.
+    /// the shell in the child of the fork.
     ///
     /// The method is non-blocking, and therefore will immediately return file handles to the
     /// stdout and stderr of the child. The PID of the child is returned, which may be used to
     /// wait for and obtain the exit status.
-    pub fn fork<F: FnMut(&mut Shell)>(&self, mut child_func: F) -> Result<IonResult, IonError> {
-        use std::os::unix::io::{AsRawFd, FromRawFd};
-        use std::process::exit;
-        use sys;
-
-        sys::signals::block();
-
-        let (stdout_read, stdout_write) = sys::pipe2(sys::O_CLOEXEC)
-            .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
-            .map_err(IonError::Fork)?;
-
-        let (stderr_read, stderr_write) = sys::pipe2(sys::O_CLOEXEC)
-            .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
-            .map_err(IonError::Fork)?;
-
-        match unsafe { sys::fork() } {
-            Ok(0) => {
-                sys::signals::unblock();
-
-                let _ = sys::dup2(stdout_write.as_raw_fd(), sys::STDOUT_FILENO);
-                let _ = sys::dup2(stderr_write.as_raw_fd(), sys::STDERR_FILENO);
-
-                drop(stdout_write);
-                drop(stdout_read);
-                drop(stderr_write);
-                drop(stderr_read);
-
-                let mut shell: Shell = unsafe { (self as *const Shell).read() };
-                child_func(&mut shell);
-
-                // Reap the child, enabling the parent to get EOF from the read end of the pipe.
-                exit(shell.previous_status);
-            }
-            Ok(pid) => {
-                // Drop the write end of the pipe, because the parent will not use it.
-                drop(stdout_write);
-                drop(stderr_write);
-
-                Ok(IonResult {
-                    pid,
-                    stdout: stdout_read,
-                    stderr: stderr_read,
-                })
-            }
-            Err(why) => Err(IonError::Fork(why)),
-        }
+    pub fn fork<F: FnMut(&mut Shell)>(
+        &self,
+        capture: Capture,
+        child_func: F,
+    ) -> Result<IonResult, IonError> {
+        Fork::new(self, capture).exec(child_func)
     }
 }
 
@@ -522,10 +478,10 @@ impl<'a> Expander for Shell {
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<Value> {
         let mut output = None;
-        match self.fork(move |shell| shell.on_command(command)) {
-            Ok(mut result) => {
+        match self.fork(Capture::Stdout, move |shell| shell.on_command(command)) {
+            Ok(result) => {
                 let mut string = String::new();
-                match result.stdout.read_to_string(&mut string) {
+                match result.stdout.unwrap().read_to_string(&mut string) {
                     Ok(_) => output = Some(string),
                     Err(why) => {
                         eprintln!("ion: error reading stdout of child: {}", why);
