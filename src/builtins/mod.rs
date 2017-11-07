@@ -257,8 +257,8 @@ fn builtin_calc(args: &[&str], _: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_random(_: &[&str], _: &mut Shell) -> i32 {
-    match random::random() {
+fn builtin_random(args: &[&str], _: &mut Shell) -> i32 {
+    match random::random(&args[1..]) {
         Ok(()) => SUCCESS,
         Err(why) => {
             let stderr = io::stderr();
