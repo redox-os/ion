@@ -1,4 +1,5 @@
 # Builtin Commands
+
 ## alias
 ```
 alias NAME=DEFINITION
@@ -46,10 +47,15 @@ Disowning a process removes that process from the shell's background process tab
 If no process is specified, the most recently-used job is removed
 
 ## drop
+
 ```
-drop VARIABLE
+drop STRING_VARIABLE
+drop -a ARRAY_VARIABLE
 ```
-Delete a variable
+A builtin for dropping variables from the variables map. The default is to drop
+strings from the string variable map. The `-a` flag can be used to specify to drop
+an array from the array map.
+
 ## echo
 ```
 echo [ -h | --help ] [-e] [-n] [-s] [STRING]...
@@ -160,6 +166,26 @@ Pop a directory from the stack and returns to the previous directory
 pushd DIRECTORY
 ```
 Push a directory to the stack.
+
+## random
+
+```
+random
+random SEED
+random START END
+random START STEP END
+random choice [ITEMS...]
+```
+
+RANDOM generates a pseudo-random integer from a uniform distribution. The range (inclusive)
+is dependent on the arguments passed. No arguments indicate a range of [0; 32767]. If one
+argument is specified, the internal engine will be seeded with the argument for future
+invocations of RANDOM and no output will be produced. Two arguments indicate a range of
+[START; END]. Three arguments indicate a range of [START; END] with a spacing of STEP between
+possible outputs. RANDOM choice will select one random item from the succeeding arguments.
+
+> Due to limitations int the rand crate, seeding is not yet implemented
+
 ## read
 ```
 read VARIABLE

@@ -176,6 +176,10 @@ impl Binary for Shell {
                 }
                 "-c" => self.execute_arguments(args),
                 "--version" => self.display_version(),
+                "-h" | "--help" => {
+                    println!("usage: ion [--version] [-c] [-n] <command>");
+                    return;
+                }
                 _ => {
                     let mut array = SmallVec::from_iter(Some(path.clone().into()));
                     for arg in args {
