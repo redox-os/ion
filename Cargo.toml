@@ -40,12 +40,16 @@ rand = "0.3"
 
 [dependencies.app_dirs]
 git = "https://github.com/redox-os/app-dirs-rs.git"
+
 [profile.release]
+lto = true
 panic = "abort"
+
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 errno = "0.2.3"
 libc = "0.2"
 libloading = "0.4"
 users = "0.5.1"
+
 [target."cfg(target_os = \"redox\")".dependencies]
 redox_syscall = "0.1"
