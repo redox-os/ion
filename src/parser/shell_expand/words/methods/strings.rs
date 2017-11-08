@@ -256,6 +256,33 @@ impl<'a> StringMethod<'a> {
                 };
             },
             "escape" => {
+                fn escape(input: &str) -> Result<String, &'static str> {
+                    let mut output = String::with_capacity(input.len() * 2);
+                    for b in input.as_bytes() {
+                        match *b {
+                            0 => output.push_str("\\0"),
+                            7 => output.push_str("\\a"),
+                            8 => output.push_str("\\b"),
+                            9 => output.push_str("\\t"),
+                            10 => output.push_str("\\n"),
+                            11 => output.push_str("\\v"),
+                            12 => output.push_str("\\f"),
+                            13 => output.push_str("\\r"),
+                            27 => output.push_str("\\e"),
+                            n if n != 59 && n != 95 &&
+                                ((n >= 33 && n < 48) ||
+                                 (n >= 58 && n < 65) ||
+                                 (n >= 91 && n < 97) ||
+                                 (n >= 123 && n < 127)) => {
+                                output.push('\\');
+                                output.push(n as char);
+                            },
+                            n if n <= 127 => output.push(n as char),
+                            _ => return Err("ion: Invalid ASCII character"),
+                        }
+                    }
+                    Ok(output)
+                }
                 let word = if let Some(value) = expand.variable(variable, false) {
                     value
                 } else if is_expression(variable) {
@@ -263,11 +290,10 @@ impl<'a> StringMethod<'a> {
                 } else {
                     return;
                 };
-                let out: Vec<String> = word
-                    .chars()
-                    .map(|c| c.escape_default().to_string())
-                    .collect();
-                output.push_str(&out.join(""));
+                match escape(&word) {
+                    Ok(out) => output.push_str(&out),
+                    Err(msg) => eprintln!("{}", &msg),
+                };
             },
             method @ _ => {
                 if sys::is_root() {
