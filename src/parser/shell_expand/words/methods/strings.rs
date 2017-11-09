@@ -183,7 +183,118 @@ impl<'a> StringMethod<'a> {
                     None
                 };
                 output.push_str(&out.unwrap_or(0).to_string());
-            }
+            },
+            "unescape" => {
+                fn unescape(input: String) -> String {
+                    let mut check = false;
+                    let mut out = String::with_capacity(input.len());
+                    for c in input.chars() {
+                        match c {
+                            '\\' if check => {
+                                out.push(c);
+                                check = false;
+                            }
+                            '\\' => check = true,
+                            '\'' if check => {
+                                out.push(c);
+                                check = false;
+                            }
+                            '\"' if check => {
+                                out.push(c);
+                                check = false;
+                            }
+                            'a' if check => {
+                                out.push('\u{0007}');
+                                check = false;
+                            }
+                            'b' if check => {
+                                out.push('\u{0008}');
+                                check = false;
+                            }
+                            'c' if check => {
+                                out = String::from("");
+                                break;
+                            }
+                            'e' if check => {
+                                out.push('\u{001B}');
+                                check = false;
+                            }
+                            'f' if check => {
+                                out.push('\u{000C}');
+                                check = false;
+                            }
+                            'n' if check => {
+                                out.push('\n');
+                                check = false;
+                            }
+                            'r' if check => {
+                                out.push('\r');
+                                check = false;
+                            }
+                            't' if check => {
+                                out.push('\t');
+                                check = false;
+                            }
+                            'v' if check => {
+                                out.push('\u{000B}');
+                                check = false;
+                            }
+                            _ if check => {
+                                out.push('\\');
+                                out.push(c);
+                                check = false;
+                            }
+                            _ => { out.push(c); }
+                        }
+                    }
+                    out
+                }
+                if let Some(value) = expand.variable(variable, false) {
+                    output.push_str(&unescape(value));
+                } else if is_expression(variable) {
+                    output.push_str(&unescape(expand_string(variable, expand, false).join(" ")));
+                };
+            },
+            "escape" => {
+                fn escape(input: &str) -> Result<String, &'static str> {
+                    let mut output = String::with_capacity(input.len() * 2);
+                    for b in input.as_bytes() {
+                        match *b {
+                            0 => output.push_str("\\0"),
+                            7 => output.push_str("\\a"),
+                            8 => output.push_str("\\b"),
+                            9 => output.push_str("\\t"),
+                            10 => output.push_str("\\n"),
+                            11 => output.push_str("\\v"),
+                            12 => output.push_str("\\f"),
+                            13 => output.push_str("\\r"),
+                            27 => output.push_str("\\e"),
+                            n if n != 59 && n != 95 &&
+                                ((n >= 33 && n < 48) ||
+                                 (n >= 58 && n < 65) ||
+                                 (n >= 91 && n < 97) ||
+                                 (n >= 123 && n < 127)) => {
+                                output.push('\\');
+                                output.push(n as char);
+                            },
+                            n if n <= 127 => output.push(n as char),
+                            _ => return Err("ion: Invalid ASCII character"),
+                        }
+                    }
+                    Ok(output)
+                }
+                let word = if let Some(value) = expand.variable(variable, false) {
+                    value
+                } else if is_expression(variable) {
+                    expand_string(variable, expand, false).join(" ")
+                } else {
+                    return;
+                };
+                match escape(&word) {
+                    Ok(out) => output.push_str(&out),
+                    Err(msg) => eprintln!("{}", &msg),
+                };
+            },
             method @ _ => {
                 if sys::is_root() {
                     eprintln!("ion: root is not allowed to execute plugins");
