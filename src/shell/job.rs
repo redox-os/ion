@@ -1,7 +1,9 @@
 use super::Shell;
+use builtins::{BuiltinFunction, BUILTINS};
 use parser::expand_string;
 use parser::pipelines::RedirectFrom;
 use smallstring::SmallString;
+use std::fmt;
 use std::fs::File;
 use std::process::{Command, Stdio};
 use std::str;
@@ -16,20 +18,23 @@ pub(crate) enum JobKind {
     Pipe(RedirectFrom),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Clone)]
 pub(crate) struct Job {
     pub command: Identifier,
     pub args:    Array,
     pub kind:    JobKind,
+    pub builtin:    Option<BuiltinFunction>,
 }
 
 impl Job {
     pub(crate) fn new(args: Array, kind: JobKind) -> Self {
         let command = SmallString::from_str(&args[0]);
+        let builtin = BUILTINS.get(command.as_ref()).map(|b| b.main);
         Job {
             command,
             args,
             kind,
+            builtin,
         }
     }
 
@@ -42,6 +47,20 @@ impl Job {
             self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).filter(|x| !x.is_empty()),
         );
         self.args = expanded;
+    }
+}
+
+impl PartialEq for Job {
+    fn eq(&self, other: &Job) -> bool {
+        self.command == other.command &&
+        self.args == other.args &&
+        self.kind == other.kind
+    }
+}
+
+impl fmt::Debug for Job {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Job {{ command: {}, args: {:?}, kind: {:?} }}", self.command, self.args, self.kind)
     }
 }
 
