@@ -51,6 +51,7 @@ function check_return_value {
 # Build debug binary
 cargo build
 
+set +e
 # Iterate over every Ion script in examples directory
 for i in $EXAMPLES_DIR/*.ion; do
     check_return_value $i;
