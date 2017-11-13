@@ -233,7 +233,6 @@ impl<'a> Shell {
     /// if an alias branch was executed.
     fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
         let command_start_time = SystemTime::now();
-        let builtins = self.builtins;
 
         // Expand any aliases found
         for job_no in 0..pipeline.items.len() {
@@ -251,10 +250,7 @@ impl<'a> Shell {
         }
 
         // Branch if -> input == shell command i.e. echo
-        let exit_status = if let Some(command) = {
-            let key: &str = pipeline.items[0].job.command.as_ref();
-            builtins.get(key)
-        } {
+        let exit_status = if let Some(main) = pipeline.items[0].job.builtin {
             pipeline.expand(self);
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
@@ -266,7 +262,7 @@ impl<'a> Shell {
                 if self.flags & NO_EXEC != 0 {
                     Some(SUCCESS)
                 } else {
-                    Some((command.main)(&small, self))
+                    Some(main(&small, self))
                 }
             } else {
                 Some(self.execute_pipeline(pipeline))

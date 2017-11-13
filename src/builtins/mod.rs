@@ -40,6 +40,8 @@ const SOURCE_DESC: &str = "Evaluate the file following the command or re-initial
 const DISOWN_DESC: &str =
     "Disowning a process removes that process from the shell's background process table.";
 
+pub type BuiltinFunction = fn(&[&str], &mut Shell) -> i32;
+
 macro_rules! map {
     ($($name:expr => $func:ident: $help:expr),+) => {{
         BuiltinMap {
@@ -96,13 +98,13 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
 pub struct Builtin {
     pub name: &'static str,
     pub help: &'static str,
-    pub main: fn(&[&str], &mut Shell) -> i32,
+    pub main: BuiltinFunction,
 }
 
 pub struct BuiltinMap {
     pub(crate) name:      &'static [&'static str],
     pub(crate) help:      &'static [&'static str],
-    pub(crate) functions: &'static [fn(&[&str], &mut Shell) -> i32],
+    pub(crate) functions: &'static [BuiltinFunction],
 }
 
 impl BuiltinMap {
