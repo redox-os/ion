@@ -60,7 +60,7 @@ impl PartialEq for Job {
 
 impl fmt::Debug for Job {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Jon {{ command: {}, args: {:?}, kind: {:?} }}", self.command, self.args, self.kind)
+        write!(f, "Job {{ command: {}, args: {:?}, kind: {:?} }}", self.command, self.args, self.kind)
     }
 }
 
