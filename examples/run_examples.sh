@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e -u -o pipefail
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
@@ -49,6 +51,7 @@ function check_return_value {
 # Build debug binary
 cargo build
 
+set +e
 # Iterate over every Ion script in examples directory
 for i in $EXAMPLES_DIR/*.ion; do
     check_return_value $i;
