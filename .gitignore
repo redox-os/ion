@@ -1,4 +1,6 @@
 .*
+!.cargo
+!.travis
 cachegrind.*
 perf.*
 target
