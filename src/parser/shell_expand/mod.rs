@@ -10,6 +10,7 @@ use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub(crate) use self::words::{Index, Range, Select, WordIterator, WordToken};
 use glob::glob;
+use std::ptr;
 use std::str;
 use types::*;
 use unicode_segmentation::UnicodeSegmentation;
@@ -41,7 +42,7 @@ fn expand_process<E: Expander>(
     expander: &E,
     quoted: bool,
 ) {
-    if let Some(output) = expander.command(command) {
+    if let Some(mut output) = expander.command(command) {
         if quoted {
             let output: &str = if let Some(pos) = output.rfind(|x| x != '\n') {
                 &output[..pos + 1]
@@ -50,32 +51,34 @@ fn expand_process<E: Expander>(
             };
             slice(current, output, selection)
         } else {
-            let mut result = String::with_capacity(output.len());
-            let mut previous_char_was_whitespace = true;
-            output
-                .chars()
-                .for_each(|c| {
-                    match c {
-                        c if !char::is_whitespace(c) => {
-                            result.push(c);
-                            previous_char_was_whitespace = false;
-                        },
-                        c if char::is_whitespace(c) && !previous_char_was_whitespace => {
-                            result.push(' ');
-                            previous_char_was_whitespace = true;
-                        },
-                        _ => (),
+            // If we ever do something with UTF-8, this won't work
+            unsafe {
+                let mut bytes = output.as_bytes_mut();
+                let bytes_v = bytes.as_mut_ptr();
+                let mut size = bytes.len();
+                let mut i = 0;
+                let mut prev_is_whitespace = true;
+                while i < size {
+                    let is_whitespace = char::is_whitespace(bytes[i] as char);
+                    if is_whitespace {
+                        bytes[i] = b' ';
                     }
-                });
-            if previous_char_was_whitespace {
-                loop {
-                    result.pop();
-                    if !result.ends_with(' ') {
-                        break;
+                    if is_whitespace && prev_is_whitespace {
+                        size -= 1;
+                        if i != size-1 {
+                            let offset = i as isize;
+                            ptr::copy(bytes_v.offset(offset+1), bytes_v.offset(offset), size - i);
+                        }
+                    } else {
+                        i += 1;
+                        prev_is_whitespace = is_whitespace;
                     }
                 }
+                if prev_is_whitespace {
+                    size -= 1;
+                }
+                slice(current, str::from_utf8_unchecked(&bytes[..size]), selection)
             }
-            slice(current, &result, selection)
         }
     }
 }
@@ -587,7 +590,7 @@ mod test {
     #[test]
     fn expand_process_unquoted() {
         let mut output = String::new();
-        let line = " Mary   had\ta\u{2009}little  \n\t lamb\t";
+        let line = " Mary   had\ta little  \n\t lamb\t";
         expand_process(&mut output, line, Select::All, &CommandExpander, false);
         assert_eq!(output, "Mary had a little lamb");
     }
