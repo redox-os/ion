@@ -10,6 +10,7 @@ use self::braces::BraceToken;
 use self::ranges::parse_range;
 pub(crate) use self::words::{Index, Range, Select, WordIterator, WordToken};
 use glob::glob;
+use std::ptr;
 use std::str;
 use types::*;
 use unicode_segmentation::UnicodeSegmentation;
@@ -41,7 +42,7 @@ fn expand_process<E: Expander>(
     expander: &E,
     quoted: bool,
 ) {
-    if let Some(output) = expander.command(command) {
+    if let Some(mut output) = expander.command(command) {
         if quoted {
             let output: &str = if let Some(pos) = output.rfind(|x| x != '\n') {
                 &output[..pos + 1]
@@ -50,15 +51,34 @@ fn expand_process<E: Expander>(
             };
             slice(current, output, selection)
         } else {
-            // TODO: Complete this so that we don't need any heap allocations.
-            //       All that we need is to shift bytes to the left when extra spaces are found.
-            //
-            // unsafe {
-            //     let bytes: &mut [u8] = output.as_bytes_mut();
-            //     bytes.iter_mut().filter(|b| **b == b'\n').for_each(|b| *b = b' ');
-            //     slice(current, str::from_utf8_unchecked(&bytes).trim(), selection)
-            // }
-            slice(current, &output.split_whitespace().collect::<Vec<&str>>().join(" "), selection)
+            // If we ever do something with UTF-8, this won't work
+            unsafe {
+                let mut bytes = output.as_bytes_mut();
+                let bytes_v = bytes.as_mut_ptr();
+                let mut size = bytes.len();
+                let mut i = 0;
+                let mut prev_is_whitespace = true;
+                while i < size {
+                    let is_whitespace = char::is_whitespace(bytes[i] as char);
+                    if is_whitespace {
+                        bytes[i] = b' ';
+                    }
+                    if is_whitespace && prev_is_whitespace {
+                        size -= 1;
+                        if i != size-1 {
+                            let offset = i as isize;
+                            ptr::copy(bytes_v.offset(offset+1), bytes_v.offset(offset), size - i);
+                        }
+                    } else {
+                        i += 1;
+                        prev_is_whitespace = is_whitespace;
+                    }
+                }
+                if prev_is_whitespace {
+                    size -= 1;
+                }
+                slice(current, str::from_utf8_unchecked(&bytes[..size]), selection)
+            }
         }
     }
 }
@@ -557,6 +577,22 @@ mod test {
                 _ => None,
             }
         }
+    }
+
+    struct CommandExpander;
+
+    impl Expander for CommandExpander {
+        fn command(&self, cmd: &str) -> Option<Value> {
+            Some(cmd.to_owned())
+        }
+    }
+
+    #[test]
+    fn expand_process_unquoted() {
+        let mut output = String::new();
+        let line = " Mary   had\ta little  \n\t lamb\t";
+        expand_process(&mut output, line, Select::All, &CommandExpander, false);
+        assert_eq!(output, "Mary had a little lamb");
     }
 
     #[test]
