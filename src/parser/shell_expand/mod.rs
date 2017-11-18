@@ -50,15 +50,24 @@ fn expand_process<E: Expander>(
             };
             slice(current, output, selection)
         } else {
-            // TODO: Complete this so that we don't need any heap allocations.
-            //       All that we need is to shift bytes to the left when extra spaces are found.
-            //
-            // unsafe {
-            //     let bytes: &mut [u8] = output.as_bytes_mut();
-            //     bytes.iter_mut().filter(|b| **b == b'\n').for_each(|b| *b = b' ');
-            //     slice(current, str::from_utf8_unchecked(&bytes).trim(), selection)
-            // }
-            slice(current, &output.split_whitespace().collect::<Vec<&str>>().join(" "), selection)
+            let mut result = String::with_capacity(output.len());
+            let mut previous_char_was_whitespace = true;
+            output
+                .chars()
+                .for_each(|c| {
+                    match c {
+                        c if !char::is_whitespace(c) => {
+                            result.push(c);
+                            previous_char_was_whitespace = false;
+                        },
+                        c if char::is_whitespace(c) && !previous_char_was_whitespace => {
+                            result.push(' ');
+                            previous_char_was_whitespace = true;
+                        },
+                        _ => (),
+                    }
+                });
+            slice(current, result.trim_right(), selection)
         }
     }
 }
@@ -557,6 +566,22 @@ mod test {
                 _ => None,
             }
         }
+    }
+
+    struct CommandExpander;
+
+    impl Expander for CommandExpander {
+        fn command(&self, cmd: &str) -> Option<Value> {
+            Some(cmd.to_owned())
+        }
+    }
+
+    #[test]
+    fn expand_process_unquoted() {
+        let mut output = String::new();
+        let line = " Mary   had\ta\u{2009}little  \n\t lamb\t";
+        expand_process(&mut output, line, Select::All, &CommandExpander, false);
+        assert_eq!(output, "Mary had a little lamb");
     }
 
     #[test]
