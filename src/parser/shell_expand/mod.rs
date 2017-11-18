@@ -67,7 +67,15 @@ fn expand_process<E: Expander>(
                         _ => (),
                     }
                 });
-            slice(current, result.trim_right(), selection)
+            if previous_char_was_whitespace {
+                loop {
+                    result.pop();
+                    if !result.ends_with(' ') {
+                        break;
+                    }
+                }
+            }
+            slice(current, &result, selection)
         }
     }
 }
