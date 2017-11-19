@@ -12,17 +12,80 @@ lazy_static! {
     static ref STRING_METHODS: StringMethodPlugins = methods::collect();
 }
 
+fn unescape(input: &str) -> Result<String, &'static str> {
+    let mut check = false;
+    let mut out = String::with_capacity(input.len());
+    let add_char = |out: &mut String, check: &mut bool, c| {
+        out.push(c);
+        *check = false;
+    };
+    for c in input.chars() {
+        match c {
+            '\\' if check => {
+                add_char(&mut out, &mut check, c);
+            }
+            '\\' => check = true,
+            '\'' if check => add_char(&mut out, &mut check, c),
+            '\"' if check => add_char(&mut out, &mut check, c),
+            'a' if check => add_char(&mut out, &mut check, '\u{0007}'),
+            'b' if check => add_char(&mut out, &mut check, '\u{0008}'),
+            'c' if check => {
+                out = String::from("");
+                break;
+            },
+            'e' if check => add_char(&mut out, &mut check, '\u{001B}'),
+            'f' if check => add_char(&mut out, &mut check, '\u{000C}'),
+            'n' if check => add_char(&mut out, &mut check, '\n'),
+            'r' if check => add_char(&mut out, &mut check, '\r'),
+            't' if check => add_char(&mut out, &mut check, '\t'),
+            'v' if check => add_char(&mut out, &mut check, '\u{000B}'),
+            _ if check => {
+                out.push('\\');
+                add_char(&mut out, &mut check, c);
+            }
+            c if c.is_ascii() => out.push(c),
+            _ => return Err("ion: Invalid ASCII character"),
+        }
+    }
+    Ok(out)
+}
+fn escape(input: &str) -> Result<String, &'static str> {
+    let mut output = String::with_capacity(input.len() * 2);
+    for b in input.as_bytes() {
+        match *b {
+            0 => output.push_str("\\0"),
+            7 => output.push_str("\\a"),
+            8 => output.push_str("\\b"),
+            9 => output.push_str("\\t"),
+            10 => output.push_str("\\n"),
+            11 => output.push_str("\\v"),
+            12 => output.push_str("\\f"),
+            13 => output.push_str("\\r"),
+            27 => output.push_str("\\e"),
+            n if n != 59 && n != 95 &&
+                ((n >= 33 && n < 48) ||
+                 (n >= 58 && n < 65) ||
+                 (n >= 91 && n < 97) ||
+                 (n >= 123 && n < 127)) => {
+                output.push('\\');
+                output.push(n as char);
+            },
+            n if n <= 127 => output.push(n as char),
+            _ => return Err("ion: Invalid ASCII character"),
+        }
+    }
+    Ok(output)
+}
+
 /// Represents a method that operates on and returns a string
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct StringMethod<'a> {
-    /// Name of this method: currently `join`, `len`, and `len_bytes` are the
-    /// supported methods
+    /// Name of this method
     pub(crate) method: &'a str,
     /// Variable that this method will operator on. This is a bit of a misnomer
     /// as this can be an expression as well
     pub(crate) variable: &'a str,
-    /// Pattern to use for certain methods: currently `join` makes use of a
-    /// pattern
+    /// Pattern to use for certain methods
     pub(crate) pattern: &'a str,
     /// Selection to use to control the output of this method
     pub(crate) selection: Select,
@@ -94,7 +157,7 @@ impl<'a> StringMethod<'a> {
             "repeat" => match pattern.join(" ").parse::<usize>() {
                 Ok(repeat) => output.push_str(&get_var!().repeat(repeat)),
                 Err(_) => {
-                    eprintln!("ion: value supplied to $repeat() is not a valid number");
+                    eprintln!("ion: value supplied to $repeat() is not a valid positive integer");
                 }
             },
             "replace" => {
@@ -182,107 +245,22 @@ impl<'a> StringMethod<'a> {
                 } else {
                     None
                 };
-                output.push_str(&out.unwrap_or(0).to_string());
+                output.push_str(&out.map(|i| i as isize).unwrap_or(-1).to_string());
             },
             "unescape" => {
-                fn unescape(input: String) -> String {
-                    let mut check = false;
-                    let mut out = String::with_capacity(input.len());
-                    for c in input.chars() {
-                        match c {
-                            '\\' if check => {
-                                out.push(c);
-                                check = false;
-                            }
-                            '\\' => check = true,
-                            '\'' if check => {
-                                out.push(c);
-                                check = false;
-                            }
-                            '\"' if check => {
-                                out.push(c);
-                                check = false;
-                            }
-                            'a' if check => {
-                                out.push('\u{0007}');
-                                check = false;
-                            }
-                            'b' if check => {
-                                out.push('\u{0008}');
-                                check = false;
-                            }
-                            'c' if check => {
-                                out = String::from("");
-                                break;
-                            }
-                            'e' if check => {
-                                out.push('\u{001B}');
-                                check = false;
-                            }
-                            'f' if check => {
-                                out.push('\u{000C}');
-                                check = false;
-                            }
-                            'n' if check => {
-                                out.push('\n');
-                                check = false;
-                            }
-                            'r' if check => {
-                                out.push('\r');
-                                check = false;
-                            }
-                            't' if check => {
-                                out.push('\t');
-                                check = false;
-                            }
-                            'v' if check => {
-                                out.push('\u{000B}');
-                                check = false;
-                            }
-                            _ if check => {
-                                out.push('\\');
-                                out.push(c);
-                                check = false;
-                            }
-                            _ => { out.push(c); }
-                        }
-                    }
-                    out
-                }
-                if let Some(value) = expand.variable(variable, false) {
-                    output.push_str(&unescape(value));
+                let out = if let Some(value) = expand.variable(variable, false) {
+                    value
                 } else if is_expression(variable) {
-                    output.push_str(&unescape(expand_string(variable, expand, false).join(" ")));
+                    expand_string(variable, expand, false).join(" ")
+                } else {
+                    return;
+                };
+                match unescape(&out) {
+                    Ok(out) => output.push_str(&out),
+                    Err(msg) => eprintln!("{}", &msg)
                 };
             },
             "escape" => {
-                fn escape(input: &str) -> Result<String, &'static str> {
-                    let mut output = String::with_capacity(input.len() * 2);
-                    for b in input.as_bytes() {
-                        match *b {
-                            0 => output.push_str("\\0"),
-                            7 => output.push_str("\\a"),
-                            8 => output.push_str("\\b"),
-                            9 => output.push_str("\\t"),
-                            10 => output.push_str("\\n"),
-                            11 => output.push_str("\\v"),
-                            12 => output.push_str("\\f"),
-                            13 => output.push_str("\\r"),
-                            27 => output.push_str("\\e"),
-                            n if n != 59 && n != 95 &&
-                                ((n >= 33 && n < 48) ||
-                                 (n >= 58 && n < 65) ||
-                                 (n >= 91 && n < 97) ||
-                                 (n >= 123 && n < 127)) => {
-                                output.push('\\');
-                                output.push(n as char);
-                            },
-                            n if n <= 127 => output.push(n as char),
-                            _ => return Err("ion: Invalid ASCII character"),
-                        }
-                    }
-                    Ok(output)
-                }
                 let word = if let Some(value) = expand.variable(variable, false) {
                     value
                 } else if is_expression(variable) {
@@ -327,5 +305,413 @@ impl<'a> StringMethod<'a> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use types::Value;
+
+    struct VariableExpander;
+
+    impl Expander for VariableExpander {
+        fn variable(&self, variable: &str, _: bool) -> Option<Value> {
+            match variable {
+                "FOO" => Some("FOOBAR".to_owned()),
+                _ => None,
+            }
+        }
+    }
+
+    #[test]
+    fn test_escape() {
+        let line = " Mary   had\ta little  \n\t lamb\t";
+        let output = escape(line).expect("error processing string");
+        assert_eq!(output, " Mary   had\\ta little  \\n\\t lamb\\t");
+    }
+
+    #[test]
+    fn test_unescape() {
+        let line = " Mary   had\ta little  \n\t lamb\t";
+        let output = unescape(line).expect("error processing string");
+        assert_eq!(output, line);
+    }
+
+    #[test]
+    fn test_ends_with_succeeding() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "ends_with",
+            variable: "$FOO",
+            pattern: "\"BAR\"",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "1");
+    }
+
+    #[test]
+    fn test_ends_with_failing() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "ends_with",
+            variable: "$FOO",
+            pattern: "\"BA\"",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "0");
+    }
+
+    #[test]
+    fn test_contains_succeeding() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "contains",
+            variable: "$FOO",
+            pattern: "\"OBA\"",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "1");
+    }
+
+    #[test]
+    fn test_contains_failing() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "contains",
+            variable: "$FOO",
+            pattern: "\"OBI\"",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "0");
+    }
+
+    #[test]
+    fn test_starts_with_succeeding() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "starts_with",
+            variable: "$FOO",
+            pattern: "\"FOO\"",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "1");
+    }
+
+    #[test]
+    fn test_starts_with_failing() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "starts_with",
+            variable: "$FOO",
+            pattern: "\"OO\"",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "0");
+    }
+
+    #[test]
+    fn test_basename() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "basename",
+            variable: "\"/home/redox/file.txt\"",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "file.txt");
+    }
+
+    #[test]
+    fn test_extension() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "extension",
+            variable: "\"/home/redox/file.txt\"",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "txt");
+    }
+
+    #[test]
+    fn test_filename() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "filename",
+            variable: "\"/home/redox/file.txt\"",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "file");
+    }
+
+    #[test]
+    fn test_parent() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "parent",
+            variable: "\"/home/redox/file.txt\"",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "/home/redox");
+    }
+
+    #[test]
+    fn test_to_lowercase() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "to_lowercase",
+            variable: "\"Ford Prefect\"",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "ford prefect");
+    }
+
+    #[test]
+    fn test_to_uppercase() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "to_uppercase",
+            variable: "\"Ford Prefect\"",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "FORD PREFECT");
+    }
+
+    #[test]
+    fn test_repeat_succeeding() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "repeat",
+            variable: "$FOO",
+            pattern: "2",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "FOOBARFOOBAR");
+    }
+
+    #[test]
+    fn test_repeat_failing() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "repeat",
+            variable: "$FOO",
+            pattern: "-2",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "");
+    }
+
+    #[test]
+    fn test_replace_succeeding() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "replace",
+            variable: "$FOO",
+            pattern: "[\"FOO\" \"BAR\"]",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "BARBAR");
+    }
+
+    #[test]
+    fn test_replace_failing() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "replace",
+            variable: "$FOO",
+            pattern: "[]",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "");
+    }
+
+    #[test]
+    fn test_replacen_succeeding() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "replacen",
+            variable: "\"FOO$FOO\"",
+            pattern: "[\"FOO\" \"BAR\" 1]",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "BARFOOBAR");
+    }
+
+    #[test]
+    fn test_replacen_failing() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "replacen",
+            variable: "$FOO",
+            pattern: "[]",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "");
+    }
+
+    #[test]
+    fn test_join_with_string() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "join",
+            variable: "[\"FOO\" \"BAR\"]",
+            pattern: "\" \"",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "FOO BAR");
+    }
+
+    #[test]
+    fn test_join_with_array() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "join",
+            variable: "[\"FOO\" \"BAR\"]",
+            pattern: "[\"-\" \"-\"]",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "FOO- -BAR");
+    }
+
+    #[test]
+    fn test_len_with_array() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "len",
+            variable: "[\"1\"]",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "1");
+    }
+
+    #[test]
+    fn test_len_with_string() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "len",
+            variable: "\"FOO\"",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "3");
+    }
+
+    #[test]
+    fn test_len_with_variable() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "len",
+            variable: "$FOO",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "6");
+    }
+
+    #[test]
+    fn test_len_bytes_with_variable() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "len_bytes",
+            variable: "$FOO",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "6");
+    }
+
+    #[test]
+    fn test_len_bytes_with_string() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "len_bytes",
+            variable: "\"oh là là\"",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "10");
+    }
+
+    #[test]
+    fn test_reverse_with_variable() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "reverse",
+            variable: "$FOO",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "RABOOF");
+    }
+
+    #[test]
+    fn test_reverse_with_string() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "reverse",
+            variable: "\"FOOBAR\"",
+            pattern: "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "RABOOF");
+    }
+
+    #[test]
+    fn test_find_succeeding() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "find",
+            variable: "$FOO",
+            pattern: "\"O\"",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "1");
+    }
+
+    #[test]
+    fn test_find_failing() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "find",
+            variable: "$FOO",
+            pattern: "\"L\"",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "-1");
     }
 }
