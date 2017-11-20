@@ -588,6 +588,14 @@ mod test {
     }
 
     #[test]
+    fn expand_process_quoted() {
+        let mut output = String::new();
+        let line = " Mary   had\ta little  \n\t lamb\t";
+        expand_process(&mut output, line, Select::All, &CommandExpander, true);
+        assert_eq!(output, line);
+    }
+
+    #[test]
     fn expand_process_unquoted() {
         let mut output = String::new();
         let line = " Mary   had\ta little  \n\t lamb\t";
