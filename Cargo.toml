@@ -42,7 +42,7 @@ rand = "0.3"
 git = "https://github.com/redox-os/app-dirs-rs.git"
 
 [profile.release]
-debug = true
+#debug = true
 lto = true
 panic = "abort"
 

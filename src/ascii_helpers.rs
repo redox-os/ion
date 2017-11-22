@@ -1,4 +1,3 @@
-use std::ascii::AsciiExt;
 use std::mem::transmute;
 use std::ops::DerefMut;
 
