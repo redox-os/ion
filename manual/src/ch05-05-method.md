@@ -62,19 +62,83 @@ for elem in @split("some, comma-separated, values", ", "); echo $elem; end
 
 The following are the currently-supported string methods:
 
+- [ends_with](#ends_with)
+- [contains](#contains)
+- [starts_with](#starts_with)
 - [basename](#basename)
 - [extension](#extension)
 - [filename](#filename)
 - [join](#join)
+- [find](#find)
 - [len](#len)
 - [len_bytes](#len_bytes)
 - [parent](#parent)
 - [repeat](#repeat)
 - [replace](#replace)
 - [replacen](#replacen)
+- [regex_replace](#regex_replace)
 - [reverse](#reverse)
 - [to_lowercase](#to_lowercase)
 - [to_uppercase](#to_uppercase)
+- [escape](#escape)
+- [unescape](#unescape)
+
+### ends_with
+
+Defaults to string variables. When supplied with a pattern, it will return one if the string
+ends with it. Zero otherwise.
+
+#### Examples
+
+```ion
+echo $ends_with("FOOBAR", "BAR")
+echo $ends_with("FOOBAR", "FOO")
+```
+
+#### Output
+
+```
+1
+0
+```
+
+### contains
+
+Defaults to string variables. When supplied with a pattern, it will return one if the string
+contains with it. Zero otherwise.
+
+#### Examples
+
+```ion
+echo $contains("FOOBAR", "OOB")
+echo $contains("FOOBAR", "foo")
+```
+
+#### Output
+
+```
+1
+0
+```
+
+### starts_with
+
+Defaults to string variables. When supplied with a pattern, it will return one if the string
+starts with it. Zero otherwise.
+
+#### Examples
+
+```ion
+echo $starts_with("FOOBAR", "FOO")
+echo $starts_with("FOOBAR", "BAR")
+```
+
+#### Output
+
+```
+1
+0
+```
 
 ### basename
 
@@ -148,7 +212,27 @@ echo $join(array, ", ")
 1, 2, 3, 4, 5
 ```
 
+### find
+
+Defaults to string variables. When given an string, it returns the first index in which that
+string appears. It returns `-1` if it isn't contained.
+
+#### Examples
+
+```ion
+echo $find("FOOBAR", "OB")
+echo $find("FOOBAR", "ob")
+```
+
+#### Output
+
+```
+2
+-1
+```
+
 ### len
+
 
 Defaults to string variables. Counts the number of graphemes in the output. If an array expression
 is supplied, it will print the number of elements in the array.
@@ -262,6 +346,25 @@ three two one two
 one three one three
 ```
 
+### regex_replace
+
+Defaults to string variables. Equivalent to `replace`, but the first argument will be treated
+as a regex.
+
+#### Examples
+
+```ion
+echo $regex_replace("FOOBAR", "^F" "f")
+echo $regex_replace("FOOBAR", "^f" "F")
+```
+
+#### Output
+
+```
+fOOBAR
+FOOBAR
+```
+
 ### reverse
 
 Defaults to string variables. Simply returns the same string, but with each grapheme displayed
@@ -311,6 +414,41 @@ echo $to_uppercase("foobar")
 
 ```
 FOOBAR
+```
+
+### escape
+
+Defaults to string variables. Escapes the content of the string.
+
+#### Example
+
+```ion
+let line = " Mary   had\ta little  \n\t lamb\t"
+echo $escape($line)
+```
+
+#### Output
+
+```
+ Mary   had\\ta little  \\n\\t lamb\\t
+```
+
+### unescape
+
+Defaults to string variables. Unescapes the content of the string.
+
+#### Example
+
+```
+let line = " Mary   had\ta little  \n\t lamb\t"
+echo $unescape($line)
+```
+
+#### Output
+
+```
+ Mary   had	a little  
+	 lamb
 ```
 
 ## Array Methods

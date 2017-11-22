@@ -573,6 +573,32 @@ mod test {
     }
 
     #[test]
+    fn test_regex_replace_succeeding() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "regex_replace",
+            variable: "$FOO",
+            pattern: "[\"^F\" \"f\"]",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "fOOBAR");
+    }
+
+    #[test]
+    fn test_regex_replace_failing() {
+        let mut output = String::new();
+        let method = StringMethod {
+            method: "regex_replace",
+            variable: "$FOO",
+            pattern: "[\"^f\" \"F\"]",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(output, "FOOBAR");
+    }
+
+    #[test]
     fn test_join_with_string() {
         let mut output = String::new();
         let method = StringMethod {
