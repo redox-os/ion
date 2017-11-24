@@ -96,13 +96,8 @@ mod tests {
     #[test]
     fn for_normal() {
         let variables = Variables::default();
-        let output = vec![
-            "1".to_owned(),
-            "2".to_owned(),
-            "3".to_owned(),
-            "4".to_owned(),
-            "5".to_owned(),
-        ];
+        let output =
+            vec!["1".to_owned(), "2".to_owned(), "3".to_owned(), "4".to_owned(), "5".to_owned()];
         assert_eq!(
             ForExpression::new(&output.clone(), &VariableExpander(variables)),
             ForExpression::Multiple(output)

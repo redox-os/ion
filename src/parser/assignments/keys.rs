@@ -42,12 +42,7 @@ impl<'a> Key<'a> {
 }
 
 impl<'a> From<Key<'a>> for KeyBuf {
-    fn from(key: Key<'a>) -> KeyBuf {
-        KeyBuf {
-            kind: key.kind,
-            name: key.name.to_owned(),
-        }
-    }
+    fn from(key: Key<'a>) -> KeyBuf { KeyBuf { kind: key.kind, name: key.name.to_owned() } }
 }
 
 /// A primitive defines the type that a requested value should satisfy.
@@ -134,12 +129,7 @@ impl<'a> KeyIterator<'a> {
         for byte in self.data.bytes().skip(self.read) {
             if byte == b' ' {
                 match &self.data[start..self.read] {
-                    "]" => {
-                        return Ok(Key {
-                            name,
-                            kind: Primitive::AnyArray,
-                        })
-                    }
+                    "]" => return Ok(Key { name, kind: Primitive::AnyArray }),
                     data @ _ => return Err(TypeError::Invalid(data)),
                 }
             }
@@ -147,12 +137,7 @@ impl<'a> KeyIterator<'a> {
         }
 
         match &self.data[start..] {
-            "]" => {
-                return Ok(Key {
-                    name,
-                    kind: Primitive::AnyArray,
-                })
-            }
+            "]" => return Ok(Key { name, kind: Primitive::AnyArray }),
             data @ _ => return Err(TypeError::Invalid(data)),
         }
     }
@@ -167,10 +152,9 @@ impl<'a> Iterator for KeyIterator<'a> {
             match byte {
                 b' ' if start + 1 == self.read => start += 1,
                 b' ' => {
-                    return Some(Ok(Key {
-                        name: &self.data[start..self.read].trim(),
-                        kind: Primitive::Any,
-                    }))
+                    return Some(
+                        Ok(Key { name: &self.data[start..self.read].trim(), kind: Primitive::Any }),
+                    )
                 }
                 b':' => {
                     // NOTE: Borrowck issue?
@@ -188,10 +172,7 @@ impl<'a> Iterator for KeyIterator<'a> {
         if start == self.read {
             None
         } else {
-            Some(Ok(Key {
-                name: &self.data[start..self.read].trim(),
-                kind: Primitive::Any,
-            }))
+            Some(Ok(Key { name: &self.data[start..self.read].trim(), kind: Primitive::Any }))
         }
     }
 }
@@ -203,41 +184,11 @@ mod tests {
     #[test]
     fn key_parsing() {
         let mut parser = KeyIterator::new("a:int b[] c:bool d e:int[] d:a");
-        assert_eq!(
-            parser.next().unwrap(),
-            Ok(Key {
-                name: "a",
-                kind: Primitive::Integer,
-            })
-        );
-        assert_eq!(
-            parser.next().unwrap(),
-            Ok(Key {
-                name: "b",
-                kind: Primitive::AnyArray,
-            })
-        );
-        assert_eq!(
-            parser.next().unwrap(),
-            Ok(Key {
-                name: "c",
-                kind: Primitive::Boolean,
-            })
-        );
-        assert_eq!(
-            parser.next().unwrap(),
-            Ok(Key {
-                name: "d",
-                kind: Primitive::Any,
-            })
-        );
-        assert_eq!(
-            parser.next().unwrap(),
-            Ok(Key {
-                name: "e",
-                kind: Primitive::IntegerArray,
-            })
-        );
+        assert_eq!(parser.next().unwrap(), Ok(Key { name: "a", kind: Primitive::Integer }));
+        assert_eq!(parser.next().unwrap(), Ok(Key { name: "b", kind: Primitive::AnyArray }));
+        assert_eq!(parser.next().unwrap(), Ok(Key { name: "c", kind: Primitive::Boolean }));
+        assert_eq!(parser.next().unwrap(), Ok(Key { name: "d", kind: Primitive::Any }));
+        assert_eq!(parser.next().unwrap(), Ok(Key { name: "e", kind: Primitive::IntegerArray }));
         assert_eq!(parser.next().unwrap(), Err(TypeError::Invalid("a")));
     }
 }

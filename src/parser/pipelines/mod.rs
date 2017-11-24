@@ -45,11 +45,7 @@ pub(crate) struct PipeItem {
 
 impl PipeItem {
     pub(crate) fn new(job: Job, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
-        PipeItem {
-            job,
-            outputs,
-            inputs,
-        }
+        PipeItem { job, outputs, inputs }
     }
 
     pub(crate) fn expand(&mut self, shell: &Shell) {

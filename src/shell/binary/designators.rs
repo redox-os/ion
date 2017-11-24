@@ -24,10 +24,7 @@ struct DesignatorSearcher<'a> {
 
 impl<'a> DesignatorSearcher<'a> {
     fn new(data: &'a [u8]) -> DesignatorSearcher {
-        DesignatorSearcher {
-            data,
-            flags: Flags::empty(),
-        }
+        DesignatorSearcher { data, flags: Flags::empty() }
     }
 
     fn grab_and_shorten(&mut self, id: usize) -> &'a str {

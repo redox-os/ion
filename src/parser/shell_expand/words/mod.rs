@@ -56,12 +56,7 @@ pub(crate) struct WordIterator<'a, E: Expander + 'a> {
 
 impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     pub(crate) fn new(data: &'a str, expanders: &'a E) -> WordIterator<'a, E> {
-        WordIterator {
-            data,
-            read: 0,
-            flags: Flags::empty(),
-            expanders,
-        }
+        WordIterator { data, read: 0, flags: Flags::empty(), expanders }
     }
 
     // Contains the grammar for collecting whitespace characters

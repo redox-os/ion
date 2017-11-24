@@ -84,6 +84,7 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "set" => builtin_set : "Set or unset values of shell options and positional parameters.",
     "source" => builtin_source : SOURCE_DESC,
     "starts-with" => starts_with : "Evaluates if the supplied argument starts with a given string",
+    "status" => builtin_status : "Evaluates the current runtime status",
     "suspend" => builtin_suspend : "Suspends the shell with a SIGTSTOP signal",
     "test" => builtin_test : "Performs tests on files and text",
     "true" => builtin_true : "Do nothing, successfully",
@@ -125,7 +126,10 @@ impl BuiltinMap {
 
 // Definitions of simple builtins go here
 
-fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
+// TODO: dummy function
+fn builtin_status(_: &[&str], _: &mut Shell) -> i32 { SUCCESS }
+
+pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.directory_stack.cd(args, &shell.variables) {
         Ok(()) => SUCCESS,
         Err(why) => {

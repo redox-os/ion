@@ -295,10 +295,7 @@ fn test_evaluate_arguments() {
     let name_str = "test_function";
     let name = SmallString::from_str(name_str);
     let mut args = Vec::new();
-    args.push(KeyBuf {
-        name: "testy".into(),
-        kind: Primitive::Any,
-    });
+    args.push(KeyBuf { name: "testy".into(), kind: Primitive::Any });
     let mut statements = Vec::new();
     statements.push(Statement::End);
     let description = "description".to_owned();
@@ -434,10 +431,7 @@ fn test_function_is_defined() {
     let name_str = "test_function";
     let name = SmallString::from_str(name_str);
     let mut args = Vec::new();
-    args.push(KeyBuf {
-        name: "testy".into(),
-        kind: Primitive::Any,
-    });
+    args.push(KeyBuf { name: "testy".into(), kind: Primitive::Any });
     let mut statements = Vec::new();
     statements.push(Statement::End);
     let description = "description".to_owned();

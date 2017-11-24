@@ -18,6 +18,7 @@ use super::flow_control::FunctionError;
 use super::job::{RefinedJob, TeeItem};
 use super::signals::{self, SignalHandler};
 use super::status::*;
+use builtins::{self, BuiltinFunction};
 use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Error, Write};
@@ -29,8 +30,6 @@ use std::process::{self, exit, Command};
 use sys;
 
 type RefinedItem = (RefinedJob, JobKind, Vec<Redirection>, Vec<Input>);
-
-
 
 /// Create an OS pipe and write the contents of a byte slice to one end
 /// such that reading from this pipe will produce the byte slice. Return
@@ -262,14 +261,8 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
             (true, false) => set_one_tee!(new_commands, outputs, job, kind, Stdout, Stderr),
             // tee both
             (true, true) => {
-                let mut tee_out = TeeItem {
-                    sinks:  Vec::new(),
-                    source: None,
-                };
-                let mut tee_err = TeeItem {
-                    sinks:  Vec::new(),
-                    source: None,
-                };
+                let mut tee_out = TeeItem { sinks:  Vec::new(), source: None };
+                let mut tee_err = TeeItem { sinks:  Vec::new(), source: None };
                 for output in outputs {
                     match if output.append {
                         OpenOptions::new().create(true).write(true).append(true).open(&output.file)
@@ -356,7 +349,7 @@ pub(crate) trait PipelineExecution {
     /// * `shell.builtins.contains_key(name)`; otherwise this function will panic
     fn exec_builtin(
         &mut self,
-        name: &str,
+        main: BuiltinFunction,
         args: &[&str],
         stdout: &Option<File>,
         stderr: &Option<File>,
@@ -436,21 +429,17 @@ impl PipelineExecution for Shell {
     fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<RefinedItem>, i32> {
         let mut results = Vec::new();
         for item in pipeline.items.drain(..) {
-            let PipeItem {
-                mut job,
-                outputs,
-                inputs,
-            } = item;
+            let PipeItem { mut job, outputs, inputs } = item;
             let refined = {
                 if is_implicit_cd(&job.args[0]) {
                     RefinedJob::builtin(
-                        "cd".into(),
+                        builtins::builtin_cd,
                         iter::once("cd".into()).chain(job.args.drain()).collect(),
                     )
                 } else if self.functions.contains_key(job.args[0].as_str()) {
                     RefinedJob::function(job.args[0].clone().into(), job.args.drain().collect())
-                } else if self.builtins.contains_key(job.args[0].as_str()) {
-                    RefinedJob::builtin(job.args[0].clone().into(), job.args.drain().collect())
+                } else if let Some(builtin) = job.builtin {
+                    RefinedJob::builtin(builtin, job.args.drain().collect())
                 } else {
                     let mut command = Command::new(job.args[0].clone());
                     for arg in job.args.drain().skip(1) {
@@ -513,29 +502,17 @@ impl PipelineExecution for Shell {
                     COULD_NOT_EXEC
                 },
             },
-            RefinedJob::Builtin {
-                ref name,
-                ref args,
-                ref stdin,
-                ref stdout,
-                ref stderr,
-            } => {
+            RefinedJob::Builtin { main, ref args, ref stdin, ref stdout, ref stderr } => {
                 if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
                     let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
-                    let code = self.exec_builtin(name, &args, stdout, stderr, stdin);
+                    let code = self.exec_builtin(main, &args, stdout, stderr, stdin);
                     redirect_streams(stdin_bk, stdout_bk, stderr_bk);
                     return code;
                 }
                 eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", long);
                 COULD_NOT_EXEC
             }
-            RefinedJob::Function {
-                ref name,
-                ref args,
-                ref stdin,
-                ref stdout,
-                ref stderr,
-            } => {
+            RefinedJob::Function { ref name, ref args, ref stdin, ref stdout, ref stderr } => {
                 if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
                     let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
                     let code = self.exec_function(name, &args, stdout, stderr, stdin);
@@ -551,7 +528,7 @@ impl PipelineExecution for Shell {
 
     fn exec_builtin(
         &mut self,
-        name: &str,
+        main: BuiltinFunction,
         args: &[&str],
         stdout: &Option<File>,
         stderr: &Option<File>,
@@ -566,10 +543,8 @@ impl PipelineExecution for Shell {
         if let Some(ref file) = *stderr {
             redir(file.as_raw_fd(), sys::STDERR_FILENO);
         }
-        // The precondition for this function asserts that there exists some `builtin`
-        // in the shell named `name`, so we unwrap here.
-        let builtin = self.builtins.get(name).unwrap();
-        (builtin.main)(args, self)
+
+        main(args, self)
     }
 
     fn exec_function(
@@ -783,7 +758,7 @@ pub(crate) fn pipe(
                                         }
                                     }
                                 }
-                                RefinedJob::Builtin { ref name,
+                                RefinedJob::Builtin { main,
                                                       ref args,
                                                       ref stdout,
                                                       ref stderr,
@@ -799,7 +774,7 @@ pub(crate) fn pipe(
                                             let args: Vec<&str> = args
                                                 .iter()
                                                 .map(|x| x as &str).collect();
-                                            let ret = shell.exec_builtin(name,
+                                            let ret = shell.exec_builtin(main,
                                                               &args,
                                                               stdout,
                                                               stderr,

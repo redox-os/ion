@@ -113,19 +113,13 @@ pub(crate) fn parse(code: &str) -> Statement {
                 return Statement::Else;
             } else if cmd.starts_with("if ") {
                 return collect(cmd[3..].trim_left(), |pipeline| {
-                    Statement::ElseIf(ElseIf {
-                        expression: pipeline,
-                        success:    Vec::new(),
-                    })
+                    Statement::ElseIf(ElseIf { expression: pipeline, success:    Vec::new() })
                 });
             }
         }
         _ if cmd.starts_with("while ") => {
             return collect(cmd[6..].trim_left(), |pipeline| {
-                Statement::While {
-                    expression: pipeline,
-                    statements: Vec::new(),
-                }
+                Statement::While { expression: pipeline, statements: Vec::new() }
             })
         }
         _ if cmd.starts_with("for ") => {
@@ -172,12 +166,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             };
 
-            return Statement::Case(Case {
-                value,
-                binding,
-                conditional,
-                statements: Vec::new(),
-            });
+            return Statement::Case(Case { value, binding, conditional, statements: Vec::new() });
         }
         _ if cmd.starts_with("match ") => {
             return Statement::Match {
@@ -331,14 +320,8 @@ mod tests {
             description: None,
             name:        "bob".into(),
             args:        vec![
-                KeyBuf {
-                    name: "a".into(),
-                    kind: Primitive::Any,
-                },
-                KeyBuf {
-                    name: "b".into(),
-                    kind: Primitive::Any,
-                },
+                KeyBuf { name: "a".into(), kind: Primitive::Any },
+                KeyBuf { name: "b".into(), kind: Primitive::Any },
             ],
             statements:  Default::default(),
         };
@@ -353,14 +336,8 @@ mod tests {
             description: Some("bob is a nice function".to_string()),
             name:        "bob".into(),
             args:        vec![
-                KeyBuf {
-                    name: "a".into(),
-                    kind: Primitive::Any,
-                },
-                KeyBuf {
-                    name: "b".into(),
-                    kind: Primitive::Any,
-                },
+                KeyBuf { name: "a".into(), kind: Primitive::Any },
+                KeyBuf { name: "b".into(), kind: Primitive::Any },
             ],
             statements:  vec![],
         };

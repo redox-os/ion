@@ -27,10 +27,7 @@ pub(crate) struct IgnoreSetting {
 
 impl IgnoreSetting {
     pub(crate) fn default() -> IgnoreSetting {
-        IgnoreSetting {
-            flags:   IgnoreFlags::empty(),
-            regexes: None,
-        }
+        IgnoreSetting { flags:   IgnoreFlags::empty(), regexes: None }
     }
 }
 

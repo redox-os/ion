@@ -1,4 +1,9 @@
+array_horizontal_layout_threshold = 100
+array_width = 100
+attributes_on_same_line_as_field = false
+attributes_on_same_line_as_variant = false
 chain_one_line_max = 100
+chain_width = 100
 comment_width = 100
 condense_wildcard_suffixes = true
 error_on_line_overflow = false
@@ -14,6 +19,7 @@ reorder_imports = true
 reorder_imports_in_group = true
 single_line_if_else_max_width = 100
 struct_field_align_threshold = 30
+struct_lit_width = 100
 where_style = "legacy"
 wrap_comments = true
 write_mode = "overwrite"

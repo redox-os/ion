@@ -167,12 +167,7 @@ impl Function {
         args: Vec<KeyBuf>,
         statements: Vec<Statement>,
     ) -> Function {
-        Function {
-            description,
-            name,
-            args,
-            statements,
-        }
+        Function { description, name, args, statements }
     }
 
     pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> { self.description.as_ref() }

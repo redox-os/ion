@@ -12,10 +12,7 @@ use std::path::PathBuf;
 pub(crate) fn config_dir() -> Option<PathBuf> {
     match app_root(
         AppDataType::UserConfig,
-        &AppInfo {
-            name:   "ion",
-            author: "Redox OS Developers",
-        },
+        &AppInfo { name:   "ion", author: "Redox OS Developers" },
     ) {
         Ok(mut path) => {
             path.push("plugins");

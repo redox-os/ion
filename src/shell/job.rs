@@ -23,19 +23,14 @@ pub(crate) struct Job {
     pub command: Identifier,
     pub args:    Array,
     pub kind:    JobKind,
-    pub builtin:    Option<BuiltinFunction>,
+    pub builtin: Option<BuiltinFunction>,
 }
 
 impl Job {
     pub(crate) fn new(args: Array, kind: JobKind) -> Self {
         let command = SmallString::from_str(&args[0]);
         let builtin = BUILTINS.get(command.as_ref()).map(|b| b.main);
-        Job {
-            command,
-            args,
-            kind,
-            builtin,
-        }
+        Job { command, args, kind, builtin }
     }
 
     /// Takes the current job's arguments and expands them, one argument at a
@@ -52,15 +47,19 @@ impl Job {
 
 impl PartialEq for Job {
     fn eq(&self, other: &Job) -> bool {
-        self.command == other.command &&
-        self.args == other.args &&
-        self.kind == other.kind
+        self.command == other.command && self.args == other.args && self.kind == other.kind
     }
 }
 
 impl fmt::Debug for Job {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Job {{ command: {}, args: {:?}, kind: {:?} }}", self.command, self.args, self.kind)
+        write!(
+            f,
+            "Job {{ command: {}, args: {:?}, kind: {:?} }}",
+            self.command,
+            self.args,
+            self.kind
+        )
     }
 }
 
@@ -82,7 +81,7 @@ pub(crate) enum RefinedJob {
     /// A procedure embedded into Ion
     Builtin {
         /// Name of the procedure
-        name: Identifier,
+        main: BuiltinFunction,
         /// Arguments to pass in to the procedure
         args: Array,
         /// A file corresponding to the standard input for this builtin
@@ -200,41 +199,20 @@ macro_rules! set_field {
 }
 
 impl RefinedJob {
-    pub(crate) fn builtin(name: Identifier, args: Array) -> Self {
-        RefinedJob::Builtin {
-            name,
-            args,
-            stdin: None,
-            stdout: None,
-            stderr: None,
-        }
+    pub(crate) fn builtin(main: BuiltinFunction, args: Array) -> Self {
+        RefinedJob::Builtin { main, args, stdin: None, stdout: None, stderr: None }
     }
 
     pub(crate) fn function(name: Identifier, args: Array) -> Self {
-        RefinedJob::Function {
-            name,
-            args,
-            stdin: None,
-            stdout: None,
-            stderr: None,
-        }
+        RefinedJob::Function { name, args, stdin: None, stdout: None, stderr: None }
     }
 
     pub(crate) fn cat(sources: Vec<File>) -> Self {
-        RefinedJob::Cat {
-            sources,
-            stdin: None,
-            stdout: None,
-        }
+        RefinedJob::Cat { sources, stdin: None, stdout: None }
     }
 
     pub(crate) fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
-        RefinedJob::Tee {
-            items:  (tee_out, tee_err),
-            stdin:  None,
-            stdout: None,
-            stderr: None,
-        }
+        RefinedJob::Tee { items:  (tee_out, tee_err), stdin:  None, stdout: None, stderr: None }
     }
 
     pub(crate) fn stdin(&mut self, file: File) {
@@ -264,9 +242,8 @@ impl RefinedJob {
             RefinedJob::External(ref cmd) => {
                 format!("{:?}", cmd).split('"').nth(1).unwrap_or("").to_string()
             }
-            RefinedJob::Builtin { ref name, .. } | RefinedJob::Function { ref name, .. } => {
-                name.to_string()
-            }
+            RefinedJob::Builtin { .. } => String::from("Shell Builtin"),
+            RefinedJob::Function { ref name, .. } => name.to_string(),
             // TODO: Print for real
             RefinedJob::Cat { .. } => "multi-input".into(),
             RefinedJob::Tee { .. } => "multi-output".into(),

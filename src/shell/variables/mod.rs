@@ -45,10 +45,7 @@ impl Default for Variables {
         // Initialize the HISTFILE variable
         if let Ok(mut home_path) = app_root(
             AppDataType::UserData,
-            &AppInfo {
-                name:   "ion",
-                author: "Redox OS Developers",
-            },
+            &AppInfo { name:   "ion", author: "Redox OS Developers" },
         ) {
             home_path.push("history");
             map.insert("HISTFILE".into(), home_path.to_str().unwrap_or("?").into());

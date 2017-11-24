@@ -18,7 +18,6 @@ fn rand_list(args: &[&str]) -> Result<(), String> {
     }
     for out in output {
         write!(stdout, "{} ", out);
-
     }
     writeln!(stdout);
     Ok(())
@@ -73,7 +72,6 @@ pub(crate) fn random(args: &[&str]) -> Result<(), String> {
                 }
                 Err(_) => return rand_list(args),
             };
-
         }
         _ => return rand_list(args),
     }

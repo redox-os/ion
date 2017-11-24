@@ -204,10 +204,7 @@ impl<'a> Shell {
     pub fn evaluate_init_file(&mut self) {
         match app_root(
             AppDataType::UserConfig,
-            &AppInfo {
-                name:   "ion",
-                author: "Redox OS Developers",
-            },
+            &AppInfo { name:   "ion", author: "Redox OS Developers" },
         ) {
             Ok(mut initrc) => {
                 initrc.push("initrc");

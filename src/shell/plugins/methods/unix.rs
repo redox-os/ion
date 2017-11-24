@@ -109,10 +109,7 @@ pub(crate) struct StringMethodPlugins {
 
 impl StringMethodPlugins {
     pub(crate) fn new() -> StringMethodPlugins {
-        StringMethodPlugins {
-            libraries: Vec::new(),
-            symbols:   FnvHashMap::default(),
-        }
+        StringMethodPlugins { libraries: Vec::new(), symbols:   FnvHashMap::default() }
     }
 
     pub(crate) fn load(&mut self, library: Library) -> Result<(), StringError> {

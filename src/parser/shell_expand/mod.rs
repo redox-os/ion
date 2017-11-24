@@ -65,9 +65,9 @@ fn expand_process<E: Expander>(
                     }
                     if is_whitespace && prev_is_whitespace {
                         size -= 1;
-                        if i != size-1 {
+                        if i != size - 1 {
                             let offset = i as isize;
-                            ptr::copy(bytes_v.offset(offset+1), bytes_v.offset(offset), size - i);
+                            ptr::copy(bytes_v.offset(offset + 1), bytes_v.offset(offset), size - i);
                         }
                     } else {
                         i += 1;
@@ -582,9 +582,7 @@ mod test {
     struct CommandExpander;
 
     impl Expander for CommandExpander {
-        fn command(&self, cmd: &str) -> Option<Value> {
-            Some(cmd.to_owned())
-        }
+        fn command(&self, cmd: &str) -> Option<Value> { Some(cmd.to_owned()) }
     }
 
     #[test]
@@ -702,10 +700,8 @@ mod test {
 
     #[test]
     fn inline_expression() {
-        let cases = vec![
-            (array!["5"], "$len([0 1 2 3 4])"),
-            (array!["FxOxO"], "$join(@chars(FOO), 'x')"),
-        ];
+        let cases =
+            vec![(array!["5"], "$len([0 1 2 3 4])"), (array!["FxOxO"], "$join(@chars(FOO), 'x')")];
         for (expected, input) in cases {
             assert_eq!(expected, expand_string(input, &VariableExpander, false));
         }
