@@ -32,7 +32,7 @@ function check_return_value {
     $PROJECT_DIR/target/debug/ion $1 1> $EXAMPLES_DIR/tmp.out 2> /dev/null
 
     # Compare real and expected output
-    cmp --silent $EXAMPLES_DIR/tmp.out $EXPECTED_OUTPUT_FILE
+    diff "$EXAMPLES_DIR"/tmp.out "$EXPECTED_OUTPUT_FILE" > "$EXAMPLES_DIR"/diff_tmp
     local RET=$?
 
     # Clean up the mess
@@ -40,9 +40,12 @@ function check_return_value {
 
     # Write result
     if [[ $RET -ne 0 ]]; then
+        cat "$EXAMPLES_DIR"/diff_tmp
+        rm "$EXAMPLES_DIR"/diff_tmp
         echo -e "Test ${1} ${TAGFAIL}";
         return 1;
     else
+        rm "$EXAMPLES_DIR"/diff_tmp
         echo -e "Test ${1} ${TAGPASS}";
         return 0;
     fi

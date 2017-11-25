@@ -1,0 +1,5 @@
+echo @split("onetwoone", "two")
+echo @split_at("onetwoone", "3")
+echo @graphemes("onetwo", "3")
+echo @bytes("onetwo")
+echo @chars("onetwo")
