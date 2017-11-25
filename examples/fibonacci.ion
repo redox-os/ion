@@ -10,7 +10,6 @@ fn fib n
         end
         echo $output
     end
-    status
 end
 
 for i in 1..200
