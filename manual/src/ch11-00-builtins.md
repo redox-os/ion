@@ -390,3 +390,17 @@ which COMMAND
 ```
 
 Shows the full path of commands
+
+## status
+
+```
+status COMMAND
+```
+
+Evaluates the current runtime status
+
+### Options
+
+- **-l**: returns true if shell is a login shell
+- **-i**: returns true if shell is interactive
+- **-f**: prints the filename of the currently running script or stdio
