@@ -9,6 +9,7 @@ mod job_control;
 mod test;
 mod echo;
 mod set;
+mod status;
 mod exists;
 mod ion;
 
@@ -17,6 +18,7 @@ use self::echo::echo;
 use self::exists::exists;
 use self::functions::fn_;
 use self::ion::ion_docs;
+use self::status::status;
 use self::source::source;
 use self::test::test;
 use self::variables::{alias, drop_alias, drop_array, drop_variable};
@@ -52,6 +54,7 @@ macro_rules! map {
     }
 }}
 
+/// Builtins are in A-Z order.
 pub const BUILTINS: &'static BuiltinMap = &map!(
     "alias" => builtin_alias : "View, set or unset aliases",
     "and" => builtin_and : "Execute the command if the shell's previous status is success",
@@ -125,9 +128,17 @@ impl BuiltinMap {
 }
 
 // Definitions of simple builtins go here
-
-// TODO: dummy function
-fn builtin_status(_: &[&str], _: &mut Shell) -> i32 { SUCCESS }
+fn builtin_status(args: &[&str], shell: &mut Shell) -> i32 {
+    match status(args, shell) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = stderr.write_all(why.as_bytes());
+            FAILURE
+        }
+    }
+}
 
 pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.directory_stack.cd(args, &shell.variables) {
