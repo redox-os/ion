@@ -80,7 +80,7 @@ pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
         }
 
         if flags.contains(Flags::FILENAME) {
-            // TODO: Dodgy way to work out if the file we were executed from was a shell script.
+            // TODO: This technique will not work if ion is renamed. 
             let sa_len = shell_args.len() - 1;
             let last_sa = &shell_args[sa_len];
             let last_3: String = last_sa[last_sa.len() - 3 .. last_sa.len()].to_string();
