@@ -59,6 +59,7 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "alias" => builtin_alias : "View, set or unset aliases",
     "and" => builtin_and : "Execute the command if the shell's previous status is success",
     "bg" => builtin_bg : "Resumes a stopped background process",
+    "bool" => builtin_bool : "If the value is '1' or 'true', return 0 exit status",
     "calc" => builtin_calc : "Calculate a mathematical expression",
     "cd" => builtin_cd : "Change the current directory\n    cd <path>",
     "contains" => contains : "Evaluates if the supplied argument contains a given string",
@@ -150,6 +151,26 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
             FAILURE
         }
     }
+}
+
+fn builtin_bool(args: &[&str], _: &mut Shell) -> i32 {
+    if args.len() != 2 {
+        let stderr = io::stderr();
+        let mut stderr = stderr.lock();
+        let _ = stderr.write_all(b"bool requires one argument\n");
+        return FAILURE
+    }
+
+    let help_msg = "DESCRIPTION: If the value is '1' or 'true', bool returns the 0 exit status\nusage: bool <value>";
+    match args[1] {
+        "1" => (),
+        "true" => (),
+        "--help" => println!("{}", help_msg),
+        "-h" => println!("{}", help_msg),
+        _ => return FAILURE
+    }
+
+    SUCCESS
 }
 
 fn builtin_dirs(args: &[&str], shell: &mut Shell) -> i32 { shell.directory_stack.dirs(args) }
