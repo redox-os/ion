@@ -153,7 +153,7 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_bool(args: &[&str], _: &mut Shell) -> i32 {
+fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
     if args.len() != 2 {
         let stderr = io::stderr();
         let mut stderr = stderr.lock();
@@ -161,13 +161,23 @@ fn builtin_bool(args: &[&str], _: &mut Shell) -> i32 {
         return FAILURE
     }
 
+    let opt = shell.variables.get_var(args[1]);
+    let sh_var: &str = match opt.as_ref() {
+        Some(s) => s,
+        None => "",
+    };
+
     let help_msg = "DESCRIPTION: If the value is '1' or 'true', bool returns the 0 exit status\nusage: bool <value>";
-    match args[1] {
+    match sh_var {
         "1" => (),
         "true" => (),
-        "--help" => println!("{}", help_msg),
-        "-h" => println!("{}", help_msg),
-        _ => return FAILURE
+        _ => match args[1] {
+            "1" => (),
+            "true" => (),
+            "--help" => println!("{}", help_msg),
+            "-h" => println!("{}", help_msg),
+            _ => return FAILURE
+        }
     }
 
     SUCCESS
