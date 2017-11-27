@@ -404,3 +404,11 @@ Evaluates the current runtime status
 - **-l**: returns true if shell is a login shell
 - **-i**: returns true if shell is interactive
 - **-f**: prints the filename of the currently running script or stdio
+
+## bool
+
+```
+bool VALUE
+```
+
+If the value is '1' or 'true', return 0 exit status
