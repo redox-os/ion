@@ -1,17 +1,41 @@
 //! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job control in the shell.
 
+use std::error::Error;
 use shell::Shell;
 use shell::job_control::{JobControl, ProcessState};
 use shell::signals;
 use shell::status::*;
-use std::io::{stderr, Write};
+use std::io::{stderr, stdout, Write};
+
+const DISOWN_MAN_PAGE: &'static str = r#"NAME
+    disown - Disown processes
+
+SYNOPSIS
+    disown [ --help | -r | -h | -a ][PID...]
+
+DESCRIPTION
+    Disowning a process removes that process from the shell's background process table.
+
+OPTIONS
+    -r  Remove all running jobs from the background process list.
+    -h  Specifies that each job supplied will not receive the SIGHUP signal when the shell receives a SIGHUP.
+    -a  If no job IDs were supplied, remove all jobs from the background process list.
+"#;
 
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
 /// SIGHUP ignoral.
-pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
-    let stderr = stderr();
-    let mut stderr = stderr.lock();
+pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
+    fn print_help(ret: Result<(), String>) -> Result<(), String> {
+        let stdout = stdout();
+        let mut stdout = stdout.lock();
+
+        return match stdout.write_all(DISOWN_MAN_PAGE.as_bytes()).and_then(|_| stdout.flush()) {
+            Ok(_) => ret,
+            Err(err) => Err(err.description().to_owned()),
+        }
+    }
+
     const NO_SIGHUP: u8 = 1;
     const ALL_JOBS: u8 = 2;
     const RUN_JOBS: u8 = 4;
@@ -23,14 +47,22 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
             "-a" => flags |= ALL_JOBS,
             "-h" => flags |= NO_SIGHUP,
             "-r" => flags |= RUN_JOBS,
+            "--help" => {
+                return print_help(Ok(()));
+            },
             _ => match arg.parse::<u32>() {
                 Ok(jobspec) => jobspecs.push(jobspec),
                 Err(_) => {
-                    let _ = writeln!(stderr, "ion: disown: invalid jobspec: '{}'", arg);
-                    return FAILURE;
+                    return Err(format!("invalid jobspec: '{}'", arg));
                 }
             },
         }
+    }
+
+    if flags == 0 {
+        return print_help(Err("must provide arguments".to_owned()));
+    } else if (flags & ALL_JOBS) == 0 && jobspecs.is_empty() {
+        return Err("must provide a jobspec with -h or -r".to_owned());
     }
 
     let mut processes = shell.background.lock().unwrap();
@@ -71,7 +103,7 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> i32 {
         }
     }
 
-    SUCCESS
+    Ok(())
 }
 
 /// Display a list of all jobs running in the background.

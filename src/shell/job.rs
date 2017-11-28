@@ -39,7 +39,7 @@ impl Job {
         let mut expanded = Array::new();
         expanded.grow(self.args.len());
         expanded.extend(
-            self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).filter(|x| !x.is_empty()),
+            self.args.drain().flat_map(|arg| expand_arg(&arg, shell)),
         );
         self.args = expanded;
     }

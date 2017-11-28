@@ -357,7 +357,15 @@ fn builtin_suspend(_: &[&str], _: &mut Shell) -> i32 {
 }
 
 fn builtin_disown(args: &[&str], shell: &mut Shell) -> i32 {
-    job_control::disown(shell, &args[1..])
+    match job_control::disown(shell, &args[1..]) {
+        Ok(()) => SUCCESS,
+        Err(err) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "ion: disown: {}", err);
+            FAILURE
+        }
+    }
 }
 
 fn builtin_help(args: &[&str], shell: &mut Shell) -> i32 {
