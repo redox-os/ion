@@ -43,7 +43,9 @@ fn expand_process<E: Expander>(
     quoted: bool,
 ) {
     if let Some(mut output) = expander.command(command) {
-        if quoted {
+        if output.is_empty() {
+            return
+        } else if quoted {
             let output: &str = if let Some(pos) = output.rfind(|x| x != '\n') {
                 &output[..pos + 1]
             } else {
