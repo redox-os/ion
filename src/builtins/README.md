@@ -29,3 +29,7 @@ Source code for the time command, which is used to evaluate the time spent runni
 ## variables.rs
 
 The **variables.rs** module contains commands relating to setting and removing aliases, variables, and exports.
+
+## status.rs
+
+The source for status command, which is used to get information at runtime about the shell.
