@@ -12,12 +12,14 @@ mod set;
 mod status;
 mod exists;
 mod ion;
+mod is;
 
 use self::conditionals::{contains, ends_with, starts_with};
 use self::echo::echo;
 use self::exists::exists;
 use self::functions::fn_;
 use self::ion::ion_docs;
+use self::is::is;
 use self::status::status;
 use self::source::source;
 use self::test::test;
@@ -77,6 +79,7 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "help" => builtin_help : HELP_DESC,
     "history" => builtin_history : "Display a log of all commands previously executed",
     "ion-docs" => ion_docs : "Opens the Ion manual",
+    "is" => builtin_is : "Simple alternative to == and !=",
     "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
     "matches" => builtin_matches : "Checks if a string matches a given regex",
     "not" => builtin_not : "Reverses the exit status value of the given command.",
@@ -161,7 +164,7 @@ fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
         return FAILURE
     }
 
-    let opt = shell.variables.get_var(args[1]);
+    let opt = shell.variables.get_var(&args[1][1..]);
     let sh_var: &str = match opt.as_ref() {
         Some(s) => s,
         None => "",
@@ -179,8 +182,19 @@ fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
             _ => return FAILURE
         }
     }
-
     SUCCESS
+}
+
+fn builtin_is(args: &[&str], shell: &mut Shell) -> i32 {
+    match is(args, shell) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = stderr.write_all(why.as_bytes());
+            FAILURE
+        }
+    }
 }
 
 fn builtin_dirs(args: &[&str], shell: &mut Shell) -> i32 { shell.directory_stack.dirs(args) }
@@ -241,6 +255,7 @@ fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
 }
 
 fn builtin_set(args: &[&str], shell: &mut Shell) -> i32 { set::set(args, shell) }
+
 fn builtin_eval(args: &[&str], shell: &mut Shell) -> i32 {
     let evaluated_command = args[1..].join(" ");
     let mut buffer = Terminator::new(evaluated_command);
@@ -254,6 +269,7 @@ fn builtin_eval(args: &[&str], shell: &mut Shell) -> i32 {
         FAILURE
     }
 }
+
 fn builtin_history(args: &[&str], shell: &mut Shell) -> i32 { shell.print_history(args) }
 
 fn builtin_source(args: &[&str], shell: &mut Shell) -> i32 {

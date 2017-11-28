@@ -411,4 +411,15 @@ Evaluates the current runtime status
 bool VALUE
 ```
 
-If the value is '1' or 'true', return 0 exit status
+If the value is '1' or 'true', returns the 0 exit status
+
+## is
+
+```
+is VALUE VALUE
+```
+
+Returns 0 if the two arguments are equal
+
+### Options
+- **not**: returns 0 if the two arguments are not equal.
