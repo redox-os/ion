@@ -231,7 +231,7 @@ impl<'a> Shell {
 
         // Expand any aliases found
         for job_no in 0..pipeline.items.len() {
-            if let Some(alias) = {
+            while let Some(alias) = {
                 let key: &str = pipeline.items[job_no].job.command.as_ref();
                 self.variables.aliases.get(key)
             } {
