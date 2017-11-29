@@ -12,7 +12,7 @@ lazy_static! {
     static ref STRING_METHODS: StringMethodPlugins = methods::collect();
 }
 
-fn unescape(input: &str) -> Result<String, &'static str> {
+pub(crate) fn unescape(input: &str) -> Result<String, &'static str> {
     let mut check = false;
     let mut out = String::with_capacity(input.len());
     let add_char = |out: &mut String, check: &mut bool, c| {
@@ -39,6 +39,7 @@ fn unescape(input: &str) -> Result<String, &'static str> {
             'r' if check => add_char(&mut out, &mut check, '\r'),
             't' if check => add_char(&mut out, &mut check, '\t'),
             'v' if check => add_char(&mut out, &mut check, '\u{000B}'),
+            ' ' if check => add_char(&mut out, &mut check, c),
             _ if check => {
                 out.push('\\');
                 add_char(&mut out, &mut check, c);

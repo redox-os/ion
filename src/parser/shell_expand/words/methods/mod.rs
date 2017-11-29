@@ -1,14 +1,18 @@
 mod arrays;
-mod pattern;
 mod strings;
 
 pub(crate) use self::arrays::ArrayMethod;
-pub(crate) use self::pattern::Pattern;
 pub(crate) use self::strings::StringMethod;
 
-use self::pattern::unescape;
+use self::strings::unescape;
 use super::{expand_string, Expander};
 use super::super::super::ArgumentSplitter;
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum Pattern<'a> {
+    StringPattern(&'a str),
+    Whitespace,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Key {
@@ -32,12 +36,14 @@ impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
     }
 
     pub(crate) fn join(self, pattern: &str) -> String {
-        unescape(expand_string(self.args, self.expand, false).join(pattern))
+        unescape(&expand_string(self.args, self.expand, false)
+            .join(pattern))
+            .unwrap_or(String::from(""))
     }
 
     pub(crate) fn array<'c>(&'c self) -> impl Iterator<Item = String> + 'c {
         ArgumentSplitter::new(self.args)
             .flat_map(move |x| expand_string(x, self.expand, false).into_iter())
-            .map(unescape)
+            .map(|s| unescape(&s).unwrap_or(String::from("")))
     }
 }
