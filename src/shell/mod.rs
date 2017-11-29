@@ -226,7 +226,7 @@ impl<'a> Shell {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
+    pub(crate) fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
         let command_start_time = SystemTime::now();
 
         // Expand any aliases found
