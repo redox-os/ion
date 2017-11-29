@@ -20,22 +20,31 @@ fn print_option definition description
     echo "    ${c::bold}- ${c::0x0CF}$definition: ${c::reset}$description"
 end
 
-# In case a bad argument was supplied, this will be used.
-fn bad_arg argument
-    echo -e "${c::0xF60,bold}Error: ${c::0xF06}`$argument`${c::0xF60} is \
-        not a valid command.${c::reset}\n${c::0x0F6}Available options for \
-        this script are:${c::reset}"
+# Print all available options
+fn show_options
+    echo -e "${c::0x0F6}Available options for this script are:${c::reset}"
     print_option "build ion" "      Build the Ion shell"
     print_option "build docs" "     Build the Ion mdBook"
     print_option "install ion" "    Install the Ion Shell"
     print_option "install docs" "   Install the Ion mdBook"
     print_option "install plugins" "Install official Ion plugins"
     print_option "uninstall ion" "  Removes Ion from System"
+end
+
+# In case a bad argument was supplied, this will be used.
+fn bad_arg argument
+    echo -e "${c::0xF60,bold}Error: ${c::0xF06}`$argument`${c::0xF60} is \
+        not a valid command.${c::reset}"
+    show_options
     exit
 end
 
 # Arguments are required!
-if test 1 -eq $len(@args); bad_arg; end
+if test 1 -eq $len(@args)
+    echo -e "${c::0xF60,bold}Error: must proved command.${c::reset}"
+    show_options
+    exit
+end
 
 # Rust/Cargo is required!
 if not exists -b "cargo"
