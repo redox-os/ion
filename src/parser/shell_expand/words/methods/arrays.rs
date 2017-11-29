@@ -1,5 +1,5 @@
 use super::Pattern;
-use super::pattern::unescape;
+use super::strings::unescape;
 use super::super::{Index, Select, SelectWithSize};
 use super::super::super::{expand_string, is_expression, Expander};
 use smallstring::SmallString;
@@ -58,10 +58,12 @@ impl<'a> ArrayMethod<'a> {
         let variable = self.resolve_var(expand_func);
         let res = match (&self.pattern, self.selection.clone()) {
             (_, Select::None) => Some("".into()).into_iter().collect(),
-            (&Pattern::StringPattern(pattern), Select::All) => variable
-                .split(&unescape(expand_string(pattern, expand_func, false).join(" ")))
-                .map(From::from)
-                .collect(),
+            (&Pattern::StringPattern(pattern), Select::All) => {
+                variable
+                    .split(&unescape(&expand_string(pattern, expand_func, false).join(" "))?)
+                    .map(From::from)
+                    .collect()
+            },
             (&Pattern::Whitespace, Select::All) => variable
                 .split(char::is_whitespace)
                 .filter(|x| !x.is_empty())
@@ -69,7 +71,7 @@ impl<'a> ArrayMethod<'a> {
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => {
                 variable
-                    .split(&unescape(expand_string(pattern, expand_func, false).join(" ")))
+                    .split(&unescape(&expand_string(pattern, expand_func, false).join(" "))?)
                     .nth(id)
                     .map(From::from)
                     .into_iter()
@@ -84,7 +86,7 @@ impl<'a> ArrayMethod<'a> {
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => {
                 variable
-                    .rsplit(&unescape(expand_string(pattern, expand_func, false).join(" ")))
+                    .rsplit(&unescape(&expand_string(pattern, expand_func, false).join(" "))?)
                     .nth(id)
                     .map(From::from)
                     .into_iter()
@@ -98,8 +100,7 @@ impl<'a> ArrayMethod<'a> {
                 .into_iter()
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Range(range)) => {
-                let expansion =
-                    unescape(expand_string(pattern, expand_func, false).join(" "));
+                let expansion = unescape(&expand_string(pattern, expand_func, false).join(" "))?;
                 let iter = variable.split(&expansion);
                 if let Some((start, length)) = range.bounds(iter.clone().count()) {
                     iter.skip(start).take(length).map(From::from).collect()

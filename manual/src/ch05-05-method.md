@@ -456,6 +456,7 @@ echo $unescape($line)
 The following are the currently-supported array methods.
 
 - [split](#split)
+- [split_at](#split_at)
 - [bytes](#bytes)
 - [chars](#chars)
 - [graphemes](#graphemes)
@@ -487,6 +488,28 @@ some data
 person
 age
 data
+```
+
+### split_at
+
+Defaults to string variables. The supplied string will be split in two pieces, from the index specified in the second argument.
+
+#### Examples
+
+```
+echo @split_at("FOOBAR", "3")
+echo @split_at("FOOBAR")
+echo @split_at("FOOBAR", "-1")
+echo @split_at("FOOBAR", "8")
+```
+
+#### Output
+
+```
+FOO BAR
+ion: split_at: requires an argument
+ion: split_at: requires a valid number as an argument
+ion: split_at: value is out of bounds
 ```
 
 ### bytes
