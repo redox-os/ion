@@ -85,10 +85,9 @@ impl<'a> Fork<'a> {
                     drop(read);
                 }
 
-                // Execute the given closure within the child's shell, and stop the context's
-                // background thread. NOTE: That last thing solves a memory leak.
+                // Execute the given closure within the child's shell.
                 let mut shell: Shell = unsafe { (self.shell as *const Shell).read() };
-                shell.context.take().map(|mut c| c.history.commit_history());
+                //  shell.context.take().map(|mut c| c.history.commit_history());
                 child_func(&mut shell);
 
                 // Reap the child, enabling the parent to get EOF from the read end of the pipe.

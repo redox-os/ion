@@ -30,7 +30,7 @@ pub(crate) fn fork_pipe(
 
             // Drop the context and it's background thread in the child.
             // NOTE: Solves a memory leak.
-            shell.context.take().map(|mut c| c.history.commit_history());
+            // shell.context.take().map(|mut c| c.history.commit_history());
 
             // After execution of it's commands, exit with the last command's status.
             exit(pipe(shell, commands, false));
