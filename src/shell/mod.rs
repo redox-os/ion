@@ -204,7 +204,7 @@ impl<'a> Shell {
     pub fn evaluate_init_file(&mut self) {
         match app_root(
             AppDataType::UserConfig,
-            &AppInfo { name:   "ion", author: "Redox OS Developers" },
+            &AppInfo { name: "ion", author: "Redox OS Developers" },
         ) {
             Ok(mut initrc) => {
                 initrc.push("initrc");
@@ -226,8 +226,6 @@ impl<'a> Shell {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    /// To avoid infinite recursion when using aliases, the noalias boolean will be set the true
-    /// if an alias branch was executed.
     fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
         let command_start_time = SystemTime::now();
 

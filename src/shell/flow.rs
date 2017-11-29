@@ -10,6 +10,7 @@ use shell::assignments::VariableStore;
 use std::io::{self, stdout, Write};
 use std::mem;
 use types::Array;
+use std::iter;
 
 pub(crate) enum Condition {
     Continue,
@@ -550,22 +551,21 @@ impl FlowLogic for Shell {
 
     fn execute_if(
         &mut self,
-        mut expression: Pipeline,
+        expression: Pipeline,
         success: Vec<Statement>,
         else_if: Vec<ElseIf>,
         failure: Vec<Statement>,
     ) -> Condition {
-        match self.run_pipeline(&mut expression) {
-            Some(SUCCESS) => self.execute_statements(success),
-            _ => {
-                for mut elseif in else_if {
-                    if self.run_pipeline(&mut elseif.expression) == Some(SUCCESS) {
-                        return self.execute_statements(elseif.success);
-                    }
-                }
-                self.execute_statements(failure)
+        let first_condition = iter::once((expression, success));
+        let else_conditions = else_if.into_iter().map(|cond| (cond.expression, cond.success));
+
+        for (mut condition, mut statements) in first_condition.chain(else_conditions) {
+            if self.run_pipeline(&mut condition) == Some(SUCCESS) {
+                return self.execute_statements(statements);
             }
         }
+
+        self.execute_statements(failure)
     }
 
     fn execute_toplevel<I>(
