@@ -14,14 +14,7 @@ pub(crate) fn parse_function<'a>(arg: &'a str) -> (KeyIterator<'a>, Option<&'a s
 /// of lifetime restrictions on `KeyIterator`, which will not live for the remainder of the
 /// declared function's lifetime.
 pub(crate) fn collect_arguments<'a>(args: KeyIterator<'a>) -> Result<Vec<KeyBuf>, TypeError<'a>> {
-    // NOTE: Seems to be some kind of issue with Rust's compiler accepting this:
-    //     Ok(args.map(|a| a.map(Into::into)?).collect::<Vec<_>>())
-    // Seems to think that `a` is a `KeyBuf` when it's actually a `Result<Key, _>`.
-    let mut output = Vec::new();
-    for arg in args {
-        output.push(arg?.into());
-    }
-    Ok(output)
+    args.map(|a| a.map(Into::into)).collect()
 }
 
 #[cfg(test)]
