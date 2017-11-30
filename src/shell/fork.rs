@@ -52,7 +52,7 @@ impl<'a> Fork<'a> {
         let outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
             Some(sys::pipe2(sys::O_CLOEXEC)
                 .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
-                .map_err(IonError::Fork)?)
+                .map_err(|err| IonError::Fork { why: err })?)
         } else {
             None
         };
@@ -61,7 +61,7 @@ impl<'a> Fork<'a> {
         let errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
             Some(sys::pipe2(sys::O_CLOEXEC)
                 .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
-                .map_err(IonError::Fork)?)
+                .map_err(|err| IonError::Fork { why: err })?)
         } else {
             None
         };
@@ -104,7 +104,7 @@ impl<'a> Fork<'a> {
                     read
                 }),
             }),
-            Err(why) => Err(IonError::Fork(why)),
+            Err(why) => Err(IonError::Fork { why: why }),
         }
     }
 }
