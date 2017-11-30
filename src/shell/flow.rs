@@ -8,9 +8,9 @@ use parser::assignments::{is_array, ReturnValue};
 use parser::pipelines::Pipeline;
 use shell::assignments::VariableStore;
 use std::io::{self, stdout, Write};
+use std::iter;
 use std::mem;
 use types::Array;
-use std::iter;
 
 pub(crate) enum Condition {
     Continue,

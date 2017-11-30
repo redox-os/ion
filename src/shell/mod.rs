@@ -55,13 +55,13 @@ use types::*;
 #[derive(Debug, Fail)]
 pub enum IonError {
     #[fail(display = "failed to fork: {}", why)]
-    Fork{why: io::Error },
+    Fork { why: io::Error },
     #[fail(display = "element does not exist")]
     DoesNotExist,
     #[fail(display = "input was not terminated")]
     Unterminated,
     #[fail(display = "function error: {}", why)]
-    Function{why: FunctionError},
+    Function { why: FunctionError },
 }
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
@@ -196,7 +196,7 @@ impl<'a> Shell {
     pub fn evaluate_init_file(&mut self) {
         match app_root(
             AppDataType::UserConfig,
-            &AppInfo { name: "ion", author: "Redox OS Developers" },
+            &AppInfo { name:   "ion", author: "Redox OS Developers" },
         ) {
             Ok(mut initrc) => {
                 initrc.push("initrc");

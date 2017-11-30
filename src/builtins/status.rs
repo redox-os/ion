@@ -1,6 +1,6 @@
 use std::env;
 use std::error::Error;
-use std::io::{Write, stdout};
+use std::io::{stdout, Write};
 
 use shell::Shell;
 
@@ -62,9 +62,9 @@ pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
                         'l' => flags |= Flags::LOGIN_SHELL,
                         'i' => flags |= Flags::INTERACTIVE,
                         'f' => flags |= Flags::FILENAME,
-                        _ => ()
+                        _ => (),
                     }
-                }
+                },
             }
         }
         let err = "".to_string();
@@ -80,10 +80,10 @@ pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
         }
 
         if flags.contains(Flags::FILENAME) {
-            // TODO: This technique will not work if ion is renamed. 
+            // TODO: This technique will not work if ion is renamed.
             let sa_len = shell_args.len() - 1;
             let last_sa = &shell_args[sa_len];
-            let last_3: String = last_sa[last_sa.len() - 3 .. last_sa.len()].to_string();
+            let last_3: String = last_sa[last_sa.len() - 3..last_sa.len()].to_string();
 
             if last_3 == "ion" {
                 println!("stdio");
@@ -99,9 +99,8 @@ pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
             return match stdout.write_all(MAN_PAGE.as_bytes()).and_then(|_| stdout.flush()) {
                 Ok(_) => Ok(()),
                 Err(err) => Err(err.description().to_owned()),
-            }
+            };
         }
     }
     Ok(())
 }
-

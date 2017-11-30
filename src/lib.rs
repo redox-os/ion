@@ -11,6 +11,9 @@ extern crate bitflags;
 extern crate calc;
 #[cfg(all(unix, not(target_os = "redox")))]
 extern crate errno;
+extern crate failure;
+#[macro_use]
+extern crate failure_derive;
 extern crate fnv;
 extern crate glob;
 extern crate itoa;
@@ -29,9 +32,6 @@ extern crate syscall;
 extern crate unicode_segmentation;
 #[cfg(all(unix, not(target_os = "redox")))]
 extern crate users as users_unix;
-extern crate failure;
-#[macro_use]
-extern crate failure_derive;
 
 #[cfg(target_os = "redox")]
 #[path = "sys/redox.rs"]

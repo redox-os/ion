@@ -38,9 +38,7 @@ impl Job {
     pub(crate) fn expand(&mut self, shell: &Shell) {
         let mut expanded = Array::new();
         expanded.grow(self.args.len());
-        expanded.extend(
-            self.args.drain().flat_map(|arg| expand_arg(&arg, shell)),
-        );
+        expanded.extend(self.args.drain().flat_map(|arg| expand_arg(&arg, shell)));
         self.args = expanded;
     }
 }

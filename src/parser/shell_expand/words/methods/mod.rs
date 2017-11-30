@@ -36,8 +36,7 @@ impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
     }
 
     pub(crate) fn join(self, pattern: &str) -> String {
-        unescape(&expand_string(self.args, self.expand, false)
-            .join(pattern))
+        unescape(&expand_string(self.args, self.expand, false).join(pattern))
             .unwrap_or(String::from(""))
     }
 

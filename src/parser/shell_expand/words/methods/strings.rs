@@ -576,9 +576,9 @@ mod test {
     fn test_regex_replace_succeeding() {
         let mut output = String::new();
         let method = StringMethod {
-            method: "regex_replace",
-            variable: "$FOO",
-            pattern: "[\"^F\" \"f\"]",
+            method:    "regex_replace",
+            variable:  "$FOO",
+            pattern:   "[\"^F\" \"f\"]",
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
@@ -589,9 +589,9 @@ mod test {
     fn test_regex_replace_failing() {
         let mut output = String::new();
         let method = StringMethod {
-            method: "regex_replace",
-            variable: "$FOO",
-            pattern: "[\"^f\" \"F\"]",
+            method:    "regex_replace",
+            variable:  "$FOO",
+            pattern:   "[\"^f\" \"F\"]",
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);

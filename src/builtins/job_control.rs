@@ -1,10 +1,10 @@
 //! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job control in the shell.
 
-use std::error::Error;
 use shell::Shell;
 use shell::job_control::{JobControl, ProcessState};
 use shell::signals;
 use shell::status::*;
+use std::error::Error;
 use std::io::{stderr, stdout, Write};
 
 const DISOWN_MAN_PAGE: &'static str = r#"NAME
@@ -33,7 +33,7 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
         return match stdout.write_all(DISOWN_MAN_PAGE.as_bytes()).and_then(|_| stdout.flush()) {
             Ok(_) => ret,
             Err(err) => Err(err.description().to_owned()),
-        }
+        };
     }
 
     const NO_SIGHUP: u8 = 1;
@@ -49,7 +49,7 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
             "-r" => flags |= RUN_JOBS,
             "--help" => {
                 return print_help(Ok(()));
-            },
+            }
             _ => match arg.parse::<u32>() {
                 Ok(jobspec) => jobspecs.push(jobspec),
                 Err(_) => {

@@ -20,8 +20,8 @@ use self::exists::exists;
 use self::functions::fn_;
 use self::ion::ion_docs;
 use self::is::is;
-use self::status::status;
 use self::source::source;
+use self::status::status;
 use self::test::test;
 use self::variables::{alias, drop_alias, drop_array, drop_variable};
 use types::Array;
@@ -33,7 +33,7 @@ use std::path::Path;
 
 use parser::Terminator;
 use parser::pipelines::{PipeItem, Pipeline};
-use shell::{self, FlowLogic, Shell, ShellHistory, Job, JobKind};
+use shell::{self, FlowLogic, Job, JobKind, Shell, ShellHistory};
 use shell::job_control::{JobControl, ProcessState};
 use shell::status::*;
 use sys;
@@ -163,7 +163,7 @@ fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
         let stderr = io::stderr();
         let mut stderr = stderr.lock();
         let _ = stderr.write_all(b"bool requires one argument\n");
-        return FAILURE
+        return FAILURE;
     }
 
     let opt = shell.variables.get_var(&args[1][1..]);
@@ -172,7 +172,8 @@ fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
         None => "",
     };
 
-    let help_msg = "DESCRIPTION: If the value is '1' or 'true', bool returns the 0 exit status\nusage: bool <value>";
+    let help_msg = "DESCRIPTION: If the value is '1' or 'true', bool returns the 0 exit \
+                    status\nusage: bool <value>";
     match sh_var {
         "1" => (),
         "true" => (),
@@ -181,8 +182,8 @@ fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
             "true" => (),
             "--help" => println!("{}", help_msg),
             "-h" => println!("{}", help_msg),
-            _ => return FAILURE
-        }
+            _ => return FAILURE,
+        },
     }
     SUCCESS
 }
