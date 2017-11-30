@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::io::{Write, stdout};
+use std::io::{stdout, Write};
 
 use shell::Shell;
 
@@ -34,9 +34,9 @@ pub(crate) fn is(args: &[&str], shell: &mut Shell) -> Result<(), String> {
             return match stdout.write_all(MAN_PAGE.as_bytes()).and_then(|_| stdout.flush()) {
                 Ok(_) => Ok(()),
                 Err(err) => Err(err.description().to_owned()),
-            }
+            };
         } else {
-            return Err("is needs 3 or 4 arguments\n".to_string())
+            return Err("is needs 3 or 4 arguments\n".to_string());
         },
         _ => return Err("is needs 3 or 4 arguments\n".to_string()),
     }
@@ -48,7 +48,7 @@ fn eval_arg(arg: &str, shell: &mut Shell) -> String {
     let var_value = get_var_string(arg, shell);
 
     if var_value != "" {
-        return var_value
+        return var_value;
     }
     arg.to_string()
 }
@@ -56,7 +56,7 @@ fn eval_arg(arg: &str, shell: &mut Shell) -> String {
 // On error returns an empty String.
 fn get_var_string(name: &str, shell: &mut Shell) -> String {
     if name.chars().nth(0).unwrap() != '$' {
-        return "".to_string()
+        return "".to_string();
     }
 
     let var = shell.variables.get_var(&name[1..]);

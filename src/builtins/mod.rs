@@ -20,10 +20,11 @@ use self::exists::exists;
 use self::functions::fn_;
 use self::ion::ion_docs;
 use self::is::is;
-use self::status::status;
 use self::source::source;
+use self::status::status;
 use self::test::test;
 use self::variables::{alias, drop_alias, drop_array, drop_variable};
+use types::Array;
 
 use std::env;
 use std::error::Error;
@@ -31,7 +32,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use parser::Terminator;
-use shell::{self, FlowLogic, Shell, ShellHistory};
+use parser::pipelines::{PipeItem, Pipeline};
+use shell::{self, FlowLogic, Job, JobKind, Shell, ShellHistory};
 use shell::job_control::{JobControl, ProcessState};
 use shell::status::*;
 use sys;
@@ -161,7 +163,7 @@ fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
         let stderr = io::stderr();
         let mut stderr = stderr.lock();
         let _ = stderr.write_all(b"bool requires one argument\n");
-        return FAILURE
+        return FAILURE;
     }
 
     let opt = shell.variables.get_var(&args[1][1..]);
@@ -170,7 +172,8 @@ fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
         None => "",
     };
 
-    let help_msg = "DESCRIPTION: If the value is '1' or 'true', bool returns the 0 exit status\nusage: bool <value>";
+    let help_msg = "DESCRIPTION: If the value is '1' or 'true', bool returns the 0 exit \
+                    status\nusage: bool <value>";
     match sh_var {
         "1" => (),
         "true" => (),
@@ -179,8 +182,8 @@ fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
             "true" => (),
             "--help" => println!("{}", help_msg),
             "-h" => println!("{}", help_msg),
-            _ => return FAILURE
-        }
+            _ => return FAILURE,
+        },
     }
     SUCCESS
 }
@@ -241,16 +244,6 @@ fn builtin_drop(args: &[&str], shell: &mut Shell) -> i32 {
         drop_array(&mut shell.variables, args)
     } else {
         drop_variable(&mut shell.variables, args)
-    }
-}
-
-fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
-    let cmd = args[1..].join(" ");
-    shell.on_command(&cmd);
-    match shell.previous_status {
-        SUCCESS => FAILURE,
-        FAILURE => SUCCESS,
-        _ => shell.previous_status,
     }
 }
 
@@ -432,11 +425,25 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
     }
 }
 
+fn args_to_pipeline(args: &[&str]) -> Pipeline {
+    let owned = args.into_iter().map(|&x| String::from(x)).collect::<Array>();
+    let pipe_item = PipeItem::new(Job::new(owned, JobKind::And), Vec::new(), Vec::new());
+    Pipeline { items: vec![pipe_item] }
+}
+
+fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
+    shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
+    match shell.previous_status {
+        SUCCESS => FAILURE,
+        FAILURE => SUCCESS,
+        _ => shell.previous_status,
+    }
+}
+
 fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.previous_status {
         SUCCESS => {
-            let cmd = args[1..].join(" ");
-            shell.on_command(&cmd);
+            shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
             shell.previous_status
         }
         _ => shell.previous_status,
@@ -446,8 +453,7 @@ fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
 fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.previous_status {
         FAILURE => {
-            let cmd = args[1..].join(" ");
-            shell.on_command(&cmd);
+            shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
             shell.previous_status
         }
         _ => shell.previous_status,

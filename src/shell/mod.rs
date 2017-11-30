@@ -39,7 +39,6 @@ use parser::Terminator;
 use parser::pipelines::Pipeline;
 use smallvec::SmallVec;
 use std::env;
-use std::fmt::{self, Display, Formatter};
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::iter::FromIterator;
@@ -53,23 +52,16 @@ use sys;
 use types::*;
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum IonError {
-    Fork(io::Error),
+    #[fail(display = "failed to fork: {}", why)]
+    Fork { why: io::Error },
+    #[fail(display = "element does not exist")]
     DoesNotExist,
+    #[fail(display = "input was not terminated")]
     Unterminated,
-    Function(FunctionError),
-}
-
-impl Display for IonError {
-    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
-        match *self {
-            IonError::Fork(ref why) => writeln!(fmt, "failed to fork: {}", why),
-            IonError::DoesNotExist => writeln!(fmt, "element does not exist"),
-            IonError::Function(ref why) => writeln!(fmt, "function error: {}", why),
-            IonError::Unterminated => writeln!(fmt, "input was not terminated"),
-        }
-    }
+    #[fail(display = "function error: {}", why)]
+    Function { why: FunctionError },
 }
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
@@ -226,23 +218,31 @@ impl<'a> Shell {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    /// To avoid infinite recursion when using aliases, the noalias boolean will be set the true
-    /// if an alias branch was executed.
-    fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
+    pub(crate) fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
         let command_start_time = SystemTime::now();
 
         // Expand any aliases found
         for job_no in 0..pipeline.items.len() {
-            if let Some(alias) = {
-                let key: &str = pipeline.items[job_no].job.command.as_ref();
-                self.variables.aliases.get(key)
-            } {
-                let new_args = ArgumentSplitter::new(alias)
-                    .map(String::from)
-                    .chain(pipeline.items[job_no].job.args.drain().skip(1))
-                    .collect::<SmallVec<[String; 4]>>();
-                pipeline.items[job_no].job.command = new_args[0].clone().into();
-                pipeline.items[job_no].job.args = new_args;
+            let mut last_command = String::new();
+            loop {
+                let possible_alias = {
+                    let key: &str = pipeline.items[job_no].job.command.as_ref();
+                    if &last_command == key {
+                        break;
+                    }
+                    last_command.clear();
+                    last_command.push_str(key);
+                    self.variables.aliases.get(key)
+                };
+
+                if let Some(alias) = possible_alias {
+                    let new_args = ArgumentSplitter::new(alias)
+                        .map(String::from)
+                        .chain(pipeline.items[job_no].job.args.drain().skip(1))
+                        .collect::<Array>();
+                    pipeline.items[job_no].job.command = new_args[0].clone().into();
+                    pipeline.items[job_no].job.args = new_args;
+                }
             }
         }
 
@@ -384,7 +384,7 @@ impl<'a> Shell {
                 function
                     .execute(self, args)
                     .map(|_| self.previous_status)
-                    .map_err(IonError::Function)
+                    .map_err(|err| IonError::Function { why: err })
             })
     }
 
