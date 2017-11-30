@@ -223,16 +223,26 @@ impl<'a> Shell {
 
         // Expand any aliases found
         for job_no in 0..pipeline.items.len() {
-            while let Some(alias) = {
-                let key: &str = pipeline.items[job_no].job.command.as_ref();
-                self.variables.aliases.get(key)
-            } {
-                let new_args = ArgumentSplitter::new(alias)
-                    .map(String::from)
-                    .chain(pipeline.items[job_no].job.args.drain().skip(1))
-                    .collect::<SmallVec<[String; 4]>>();
-                pipeline.items[job_no].job.command = new_args[0].clone().into();
-                pipeline.items[job_no].job.args = new_args;
+            let mut last_command = String::new();
+            loop {
+                let possible_alias = {
+                    let key: &str = pipeline.items[job_no].job.command.as_ref();
+                    if &last_command == key {
+                        break;
+                    }
+                    last_command.clear();
+                    last_command.push_str(key);
+                    self.variables.aliases.get(key)
+                };
+
+                if let Some(alias) = possible_alias {
+                    let new_args = ArgumentSplitter::new(alias)
+                        .map(String::from)
+                        .chain(pipeline.items[job_no].job.args.drain().skip(1))
+                        .collect::<Array>();
+                    pipeline.items[job_no].job.command = new_args[0].clone().into();
+                    pipeline.items[job_no].job.args = new_args;
+                }
             }
         }
 
