@@ -440,25 +440,11 @@ fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
     }
 }
 
-fn custom_eval(args: &[&str], shell: &mut Shell, un_terminated: &str) -> i32 {
-    let evaluated_command = args[1..].join(" ");
-    let mut buffer = Terminator::new(evaluated_command);
-
-    if buffer.is_terminated() {
-        shell.on_command(&buffer.consume());
-        shell.previous_status
-    } else {
-        let stderr = io::stderr();
-        let mut stderr = stderr.lock();
-        let _ = writeln!(stderr, "{}", un_terminated);
-        FAILURE
-    }
-}
-
 fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.previous_status {
         SUCCESS => {
-            custom_eval(args, shell, "ion: supplied expression after 'and' was not terminated")
+            shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
+            shell.previous_status
         }
         _ => shell.previous_status,
     }
@@ -467,7 +453,8 @@ fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
 fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.previous_status {
         FAILURE => {
-            custom_eval(args, shell, "ion: supplied expression after 'and' was not terminated")
+            shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
+            shell.previous_status
         }
         _ => shell.previous_status,
     }
