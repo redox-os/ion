@@ -22,7 +22,7 @@ fn main() {
             eprintln!(
                 "{} {}",
                 Red.bold().paint("Error:"),
-                White.paint("Ion requires nighlty to build.")
+                White.paint("Ion requires nightly to build.")
             );
             // print_version_err(&*version_string);
             eprintln!(
