@@ -6,6 +6,7 @@ pub mod random;
 
 mod conditionals;
 mod job_control;
+mod man_pages;
 mod test;
 mod echo;
 mod set;
@@ -20,6 +21,7 @@ use self::exists::exists;
 use self::functions::fn_;
 use self::ion::ion_docs;
 use self::is::is;
+use self::man_pages::*;
 use self::source::source;
 use self::status::status;
 use self::test::test;
@@ -147,6 +149,10 @@ fn builtin_status(args: &[&str], shell: &mut Shell) -> i32 {
 }
 
 pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
+    if check_help(args, MAN_CD) {
+        return SUCCESS
+    }
+
     match shell.directory_stack.cd(args, &shell.variables) {
         Ok(()) => SUCCESS,
         Err(why) => {
@@ -172,16 +178,14 @@ fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
         None => "",
     };
 
-    let help_msg = "DESCRIPTION: If the value is '1' or 'true', bool returns the 0 exit \
-                    status\nusage: bool <value>";
     match sh_var {
         "1" => (),
         "true" => (),
         _ => match args[1] {
             "1" => (),
             "true" => (),
-            "--help" => println!("{}", help_msg),
-            "-h" => println!("{}", help_msg),
+            "--help" => print_man(MAN_BOOL),
+            "-h" => print_man(MAN_BOOL),
             _ => return FAILURE,
         },
     }
@@ -200,9 +204,18 @@ fn builtin_is(args: &[&str], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_dirs(args: &[&str], shell: &mut Shell) -> i32 { shell.directory_stack.dirs(args) }
+fn builtin_dirs(args: &[&str], shell: &mut Shell) -> i32 {
+    if check_help(args, MAN_DIRS) {
+        return SUCCESS
+    }
+
+    shell.directory_stack.dirs(args) 
+}
 
 fn builtin_pushd(args: &[&str], shell: &mut Shell) -> i32 {
+    if check_help(args, MAN_PUSHD) {
+        return SUCCESS
+    }
     match shell.directory_stack.pushd(args, &shell.variables) {
         Ok(()) => SUCCESS,
         Err(why) => {
@@ -215,6 +228,10 @@ fn builtin_pushd(args: &[&str], shell: &mut Shell) -> i32 {
 }
 
 fn builtin_popd(args: &[&str], shell: &mut Shell) -> i32 {
+    if check_help(args, MAN_POPD) {
+        return SUCCESS
+    }
+
     match shell.directory_stack.popd(args) {
         Ok(()) => SUCCESS,
         Err(why) => {
@@ -235,7 +252,9 @@ fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 {
     drop_alias(&mut shell.variables, args)
 }
 
-fn builtin_fn(_: &[&str], shell: &mut Shell) -> i32 { fn_(&mut shell.functions) }
+fn builtin_fn(_: &[&str], shell: &mut Shell) -> i32 {
+    fn_(&mut shell.functions)
+}
 
 fn builtin_read(args: &[&str], shell: &mut Shell) -> i32 { shell.variables.read(args) }
 
