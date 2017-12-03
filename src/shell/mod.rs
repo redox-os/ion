@@ -240,7 +240,11 @@ impl<'a> Shell {
                         .map(String::from)
                         .chain(pipeline.items[job_no].job.args.drain().skip(1))
                         .collect::<Array>();
-                    pipeline.items[job_no].job.command = new_args[0].clone().into();
+                    if let Some(builtin) = BUILTINS.get(&new_args[0]) {
+                        pipeline.items[job_no].job.builtin = Some(builtin.main);
+                    } else {
+                        pipeline.items[job_no].job.command = new_args[0].clone().into();
+                    }
                     pipeline.items[job_no].job.args = new_args;
                 }
             }
