@@ -46,15 +46,15 @@ reason for a shell language to have multiple different keywords to end different
 
 ## Complete List of Conditional Builtins
 
-- [ ] and
+- [x] and
 - [ ] contains
-- [ ] exists
+- [x] exists
 - [ ] intersects
-- [ ] is
+- [x] is
 - [ ] isatty
 - [x] matches
 - [x] not
-- [ ] or
+- [x] or
 - [x] test
 - [ ] < (Polish Notation)
 - [ ] <= (Polish Notation)

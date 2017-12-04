@@ -1,21 +1,5 @@
-use std::error::Error;
-use std::io::{stdout, Write};
-
+use builtins::man_pages::{check_help, MAN_IS};
 use shell::Shell;
-
-const MAN_PAGE: &'static str = r#"NAME
-    is - Checks if two arguments are the same
-
-SYNOPSIS
-    is [ -h | --help ] [not]
-
-DESCRIPTION
-    Returns 0 if the two arguments are equal
-
-OPTIONS
-    not
-        returns 0 if the two arguments are not equal.
-"#; // @MANEND
 
 pub(crate) fn is(args: &[&str], shell: &mut Shell) -> Result<(), String> {
     match args.len() {
@@ -27,15 +11,7 @@ pub(crate) fn is(args: &[&str], shell: &mut Shell) -> Result<(), String> {
         3 => if eval_arg(args[1], shell) != eval_arg(args[2], shell) {
             return Err("".to_string());
         },
-        2 => if args[1] == "-h" || args[1] == "--help" {
-            let stdout = stdout();
-            let mut stdout = stdout.lock();
-
-            return match stdout.write_all(MAN_PAGE.as_bytes()).and_then(|_| stdout.flush()) {
-                Ok(_) => Ok(()),
-                Err(err) => Err(err.description().to_owned()),
-            };
-        } else {
+        2 => if !check_help(args, MAN_IS) {
             return Err("is needs 3 or 4 arguments\n".to_string());
         },
         _ => return Err("is needs 3 or 4 arguments\n".to_string()),

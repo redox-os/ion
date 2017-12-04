@@ -4,30 +4,6 @@ use shell::flags::*;
 use std::io::{self, Write};
 use std::iter;
 
-const HELP: &'static str = r#"NAME
-    set - Set or unset values of shell options and positional parameters.
-
-SYNOPSIS
-    set [ --help ] [-e | +e] [-x | +x] [-o [vi | emacs]] [- | --] [STRING]...
-
-DESCRIPTION
-    Shell options may be set using the '-' character, and unset using the '+' character.
-
-OPTIONS
-    -e  Exit immediately if a command exits with a non-zero status.
-
-    -o  Specifies that an argument will follow that sets the key map.
-        The keymap argument may be either `vi` or `emacs`.
-
-    -x  Specifies that commands will be printed as they are executed.
-
-    --  Following arguments will be set as positional arguments in the shell.
-        If no argument are supplied, arguments will be unset.
-
-    -   Following arguments will be set as positional arguments in the shell.
-        If no arguments are suppled, arguments will not be unset.
-"#;
-
 enum PositionalArgs {
     UnsetIfNone,
     RetainIfNone,
@@ -36,7 +12,6 @@ enum PositionalArgs {
 use self::PositionalArgs::*;
 
 pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
-    let stdout = io::stdout();
     let stderr = io::stderr();
     let mut args_iter = args.iter();
     let mut positionals = None;
@@ -47,12 +22,8 @@ pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
                 positionals = Some(UnsetIfNone);
                 break;
             }
-            if &arg[2..] == "help" {
-                let mut stdout = stdout.lock();
-                let _ = stdout.write(HELP.as_bytes());
-            } else {
-                return 0;
-            }
+            return 0;
+            
         } else if arg.starts_with('-') {
             if arg.len() == 1 {
                 positionals = Some(RetainIfNone);
