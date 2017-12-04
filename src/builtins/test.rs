@@ -239,8 +239,7 @@ fn test_strings() {
 
 #[test]
 fn test_empty_str() {
-    let mut empty = BufWriter::new(io::sink());
-    let mut eval = |args: Vec<&str>| evaluate_arguments(&args, &mut empty);
+    let eval = |args: Vec<&str>| evaluate_arguments(&args);
     assert_eq!(eval(vec![""]), Ok(false));
     assert_eq!(eval(vec!["c", "=", ""]), Ok(false));
 }
@@ -248,48 +247,45 @@ fn test_empty_str() {
 
 #[test]
 fn test_integers_arguments() {
-    let stdout = io::stdout();
-    let mut buffer = BufWriter::new(stdout.lock());
-
     // Equal To
-    assert_eq!(evaluate_arguments(&["10", "-eq", "10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["10", "-eq", "5"], &mut buffer), Ok(false));
-    assert_eq!(evaluate_arguments(&["-10", "-eq", "-10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["-10", "-eq", "10"], &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["10", "-eq", "10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-eq", "5"]), Ok(false));
+    assert_eq!(evaluate_arguments(&["-10", "-eq", "-10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["-10", "-eq", "10"]), Ok(false));
 
     // Greater Than or Equal To
-    assert_eq!(evaluate_arguments(&["10", "-ge", "10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["10", "-ge", "5"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["5", "-ge", "10"], &mut buffer), Ok(false));
-    assert_eq!(evaluate_arguments(&["-9", "-ge", "-10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["-10", "-ge", "-10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["-10", "-ge", "10"], &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["10", "-ge", "10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-ge", "5"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["5", "-ge", "10"]), Ok(false));
+    assert_eq!(evaluate_arguments(&["-9", "-ge", "-10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["-10", "-ge", "-10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["-10", "-ge", "10"]), Ok(false));
 
     // Less Than or Equal To
-    assert_eq!(evaluate_arguments(&["5", "-le", "5"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["5", "-le", "10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["10", "-le", "5"], &mut buffer), Ok(false));
-    assert_eq!(evaluate_arguments(&["-11", "-le", "-10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["-10", "-le", "-10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["10", "-le", "-10"], &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["5", "-le", "5"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["5", "-le", "10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-le", "5"]), Ok(false));
+    assert_eq!(evaluate_arguments(&["-11", "-le", "-10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["-10", "-le", "-10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-le", "-10"]), Ok(false));
 
     // Less Than
-    assert_eq!(evaluate_arguments(&["5", "-lt", "10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["10", "-lt", "5"], &mut buffer), Ok(false));
-    assert_eq!(evaluate_arguments(&["-11", "-lt", "-10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["10", "-lt", "-10"], &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["5", "-lt", "10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-lt", "5"]), Ok(false));
+    assert_eq!(evaluate_arguments(&["-11", "-lt", "-10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-lt", "-10"]), Ok(false));
 
     // Greater Than
-    assert_eq!(evaluate_arguments(&["10", "-gt", "5"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["5", "-gt", "10"], &mut buffer), Ok(false));
-    assert_eq!(evaluate_arguments(&["-9", "-gt", "-10"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["-10", "-gt", "10"], &mut buffer), Ok(false));
+    assert_eq!(evaluate_arguments(&["10", "-gt", "5"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["5", "-gt", "10"]), Ok(false));
+    assert_eq!(evaluate_arguments(&["-9", "-gt", "-10"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["-10", "-gt", "10"]), Ok(false));
 
     // Not Equal To
-    assert_eq!(evaluate_arguments(&["10", "-ne", "5"], &mut buffer), Ok(true));
-    assert_eq!(evaluate_arguments(&["5", "-ne", "5"], &mut buffer), Ok(false));
-    assert_eq!(evaluate_arguments(&["-10", "-ne", "-10"], &mut buffer), Ok(false));
-    assert_eq!(evaluate_arguments(&["-10", "-ne", "10"], &mut buffer), Ok(true));
+    assert_eq!(evaluate_arguments(&["10", "-ne", "5"]), Ok(true));
+    assert_eq!(evaluate_arguments(&["5", "-ne", "5"]), Ok(false));
+    assert_eq!(evaluate_arguments(&["-10", "-ne", "-10"]), Ok(false));
+    assert_eq!(evaluate_arguments(&["-10", "-ne", "10"]), Ok(true));
 }
 
 #[test]

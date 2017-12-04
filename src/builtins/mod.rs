@@ -61,7 +61,7 @@ macro_rules! map {
 }}
 
 /// If you are implementing a builtin add it to the table below, create a well named manpage in man_pages 
-/// and check for help flags by adding to the start of your builtin the following.
+/// and check for help flags by adding to the start of your builtin the following
 /// if check_help(args, MAN_CD) {
 ///     return SUCCESS
 /// }
@@ -258,7 +258,7 @@ fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 {
     drop_alias(&mut shell.variables, args)
 }
 
-// TODO There is a man page for fn however it is currently not used.
+// TODO There is a man page for fn however the -h and --help flags are not checked for.
 fn builtin_fn(_: &[&str], shell: &mut Shell) -> i32 {
     fn_(&mut shell.functions)
 }

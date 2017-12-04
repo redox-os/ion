@@ -106,7 +106,7 @@ DESCRIPTION
     pushd adds directories to the stack.
 "#;
 
-pub(crate) const MAN_FN: &'static str = r#"NAME
+/*pub(crate) const MAN_FN: &'static str = r#"NAME
     fn - print a list of all functions or create a function
 
 SYNOPSIS
@@ -130,7 +130,7 @@ DESCRIPTION
     end
 
     example 1
-"#;
+"#;*/
 
 pub(crate) const MAN_READ: &'static str = r#"NAME
     read - read a line of input into some variables
