@@ -30,7 +30,7 @@ use self::job_control::{BackgroundProcess, JobControl};
 use self::pipe_exec::PipelineExecution;
 use self::status::*;
 use self::variables::Variables;
-use app_dirs::{app_root, AppDataType, AppInfo};
+use xdg::BaseDirectories;
 use builtins::{BuiltinMap, BUILTINS};
 use fnv::FnvHashMap;
 use liner::Context;
@@ -194,25 +194,23 @@ impl<'a> Shell {
 
     /// Evaluates the source init file in the user's home directory.
     pub fn evaluate_init_file(&mut self) {
-        match app_root(
-            AppDataType::UserConfig,
-            &AppInfo { name:   "ion", author: "Redox OS Developers" },
-        ) {
-            Ok(mut initrc) => {
-                initrc.push("initrc");
-                if initrc.exists() {
-                    if let Err(err) = self.execute_script(&initrc) {
-                        eprintln!("ion: {}", err);
-                    }
-                } else {
-                    eprintln!("ion: creating initrc file at {:?}", initrc);
-                    if let Err(why) = File::create(initrc) {
-                        eprintln!("ion: could not create initrc file: {}", why);
-                    }
-                }
+        let base_dirs = match BaseDirectories::with_prefix("ion") {
+            Ok(base_dirs) => base_dirs,
+            Err(err) => {
+                eprintln!("ion: unable to get base directory: {}", err);
+                return;
             }
-            Err(why) => {
-                eprintln!("ion: unable to get config root: {}", why);
+        };
+        match base_dirs.find_config_file("initrc") {
+            Some(initrc) => {
+                if let Err(err) = self.execute_script(&initrc) {
+                    eprintln!("ion: {}", err);
+                }
+            },
+            None => {
+                if let Err(err) = base_dirs.place_config_file("initrc") {
+                    eprintln!("ion: could not create initrc file: {}", err);
+                }
             }
         }
     }
