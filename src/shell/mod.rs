@@ -30,13 +30,12 @@ use self::job_control::{BackgroundProcess, JobControl};
 use self::pipe_exec::PipelineExecution;
 use self::status::*;
 use self::variables::Variables;
-use xdg::BaseDirectories;
 use builtins::{BuiltinMap, BUILTINS};
 use fnv::FnvHashMap;
 use liner::Context;
-use parser::{ArgumentSplitter, Expander, Select};
 use parser::Terminator;
 use parser::pipelines::Pipeline;
+use parser::{ArgumentSplitter, Expander, Select};
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
@@ -45,11 +44,12 @@ use std::iter::FromIterator;
 use std::ops::Deref;
 use std::path::Path;
 use std::process;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use sys;
 use types::*;
+use xdg::BaseDirectories;
 
 #[allow(dead_code)]
 #[derive(Debug, Fail)]

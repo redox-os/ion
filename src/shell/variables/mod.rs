@@ -2,18 +2,18 @@ use super::colors::Colors;
 use super::directory_stack::DirectoryStack;
 use super::plugins::namespaces::{self, StringNamespace};
 use super::status::{FAILURE, SUCCESS};
-use xdg::BaseDirectories;
 use fnv::FnvHashMap;
 use liner::Context;
 use std::env;
 use std::io::{self, BufRead};
-use sys::{self, getpid, is_root};
 use sys::variables as self_sys;
+use sys::{self, getpid, is_root};
 use types::{
     Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value,
     VariableContext,
 };
 use unicode_segmentation::UnicodeSegmentation;
+use xdg::BaseDirectories;
 
 lazy_static! {
     static ref STRING_NAMESPACES: FnvHashMap<Identifier, StringNamespace> = namespaces::collect();

@@ -6,8 +6,8 @@ mod string;
 pub(crate) use self::library_iter::*;
 pub(crate) use self::string::StringError;
 
-use xdg::BaseDirectories;
 use std::path::PathBuf;
+use xdg::BaseDirectories;
 
 pub(crate) fn config_dir() -> Option<PathBuf> {
     match BaseDirectories::with_prefix("ion") {
