@@ -5,7 +5,7 @@
 #![feature(pointer_methods)]
 #![feature(getpid)]
 
-extern crate app_dirs;
+extern crate xdg;
 #[macro_use]
 extern crate bitflags;
 extern crate calc;

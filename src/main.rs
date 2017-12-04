@@ -9,7 +9,7 @@
 // #![feature(alloc_system)]
 // extern crate alloc_system;
 
-extern crate app_dirs;
+extern crate xdg;
 #[macro_use]
 extern crate bitflags;
 extern crate calc;

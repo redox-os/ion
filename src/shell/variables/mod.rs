@@ -2,18 +2,18 @@ use super::colors::Colors;
 use super::directory_stack::DirectoryStack;
 use super::plugins::namespaces::{self, StringNamespace};
 use super::status::{FAILURE, SUCCESS};
-use app_dirs::{app_root, AppDataType, AppInfo};
 use fnv::FnvHashMap;
 use liner::Context;
 use std::env;
 use std::io::{self, BufRead};
-use sys::{self, getpid, is_root};
 use sys::variables as self_sys;
+use sys::{self, getpid, is_root};
 use types::{
     Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value,
     VariableContext,
 };
 use unicode_segmentation::UnicodeSegmentation;
+use xdg::BaseDirectories;
 
 lazy_static! {
     static ref STRING_NAMESPACES: FnvHashMap<Identifier, StringNamespace> = namespaces::collect();
@@ -43,13 +43,11 @@ impl Default for Variables {
         map.insert("PID".into(), pid.into());
 
         // Initialize the HISTFILE variable
-        if let Ok(mut home_path) = app_root(
-            AppDataType::UserData,
-            &AppInfo { name:   "ion", author: "Redox OS Developers" },
-        ) {
-            home_path.push("history");
-            map.insert("HISTFILE".into(), home_path.to_str().unwrap_or("?").into());
-            map.insert("HISTFILE_ENABLED".into(), "1".into());
+        if let Ok(base_dirs) = BaseDirectories::with_prefix("ion") {
+            if let Ok(mut path) = base_dirs.place_data_file("history") {
+                map.insert("HISTFILE".into(), path.to_str().unwrap_or("?").into());
+                map.insert("HISTFILE_ENABLED".into(), "1".into());
+            }
         }
 
         // Initialize the PWD (Present Working Directory) variable
