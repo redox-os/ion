@@ -2,92 +2,23 @@
 use smallstring::SmallString;
 #[cfg(test)]
 use smallvec::SmallVec;
-use std::error::Error;
 use std::fs;
-use std::io::{self, BufWriter};
 use std::os::unix::fs::PermissionsExt;
 
 use shell::Shell;
 #[cfg(test)]
 use shell::flow_control::{Function, Statement};
 
-const MAN_PAGE: &'static str = r#"NAME
-    exists - check whether items exist
-
-SYNOPSIS
-    exists [EXPRESSION]
-
-DESCRIPTION
-    Checks whether the given item exists and returns an exit status of 0 if it does, else 1.
-
-OPTIONS
-    -a ARRAY
-        array var is not empty
-
-    -b BINARY
-        binary is in PATH
-
-    -d PATH
-        path is a directory
-        This is the same as test -d
-
-    -f PATH
-        path is a file
-        This is the same as test -f
-
-    --fn FUNCTION
-        function is defined
-
-    -s STRING
-        string var is not empty
-
-    STRING
-        string is not empty
-        This is the same as test -n
-
-EXAMPLES
-    Test if the file exists:
-        exists -f FILE && echo "The FILE exists" || echo "The FILE does not exist"
-
-    Test if some-command exists in the path and is executable:
-        exists -b some-command && echo "some-command exists" || echo "some-command does not exist"
-
-    Test if variable exists AND is not empty
-        exists -s myVar && echo "myVar exists: $myVar" || echo "myVar does not exist or is empty"
-        NOTE: Don't use the '$' sigil, but only the name of the variable to check
-
-    Test if array exists and is not empty
-        exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
-        NOTE: Don't use the '@' sigil, but only the name of the array to check
-
-    Test if a function named 'myFunc' exists
-        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
-
-AUTHOR
-    Written by Fabian Würfl.
-    Heavily based on implementation of the test builtin, which was written by Michael Murph.
-"#; // @MANEND
-
 pub(crate) fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
-    let stdout = io::stdout();
-    let mut buffer = BufWriter::new(stdout.lock());
-
     let arguments = &args[1..];
-    evaluate_arguments(arguments, &mut buffer, shell)
+    evaluate_arguments(arguments, shell)
 }
 
-fn evaluate_arguments<W: io::Write>(
+fn evaluate_arguments(
     arguments: &[&str],
-    buffer: &mut W,
     shell: &Shell,
 ) -> Result<bool, String> {
     match arguments.first() {
-        Some(&"--help") => {
-            // not handled by the second case, so that we don't have to pass the buffer around
-            buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| x.description().to_owned())?;
-            buffer.flush().map_err(|x| x.description().to_owned())?;
-            Ok(true)
-        }
         Some(&s) if s.starts_with("--") => {
             let (_, option) = s.split_at(2);
             // If no argument was given, return `SUCCESS`, as this means a string starting
