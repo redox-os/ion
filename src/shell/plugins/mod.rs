@@ -23,7 +23,7 @@ pub(crate) fn config_dir() -> Option<PathBuf> {
             }
         },
         Err(err) => {
-            println!("ion: unable to get config directory: {:?}", err);
+            eprintln!("ion: unable to get config directory: {:?}", err);
             None
         }
     }
