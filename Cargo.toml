@@ -39,9 +39,8 @@ regex = "0.2"
 smallstring = "0.1"
 smallvec = "0.4"
 unicode-segmentation = "1.2"
+xdg = { git = "https://github.com/jD91mZM2/rust-xdg", branch = "redox" }
 
-[dependencies.app_dirs]
-git = "https://github.com/redox-os/app-dirs-rs.git"
 [profile.release]
 lto = true
 panic = "abort"
