@@ -167,8 +167,7 @@ fn complete_as_file(current_dir: PathBuf, filename: String, index: usize) -> boo
     false
 }
 
-/// takes the input shell,
-/// prints prompt info lines, and
+/// prints prompt info lines and
 /// returns the last prompt line.
 fn handle_prompt(full_prompt: String) -> Result<String, String> {
     if !full_prompt.contains("\n") {
