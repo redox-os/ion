@@ -17,10 +17,7 @@ pub(crate) fn prompt(shell: &mut Shell) -> String {
 }
 
 pub(crate) fn prompt_fn(shell: &mut Shell) -> Option<String> {
-    let function = match shell.functions.get("PROMPT") {
-        Some(func) => func as *const Function,
-        None => return None,
-    };
+    let function = shell.functions.get("PROMPT")? as *const Function;
 
     let mut output = None;
 

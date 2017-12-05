@@ -5,10 +5,7 @@ use std::process;
 use sys;
 
 pub(crate) fn command_not_found(shell: &mut Shell, command: &str) -> Option<String> {
-    let function = match shell.functions.get("COMMAND_NOT_FOUND") {
-        Some(func) => func as *const Function,
-        None => return None // TODO: Use ? on Option whenever we drop support for older rust versions
-    };
+    let function = shell.functions.get("COMMAND_NOT_FOUND")? as *const Function;
 
     let mut output = None;
 
