@@ -2,92 +2,20 @@
 use smallstring::SmallString;
 #[cfg(test)]
 use smallvec::SmallVec;
-use std::error::Error;
 use std::fs;
-use std::io::{self, BufWriter};
 use std::os::unix::fs::PermissionsExt;
 
 use shell::Shell;
 #[cfg(test)]
 use shell::flow_control::{Function, Statement};
 
-const MAN_PAGE: &'static str = r#"NAME
-    exists - check whether items exist
-
-SYNOPSIS
-    exists [EXPRESSION]
-
-DESCRIPTION
-    Checks whether the given item exists and returns an exit status of 0 if it does, else 1.
-
-OPTIONS
-    -a ARRAY
-        array var is not empty
-
-    -b BINARY
-        binary is in PATH
-
-    -d PATH
-        path is a directory
-        This is the same as test -d
-
-    -f PATH
-        path is a file
-        This is the same as test -f
-
-    --fn FUNCTION
-        function is defined
-
-    -s STRING
-        string var is not empty
-
-    STRING
-        string is not empty
-        This is the same as test -n
-
-EXAMPLES
-    Test if the file exists:
-        exists -f FILE && echo "The FILE exists" || echo "The FILE does not exist"
-
-    Test if some-command exists in the path and is executable:
-        exists -b some-command && echo "some-command exists" || echo "some-command does not exist"
-
-    Test if variable exists AND is not empty
-        exists -s myVar && echo "myVar exists: $myVar" || echo "myVar does not exist or is empty"
-        NOTE: Don't use the '$' sigil, but only the name of the variable to check
-
-    Test if array exists and is not empty
-        exists -a myArr && echo "myArr exists: @myArr" || echo "myArr does not exist or is empty"
-        NOTE: Don't use the '@' sigil, but only the name of the array to check
-
-    Test if a function named 'myFunc' exists
-        exists --fn myFunc && myFunc || echo "No function with name myFunc found"
-
-AUTHOR
-    Written by Fabian Würfl.
-    Heavily based on implementation of the test builtin, which was written by Michael Murph.
-"#; // @MANEND
-
 pub(crate) fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
-    let stdout = io::stdout();
-    let mut buffer = BufWriter::new(stdout.lock());
-
     let arguments = &args[1..];
-    evaluate_arguments(arguments, &mut buffer, shell)
+    evaluate_arguments(arguments, shell)
 }
 
-fn evaluate_arguments<W: io::Write>(
-    arguments: &[&str],
-    buffer: &mut W,
-    shell: &Shell,
-) -> Result<bool, String> {
+fn evaluate_arguments(arguments: &[&str], shell: &Shell) -> Result<bool, String> {
     match arguments.first() {
-        Some(&"--help") => {
-            // not handled by the second case, so that we don't have to pass the buffer around
-            buffer.write_all(MAN_PAGE.as_bytes()).map_err(|x| x.description().to_owned())?;
-            buffer.flush().map_err(|x| x.description().to_owned())?;
-            Ok(true)
-        }
         Some(&s) if s.starts_with("--") => {
             let (_, option) = s.split_at(2);
             // If no argument was given, return `SUCCESS`, as this means a string starting
@@ -215,47 +143,42 @@ fn function_is_defined(function: &str, shell: &Shell) -> bool {
 fn test_evaluate_arguments() {
     use parser::assignments::{KeyBuf, Primitive};
     let mut shell = Shell::new();
-    let mut sink = BufWriter::new(io::sink());
 
     // assert_eq!(evaluate_arguments(&[], &mut sink, &shell), Ok(false));
     // no parameters
-    assert_eq!(evaluate_arguments(&[], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&[], &shell), Ok(false));
     // multiple arguments
     // ignores all but the first argument
-    assert_eq!(evaluate_arguments(&["foo", "bar"], &mut sink, &shell), Ok(true));
-
-    // check whether --help returns SUCCESS
-    assert_eq!(evaluate_arguments(&["--help"], &mut sink, &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["--help", "unused", "params"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["foo", "bar"], &shell), Ok(true));
 
     // check `exists STRING`
-    assert_eq!(evaluate_arguments(&[""], &mut sink, &shell), Ok(false));
-    assert_eq!(evaluate_arguments(&["string"], &mut sink, &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["string with space"], &mut sink, &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-startswithdash"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&[""], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["string"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["string with space"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-startswithdash"], &shell), Ok(true));
 
     // check `exists -a`
     // no argument means we treat it as a string
-    assert_eq!(evaluate_arguments(&["-a"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-a"], &shell), Ok(true));
     shell.variables.set_array("emptyarray", SmallVec::from_vec(Vec::new()));
-    assert_eq!(evaluate_arguments(&["-a", "emptyarray"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-a", "emptyarray"], &shell), Ok(false));
     let mut vec = Vec::new();
     vec.push("element".to_owned());
     shell.variables.set_array("array", SmallVec::from_vec(vec));
-    assert_eq!(evaluate_arguments(&["-a", "array"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-a", "array"], &shell), Ok(true));
     shell.variables.unset_array("array");
-    assert_eq!(evaluate_arguments(&["-a", "array"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-a", "array"], &shell), Ok(false));
 
     // check `exists -b`
     // TODO: see test_binary_is_in_path()
     // no argument means we treat it as a string
-    assert_eq!(evaluate_arguments(&["-b"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-b"], &shell), Ok(true));
     let oldpath = shell.get_var("PATH").unwrap_or("/usr/bin".to_owned());
     shell.set_var("PATH", "testing/");
 
-    assert_eq!(evaluate_arguments(&["-b", "executable_file"], &mut sink, &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-b", "empty_file"], &mut sink, &shell), Ok(false));
-    assert_eq!(evaluate_arguments(&["-b", "file_does_not_exist"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-b", "executable_file"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-b", "empty_file"], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-b", "file_does_not_exist"], &shell), Ok(false));
 
     // restore original PATH. Not necessary for the currently defined test cases but this might
     // change in the future? Better safe than sorry!
@@ -263,33 +186,33 @@ fn test_evaluate_arguments() {
 
     // check `exists -d`
     // no argument means we treat it as a string
-    assert_eq!(evaluate_arguments(&["-d"], &mut sink, &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-d", "testing/"], &mut sink, &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-d", "testing/empty_file"], &mut sink, &shell), Ok(false));
-    assert_eq!(evaluate_arguments(&["-d", "does/not/exist/"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-d"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-d", "testing/"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-d", "testing/empty_file"], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-d", "does/not/exist/"], &shell), Ok(false));
 
     // check `exists -f`
     // no argument means we treat it as a string
-    assert_eq!(evaluate_arguments(&["-f"], &mut sink, &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-f", "testing/"], &mut sink, &shell), Ok(false));
-    assert_eq!(evaluate_arguments(&["-f", "testing/empty_file"], &mut sink, &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-f", "does-not-exist"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-f"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-f", "testing/"], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-f", "testing/empty_file"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-f", "does-not-exist"], &shell), Ok(false));
 
     // check `exists -s`
     // no argument means we treat it as a string
-    assert_eq!(evaluate_arguments(&["-s"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-s"], &shell), Ok(true));
     shell.set_var("emptyvar", "");
-    assert_eq!(evaluate_arguments(&["-s", "emptyvar"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-s", "emptyvar"], &shell), Ok(false));
     shell.set_var("testvar", "foobar");
-    assert_eq!(evaluate_arguments(&["-s", "testvar"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-s", "testvar"], &shell), Ok(true));
     shell.variables.unset_var("testvar");
-    assert_eq!(evaluate_arguments(&["-s", "testvar"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-s", "testvar"], &shell), Ok(false));
     // also check that it doesn't trigger on arrays
     let mut vec = Vec::new();
     vec.push("element".to_owned());
     shell.variables.unset_var("array");
     shell.variables.set_array("array", SmallVec::from_vec(vec));
-    assert_eq!(evaluate_arguments(&["-s", "array"], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-s", "array"], &shell), Ok(false));
 
     // check `exists --fn`
     let name_str = "test_function";
@@ -302,13 +225,13 @@ fn test_evaluate_arguments() {
 
     shell.functions.insert(name.clone(), Function::new(Some(description), name, args, statements));
 
-    assert_eq!(evaluate_arguments(&["--fn", name_str], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["--fn", name_str], &shell), Ok(true));
     shell.functions.remove(name_str);
-    assert_eq!(evaluate_arguments(&["--fn", name_str], &mut sink, &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["--fn", name_str], &shell), Ok(false));
 
     // check invalid flags / parameters (should all be treated as strings and therefore succeed)
-    assert_eq!(evaluate_arguments(&["--foo"], &mut sink, &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-x"], &mut sink, &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["--foo"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-x"], &shell), Ok(true));
 }
 
 #[test]

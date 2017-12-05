@@ -1,8 +1,7 @@
-use std::env;
-use std::error::Error;
-use std::io::{stdout, Write};
-
+use builtins::man_pages::{print_man, MAN_STATUS};
 use shell::Shell;
+
+use std::env;
 
 bitflags! {
     struct Flags : u8 {
@@ -12,24 +11,6 @@ bitflags! {
         const FILENAME = 8;
     }
 }
-
-const MAN_PAGE: &'static str = r#"NAME
-    status - Evaluates the current runtime status
-
-SYNOPSIS
-    status [ -h | --help ] [-l] [-i]
-
-DESCRIPTION
-    With no arguments status displays the current login information of the shell.
-
-OPTIONS
-    -l
-        returns true if shell is a login shell. Also --is-login.
-    -i
-        returns true if shell is interactive. Also --is-interactive.
-    -f
-        prints the filename of the currently running script or stdio. Also --current-filename.
-"#; // @MANEND
 
 pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
     let mut flags = Flags::empty();
@@ -80,7 +61,7 @@ pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
         }
 
         if flags.contains(Flags::FILENAME) {
-            // TODO: This technique will not work if ion is renamed.
+            // TODO: This will not work if ion is renamed.
             let sa_len = shell_args.len() - 1;
             let last_sa = &shell_args[sa_len];
             let last_3: String = last_sa[last_sa.len() - 3..last_sa.len()].to_string();
@@ -92,14 +73,8 @@ pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
             }
         }
 
-        let stdout = stdout();
-        let mut stdout = stdout.lock();
-
         if flags.contains(Flags::HELP) {
-            return match stdout.write_all(MAN_PAGE.as_bytes()).and_then(|_| stdout.flush()) {
-                Ok(_) => Ok(()),
-                Err(err) => Err(err.description().to_owned()),
-            };
+            print_man(MAN_STATUS);
         }
     }
     Ok(())

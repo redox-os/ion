@@ -2,44 +2,11 @@ use std::io::{self, BufWriter, Write};
 
 bitflags! {
     struct Flags : u8 {
-        const HELP = 1;
-        const ESCAPE = 2;
-        const NO_NEWLINE = 4;
-        const NO_SPACES = 8;
+        const ESCAPE = 1;
+        const NO_NEWLINE = 2;
+        const NO_SPACES = 4;
     }
 }
-
-
-const MAN_PAGE: &'static str = r#"NAME
-    echo - display a line of text
-
-SYNOPSIS
-    echo [ -h | --help ] [-e] [-n] [-s] [STRING]...
-
-DESCRIPTION
-    Print the STRING(s) to standard output.
-
-OPTIONS
-    -e
-        enable the interpretation of backslash escapes
-    -n
-        do not output the trailing newline
-    -s
-        do not separate arguments with spaces
-
-    Escape Sequences
-        When the -e argument is used, the following sequences will be interpreted:
-        \\  backslash
-        \a  alert (BEL)
-        \b  backspace (BS)
-        \c  produce no further output
-        \e  escape (ESC)
-        \f  form feed (FF)
-        \n  new line
-        \r  carriage return
-        \t  horizontal tab (HT)
-        \v  vertical tab (VT)
-"#; // @MANEND
 
 pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
     let mut flags = Flags::empty();
@@ -47,7 +14,6 @@ pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
 
     for arg in args {
         match *arg {
-            "--help" => flags |= Flags::HELP,
             "--escape" => flags |= Flags::ESCAPE,
             "--no-newline" => flags |= Flags::NO_NEWLINE,
             "--no-spaces" => flags |= Flags::NO_SPACES,
@@ -60,7 +26,6 @@ pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
                         'e' => short_flags |= Flags::ESCAPE,
                         'n' => short_flags |= Flags::NO_NEWLINE,
                         's' => short_flags |= Flags::NO_SPACES,
-                        'h' => short_flags |= Flags::HELP,
                         _ => {
                             is_opts = false;
                             break;
@@ -80,12 +45,6 @@ pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
 
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
-
-    if flags.contains(Flags::HELP) {
-        buffer.write_all(MAN_PAGE.as_bytes())?;
-        buffer.flush()?;
-        return Ok(());
-    }
 
     let mut first = true;
     for arg in data[1..].iter().map(|x| x.as_bytes()) {
