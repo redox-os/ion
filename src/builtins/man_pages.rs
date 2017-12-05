@@ -577,9 +577,9 @@ pub(crate) const MAN_WHICH: &'static str = r#"NAME
     which - locate a program file in the current user's path
 
 SYNOPSIS
-    which PROGRAM
+    which PROGRAM 
 
 DESCRIPTION
-    The which utility takes a command name and searches the path for the executable file that would 
-    be run had the command been executed.
+    The which utility takes a list of command names and searches for the 
+    alias/builtin/function/executable that whould be executed if you ran that command.
 "#;

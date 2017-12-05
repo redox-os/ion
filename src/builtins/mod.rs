@@ -585,34 +585,29 @@ fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
         return SUCCESS
     }
 
-    if args[1..].len() != 1 {
-        let stderr = io::stderr();
-        let mut stderr = stderr.lock();
-        let _ = stderr.write_all(b"which takes one argument\n");
-        return BAD_ARG;
-    }
-
-    let command = args[1];
-
-    if let Some(alias) = shell.variables.aliases.get(command) {
-        println!("{}: alias to {}", command, alias);
-        SUCCESS
-    } else if shell.builtins.contains_key(command) {
-        println!("{}: built-in shell command", command);
-        SUCCESS
-    } else if shell.functions.contains_key(command) {
-        println!("{}: function", command);
-        SUCCESS
-    } else {
-        for path in env::var("PATH").unwrap_or("/bin".to_string()).split(sys::PATH_SEPARATOR) {
-            let executable = Path::new(path).join(command);
-            if executable.is_file() {
-                println!("{}", executable.display());
-                return SUCCESS;
+    let mut result = SUCCESS;
+    'outer: for i in 1..args.len() {
+        let command = args[i];
+        if let Some(alias) = shell.variables.aliases.get(command) {
+            println!("{}: alias to {}", command, alias);
+            continue;
+        } else if shell.builtins.contains_key(command) {
+            println!("{}: built-in shell command", command);
+            continue;
+        } else if shell.functions.contains_key(command) {
+            println!("{}: function", command);
+            continue;
+        } else {
+            for path in env::var("PATH").unwrap_or("/bin".to_string()).split(sys::PATH_SEPARATOR) {
+                let executable = Path::new(path).join(command);
+                if executable.is_file() {
+                    println!("{}", executable.display());
+                    continue 'outer;
+                }
             }
+            result = FAILURE;
+            println!("{} not found", command);
         }
-
-        println!("{} not found", command);
-        FAILURE
     }
+    result
 }
