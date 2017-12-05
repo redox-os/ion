@@ -174,7 +174,7 @@ impl Variables {
             // Temporarily borrow the `swd` variable while we attempt to assemble a minimal
             // variant of the directory path. If that is not possible, we will cancel the
             // borrow and return `swd` itself as the minified path.
-            let elements = swd.split("/").collect::<Vec<&str>>();
+            let elements = swd.split("/").filter(|s| !s.is_empty()).collect::<Vec<&str>>();
             if elements.len() > 2 {
                 let mut output = String::new();
                 for element in &elements[0..elements.len() - 1] {
@@ -382,5 +382,19 @@ mod tests {
         } else {
             assert!(false);
         }
+    }
+
+    #[test]
+    fn minimal_directory_var_should_compact_path() {
+        let mut variables = Variables::default();
+        variables.set_var("PWD", "/var/log/nix");
+        assert_eq!("v/l/nix", variables.get_var("MWD").expect("no value returned"));
+    }
+
+    #[test]
+    fn minimal_directory_var_shouldnt_compact_path() {
+        let mut variables = Variables::default();
+        variables.set_var("PWD", "/var/log");
+        assert_eq!("/var/log", variables.get_var("MWD").expect("no value returned"));
     }
 }
