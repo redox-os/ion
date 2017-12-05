@@ -4,11 +4,13 @@
 //! IDs, watching foreground and background tasks, sending foreground tasks to the background,
 //! handling pipeline and conditional operators, and std{in,out,err} redirections.
 
+mod command_not_found;
 pub mod foreground;
 mod fork;
 pub mod job_control;
 mod streams;
 
+use self::command_not_found::command_not_found;
 use self::fork::{create_process_group, fork_pipe};
 use self::job_control::JobControl;
 use self::streams::{duplicate_streams, redir, redirect_streams};
@@ -495,7 +497,11 @@ impl PipelineExecution for Shell {
                     self.watch_foreground(child.id(), child.id(), move || long, |_| ())
                 }
                 Err(e) => if e.kind() == io::ErrorKind::NotFound {
-                    eprintln!("ion: command not found: {}", short);
+                    if let Some(output) = command_not_found(self, &short) {
+                        print!("{}", output);
+                    } else {
+                        eprintln!("ion: command not found: {}", short);
+                    }
                     NO_SUCH_COMMAND
                 } else {
                     eprintln!("ion: error spawning process: {}", e);
@@ -749,7 +755,11 @@ pub(crate) fn pipe(
                                         },
                                         Err(e) => {
                                             return if e.kind() == io::ErrorKind::NotFound {
-                                                eprintln!("ion: command not found: {}", short);
+                                                if let Some(output) = command_not_found(shell, &short) {
+                                                    print!("{}", output);
+                                                } else {
+                                                    eprintln!("ion: command not found: {}", short);
+                                                }
                                                 NO_SUCH_COMMAND
                                             } else {
                                                 eprintln!("ion: error spawning process: {}", e);
