@@ -497,9 +497,7 @@ impl PipelineExecution for Shell {
                     self.watch_foreground(child.id(), child.id(), move || long, |_| ())
                 }
                 Err(e) => if e.kind() == io::ErrorKind::NotFound {
-                    if let Some(output) = command_not_found(self, &short) {
-                        print!("{}", output);
-                    } else {
+                    if !command_not_found(self, &short) {
                         eprintln!("ion: command not found: {}", short);
                     }
                     NO_SUCH_COMMAND
@@ -755,9 +753,7 @@ pub(crate) fn pipe(
                                         },
                                         Err(e) => {
                                             return if e.kind() == io::ErrorKind::NotFound {
-                                                if let Some(output) = command_not_found(shell, &short) {
-                                                    print!("{}", output);
-                                                } else {
+                                                if !command_not_found(shell, &short) {
                                                     eprintln!("ion: command not found: {}", short);
                                                 }
                                                 NO_SUCH_COMMAND

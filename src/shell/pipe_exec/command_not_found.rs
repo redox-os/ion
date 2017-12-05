@@ -1,32 +1,24 @@
-use super::super::{Capture, Function, Shell};
-use parser::shell_expand::expand_string;
-use std::io::Read;
+use super::super::{Capture, Function, FunctionError, Shell};
 use std::process;
 use sys;
 
-pub(crate) fn command_not_found(shell: &mut Shell, command: &str) -> Option<String> {
-    let function = shell.functions.get("COMMAND_NOT_FOUND")? as *const Function;
+pub(crate) fn command_not_found(shell: &mut Shell, command: &str) -> bool {
+    let function = match shell.functions.get("COMMAND_NOT_FOUND") {
+        Some(func) => func as *const Function,
+        None => return false
+    };
 
-    let mut output = None;
-
-    match shell.fork(Capture::Stdout, |child| unsafe {
-        let _ = function.read().execute(child, &["ion", command]);
-    }) {
-        Ok(result) => {
-            let mut string = String::new();
-            match result.stdout.unwrap().read_to_string(&mut string) {
-                Ok(_) => output = Some(string),
-                Err(err) => {
-                    eprintln!("ion: error reading stdout of child: {}", err);
-                }
-            }
-        },
-        Err(err) => {
-            eprintln!("ion: fork error: {}", err);
+    if let Err(err) = shell.fork(Capture::None, |child| {
+        let result = unsafe { function.read() }.execute(child, &["ion", command]);
+        if let Err(FunctionError::InvalidArgumentCount) = result {
+            eprintln!("ion: COMMAND_NOT_FOUND function takes an invalid number of arguments: must be exactly one");
         }
+    }) {
+        eprintln!("ion: fork error: {}", err);
+        return false;
     }
 
     // Ensure that the parent retains ownership of the terminal before exiting.
     let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
-    output
+    true
 }
