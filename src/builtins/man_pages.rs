@@ -581,5 +581,5 @@ SYNOPSIS
 
 DESCRIPTION
     The which utility takes a list of command names and searches for the 
-    alias/builtin/function/executable that whould be executed if you ran that command.
+    alias/builtin/function/executable that would be executed if you ran that command.
 "#;
