@@ -1,0 +1,4 @@
+for key in {0...9,a...f}{0...9,a...f}{0...9,a...f}
+    eval echo -n \$\{c::0x$key\}0x$key,\' \'
+end
+echo
