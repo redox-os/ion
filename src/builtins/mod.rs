@@ -586,8 +586,7 @@ fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
     }
 
     let mut result = SUCCESS;
-    'outer: for arg in &args[1..] {
-        let command = *arg;
+    'outer: for &command in &args[1..] {
         if let Some(alias) = shell.variables.aliases.get(command) {
             println!("{}: alias to {}", command, alias);
             continue;
