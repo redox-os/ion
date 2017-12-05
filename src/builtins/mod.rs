@@ -586,16 +586,16 @@ fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
     }
 
     let mut result = SUCCESS;
-    'outer: for i in 1..args.len() {
-        let command = args[i];
+    'outer: for arg in &args[1..] {
+        let command = *arg;
         if let Some(alias) = shell.variables.aliases.get(command) {
             println!("{}: alias to {}", command, alias);
             continue;
-        } else if shell.builtins.contains_key(command) {
-            println!("{}: built-in shell command", command);
-            continue;
         } else if shell.functions.contains_key(command) {
             println!("{}: function", command);
+            continue;
+        } else if shell.builtins.contains_key(command) {
+            println!("{}: built-in shell command", command);
             continue;
         } else {
             for path in env::var("PATH").unwrap_or("/bin".to_string()).split(sys::PATH_SEPARATOR) {
