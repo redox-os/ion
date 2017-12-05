@@ -75,13 +75,12 @@ fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Ve
         return None;
     }
 
-    let char_step = match step.checked_abs() {
-        Some(v) => if v > u8::MAX as isize {
+    let char_step = {
+        let v = step.checked_abs()?;
+        if v > u8::MAX as isize {
             return None;
-        } else {
-            v as u8
-        },
-        None => return None,
+        }
+        v as u8
     };
 
     if start < end {
