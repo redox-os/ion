@@ -67,7 +67,9 @@ fn numeric_range(
 }
 
 #[inline]
-fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') }
+fn byte_is_valid_range(b: u8) -> bool {
+    (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z')
+}
 
 use std::u8;
 fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Vec<String>> {
@@ -286,11 +288,26 @@ pub(crate) fn parse_index_range(input: &str) -> Option<Range> {
 #[test]
 fn index_ranges() {
     let valid_cases = vec![
-        (Range::exclusive(Index::Forward(0), Index::Forward(3)), "0..3"),
-        (Range::inclusive(Index::Forward(0), Index::Forward(2)), "0...2"),
-        (Range::inclusive(Index::Forward(2), Index::Backward(1)), "2...-2"),
-        (Range::inclusive(Index::Forward(0), Index::Backward(0)), "0...-1"),
-        (Range::exclusive(Index::Backward(2), Index::Backward(0)), "-3..-1"),
+        (
+            Range::exclusive(Index::Forward(0), Index::Forward(3)),
+            "0..3",
+        ),
+        (
+            Range::inclusive(Index::Forward(0), Index::Forward(2)),
+            "0...2",
+        ),
+        (
+            Range::inclusive(Index::Forward(2), Index::Backward(1)),
+            "2...-2",
+        ),
+        (
+            Range::inclusive(Index::Forward(0), Index::Backward(0)),
+            "0...-1",
+        ),
+        (
+            Range::exclusive(Index::Backward(2), Index::Backward(0)),
+            "-3..-1",
+        ),
         (Range::from(Index::Backward(2)), "-3.."),
         (Range::to(Index::Forward(5)), "..5"),
     ];

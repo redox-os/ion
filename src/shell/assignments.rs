@@ -41,7 +41,11 @@ fn list_vars(shell: &Shell) {
 
     // Then immediately follow that with a list of array variables.
     let _ = buffer.write(b"\n# Array Variables\n");
-    shell.variables.arrays.iter().for_each(|(key, val)| print_array(&mut buffer, &key, &val));
+    shell
+        .variables
+        .arrays
+        .iter()
+        .for_each(|(key, val)| print_array(&mut buffer, &key, &val));
 }
 
 /// Represents: A variable store capable of setting local variables or
@@ -86,7 +90,7 @@ impl VariableStore for Shell {
                 Ok(Action::UpdateArray(..)) => {
                     eprintln!(
                         "ion: arithmetic operators on array expressions aren't supported \
-                            yet."
+                         yet."
                     );
                     return FAILURE;
                 }
@@ -105,13 +109,12 @@ impl VariableStore for Shell {
                                 .map(|x| x.as_str())
                                 .unwrap_or("0") as *const str;
 
-                            let result = math(
-                                unsafe { &*lhs },
-                                key.kind,
-                                operator,
-                                &value,
-                                |value| self.set_var(key_name, unsafe { str::from_utf8_unchecked(value) }),
-                            );
+                            let result =
+                                math(unsafe { &*lhs }, key.kind, operator, &value, |value| {
+                                    self.set_var(key_name, unsafe {
+                                        str::from_utf8_unchecked(value)
+                                    })
+                                });
 
                             if let Err(why) = result {
                                 eprintln!("ion: assignment error: {}", why);
@@ -230,15 +233,23 @@ impl Display for MathError {
 }
 
 fn parse_f64<F: Fn(f64, f64) -> f64>(lhs: &str, rhs: &str, operation: F) -> Result<f64, MathError> {
-    lhs.parse::<f64>().map_err(|_| MathError::LHS).and_then(
-        |lhs| rhs.parse::<f64>().map_err(|_| MathError::RHS).map(|rhs| operation(lhs, rhs)),
-    )
+    lhs.parse::<f64>()
+        .map_err(|_| MathError::LHS)
+        .and_then(|lhs| {
+            rhs.parse::<f64>()
+                .map_err(|_| MathError::RHS)
+                .map(|rhs| operation(lhs, rhs))
+        })
 }
 
 fn parse_i64<F: Fn(i64, i64) -> i64>(lhs: &str, rhs: &str, operation: F) -> Result<i64, MathError> {
-    lhs.parse::<i64>().map_err(|_| MathError::LHS).and_then(
-        |lhs| rhs.parse::<i64>().map_err(|_| MathError::RHS).map(|rhs| operation(lhs, rhs)),
-    )
+    lhs.parse::<i64>()
+        .map_err(|_| MathError::LHS)
+        .and_then(|lhs| {
+            rhs.parse::<i64>()
+                .map_err(|_| MathError::RHS)
+                .map(|rhs| operation(lhs, rhs))
+        })
 }
 
 fn write_integer<F: FnMut(&[u8])>(integer: i64, mut func: F) {
@@ -256,7 +267,11 @@ fn math<'a, F: FnMut(&[u8])>(
 ) -> Result<(), MathError> {
     match operator {
         Operator::Add => if Primitive::Any == key || Primitive::Float == key {
-            writefn(parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?.to_string().as_bytes());
+            writefn(
+                parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?
+                    .to_string()
+                    .as_bytes(),
+            );
         } else if let Primitive::Integer = key {
             write_integer(parse_i64(lhs, value, |lhs, rhs| lhs + rhs)?, writefn);
         } else {
@@ -264,7 +279,11 @@ fn math<'a, F: FnMut(&[u8])>(
         },
         Operator::Divide => {
             if Primitive::Any == key || Primitive::Float == key || Primitive::Integer == key {
-                writefn(parse_f64(lhs, value, |lhs, rhs| lhs / rhs)?.to_string().as_bytes());
+                writefn(
+                    parse_f64(lhs, value, |lhs, rhs| lhs / rhs)?
+                        .to_string()
+                        .as_bytes(),
+                );
             } else {
                 return Err(MathError::Unsupported);
             }
@@ -275,23 +294,38 @@ fn math<'a, F: FnMut(&[u8])>(
             return Err(MathError::Unsupported);
         },
         Operator::Subtract => if Primitive::Any == key || Primitive::Float == key {
-            writefn(parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?.to_string().as_bytes());
+            writefn(
+                parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?
+                    .to_string()
+                    .as_bytes(),
+            );
         } else if let Primitive::Integer = key {
             write_integer(parse_i64(lhs, value, |lhs, rhs| lhs - rhs)?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
         Operator::Multiply => if Primitive::Any == key || Primitive::Float == key {
-            writefn(parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?.to_string().as_bytes());
+            writefn(
+                parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?
+                    .to_string()
+                    .as_bytes(),
+            );
         } else if let Primitive::Integer = key {
             write_integer(parse_i64(lhs, value, |lhs, rhs| lhs * rhs)?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
         Operator::Exponent => if Primitive::Any == key || Primitive::Float == key {
-            writefn(parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?.to_string().as_bytes());
+            writefn(
+                parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?
+                    .to_string()
+                    .as_bytes(),
+            );
         } else if let Primitive::Integer = key {
-            write_integer(parse_i64(lhs, value, |lhs, rhs| lhs.pow(rhs as u32))?, writefn);
+            write_integer(
+                parse_i64(lhs, value, |lhs, rhs| lhs.pow(rhs as u32))?,
+                writefn,
+            );
         } else {
             return Err(MathError::Unsupported);
         },

@@ -1,8 +1,9 @@
-//! The purpose of the pipeline execution module is to create commands from supplied pieplines, and
-//! manage their execution thereof. That includes forking, executing commands, managing process
-//! group
-//! IDs, watching foreground and background tasks, sending foreground tasks to the background,
-//! handling pipeline and conditional operators, and std{in,out,err} redirections.
+//! The purpose of the pipeline execution module is to create commands from
+//! supplied pieplines, and manage their execution thereof. That includes
+//! forking, executing commands, managing process group
+//! IDs, watching foreground and background tasks, sending foreground tasks to
+//! the background, handling pipeline and conditional operators, and
+//! std{in,out,err} redirections.
 
 mod command_not_found;
 pub mod foreground;
@@ -43,8 +44,9 @@ pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<RawFd, Error> {
     // the entire string is written
     infile.write_all(input.as_ref())?;
     infile.flush()?;
-    // `infile` currently owns the writer end RawFd. If we just return the reader end
-    // and let `infile` go out of scope, it will be closed, sending EOF to the reader!
+    // `infile` currently owns the writer end RawFd. If we just return the reader
+    // end and let `infile` go out of scope, it will be closed, sending EOF to
+    // the reader!
     Ok(reader)
 }
 
@@ -231,7 +233,10 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
             (0, _) => {}
             (1, JobKind::Pipe(_)) => {
                 let sources = vec![get_infile!(inputs[0])?];
-                new_commands.push((RefinedJob::cat(sources), JobKind::Pipe(RedirectFrom::Stdout)));
+                new_commands.push((
+                    RefinedJob::cat(sources),
+                    JobKind::Pipe(RedirectFrom::Stdout),
+                ));
             }
             (1, _) => job.stdin(get_infile!(inputs[0])?),
             _ => {
@@ -243,7 +248,10 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
                         return None;
                     });
                 }
-                new_commands.push((RefinedJob::cat(sources), JobKind::Pipe(RedirectFrom::Stdout)));
+                new_commands.push((
+                    RefinedJob::cat(sources),
+                    JobKind::Pipe(RedirectFrom::Stdout),
+                ));
             }
         }
         prev_kind = kind;
@@ -263,11 +271,21 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
             (true, false) => set_one_tee!(new_commands, outputs, job, kind, Stdout, Stderr),
             // tee both
             (true, true) => {
-                let mut tee_out = TeeItem { sinks:  Vec::new(), source: None };
-                let mut tee_err = TeeItem { sinks:  Vec::new(), source: None };
+                let mut tee_out = TeeItem {
+                    sinks: Vec::new(),
+                    source: None,
+                };
+                let mut tee_err = TeeItem {
+                    sinks: Vec::new(),
+                    source: None,
+                };
                 for output in outputs {
                     match if output.append {
-                        OpenOptions::new().create(true).write(true).append(true).open(&output.file)
+                        OpenOptions::new()
+                            .create(true)
+                            .write(true)
+                            .append(true)
+                            .open(&output.file)
                     } else {
                         File::create(&output.file)
                     } {
@@ -390,11 +408,12 @@ impl PipelineExecution for Shell {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
         // Remove any leftover foreground tasks from the last execution.
         self.foreground.clear();
-        // If the supplied pipeline is a background, a string representing the command will be
-        // stored here.
+        // If the supplied pipeline is a background, a string representing the command
+        // will be stored here.
         let possible_background_name =
             gen_background_string(&pipeline, self.flags & PRINT_COMMS != 0);
-        // Generates commands for execution, differentiating between external and builtin commands.
+        // Generates commands for execution, differentiating between external and
+        // builtin commands.
         let piped_commands = match self.generate_commands(pipeline) {
             Ok(commands) => commands,
             Err(error) => return error,
@@ -431,7 +450,11 @@ impl PipelineExecution for Shell {
     fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<RefinedItem>, i32> {
         let mut results = Vec::new();
         for item in pipeline.items.drain(..) {
-            let PipeItem { mut job, outputs, inputs } = item;
+            let PipeItem {
+                mut job,
+                outputs,
+                inputs,
+            } = item;
             let refined = {
                 if is_implicit_cd(&job.args[0]) {
                     RefinedJob::builtin(
@@ -457,7 +480,11 @@ impl PipelineExecution for Shell {
 
     fn wait(&mut self, mut children: Vec<u32>, mut commands: Vec<RefinedJob>) -> i32 {
         // TODO: Find a way to only do this when absolutely necessary.
-        let as_string = commands.iter().map(RefinedJob::long).collect::<Vec<String>>().join(" | ");
+        let as_string = commands
+            .iter()
+            .map(RefinedJob::long)
+            .collect::<Vec<String>>()
+            .join(" | ");
 
         // Each process in the pipe has the same PGID, which is the first process's PID.
         let pgid = children[0];
@@ -506,24 +533,42 @@ impl PipelineExecution for Shell {
                     COULD_NOT_EXEC
                 },
             },
-            RefinedJob::Builtin { main, ref args, ref stdin, ref stdout, ref stderr } => {
+            RefinedJob::Builtin {
+                main,
+                ref args,
+                ref stdin,
+                ref stdout,
+                ref stderr,
+            } => {
                 if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
                     let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
                     let code = self.exec_builtin(main, &args, stdout, stderr, stdin);
                     redirect_streams(stdin_bk, stdout_bk, stderr_bk);
                     return code;
                 }
-                eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", long);
+                eprintln!(
+                    "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
+                    long
+                );
                 COULD_NOT_EXEC
             }
-            RefinedJob::Function { ref name, ref args, ref stdin, ref stdout, ref stderr } => {
+            RefinedJob::Function {
+                ref name,
+                ref args,
+                ref stdin,
+                ref stdout,
+                ref stderr,
+            } => {
                 if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
                     let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
                     let code = self.exec_function(name, &args, stdout, stderr, stdin);
                     redirect_streams(stdin_bk, stdout_bk, stderr_bk);
                     return code;
                 }
-                eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", long);
+                eprintln!(
+                    "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
+                    long
+                );
                 COULD_NOT_EXEC
             }
             _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
@@ -698,8 +743,8 @@ pub(crate) fn pipe(
     let mut ext_stdio: Option<Vec<RawFd>> = None;
     loop {
         if let Some((mut parent, mut kind)) = commands.next() {
-            // When an `&&` or `||` operator is utilized, execute commands based on the previous
-            // status.
+            // When an `&&` or `||` operator is utilized, execute commands based on the
+            // previous status.
             match previous_kind {
                 JobKind::And => if previous_status != SUCCESS {
                     if let JobKind::Or = kind {
@@ -932,8 +977,11 @@ pub(crate) fn pipe(
                         // If parent is a RefindJob::External, then we need to keep track of the
                         // output pipes, so we can properly close them after the job has been
                         // spawned.
-                        let is_external =
-                            if let RefinedJob::External(..) = parent { true } else { false };
+                        let is_external = if let RefinedJob::External(..) = parent {
+                            true
+                        } else {
+                            false
+                        };
 
                         // If we need to tee both stdout and stderr, we directly connect pipes to
                         // the relevant sources in both of them.
@@ -976,10 +1024,14 @@ pub(crate) fn pipe(
                                     child.stdin(unsafe { File::from_raw_fd(reader) });
                                     match mode {
                                         RedirectFrom::Stderr => {
-                                            parent.stderr(unsafe { File::from_raw_fd(writer) });
+                                            parent.stderr(unsafe {
+                                                File::from_raw_fd(writer)
+                                            });
                                         }
                                         RedirectFrom::Stdout => {
-                                            parent.stdout(unsafe { File::from_raw_fd(writer) });
+                                            parent.stdout(unsafe {
+                                                File::from_raw_fd(writer)
+                                            });
                                         }
                                         RedirectFrom::Both => {
                                             let temp = unsafe { File::from_raw_fd(writer) };

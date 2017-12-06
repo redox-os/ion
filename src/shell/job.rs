@@ -21,8 +21,8 @@ pub(crate) enum JobKind {
 #[derive(Clone)]
 pub(crate) struct Job {
     pub command: Identifier,
-    pub args:    Array,
-    pub kind:    JobKind,
+    pub args: Array,
+    pub kind: JobKind,
     pub builtin: Option<BuiltinFunction>,
 }
 
@@ -30,7 +30,12 @@ impl Job {
     pub(crate) fn new(args: Array, kind: JobKind) -> Self {
         let command = SmallString::from_str(&args[0]);
         let builtin = BUILTINS.get(command.as_ref()).map(|b| b.main);
-        Job { command, args, kind, builtin }
+        Job {
+            command,
+            args,
+            kind,
+            builtin,
+        }
     }
 
     /// Takes the current job's arguments and expands them, one argument at a
@@ -105,8 +110,8 @@ pub(crate) enum RefinedJob {
     /// Represents redirection into stdin from more than one source
     Cat {
         sources: Vec<File>,
-        stdin:   Option<File>,
-        stdout:  Option<File>,
+        stdin: Option<File>,
+        stdout: Option<File>,
     },
     Tee {
         /// 0 for stdout, 1 for stderr
@@ -134,7 +139,8 @@ impl TeeItem {
         use std::io::{self, Read, Write};
         use std::os::unix::io::*;
         fn write_out<R>(source: &mut R, sinks: &mut [File]) -> io::Result<()>
-            where R: Read
+        where
+            R: Read,
         {
             let mut buf = [0; 4096];
             loop {
@@ -198,19 +204,40 @@ macro_rules! set_field {
 
 impl RefinedJob {
     pub(crate) fn builtin(main: BuiltinFunction, args: Array) -> Self {
-        RefinedJob::Builtin { main, args, stdin: None, stdout: None, stderr: None }
+        RefinedJob::Builtin {
+            main,
+            args,
+            stdin: None,
+            stdout: None,
+            stderr: None,
+        }
     }
 
     pub(crate) fn function(name: Identifier, args: Array) -> Self {
-        RefinedJob::Function { name, args, stdin: None, stdout: None, stderr: None }
+        RefinedJob::Function {
+            name,
+            args,
+            stdin: None,
+            stdout: None,
+            stderr: None,
+        }
     }
 
     pub(crate) fn cat(sources: Vec<File>) -> Self {
-        RefinedJob::Cat { sources, stdin: None, stdout: None }
+        RefinedJob::Cat {
+            sources,
+            stdin: None,
+            stdout: None,
+        }
     }
 
     pub(crate) fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
-        RefinedJob::Tee { items:  (tee_out, tee_err), stdin:  None, stdout: None, stderr: None }
+        RefinedJob::Tee {
+            items: (tee_out, tee_err),
+            stdin: None,
+            stdout: None,
+            stderr: None,
+        }
     }
 
     pub(crate) fn stdin(&mut self, file: File) {
@@ -237,9 +264,11 @@ impl RefinedJob {
     /// or builtin name
     pub(crate) fn short(&self) -> String {
         match *self {
-            RefinedJob::External(ref cmd) => {
-                format!("{:?}", cmd).split('"').nth(1).unwrap_or("").to_string()
-            }
+            RefinedJob::External(ref cmd) => format!("{:?}", cmd)
+                .split('"')
+                .nth(1)
+                .unwrap_or("")
+                .to_string(),
             RefinedJob::Builtin { .. } => String::from("Shell Builtin"),
             RefinedJob::Function { ref name, .. } => name.to_string(),
             // TODO: Print for real

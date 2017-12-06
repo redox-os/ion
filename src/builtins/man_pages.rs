@@ -4,7 +4,10 @@ use std::io::{stdout, Write};
 pub(crate) fn print_man(man_page: &'static str) {
     let stdout = stdout();
     let mut stdout = stdout.lock();
-    match stdout.write_all(man_page.as_bytes()).and_then(|_| stdout.flush()) {
+    match stdout
+        .write_all(man_page.as_bytes())
+        .and_then(|_| stdout.flush())
+    {
         Ok(_) => (),
         Err(err) => panic!("{}", err.description().to_owned()),
     }
@@ -14,7 +17,7 @@ pub(crate) fn check_help(args: &[&str], man_page: &'static str) -> bool {
     for arg in args {
         if *arg == "-h" || *arg == "--help" {
             print_man(man_page);
-            return true
+            return true;
         }
     }
     false
@@ -106,31 +109,33 @@ DESCRIPTION
     pushd adds directories to the stack.
 "#;
 
-/*pub(crate) const MAN_FN: &'static str = r#"NAME
-    fn - print a list of all functions or create a function
-
-SYNOPSIS
-    fn
-
-    fn example arg:int
-        echo $arg
-    end
-
-DESCRIPTION
-    fn prints a list of all functions that exist in the shell or creates a function when combined
-    with the 'end' keyword. Functions can have type hints, to tell ion to check the type of a 
-    functions arguments. An error will occur if an argument supplied to a function is of the wrong type.
-    The supported types in ion are, [], bool, bool[], float, float[], int, int[], str, str[].
-
-    Functions are called by typing the function name and then the function arguments, separated
-    by a space.
-
-    fn example arg0:int arg1:int
-        echo $arg
-    end
-
-    example 1
-"#;*/
+// pub(crate) const MAN_FN: &'static str = r#"NAME
+// fn - print a list of all functions or create a function
+//
+// SYNOPSIS
+// fn
+//
+// fn example arg:int
+// echo $arg
+// end
+//
+// DESCRIPTION
+// fn prints a list of all functions that exist in the shell or creates a
+// function when combined with the 'end' keyword. Functions can have type
+// hints, to tell ion to check the type of a functions arguments. An error will
+// occur if an argument supplied to a function is of the wrong type.
+// The supported types in ion are, [], bool, bool[], float, float[], int,
+// int[], str, str[].
+//
+// Functions are called by typing the function name and then the function
+// arguments, separated by a space.
+//
+// fn example arg0:int arg1:int
+// echo $arg
+// end
+//
+// example 1
+// "#;
 
 pub(crate) const MAN_READ: &'static str = r#"NAME
     read - read a line of input into some variables

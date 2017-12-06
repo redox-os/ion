@@ -23,7 +23,10 @@ impl AsciiReplaceInPlace for str {
     // I tried replacing these `assert!` calls with `debug_assert!` but it looks
     // like they get const-folded away anyway since it doesn't affect the speed
     fn ascii_replace_in_place(&mut self, needle: char, haystack: char) {
-        assert!(needle.is_ascii(), "AsciiReplace functions can only be used for ascii characters");
+        assert!(
+            needle.is_ascii(),
+            "AsciiReplace functions can only be used for ascii characters"
+        );
         assert!(
             haystack.is_ascii(),
             "AsciiReplace functions can only be used for ascii characters"

@@ -21,9 +21,9 @@ impl IonFileCompleter {
         vars: *const Variables,
     ) -> IonFileCompleter {
         IonFileCompleter {
-            inner:     FilenameCompleter::new(path),
+            inner: FilenameCompleter::new(path),
             dir_stack: dir_stack,
-            vars:      vars,
+            vars: vars,
         }
     }
 }
@@ -43,8 +43,10 @@ impl Completer for IonFileCompleter {
         if start.starts_with('~') {
             // Dereferencing the raw pointers here should be entirely safe, theoretically,
             // because no changes will occur to either of the underlying references in the
-            // duration between creation of the completers and execution of their completions.
-            if let Some(expanded) = unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) }
+            // duration between creation of the completers and execution of their
+            // completions.
+            if let Some(expanded) =
+                unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) }
             {
                 // Now we obtain completions for the `expanded` form of the `start` value.
                 let completions = self.inner.completions(&expanded);
@@ -54,8 +56,9 @@ impl Completer for IonFileCompleter {
                 // of the tilde pattern and replace it with that pattern yet again.
                 let mut completions = Vec::new();
 
-                // We can do that by obtaining the index position where the tilde character ends.
-                // We don't search with `~` because we also want to handle other tilde variants.
+                // We can do that by obtaining the index position where the tilde character
+                // ends. We don't search with `~` because we also want to
+                // handle other tilde variants.
                 let t_index = start.find('/').unwrap_or(1);
                 // `tilde` is the tilde pattern, and `search` is the pattern that follows.
                 let (tilde, search) = start.split_at(t_index as usize);
@@ -90,7 +93,11 @@ impl Completer for IonFileCompleter {
             }
         }
 
-        self.inner.completions(&unescape(start)).iter().map(|x| escape(x.as_str())).collect()
+        self.inner
+            .completions(&unescape(start))
+            .iter()
+            .map(|x| escape(x.as_str()))
+            .collect()
     }
 }
 
@@ -102,23 +109,8 @@ fn escape(input: &str) -> String {
     let mut output = Vec::with_capacity(input.len());
     for character in input.bytes() {
         match character {
-            b'('
-            | b')'
-            | b'['
-            | b']'
-            | b'&'
-            | b'$'
-            | b'@'
-            | b'{'
-            | b'}'
-            | b'<'
-            | b'>'
-            | b';'
-            | b'"'
-            | b'\''
-            | b'#'
-            | b'^'
-            | b'*' => output.push(b'\\'),
+            b'(' | b')' | b'[' | b']' | b'&' | b'$' | b'@' | b'{' | b'}' | b'<' | b'>' | b';'
+            | b'"' | b'\'' | b'#' | b'^' | b'*' => output.push(b'\\'),
             _ => (),
         }
         output.push(character);
@@ -146,23 +138,28 @@ fn unescape(input: &str) -> String {
 /// A completer that combines suggestions from multiple completers.
 #[derive(Clone, Eq, PartialEq)]
 pub(crate) struct MultiCompleter<A, B>
-    where A: Completer,
-          B: Completer
+where
+    A: Completer,
+    B: Completer,
 {
     a: Vec<A>,
     b: B,
 }
 
 impl<A, B> MultiCompleter<A, B>
-    where A: Completer,
-          B: Completer
+where
+    A: Completer,
+    B: Completer,
 {
-    pub(crate) fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> { MultiCompleter { a: a, b: b } }
+    pub(crate) fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> {
+        MultiCompleter { a: a, b: b }
+    }
 }
 
 impl<A, B> Completer for MultiCompleter<A, B>
-    where A: Completer,
-          B: Completer
+where
+    A: Completer,
+    B: Completer,
 {
     fn completions(&self, start: &str) -> Vec<String> {
         let mut completions = self.b.completions(start);

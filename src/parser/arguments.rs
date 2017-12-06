@@ -7,14 +7,18 @@ const METHOD: u8 = 32;
 
 /// An efficient `Iterator` structure for splitting arguments
 pub struct ArgumentSplitter<'a> {
-    data:  &'a str,
-    read:  usize,
+    data: &'a str,
+    read: usize,
     flags: u8,
 }
 
 impl<'a> ArgumentSplitter<'a> {
     pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
-        ArgumentSplitter { data:  data, read:  0, flags: 0 }
+        ArgumentSplitter {
+            data: data,
+            read: 0,
+            flags: 0,
+        }
     }
 }
 
@@ -135,14 +139,22 @@ mod tests {
     #[test]
     fn arrays() {
         let input = "echo [ one two @[echo three four] five ] [ six seven ]";
-        let expected = vec!["echo", "[ one two @[echo three four] five ]", "[ six seven ]"];
+        let expected = vec![
+            "echo",
+            "[ one two @[echo three four] five ]",
+            "[ six seven ]",
+        ];
         compare(input, expected);
     }
 
     #[test]
     fn quotes() {
         let input = "echo 'one two \"three four\"' \"five six 'seven eight'\"";
-        let expected = vec!["echo", "'one two \"three four\"'", "\"five six 'seven eight'\""];
+        let expected = vec![
+            "echo",
+            "'one two \"three four\"'",
+            "\"five six 'seven eight'\"",
+        ];
         compare(input, expected);
     }
 }

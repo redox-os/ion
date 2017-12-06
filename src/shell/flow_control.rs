@@ -10,7 +10,7 @@ use types::Identifier;
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ElseIf {
     pub expression: Pipeline,
-    pub success:    Vec<Statement>,
+    pub success: Vec<Statement>,
 }
 
 /// Represents a single branch in a match statement. For example, in the expression
@@ -35,10 +35,10 @@ pub(crate) struct ElseIf {
 /// ```
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Case {
-    pub value:       Option<String>,
-    pub binding:     Option<String>,
+    pub value: Option<String>,
+    pub binding: Option<String>,
     pub conditional: Option<String>,
-    pub statements:  Vec<Statement>,
+    pub statements: Vec<Statement>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -62,20 +62,20 @@ pub(crate) enum Statement {
     Export(ExportAction),
     If {
         expression: Pipeline,
-        success:    Vec<Statement>,
-        else_if:    Vec<ElseIf>,
-        failure:    Vec<Statement>,
+        success: Vec<Statement>,
+        else_if: Vec<ElseIf>,
+        failure: Vec<Statement>,
     },
     ElseIf(ElseIf),
     Function {
-        name:        Identifier,
+        name: Identifier,
         description: Option<String>,
-        args:        Vec<KeyBuf>,
-        statements:  Vec<Statement>,
+        args: Vec<KeyBuf>,
+        statements: Vec<Statement>,
     },
     For {
-        variable:   Identifier,
-        values:     Vec<String>,
+        variable: Identifier,
+        values: Vec<String>,
         statements: Vec<Statement>,
     },
     While {
@@ -84,7 +84,7 @@ pub(crate) enum Statement {
     },
     Match {
         expression: String,
-        cases:      Vec<Case>,
+        cases: Vec<Case>,
     },
     Else,
     End,
@@ -121,17 +121,17 @@ impl Statement {
 }
 
 pub(crate) struct FlowControl {
-    pub level:             usize,
+    pub level: usize,
     pub current_statement: Statement,
-    pub current_if_mode:   u8, // { 0 = SUCCESS; 1 = FAILURE }
+    pub current_if_mode: u8, // { 0 = SUCCESS; 1 = FAILURE }
 }
 
 impl Default for FlowControl {
     fn default() -> FlowControl {
         FlowControl {
-            level:             0,
+            level: 0,
             current_statement: Statement::Default,
-            current_if_mode:   0,
+            current_if_mode: 0,
         }
     }
 }
@@ -139,9 +139,9 @@ impl Default for FlowControl {
 #[derive(Clone)]
 pub struct Function {
     description: Option<String>,
-    name:        Identifier,
-    args:        Vec<KeyBuf>,
-    statements:  Vec<Statement>,
+    name: Identifier,
+    args: Vec<KeyBuf>,
+    statements: Vec<Statement>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -167,10 +167,17 @@ impl Function {
         args: Vec<KeyBuf>,
         statements: Vec<Statement>,
     ) -> Function {
-        Function { description, name, args, statements }
+        Function {
+            description,
+            name,
+            args,
+            statements,
+        }
     }
 
-    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> { self.description.as_ref() }
+    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> {
+        self.description.as_ref()
+    }
 
     pub(crate) fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
@@ -187,7 +194,10 @@ impl Function {
             let value = match value_check(shell, value, type_.kind) {
                 Ok(value) => value,
                 Err(_) => {
-                    return Err(FunctionError::InvalidArgumentType(type_.kind, (*value).into()))
+                    return Err(FunctionError::InvalidArgumentType(
+                        type_.kind,
+                        (*value).into(),
+                    ))
                 }
             };
 
@@ -233,7 +243,8 @@ pub(crate) fn collect_cases<I>(
     cases: &mut Vec<Case>,
     level: &mut usize,
 ) -> Result<(), String>
-    where I: Iterator<Item = Statement>
+where
+    I: Iterator<Item = Statement>,
 {
     macro_rules! add_to_case {
         ($statement:expr) => {
@@ -336,7 +347,8 @@ pub(crate) fn collect_if<I>(
     level: &mut usize,
     mut current_block: u8,
 ) -> Result<u8, &'static str>
-    where I: Iterator<Item = Statement>
+where
+    I: Iterator<Item = Statement>,
 {
     #[allow(while_let_on_iterator)]
     while let Some(statement) = iterator.next() {

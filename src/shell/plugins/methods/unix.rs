@@ -15,11 +15,11 @@ use types::Identifier;
 /// corresponding field to `NULL`. Libraries importing this structure should check for nullness.
 #[repr(C)]
 pub(crate) struct RawMethodArguments {
-    key_ptr:       *mut c_char,
+    key_ptr: *mut c_char,
     key_array_ptr: *mut *mut c_char,
-    args_ptr:      *mut *mut c_char,
-    key_len:       usize,
-    args_len:      usize,
+    args_ptr: *mut *mut c_char,
+    key_len: usize,
+    args_len: usize,
 }
 
 pub(crate) enum MethodArguments {
@@ -82,11 +82,11 @@ impl From<MethodArguments> for RawMethodArguments {
                 }
             }
             MethodArguments::NoArgs => RawMethodArguments {
-                key_ptr:       ptr::null_mut(),
+                key_ptr: ptr::null_mut(),
                 key_array_ptr: ptr::null_mut(),
-                args_ptr:      ptr::null_mut(),
-                key_len:       0,
-                args_len:      0,
+                args_ptr: ptr::null_mut(),
+                key_len: 0,
+                args_len: 0,
             },
         }
     }
@@ -100,7 +100,8 @@ impl From<MethodArguments> for RawMethodArguments {
 /// the namespace.
 pub(crate) struct StringMethodPlugins {
     #[allow(dead_code)]
-    /// Contains all of the loaded libraries from whence the symbols were obtained.
+    /// Contains all of the loaded libraries from whence the symbols were
+    /// obtained.
     libraries: Vec<Library>,
     /// A map of all the symbols that were collected from the above libraries.
     pub symbols:
@@ -109,7 +110,10 @@ pub(crate) struct StringMethodPlugins {
 
 impl StringMethodPlugins {
     pub(crate) fn new() -> StringMethodPlugins {
-        StringMethodPlugins { libraries: Vec::new(), symbols:   FnvHashMap::default() }
+        StringMethodPlugins {
+            libraries: Vec::new(),
+            symbols: FnvHashMap::default(),
+        }
     }
 
     pub(crate) fn load(&mut self, library: Library) -> Result<(), StringError> {
@@ -156,9 +160,10 @@ impl StringMethodPlugins {
 
                             // Then attempt to load that symbol from the dynamic library.
                             let symbol: Symbol<
-                                unsafe extern "C" fn(RawMethodArguments)
-                                    -> *mut c_char,
-                            > = library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
+                                unsafe extern "C" fn(RawMethodArguments) -> *mut c_char,
+                            > = library
+                                .get(symbol.as_slice())
+                                .map_err(StringError::SymbolErr)?;
 
                             // And finally add the name of the function and it's function into the
                             // map.
@@ -169,8 +174,8 @@ impl StringMethodPlugins {
                     counter += 1;
                 }
 
-                // Identical to the logic in the loop above. Handles any unparsed stragglers that
-                // have been left over.
+                // Identical to the logic in the loop above. Handles any unparsed stragglers
+                // that have been left over.
                 if counter != start {
                     let slice = &symbol_list[start..];
                     let identifier = str::from_utf8(slice)
@@ -182,7 +187,9 @@ impl StringMethodPlugins {
                     symbol.push(b'\0');
                     let symbol: Symbol<
                         unsafe extern "C" fn(RawMethodArguments) -> *mut c_char,
-                    > = library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
+                    > = library
+                        .get(symbol.as_slice())
+                        .map_err(StringError::SymbolErr)?;
                     self.symbols.insert(identifier, symbol.into_raw());
                 }
             }
@@ -201,8 +208,9 @@ impl StringMethodPlugins {
         function: &str,
         arguments: MethodArguments,
     ) -> Result<Option<String>, StringError> {
-        let func =
-            self.symbols.get(function.into()).ok_or(StringError::FunctionMissing(function.into()))?;
+        let func = self.symbols
+            .get(function.into())
+            .ok_or(StringError::FunctionMissing(function.into()))?;
         unsafe {
             let data = (*func)(RawMethodArguments::from(arguments));
             if data.is_null() {

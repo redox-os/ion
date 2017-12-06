@@ -5,7 +5,6 @@
 #![feature(pointer_methods)]
 #![feature(getpid)]
 
-extern crate xdg;
 #[macro_use]
 extern crate bitflags;
 extern crate calc;
@@ -32,6 +31,7 @@ extern crate syscall;
 extern crate unicode_segmentation;
 #[cfg(all(unix, not(target_os = "redox")))]
 extern crate users as users_unix;
+extern crate xdg;
 
 #[cfg(target_os = "redox")]
 #[path = "sys/redox.rs"]

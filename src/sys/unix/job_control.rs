@@ -88,8 +88,9 @@ pub(crate) fn watch_foreground<F, D>(
     get_command: F,
     mut drop_command: D,
 ) -> i32
-    where F: FnOnce() -> String,
-          D: FnMut(i32)
+where
+    F: FnOnce() -> String,
+    D: FnMut(i32),
 {
     let mut exit_status = 0;
     let mut found = 0;

@@ -70,26 +70,26 @@ fn is_invalid(byte: u8) -> bool {
 }
 
 pub(crate) struct StatementSplitter<'a> {
-    data:             &'a str,
-    read:             usize,
-    flags:            Flags,
-    a_level:          u8,
-    ap_level:         u8,
-    p_level:          u8,
-    brace_level:      u8,
+    data: &'a str,
+    read: usize,
+    flags: Flags,
+    a_level: u8,
+    ap_level: u8,
+    p_level: u8,
+    brace_level: u8,
     math_paren_level: i8,
 }
 
 impl<'a> StatementSplitter<'a> {
     pub(crate) fn new(data: &'a str) -> StatementSplitter<'a> {
         StatementSplitter {
-            data:             data,
-            read:             0,
-            flags:            Flags::empty(),
-            a_level:          0,
-            ap_level:         0,
-            p_level:          0,
-            brace_level:      0,
+            data: data,
+            read: 0,
+            flags: Flags::empty(),
+            a_level: 0,
+            ap_level: 0,
+            p_level: 0,
+            brace_level: 0,
             math_paren_level: 0,
         }
     }
@@ -134,7 +134,10 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 {
                     // If we are just ending the braced section continue as normal
                     if error.is_none() {
-                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                        error = Some(StatementError::InvalidCharacter(
+                            character as char,
+                            self.read,
+                        ))
                     }
                 }
                 b'\'' if !self.flags.contains(Flags::DQUOTE) => {
@@ -159,7 +162,10 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'}' if self.flags.contains(Flags::VBRACE) => self.flags.toggle(Flags::VBRACE),
                 b'}' if !self.flags.contains(Flags::DQUOTE) => if self.brace_level == 0 {
                     if error.is_none() {
-                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                        error = Some(StatementError::InvalidCharacter(
+                            character as char,
+                            self.read,
+                        ))
                     }
                 } else {
                     self.brace_level -= 1;
@@ -167,9 +173,14 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'(' if self.flags.contains(Flags::MATHEXPR) => {
                     self.math_paren_level += 1;
                 }
-                b'(' if !self.flags.intersects(Flags::COMM_1 | Flags::VARIAB | Flags::ARRAY) => {
+                b'(' if !self.flags
+                    .intersects(Flags::COMM_1 | Flags::VARIAB | Flags::ARRAY) =>
+                {
                     if error.is_none() && !self.flags.contains(Flags::DQUOTE) {
-                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                        error = Some(StatementError::InvalidCharacter(
+                            character as char,
+                            self.read,
+                        ))
                     }
                 }
                 b'(' if self.flags.intersects(Flags::COMM_1 | Flags::METHOD) => {
@@ -210,7 +221,10 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b')' if self.p_level + self.ap_level == 0 => {
                     if error.is_none() && !self.flags.contains(Flags::DQUOTE) {
-                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                        error = Some(StatementError::InvalidCharacter(
+                            character as char,
+                            self.read,
+                        ))
                     }
                 }
                 b')' if self.p_level != 0 => self.p_level -= 1,
@@ -324,7 +338,10 @@ fn syntax_errors() {
 
     let command = ">echo";
     let results = StatementSplitter::new(command).collect::<Vec<Result<&str, StatementError>>>();
-    assert_eq!(results[0], Err(StatementError::ExpectedCommandButFound("redirection")));
+    assert_eq!(
+        results[0],
+        Err(StatementError::ExpectedCommandButFound("redirection"))
+    );
     assert_eq!(results.len(), 1);
 
     let command = "echo $((foo bar baz)";

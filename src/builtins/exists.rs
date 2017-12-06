@@ -27,9 +27,9 @@ fn evaluate_arguments(arguments: &[&str], shell: &Shell) -> Result<bool, String>
             })
         }
         Some(&s) if s.starts_with("-") => {
-            // Access the second character in the flag string: this will be type of the flag.
-            // If no flag was given, return `SUCCESS`, as this means a string with value "-" was
-            // checked.
+            // Access the second character in the flag string: this will be type of the
+            // flag. If no flag was given, return `SUCCESS`, as this means a
+            // string with value "-" was checked.
             s.chars().nth(1).map_or(Ok(true), |flag| {
                 // If no argument was given, return `SUCCESS`, as this means a string starting
                 // with a dash was given
@@ -45,7 +45,8 @@ fn evaluate_arguments(arguments: &[&str], shell: &Shell) -> Result<bool, String>
     }
 }
 
-/// Matches flag arguments to their respective functionaity when the `-` character is detected.
+/// Matches flag arguments to their respective functionaity when the `-`
+/// character is detected.
 fn match_flag_argument(flag: char, argument: &str, shell: &Shell) -> bool {
     match flag {
         'a' => array_var_is_not_empty(argument, shell),
@@ -67,20 +68,24 @@ fn match_option_argument(option: &str, argument: &str, shell: &Shell) -> bool {
 
 /// Returns true if the file is a regular file
 fn path_is_file(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_file())
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_file())
 }
 
 /// Returns true if the file is a directory
 fn path_is_directory(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_dir())
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_dir())
 }
 
 /// Returns true if the binary is found in path (and is executable)
 fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
     // TODO: Maybe this function should reflect the logic for spawning new processes
-    // TODO: Right now they use an entirely different logic which means that it *might* be possible
-    // TODO: that `exists` reports a binary to be in the path, while the shell cannot find it or
-    // TODO: vice-versa
+    // TODO: Right now they use an entirely different logic which means that it
+    // *might* be possible TODO: that `exists` reports a binary to be in the
+    // path, while the shell cannot find it or TODO: vice-versa
     if let Some(path) = shell.get_var("PATH") {
         for dir in path.split(":") {
             let fname = format!("{}/{}", dir, binaryname);
@@ -113,7 +118,9 @@ fn file_has_execute_permission(filepath: &str) -> bool {
 }
 
 /// Returns true if the string is not empty
-fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
+fn string_is_nonzero(string: &str) -> bool {
+    !string.is_empty()
+}
 
 /// Returns true if the variable is an array and the array is not empty
 fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
@@ -160,7 +167,9 @@ fn test_evaluate_arguments() {
     // check `exists -a`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-a"], &shell), Ok(true));
-    shell.variables.set_array("emptyarray", SmallVec::from_vec(Vec::new()));
+    shell
+        .variables
+        .set_array("emptyarray", SmallVec::from_vec(Vec::new()));
     assert_eq!(evaluate_arguments(&["-a", "emptyarray"], &shell), Ok(false));
     let mut vec = Vec::new();
     vec.push("element".to_owned());
@@ -176,27 +185,45 @@ fn test_evaluate_arguments() {
     let oldpath = shell.get_var("PATH").unwrap_or("/usr/bin".to_owned());
     shell.set_var("PATH", "testing/");
 
-    assert_eq!(evaluate_arguments(&["-b", "executable_file"], &shell), Ok(true));
+    assert_eq!(
+        evaluate_arguments(&["-b", "executable_file"], &shell),
+        Ok(true)
+    );
     assert_eq!(evaluate_arguments(&["-b", "empty_file"], &shell), Ok(false));
-    assert_eq!(evaluate_arguments(&["-b", "file_does_not_exist"], &shell), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&["-b", "file_does_not_exist"], &shell),
+        Ok(false)
+    );
 
-    // restore original PATH. Not necessary for the currently defined test cases but this might
-    // change in the future? Better safe than sorry!
+    // restore original PATH. Not necessary for the currently defined test cases
+    // but this might change in the future? Better safe than sorry!
     shell.set_var("PATH", &oldpath);
 
     // check `exists -d`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-d"], &shell), Ok(true));
     assert_eq!(evaluate_arguments(&["-d", "testing/"], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-d", "testing/empty_file"], &shell), Ok(false));
-    assert_eq!(evaluate_arguments(&["-d", "does/not/exist/"], &shell), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&["-d", "testing/empty_file"], &shell),
+        Ok(false)
+    );
+    assert_eq!(
+        evaluate_arguments(&["-d", "does/not/exist/"], &shell),
+        Ok(false)
+    );
 
     // check `exists -f`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-f"], &shell), Ok(true));
     assert_eq!(evaluate_arguments(&["-f", "testing/"], &shell), Ok(false));
-    assert_eq!(evaluate_arguments(&["-f", "testing/empty_file"], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-f", "does-not-exist"], &shell), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&["-f", "testing/empty_file"], &shell),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&["-f", "does-not-exist"], &shell),
+        Ok(false)
+    );
 
     // check `exists -s`
     // no argument means we treat it as a string
@@ -218,18 +245,25 @@ fn test_evaluate_arguments() {
     let name_str = "test_function";
     let name = SmallString::from_str(name_str);
     let mut args = Vec::new();
-    args.push(KeyBuf { name: "testy".into(), kind: Primitive::Any });
+    args.push(KeyBuf {
+        name: "testy".into(),
+        kind: Primitive::Any,
+    });
     let mut statements = Vec::new();
     statements.push(Statement::End);
     let description = "description".to_owned();
 
-    shell.functions.insert(name.clone(), Function::new(Some(description), name, args, statements));
+    shell.functions.insert(
+        name.clone(),
+        Function::new(Some(description), name, args, statements),
+    );
 
     assert_eq!(evaluate_arguments(&["--fn", name_str], &shell), Ok(true));
     shell.functions.remove(name_str);
     assert_eq!(evaluate_arguments(&["--fn", name_str], &shell), Ok(false));
 
-    // check invalid flags / parameters (should all be treated as strings and therefore succeed)
+    // check invalid flags / parameters (should all be treated as strings and
+    // therefore succeed)
     assert_eq!(evaluate_arguments(&["--foo"], &shell), Ok(true));
     assert_eq!(evaluate_arguments(&["-x"], &shell), Ok(true));
 }
@@ -238,12 +272,28 @@ fn test_evaluate_arguments() {
 fn test_match_flag_argument() {
     let shell = Shell::new();
 
-    // we don't really care about the passed values, as long as both sited return the same value
-    assert_eq!(match_flag_argument('a', "ARRAY", &shell), array_var_is_not_empty("ARRAY", &shell));
-    assert_eq!(match_flag_argument('b', "binary", &shell), binary_is_in_path("binary", &shell));
-    assert_eq!(match_flag_argument('d', "path", &shell), path_is_directory("path"));
-    assert_eq!(match_flag_argument('f', "file", &shell), path_is_file("file"));
-    assert_eq!(match_flag_argument('s', "STR", &shell), string_var_is_not_empty("STR", &shell));
+    // we don't really care about the passed values, as long as both sited return
+    // the same value
+    assert_eq!(
+        match_flag_argument('a', "ARRAY", &shell),
+        array_var_is_not_empty("ARRAY", &shell)
+    );
+    assert_eq!(
+        match_flag_argument('b', "binary", &shell),
+        binary_is_in_path("binary", &shell)
+    );
+    assert_eq!(
+        match_flag_argument('d', "path", &shell),
+        path_is_directory("path")
+    );
+    assert_eq!(
+        match_flag_argument('f', "file", &shell),
+        path_is_file("file")
+    );
+    assert_eq!(
+        match_flag_argument('s', "STR", &shell),
+        string_var_is_not_empty("STR", &shell)
+    );
 
     // Any flag which is not implemented
     assert_eq!(match_flag_argument('x', "ARG", &shell), false);
@@ -253,8 +303,12 @@ fn test_match_flag_argument() {
 fn test_match_option_argument() {
     let shell = Shell::new();
 
-    // we don't really care about the passed values, as long as both sited return the same value
-    assert_eq!(match_option_argument("fn", "FUN", &shell), array_var_is_not_empty("FUN", &shell));
+    // we don't really care about the passed values, as long as both sited return
+    // the same value
+    assert_eq!(
+        match_option_argument("fn", "FUN", &shell),
+        array_var_is_not_empty("FUN", &shell)
+    );
 
     // Any option which is not implemented
     assert_eq!(match_option_argument("foo", "ARG", &shell), false);
@@ -280,8 +334,8 @@ fn test_binary_is_in_path() {
     // TODO: multiple/:directories/
     // TODO: PATH containing directories which do not exist
     // TODO: PATH containing directories without read permission (for user)
-    // TODO: PATH containing directories without execute ("enter") permission (for user)
-    // TODO: empty PATH?
+    // TODO: PATH containing directories without execute ("enter") permission (for
+    // user) TODO: empty PATH?
     shell.set_var("PATH", "testing/");
 
     assert_eq!(binary_is_in_path("executable_file", &shell), true);
@@ -307,19 +361,24 @@ fn test_string_is_nonzero() {
 fn test_array_var_is_not_empty() {
     let mut shell = Shell::new();
 
-    shell.variables.set_array("EMPTY_ARRAY", SmallVec::from_vec(Vec::new()));
+    shell
+        .variables
+        .set_array("EMPTY_ARRAY", SmallVec::from_vec(Vec::new()));
     assert_eq!(array_var_is_not_empty("EMPTY_ARRAY", &shell), false);
 
     let mut not_empty_vec = Vec::new();
     not_empty_vec.push("array not empty".to_owned());
-    shell.variables.set_array("NOT_EMPTY_ARRAY", SmallVec::from_vec(not_empty_vec));
+    shell
+        .variables
+        .set_array("NOT_EMPTY_ARRAY", SmallVec::from_vec(not_empty_vec));
     assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), true);
 
     // test for array which does not even exist
     shell.variables.unset_array("NOT_EMPTY_ARRAY");
     assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), false);
 
-    // array_var_is_not_empty should NOT match for non-array variables with the same name
+    // array_var_is_not_empty should NOT match for non-array variables with the
+    // same name
     shell.set_var("VARIABLE", "notempty-variable");
     assert_eq!(array_var_is_not_empty("VARIABLE", &shell), false);
 }
@@ -337,7 +396,9 @@ fn test_string_var_is_not_empty() {
     // string_var_is_not_empty should NOT match for arrays with the same name
     let mut vec = Vec::new();
     vec.push("not-empty".to_owned());
-    shell.variables.set_array("ARRAY_NOT_EMPTY", SmallVec::from_vec(vec));
+    shell
+        .variables
+        .set_array("ARRAY_NOT_EMPTY", SmallVec::from_vec(vec));
     assert_eq!(string_var_is_not_empty("ARRAY_NOT_EMPTY", &shell), false);
 
     // test for a variable which does not even exist
@@ -354,12 +415,18 @@ fn test_function_is_defined() {
     let name_str = "test_function";
     let name = SmallString::from_str(name_str);
     let mut args = Vec::new();
-    args.push(KeyBuf { name: "testy".into(), kind: Primitive::Any });
+    args.push(KeyBuf {
+        name: "testy".into(),
+        kind: Primitive::Any,
+    });
     let mut statements = Vec::new();
     statements.push(Statement::End);
     let description = "description".to_owned();
 
-    shell.functions.insert(name.clone(), Function::new(Some(description), name, args, statements));
+    shell.functions.insert(
+        name.clone(),
+        Function::new(Some(description), name, args, statements),
+    );
 
     assert_eq!(function_is_defined(name_str, &shell), true);
     shell.functions.remove(name_str);

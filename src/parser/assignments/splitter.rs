@@ -1,4 +1,5 @@
-/// Given an valid assignment expression, this will split it into `keys`, `operator`, `values`.
+/// Given an valid assignment expression, this will split it into `keys`,
+/// `operator`, `values`.
 pub(crate) fn split_assignment<'a>(
     statement: &'a str,
 ) -> (Option<&'a str>, Option<&'a str>, Option<&'a str>) {
@@ -48,7 +49,9 @@ pub(crate) fn split_assignment<'a>(
     (Some(keys), Some(operator), Some(values.trim()))
 }
 
-fn is_operator(byte: u8) -> bool { byte == b'+' || byte == b'-' || byte == b'*' || byte == b'/' }
+fn is_operator(byte: u8) -> bool {
+    byte == b'+' || byte == b'-' || byte == b'*' || byte == b'/'
+}
 
 #[cfg(test)]
 mod tests {
@@ -58,11 +61,20 @@ mod tests {
     fn assignment_splitting() {
         assert_eq!(split_assignment(""), (None, None, None));
         assert_eq!(split_assignment("abc"), (Some("abc"), None, None));
-        assert_eq!(split_assignment("abc+=def"), (Some("abc"), Some("+="), Some("def")));
+        assert_eq!(
+            split_assignment("abc+=def"),
+            (Some("abc"), Some("+="), Some("def"))
+        );
         assert_eq!(split_assignment("abc ="), (Some("abc"), Some("="), None));
         assert_eq!(split_assignment("abc =  "), (Some("abc"), Some("="), None));
-        assert_eq!(split_assignment("abc = def"), (Some("abc"), Some("="), Some("def")));
-        assert_eq!(split_assignment("abc=def"), (Some("abc"), Some("="), Some("def")));
+        assert_eq!(
+            split_assignment("abc = def"),
+            (Some("abc"), Some("="), Some("def"))
+        );
+        assert_eq!(
+            split_assignment("abc=def"),
+            (Some("abc"), Some("="), Some("def"))
+        );
         assert_eq!(
             split_assignment("def ghi += 124 523"),
             (Some("def ghi"), Some("+="), Some("124 523"))

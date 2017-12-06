@@ -15,8 +15,8 @@ pub(crate) enum RedirectFrom {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Redirection {
-    pub from:   RedirectFrom,
-    pub file:   String,
+    pub from: RedirectFrom,
+    pub file: String,
     pub append: bool,
 }
 
@@ -24,7 +24,8 @@ pub(crate) struct Redirection {
 /// Represents input that a process could initially receive from `stdin`
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Input {
-    /// A file; the contents of said file will be written to the `stdin` of a process
+    /// A file; the contents of said file will be written to the `stdin` of a
+    /// process
     File(String),
     /// A string literal that is written to the `stdin` of a process.
     /// If there is a second string, that second string is the EOF phrase for the heredoc.
@@ -38,14 +39,18 @@ pub(crate) struct Pipeline {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct PipeItem {
-    pub job:     Job,
+    pub job: Job,
     pub outputs: Vec<Redirection>,
-    pub inputs:  Vec<Input>,
+    pub inputs: Vec<Input>,
 }
 
 impl PipeItem {
     pub(crate) fn new(job: Job, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
-        PipeItem { job, outputs, inputs }
+        PipeItem {
+            job,
+            outputs,
+            inputs,
+        }
     }
 
     pub(crate) fn expand(&mut self, shell: &Shell) {
@@ -67,7 +72,9 @@ impl PipeItem {
 }
 
 impl Pipeline {
-    pub(crate) fn new() -> Self { Pipeline { items: Vec::new() } }
+    pub(crate) fn new() -> Self {
+        Pipeline { items: Vec::new() }
+    }
 
     pub(crate) fn expand(&mut self, shell: &Shell) {
         self.items.iter_mut().for_each(|i| i.expand(shell));

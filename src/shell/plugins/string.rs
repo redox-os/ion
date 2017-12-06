@@ -9,9 +9,11 @@ pub(crate) enum StringError {
     /// This occurs when a symbol could not be loaded from the library in question. It is an
     /// error that infers that the problem is with the plugin, not Ion itself.
     SymbolErr(io::Error),
-    /// Function names must be valid UTF-8. If they aren't something's wrong with the plugin.
+    /// Function names must be valid UTF-8. If they aren't something's wrong
+    /// with the plugin.
     UTF8Function,
-    /// The result from a plugin must be valid UTF-8. If it isn't, the plugin's bad.
+    /// The result from a plugin must be valid UTF-8. If it isn't, the plugin's
+    /// bad.
     UTF8Result,
     /// This infers that the user called a function that doesn't exist in the library. Bad
     /// user, bad.

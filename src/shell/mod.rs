@@ -54,14 +54,10 @@ use xdg::BaseDirectories;
 #[allow(dead_code)]
 #[derive(Debug, Fail)]
 pub enum IonError {
-    #[fail(display = "failed to fork: {}", why)]
-    Fork { why: io::Error },
-    #[fail(display = "element does not exist")]
-    DoesNotExist,
-    #[fail(display = "input was not terminated")]
-    Unterminated,
-    #[fail(display = "function error: {}", why)]
-    Function { why: FunctionError },
+    #[fail(display = "failed to fork: {}", why)] Fork { why: io::Error },
+    #[fail(display = "element does not exist")] DoesNotExist,
+    #[fail(display = "input was not terminated")] Unterminated,
+    #[fail(display = "function error: {}", why)] Function { why: FunctionError },
 }
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
@@ -69,7 +65,8 @@ pub enum IonError {
 /// program. It is initialized at the beginning of the program, and lives until the end of the
 /// program.
 pub struct Shell {
-    /// Contains a list of built-in commands that were created when the program started.
+    /// Contains a list of built-in commands that were created when the program
+    /// started.
     pub(crate) builtins: &'static BuiltinMap,
     /// Contains the history, completions, and manages writes to the history file.
     /// Note that the context is only available in an interactive session.
@@ -82,20 +79,23 @@ pub struct Shell {
     pub(crate) directory_stack: DirectoryStack,
     /// Contains all of the user-defined functions that have been created.
     pub(crate) functions: FnvHashMap<Identifier, Function>,
-    /// When a command is executed, the final result of that command is stored here.
+    /// When a command is executed, the final result of that command is stored
+    /// here.
     pub previous_status: i32,
     /// The job ID of the previous command sent to the background.
     pub(crate) previous_job: u32,
     /// Contains all the boolean flags that control shell behavior.
     pub flags: u8,
-    /// A temporary field for storing foreground PIDs used by the pipeline execution.
+    /// A temporary field for storing foreground PIDs used by the pipeline
+    /// execution.
     foreground: Vec<u32>,
     /// Contains information on all of the active background processes that are being managed
     /// by the shell.
     pub(crate) background: Arc<Mutex<Vec<BackgroundProcess>>>,
     /// If set, denotes that this shell is running as a background job.
     pub(crate) is_background_shell: bool,
-    /// Set when a signal is received, this will tell the flow control logic to abort.
+    /// Set when a signal is received, this will tell the flow control logic to
+    /// abort.
     pub(crate) break_flow: bool,
     // Useful for disabling the execution of the `tcsetpgrp` call.
     pub(crate) is_library: bool,
@@ -112,22 +112,22 @@ impl<'a> Shell {
     /// Panics if DirectoryStack construction fails
     pub(crate) fn new_bin() -> Shell {
         Shell {
-            builtins:            BUILTINS,
-            context:             None,
-            variables:           Variables::default(),
-            flow_control:        FlowControl::default(),
-            directory_stack:     DirectoryStack::new(),
-            functions:           FnvHashMap::default(),
-            previous_job:        !0,
-            previous_status:     0,
-            flags:               0,
-            foreground:          Vec::new(),
-            background:          Arc::new(Mutex::new(Vec::new())),
+            builtins: BUILTINS,
+            context: None,
+            variables: Variables::default(),
+            flow_control: FlowControl::default(),
+            directory_stack: DirectoryStack::new(),
+            functions: FnvHashMap::default(),
+            previous_job: !0,
+            previous_status: 0,
+            flags: 0,
+            foreground: Vec::new(),
+            background: Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
-            is_library:          false,
-            break_flow:          false,
-            foreground_signals:  Arc::new(ForegroundSignals::new()),
-            ignore_setting:      IgnoreSetting::default(),
+            is_library: false,
+            break_flow: false,
+            foreground_signals: Arc::new(ForegroundSignals::new()),
+            ignore_setting: IgnoreSetting::default(),
         }
     }
 
@@ -135,22 +135,22 @@ impl<'a> Shell {
     /// Creates a new shell within memory.
     pub fn new() -> Shell {
         Shell {
-            builtins:            BUILTINS,
-            context:             None,
-            variables:           Variables::default(),
-            flow_control:        FlowControl::default(),
-            directory_stack:     DirectoryStack::new(),
-            functions:           FnvHashMap::default(),
-            previous_job:        !0,
-            previous_status:     0,
-            flags:               0,
-            foreground:          Vec::new(),
-            background:          Arc::new(Mutex::new(Vec::new())),
+            builtins: BUILTINS,
+            context: None,
+            variables: Variables::default(),
+            flow_control: FlowControl::default(),
+            directory_stack: DirectoryStack::new(),
+            functions: FnvHashMap::default(),
+            previous_job: !0,
+            previous_status: 0,
+            flags: 0,
+            foreground: Vec::new(),
+            background: Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
-            is_library:          true,
-            break_flow:          false,
-            foreground_signals:  Arc::new(ForegroundSignals::new()),
-            ignore_setting:      IgnoreSetting::default(),
+            is_library: true,
+            break_flow: false,
+            foreground_signals: Arc::new(ForegroundSignals::new()),
+            ignore_setting: IgnoreSetting::default(),
         }
     }
 
@@ -176,8 +176,8 @@ impl<'a> Shell {
     /// the
     /// the current working directory.
     fn update_variables(&mut self) {
-        // Update the PWD (Present Working Directory) variable if the current working directory has
-        // been updated.
+        // Update the PWD (Present Working Directory) variable if the current working
+        // directory has been updated.
         env::current_dir().ok().map_or_else(
             || env::set_var("PWD", "?"),
             |path| {
@@ -206,7 +206,7 @@ impl<'a> Shell {
                 if let Err(err) = self.execute_script(&initrc) {
                     eprintln!("ion: {}", err);
                 }
-            },
+            }
             None => {
                 if let Err(err) = base_dirs.place_config_file("initrc") {
                     eprintln!("ion: could not create initrc file: {}", err);
@@ -295,9 +295,9 @@ impl<'a> Shell {
             Some(self.execute_pipeline(pipeline))
         };
 
-        // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the pipline
-        // just executed to the the file and context histories. At the moment, this means
-        // record how long it took.
+        // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the
+        // pipline just executed to the the file and context histories. At the
+        // moment, this means record how long it took.
         if let Some(context) = self.context.as_mut() {
             if "1" == self.variables.get_var_or_empty("RECORD_SUMMARY") {
                 if let Ok(elapsed_time) = command_start_time.elapsed() {
@@ -323,11 +323,16 @@ impl<'a> Shell {
         exit_status
     }
 
-    /// Sets a variable of `name` with the given `value` in the shell's variable map.
-    pub fn set_var(&mut self, name: &str, value: &str) { self.variables.set_var(name, value); }
+    /// Sets a variable of `name` with the given `value` in the shell's
+    /// variable map.
+    pub fn set_var(&mut self, name: &str, value: &str) {
+        self.variables.set_var(name, value);
+    }
 
     /// Gets a string variable, if it exists within the shell's variable map.
-    pub fn get_var(&self, name: &str) -> Option<String> { self.variables.get_var(name) }
+    pub fn get_var(&self, name: &str) -> Option<String> {
+        self.variables.get_var(name)
+    }
 
     /// Obtains a variable, returning an empty string if it does not exist.
     pub(crate) fn get_var_or_empty(&self, name: &str) -> String {
@@ -348,7 +353,8 @@ impl<'a> Shell {
     /// not
     /// terminated, then an error will be returned.
     pub fn execute_command<CMD>(&mut self, command: CMD) -> Result<i32, IonError>
-        where CMD: Into<Terminator>
+    where
+        CMD: Into<Terminator>,
     {
         let mut terminator = command.into();
         if terminator.is_terminated() {
@@ -466,7 +472,8 @@ impl<'a> Expander for Shell {
         if quoted {
             self.get_var(variable)
         } else {
-            self.get_var(variable).map(|x| x.ascii_replace('\n', ' ').into())
+            self.get_var(variable)
+                .map(|x| x.ascii_replace('\n', ' ').into())
         }
     }
 

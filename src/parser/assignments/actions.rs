@@ -28,11 +28,11 @@ impl<'a> Display for AssignmentError<'a> {
 /// Each request will tell the shell whether the assignment is asking to update an array or a
 /// string, and will contain the key/value pair to assign.
 pub(crate) struct AssignmentActions<'a> {
-    keys:     KeyIterator<'a>,
+    keys: KeyIterator<'a>,
     operator: Operator,
-    values:   ArgumentSplitter<'a>,
-    prevkey:  &'a str,
-    prevval:  &'a str,
+    values: ArgumentSplitter<'a>,
+    prevkey: &'a str,
+    prevval: &'a str,
 }
 
 impl<'a> AssignmentActions<'a> {
@@ -118,7 +118,11 @@ mod tests {
 
     fn split(input: &str) -> (String, Operator, String) {
         let (keys, op, vals) = split_assignment(input);
-        (keys.unwrap().into(), Operator::parse(op.unwrap()).unwrap(), vals.unwrap().into())
+        (
+            keys.unwrap().into(),
+            Operator::parse(op.unwrap()).unwrap(),
+            vals.unwrap().into(),
+        )
     }
 
     #[test]
@@ -129,7 +133,10 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                Key { name: "abc", kind: Primitive::Any },
+                Key {
+                    name: "abc",
+                    kind: Primitive::Any,
+                },
                 Operator::Equal,
                 "123",
             ))
@@ -137,7 +144,10 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateString(
-                Key { name: "def", kind: Primitive::Any },
+                Key {
+                    name: "def",
+                    kind: Primitive::Any,
+                },
                 Operator::Equal,
                 "456",
             ))
@@ -149,7 +159,10 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                Key { name: "ab", kind: Primitive::Integer },
+                Key {
+                    name: "ab",
+                    kind: Primitive::Integer,
+                },
                 Operator::Multiply,
                 "3",
             ))
@@ -161,7 +174,10 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                Key { name: "a", kind: Primitive::Any },
+                Key {
+                    name: "a",
+                    kind: Primitive::Any,
+                },
                 Operator::Equal,
                 "one",
             ))
@@ -169,7 +185,10 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateArray(
-                Key { name: "b", kind: Primitive::AnyArray },
+                Key {
+                    name: "b",
+                    kind: Primitive::AnyArray,
+                },
                 Operator::Equal,
                 "[two three]",
             ))
@@ -177,7 +196,10 @@ mod tests {
         assert_eq!(
             actions[2],
             Ok(Action::UpdateArray(
-                Key { name: "c", kind: Primitive::IntegerArray },
+                Key {
+                    name: "c",
+                    kind: Primitive::IntegerArray,
+                },
                 Operator::Equal,
                 "[4 5 6]",
             ))
@@ -189,7 +211,10 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateArray(
-                Key { name: "a", kind: Primitive::AnyArray },
+                Key {
+                    name: "a",
+                    kind: Primitive::AnyArray,
+                },
                 Operator::Equal,
                 "[one two]",
             ))
@@ -197,7 +222,10 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateString(
-                Key { name: "b", kind: Primitive::Any },
+                Key {
+                    name: "b",
+                    kind: Primitive::Any,
+                },
                 Operator::Equal,
                 "three",
             ))
@@ -205,7 +233,10 @@ mod tests {
         assert_eq!(
             actions[2],
             Ok(Action::UpdateArray(
-                Key { name: "c", kind: Primitive::AnyArray },
+                Key {
+                    name: "c",
+                    kind: Primitive::AnyArray,
+                },
                 Operator::Equal,
                 "[four five]",
             ))

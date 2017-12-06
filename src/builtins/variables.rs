@@ -125,7 +125,11 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
         Binding::ListEntries => print_list(&vars.aliases),
         Binding::KeyOnly(key) => {
             let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: please provide value for alias '{}'", key);
+            let _ = writeln!(
+                &mut stderr.lock(),
+                "ion: please provide value for alias '{}'",
+                key
+            );
             return FAILURE;
         }
         _ => {
@@ -140,7 +144,8 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
 
 /// Dropping an alias will erase it from the shell.
 pub(crate) fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
-    where I::Item: AsRef<str>
+where
+    I::Item: AsRef<str>,
 {
     let args = args.into_iter().collect::<Vec<I::Item>>();
     if args.len() <= 1 {
@@ -151,7 +156,11 @@ pub(crate) fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
     for alias in args.iter().skip(1) {
         if vars.aliases.remove(alias.as_ref()).is_none() {
             let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: undefined alias: {}", alias.as_ref());
+            let _ = writeln!(
+                &mut stderr.lock(),
+                "ion: undefined alias: {}",
+                alias.as_ref()
+            );
             return FAILURE;
         }
     }
@@ -160,7 +169,8 @@ pub(crate) fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
 
 /// Dropping an array will erase it from the shell.
 pub(crate) fn drop_array<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
-    where I::Item: AsRef<str>
+where
+    I::Item: AsRef<str>,
 {
     let args = args.into_iter().collect::<Vec<I::Item>>();
     if args.len() <= 2 {
@@ -171,14 +181,21 @@ pub(crate) fn drop_array<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
 
     if args[1].as_ref() != "-a" {
         let stderr = io::stderr();
-        let _ = writeln!(&mut stderr.lock(), "ion: drop_array must be used with -a option");
+        let _ = writeln!(
+            &mut stderr.lock(),
+            "ion: drop_array must be used with -a option"
+        );
         return FAILURE;
     }
 
     for array in args.iter().skip(2) {
         if vars.unset_array(array.as_ref()).is_none() {
             let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: undefined array: {}", array.as_ref());
+            let _ = writeln!(
+                &mut stderr.lock(),
+                "ion: undefined array: {}",
+                array.as_ref()
+            );
             return FAILURE;
         }
     }
@@ -187,7 +204,8 @@ pub(crate) fn drop_array<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
 
 /// Dropping a variable will erase it from the shell.
 pub(crate) fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
-    where I::Item: AsRef<str>
+where
+    I::Item: AsRef<str>,
 {
     let args = args.into_iter().collect::<Vec<I::Item>>();
     if args.len() <= 1 {
@@ -199,7 +217,11 @@ pub(crate) fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i
     for variable in args.iter().skip(1) {
         if vars.unset_var(variable.as_ref()).is_none() {
             let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: undefined variable: {}", variable.as_ref());
+            let _ = writeln!(
+                &mut stderr.lock(),
+                "ion: undefined variable: {}",
+                variable.as_ref()
+            );
             return FAILURE;
         }
     }
@@ -217,7 +239,9 @@ mod test {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
+        fn variable(&self, var: &str, _: bool) -> Option<Value> {
+            self.0.get_var(var)
+        }
     }
 
     // TODO: Rewrite tests now that let is part of the grammar.
@@ -226,8 +250,8 @@ mod test {
     //     let mut variables = Variables::default();
     //     let dir_stack = new_dir_stack();
     //     let_(&mut variables, vec!["let", "FOO", "=", "BAR"]);
-    //     let expanded = expand_string("$FOO", &variables, &dir_stack, false).join("");
-    //     assert_eq!("BAR", &expanded);
+    // let expanded = expand_string("$FOO", &variables, &dir_stack,
+    // false).join("");     assert_eq!("BAR", &expanded);
     // }
     //
     // #[test]
@@ -240,8 +264,8 @@ mod test {
     // #[test]
     // fn let_checks_variable_name() {
     //     let mut variables = Variables::default();
-    //     let return_status = let_(&mut variables, vec!["let", ",;!:", "=", "FOO"]);
-    //     assert_eq!(FAILURE, return_status);
+    // let return_status = let_(&mut variables, vec!["let", ",;!:", "=",
+    // "FOO"]);     assert_eq!(FAILURE, return_status);
     // }
 
     #[test]

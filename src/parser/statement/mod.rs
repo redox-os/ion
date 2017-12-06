@@ -7,7 +7,8 @@ pub(crate) use self::parse::parse;
 pub(crate) use self::splitter::{StatementError, StatementSplitter};
 use shell::flow_control::Statement;
 
-/// Parses a given statement string and return's the corresponding mapped `Statement`
+/// Parses a given statement string and return's the corresponding mapped
+/// `Statement`
 pub(crate) fn parse_and_validate<'a>(statement: Result<&str, StatementError<'a>>) -> Statement {
     match statement {
         Ok(statement) => parse(statement),

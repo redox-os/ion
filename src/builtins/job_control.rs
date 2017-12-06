@@ -1,4 +1,5 @@
-//! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job control in the shell.
+//! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job
+//! control in the shell.
 
 use shell::Shell;
 use shell::job_control::{JobControl, ProcessState};
@@ -10,7 +11,6 @@ use std::io::{stderr, Write};
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
 /// SIGHUP ignoral.
 pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
-
     const NO_SIGHUP: u8 = 1;
     const ALL_JOBS: u8 = 2;
     const RUN_JOBS: u8 = 4;
@@ -84,8 +84,14 @@ pub(crate) fn jobs(shell: &mut Shell) {
     let mut stderr = stderr.lock();
     for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
         if process.state != ProcessState::Empty {
-            let _ =
-                writeln!(stderr, "[{}] {} {}\t{}", id, process.pid, process.state, process.name);
+            let _ = writeln!(
+                stderr,
+                "[{}] {} {}\t{}",
+                id,
+                process.pid,
+                process.state,
+                process.name
+            );
         }
     }
 }
@@ -146,7 +152,13 @@ pub(crate) fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
 /// Resumes a stopped background process, if it was stopped.
 pub(crate) fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
-        if let Some(job) = shell.background.lock().unwrap().iter_mut().nth(njob as usize) {
+        if let Some(job) = shell
+            .background
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .nth(njob as usize)
+        {
             match job.state {
                 ProcessState::Running => {
                     eprintln!("ion: bg: job {} is already running", njob);

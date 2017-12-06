@@ -17,7 +17,9 @@ lazy_static! {
 }
 
 impl<'a> Collector<'a> {
-    pub(crate) fn new(data: &'a str) -> Self { Collector { data } }
+    pub(crate) fn new(data: &'a str) -> Self {
+        Collector { data }
+    }
 
     pub(crate) fn run(data: &'a str) -> Result<Pipeline, &'static str> {
         Collector::new(data).parse()
@@ -36,7 +38,8 @@ impl<'a> Collector<'a> {
         bytes: &mut Peekable<I>,
         start: usize,
     ) -> Result<&'a str, &'static str>
-        where I: Iterator<Item = (usize, u8)>
+    where
+        I: Iterator<Item = (usize, u8)>,
     {
         while let Some(&(i, b)) = bytes.peek() {
             match b {
@@ -57,7 +60,8 @@ impl<'a> Collector<'a> {
         bytes: &mut Peekable<I>,
         start: usize,
     ) -> Result<&'a str, &'static str>
-        where I: Iterator<Item = (usize, u8)>
+    where
+        I: Iterator<Item = (usize, u8)>,
     {
         while let Some(&(i, b)) = bytes.peek() {
             match b {
@@ -77,10 +81,11 @@ impl<'a> Collector<'a> {
     }
 
     fn arg<I>(&self, bytes: &mut Peekable<I>) -> Result<Option<&'a str>, &'static str>
-        where I: Iterator<Item = (usize, u8)>
+    where
+        I: Iterator<Item = (usize, u8)>,
     {
-        // XXX: I don't think its the responsibility of the pipeline parser to do this but I'm
-        // not sure of a better solution
+        // XXX: I don't think its the responsibility of the pipeline parser to do this
+        // but I'm not sure of a better solution
         let mut array_level = 0;
         let mut proc_level = 0;
         let mut brace_level = 0;
@@ -326,7 +331,9 @@ impl<'a> Collector<'a> {
                             bytes.next();
                             bytes.next();
                             if let Some(cmd) = self.arg(&mut bytes)? {
-                                inputs.as_mut().map(|x| x.push(Input::HereString(cmd.into())));
+                                inputs
+                                    .as_mut()
+                                    .map(|x| x.push(Input::HereString(cmd.into())));
                             } else {
                                 return Err("expected string argument after '<<<'");
                             }
@@ -345,13 +352,9 @@ impl<'a> Collector<'a> {
                             };
                             let heredoc = heredoc.lines().collect::<Vec<&str>>();
                             // Then collect the heredoc from standard input.
-                            inputs.as_mut().map(
-                                |x| {
-                                    x.push(
-                                        Input::HereString(heredoc[1..heredoc.len() - 1].join("\n")),
-                                    )
-                                },
-                            );
+                            inputs.as_mut().map(|x| {
+                                x.push(Input::HereString(heredoc[1..heredoc.len() - 1].join("\n")))
+                            });
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
                         // Otherwise interpret it as stdin redirection
@@ -396,8 +399,8 @@ mod tests {
 
             let expected = vec![
                 Redirection {
-                    from:   RedirectFrom::Stderr,
-                    file:   "/dev/null".to_owned(),
+                    from: RedirectFrom::Stderr,
+                    file: "/dev/null".to_owned(),
                     append: false,
                 },
             ];
@@ -761,30 +764,30 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
-                    inputs:  vec![
+                    job: Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs: vec![
                         Input::File("file1".into()),
                         Input::HereString("\"herestring\"".into()),
                     ],
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["tr", "'x'", "'y'"], JobKind::Last),
-                    inputs:  Vec::new(),
+                    job: Job::new(array!["tr", "'x'", "'y'"], JobKind::Last),
+                    inputs: Vec::new(),
                     outputs: vec![
                         Redirection {
-                            from:   RedirectFrom::Stderr,
-                            file:   "err".into(),
+                            from: RedirectFrom::Stderr,
+                            file: "err".into(),
                             append: true,
                         },
                         Redirection {
-                            from:   RedirectFrom::Both,
-                            file:   "both".into(),
+                            from: RedirectFrom::Both,
+                            file: "both".into(),
                             append: false,
                         },
                         Redirection {
-                            from:   RedirectFrom::Stdout,
-                            file:   "out".into(),
+                            from: RedirectFrom::Stdout,
+                            file: "out".into(),
                             append: false,
                         },
                     ],
@@ -802,22 +805,22 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
-                    inputs:  Vec::new(),
+                    job: Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs: Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
-                    inputs:  Vec::new(),
+                    job: Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs: Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Last),
-                    inputs:  vec![Input::File("stuff".into())],
+                    job: Job::new(array!["cat"], JobKind::Last),
+                    inputs: vec![Input::File("stuff".into())],
                     outputs: vec![
                         Redirection {
-                            from:   RedirectFrom::Stderr,
-                            file:   "other".into(),
+                            from: RedirectFrom::Stderr,
+                            file: "other".into(),
                             append: true,
                         },
                     ],
@@ -835,22 +838,22 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
-                    inputs:  Vec::new(),
+                    job: Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs: Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
-                    inputs:  Vec::new(),
+                    job: Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs: Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Last),
-                    inputs:  vec![Input::File("stuff".into())],
+                    job: Job::new(array!["cat"], JobKind::Last),
+                    inputs: vec![Input::File("stuff".into())],
                     outputs: vec![
                         Redirection {
-                            from:   RedirectFrom::Both,
-                            file:   "other".into(),
+                            from: RedirectFrom::Both,
+                            file: "other".into(),
                             append: true,
                         },
                     ],
@@ -901,8 +904,8 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["calc"], JobKind::Last),
-                    inputs:  vec![Input::HereString("$(cat math.txt)".into())],
+                    job: Job::new(array!["calc"], JobKind::Last),
+                    inputs: vec![Input::HereString("$(cat math.txt)".into())],
                     outputs: vec![],
                 },
             ],
@@ -916,8 +919,8 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["calc"], JobKind::Last),
-                    inputs:  vec![Input::HereString("1 + 2\n3 + 4".into())],
+                    job: Job::new(array!["calc"], JobKind::Last),
+                    inputs: vec![Input::HereString("1 + 2\n3 + 4".into())],
                     outputs: vec![],
                 },
             ],
@@ -933,17 +936,17 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
-                    inputs:  Vec::new(),
+                    job: Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    inputs: Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["tr", "'o'", "'x'"], JobKind::Last),
-                    inputs:  vec![Input::HereString("$VAR".into())],
+                    job: Job::new(array!["tr", "'o'", "'x'"], JobKind::Last),
+                    inputs: vec![Input::HereString("$VAR".into())],
                     outputs: vec![
                         Redirection {
-                            from:   RedirectFrom::Stdout,
-                            file:   "out.log".into(),
+                            from: RedirectFrom::Stdout,
+                            file: "out.log".into(),
                             append: false,
                         },
                     ],
@@ -960,7 +963,10 @@ mod tests {
             assert_eq!("awk", &pipeline.clone().items[0].job.args[0]);
             assert_eq!("-v", &pipeline.clone().items[0].job.args[1]);
             assert_eq!("x=$x", &pipeline.clone().items[0].job.args[2]);
-            assert_eq!("'{ if (1) print $1 }'", &pipeline.clone().items[0].job.args[3]);
+            assert_eq!(
+                "'{ if (1) print $1 }'",
+                &pipeline.clone().items[0].job.args[3]
+            );
             assert_eq!("myfile", &pipeline.clone().items[0].job.args[4]);
         } else {
             assert!(false);
@@ -973,12 +979,12 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["echo", "zardoz"], JobKind::Last),
-                    inputs:  Vec::new(),
+                    job: Job::new(array!["echo", "zardoz"], JobKind::Last),
+                    inputs: Vec::new(),
                     outputs: vec![
                         Redirection {
-                            from:   RedirectFrom::Stdout,
-                            file:   "foo\\'bar".into(),
+                            from: RedirectFrom::Stdout,
+                            file: "foo\\'bar".into(),
                             append: true,
                         },
                     ],

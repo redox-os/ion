@@ -70,7 +70,9 @@ mod tests {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
+        fn variable(&self, var: &str, _: bool) -> Option<Value> {
+            self.0.get_var(var)
+        }
     }
 
     #[test]
@@ -96,8 +98,13 @@ mod tests {
     #[test]
     fn for_normal() {
         let variables = Variables::default();
-        let output =
-            vec!["1".to_owned(), "2".to_owned(), "3".to_owned(), "4".to_owned(), "5".to_owned()];
+        let output = vec![
+            "1".to_owned(),
+            "2".to_owned(),
+            "3".to_owned(),
+            "4".to_owned(),
+            "5".to_owned(),
+        ];
         assert_eq!(
             ForExpression::new(&output.clone(), &VariableExpander(variables)),
             ForExpression::Multiple(output)

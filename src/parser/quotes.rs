@@ -18,39 +18,46 @@ bitflags! {
 /// This example comes from the shell's REPL, which ensures that the user's input
 /// will only be submitted for execution once a terminated command is supplied.
 pub struct Terminator {
-    buffer:     String,
-    eof:        Option<String>,
+    buffer: String,
+    eof: Option<String>,
     eof_buffer: String,
-    array:      usize,
-    read:       usize,
-    flags:      Flags,
+    array: usize,
+    read: usize,
+    flags: Flags,
 }
 
 impl<'a> From<&'a str> for Terminator {
-    fn from(string: &'a str) -> Terminator { Terminator::new(string.to_owned()) }
+    fn from(string: &'a str) -> Terminator {
+        Terminator::new(string.to_owned())
+    }
 }
 
 impl From<String> for Terminator {
-    fn from(string: String) -> Terminator { Terminator::new(string) }
+    fn from(string: String) -> Terminator {
+        Terminator::new(string)
+    }
 }
 
 impl Terminator {
     pub fn new(input: String) -> Terminator {
         Terminator {
-            buffer:     input,
-            eof:        None,
+            buffer: input,
+            eof: None,
             eof_buffer: String::new(),
-            array:      0,
-            read:       0,
-            flags:      Flags::empty(),
+            array: 0,
+            read: 0,
+            flags: Flags::empty(),
         }
     }
 
     /// Appends a string to the internal buffer.
     pub fn append(&mut self, input: &str) {
         if self.eof.is_none() {
-            self.buffer
-                .push_str(if self.flags.contains(Flags::TRIM) { input.trim() } else { input });
+            self.buffer.push_str(if self.flags.contains(Flags::TRIM) {
+                input.trim()
+            } else {
+                input
+            });
         } else {
             self.eof_buffer.push_str(input);
         }
@@ -127,18 +134,25 @@ impl Terminator {
                     return false;
                 } else if instance.contains(Flags::COMM) {
                     self.buffer.truncate(self.read - 1);
-                    return !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE | Flags::ARRAY);
+                    return !self.flags
+                        .intersects(Flags::SQUOTE | Flags::DQUOTE | Flags::ARRAY);
                 }
             }
 
-            if self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE | Flags::ARRAY) {
+            if self.flags
+                .intersects(Flags::SQUOTE | Flags::DQUOTE | Flags::ARRAY)
+            {
                 if let Some(b'\\') = self.buffer.bytes().last() {
                     let _ = self.buffer.pop();
                     self.read -= 1;
                     self.flags |= Flags::TRIM;
                 } else {
                     self.read += 1;
-                    self.buffer.push(if self.flags.contains(Flags::ARRAY) { ' ' } else { '\n' });
+                    self.buffer.push(if self.flags.contains(Flags::ARRAY) {
+                        ' '
+                    } else {
+                        '\n'
+                    });
                 }
                 false
             } else {
@@ -173,5 +187,7 @@ impl Terminator {
     }
 
     /// Consumes the `Terminator`, and returns the underlying `String`.
-    pub fn consume(self) -> String { self.buffer }
+    pub fn consume(self) -> String {
+        self.buffer
+    }
 }

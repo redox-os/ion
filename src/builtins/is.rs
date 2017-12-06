@@ -21,10 +21,9 @@ pub(crate) fn is(args: &[&str], shell: &mut Shell) -> Result<(), String> {
 }
 
 fn eval_arg(arg: &str, shell: &mut Shell) -> String {
-    let var_value = get_var_string(arg, shell);
-
-    if var_value != "" {
-        return var_value;
+    let value = get_var_string(arg, shell);
+    if value != "" {
+        return value;
     }
     arg.to_string()
 }
@@ -42,4 +41,46 @@ fn get_var_string(name: &str, shell: &mut Shell) -> String {
     };
 
     sh_var.to_string()
+}
+
+#[test]
+fn test_is() {
+    let mut shell = Shell::new();
+    shell.set_var("x", "value");
+    shell.set_var("y", "0");
+
+    // Four arguments
+    assert_eq!(
+        is(&["is", " ", " ", " "], &mut shell),
+        Err("Expected 'not' instead found ' '\n".to_string())
+    );
+    assert_eq!(
+        is(&["is", "not", " ", " "], &mut shell),
+        Err("".to_string())
+    );
+    assert_eq!(
+        is(&["is", "not", "$x", "$x"], &mut shell),
+        Err("".to_string())
+    );
+    assert_eq!(is(&["is", "not", "2", "1"], &mut shell), Ok(()));
+    assert_eq!(is(&["is", "not", "$x", "$y"], &mut shell), Ok(()));
+
+    // Three arguments
+    assert_eq!(is(&["is", "1", "2"], &mut shell), Err("".to_string()));
+    assert_eq!(is(&["is", "$x", "$y"], &mut shell), Err("".to_string()));
+    assert_eq!(is(&["is", " ", " "], &mut shell), Ok(()));
+    assert_eq!(is(&["is", "$x", "$x"], &mut shell), Ok(()));
+
+    // Two arguments
+    assert_eq!(
+        is(&["is", " "], &mut shell),
+        Err("is needs 3 or 4 arguments\n".to_string())
+    );
+    assert_eq!(is(&["is", "-h"], &mut shell), Ok(()));
+
+    // One argument
+    assert_eq!(
+        is(&["is"], &mut shell),
+        Err("is needs 3 or 4 arguments\n".to_string())
+    );
 }

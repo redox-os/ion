@@ -12,7 +12,8 @@ use sys;
 use sys::job_control as self_sys;
 pub(crate) use sys::job_control::watch_background;
 
-/// When given a process ID, that process's group will be assigned as the foreground process group.
+/// When given a process ID, that process's group will be assigned as the
+/// foreground process group.
 pub(crate) fn set_foreground_as(pid: u32) {
     signals::block();
     let _ = sys::tcsetpgrp(0, pid);
@@ -38,8 +39,9 @@ pub(crate) trait JobControl {
         get_command: F,
         drop_command: D,
     ) -> i32
-        where F: FnOnce() -> String,
-              D: FnMut(i32);
+    where
+        F: FnOnce() -> String,
+        D: FnMut(i32);
     fn send_to_background(&mut self, child: u32, state: ProcessState, command: String);
 }
 
@@ -68,23 +70,26 @@ pub(crate) fn add_to_background(
     command: String,
 ) -> u32 {
     let mut processes = processes.lock().unwrap();
-    match (*processes).iter().position(|x| x.state == ProcessState::Empty) {
+    match (*processes)
+        .iter()
+        .position(|x| x.state == ProcessState::Empty)
+    {
         Some(id) => {
             (*processes)[id] = BackgroundProcess {
-                pid:           pid,
+                pid: pid,
                 ignore_sighup: false,
-                state:         state,
-                name:          command,
+                state: state,
+                name: command,
             };
             id as u32
         }
         None => {
             let njobs = (*processes).len();
             (*processes).push(BackgroundProcess {
-                pid:           pid,
+                pid: pid,
                 ignore_sighup: false,
-                state:         state,
-                name:          command,
+                state: state,
+                name: command,
             });
             njobs as u32
         }
@@ -97,10 +102,10 @@ pub(crate) fn add_to_background(
 /// as the process ID, state that the process is in, and the command that the
 /// process is executing.
 pub struct BackgroundProcess {
-    pub pid:           u32,
+    pub pid: u32,
     pub ignore_sighup: bool,
-    pub state:         ProcessState,
-    pub name:          String,
+    pub state: ProcessState,
+    pub name: String,
 }
 
 impl JobControl for Shell {
@@ -114,9 +119,9 @@ impl JobControl for Shell {
         // Signal the background thread that is waiting on this process to stop waiting.
         self.foreground_signals.signal_to_grab(pid);
         let status = loop {
-            // When the background thread that is monitoring the task receives an exit/stop signal,
-            // the status of that process will be communicated back. To avoid consuming CPU cycles,
-            // we wait 25 ms between polls.
+            // When the background thread that is monitoring the task receives an exit/stop
+            // signal, the status of that process will be communicated back. To
+            // avoid consuming CPU cycles, we wait 25 ms between polls.
             match self.foreground_signals.was_processed() {
                 Some(BackgroundResult::Status(stat)) => break stat as i32,
                 Some(BackgroundResult::Errored) => break TERMINATED,
@@ -158,8 +163,9 @@ impl JobControl for Shell {
         get_command: F,
         drop_command: D,
     ) -> i32
-        where F: FnOnce() -> String,
-              D: FnMut(i32)
+    where
+        F: FnOnce() -> String,
+        D: FnMut(i32),
     {
         self_sys::watch_foreground(self, pid, last_pid, get_command, drop_command)
     }
