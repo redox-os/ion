@@ -22,7 +22,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                 .collect::<Vec<SmallString>>();
 
         loop {
-            let prompt = shell.prompt();
+            let prompt = handle_prompt(shell.prompt()).unwrap();
             let funcs = &shell.functions;
             let vars = &shell.variables;
             let builtins = &shell.builtins;
@@ -165,4 +165,24 @@ fn complete_as_file(current_dir: PathBuf, filename: String, index: usize) -> boo
     }
     // By default assume its not a file
     false
+}
+
+/// prints prompt info lines and
+/// returns the last prompt line.
+fn handle_prompt(full_prompt: String) -> Result<String, String> {
+    
+    if let Some(index) = full_prompt.rfind('\n') {
+        let (info, prompt) = full_prompt.split_at(index+1);
+
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        if let Err(why) =
+            handle.write(info.as_bytes()) {
+            return Err(format!("unable to print prompt info: {}", why));
+        }
+
+        return Ok(String::from(prompt))
+    } else {
+        return Ok(full_prompt)
+    }
 }
