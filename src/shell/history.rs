@@ -27,13 +27,17 @@ pub(crate) struct IgnoreSetting {
 
 impl IgnoreSetting {
     pub(crate) fn default() -> IgnoreSetting {
-        IgnoreSetting { flags:   IgnoreFlags::empty(), regexes: None }
+        IgnoreSetting {
+            flags: IgnoreFlags::empty(),
+            regexes: None,
+        }
     }
 }
 
 /// Contains all history-related functionality for the `Shell`.
 pub(crate) trait ShellHistory {
-    /// Prints the commands contained within the history buffers to standard output.
+    /// Prints the commands contained within the history buffers to standard
+    /// output.
     fn print_history(&self, _arguments: &[&str]) -> i32;
 
     /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if
@@ -54,7 +58,8 @@ pub(crate) trait ShellHistory {
     /// immediately after `on_command()`
     fn save_command_in_history(&mut self, command: &str);
 
-    /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE is changed.
+    /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
+    /// is changed.
     fn update_ignore_patterns(&mut self, patterns: &Array);
 }
 
@@ -83,7 +88,10 @@ impl ShellHistory for Shell {
     fn set_context_history_from_vars(&mut self) {
         let context = self.context.as_mut().unwrap();
         let variables = &self.variables;
-        let max_history_size = variables.get_var_or_empty("HISTORY_SIZE").parse().unwrap_or(1000);
+        let max_history_size = variables
+            .get_var_or_empty("HISTORY_SIZE")
+            .parse()
+            .unwrap_or(1000);
 
         context.history.set_max_size(max_history_size);
 
@@ -91,8 +99,10 @@ impl ShellHistory for Shell {
             let file_name = variables.get_var("HISTFILE");
             context.history.set_file_name(file_name.map(|f| f.into()));
 
-            let max_histfile_size =
-                variables.get_var_or_empty("HISTFILE_SIZE").parse().unwrap_or(1000);
+            let max_histfile_size = variables
+                .get_var_or_empty("HISTFILE_SIZE")
+                .parse()
+                .unwrap_or(1000);
             context.history.set_max_file_size(max_histfile_size);
         } else {
             context.history.set_file_name(None);
@@ -133,7 +143,11 @@ impl ShellHistory for Shell {
         }
 
         self.ignore_setting.flags = flags;
-        self.ignore_setting.regexes = if regexes.len() > 0 { Some(regexes) } else { None }
+        self.ignore_setting.regexes = if regexes.len() > 0 {
+            Some(regexes)
+        } else {
+            None
+        }
     }
 }
 
@@ -143,14 +157,14 @@ impl ShellHistoryPrivate for Shell {
         let ignore = &self.ignore_setting.flags;
         let regexes = &self.ignore_setting.regexes;
 
-        // without the second check the command which sets the local variable would also be
-        // ignored. However, this behavior might not be wanted.
+        // without the second check the command which sets the local variable would
+        // also be ignored. However, this behavior might not be wanted.
         if ignore.contains(IgnoreFlags::ALL) && !command.contains("HISTORY_IGNORE") {
             return false;
         }
 
-        // Here we allow to also ignore the setting of the local variable because we assume
-        // the user entered the leading whitespace on purpose.
+        // Here we allow to also ignore the setting of the local variable because we
+        // assume the user entered the leading whitespace on purpose.
         if ignore.contains(IgnoreFlags::WHITESPACE) {
             if command.chars().next().map_or(false, |b| b.is_whitespace()) {
                 return false;
@@ -173,7 +187,8 @@ impl ShellHistoryPrivate for Shell {
             }
         }
 
-        // default to true, as it's more likely that we want to save a command in history
+        // default to true, as it's more likely that we want to save a command in
+        // history
         true
     }
 }

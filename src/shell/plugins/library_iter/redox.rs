@@ -9,7 +9,9 @@ pub(crate) struct LibraryIterator {
 }
 
 impl LibraryIterator {
-    pub(crate) fn new(directory: ReadDir) -> LibraryIterator { LibraryIterator { directory } }
+    pub(crate) fn new(directory: ReadDir) -> LibraryIterator {
+        LibraryIterator { directory }
+    }
 }
 
 impl Iterator for LibraryIterator {
@@ -17,5 +19,7 @@ impl Iterator for LibraryIterator {
     // The `Library` is a handle to dynamic library loaded into memory.
     type Item = (Identifier, Library);
 
-    fn next(&mut self) -> Option<(Identifier, Library)> { None }
+    fn next(&mut self) -> Option<(Identifier, Library)> {
+        None
+    }
 }

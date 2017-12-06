@@ -5,7 +5,7 @@ use sys;
 pub(crate) fn command_not_found(shell: &mut Shell, command: &str) -> bool {
     let function = match shell.functions.get("COMMAND_NOT_FOUND") {
         Some(func) => func as *const Function,
-        None => return false
+        None => return false,
     };
 
     if let Err(err) = shell.fork(Capture::None, |child| {

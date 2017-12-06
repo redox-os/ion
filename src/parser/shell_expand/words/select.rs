@@ -23,22 +23,26 @@ pub(crate) enum Select {
 pub(crate) trait SelectWithSize {
     type Item;
     fn select<O>(&mut self, Select, usize) -> O
-        where O: FromIterator<Self::Item>;
+    where
+        O: FromIterator<Self::Item>;
 }
 
 impl<I, T> SelectWithSize for I
-    where I: Iterator<Item = T>
+where
+    I: Iterator<Item = T>,
 {
     type Item = T;
     fn select<O>(&mut self, s: Select, size: usize) -> O
-        where O: FromIterator<Self::Item>
+    where
+        O: FromIterator<Self::Item>,
     {
         match s {
             Select::None => empty().collect(),
             Select::All => self.collect(),
-            Select::Index(idx) => {
-                idx.resolve(size).and_then(|idx| self.nth(idx)).into_iter().collect()
-            }
+            Select::Index(idx) => idx.resolve(size)
+                .and_then(|idx| self.nth(idx))
+                .into_iter()
+                .collect(),
             Select::Range(range) => if let Some((start, length)) = range.bounds(size) {
                 self.skip(start).take(length).collect()
             } else {

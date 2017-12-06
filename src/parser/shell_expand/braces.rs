@@ -16,7 +16,10 @@ pub(crate) fn expand_braces(tokens: &[BraceToken], mut expanders: Vec<Vec<String
         let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
         multiple_brace_expand(&vector_of_arrays[..], tokens)
     } else if expanders.len() == 1 {
-        let elements = expanders.drain(..).next().expect("there should be at least one value");
+        let elements = expanders
+            .drain(..)
+            .next()
+            .expect("there should be at least one value");
         let elements: Vec<&str> = elements.iter().map(AsRef::as_ref).collect();
         single_brace_expand(&elements, tokens)
     } else {
@@ -144,5 +147,8 @@ fn test_single_brace_expand() {
     let elements = &["one", "two", "three"];
     let tokens: &[BraceToken] = &[BraceToken::Normal("A=".to_owned()), BraceToken::Expander];
     let out = single_brace_expand(elements, &tokens);
-    assert_eq!(out, vec!["A=one".to_owned(), "A=two".to_owned(), "A=three".to_owned()]);
+    assert_eq!(
+        out,
+        vec!["A=one".to_owned(), "A=two".to_owned(), "A=three".to_owned()]
+    );
 }

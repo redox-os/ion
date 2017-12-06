@@ -60,8 +60,8 @@ macro_rules! map {
     }
 }}
 
-/// If you are implementing a builtin add it to the table below, create a well named manpage in man_pages 
-/// and check for help flags by adding to the start of your builtin the following
+/// If you are implementing a builtin add it to the table below, create a well named manpage in
+/// man_pages and check for help flags by adding to the start of your builtin the following
 /// if check_help(args, MAN_CD) {
 ///     return SUCCESS
 /// }
@@ -120,8 +120,8 @@ pub struct Builtin {
 }
 
 pub struct BuiltinMap {
-    pub(crate) name:      &'static [&'static str],
-    pub(crate) help:      &'static [&'static str],
+    pub(crate) name: &'static [&'static str],
+    pub(crate) help: &'static [&'static str],
     pub(crate) functions: &'static [BuiltinFunction],
 }
 
@@ -136,9 +136,13 @@ impl BuiltinMap {
         })
     }
 
-    pub fn keys(&self) -> &'static [&'static str] { self.name }
+    pub fn keys(&self) -> &'static [&'static str] {
+        self.name
+    }
 
-    pub fn contains_key(&self, func: &str) -> bool { self.name.iter().any(|&name| name == func) }
+    pub fn contains_key(&self, func: &str) -> bool {
+        self.name.iter().any(|&name| name == func)
+    }
 }
 
 // Definitions of simple builtins go here
@@ -156,7 +160,7 @@ fn builtin_status(args: &[&str], shell: &mut Shell) -> i32 {
 
 pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_CD) {
-        return SUCCESS
+        return SUCCESS;
     }
 
     match shell.directory_stack.cd(args, &shell.variables) {
@@ -212,15 +216,15 @@ fn builtin_is(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_dirs(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_DIRS) {
-        return SUCCESS
+        return SUCCESS;
     }
 
-    shell.directory_stack.dirs(args) 
+    shell.directory_stack.dirs(args)
 }
 
 fn builtin_pushd(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_PUSHD) {
-        return SUCCESS
+        return SUCCESS;
     }
     match shell.directory_stack.pushd(args, &shell.variables) {
         Ok(()) => SUCCESS,
@@ -235,7 +239,7 @@ fn builtin_pushd(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_popd(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_POPD) {
-        return SUCCESS
+        return SUCCESS;
     }
 
     match shell.directory_stack.popd(args) {
@@ -258,21 +262,22 @@ fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 {
     drop_alias(&mut shell.variables, args)
 }
 
-// TODO There is a man page for fn however the -h and --help flags are not checked for.
+// TODO There is a man page for fn however the -h and --help flags are not
+// checked for.
 fn builtin_fn(_: &[&str], shell: &mut Shell) -> i32 {
     fn_(&mut shell.functions)
 }
 
 fn builtin_read(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_READ) {
-        return SUCCESS
+        return SUCCESS;
     }
-    shell.variables.read(args) 
+    shell.variables.read(args)
 }
 
 fn builtin_drop(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_DROP) {
-        return SUCCESS
+        return SUCCESS;
     }
     if args.len() >= 2 && args[1] == "-a" {
         drop_array(&mut shell.variables, args)
@@ -283,14 +288,14 @@ fn builtin_drop(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_set(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_SET) {
-        return SUCCESS
+        return SUCCESS;
     }
     set::set(args, shell)
 }
 
 fn builtin_eval(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_EVAL) {
-        return SUCCESS
+        return SUCCESS;
     }
     let evaluated_command = args[1..].join(" ");
     let mut buffer = Terminator::new(evaluated_command);
@@ -305,16 +310,16 @@ fn builtin_eval(args: &[&str], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_history(args: &[&str], shell: &mut Shell) -> i32 { 
+fn builtin_history(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_HISTORY) {
-        return SUCCESS
+        return SUCCESS;
     }
     shell.print_history(args)
 }
 
 fn builtin_source(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_SOURCE) {
-        return SUCCESS
+        return SUCCESS;
     }
     match source(shell, args) {
         Ok(()) => SUCCESS,
@@ -329,7 +334,7 @@ fn builtin_source(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_echo(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_ECHO) {
-        return SUCCESS
+        return SUCCESS;
     }
     match echo(args) {
         Ok(()) => SUCCESS,
@@ -344,7 +349,7 @@ fn builtin_echo(args: &[&str], _: &mut Shell) -> i32 {
 
 fn builtin_test(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_TEST) {
-        return SUCCESS
+        return SUCCESS;
     }
     match test(args) {
         Ok(true) => SUCCESS,
@@ -373,7 +378,7 @@ fn builtin_calc(args: &[&str], _: &mut Shell) -> i32 {
 
 fn builtin_random(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_RANDOM) {
-        return SUCCESS
+        return SUCCESS;
     }
     match random::random(&args[1..]) {
         Ok(()) => SUCCESS,
@@ -386,16 +391,16 @@ fn builtin_random(args: &[&str], _: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_true(args: &[&str], _: &mut Shell) -> i32 { 
+fn builtin_true(args: &[&str], _: &mut Shell) -> i32 {
     check_help(args, MAN_TRUE);
     SUCCESS
 }
 
 fn builtin_false(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_FALSE) {
-        return SUCCESS
+        return SUCCESS;
     }
-    FAILURE 
+    FAILURE
 }
 
 // TODO create a manpage
@@ -412,21 +417,21 @@ fn builtin_jobs(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_bg(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_BG) {
-        return SUCCESS
+        return SUCCESS;
     }
     job_control::bg(shell, &args[1..])
 }
 
 fn builtin_fg(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_FG) {
-        return SUCCESS
+        return SUCCESS;
     }
-    job_control::fg(shell, &args[1..]) 
+    job_control::fg(shell, &args[1..])
 }
 
 fn builtin_suspend(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_SUSPEND) {
-        return SUCCESS
+        return SUCCESS;
     }
     shell::signals::suspend(0);
     SUCCESS
@@ -436,7 +441,7 @@ fn builtin_disown(args: &[&str], shell: &mut Shell) -> i32 {
     for arg in args {
         if *arg == "--help" {
             print_man(MAN_DISOWN);
-            return SUCCESS
+            return SUCCESS;
         }
     }
     match job_control::disown(shell, &args[1..]) {
@@ -478,7 +483,7 @@ fn builtin_help(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_exit(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_EXIT) {
-        return SUCCESS
+        return SUCCESS;
     }
     // Kill all active background tasks before exiting the shell.
     for process in shell.background.lock().unwrap().iter() {
@@ -487,13 +492,17 @@ fn builtin_exit(args: &[&str], shell: &mut Shell) -> i32 {
         }
     }
     let previous_status = shell.previous_status;
-    shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok()).unwrap_or(previous_status))
+    shell.exit(
+        args.get(1)
+            .and_then(|status| status.parse::<i32>().ok())
+            .unwrap_or(previous_status),
+    )
 }
 
 use regex::Regex;
 fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_MATCHES) {
-        return SUCCESS
+        return SUCCESS;
     }
     if args[1..].len() != 2 {
         let stderr = io::stderr();
@@ -521,14 +530,18 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
 }
 
 fn args_to_pipeline(args: &[&str]) -> Pipeline {
-    let owned = args.into_iter().map(|&x| String::from(x)).collect::<Array>();
+    let owned = args.into_iter()
+        .map(|&x| String::from(x))
+        .collect::<Array>();
     let pipe_item = PipeItem::new(Job::new(owned, JobKind::And), Vec::new(), Vec::new());
-    Pipeline { items: vec![pipe_item] }
+    Pipeline {
+        items: vec![pipe_item],
+    }
 }
 
 fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_NOT) {
-        return SUCCESS
+        return SUCCESS;
     }
     shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
     match shell.previous_status {
@@ -540,7 +553,7 @@ fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_AND) {
-        return SUCCESS
+        return SUCCESS;
     }
     match shell.previous_status {
         SUCCESS => {
@@ -553,7 +566,7 @@ fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_OR) {
-        return SUCCESS
+        return SUCCESS;
     }
     match shell.previous_status {
         FAILURE => {
@@ -566,7 +579,7 @@ fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_EXISTS) {
-        return SUCCESS
+        return SUCCESS;
     }
     match exists(args, shell) {
         Ok(true) => SUCCESS,
@@ -582,7 +595,7 @@ fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_WHICH) {
-        return SUCCESS
+        return SUCCESS;
     }
 
     let mut result = SUCCESS;
@@ -597,7 +610,10 @@ fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
             println!("{}: built-in shell command", command);
             continue;
         } else {
-            for path in env::var("PATH").unwrap_or("/bin".to_string()).split(sys::PATH_SEPARATOR) {
+            for path in env::var("PATH")
+                .unwrap_or("/bin".to_string())
+                .split(sys::PATH_SEPARATOR)
+            {
                 let executable = Path::new(path).join(command);
                 if executable.is_file() {
                     println!("{}", executable.display());

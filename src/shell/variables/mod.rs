@@ -8,10 +8,8 @@ use std::env;
 use std::io::{self, BufRead};
 use sys::variables as self_sys;
 use sys::{self, getpid, is_root};
-use types::{
-    Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value,
-    VariableContext,
-};
+use types::{Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value,
+            VariableContext};
 use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
 
@@ -21,11 +19,11 @@ lazy_static! {
 
 #[derive(Clone, Debug)]
 pub struct Variables {
-    pub hashmaps:  HashMapVariableContext,
-    pub arrays:    ArrayVariableContext,
+    pub hashmaps: HashMapVariableContext,
+    pub arrays: ArrayVariableContext,
     pub variables: VariableContext,
-    pub aliases:   VariableContext,
-    flags:         u8,
+    pub aliases: VariableContext,
+    flags: u8,
 }
 
 impl Default for Variables {
@@ -39,7 +37,9 @@ impl Default for Variables {
             "${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}".into(),
         );
         // Set the PID variable to the PID of the shell
-        let pid = getpid().map(|p| p.to_string()).unwrap_or_else(|e| e.to_string());
+        let pid = getpid()
+            .map(|p| p.to_string())
+            .unwrap_or_else(|e| e.to_string());
         map.insert("PID".into(), pid.into());
 
         // Initialize the HISTFILE variable
@@ -62,11 +62,11 @@ impl Default for Variables {
             |path| env::set_var("HOME", path.to_str().unwrap_or("?")),
         );
         Variables {
-            hashmaps:  FnvHashMap::with_capacity_and_hasher(64, Default::default()),
-            arrays:    FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+            hashmaps: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+            arrays: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
             variables: map,
-            aliases:   FnvHashMap::with_capacity_and_hasher(64, Default::default()),
-            flags:     0,
+            aliases: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+            flags: 0,
         }
     }
 }
@@ -74,14 +74,21 @@ impl Default for Variables {
 const PLUGIN: u8 = 1;
 
 impl Variables {
-    pub(crate) fn has_plugin_support(&self) -> bool { self.flags & PLUGIN != 0 }
+    pub(crate) fn has_plugin_support(&self) -> bool {
+        self.flags & PLUGIN != 0
+    }
 
-    pub(crate) fn enable_plugins(&mut self) { self.flags |= PLUGIN; }
+    pub(crate) fn enable_plugins(&mut self) {
+        self.flags |= PLUGIN;
+    }
 
-    pub(crate) fn disable_plugins(&mut self) { self.flags &= 255 ^ PLUGIN; }
+    pub(crate) fn disable_plugins(&mut self) {
+        self.flags &= 255 ^ PLUGIN;
+    }
 
     pub(crate) fn read<I: IntoIterator>(&mut self, args: I) -> i32
-        where I::Item: AsRef<str>
+    where
+        I::Item: AsRef<str>,
     {
         if sys::isatty(sys::STDIN_FILENO) {
             let mut con = Context::new();
@@ -148,18 +155,26 @@ impl Variables {
         }
     }
 
-    pub fn get_map(&self, name: &str) -> Option<&HashMap> { self.hashmaps.get(name) }
+    pub fn get_map(&self, name: &str) -> Option<&HashMap> {
+        self.hashmaps.get(name)
+    }
 
-    pub fn get_array(&self, name: &str) -> Option<&Array> { self.arrays.get(name) }
+    pub fn get_array(&self, name: &str) -> Option<&Array> {
+        self.arrays.get(name)
+    }
 
-    pub fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
+    pub fn unset_array(&mut self, name: &str) -> Option<Array> {
+        self.arrays.remove(name)
+    }
 
     /// Obtains the value for the **SWD** variable.
     ///
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
     fn get_simplified_directory(&self) -> Value {
-        self.get_var("PWD").unwrap().replace(&self.get_var("HOME").unwrap(), "~")
+        self.get_var("PWD")
+            .unwrap()
+            .replace(&self.get_var("HOME").unwrap(), "~")
     }
 
     /// Obtains the value for the **MWD** variable.
@@ -174,7 +189,9 @@ impl Variables {
             // Temporarily borrow the `swd` variable while we attempt to assemble a minimal
             // variant of the directory path. If that is not possible, we will cancel the
             // borrow and return `swd` itself as the minified path.
-            let elements = swd.split("/").filter(|s| !s.is_empty()).collect::<Vec<&str>>();
+            let elements = swd.split("/")
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<&str>>();
             if elements.len() > 2 {
                 let mut output = String::new();
                 for element in &elements[0..elements.len() - 1] {
@@ -202,8 +219,8 @@ impl Variables {
         }
         if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..]))
         {
-            // If the parsed name contains the '::' pattern, then a namespace was designated. Find
-            // it.
+            // If the parsed name contains the '::' pattern, then a namespace was
+            // designated. Find it.
             match name {
                 "c" | "color" => Colors::collect(variable).into_string(),
                 "env" => env::var(variable).map(Into::into).ok(),
@@ -241,16 +258,26 @@ impl Variables {
             }
         } else {
             // Otherwise, it's just a simple variable name.
-            self.variables.get(name).cloned().or_else(|| env::var(name).map(Into::into).ok())
+            self.variables
+                .get(name)
+                .cloned()
+                .or_else(|| env::var(name).map(Into::into).ok())
         }
     }
 
-    pub fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
+    pub fn get_var_or_empty(&self, name: &str) -> Value {
+        self.get_var(name).unwrap_or_default()
+    }
 
-    pub fn unset_var(&mut self, name: &str) -> Option<Value> { self.variables.remove(name) }
+    pub fn unset_var(&mut self, name: &str) -> Option<Value> {
+        self.variables.remove(name)
+    }
 
     pub fn get_vars<'a>(&'a self) -> impl Iterator<Item = Identifier> + 'a {
-        self.variables.keys().cloned().chain(env::vars().map(|(k, _)| k.into()))
+        self.variables
+            .keys()
+            .cloned()
+            .chain(env::vars().map(|(k, _)| k.into()))
     }
 
     pub(crate) fn is_valid_variable_character(c: char) -> bool {
@@ -356,7 +383,9 @@ mod tests {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
+        fn variable(&self, var: &str, _: bool) -> Option<Value> {
+            self.0.get_var(var)
+        }
     }
 
     #[test]
@@ -388,13 +417,19 @@ mod tests {
     fn minimal_directory_var_should_compact_path() {
         let mut variables = Variables::default();
         variables.set_var("PWD", "/var/log/nix");
-        assert_eq!("v/l/nix", variables.get_var("MWD").expect("no value returned"));
+        assert_eq!(
+            "v/l/nix",
+            variables.get_var("MWD").expect("no value returned")
+        );
     }
 
     #[test]
     fn minimal_directory_var_shouldnt_compact_path() {
         let mut variables = Variables::default();
         variables.set_var("PWD", "/var/log");
-        assert_eq!("/var/log", variables.get_var("MWD").expect("no value returned"));
+        assert_eq!(
+            "/var/log",
+            variables.get_var("MWD").expect("no value returned")
+        );
     }
 }

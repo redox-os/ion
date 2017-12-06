@@ -8,7 +8,9 @@ pub(crate) struct LibraryIterator {
 }
 
 impl LibraryIterator {
-    pub(crate) fn new(directory: ReadDir) -> LibraryIterator { LibraryIterator { directory } }
+    pub(crate) fn new(directory: ReadDir) -> LibraryIterator {
+        LibraryIterator { directory }
+    }
 }
 
 impl Iterator for LibraryIterator {
@@ -18,7 +20,11 @@ impl Iterator for LibraryIterator {
 
     fn next(&mut self) -> Option<(Identifier, Library)> {
         while let Some(entry) = self.directory.next() {
-            let entry = if let Ok(entry) = entry { entry } else { continue };
+            let entry = if let Ok(entry) = entry {
+                entry
+            } else {
+                continue;
+            };
             let path = entry.path();
             // An entry is a library if it is a file with a 'so' extension.
             if path.is_file() && path.extension().map_or(false, |ext| ext == "so") {

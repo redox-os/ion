@@ -12,7 +12,11 @@ pub(crate) fn block() {
         sigaddset(&mut sigset as *mut sigset_t, SIGTTOU);
         sigaddset(&mut sigset as *mut sigset_t, SIGTTIN);
         sigaddset(&mut sigset as *mut sigset_t, SIGCHLD);
-        sigprocmask(SIG_BLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
+        sigprocmask(
+            SIG_BLOCK,
+            &sigset as *const sigset_t,
+            ptr::null_mut() as *mut sigset_t,
+        );
     }
 }
 
@@ -27,6 +31,10 @@ pub(crate) fn unblock() {
         sigaddset(&mut sigset as *mut sigset_t, SIGTTOU);
         sigaddset(&mut sigset as *mut sigset_t, SIGTTIN);
         sigaddset(&mut sigset as *mut sigset_t, SIGCHLD);
-        sigprocmask(SIG_UNBLOCK, &sigset as *const sigset_t, ptr::null_mut() as *mut sigset_t);
+        sigprocmask(
+            SIG_UNBLOCK,
+            &sigset as *const sigset_t,
+            ptr::null_mut() as *mut sigset_t,
+        );
     }
 }

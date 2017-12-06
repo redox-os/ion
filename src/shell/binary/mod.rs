@@ -26,7 +26,8 @@ pub(crate) trait Binary {
     fn main(self);
     /// Parses and executes the arguments that were supplied to the shell.
     fn execute_arguments<A: Iterator<Item = String>>(&mut self, args: A);
-    /// Creates an interactive session that reads from a prompt provided by Liner.
+    /// Creates an interactive session that reads from a prompt provided by
+    /// Liner.
     fn execute_interactive(self);
     /// Ensures that read statements from a script are terminated.
     fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I) -> i32;
@@ -48,11 +49,17 @@ pub(crate) trait Binary {
 }
 
 impl Binary for Shell {
-    fn prompt(&mut self) -> String { prompt(self) }
+    fn prompt(&mut self) -> String {
+        prompt(self)
+    }
 
-    fn prompt_fn(&mut self) -> Option<String> { prompt_fn(self) }
+    fn prompt_fn(&mut self) -> Option<String> {
+        prompt_fn(self)
+    }
 
-    fn readln(&mut self) -> Option<String> { readln(self) }
+    fn readln(&mut self) -> Option<String> {
+        readln(self)
+    }
 
     fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I) -> i32 {
         terminate_script_quotes(self, lines)
@@ -106,7 +113,11 @@ impl Binary for Shell {
                     }
                     Err(ref err) if err.kind() == ErrorKind::NotFound => {
                         let history_filename = self.get_var_or_empty("HISTFILE");
-                        eprintln!("ion: failed to find history file {}: {}", history_filename, err);
+                        eprintln!(
+                            "ion: failed to find history file {}: {}",
+                            history_filename,
+                            err
+                        );
                     }
                     Err(err) => {
                         eprintln!("ion: failed to load history: {}", err);
@@ -118,7 +129,8 @@ impl Binary for Shell {
 
         self.evaluate_init_file();
 
-        self.variables.set_array("args", iter::once(env::args().next().unwrap()).collect());
+        self.variables
+            .set_array("args", iter::once(env::args().next().unwrap()).collect());
 
         loop {
             if let Some(command) = self.readln() {

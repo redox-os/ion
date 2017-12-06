@@ -23,7 +23,6 @@ pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
                 break;
             }
             return 0;
-            
         } else if arg.starts_with('-') {
             if arg.len() == 1 {
                 positionals = Some(RetainIfNone);
@@ -74,7 +73,9 @@ pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
             // This used to take a `&[String]` but cloned them all, so although
             // this is non-ideal and could probably be better done with `Rc`, it
             // hasn't got any slower.
-            let arguments = iter::once(command).chain(args_iter.map(|i| i.to_string())).collect();
+            let arguments = iter::once(command)
+                .chain(args_iter.map(|i| i.to_string()))
+                .collect();
             match kind {
                 UnsetIfNone => shell.variables.set_array("args", arguments),
                 RetainIfNone => if arguments.len() != 1 {

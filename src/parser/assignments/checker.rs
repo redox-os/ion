@@ -220,7 +220,13 @@ mod test {
     #[test]
     fn is_integer_array_() {
         let expected = Ok(ReturnValue::Vector(array!["1", "2", "3"]));
-        assert_eq!(is_integer_array(ReturnValue::Vector(array!["1", "2", "3"])), expected);
-        assert_eq!(is_integer_array(ReturnValue::Vector(array!["1", "2", "three"])), Err(()));
+        assert_eq!(
+            is_integer_array(ReturnValue::Vector(array!["1", "2", "3"])),
+            expected
+        );
+        assert_eq!(
+            is_integer_array(ReturnValue::Vector(array!["1", "2", "three"])),
+            Err(())
+        );
     }
 }

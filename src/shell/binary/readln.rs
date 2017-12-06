@@ -97,8 +97,11 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                             // completion list.
                             if let Ok(current_dir) = env::current_dir() {
                                 if let Some(url) = current_dir.to_str() {
-                                    file_completers
-                                        .push(IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr));
+                                    file_completers.push(IonFileCompleter::new(
+                                        Some(url),
+                                        dirs_ptr,
+                                        vars_ptr,
+                                    ));
                                 }
                             }
 
@@ -141,7 +144,8 @@ fn complete_as_file(current_dir: PathBuf, filename: String, index: usize) -> boo
     let filename = filename.trim();
     let mut file = current_dir.clone();
     file.push(&filename);
-    // If the user explicitly requests a file through this syntax then complete as a file
+    // If the user explicitly requests a file through this syntax then complete as
+    // a file
     if filename.starts_with(".") {
         return true;
     }
@@ -157,9 +161,9 @@ fn complete_as_file(current_dir: PathBuf, filename: String, index: usize) -> boo
     if file.exists() {
         return true;
     }
-    // If we have a partial file inside an existing directory, e.g. /foo/b when /foo/bar
-    // exists, then treat it as file as long as `foo` isn't the current directory, otherwise
-    // this would apply to any string `foo`
+    // If we have a partial file inside an existing directory, e.g. /foo/b when
+    // /foo/bar exists, then treat it as file as long as `foo` isn't the
+    // current directory, otherwise this would apply to any string `foo`
     if let Some(parent) = file.parent() {
         return parent.exists() && parent != current_dir;
     }
@@ -170,19 +174,17 @@ fn complete_as_file(current_dir: PathBuf, filename: String, index: usize) -> boo
 /// prints prompt info lines and
 /// returns the last prompt line.
 fn handle_prompt(full_prompt: String) -> Result<String, String> {
-    
     if let Some(index) = full_prompt.rfind('\n') {
-        let (info, prompt) = full_prompt.split_at(index+1);
+        let (info, prompt) = full_prompt.split_at(index + 1);
 
         let stdout = io::stdout();
         let mut handle = stdout.lock();
-        if let Err(why) =
-            handle.write(info.as_bytes()) {
+        if let Err(why) = handle.write(info.as_bytes()) {
             return Err(format!("unable to print prompt info: {}", why));
         }
 
-        return Ok(String::from(prompt))
+        return Ok(String::from(prompt));
     } else {
-        return Ok(full_prompt)
+        return Ok(full_prompt);
     }
 }

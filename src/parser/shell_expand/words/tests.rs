@@ -30,16 +30,16 @@ fn string_method() {
     let input = "$join(array, 'pattern') $join(array, 'pattern')";
     let expected = vec![
         WordToken::StringMethod(StringMethod {
-            method:    "join",
-            variable:  "array",
-            pattern:   "'pattern'",
+            method: "join",
+            variable: "array",
+            pattern: "'pattern'",
             selection: Select::All,
         }),
         WordToken::Whitespace(" "),
         WordToken::StringMethod(StringMethod {
-            method:    "join",
-            variable:  "array",
-            pattern:   "'pattern'",
+            method: "join",
+            variable: "array",
+            pattern: "'pattern'",
             selection: Select::All,
         }),
     ];
@@ -152,7 +152,11 @@ fn words_process_with_quotes() {
     let expected = vec![
         WordToken::Normal("echo", false, false),
         WordToken::Whitespace(" "),
-        WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", false, Select::All),
+        WordToken::Process(
+            "git branch | rg '[*]' | awk '{print $2}'",
+            false,
+            Select::All,
+        ),
     ];
     compare(input, expected);
 
@@ -160,7 +164,11 @@ fn words_process_with_quotes() {
     let expected = vec![
         WordToken::Normal("echo", false, false),
         WordToken::Whitespace(" "),
-        WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", false, Select::All),
+        WordToken::Process(
+            "git branch | rg \"[*]\" | awk '{print $2}'",
+            false,
+            Select::All,
+        ),
     ];
     compare(input, expected);
 }
@@ -257,25 +265,25 @@ impl Expander for WithVars {
 fn array_methods() {
     let expanders = WithVars;
     let method = ArrayMethod {
-        method:    "graphemes",
-        variable:  "pkmn1",
-        pattern:   Pattern::Whitespace,
+        method: "graphemes",
+        variable: "pkmn1",
+        pattern: Pattern::Whitespace,
         selection: Select::Index(Index::Forward(3)),
     };
     let expected = array!["é"];
     assert_eq!(method.handle_as_array(&expanders), expected);
     let method = ArrayMethod {
-        method:    "chars",
-        variable:  "pkmn2",
-        pattern:   Pattern::Whitespace,
+        method: "chars",
+        variable: "pkmn2",
+        pattern: Pattern::Whitespace,
         selection: Select::Index(Index::Forward(3)),
     };
     let expected = array!["e"];
     assert_eq!(method.handle_as_array(&expanders), expected);
     let method = ArrayMethod {
-        method:    "bytes",
-        variable:  "pkmn2",
-        pattern:   Pattern::Whitespace,
+        method: "bytes",
+        variable: "pkmn2",
+        pattern: Pattern::Whitespace,
         selection: Select::Index(Index::Forward(1)),
     };
     let expected = array!["111"];

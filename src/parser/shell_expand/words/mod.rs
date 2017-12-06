@@ -48,20 +48,26 @@ pub(crate) enum WordToken<'a> {
 }
 
 pub(crate) struct WordIterator<'a, E: Expander + 'a> {
-    data:      &'a str,
-    read:      usize,
-    flags:     Flags,
+    data: &'a str,
+    read: usize,
+    flags: Flags,
     expanders: &'a E,
 }
 
 impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     pub(crate) fn new(data: &'a str, expanders: &'a E) -> WordIterator<'a, E> {
-        WordIterator { data, read: 0, flags: Flags::empty(), expanders }
+        WordIterator {
+            data,
+            read: 0,
+            flags: Flags::empty(),
+            expanders,
+        }
     }
 
     // Contains the grammar for collecting whitespace characters
     fn whitespaces<I>(&mut self, iterator: &mut I) -> WordToken<'a>
-        where I: Iterator<Item = u8>
+    where
+        I: Iterator<Item = u8>,
     {
         let start = self.read;
         self.read += 1;
@@ -78,7 +84,8 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
     // Contains the logic for parsing braced variables
     fn braced_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
-        where I: Iterator<Item = u8>
+    where
+        I: Iterator<Item = u8>,
     {
         let start = self.read;
         while let Some(character) = iterator.next() {
@@ -96,7 +103,8 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
     /// Contains the logic for parsing variable syntax
     fn variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
-        where I: Iterator<Item = u8>
+    where
+        I: Iterator<Item = u8>,
     {
         let mut start = self.read;
         self.read += 1;
@@ -202,11 +210,16 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             self.read += 1;
         }
 
-        WordToken::Variable(&self.data[start..], self.flags.contains(Flags::DQUOTE), Select::All)
+        WordToken::Variable(
+            &self.data[start..],
+            self.flags.contains(Flags::DQUOTE),
+            Select::All,
+        )
     }
 
     fn read_selection<I>(&mut self, iterator: &mut I) -> Select
-        where I: Iterator<Item = u8>
+    where
+        I: Iterator<Item = u8>,
     {
         self.read += 1;
         let start = self.read;
@@ -229,7 +242,8 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
     /// Contains the logic for parsing array variable syntax
     fn array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
-        where I: Iterator<Item = u8>
+    where
+        I: Iterator<Item = u8>,
     {
         let mut start = self.read;
         self.read += 1;
@@ -331,7 +345,8 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     fn braced_array_variable<I>(&mut self, iterator: &mut I) -> WordToken<'a>
-        where I: Iterator<Item = u8>
+    where
+        I: Iterator<Item = u8>,
     {
         let start = self.read;
         // self.read += 1;
@@ -382,7 +397,8 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
     /// Contains the logic for parsing subshell syntax.
     fn process<I>(&mut self, iterator: &mut I) -> WordToken<'a>
-        where I: Iterator<Item = u8>
+    where
+        I: Iterator<Item = u8>,
     {
         let start = self.read;
         let mut level = 0;
@@ -424,7 +440,8 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
     /// Contains the logic for parsing array subshell syntax.
     fn array_process<I>(&mut self, iterator: &mut I) -> WordToken<'a>
-        where I: Iterator<Item = u8>
+    where
+        I: Iterator<Item = u8>,
     {
         let start = self.read;
         let mut level = 0;
@@ -470,7 +487,8 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
     /// Contains the grammar for parsing brace expansion syntax
     fn braces<I>(&mut self, iterator: &mut I) -> WordToken<'a>
-        where I: Iterator<Item = u8>
+    where
+        I: Iterator<Item = u8>,
     {
         let mut start = self.read;
         let mut level = 0;
@@ -503,7 +521,8 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
     /// Contains the grammar for parsing array expression syntax
     fn array<I>(&mut self, iterator: &mut I) -> WordToken<'a>
-        where I: Iterator<Item = u8>
+    where
+        I: Iterator<Item = u8>,
     {
         let start = self.read;
         let mut level = 0;
@@ -537,10 +556,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     fn glob_check<I>(&mut self, iterator: &mut I) -> bool
-        where I: Iterator<Item = u8> + Clone
+    where
+        I: Iterator<Item = u8> + Clone,
     {
-        // Clone the iterator and scan for illegal characters until the corresponding ] is
-        // discovered. If none are found, then it's a valid glob signature.
+        // Clone the iterator and scan for illegal characters until the corresponding ]
+        // is discovered. If none are found, then it's a valid glob signature.
         let mut moves = 0;
         let mut glob = false;
         let mut square_bracket = 0;

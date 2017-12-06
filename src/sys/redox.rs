@@ -19,11 +19,17 @@ pub(crate) const STDIN_FILENO: RawFd = 0;
 pub(crate) const STDOUT_FILENO: RawFd = 1;
 pub(crate) const STDERR_FILENO: RawFd = 2;
 
-pub(crate) fn is_root() -> bool { syscall::geteuid().map(|id| id == 0).unwrap_or(false) }
+pub(crate) fn is_root() -> bool {
+    syscall::geteuid().map(|id| id == 0).unwrap_or(false)
+}
 
-pub unsafe fn fork() -> io::Result<u32> { cvt(syscall::clone(0)).map(|pid| pid as u32) }
+pub unsafe fn fork() -> io::Result<u32> {
+    cvt(syscall::clone(0)).map(|pid| pid as u32)
+}
 
-pub(crate) fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
+pub(crate) fn getpid() -> io::Result<u32> {
+    cvt(syscall::getpid()).map(|pid| pid as u32)
+}
 
 pub(crate) fn kill(pid: u32, signal: i32) -> io::Result<()> {
     cvt(syscall::kill(pid as usize, signal as usize)).and(Ok(()))
@@ -47,8 +53,8 @@ pub(crate) fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
 pub(crate) fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     let new = SigAction {
         sa_handler: unsafe { mem::transmute(handler) },
-        sa_mask:    [0; 2],
-        sa_flags:   0,
+        sa_mask: [0; 2],
+        sa_flags: 0,
     };
     cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
 }
@@ -56,8 +62,8 @@ pub(crate) fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()>
 pub(crate) fn reset_signal(signal: i32) -> io::Result<()> {
     let new = SigAction {
         sa_handler: unsafe { mem::transmute(syscall::flag::SIG_DFL) },
-        sa_mask:    [0; 2],
-        sa_flags:   0,
+        sa_mask: [0; 2],
+        sa_flags: 0,
     };
     cvt(syscall::sigaction(signal as usize, Some(&new), None)).and(Ok(()))
 }
@@ -67,7 +73,10 @@ pub(crate) fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
 
     let pgid_usize = pgid as usize;
     let res = syscall::write(fd, unsafe {
-        slice::from_raw_parts(&pgid_usize as *const usize as *const u8, mem::size_of::<usize>())
+        slice::from_raw_parts(
+            &pgid_usize as *const usize as *const u8,
+            mem::size_of::<usize>(),
+        )
     });
 
     let _ = syscall::close(fd);
@@ -75,13 +84,17 @@ pub(crate) fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
     cvt(res).and(Ok(()))
 }
 
-pub(crate) fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(syscall::dup(fd, &[])) }
+pub(crate) fn dup(fd: RawFd) -> io::Result<RawFd> {
+    cvt(syscall::dup(fd, &[]))
+}
 
 pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
     cvt(syscall::dup2(old, new, &[]))
 }
 
-pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(syscall::close(fd)).and(Ok(())) }
+pub(crate) fn close(fd: RawFd) -> io::Result<()> {
+    cvt(syscall::close(fd)).and(Ok(()))
+}
 
 pub(crate) fn isatty(fd: RawFd) -> bool {
     if let Ok(tfd) = syscall::dup(fd, b"termios") {
@@ -135,8 +148,9 @@ pub mod job_control {
         _get_command: F,
         mut drop_command: D,
     ) -> i32
-        where F: FnOnce() -> String,
-              D: FnMut(i32)
+    where
+        F: FnOnce() -> String,
+        D: FnMut(i32),
     {
         let mut exit_status = 0;
         loop {

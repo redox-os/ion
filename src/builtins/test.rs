@@ -12,8 +12,8 @@ pub(crate) fn test(args: &[&str]) -> Result<bool, String> {
 fn evaluate_arguments(arguments: &[&str]) -> Result<bool, String> {
     match arguments.first() {
         Some(&s) if s.starts_with("-") && s[1..].starts_with(char::is_alphabetic) => {
-            // Access the second character in the flag string: this will be type of the flag.
-            // If no flag was given, return `SUCCESS`
+            // Access the second character in the flag string: this will be type of the
+            // flag. If no flag was given, return `SUCCESS`
             s.chars().nth(1).map_or(Ok(true), |flag| {
                 // If no argument was given, return `SUCCESS`
                 arguments.get(1).map_or(Ok(true), {
@@ -25,13 +25,15 @@ fn evaluate_arguments(arguments: &[&str]) -> Result<bool, String> {
         }
         Some(arg) => {
             // If there is no operator, check if the first argument is non-zero
-            arguments.get(1).map_or(Ok(string_is_nonzero(arg)), |operator| {
-                // If there is no right hand argument, a condition was expected
-                let right_arg = arguments
-                    .get(2)
-                    .ok_or_else(|| SmallString::from("parse error: condition expected"))?;
-                evaluate_expression(arg, operator, right_arg)
-            })
+            arguments
+                .get(1)
+                .map_or(Ok(string_is_nonzero(arg)), |operator| {
+                    // If there is no right hand argument, a condition was expected
+                    let right_arg = arguments
+                        .get(2)
+                        .ok_or_else(|| SmallString::from("parse error: condition expected"))?;
+                    evaluate_expression(arg, operator, right_arg)
+                })
         }
         None => Ok(false),
     }
@@ -73,7 +75,9 @@ fn files_have_same_device_and_inode_numbers(first: &str, second: &str) -> bool {
 
 /// Obtains the device and inode numbers of the file specified
 fn get_dev_and_inode(filename: &str) -> Option<(u64, u64)> {
-    fs::metadata(filename).map(|file| (file.dev(), file.ino())).ok()
+    fs::metadata(filename)
+        .map(|file| (file.dev(), file.ino()))
+        .ok()
 }
 
 /// Exits SUCCESS if the first file is newer than the second file.
@@ -90,7 +94,9 @@ fn file_is_newer_than(first: &str, second: &str) -> bool {
 
 /// Obtain the time the file was last modified as a `SystemTime` type.
 fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
-    fs::metadata(filename).ok().and_then(|file| file.modified().ok())
+    fs::metadata(filename)
+        .ok()
+        .and_then(|file| file.modified().ok())
 }
 
 /// Attempt to parse a &str as a usize.
@@ -111,7 +117,8 @@ fn parse_integers(left: &str, right: &str) -> Result<(Option<isize>, Option<isiz
     })
 }
 
-/// Matches flag arguments to their respective functionaity when the `-` character is detected.
+/// Matches flag arguments to their respective functionaity when the `-`
+/// character is detected.
 fn match_flag_argument(flag: char, argument: &str) -> bool {
     // TODO: Implement missing flags
     match flag {
@@ -140,7 +147,9 @@ fn match_flag_argument(flag: char, argument: &str) -> bool {
 
 /// Exits SUCCESS if the file size is greather than zero.
 fn file_size_is_greater_than_zero(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.len() > 0)
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.len() > 0)
 }
 
 /// Exits SUCCESS if the file has read permissions. This function is rather low level because
@@ -192,42 +201,60 @@ fn file_has_execute_permission(filepath: &str) -> bool {
 
 /// Exits SUCCESS if the file argument is a socket
 fn file_is_socket(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_socket())
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_socket())
 }
 
 /// Exits SUCCESS if the file argument is a block device
 fn file_is_block_device(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_block_device())
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_block_device())
 }
 
 /// Exits SUCCESS if the file argument is a character device
 fn file_is_character_device(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_char_device())
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_char_device())
 }
 
 /// Exits SUCCESS if the file exists
-fn file_exists(filepath: &str) -> bool { Path::new(filepath).exists() }
+fn file_exists(filepath: &str) -> bool {
+    Path::new(filepath).exists()
+}
 
 /// Exits SUCCESS if the file is a regular file
 fn file_is_regular(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_file())
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_file())
 }
 
 /// Exits SUCCESS if the file is a directory
 fn file_is_directory(filepath: &str) -> bool {
-    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_dir())
+    fs::metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_dir())
 }
 
 /// Exits SUCCESS if the file is a symbolic link
 fn file_is_symlink(filepath: &str) -> bool {
-    fs::symlink_metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_symlink())
+    fs::symlink_metadata(filepath)
+        .ok()
+        .map_or(false, |metadata| metadata.file_type().is_symlink())
 }
 
 /// Exits SUCCESS if the string is not empty
-fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
+fn string_is_nonzero(string: &str) -> bool {
+    !string.is_empty()
+}
 
 /// Exits SUCCESS if the string is empty
-fn string_is_zero(string: &str) -> bool { string.is_empty() }
+fn string_is_zero(string: &str) -> bool {
+    string.is_empty()
+}
 
 #[test]
 fn test_strings() {
@@ -320,6 +347,9 @@ fn test_file_has_execute_permission() {
 
 #[test]
 fn test_file_size_is_greater_than_zero() {
-    assert_eq!(file_size_is_greater_than_zero("testing/file_with_text"), true);
+    assert_eq!(
+        file_size_is_greater_than_zero("testing/file_with_text"),
+        true
+    );
     assert_eq!(file_size_is_greater_than_zero("testing/empty_file"), false);
 }

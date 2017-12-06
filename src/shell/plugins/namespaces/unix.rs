@@ -73,7 +73,9 @@ impl StringNamespace {
                             // Then attempt to load that symbol from the dynamic library.
                             let symbol: Symbol<
                                 unsafe extern "C" fn() -> *mut c_char,
-                            > = library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
+                            > = library
+                                .get(symbol.as_slice())
+                                .map_err(StringError::SymbolErr)?;
 
                             // And finally add the name of the function and it's function into the
                             // map.
@@ -84,8 +86,8 @@ impl StringNamespace {
                     counter += 1;
                 }
 
-                // Identical to the logic in the loop above. Handles any unparsed stragglers that
-                // have been left over.
+                // Identical to the logic in the loop above. Handles any unparsed stragglers
+                // that have been left over.
                 if counter != start {
                     let slice = &symbol_list[start..];
                     let identifier = str::from_utf8(slice)
@@ -95,8 +97,9 @@ impl StringNamespace {
                     symbol.reserve_exact(slice.len() + 1);
                     symbol.extend_from_slice(slice);
                     symbol.push(b'\0');
-                    let symbol: Symbol<unsafe extern "C" fn() -> *mut c_char> =
-                        library.get(symbol.as_slice()).map_err(StringError::SymbolErr)?;
+                    let symbol: Symbol<unsafe extern "C" fn() -> *mut c_char> = library
+                        .get(symbol.as_slice())
+                        .map_err(StringError::SymbolErr)?;
                     symbols.insert(identifier, symbol.into_raw());
                 }
             }
@@ -110,8 +113,9 @@ impl StringNamespace {
     /// If the function exists, it is executed, and it's return value is then converted into a
     /// proper Rusty type.
     pub(crate) fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> {
-        let func =
-            self.symbols.get(&function).ok_or(StringError::FunctionMissing(function.clone()))?;
+        let func = self.symbols
+            .get(&function)
+            .ok_or(StringError::FunctionMissing(function.clone()))?;
         unsafe {
             let data = (*func)();
             if data.is_null() {

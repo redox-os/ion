@@ -1,6 +1,7 @@
 use super::Shell;
 use super::flags::*;
-use super::flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function, Statement};
+use super::flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function,
+                          Statement};
 use super::job_control::JobControl;
 use super::status::*;
 use parser::{expand_string, parse_and_validate, ForExpression, StatementSplitter};
@@ -30,12 +31,15 @@ pub(crate) trait FlowLogic {
         iterator: &mut I,
         statement: Statement,
     ) -> Result<(), &'static str>
-        where I: Iterator<Item = Statement>;
+    where
+        I: Iterator<Item = Statement>;
 
-    /// Executes all of the statements within a while block until a certain condition is met.
+    /// Executes all of the statements within a while block until a certain
+    /// condition is met.
     fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) -> Condition;
 
-    /// Executes all of the statements within a for block for each value specified in the range.
+    /// Executes all of the statements within a for block for each value
+    /// specified in the range.
     fn execute_for(
         &mut self,
         variable: &str,
@@ -43,7 +47,8 @@ pub(crate) trait FlowLogic {
         statements: Vec<Statement>,
     ) -> Condition;
 
-    /// Conditionally executes branches of statements according to evaluated expressions
+    /// Conditionally executes branches of statements according to evaluated
+    /// expressions
     fn execute_if(
         &mut self,
         expression: Pipeline,
@@ -57,9 +62,11 @@ pub(crate) trait FlowLogic {
 
     /// Executes a single statement
     fn execute_statement<I>(&mut self, iterator: &mut I, statement: Statement) -> Condition
-        where I: Iterator<Item = Statement>;
+    where
+        I: Iterator<Item = Statement>;
 
-    /// Expand an expression and run a branch based on the value of the expanded expression
+    /// Expand an expression and run a branch based on the value of the
+    /// expanded expression
     fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition;
 }
 
@@ -68,8 +75,9 @@ impl FlowLogic for Shell {
         self.break_flow = false;
         let mut iterator = StatementSplitter::new(command_string).map(parse_and_validate);
 
-        // If the value is set to `0`, this means that we don't need to append to an existing
-        // partial statement block in memory, but can read and execute new statements.
+        // If the value is set to `0`, this means that we don't need to append to an
+        // existing partial statement block in memory, but can read and execute
+        // new statements.
         if self.flow_control.level == 0 {
             while let Some(statement) = iterator.next() {
                 // Executes all statements that it can, and stores the last remaining partial
@@ -92,9 +100,15 @@ impl FlowLogic for Shell {
                 current_if_mode: &mut u8,
             ) {
                 match current_statement {
-                    &mut Statement::While { ref mut statements, .. }
-                    | &mut Statement::For { ref mut statements, .. }
-                    | &mut Statement::Function { ref mut statements, .. } => {
+                    &mut Statement::While {
+                        ref mut statements, ..
+                    }
+                    | &mut Statement::For {
+                        ref mut statements, ..
+                    }
+                    | &mut Statement::Function {
+                        ref mut statements, ..
+                    } => {
                         collect_loops(&mut iterator, statements, level);
                     }
                     &mut Statement::If {
@@ -166,25 +180,42 @@ impl FlowLogic for Shell {
                         Statement::Export(action) => {
                             shell.previous_status = shell.export(action);
                         }
-                        Statement::While { expression, statements } => {
+                        Statement::While {
+                            expression,
+                            statements,
+                        } => {
                             if let Condition::SigInt = shell.execute_while(expression, statements) {
                                 return Condition::SigInt;
                             }
                         }
-                        Statement::For { variable, values, statements } => {
+                        Statement::For {
+                            variable,
+                            values,
+                            statements,
+                        } => {
                             if let Condition::SigInt =
                                 shell.execute_for(&variable, &values, statements)
                             {
                                 return Condition::SigInt;
                             }
                         }
-                        Statement::Function { name, args, statements, description } => {
+                        Statement::Function {
+                            name,
+                            args,
+                            statements,
+                            description,
+                        } => {
                             shell.functions.insert(
                                 name.clone(),
                                 Function::new(description, name, args, statements),
                             );
                         }
-                        Statement::If { expression, success, else_if, failure } => {
+                        Statement::If {
+                            expression,
+                            success,
+                            else_if,
+                            failure,
+                        } => {
                             shell.execute_if(expression, success, else_if, failure);
                         }
                         Statement::Match { expression, cases } => {
@@ -239,10 +270,10 @@ impl FlowLogic for Shell {
     }
 
     fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition {
-        // Logic for determining if the LHS of a match-case construct (the value we are matching
-        // against) matches the RHS of a match-case construct (a value in a case statement). For
-        // example, checking to see if the value "foo" matches the pattern "bar" would be invoked
-        // like so :
+        // Logic for determining if the LHS of a match-case construct (the value we are
+        // matching against) matches the RHS of a match-case construct (a value
+        // in a case statement). For example, checking to see if the value
+        // "foo" matches the pattern "bar" would be invoked like so :
         // ```ignore
         // matches("foo", "bar")
         // ```
@@ -352,7 +383,8 @@ impl FlowLogic for Shell {
     }
 
     fn execute_statement<I>(&mut self, mut iterator: &mut I, statement: Statement) -> Condition
-        where I: Iterator<Item = Statement>
+    where
+        I: Iterator<Item = Statement>,
     {
         match statement {
             Statement::Error(number) => self.previous_status = number,
@@ -362,21 +394,33 @@ impl FlowLogic for Shell {
             Statement::Export(action) => {
                 self.previous_status = self.export(action);
             }
-            Statement::While { expression, mut statements } => {
+            Statement::While {
+                expression,
+                mut statements,
+            } => {
                 self.flow_control.level += 1;
                 collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
                 if let Condition::SigInt = self.execute_while(expression, statements) {
                     return Condition::SigInt;
                 }
             }
-            Statement::For { variable, values, mut statements } => {
+            Statement::For {
+                variable,
+                values,
+                mut statements,
+            } => {
                 self.flow_control.level += 1;
                 collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
                 if let Condition::SigInt = self.execute_for(&variable, &values, statements) {
                     return Condition::SigInt;
                 }
             }
-            Statement::If { expression, mut success, mut else_if, mut failure } => {
+            Statement::If {
+                expression,
+                mut success,
+                mut else_if,
+                mut failure,
+            } => {
                 self.flow_control.level += 1;
                 if let Err(why) = collect_if(
                     &mut iterator,
@@ -401,11 +445,18 @@ impl FlowLogic for Shell {
                     Condition::SigInt => return Condition::SigInt,
                 }
             }
-            Statement::Function { name, args, mut statements, description } => {
+            Statement::Function {
+                name,
+                args,
+                mut statements,
+                description,
+            } => {
                 self.flow_control.level += 1;
                 collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
-                self.functions
-                    .insert(name.clone(), Function::new(description, name, args, statements));
+                self.functions.insert(
+                    name.clone(),
+                    Function::new(description, name, args, statements),
+                );
             }
             Statement::Pipeline(mut pipeline) => {
                 self.run_pipeline(&mut pipeline);
@@ -446,7 +497,10 @@ impl FlowLogic for Shell {
             }
             Statement::Break => return Condition::Break,
             Statement::Continue => return Condition::Continue,
-            Statement::Match { expression, mut cases } => {
+            Statement::Match {
+                expression,
+                mut cases,
+            } => {
                 self.flow_control.level += 1;
                 if let Err(why) =
                     collect_cases(&mut iterator, &mut cases, &mut self.flow_control.level)
@@ -557,7 +611,9 @@ impl FlowLogic for Shell {
         failure: Vec<Statement>,
     ) -> Condition {
         let first_condition = iter::once((expression, success));
-        let else_conditions = else_if.into_iter().map(|cond| (cond.expression, cond.success));
+        let else_conditions = else_if
+            .into_iter()
+            .map(|cond| (cond.expression, cond.success));
 
         for (mut condition, mut statements) in first_condition.chain(else_conditions) {
             if self.run_pipeline(&mut condition) == Some(SUCCESS) {
@@ -573,7 +629,8 @@ impl FlowLogic for Shell {
         iterator: &mut I,
         statement: Statement,
     ) -> Result<(), &'static str>
-        where I: Iterator<Item = Statement>
+    where
+        I: Iterator<Item = Statement>,
     {
         match statement {
             Statement::Error(number) => self.previous_status = number,
@@ -586,7 +643,10 @@ impl FlowLogic for Shell {
             }
             // Collect the statements for the while loop, and if the loop is complete,
             // execute the while loop with the provided expression.
-            Statement::While { expression, mut statements } => {
+            Statement::While {
+                expression,
+                mut statements,
+            } => {
                 self.flow_control.level += 1;
 
                 // Collect all of the statements contained within the while block.
@@ -597,13 +657,19 @@ impl FlowLogic for Shell {
                     self.execute_while(expression, statements);
                 } else {
                     // Store the partial `Statement::While` to memory
-                    self.flow_control.current_statement =
-                        Statement::While { expression: expression, statements: statements }
+                    self.flow_control.current_statement = Statement::While {
+                        expression: expression,
+                        statements: statements,
+                    }
                 }
             }
             // Collect the statements for the for loop, and if the loop is complete,
             // execute the for loop with the provided expression.
-            Statement::For { variable, values, mut statements } => {
+            Statement::For {
+                variable,
+                values,
+                mut statements,
+            } => {
                 self.flow_control.level += 1;
 
                 // Collect all of the statements contained within the for block.
@@ -615,15 +681,20 @@ impl FlowLogic for Shell {
                 } else {
                     // Store the partial `Statement::For` to memory
                     self.flow_control.current_statement = Statement::For {
-                        variable:   variable,
-                        values:     values,
+                        variable: variable,
+                        values: values,
                         statements: statements,
                     }
                 }
             }
             // Collect the statements needed for the `success`, `else_if`, and `failure`
             // conditions; then execute the if statement if it is complete.
-            Statement::If { expression, mut success, mut else_if, mut failure } => {
+            Statement::If {
+                expression,
+                mut success,
+                mut else_if,
+                mut failure,
+            } => {
                 self.flow_control.level += 1;
 
                 // Collect all of the success and failure statements within the if condition.
@@ -646,15 +717,20 @@ impl FlowLogic for Shell {
                     self.flow_control.current_if_mode = mode;
                     self.flow_control.current_statement = Statement::If {
                         expression: expression,
-                        success:    success,
-                        else_if:    else_if,
-                        failure:    failure,
+                        success: success,
+                        else_if: else_if,
+                        failure: failure,
                     };
                 }
             }
             // Collect the statements needed by the function and add the function to the
             // list of functions if it is complete.
-            Statement::Function { name, args, mut statements, description } => {
+            Statement::Function {
+                name,
+                args,
+                mut statements,
+                description,
+            } => {
                 self.flow_control.level += 1;
 
                 // The same logic that applies to loops, also applies here.
@@ -662,15 +738,17 @@ impl FlowLogic for Shell {
 
                 if self.flow_control.level == 0 {
                     // All blocks were read, thus we can add it to the list
-                    self.functions
-                        .insert(name.clone(), Function::new(description, name, args, statements));
+                    self.functions.insert(
+                        name.clone(),
+                        Function::new(description, name, args, statements),
+                    );
                 } else {
                     // Store the partial function declaration in memory.
                     self.flow_control.current_statement = Statement::Function {
                         description: description,
-                        name:        name,
-                        args:        args,
-                        statements:  statements,
+                        name: name,
+                        args: args,
+                        statements: statements,
                     }
                 }
             }
@@ -732,7 +810,10 @@ impl FlowLogic for Shell {
                 let _ = writeln!(stderr, "ion: syntax error: no block to end");
             }
             // Collect all cases that are being used by a match construct
-            Statement::Match { expression, mut cases } => {
+            Statement::Match {
+                expression,
+                mut cases,
+            } => {
                 self.flow_control.level += 1;
                 if let Err(why) = collect_cases(iterator, &mut cases, &mut self.flow_control.level)
                 {

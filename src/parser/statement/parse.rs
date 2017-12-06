@@ -7,7 +7,8 @@ use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};
 use std::char;
 
 fn collect<F>(arguments: &str, statement: F) -> Statement
-    where F: Fn(Pipeline) -> Statement
+where
+    F: Fn(Pipeline) -> Statement,
 {
     match pipelines::Collector::run(arguments) {
         Ok(pipeline) => statement(pipeline),
@@ -18,7 +19,9 @@ fn collect<F>(arguments: &str, statement: F) -> Statement
     }
 }
 
-fn is_valid_name(name: &str) -> bool { !name.chars().any(|c| !(c.is_alphanumeric() || c == '_')) }
+fn is_valid_name(name: &str) -> bool {
+    !name.chars().any(|c| !(c.is_alphanumeric() || c == '_'))
+}
 
 pub(crate) fn parse(code: &str) -> Statement {
     let cmd = code.trim();
@@ -51,7 +54,8 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             };
 
-            // After also ensuring the the operator is a valid operator, create the let statement.
+            // After also ensuring the the operator is a valid operator, create the let
+            // statement.
             match Operator::parse(op) {
                 Ok(operator) => {
                     return Statement::Let(LocalAction::Assign(keys, operator, values));
@@ -85,7 +89,8 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             };
 
-            // After also ensuring the the operator is a valid operator, create the let statement.
+            // After also ensuring the the operator is a valid operator, create the let
+            // statement.
             match Operator::parse(op) {
                 Ok(operator) => {
                     return Statement::Export(ExportAction::Assign(keys, operator, values));
@@ -100,9 +105,9 @@ pub(crate) fn parse(code: &str) -> Statement {
             return collect(cmd[3..].trim_left(), |pipeline| {
                 Statement::If {
                     expression: pipeline,
-                    success:    Vec::new(),
-                    else_if:    Vec::new(),
-                    failure:    Vec::new(),
+                    success: Vec::new(),
+                    else_if: Vec::new(),
+                    failure: Vec::new(),
                 }
             })
         }
@@ -113,13 +118,19 @@ pub(crate) fn parse(code: &str) -> Statement {
                 return Statement::Else;
             } else if cmd.starts_with("if ") {
                 return collect(cmd[3..].trim_left(), |pipeline| {
-                    Statement::ElseIf(ElseIf { expression: pipeline, success:    Vec::new() })
+                    Statement::ElseIf(ElseIf {
+                        expression: pipeline,
+                        success: Vec::new(),
+                    })
                 });
             }
         }
         _ if cmd.starts_with("while ") => {
             return collect(cmd[6..].trim_left(), |pipeline| {
-                Statement::While { expression: pipeline, statements: Vec::new() }
+                Statement::While {
+                    expression: pipeline,
+                    statements: Vec::new(),
+                }
             })
         }
         _ if cmd.starts_with("for ") => {
@@ -141,8 +152,10 @@ pub(crate) fn parse(code: &str) -> Statement {
             }
 
             return Statement::For {
-                variable:   variable.into(),
-                values:     ArgumentSplitter::new(cmd[3..].trim_left()).map(String::from).collect(),
+                variable: variable.into(),
+                values: ArgumentSplitter::new(cmd[3..].trim_left())
+                    .map(String::from)
+                    .collect(),
                 statements: Vec::new(),
             };
         }
@@ -166,12 +179,17 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             };
 
-            return Statement::Case(Case { value, binding, conditional, statements: Vec::new() });
+            return Statement::Case(Case {
+                value,
+                binding,
+                conditional,
+                statements: Vec::new(),
+            });
         }
         _ if cmd.starts_with("match ") => {
             return Statement::Match {
                 expression: cmd[6..].trim_left().into(),
-                cases:      Vec::new(),
+                cases: Vec::new(),
             }
         }
         _ if cmd.starts_with("fn ") => {
@@ -234,7 +252,7 @@ mod tests {
             expression: Pipeline {
                 items: vec![
                     PipeItem {
-                        job:     Job::new(
+                        job: Job::new(
                             vec![
                                 "test".to_owned(),
                                 "1".to_owned(),
@@ -245,13 +263,13 @@ mod tests {
                             JobKind::Last,
                         ),
                         outputs: Vec::new(),
-                        inputs:  Vec::new(),
+                        inputs: Vec::new(),
                     },
                 ],
             },
-            success:    vec![],
-            else_if:    vec![],
-            failure:    vec![],
+            success: vec![],
+            else_if: vec![],
+            failure: vec![],
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -300,9 +318,9 @@ mod tests {
         let parsed_if = parse("fn bob");
         let correct_parse = Statement::Function {
             description: None,
-            name:        "bob".into(),
-            args:        Default::default(),
-            statements:  Default::default(),
+            name: "bob".into(),
+            args: Default::default(),
+            statements: Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -318,12 +336,18 @@ mod tests {
         let parsed_if = parse("fn bob a b");
         let correct_parse = Statement::Function {
             description: None,
-            name:        "bob".into(),
-            args:        vec![
-                KeyBuf { name: "a".into(), kind: Primitive::Any },
-                KeyBuf { name: "b".into(), kind: Primitive::Any },
+            name: "bob".into(),
+            args: vec![
+                KeyBuf {
+                    name: "a".into(),
+                    kind: Primitive::Any,
+                },
+                KeyBuf {
+                    name: "b".into(),
+                    kind: Primitive::Any,
+                },
             ],
-            statements:  Default::default(),
+            statements: Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -334,12 +358,18 @@ mod tests {
         let parsed_if = parse("fn bob a b --bob is a nice function");
         let correct_parse = Statement::Function {
             description: Some("bob is a nice function".to_string()),
-            name:        "bob".into(),
-            args:        vec![
-                KeyBuf { name: "a".into(), kind: Primitive::Any },
-                KeyBuf { name: "b".into(), kind: Primitive::Any },
+            name: "bob".into(),
+            args: vec![
+                KeyBuf {
+                    name: "a".into(),
+                    kind: Primitive::Any,
+                },
+                KeyBuf {
+                    name: "b".into(),
+                    kind: Primitive::Any,
+                },
             ],
-            statements:  vec![],
+            statements: vec![],
         };
         assert_eq!(correct_parse, parsed_if);
         let parsed_if = parse("fn bob a b --          bob is a nice function");
