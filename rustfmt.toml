@@ -1,3 +1,4 @@
+unstable_features = true
 array_horizontal_layout_threshold = 100
 array_width = 100
 attributes_on_same_line_as_field = false
@@ -6,7 +7,7 @@ chain_one_line_max = 100
 chain_width = 100
 comment_width = 100
 condense_wildcard_suffixes = true
-error_on_line_overflow = false
+error_on_line_overflow_comments = false
 fn_call_width = 100
 fn_single_line = true
 format_strings = true

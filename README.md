@@ -28,7 +28,8 @@ We are providing our manual for Ion in the form of a markdown-based book, which 
 
 ### Code Formatting
 
-When submitting a pull request, be sure to run `cargo +nightly fmt` on your project with a
+When submitting a pull request, be sure to run
+`env CFG_RELEASE_CHANNEL=nightly cargo +nightly fmt` on your project with a
 nightly version of **rustfmt**. This will prevent me from having to push PR's specifically
 to format the code base from time to time. To install **rustfmt-nightly**, simply run
 `cargo install rustfmt-nightly --force`.
