@@ -170,19 +170,19 @@ fn complete_as_file(current_dir: PathBuf, filename: String, index: usize) -> boo
 /// prints prompt info lines and
 /// returns the last prompt line.
 fn handle_prompt(full_prompt: String) -> Result<String, String> {
-    if !full_prompt.contains("\n") {
+    
+    if let Some(index) = full_prompt.rfind('\n') {
+        let (info, prompt) = full_prompt.split_at(index+1);
+
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        if let Err(why) =
+            handle.write(info.as_bytes()) {
+            return Err(format!("unable to print prompt info: {}", why));
+        }
+
+        return Ok(String::from(prompt))
+    } else {
         return Ok(full_prompt)
-    }
-
-    let stdout = io::stdout();
-    let mut handle = stdout.lock();
-    if let Err(why) =
-        handle.write(full_prompt.as_bytes()) {
-        return Err(format!("unable to print prompt info: {}", why));
-    }
-
-    match full_prompt.lines().last() {
-        Some(prompt) => Ok(String::from(prompt)),
-        None => Err(format!("unable to get prompt"))
     }
 }
