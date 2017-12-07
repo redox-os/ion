@@ -350,11 +350,11 @@ impl<'a> Collector<'a> {
                                 }
                                 unsafe { String::from_utf8_unchecked(buffer) }
                             };
-                            let heredoc = heredoc.lines().collect::<Vec<&str>>();
-                            // Then collect the heredoc from standard input.
-                            inputs.as_mut().map(|x| {
-                                x.push(Input::HereString(heredoc[1..heredoc.len() - 1].join("\n")))
-                            });
+                            let heredoc = heredoc.lines().skip(1).collect::<Vec<&str>>();
+                            if heredoc.len() > 1 {
+                                let herestring = Input::HereString(heredoc[..heredoc.len()-1].join("\n"));
+                                inputs.as_mut().map(|x| x.push(herestring.clone()));
+                            }
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
                         // Otherwise interpret it as stdin redirection
