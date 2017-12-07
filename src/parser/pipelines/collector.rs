@@ -281,6 +281,10 @@ impl<'a> Collector<'a> {
                             bytes.next();
                             try_add_item!(JobKind::And);
                         }
+                        Some(&(_, b'!')) => {
+                            bytes.next();
+                            try_add_item!(JobKind::Disown);
+                        }
                         Some(_) | None => {
                             try_add_item!(JobKind::Background);
                         }
@@ -638,6 +642,16 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo hello world &") {
             let items = pipeline.items;
             assert_eq!(JobKind::Background, items[0].job.kind);
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn disown_job() {
+        if let Statement::Pipeline(pipeline) = parse("echo hello world&!") {
+            let items = pipeline.items;
+            assert_eq!(JobKind::Disown, items[0].job.kind);
         } else {
             assert!(false);
         }

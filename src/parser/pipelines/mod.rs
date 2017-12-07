@@ -84,6 +84,7 @@ impl Pipeline {
         self.items.len() > 1 || self.items.iter().any(|it| it.outputs.len() > 0)
             || self.items.iter().any(|it| it.inputs.len() > 0)
             || self.items.last().unwrap().job.kind == JobKind::Background
+            || self.items.last().unwrap().job.kind == JobKind::Disown
     }
 }
 
@@ -127,6 +128,7 @@ impl fmt::Display for Pipeline {
                 JobKind::And => tokens.push("&&".into()),
                 JobKind::Or => tokens.push("||".into()),
                 JobKind::Background => tokens.push("&".into()),
+                JobKind::Disown => tokens.push("&!".into()),
                 JobKind::Pipe(RedirectFrom::Stdout) => tokens.push("|".into()),
                 JobKind::Pipe(RedirectFrom::Stderr) => tokens.push("^|".into()),
                 JobKind::Pipe(RedirectFrom::Both) => tokens.push("&|".into()),
