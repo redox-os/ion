@@ -353,7 +353,7 @@ impl<'a> Collector<'a> {
                             let heredoc = heredoc.lines().collect::<Vec<&str>>();
                             // Then collect the heredoc from standard input.
                             inputs.as_mut().map(|x| {
-                                x.push(Input::HereString(heredoc[1..heredoc.len() - 1].join("\n")))
+                                x.push(Input::HereString(heredoc[1..heredoc.len()].join("\n")))
                             });
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
