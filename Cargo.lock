@@ -207,7 +207,7 @@ dependencies = [
  "unicode-segmentation 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "users 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "version_check 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "xdg 2.1.0 (git+https://github.com/jD91mZM2/rust-xdg?branch=redox)",
+ "xdg 2.1.0 (git+https://github.com/whitequark/rust-xdg)",
 ]
 
 [[package]]
@@ -472,7 +472,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "xdg"
 version = "2.1.0"
-source = "git+https://github.com/jD91mZM2/rust-xdg?branch=redox#5435baa3ac09a00c38fa931c6e7b929353e3286e"
+source = "git+https://github.com/whitequark/rust-xdg#a1c9249f78a5395c2ee3dc8688a03c59fe9afe2a"
 
 [metadata]
 "checksum aho-corasick 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "500909c4f87a9e52355b26626d890833e9e1d53ac566db76c36faa984b889699"
@@ -537,4 +537,4 @@ source = "git+https://github.com/jD91mZM2/rust-xdg?branch=redox#5435baa3ac09a00c
 "checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
 "checksum winapi-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2d315eee3b34aca4797b2da6b13ed88266e6d612562a0c46390af8299fc699bc"
-"checksum xdg 2.1.0 (git+https://github.com/jD91mZM2/rust-xdg?branch=redox)" = "<none>"
+"checksum xdg 2.1.0 (git+https://github.com/whitequark/rust-xdg)" = "<none>"
