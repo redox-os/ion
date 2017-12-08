@@ -18,6 +18,7 @@ pub(crate) fn fork_pipe(
     shell: &mut Shell,
     commands: Vec<(RefinedJob, JobKind)>,
     command_name: String,
+    state: ProcessState
 ) -> i32 {
     match unsafe { sys::fork() } {
         Ok(0) => {
@@ -38,8 +39,10 @@ pub(crate) fn fork_pipe(
             exit(pipe(shell, commands, false));
         }
         Ok(pid) => {
-            // The parent process should add the child fork's PID to the background.
-            shell.send_to_background(pid, ProcessState::Running, command_name);
+            if state != ProcessState::Empty {
+                // The parent process should add the child fork's PID to the background.
+                shell.send_to_background(pid, state, command_name);
+            }
             SUCCESS
         }
         Err(why) => {
