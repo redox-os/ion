@@ -165,9 +165,18 @@ impl<'a> Shell {
     }
 
     pub(crate) fn exit(&mut self, status: i32) -> ! {
-        if let Some(context) = self.context.as_mut() {
-            context.history.commit_history();
+        // The context has two purposes: if it exists, this is an interactive shell; and the
+        // context will also be sent a signal to commit all changes to the history file,
+        // and waiting for the history thread in the background to finish.
+        if self.context.is_some() {
+            if self.flags & HUPONEXIT != 0 {
+                self.resume_stopped();
+                self.background_send(sys::SIGHUP);
+            }
+            let context = self.context.as_mut().unwrap();
+            context.history.commit_history()
         }
+        
         process::exit(status);
     }
 

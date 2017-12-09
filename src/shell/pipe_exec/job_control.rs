@@ -29,6 +29,7 @@ pub(crate) trait JobControl {
     /// will
     /// be returned, and ownership of the TTY given back to the shell.
     fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32;
+    fn resume_stopped(&mut self);
     fn handle_signal(&self, signal: i32) -> bool;
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
@@ -174,6 +175,15 @@ impl JobControl for Shell {
     fn foreground_send(&self, signal: i32) {
         for &process in self.foreground.iter() {
             let _ = sys::killpg(process, signal);
+        }
+    }
+
+    /// Resumes all stopped background jobs
+    fn resume_stopped(&mut self) {
+        for process in self.background.lock().unwrap().iter() {
+            if process.state == ProcessState::Stopped {
+                signals::resume(process.pid);
+            }
         }
     }
 

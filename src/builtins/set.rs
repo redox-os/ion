@@ -1,7 +1,6 @@
 use liner::KeyBindings;
 use shell::Shell;
 use shell::flags::*;
-use std::io::{self, Write};
 use std::iter;
 
 enum PositionalArgs {
@@ -12,7 +11,6 @@ enum PositionalArgs {
 use self::PositionalArgs::*;
 
 pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
-    let stderr = io::stderr();
     let mut args_iter = args.iter();
     let mut positionals = None;
 
@@ -32,22 +30,19 @@ pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
                 match flag {
                     b'e' => shell.flags |= ERR_EXIT,
                     b'o' => match args_iter.next() {
-                        Some(&mode) if mode == "vi" => {
-                            if let Some(context) = shell.context.as_mut() {
-                                context.key_bindings = KeyBindings::Vi;
-                            }
+                        Some(&"vi") => if let Some(context) = shell.context.as_mut() {
+                            context.key_bindings = KeyBindings::Vi;
                         }
-                        Some(&mode) if mode == "emacs" => {
-                            if let Some(context) = shell.context.as_mut() {
-                                context.key_bindings = KeyBindings::Emacs;
-                            }
+                        Some(&"emacs") => if let Some(context) = shell.context.as_mut() {
+                            context.key_bindings = KeyBindings::Emacs;
                         }
+                        Some(&"huponexit") => shell.flags |= HUPONEXIT,
                         Some(_) => {
-                            let _ = stderr.lock().write_all(b"set: invalid keymap\n");
+                            eprintln!("ion: set: invalid option");
                             return 0;
                         }
                         None => {
-                            let _ = stderr.lock().write_all(b"set: no keymap given\n");
+                            eprintln!("ion: set: no option given");
                             return 0;
                         }
                     },
@@ -60,6 +55,17 @@ pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
                 match flag {
                     b'e' => shell.flags &= 255 ^ ERR_EXIT,
                     b'x' => shell.flags &= 255 ^ PRINT_COMMS,
+                    b'o' => match args_iter.next() {
+                        Some(&"huponexit") => shell.flags &= 255 ^ HUPONEXIT,
+                        Some(_) => {
+                            eprintln!("ion: set: invalid option");
+                            return 0;
+                        }
+                        None => {
+                            eprintln!("ion: set: no option given");
+                            return 0;
+                        }
+                    }
                     _ => return 0,
                 }
             }
