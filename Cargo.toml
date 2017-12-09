@@ -39,7 +39,7 @@ regex = "0.2"
 smallstring = "0.1"
 smallvec = "0.4"
 unicode-segmentation = "1.2"
-xdg = { git = "https://github.com/jD91mZM2/rust-xdg", branch = "redox" }
+xdg = { git = "https://github.com/whitequark/rust-xdg" }
 
 [profile.release]
 lto = true

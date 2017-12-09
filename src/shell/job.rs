@@ -13,6 +13,7 @@ use types::*;
 pub(crate) enum JobKind {
     And,
     Background,
+    Disown,
     Last,
     Or,
     Pipe(RedirectFrom),

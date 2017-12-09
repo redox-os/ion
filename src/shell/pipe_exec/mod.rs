@@ -13,7 +13,7 @@ mod streams;
 
 use self::command_not_found::command_not_found;
 use self::fork::{create_process_group, fork_pipe};
-use self::job_control::JobControl;
+use self::job_control::{JobControl, ProcessState};
 use self::streams::{duplicate_streams, redir, redirect_streams};
 use super::{JobKind, Shell};
 use super::flags::*;
@@ -54,13 +54,14 @@ pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<RawFd, Error> {
 /// 1. If the result is `Some`, then we will fork the pipeline executing into the background.
 /// 2. The value stored within `Some` will be that background job's command name.
 /// 3. If `set -x` was set, print the command.
-fn gen_background_string(pipeline: &Pipeline, print_comm: bool) -> Option<String> {
-    if pipeline.items[pipeline.items.len() - 1].job.kind == JobKind::Background {
+fn gen_background_string(pipeline: &Pipeline, print_comm: bool) -> Option<(String, bool)> {
+    let last = &pipeline.items[pipeline.items.len() - 1];
+    if last.job.kind == JobKind::Background || last.job.kind == JobKind::Disown {
         let command = pipeline.to_string();
         if print_comm {
             eprintln!("> {}", command);
         }
-        Some(command)
+        Some((command, last.job.kind == JobKind::Disown))
     } else if print_comm {
         eprintln!("> {}", pipeline.to_string());
         None
@@ -409,7 +410,7 @@ impl PipelineExecution for Shell {
         // Remove any leftover foreground tasks from the last execution.
         self.foreground.clear();
         // If the supplied pipeline is a background, a string representing the command
-        // will be stored here.
+        // and a boolean representing whether it should be disowned is stored here.
         let possible_background_name =
             gen_background_string(&pipeline, self.flags & PRINT_COMMS != 0);
         // Generates commands for execution, differentiating between external and
@@ -431,8 +432,12 @@ impl PipelineExecution for Shell {
         };
 
         // If the given pipeline is a background task, fork the shell.
-        if let Some(command_name) = possible_background_name {
-            fork_pipe(self, piped_commands, command_name)
+        if let Some((command_name, disown)) = possible_background_name {
+            fork_pipe(self, piped_commands, command_name, if disown {
+                ProcessState::Empty
+            } else {
+                ProcessState::Running
+            })
         } else {
             // While active, the SIGTTOU signal will be ignored.
             let _sig_ignore = SignalHandler::new();
