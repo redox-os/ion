@@ -1,0 +1,16 @@
+let x = [
+    a # a comment
+    b # another comment
+    ab#cd #with a comment
+]
+
+echo @x
+
+let y = [
+    a
+    # a comment
+    #another comment
+]
+
+echo @x
+
