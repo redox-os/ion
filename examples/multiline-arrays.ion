@@ -12,5 +12,4 @@ let y = [
     #another comment
 ]
 
-echo @x
-
+echo @y
