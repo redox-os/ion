@@ -176,7 +176,7 @@ impl<'a> Shell {
             let context = self.context.as_mut().unwrap();
             context.history.commit_history()
         }
-        
+
         process::exit(status);
     }
 
@@ -230,7 +230,7 @@ impl<'a> Shell {
 
         // Expand any aliases found
         for job_no in 0..pipeline.items.len() {
-            let mut last_command = String::new();
+            let mut last_command = String::with_capacity(32);
             loop {
                 let possible_alias = {
                     let key: &str = pipeline.items[job_no].job.command.as_ref();
@@ -265,11 +265,11 @@ impl<'a> Shell {
                 if self.flags & PRINT_COMMS != 0 {
                     eprintln!("> {}", pipeline.to_string());
                 }
-                let borrowed = &pipeline.items[0].job.args;
-                let small: SmallVec<[&str; 4]> = borrowed.iter().map(|x| x as &str).collect();
                 if self.flags & NO_EXEC != 0 {
                     Some(SUCCESS)
                 } else {
+                    let borrowed = &pipeline.items[0].job.args;
+                    let small: SmallVec<[&str; 4]> = borrowed.iter().map(|x| x as &str).collect();
                     Some(main(&small, self))
                 }
             } else {
@@ -316,9 +316,7 @@ impl<'a> Shell {
                         elapsed_time.subsec_nanos()
                     );
                     context.history.push(summary.into()).unwrap_or_else(|err| {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "ion: {}\n", err);
+                        eprintln!("ion: history append: {}", err);
                     });
                 }
             }
@@ -459,11 +457,7 @@ impl<'a> Expander for Shell {
             found = match self.variables.get_map(array) {
                 Some(map) => match selection {
                     Select::All => {
-                        let mut arr = Array::new();
-                        for (_, value) in map {
-                            arr.push(value.clone());
-                        }
-                        Some(arr)
+                        Some(map.iter().map(|(_, value)| value.clone()).collect::<Array>())
                     }
                     Select::Key(ref key) => {
                         Some(array![map.get(key.get()).unwrap_or(&"".into()).clone()])
