@@ -1,0 +1,6 @@
+for value in 1...10
+    if test 0 -eq $(( value % 2 ))
+        continue
+    end
+    echo $value
+end
