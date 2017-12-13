@@ -6,11 +6,10 @@ use sys;
 
 pub(crate) fn prompt(shell: &mut Shell) -> String {
     if shell.flow_control.level == 0 {
-        let rprompt = match prompt_fn(shell) {
+        match prompt_fn(shell) {
             Some(prompt) => prompt,
-            None => shell.get_var_or_empty("PROMPT"),
-        };
-        expand_string(&rprompt, shell, false).join(" ")
+            None => expand_string(&shell.get_var_or_empty("PROMPT"), shell, false).join(" "),
+        }
     } else {
         "    ".repeat(shell.flow_control.level as usize)
     }
