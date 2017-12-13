@@ -58,6 +58,71 @@ fn escape_with_backslash() {
 }
 
 #[test]
+fn escape_control_character() {
+    let input = r#"foo\nbar"#;
+    let expected = vec![
+        WordToken::Normal("foo", false, false),
+        WordToken::Normal("\\nbar", false, false),
+    ];
+
+    compare(input, expected);
+}
+
+#[test]
+fn escaping_double_quotes() {
+    let input = r#""some\"thing\"""#;
+    let expected = vec![
+        WordToken::Normal("some", false, false),
+        WordToken::Normal("\"thing", false, false),
+        WordToken::Normal("\"", false, false),
+    ];
+
+    compare(input, expected);
+}
+
+#[test]
+fn escaping_triple_backslash() {
+    let input = r#""\\\$test""#;
+    let expected = vec![
+        WordToken::Normal("", false, false),
+        WordToken::Normal("\\", false, false),
+        WordToken::Normal("$test", false, false),
+    ];
+
+    compare(input, expected);
+}
+
+#[test]
+fn escaping_all_escapable_characters() {
+    let input = r#"let \$test = arr\[0\]+\@some"#;
+    let expected = vec![
+        WordToken::Normal("let", false, false),
+        WordToken::Whitespace(" "),
+        WordToken::Normal("$test", false, false),
+        WordToken::Whitespace(" "),
+        WordToken::Normal("=", false, false),
+        WordToken::Whitespace(" "),
+        WordToken::Normal("arr", false, false),
+        WordToken::Normal("[0", false, false),
+        WordToken::Normal("]+", false, false),
+        WordToken::Normal("@some", false, false),
+    ];
+
+    compare(input, expected);
+}
+
+#[test]
+fn escape_with_backslash_double_quotes() {
+    let input = r#""\$test""#;
+    let expected = vec![
+        WordToken::Normal("", false, false),
+        WordToken::Normal("$test", false, false),
+    ];
+
+    compare(input, expected);
+}
+
+#[test]
 fn array_expressions() {
     let input = "[ one two [three four]] [[one two] three four][0]";
     let first = vec!["one", "two", "[three four]"];

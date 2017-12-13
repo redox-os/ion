@@ -619,6 +619,15 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         }
         panic!("ion: fatal syntax error: unterminated arithmetic expression");
     }
+
+    fn can_be_escaped(&self, next: Option<u8>) -> bool {
+        match next {
+            Some(b'$') | Some(b'@') | Some(b'(') | Some(b')') | Some(b'\\') | Some(b'"')
+            | Some(b'\'') | Some(b'[') | Some(b']') | Some(b'{') | Some(b'}') => true,
+            Some(_) => false,
+            None => false,
+        }
+    }
 }
 
 impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
@@ -751,13 +760,12 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                 _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
                 b'\\' => {
                     self.flags ^= Flags::BACKSL;
-                    let end = if self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) {
-                        self.read + 1
-                    } else {
-                        self.read
-                    };
-                    let output = &self.data[start..end];
-                    self.read += 1;
+                    let output = &self.data[start..self.read];
+
+                    if self.can_be_escaped(iterator.next()) {
+                        self.read += 1;
+                    }
+
                     return Some(WordToken::Normal(output, glob, tilde));
                 }
                 b'\'' if !self.flags.contains(Flags::DQUOTE) => {
