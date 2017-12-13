@@ -126,9 +126,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                 // Handles Ctrl + D
                 Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => break,
                 Err(err) => {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "ion: liner: {}", err);
+                    eprintln!("ion: liner: {}", err);
                     return None;
                 }
             }

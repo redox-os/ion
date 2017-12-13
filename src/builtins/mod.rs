@@ -306,9 +306,7 @@ fn builtin_eval(args: &[&str], shell: &mut Shell) -> i32 {
         shell.on_command(&buffer.consume());
         shell.previous_status
     } else {
-        let stderr = io::stderr();
-        let mut stderr = stderr.lock();
-        let _ = writeln!(stderr, "ion: supplied eval expression was not terminted");
+        eprintln!("ion: supplied eval expression was not terminted");
         FAILURE
     }
 }
@@ -358,9 +356,7 @@ fn builtin_test(args: &[&str], _: &mut Shell) -> i32 {
         Ok(true) => SUCCESS,
         Ok(false) => FAILURE,
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "{}", why);
+            eprintln!("{}", why);
             FAILURE
         }
     }
@@ -371,9 +367,7 @@ fn builtin_calc(args: &[&str], _: &mut Shell) -> i32 {
     match calc::calc(&args[1..]) {
         Ok(()) => SUCCESS,
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "{}", why);
+            eprintln!("{}", why);
             FAILURE
         }
     }
@@ -386,9 +380,7 @@ fn builtin_random(args: &[&str], _: &mut Shell) -> i32 {
     match random::random(&args[1..]) {
         Ok(()) => SUCCESS,
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "{}", why);
+            eprintln!("{}", why);
             FAILURE
         }
     }
@@ -450,9 +442,7 @@ fn builtin_disown(args: &[&str], shell: &mut Shell) -> i32 {
     match job_control::disown(shell, &args[1..]) {
         Ok(()) => SUCCESS,
         Err(err) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "ion: disown: {}", err);
+            eprintln!("ion: disown: {}", err);
             FAILURE
         }
     }
@@ -601,9 +591,7 @@ fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
         Ok(true) => SUCCESS,
         Ok(false) => FAILURE,
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "{}", why);
+            eprintln!("{}", why);
             FAILURE
         }
     }

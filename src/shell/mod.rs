@@ -39,7 +39,7 @@ use parser::{ArgumentSplitter, Expander, Select};
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::iter::FromIterator;
 use std::ops::Deref;
 use std::path::Path;
