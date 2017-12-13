@@ -3,8 +3,10 @@ extern crate libc;
 pub mod job_control;
 pub mod signals;
 
-use libc::{c_int, pid_t, sighandler_t};
-use std::io;
+use libc::{c_char, c_int, pid_t, sighandler_t};
+use std::{io, ptr};
+use std::env;
+use std::ffi::CString;
 use std::os::unix::io::RawFd;
 
 pub(crate) const PATH_SEPARATOR: &str = ":";
@@ -39,6 +41,83 @@ pub(crate) fn kill(pid: u32, signal: i32) -> io::Result<()> {
 
 pub(crate) fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
     cvt(unsafe { libc::kill(-(pgid as pid_t), signal as c_int) }).and(Ok(()))
+}
+
+pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Result<()> {
+    // Prepare the program string
+    let prog_str = match CString::new(prog) {
+        Ok(prog_str) => prog_str,
+        Err(_) => { return Err(io::Error::last_os_error()); }
+    };
+
+    // Create the arguments vector
+    let mut cvt_args: Vec<CString> = Vec::new();
+    cvt_args.push(prog_str);
+    for arg in args.iter() {
+        match CString::new(*arg) {
+            Ok(arg) => cvt_args.push(arg),
+            Err(_) => {
+                return Err(io::Error::last_os_error());
+            }
+        }
+    }
+    let mut arg_ptrs: Vec<*const c_char> = cvt_args.iter().map(|x| x.as_ptr()).collect();
+    // NULL terminate the argv array
+    arg_ptrs.push(ptr::null());
+
+    // Get the PathBuf of the program if it exists.
+    let prog = if prog.contains('/') {
+        // This is a fully specified path to an executable.
+        match CString::new(prog) {
+            Ok(prog_str) => Some(prog_str),
+            Err(_) => None,
+        }
+    } else if let Ok(paths) = env::var("PATH") {
+        // This is not a fully specified scheme or path.
+        // Iterate through the possible paths in the
+        // env var PATH that this executable may be found
+        // in and return the first one found.
+        env::split_paths(&paths)
+            .filter_map(|mut path| {
+                path.push(prog);
+                match (path.exists(), path.to_str()) {
+                    (false, _) => None,
+                    (true, Some(path)) => match CString::new(path) {
+                        Ok(prog_str) => Some(prog_str),
+                        Err(_) => None,
+                    },
+                    (true, None) => None,
+                }
+            })
+            .next()
+    } else {
+        None
+    };
+
+    let mut env_ptrs: Vec<*const c_char> = Vec::new();
+    // If clear_env is not specified build envp
+    if !clear_env {
+        let mut env_vars: Vec<CString> = Vec::new();
+        for (key, value) in env::vars() {
+            match CString::new(format!("{}={}", key, value)) {
+                Ok(var) => env_vars.push(var),
+                Err(_) => {
+                    return Err(io::Error::last_os_error());
+                }
+            }
+        }
+        env_ptrs = env_vars.iter().map(|x| x.as_ptr()).collect();
+    }
+    env_ptrs.push(ptr::null());
+
+    if let Some(prog) = prog {
+        // If we found the program. Run it!
+        cvt(unsafe { libc::execve(prog.as_ptr(), arg_ptrs.as_ptr(), env_ptrs.as_ptr()) })
+            .and(Ok(()))
+    } else {
+        // The binary was not found.
+        Err(io::Error::from_raw_os_error(libc::ENOENT))
+    }
 }
 
 pub(crate) fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {

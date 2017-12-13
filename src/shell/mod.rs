@@ -164,7 +164,7 @@ impl<'a> Shell {
         }
     }
 
-    pub(crate) fn exit(&mut self, status: i32) -> ! {
+    pub(crate) fn prep_for_exit(&mut self) {
         // The context has two purposes: if it exists, this is an interactive shell; and the
         // context will also be sent a signal to commit all changes to the history file,
         // and waiting for the history thread in the background to finish.
@@ -174,9 +174,12 @@ impl<'a> Shell {
                 self.background_send(sys::SIGHUP);
             }
             let context = self.context.as_mut().unwrap();
-            context.history.commit_history()
+            context.history.commit_history();
         }
+    }
 
+    pub(crate) fn exit(&mut self, status: i32) -> ! {
+        self.prep_for_exit();
         process::exit(status);
     }
 

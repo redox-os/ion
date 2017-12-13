@@ -12,11 +12,13 @@ mod echo;
 mod set;
 mod status;
 mod exists;
+mod exec;
 mod ion;
 mod is;
 
 use self::conditionals::{contains, ends_with, starts_with};
 use self::echo::echo;
+use self::exec::exec;
 use self::exists::exists;
 use self::functions::fn_;
 use self::ion::ion_docs;
@@ -80,7 +82,8 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "drop" => builtin_drop : "Delete a variable",
     "echo" => builtin_echo : "Display a line of text",
     "ends-with" => ends_with :"Evaluates if the supplied argument ends with a given string",
-    "eval" => builtin_eval : "evaluates the evaluated expression",
+    "eval" => builtin_eval : "Evaluates the evaluated expression",
+    "exec" => builtin_exec : "Replace the shell with the given command.",
     "exists" => builtin_exists : "Performs tests on files and text",
     "exit" => builtin_exit : "Exits the current session",
     "false" => builtin_false : "Do nothing, unsuccessfully",
@@ -497,6 +500,19 @@ fn builtin_exit(args: &[&str], shell: &mut Shell) -> i32 {
             .and_then(|status| status.parse::<i32>().ok())
             .unwrap_or(previous_status),
     )
+}
+
+fn builtin_exec(args: &[&str], shell: &mut Shell) -> i32 {
+    match exec(shell, &args[1..]) {
+        // Shouldn't ever hit this case.
+        Ok(()) => SUCCESS,
+        Err(err) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = writeln!(stderr, "ion: exec: {}", err);
+            FAILURE
+        }
+    }
 }
 
 use regex::Regex;

@@ -197,6 +197,22 @@ DESCRIPTION
     all arguments are joined using a space as a separator.
 "#;
 
+pub(crate) const MAN_EXEC: &'static str = r#"NAME
+    exec - Replace the shell with the given command.
+
+SYNOPSIS
+    exec [-ch] [--help] [command [arguments ...]]
+
+DESCRIPTION
+    Execute <command>, replacing the shell with the specified program.
+    The <arguments> following the command become the arguments to
+    <command>.
+
+OPTIONS
+    -c  Execute command with an empty environment.
+"#;
+
+
 pub(crate) const MAN_HISTORY: &'static str = r#"NAME
     history - print command history
 

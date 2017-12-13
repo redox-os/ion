@@ -1,7 +1,10 @@
 extern crate syscall;
 
 use std::{io, mem, slice};
+use std::env;
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::RawFd;
+use std::path::PathBuf;
 
 use syscall::SigAction;
 
@@ -47,6 +50,55 @@ pub(crate) fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
 
 pub(crate) fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
     cvt(syscall::setpgid(pid as usize, pgid as usize)).and(Ok(()))
+}
+
+pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Result<()> {
+    // Construct a valid set of arguments to pass to execve. Ensure
+    // that the program is the first argument.
+    let mut cvt_args: Vec<[usize; 2]> = Vec::new();
+    cvt_args.push([prog.as_ptr() as usize, prog.len()]);
+    for arg in args {
+        cvt_args.push([arg.as_ptr() as usize, arg.len()]);
+    }
+
+    // Get the PathBuf of the program if it exists.
+    let prog = if prog.contains(':') || prog.contains('/') {
+        // This is a fully specified scheme or path to an
+        // executable.
+        Some(PathBuf::from(prog))
+    } else if let Ok(paths) = env::var("PATH") {
+        // This is not a fully specified scheme or path.
+        // Iterate through the possible paths in the
+        // env var PATH that this executable may be found
+        // in and return the first one found.
+        env::split_paths(&paths)
+            .filter_map(|mut path| {
+                path.push(prog);
+                if path.exists() {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .next()
+    } else {
+        None
+    };
+
+    // If clear_env set, clear the env.
+    if clear_env {
+        for (key, _) in env::vars() {
+            env::remove_var(key);
+        }
+    }
+
+    if let Some(prog) = prog {
+        // If we found the program. Run it!
+        cvt(syscall::execve(prog.as_os_str().as_bytes(), &cvt_args)).and(Ok(()))
+    } else {
+        // The binary was not found.
+        Err(io::Error::from_raw_os_error(syscall::ENOENT))
+    }
 }
 
 #[allow(dead_code)]
