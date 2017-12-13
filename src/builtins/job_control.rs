@@ -5,7 +5,6 @@ use shell::Shell;
 use shell::job_control::{JobControl, ProcessState};
 use shell::signals;
 use shell::status::*;
-use std::io::{stderr, Write};
 
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
@@ -79,18 +78,9 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
 
 /// Display a list of all jobs running in the background.
 pub(crate) fn jobs(shell: &mut Shell) {
-    let stderr = stderr();
-    let mut stderr = stderr.lock();
     for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
         if process.state != ProcessState::Empty {
-            let _ = writeln!(
-                stderr,
-                "[{}] {} {}\t{}",
-                id,
-                process.pid,
-                process.state,
-                process.name
-            );
+            eprintln!("[{}] {} {}\t{}", id, process.pid, process.state, process.name);
         }
     }
 }
