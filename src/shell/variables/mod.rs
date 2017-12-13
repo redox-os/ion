@@ -34,7 +34,7 @@ impl Default for Variables {
         map.insert("HISTFILE_SIZE".into(), "1000".into());
         map.insert(
             "PROMPT".into(),
-            "${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}".into(),
+            "${x::1B}]0;${USER}: ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}".into(),
         );
         // Set the PID variable to the PID of the shell
         let pid = getpid()
@@ -223,6 +223,15 @@ impl Variables {
             // designated. Find it.
             match name {
                 "c" | "color" => Colors::collect(variable).into_string(),
+                "x" | "hex" => match u8::from_str_radix(variable, 16) {
+                    Ok(c) => {
+                        Some((c as char).to_string())
+                    },
+                    Err(why) => {
+                        eprintln!("ion: hex parse error: {}: {}", variable, why);
+                        None
+                    }
+                },
                 "env" => env::var(variable).map(Into::into).ok(),
                 _ => {
                     if is_root() {
@@ -246,7 +255,7 @@ impl Variables {
                         match namespace.execute(variable.into()) {
                             Ok(value) => value.map(Into::into),
                             Err(why) => {
-                                eprintln!("ion: string namespace erorr: {}: {}", name, why);
+                                eprintln!("ion: string namespace error: {}: {}", name, why);
                                 None
                             }
                         }
