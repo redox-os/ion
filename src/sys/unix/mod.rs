@@ -52,7 +52,7 @@ pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Result<(
 
     // Create the arguments vector
     let mut cvt_args: Vec<CString> = Vec::new();
-    cvt_args.push(prog_str);
+    cvt_args.push(prog_str.clone());
     for arg in args.iter() {
         match CString::new(*arg) {
             Ok(arg) => cvt_args.push(arg),
@@ -68,10 +68,7 @@ pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Result<(
     // Get the PathBuf of the program if it exists.
     let prog = if prog.contains('/') {
         // This is a fully specified path to an executable.
-        match CString::new(prog) {
-            Ok(prog_str) => Some(prog_str),
-            Err(_) => None,
-        }
+        Some(prog_str)
     } else if let Ok(paths) = env::var("PATH") {
         // This is not a fully specified scheme or path.
         // Iterate through the possible paths in the
@@ -95,9 +92,9 @@ pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Result<(
     };
 
     let mut env_ptrs: Vec<*const c_char> = Vec::new();
+    let mut env_vars: Vec<CString> = Vec::new();
     // If clear_env is not specified build envp
     if !clear_env {
-        let mut env_vars: Vec<CString> = Vec::new();
         for (key, value) in env::vars() {
             match CString::new(format!("{}={}", key, value)) {
                 Ok(var) => env_vars.push(var),
