@@ -8,7 +8,7 @@ use parser::{expand_string, parse_and_validate, ForExpression, StatementSplitter
 use parser::assignments::{is_array, ReturnValue};
 use parser::pipelines::Pipeline;
 use shell::assignments::VariableStore;
-use std::io::{self, stdout, Write};
+use std::io::{stdout, Write};
 use std::iter;
 use std::mem;
 use types::Array;
@@ -84,9 +84,7 @@ impl FlowLogic for Shell {
                 // statement in memory if needed. We can tell if there is a partial statement
                 // later if the value of `level` is not set to `0`.
                 if let Err(why) = self.execute_toplevel(&mut iterator, statement) {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "{}", why);
+                    eprintln!("{}", why);
                     self.flow_control.level = 0;
                     self.flow_control.current_if_mode = 0;
                     return;
@@ -127,18 +125,14 @@ impl FlowLogic for Shell {
                         ) {
                             Ok(mode) => mode,
                             Err(why) => {
-                                let stderr = io::stderr();
-                                let mut stderr = stderr.lock();
-                                let _ = writeln!(stderr, "{}", why);
+                                eprintln!("{}", why);
                                 4
                             }
                         };
                     }
                     &mut Statement::Match { ref mut cases, .. } => {
                         if let Err(why) = collect_cases(&mut iterator, cases, level) {
-                            let stderr = io::stderr();
-                            let mut stderr = stderr.lock();
-                            let _ = writeln!(stderr, "{}", why);
+                            eprintln!("{}", why);
                         }
                     }
                     &mut Statement::Time(ref mut box_stmt) => {
@@ -257,9 +251,7 @@ impl FlowLogic for Shell {
                 // Capture any leftover statements.
                 while let Some(statement) = iterator.next() {
                     if let Err(why) = self.execute_toplevel(&mut iterator, statement) {
-                        let stderr = io::stderr();
-                        let mut stderr = stderr.lock();
-                        let _ = writeln!(stderr, "{}", why);
+                        eprintln!("{}", why);
                         self.flow_control.level = 0;
                         self.flow_control.current_if_mode = 0;
                         return;
@@ -430,9 +422,7 @@ impl FlowLogic for Shell {
                     &mut self.flow_control.level,
                     0,
                 ) {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "{}", why);
+                    eprintln!("{}", why);
                     self.flow_control.level = 0;
                     self.flow_control.current_if_mode = 0;
                     return Condition::Break;
@@ -505,9 +495,7 @@ impl FlowLogic for Shell {
                 if let Err(why) =
                     collect_cases(&mut iterator, &mut cases, &mut self.flow_control.level)
                 {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "{}", why);
+                    eprintln!("{}", why);
                     self.flow_control.level = 0;
                     self.flow_control.current_if_mode = 0;
                     return Condition::Break;
@@ -764,9 +752,7 @@ impl FlowLogic for Shell {
                 let time = ::std::time::Instant::now();
 
                 if let Err(why) = self.execute_toplevel(iterator, *box_statement) {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "{}", why);
+                    eprintln!("{}", why);
                     self.flow_control.level = 0;
                     self.flow_control.current_if_mode = 0;
                 }
@@ -799,15 +785,11 @@ impl FlowLogic for Shell {
             }
             // At this level, else and else if keywords are forbidden.
             Statement::ElseIf { .. } | Statement::Else => {
-                let stderr = io::stderr();
-                let mut stderr = stderr.lock();
-                let _ = writeln!(stderr, "ion: syntax error: not an if statement");
+                eprintln!("ion: syntax error: not an if statement");
             }
             // Likewise to else and else if, the end keyword does nothing here.
             Statement::End => {
-                let stderr = io::stderr();
-                let mut stderr = stderr.lock();
-                let _ = writeln!(stderr, "ion: syntax error: no block to end");
+                eprintln!("ion: syntax error: no block to end");
             }
             // Collect all cases that are being used by a match construct
             Statement::Match {
@@ -817,9 +799,7 @@ impl FlowLogic for Shell {
                 self.flow_control.level += 1;
                 if let Err(why) = collect_cases(iterator, &mut cases, &mut self.flow_control.level)
                 {
-                    let stderr = io::stderr();
-                    let mut stderr = stderr.lock();
-                    let _ = writeln!(stderr, "{}", why);
+                    eprintln!("{}", why);
                 }
                 if self.flow_control.level == 0 {
                     // If all blocks were read we execute the statement

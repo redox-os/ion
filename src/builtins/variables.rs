@@ -115,8 +115,7 @@ fn parse_alias(args: &str) -> Binding {
 pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
     match parse_alias(args) {
         Binding::InvalidKey(key) => {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: alias name, '{}', is invalid", key);
+            eprintln!("ion: alias name, '{}', is invalid", key);
             return FAILURE;
         }
         Binding::KeyValue(key, value) => {
@@ -124,17 +123,11 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
         }
         Binding::ListEntries => print_list(&vars.aliases),
         Binding::KeyOnly(key) => {
-            let stderr = io::stderr();
-            let _ = writeln!(
-                &mut stderr.lock(),
-                "ion: please provide value for alias '{}'",
-                key
-            );
+            eprintln!("ion: please provide value for alias '{}'", key);
             return FAILURE;
         }
         _ => {
-            let stderr = io::stderr();
-            let _ = writeln!(&mut stderr.lock(), "ion: invalid alias syntax");
+            eprintln!("ion: invalid alias syntax");
             return FAILURE;
         }
     }
@@ -149,18 +142,12 @@ where
 {
     let args = args.into_iter().collect::<Vec<I::Item>>();
     if args.len() <= 1 {
-        let stderr = io::stderr();
-        let _ = writeln!(&mut stderr.lock(), "ion: you must specify an alias name");
+        eprintln!("ion: you must specify an alias name");
         return FAILURE;
     }
     for alias in args.iter().skip(1) {
         if vars.aliases.remove(alias.as_ref()).is_none() {
-            let stderr = io::stderr();
-            let _ = writeln!(
-                &mut stderr.lock(),
-                "ion: undefined alias: {}",
-                alias.as_ref()
-            );
+            eprintln!("ion: undefined alias: {}", alias.as_ref());
             return FAILURE;
         }
     }
@@ -174,28 +161,18 @@ where
 {
     let args = args.into_iter().collect::<Vec<I::Item>>();
     if args.len() <= 2 {
-        let stderr = io::stderr();
-        let _ = writeln!(&mut stderr.lock(), "ion: you must specify an array name");
+        eprintln!("ion: you must specify an array name");
         return FAILURE;
     }
 
     if args[1].as_ref() != "-a" {
-        let stderr = io::stderr();
-        let _ = writeln!(
-            &mut stderr.lock(),
-            "ion: drop_array must be used with -a option"
-        );
+        eprintln!("ion: drop_array must be used with -a option");
         return FAILURE;
     }
 
     for array in args.iter().skip(2) {
         if vars.unset_array(array.as_ref()).is_none() {
-            let stderr = io::stderr();
-            let _ = writeln!(
-                &mut stderr.lock(),
-                "ion: undefined array: {}",
-                array.as_ref()
-            );
+            eprintln!("ion: undefined array: {}", array.as_ref());
             return FAILURE;
         }
     }
@@ -209,19 +186,13 @@ where
 {
     let args = args.into_iter().collect::<Vec<I::Item>>();
     if args.len() <= 1 {
-        let stderr = io::stderr();
-        let _ = writeln!(&mut stderr.lock(), "ion: you must specify a variable name");
+        eprintln!("ion: you must specify a variable name");
         return FAILURE;
     }
 
     for variable in args.iter().skip(1) {
         if vars.unset_var(variable.as_ref()).is_none() {
-            let stderr = io::stderr();
-            let _ = writeln!(
-                &mut stderr.lock(),
-                "ion: undefined variable: {}",
-                variable.as_ref()
-            );
+            eprintln!("ion: undefined variable: {}", variable.as_ref());
             return FAILURE;
         }
     }
