@@ -21,16 +21,12 @@ pub(crate) struct Key {
 
 impl Key {
     #[cfg(test)]
-    pub(crate) fn new<K: Into<::types::Key>>(key: K) -> Key {
-        Key { key: key.into() }
-    }
-    pub(crate) fn get(&self) -> &::types::Key {
-        return &self.key;
-    }
+    pub(crate) fn new<K: Into<::types::Key>>(key: K) -> Key { Key { key: key.into() } }
+    pub(crate) fn get(&self) -> &::types::Key { return &self.key; }
 }
 
 pub(crate) struct MethodArgs<'a, 'b, E: 'b + Expander> {
-    args: &'a str,
+    args:   &'a str,
     expand: &'b E,
 }
 

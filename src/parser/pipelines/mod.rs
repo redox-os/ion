@@ -15,11 +15,10 @@ pub(crate) enum RedirectFrom {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Redirection {
-    pub from: RedirectFrom,
-    pub file: String,
+    pub from:   RedirectFrom,
+    pub file:   String,
     pub append: bool,
 }
-
 
 /// Represents input that a process could initially receive from `stdin`
 #[derive(Debug, PartialEq, Clone)]
@@ -39,9 +38,9 @@ pub(crate) struct Pipeline {
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct PipeItem {
-    pub job: Job,
+    pub job:     Job,
     pub outputs: Vec<Redirection>,
-    pub inputs: Vec<Input>,
+    pub inputs:  Vec<Input>,
 }
 
 impl PipeItem {
@@ -72,9 +71,7 @@ impl PipeItem {
 }
 
 impl Pipeline {
-    pub(crate) fn new() -> Self {
-        Pipeline { items: Vec::new() }
-    }
+    pub(crate) fn new() -> Self { Pipeline { items: Vec::new() } }
 
     pub(crate) fn expand(&mut self, shell: &Shell) {
         self.items.iter_mut().for_each(|i| i.expand(shell));

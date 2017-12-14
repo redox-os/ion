@@ -15,11 +15,11 @@ use types::Identifier;
 /// corresponding field to `NULL`. Libraries importing this structure should check for nullness.
 #[repr(C)]
 pub(crate) struct RawMethodArguments {
-    key_ptr: *mut c_char,
+    key_ptr:       *mut c_char,
     key_array_ptr: *mut *mut c_char,
-    args_ptr: *mut *mut c_char,
-    key_len: usize,
-    args_len: usize,
+    args_ptr:      *mut *mut c_char,
+    key_len:       usize,
+    args_len:      usize,
 }
 
 pub(crate) enum MethodArguments {
@@ -82,11 +82,11 @@ impl From<MethodArguments> for RawMethodArguments {
                 }
             }
             MethodArguments::NoArgs => RawMethodArguments {
-                key_ptr: ptr::null_mut(),
+                key_ptr:       ptr::null_mut(),
                 key_array_ptr: ptr::null_mut(),
-                args_ptr: ptr::null_mut(),
-                key_len: 0,
-                args_len: 0,
+                args_ptr:      ptr::null_mut(),
+                key_len:       0,
+                args_len:      0,
             },
         }
     }
@@ -112,7 +112,7 @@ impl StringMethodPlugins {
     pub(crate) fn new() -> StringMethodPlugins {
         StringMethodPlugins {
             libraries: Vec::new(),
-            symbols: FnvHashMap::default(),
+            symbols:   FnvHashMap::default(),
         }
     }
 

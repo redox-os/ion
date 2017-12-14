@@ -134,7 +134,6 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
     SUCCESS
 }
 
-
 /// Dropping an alias will erase it from the shell.
 pub(crate) fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
 where
@@ -200,7 +199,6 @@ where
     SUCCESS
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -210,9 +208,7 @@ mod test {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn variable(&self, var: &str, _: bool) -> Option<Value> {
-            self.0.get_var(var)
-        }
+        fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
     }
 
     // TODO: Rewrite tests now that let is part of the grammar.

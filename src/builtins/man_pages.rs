@@ -212,7 +212,6 @@ OPTIONS
     -c  Execute command with an empty environment.
 "#;
 
-
 pub(crate) const MAN_HISTORY: &'static str = r#"NAME
     history - print command history
 

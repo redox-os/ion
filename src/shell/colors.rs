@@ -1,13 +1,14 @@
 struct StaticMap {
-    keys: &'static [&'static str],
+    keys:   &'static [&'static str],
     values: &'static [&'static str],
 }
 
 impl StaticMap {
     fn get(&self, key: &str) -> Option<&'static str> {
-        self.keys.binary_search(&key).ok().map(|pos| unsafe {
-            *self.values.get_unchecked(pos)
-        })
+        self.keys
+            .binary_search(&key)
+            .ok()
+            .map(|pos| unsafe { *self.values.get_unchecked(pos) })
     }
 }
 
@@ -130,7 +131,6 @@ impl Colors {
             self.attributes = Some(vec![attribute]);
         }
     }
-
 
     /// If no matches were made, then this will attempt to parse the variable as either a
     /// 24-bit true color color, or one of 256 colors. It supports both hexadecimal and

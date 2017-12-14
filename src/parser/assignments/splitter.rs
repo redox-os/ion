@@ -49,9 +49,7 @@ pub(crate) fn split_assignment<'a>(
     (Some(keys), Some(operator), Some(values.trim()))
 }
 
-fn is_operator(byte: u8) -> bool {
-    byte == b'+' || byte == b'-' || byte == b'*' || byte == b'/'
-}
+fn is_operator(byte: u8) -> bool { byte == b'+' || byte == b'-' || byte == b'*' || byte == b'/' }
 
 #[cfg(test)]
 mod tests {

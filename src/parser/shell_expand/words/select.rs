@@ -4,7 +4,6 @@ use super::super::ranges::parse_index_range;
 use std::iter::{empty, FromIterator};
 use std::str::FromStr;
 
-
 /// Represents a filter on a vector-like object
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Select {

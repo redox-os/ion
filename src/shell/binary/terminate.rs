@@ -19,13 +19,11 @@ pub(crate) fn terminate_script_quotes<I: Iterator<Item = String>>(
                             }
 
                             match command[start..].find('#').map(|x| x + start) {
-                                Some(pos) if command.as_bytes()[pos-1] != b' ' => {
+                                Some(pos) if command.as_bytes()[pos - 1] != b' ' => {
                                     start = pos + 1;
                                 }
-                                Some(pos) => {
-                                    break &command[..pos]
-                                }
-                                None => break &command
+                                Some(pos) => break &command[..pos],
+                                None => break &command,
                             }
                         };
                         buffer.append(cmd);

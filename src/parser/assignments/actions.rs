@@ -28,11 +28,11 @@ impl<'a> Display for AssignmentError<'a> {
 /// Each request will tell the shell whether the assignment is asking to update an array or a
 /// string, and will contain the key/value pair to assign.
 pub(crate) struct AssignmentActions<'a> {
-    keys: KeyIterator<'a>,
+    keys:     KeyIterator<'a>,
     operator: Operator,
-    values: ArgumentSplitter<'a>,
-    prevkey: &'a str,
-    prevval: &'a str,
+    values:   ArgumentSplitter<'a>,
+    prevkey:  &'a str,
+    prevval:  &'a str,
 }
 
 impl<'a> AssignmentActions<'a> {
@@ -65,10 +65,9 @@ impl<'a> Iterator for AssignmentActions<'a> {
         } else {
             if let Some(_) = self.values.next() {
                 eprintln!(
-                    "ion: extra values were supplied, and thus ignored. Previous \
-                     assignment: '{}' = '{}'",
-                    self.prevkey,
-                    self.prevval
+                    "ion: extra values were supplied, and thus ignored. Previous assignment: '{}' \
+                     = '{}'",
+                    self.prevkey, self.prevval
                 );
             }
             None

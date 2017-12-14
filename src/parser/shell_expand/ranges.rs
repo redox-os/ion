@@ -67,9 +67,7 @@ fn numeric_range(
 }
 
 #[inline]
-fn byte_is_valid_range(b: u8) -> bool {
-    (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z')
-}
+fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') }
 
 use std::u8;
 fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Vec<String>> {
@@ -111,7 +109,6 @@ fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize)> {
         None
     }
 }
-
 
 // In a range we allow the following syntax:
 //      Exclusive nonstepped: {start..end}
@@ -284,7 +281,6 @@ pub(crate) fn parse_index_range(input: &str) -> Option<Range> {
     None
 }
 
-
 #[test]
 fn index_ranges() {
     let valid_cases = vec![
@@ -380,7 +376,6 @@ fn range_expand() {
     let actual = parse_range("c..a");
     let expected = Some(vec!["c".to_owned(), "b".to_owned()]);
     assert_eq!(actual, expected);
-
 
     let actual = parse_range("-3..4");
     let expected = Some(vec![

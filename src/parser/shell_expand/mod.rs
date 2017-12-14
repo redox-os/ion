@@ -26,21 +26,13 @@ pub(crate) fn is_expression(s: &str) -> bool {
 /// Trait representing different elements of string expansion
 pub(crate) trait Expander {
     /// Expand a tilde form to the correct directory
-    fn tilde(&self, &str) -> Option<String> {
-        None
-    }
+    fn tilde(&self, &str) -> Option<String> { None }
     /// Expand an array variable with some selection
-    fn array(&self, &str, Select) -> Option<Array> {
-        None
-    }
+    fn array(&self, &str, Select) -> Option<Array> { None }
     /// Expand a string variable given if its quoted / unquoted
-    fn variable(&self, &str, bool) -> Option<Value> {
-        None
-    }
+    fn variable(&self, &str, bool) -> Option<Value> { None }
     /// Expand a subshell expression
-    fn command(&self, &str) -> Option<Value> {
-        None
-    }
+    fn command(&self, &str) -> Option<Value> { None }
 }
 
 fn expand_process<E: Expander>(
@@ -647,9 +639,7 @@ mod test {
     struct CommandExpander;
 
     impl Expander for CommandExpander {
-        fn command(&self, cmd: &str) -> Option<Value> {
-            Some(cmd.to_owned())
-        }
+        fn command(&self, cmd: &str) -> Option<Value> { Some(cmd.to_owned()) }
     }
 
     #[test]

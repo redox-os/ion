@@ -22,8 +22,8 @@ pub(crate) enum JobKind {
 #[derive(Clone)]
 pub(crate) struct Job {
     pub command: Identifier,
-    pub args: Array,
-    pub kind: JobKind,
+    pub args:    Array,
+    pub kind:    JobKind,
     pub builtin: Option<BuiltinFunction>,
 }
 
@@ -60,9 +60,7 @@ impl fmt::Debug for Job {
         write!(
             f,
             "Job {{ command: {}, args: {:?}, kind: {:?} }}",
-            self.command,
-            self.args,
-            self.kind
+            self.command, self.args, self.kind
         )
     }
 }
@@ -111,8 +109,8 @@ pub(crate) enum RefinedJob {
     /// Represents redirection into stdin from more than one source
     Cat {
         sources: Vec<File>,
-        stdin: Option<File>,
-        stdout: Option<File>,
+        stdin:   Option<File>,
+        stdout:  Option<File>,
     },
     Tee {
         /// 0 for stdout, 1 for stderr
@@ -234,8 +232,8 @@ impl RefinedJob {
 
     pub(crate) fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
         RefinedJob::Tee {
-            items: (tee_out, tee_err),
-            stdin: None,
+            items:  (tee_out, tee_err),
+            stdin:  None,
             stdout: None,
             stderr: None,
         }

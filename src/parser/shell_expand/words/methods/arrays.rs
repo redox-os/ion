@@ -9,9 +9,9 @@ use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ArrayMethod<'a> {
-    pub(crate) method: &'a str,
-    pub(crate) variable: &'a str,
-    pub(crate) pattern: Pattern<'a>,
+    pub(crate) method:    &'a str,
+    pub(crate) variable:  &'a str,
+    pub(crate) pattern:   Pattern<'a>,
     pub(crate) selection: Select,
 }
 
@@ -199,9 +199,9 @@ mod test {
     fn test_split_string_all() {
         let mut output = String::new();
         let method = ArrayMethod {
-            method: "split",
-            variable: "$FOO",
-            pattern: Pattern::StringPattern("OB"),
+            method:    "split",
+            variable:  "$FOO",
+            pattern:   Pattern::StringPattern("OB"),
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
@@ -212,9 +212,9 @@ mod test {
     fn test_split_whitespace_all() {
         let mut output = String::new();
         let method = ArrayMethod {
-            method: "split",
-            variable: "$SPACEDFOO",
-            pattern: Pattern::Whitespace,
+            method:    "split",
+            variable:  "$SPACEDFOO",
+            pattern:   Pattern::Whitespace,
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
@@ -225,9 +225,9 @@ mod test {
     fn test_split_string_index_forward() {
         let mut output = String::new();
         let method = ArrayMethod {
-            method: "split",
-            variable: "$FOO",
-            pattern: Pattern::StringPattern("OB"),
+            method:    "split",
+            variable:  "$FOO",
+            pattern:   Pattern::StringPattern("OB"),
             selection: Select::Index(Index::Forward(1)),
         };
         method.handle(&mut output, &VariableExpander);
@@ -238,9 +238,9 @@ mod test {
     fn test_split_whitespace_index_forward() {
         let mut output = String::new();
         let method = ArrayMethod {
-            method: "split",
-            variable: "$SPACEDFOO",
-            pattern: Pattern::Whitespace,
+            method:    "split",
+            variable:  "$SPACEDFOO",
+            pattern:   Pattern::Whitespace,
             selection: Select::Index(Index::Forward(1)),
         };
         method.handle(&mut output, &VariableExpander);
@@ -251,9 +251,9 @@ mod test {
     fn test_split_string_index_backward() {
         let mut output = String::new();
         let method = ArrayMethod {
-            method: "split",
-            variable: "$FOO",
-            pattern: Pattern::StringPattern("OB"),
+            method:    "split",
+            variable:  "$FOO",
+            pattern:   Pattern::StringPattern("OB"),
             selection: Select::Index(Index::Backward(1)),
         };
         method.handle(&mut output, &VariableExpander);
@@ -264,9 +264,9 @@ mod test {
     fn test_split_whitespace_index_backward() {
         let mut output = String::new();
         let method = ArrayMethod {
-            method: "split",
-            variable: "$SPACEDFOO",
-            pattern: Pattern::Whitespace,
+            method:    "split",
+            variable:  "$SPACEDFOO",
+            pattern:   Pattern::Whitespace,
             selection: Select::Index(Index::Backward(1)),
         };
         method.handle(&mut output, &VariableExpander);
@@ -277,9 +277,9 @@ mod test {
     fn test_split_string_range() {
         let mut output = String::new();
         let method = ArrayMethod {
-            method: "split",
-            variable: "$FOO",
-            pattern: Pattern::StringPattern("OB"),
+            method:    "split",
+            variable:  "$FOO",
+            pattern:   Pattern::StringPattern("OB"),
             selection: Select::Range(Range::from(Index::Forward(0))),
         };
         method.handle(&mut output, &VariableExpander);
@@ -290,9 +290,9 @@ mod test {
     fn test_split_whitespace_range() {
         let mut output = String::new();
         let method = ArrayMethod {
-            method: "split",
-            variable: "$SPACEDFOO",
-            pattern: Pattern::Whitespace,
+            method:    "split",
+            variable:  "$SPACEDFOO",
+            pattern:   Pattern::Whitespace,
             selection: Select::Range(Range::from(Index::Forward(0))),
         };
         method.handle(&mut output, &VariableExpander);
@@ -303,9 +303,9 @@ mod test {
     fn test_split_none() {
         let mut output = String::new();
         let method = ArrayMethod {
-            method: "split",
-            variable: "$SPACEDFOO",
-            pattern: Pattern::Whitespace,
+            method:    "split",
+            variable:  "$SPACEDFOO",
+            pattern:   Pattern::Whitespace,
             selection: Select::None,
         };
         method.handle(&mut output, &VariableExpander);
@@ -316,9 +316,9 @@ mod test {
     fn test_split_key() {
         let mut output = String::new();
         let method = ArrayMethod {
-            method: "split",
-            variable: "$SPACEDFOO",
-            pattern: Pattern::Whitespace,
+            method:    "split",
+            variable:  "$SPACEDFOO",
+            pattern:   Pattern::Whitespace,
             selection: Select::Key(Key::new("1")),
         };
         method.handle(&mut output, &VariableExpander);
@@ -328,9 +328,9 @@ mod test {
     #[test]
     fn test_split_at_failing_whitespace() {
         let method = ArrayMethod {
-            method: "split_at",
-            variable: "$SPACEDFOO",
-            pattern: Pattern::Whitespace,
+            method:    "split_at",
+            variable:  "$SPACEDFOO",
+            pattern:   Pattern::Whitespace,
             selection: Select::All,
         };
         assert_eq!(method.handle_as_array(&VariableExpander), array![]);
@@ -339,9 +339,9 @@ mod test {
     #[test]
     fn test_split_at_failing_no_number() {
         let method = ArrayMethod {
-            method: "split_at",
-            variable: "$SPACEDFOO",
-            pattern: Pattern::StringPattern("a"),
+            method:    "split_at",
+            variable:  "$SPACEDFOO",
+            pattern:   Pattern::StringPattern("a"),
             selection: Select::All,
         };
         assert_eq!(method.handle_as_array(&VariableExpander), array![]);
@@ -350,9 +350,9 @@ mod test {
     #[test]
     fn test_split_at_failing_out_of_bound() {
         let method = ArrayMethod {
-            method: "split_at",
-            variable: "$SPACEDFOO",
-            pattern: Pattern::StringPattern("100"),
+            method:    "split_at",
+            variable:  "$SPACEDFOO",
+            pattern:   Pattern::StringPattern("100"),
             selection: Select::All,
         };
         assert_eq!(method.handle_as_array(&VariableExpander), array![]);
@@ -361,9 +361,9 @@ mod test {
     #[test]
     fn test_split_at_succeeding() {
         let method = ArrayMethod {
-            method: "split_at",
-            variable: "$FOO",
-            pattern: Pattern::StringPattern("3"),
+            method:    "split_at",
+            variable:  "$FOO",
+            pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
         assert_eq!(
@@ -375,9 +375,9 @@ mod test {
     #[test]
     fn test_graphemes() {
         let method = ArrayMethod {
-            method: "graphemes",
-            variable: "$FOO",
-            pattern: Pattern::StringPattern("3"),
+            method:    "graphemes",
+            variable:  "$FOO",
+            pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
         assert_eq!(
@@ -389,9 +389,9 @@ mod test {
     #[test]
     fn test_bytes() {
         let method = ArrayMethod {
-            method: "bytes",
-            variable: "$FOO",
-            pattern: Pattern::StringPattern("3"),
+            method:    "bytes",
+            variable:  "$FOO",
+            pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
         assert_eq!(
@@ -403,9 +403,9 @@ mod test {
     #[test]
     fn test_chars() {
         let method = ArrayMethod {
-            method: "chars",
-            variable: "$FOO",
-            pattern: Pattern::StringPattern("3"),
+            method:    "chars",
+            variable:  "$FOO",
+            pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
         assert_eq!(

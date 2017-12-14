@@ -26,9 +26,10 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
             "-h" => flags |= NO_SIGHUP,
             "-r" => flags |= RUN_JOBS,
             _ => {
-                let jobspec = arg.parse::<u32>().map_err(|_| format!("invalid jobspec: '{}'", arg))?;
+                let jobspec = arg.parse::<u32>()
+                    .map_err(|_| format!("invalid jobspec: '{}'", arg))?;
                 collected_jobs.push(jobspec);
-            },
+            }
         }
     }
 
@@ -42,9 +43,13 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
     let mut process_table = shell.background.lock().unwrap();
     if collected_jobs.is_empty() && flags & ALL_JOBS != 0 {
         if flags & NO_SIGHUP != 0 {
-            process_table.iter_mut().for_each(|process| process.ignore_sighup = true);
+            process_table
+                .iter_mut()
+                .for_each(|process| process.ignore_sighup = true);
         } else {
-            process_table.iter_mut().for_each(|process| process.state = ProcessState::Empty);
+            process_table
+                .iter_mut()
+                .for_each(|process| process.state = ProcessState::Empty);
         }
     } else {
         collected_jobs.sort();
@@ -80,7 +85,10 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
 pub(crate) fn jobs(shell: &mut Shell) {
     for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
         if process.state != ProcessState::Empty {
-            eprintln!("[{}] {} {}\t{}", id, process.pid, process.state, process.name);
+            eprintln!(
+                "[{}] {} {}\t{}",
+                id, process.pid, process.state, process.name
+            );
         }
     }
 }
@@ -90,7 +98,9 @@ pub(crate) fn jobs(shell: &mut Shell) {
 /// If multiple jobs are given, then only the last job's exit status will be returned.
 pub(crate) fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
     fn fg_job(shell: &mut Shell, njob: u32) -> i32 {
-        let job = if let Some(borrowed_job) = shell.background.lock().unwrap().iter().nth(njob as usize) {
+        let job = if let Some(borrowed_job) =
+            shell.background.lock().unwrap().iter().nth(njob as usize)
+        {
             borrowed_job.clone()
         } else {
             eprintln!("ion: fg: job {} does not exist", njob);

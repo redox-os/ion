@@ -18,35 +18,31 @@ bitflags! {
 /// This example comes from the shell's REPL, which ensures that the user's input
 /// will only be submitted for execution once a terminated command is supplied.
 pub struct Terminator {
-    buffer: String,
-    eof: Option<String>,
+    buffer:     String,
+    eof:        Option<String>,
     eof_buffer: String,
-    array: usize,
-    read: usize,
-    flags: Flags,
+    array:      usize,
+    read:       usize,
+    flags:      Flags,
 }
 
 impl<'a> From<&'a str> for Terminator {
-    fn from(string: &'a str) -> Terminator {
-        Terminator::new(string.to_owned())
-    }
+    fn from(string: &'a str) -> Terminator { Terminator::new(string.to_owned()) }
 }
 
 impl From<String> for Terminator {
-    fn from(string: String) -> Terminator {
-        Terminator::new(string)
-    }
+    fn from(string: String) -> Terminator { Terminator::new(string) }
 }
 
 impl Terminator {
     pub fn new(input: String) -> Terminator {
         Terminator {
-            buffer: input,
-            eof: None,
+            buffer:     input,
+            eof:        None,
             eof_buffer: String::new(),
-            array: 0,
-            read: 0,
-            flags: Flags::empty(),
+            array:      0,
+            read:       0,
+            flags:      Flags::empty(),
         }
     }
 
@@ -62,7 +58,6 @@ impl Terminator {
             self.eof_buffer.push_str(input);
         }
     }
-
 
     pub fn is_terminated(&mut self) -> bool {
         let mut eof_line = None;
@@ -187,7 +182,5 @@ impl Terminator {
     }
 
     /// Consumes the `Terminator`, and returns the underlying `String`.
-    pub fn consume(self) -> String {
-        self.buffer
-    }
+    pub fn consume(self) -> String { self.buffer }
 }

@@ -23,17 +23,11 @@ pub(crate) const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
 pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
 pub(crate) const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 
-pub(crate) fn is_root() -> bool {
-    unsafe { libc::geteuid() == 0 }
-}
+pub(crate) fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
 
-pub unsafe fn fork() -> io::Result<u32> {
-    cvt(libc::fork()).map(|pid| pid as u32)
-}
+pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
 
-pub(crate) fn getpid() -> io::Result<u32> {
-    cvt(unsafe { libc::getpid() }).map(|pid| pid as u32)
-}
+pub(crate) fn getpid() -> io::Result<u32> { cvt(unsafe { libc::getpid() }).map(|pid| pid as u32) }
 
 pub(crate) fn kill(pid: u32, signal: i32) -> io::Result<()> {
     cvt(unsafe { libc::kill(pid as pid_t, signal as c_int) }).and(Ok(()))
@@ -47,7 +41,9 @@ pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Result<(
     // Prepare the program string
     let prog_str = match CString::new(prog) {
         Ok(prog_str) => prog_str,
-        Err(_) => { return Err(io::Error::last_os_error()); }
+        Err(_) => {
+            return Err(io::Error::last_os_error());
+        }
     };
 
     // Create the arguments vector
@@ -154,21 +150,15 @@ pub(crate) fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
     cvt(unsafe { libc::tcsetpgrp(fd as c_int, pgrp as pid_t) }).and(Ok(()))
 }
 
-pub(crate) fn dup(fd: RawFd) -> io::Result<RawFd> {
-    cvt(unsafe { libc::dup(fd) })
-}
+pub(crate) fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup(fd) }) }
 
 pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
     cvt(unsafe { libc::dup2(old, new) })
 }
 
-pub(crate) fn close(fd: RawFd) -> io::Result<()> {
-    cvt(unsafe { libc::close(fd) }).and(Ok(()))
-}
+pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
 
-pub(crate) fn isatty(fd: RawFd) -> bool {
-    unsafe { libc::isatty(fd) == 1 }
-}
+pub(crate) fn isatty(fd: RawFd) -> bool { unsafe { libc::isatty(fd) == 1 } }
 
 trait IsMinusOne {
     fn is_minus_one(&self) -> bool;

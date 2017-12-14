@@ -1,7 +1,6 @@
 use super::Shell;
 use super::flags::*;
-use super::flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function,
-                          Statement};
+use super::flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function, Statement};
 use super::job_control::JobControl;
 use super::status::*;
 use parser::{expand_string, parse_and_validate, ForExpression, StatementSplitter};
@@ -669,8 +668,8 @@ impl FlowLogic for Shell {
                 } else {
                     // Store the partial `Statement::For` to memory
                     self.flow_control.current_statement = Statement::For {
-                        variable: variable,
-                        values: values,
+                        variable:   variable,
+                        values:     values,
                         statements: statements,
                     }
                 }
@@ -705,9 +704,9 @@ impl FlowLogic for Shell {
                     self.flow_control.current_if_mode = mode;
                     self.flow_control.current_statement = Statement::If {
                         expression: expression,
-                        success: success,
-                        else_if: else_if,
-                        failure: failure,
+                        success:    success,
+                        else_if:    else_if,
+                        failure:    failure,
                     };
                 }
             }
@@ -734,9 +733,9 @@ impl FlowLogic for Shell {
                     // Store the partial function declaration in memory.
                     self.flow_control.current_statement = Statement::Function {
                         description: description,
-                        name: name,
-                        args: args,
-                        statements: statements,
+                        name:        name,
+                        args:        args,
+                        statements:  statements,
                     }
                 }
             }
