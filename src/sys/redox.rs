@@ -22,9 +22,9 @@ pub(crate) const STDIN_FILENO: RawFd = 0;
 pub(crate) const STDOUT_FILENO: RawFd = 1;
 pub(crate) const STDERR_FILENO: RawFd = 2;
 
-pub(crate) fn geteuid() -> io::Result<u32> { cvt(syscall::geteuid().map(|pid| pid as u32)) }
+pub(crate) fn geteuid() -> io::Result<u32> { cvt(syscall::geteuid()).map(|pid| pid as u32) }
 
-pub(crate) fn getuid() -> io::Result<u32> { cvt(syscall::getuid().map(|pid| pid as u32)) }
+pub(crate) fn getuid() -> io::Result<u32> { cvt(syscall::getuid()).map(|pid| pid as u32) }
 
 pub(crate) fn is_root() -> bool { syscall::geteuid().map(|id| id == 0).unwrap_or(false) }
 
