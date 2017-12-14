@@ -1,64 +1,72 @@
-use fnv::FnvHashMap;
-
-lazy_static! {
-    static ref ATTRIBUTES: FnvHashMap<&'static str, &'static str> = {
-        let mut map = FnvHashMap::default();
-        map.insert("bold", "1");
-        map.insert("dim", "2");
-        map.insert("underlined", "4");
-        map.insert("blink", "5");
-        map.insert("reverse", "7");
-        map.insert("hidden", "8");
-        map
-    };
+struct StaticMap {
+    keys: &'static [&'static str],
+    values: &'static [&'static str],
 }
 
-lazy_static! {
-    static ref COLORS: FnvHashMap<&'static str, &'static str> = {
-        let mut map = FnvHashMap::default();
-        map.insert("black", "30");
-        map.insert("red", "31");
-        map.insert("green", "32");
-        map.insert("yellow", "33");
-        map.insert("blue", "34");
-        map.insert("magenta", "35");
-        map.insert("cyan", "36");
-        map.insert("light_gray", "37");
-        map.insert("default", "39");
-        map.insert("dark_gray", "90");
-        map.insert("light_red", "91");
-        map.insert("light_green", "92");
-        map.insert("light_yellow", "93");
-        map.insert("light_blue", "94");
-        map.insert("light_magenta", "95");
-        map.insert("light_cyan", "96");
-        map
-    };
+impl StaticMap {
+    fn get(&self, key: &str) -> Option<&'static str> {
+        self.keys.binary_search(&key).ok().map(|pos| unsafe {
+            *self.values.get_unchecked(pos)
+        })
+    }
 }
 
-lazy_static! {
-    static ref BG_COLORS: FnvHashMap<&'static str, &'static str> = {
-        let mut map = FnvHashMap::default();
-        map.insert("blackbg", "40");
-        map.insert("redbg", "41");
-        map.insert("greenbg", "42");
-        map.insert("yellowbg", "43");
-        map.insert("bluebg", "44");
-        map.insert("magentabg", "45");
-        map.insert("cyanbg", "46");
-        map.insert("light_graybg", "47");
-        map.insert("defaultbg", "49");
-        map.insert("dark_graybg", "100");
-        map.insert("light_redbg", "101");
-        map.insert("light_greenbg", "102");
-        map.insert("light_yellowbg",  "103");
-        map.insert("light_bluebg", "104");
-        map.insert("light_magentabg", "105");
-        map.insert("light_cyanbg", "106");
-        map.insert("whitebg", "107");
-        map
-    };
-}
+macro_rules! map {
+    ($($name:expr => $value:expr),+) => {{
+        StaticMap {
+            keys: &[$($name),+],
+            values: &[$($value),+],
+        }
+    }
+}}
+
+const ATTRIBUTES: StaticMap = map!(
+    "blink" => "5",
+    "bold" => "1",
+    "dim" => "2",
+    "hidden" => "8",
+    "reverse" => "7",
+    "underlined" => "4"
+);
+
+const COLORS: StaticMap = map!(
+    "black" => "30",
+    "blue" => "34",
+    "cyan" => "36",
+    "dark_gray" => "90",
+    "default" => "39",
+    "green" => "32",
+    "light_blue" => "94",
+    "light_cyan" => "96",
+    "light_gray" => "37",
+    "light_green" => "92",
+    "light_magenta" => "95",
+    "light_red" => "91",
+    "light_yellow" => "93",
+    "magenta" => "35",
+    "red" => "31",
+    "yellow" => "33"
+);
+
+const BG_COLORS: StaticMap = map!(
+    "blackbg" => "40",
+    "bluebg" => "44",
+    "cyanbg" => "46",
+    "dark_graybg" => "100",
+    "defaultbg" => "49",
+    "greenbg" => "42",
+    "light_bluebg" => "104",
+    "light_cyanbg" => "106",
+    "light_graybg" => "47",
+    "light_greenbg" => "102",
+    "light_magentabg" => "105",
+    "light_redbg" => "101",
+    "light_yellowbg" =>  "103",
+    "magentabg" => "45",
+    "redbg" => "41",
+    "whitebg" => "107",
+    "yellowbg" => "43"
+);
 
 #[derive(Debug, PartialEq)]
 /// Colors may be called by name, or by a hexadecimal-converted decimal value.
@@ -97,9 +105,9 @@ impl Colors {
             } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
                 colors.append_attribute(attribute);
             } else if let Some(color) = COLORS.get(&variable) {
-                colors.foreground = Some(Mode::Name(*color));
+                colors.foreground = Some(Mode::Name(color));
             } else if let Some(color) = BG_COLORS.get(&variable) {
-                colors.background = Some(Mode::Name(*color));
+                colors.background = Some(Mode::Name(color));
             } else if !colors.parse_colors(variable) {
                 eprintln!("ion: {} is not a valid color", variable)
             }
