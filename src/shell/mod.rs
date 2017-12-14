@@ -37,7 +37,6 @@ use parser::{ArgumentSplitter, Expander, Select};
 use parser::Terminator;
 use parser::pipelines::Pipeline;
 use smallvec::SmallVec;
-use std::env;
 use std::fs::File;
 use std::io::{self, Read};
 use std::iter::FromIterator;
@@ -181,27 +180,6 @@ impl<'a> Shell {
     pub(crate) fn exit(&mut self, status: i32) -> ! {
         self.prep_for_exit();
         process::exit(status);
-    }
-
-    /// This function updates variables that need to be kept consistent with each iteration
-    /// of the prompt. For example, the PWD variable needs to be updated to reflect changes to
-    /// the
-    /// the current working directory.
-    fn update_variables(&mut self) {
-        // Update the PWD (Present Working Directory) variable if the current working
-        // directory has been updated.
-        env::current_dir().ok().map_or_else(
-            || env::set_var("PWD", "?"),
-            |path| {
-                let pwd = self.get_var_or_empty("PWD");
-                let pwd: &str = &pwd;
-                let current_dir = path.to_str().unwrap_or("?");
-                if pwd != current_dir {
-                    env::set_var("OLDPWD", pwd);
-                    env::set_var("PWD", current_dir);
-                }
-            },
-        )
     }
 
     /// Evaluates the source init file in the user's home directory.

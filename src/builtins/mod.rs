@@ -163,7 +163,21 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
     }
 
     match shell.directory_stack.cd(args, &shell.variables) {
-        Ok(()) => SUCCESS,
+        Ok(()) => {
+            env::current_dir().ok().map_or_else(
+                || env::set_var("PWD", "?"),
+                |path| {
+                    let pwd = shell.get_var_or_empty("PWD");
+                    let pwd: &str = &pwd;
+                    let current_dir = path.to_str().unwrap_or("?");
+                    if pwd != current_dir {
+                        env::set_var("OLDPWD", pwd);
+                        env::set_var("PWD", current_dir);
+                    }
+                },
+            );
+            SUCCESS
+        }
         Err(why) => {
             let stderr = io::stderr();
             let mut stderr = stderr.lock();

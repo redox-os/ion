@@ -159,7 +159,6 @@ impl Binary for Shell {
                         self.reset_flow();
                     }
                 }
-                self.update_variables();
             } else {
                 self.reset_flow();
             }
@@ -183,7 +182,6 @@ impl Binary for Shell {
             } else {
                 self.save_command_in_history(cmd);
             }
-            self.update_variables();
             return;
         }
 
