@@ -9,9 +9,7 @@ pub(crate) enum MethodArguments {
 pub(crate) struct StringMethodPlugins;
 
 impl StringMethodPlugins {
-    pub(crate) fn new() -> StringMethodPlugins {
-        StringMethodPlugins
-    }
+    pub(crate) fn new() -> StringMethodPlugins { StringMethodPlugins }
 
     pub(crate) fn execute(
         &self,
@@ -26,6 +24,4 @@ impl StringMethodPlugins {
 ///
 /// This function is meant to be called with `lazy_static` to ensure that there isn't a
 /// cost to collecting all this information when the shell never uses it in the first place!
-pub(crate) fn collect() -> StringMethodPlugins {
-    StringMethodPlugins::new()
-}
+pub(crate) fn collect() -> StringMethodPlugins { StringMethodPlugins::new() }

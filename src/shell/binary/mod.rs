@@ -49,17 +49,11 @@ pub(crate) trait Binary {
 }
 
 impl Binary for Shell {
-    fn prompt(&mut self) -> String {
-        prompt(self)
-    }
+    fn prompt(&mut self) -> String { prompt(self) }
 
-    fn prompt_fn(&mut self) -> Option<String> {
-        prompt_fn(self)
-    }
+    fn prompt_fn(&mut self) -> Option<String> { prompt_fn(self) }
 
-    fn readln(&mut self) -> Option<String> {
-        readln(self)
-    }
+    fn readln(&mut self) -> Option<String> { readln(self) }
 
     fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I) -> i32 {
         terminate_script_quotes(self, lines)
@@ -115,8 +109,7 @@ impl Binary for Shell {
                         let history_filename = self.get_var_or_empty("HISTFILE");
                         eprintln!(
                             "ion: failed to find history file {}: {}",
-                            history_filename,
-                            err
+                            history_filename, err
                         );
                     }
                     Err(err) => {

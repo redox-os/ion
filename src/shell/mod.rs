@@ -33,9 +33,9 @@ use self::variables::Variables;
 use builtins::{BuiltinMap, BUILTINS};
 use fnv::FnvHashMap;
 use liner::Context;
+use parser::{ArgumentSplitter, Expander, Select};
 use parser::Terminator;
 use parser::pipelines::Pipeline;
-use parser::{ArgumentSplitter, Expander, Select};
 use smallvec::SmallVec;
 use std::env;
 use std::fs::File;
@@ -44,8 +44,8 @@ use std::iter::FromIterator;
 use std::ops::Deref;
 use std::path::Path;
 use std::process;
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 use sys;
 use types::*;
@@ -112,22 +112,22 @@ impl<'a> Shell {
     /// Panics if DirectoryStack construction fails
     pub(crate) fn new_bin() -> Shell {
         Shell {
-            builtins: BUILTINS,
-            context: None,
-            variables: Variables::default(),
-            flow_control: FlowControl::default(),
-            directory_stack: DirectoryStack::new(),
-            functions: FnvHashMap::default(),
-            previous_job: !0,
-            previous_status: 0,
-            flags: 0,
-            foreground: Vec::new(),
-            background: Arc::new(Mutex::new(Vec::new())),
+            builtins:            BUILTINS,
+            context:             None,
+            variables:           Variables::default(),
+            flow_control:        FlowControl::default(),
+            directory_stack:     DirectoryStack::new(),
+            functions:           FnvHashMap::default(),
+            previous_job:        !0,
+            previous_status:     0,
+            flags:               0,
+            foreground:          Vec::new(),
+            background:          Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
-            is_library: false,
-            break_flow: false,
-            foreground_signals: Arc::new(ForegroundSignals::new()),
-            ignore_setting: IgnoreSetting::default(),
+            is_library:          false,
+            break_flow:          false,
+            foreground_signals:  Arc::new(ForegroundSignals::new()),
+            ignore_setting:      IgnoreSetting::default(),
         }
     }
 
@@ -135,22 +135,22 @@ impl<'a> Shell {
     /// Creates a new shell within memory.
     pub fn new() -> Shell {
         Shell {
-            builtins: BUILTINS,
-            context: None,
-            variables: Variables::default(),
-            flow_control: FlowControl::default(),
-            directory_stack: DirectoryStack::new(),
-            functions: FnvHashMap::default(),
-            previous_job: !0,
-            previous_status: 0,
-            flags: 0,
-            foreground: Vec::new(),
-            background: Arc::new(Mutex::new(Vec::new())),
+            builtins:            BUILTINS,
+            context:             None,
+            variables:           Variables::default(),
+            flow_control:        FlowControl::default(),
+            directory_stack:     DirectoryStack::new(),
+            functions:           FnvHashMap::default(),
+            previous_job:        !0,
+            previous_status:     0,
+            flags:               0,
+            foreground:          Vec::new(),
+            background:          Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
-            is_library: true,
-            break_flow: false,
-            foreground_signals: Arc::new(ForegroundSignals::new()),
-            ignore_setting: IgnoreSetting::default(),
+            is_library:          true,
+            break_flow:          false,
+            foreground_signals:  Arc::new(ForegroundSignals::new()),
+            ignore_setting:      IgnoreSetting::default(),
         }
     }
 
@@ -293,8 +293,7 @@ impl<'a> Shell {
                         eprintln!(
                             "ion: function argument has invalid type: expected {}, found value \
                              \'{}\'",
-                            expected_type,
-                            value
+                            expected_type, value
                         );
                         Some(FAILURE)
                     }
@@ -335,14 +334,10 @@ impl<'a> Shell {
 
     /// Sets a variable of `name` with the given `value` in the shell's
     /// variable map.
-    pub fn set_var(&mut self, name: &str, value: &str) {
-        self.variables.set_var(name, value);
-    }
+    pub fn set_var(&mut self, name: &str, value: &str) { self.variables.set_var(name, value); }
 
     /// Gets a string variable, if it exists within the shell's variable map.
-    pub fn get_var(&self, name: &str) -> Option<String> {
-        self.variables.get_var(name)
-    }
+    pub fn get_var(&self, name: &str) -> Option<String> { self.variables.get_var(name) }
 
     /// Obtains a variable, returning an empty string if it does not exist.
     pub(crate) fn get_var_or_empty(&self, name: &str) -> String {
@@ -459,9 +454,11 @@ impl<'a> Expander for Shell {
         if found.is_none() {
             found = match self.variables.get_map(array) {
                 Some(map) => match selection {
-                    Select::All => {
-                        Some(map.iter().map(|(_, value)| value.clone()).collect::<Array>())
-                    }
+                    Select::All => Some(
+                        map.iter()
+                            .map(|(_, value)| value.clone())
+                            .collect::<Array>(),
+                    ),
                     Select::Key(ref key) => {
                         Some(array![map.get(key.get()).unwrap_or(&"".into()).clone()])
                     }

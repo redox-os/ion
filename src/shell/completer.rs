@@ -21,9 +21,9 @@ impl IonFileCompleter {
         vars: *const Variables,
     ) -> IonFileCompleter {
         IonFileCompleter {
-            inner: FilenameCompleter::new(path),
+            inner:     FilenameCompleter::new(path),
             dir_stack: dir_stack,
-            vars: vars,
+            vars:      vars,
         }
     }
 }
@@ -151,9 +151,7 @@ where
     A: Completer,
     B: Completer,
 {
-    pub(crate) fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> {
-        MultiCompleter { a: a, b: b }
-    }
+    pub(crate) fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> { MultiCompleter { a: a, b: b } }
 }
 
 impl<A, B> Completer for MultiCompleter<A, B>

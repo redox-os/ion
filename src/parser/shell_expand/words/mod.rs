@@ -48,9 +48,9 @@ pub(crate) enum WordToken<'a> {
 }
 
 pub(crate) struct WordIterator<'a, E: Expander + 'a> {
-    data: &'a str,
-    read: usize,
-    flags: Flags,
+    data:      &'a str,
+    read:      usize,
+    flags:     Flags,
     expanders: &'a E,
 }
 

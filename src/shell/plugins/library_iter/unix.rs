@@ -8,9 +8,7 @@ pub(crate) struct LibraryIterator {
 }
 
 impl LibraryIterator {
-    pub(crate) fn new(directory: ReadDir) -> LibraryIterator {
-        LibraryIterator { directory }
-    }
+    pub(crate) fn new(directory: ReadDir) -> LibraryIterator { LibraryIterator { directory } }
 }
 
 impl Iterator for LibraryIterator {

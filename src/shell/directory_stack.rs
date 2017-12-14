@@ -239,8 +239,7 @@ impl DirectoryStack {
             }
             (Err(err), _) => Err(Cow::Owned(format!(
                 "ion: failed to set current dir to {}: {}\n",
-                dir,
-                err
+                dir, err
             ))),
             (..) => Err(Cow::Borrowed(
                 "ion: change_and_push_dir(): error occurred that should never happen\n",
@@ -329,9 +328,7 @@ impl DirectoryStack {
         SUCCESS
     }
 
-    pub(crate) fn dir_from_top(&self, num: usize) -> Option<&PathBuf> {
-        self.dirs.get(num)
-    }
+    pub(crate) fn dir_from_top(&self, num: usize) -> Option<&PathBuf> { self.dirs.get(num) }
 
     pub(crate) fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> {
         self.dirs.iter().rev().nth(num)
@@ -353,8 +350,7 @@ impl DirectoryStack {
         let dir = self.dirs.iter().nth(index).ok_or_else(|| {
             Cow::Owned(format!(
                 "ion: {}: {}: directory stack out of range\n",
-                caller,
-                index
+                caller, index
             ))
         })?;
 

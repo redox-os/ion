@@ -16,7 +16,6 @@ pub(crate) struct KeyBuf {
     pub name: String,
 }
 
-
 #[derive(Debug, PartialEq)]
 pub(crate) enum TypeError<'a> {
     Invalid(&'a str),
@@ -107,9 +106,7 @@ pub(crate) struct KeyIterator<'a> {
 }
 
 impl<'a> KeyIterator<'a> {
-    pub(crate) fn new(data: &'a str) -> KeyIterator<'a> {
-        KeyIterator { data, read: 0 }
-    }
+    pub(crate) fn new(data: &'a str) -> KeyIterator<'a> { KeyIterator { data, read: 0 } }
 
     // Parameters are values that follow the semicolon (':').
     fn parse_parameter(&mut self, name: &'a str) -> Result<Key<'a>, TypeError<'a>> {

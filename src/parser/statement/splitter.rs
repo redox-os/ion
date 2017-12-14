@@ -20,7 +20,6 @@ bitflags! {
     }
 }
 
-
 #[derive(Debug, PartialEq)]
 pub(crate) enum StatementError<'a> {
     IllegalCommandName(&'a str),
@@ -42,8 +41,7 @@ impl<'a> Display for StatementError<'a> {
             StatementError::InvalidCharacter(character, position) => writeln!(
                 f,
                 "syntax error: '{}' at position {} is out of place",
-                character,
-                position
+                character, position
             ),
             StatementError::UnterminatedSubshell => {
                 writeln!(f, "syntax error: unterminated subshell")
@@ -70,26 +68,26 @@ fn is_invalid(byte: u8) -> bool {
 }
 
 pub(crate) struct StatementSplitter<'a> {
-    data: &'a str,
-    read: usize,
-    flags: Flags,
-    a_level: u8,
-    ap_level: u8,
-    p_level: u8,
-    brace_level: u8,
+    data:             &'a str,
+    read:             usize,
+    flags:            Flags,
+    a_level:          u8,
+    ap_level:         u8,
+    p_level:          u8,
+    brace_level:      u8,
     math_paren_level: i8,
 }
 
 impl<'a> StatementSplitter<'a> {
     pub(crate) fn new(data: &'a str) -> StatementSplitter<'a> {
         StatementSplitter {
-            data: data,
-            read: 0,
-            flags: Flags::empty(),
-            a_level: 0,
-            ap_level: 0,
-            p_level: 0,
-            brace_level: 0,
+            data:             data,
+            read:             0,
+            flags:            Flags::empty(),
+            a_level:          0,
+            ap_level:         0,
+            p_level:          0,
+            brace_level:      0,
             math_paren_level: 0,
         }
     }

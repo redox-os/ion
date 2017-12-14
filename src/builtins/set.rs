@@ -32,10 +32,10 @@ pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
                     b'o' => match args_iter.next() {
                         Some(&"vi") => if let Some(context) = shell.context.as_mut() {
                             context.key_bindings = KeyBindings::Vi;
-                        }
+                        },
                         Some(&"emacs") => if let Some(context) = shell.context.as_mut() {
                             context.key_bindings = KeyBindings::Emacs;
-                        }
+                        },
                         Some(&"huponexit") => shell.flags |= HUPONEXIT,
                         Some(_) => {
                             eprintln!("ion: set: invalid option");
@@ -65,7 +65,7 @@ pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
                             eprintln!("ion: set: no option given");
                             return 0;
                         }
-                    }
+                    },
                     _ => return 0,
                 }
             }

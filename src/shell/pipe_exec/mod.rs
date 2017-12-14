@@ -225,7 +225,6 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
         }}
     }
 
-
     // Real logic begins here
     let mut new_commands = Vec::new();
     let mut prev_kind = JobKind::And;
@@ -273,11 +272,11 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
             // tee both
             (true, true) => {
                 let mut tee_out = TeeItem {
-                    sinks: Vec::new(),
+                    sinks:  Vec::new(),
                     source: None,
                 };
                 let mut tee_err = TeeItem {
-                    sinks: Vec::new(),
+                    sinks:  Vec::new(),
                     source: None,
                 };
                 for output in outputs {
@@ -302,8 +301,7 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
                                     eprintln!(
                                         "ion: failed to redirect both stdout and stderr to file \
                                          '{:?}': {}",
-                                        f,
-                                        e
+                                        f, e
                                     );
                                     return None;
                                 }
@@ -433,11 +431,16 @@ impl PipelineExecution for Shell {
 
         // If the given pipeline is a background task, fork the shell.
         if let Some((command_name, disown)) = possible_background_name {
-            fork_pipe(self, piped_commands, command_name, if disown {
-                ProcessState::Empty
-            } else {
-                ProcessState::Running
-            })
+            fork_pipe(
+                self,
+                piped_commands,
+                command_name,
+                if disown {
+                    ProcessState::Empty
+                } else {
+                    ProcessState::Running
+                },
+            )
         } else {
             // While active, the SIGTTOU signal will be ignored.
             let _sig_ignore = SignalHandler::new();
@@ -502,9 +505,11 @@ impl PipelineExecution for Shell {
             pgid,
             last_pid,
             move || as_string,
-            move |pid| if let Some(id) = children.iter().position(|&x| x as i32 == pid) {
-                commands.remove(id);
-                children.remove(id);
+            move |pid| {
+                if let Some(id) = children.iter().position(|&x| x as i32 == pid) {
+                    commands.remove(id);
+                    children.remove(id);
+                }
             },
         )
     }
@@ -629,8 +634,7 @@ impl PipelineExecution for Shell {
             Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
                 eprintln!(
                     "ion: function argument has invalid type: expected {}, found value \'{}\'",
-                    expected_type,
-                    value
+                    expected_type, value
                 );
                 FAILURE
             }

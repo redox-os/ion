@@ -57,7 +57,6 @@ pub(crate) trait VariableStore {
     fn export(&mut self, ExportAction) -> i32;
 }
 
-
 impl VariableStore for Shell {
     fn local(&mut self, action: LocalAction) -> i32 {
         let actions = match action {
@@ -89,8 +88,7 @@ impl VariableStore for Shell {
                 }
                 Ok(Action::UpdateArray(..)) => {
                     eprintln!(
-                        "ion: arithmetic operators on array expressions aren't supported \
-                         yet."
+                        "ion: arithmetic operators on array expressions aren't supported yet."
                     );
                     return FAILURE;
                 }

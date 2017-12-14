@@ -15,23 +15,21 @@ const ERRORED: u8 = 2;
 /// structure to notify a background thread that it needs to wait for and return
 /// the exit status back to the `fg` function.
 pub(crate) struct ForegroundSignals {
-    grab: AtomicU32,
+    grab:   AtomicU32,
     status: AtomicU8,
-    reply: AtomicU8,
+    reply:  AtomicU8,
 }
 
 impl ForegroundSignals {
     pub(crate) fn new() -> ForegroundSignals {
         ForegroundSignals {
-            grab: AtomicU32::new(0),
+            grab:   AtomicU32::new(0),
             status: AtomicU8::new(0),
-            reply: AtomicU8::new(0),
+            reply:  AtomicU8::new(0),
         }
     }
 
-    pub(crate) fn signal_to_grab(&self, pid: u32) {
-        self.grab.store(pid, Ordering::Relaxed);
-    }
+    pub(crate) fn signal_to_grab(&self, pid: u32) { self.grab.store(pid, Ordering::Relaxed); }
 
     pub(crate) fn reply_with(&self, status: i8) {
         self.grab.store(0, Ordering::Relaxed);
@@ -58,7 +56,5 @@ impl ForegroundSignals {
         }
     }
 
-    pub(crate) fn was_grabbed(&self, pid: u32) -> bool {
-        self.grab.load(Ordering::Relaxed) == pid
-    }
+    pub(crate) fn was_grabbed(&self, pid: u32) -> bool { self.grab.load(Ordering::Relaxed) == pid }
 }

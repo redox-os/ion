@@ -70,9 +70,7 @@ mod tests {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn variable(&self, var: &str, _: bool) -> Option<Value> {
-            self.0.get_var(var)
-        }
+        fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
     }
 
     #[test]

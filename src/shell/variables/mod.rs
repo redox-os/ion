@@ -6,10 +6,12 @@ use fnv::FnvHashMap;
 use liner::Context;
 use std::env;
 use std::io::{self, BufRead};
-use sys::variables as self_sys;
 use sys::{self, getpid, is_root};
-use types::{Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value,
-            VariableContext};
+use sys::variables as self_sys;
+use types::{
+    Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value,
+    VariableContext,
+};
 use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
 
@@ -19,11 +21,11 @@ lazy_static! {
 
 #[derive(Clone, Debug)]
 pub struct Variables {
-    pub hashmaps: HashMapVariableContext,
-    pub arrays: ArrayVariableContext,
+    pub hashmaps:  HashMapVariableContext,
+    pub arrays:    ArrayVariableContext,
     pub variables: VariableContext,
-    pub aliases: VariableContext,
-    flags: u8,
+    pub aliases:   VariableContext,
+    flags:         u8,
 }
 
 impl Default for Variables {
@@ -34,7 +36,10 @@ impl Default for Variables {
         map.insert("HISTFILE_SIZE".into(), "1000".into());
         map.insert(
             "PROMPT".into(),
-            "${x::1B}]0;${USER}: ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}".into(),
+            "${x::1B}]0;${USER}: \
+             ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# \
+             ${c::reset}"
+                .into(),
         );
         // Set the PID variable to the PID of the shell
         let pid = getpid()
@@ -62,11 +67,11 @@ impl Default for Variables {
             |path| env::set_var("HOME", path.to_str().unwrap_or("?")),
         );
         Variables {
-            hashmaps: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
-            arrays: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+            hashmaps:  FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+            arrays:    FnvHashMap::with_capacity_and_hasher(64, Default::default()),
             variables: map,
-            aliases: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
-            flags: 0,
+            aliases:   FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+            flags:     0,
         }
     }
 }
@@ -74,17 +79,11 @@ impl Default for Variables {
 const PLUGIN: u8 = 1;
 
 impl Variables {
-    pub(crate) fn has_plugin_support(&self) -> bool {
-        self.flags & PLUGIN != 0
-    }
+    pub(crate) fn has_plugin_support(&self) -> bool { self.flags & PLUGIN != 0 }
 
-    pub(crate) fn enable_plugins(&mut self) {
-        self.flags |= PLUGIN;
-    }
+    pub(crate) fn enable_plugins(&mut self) { self.flags |= PLUGIN; }
 
-    pub(crate) fn disable_plugins(&mut self) {
-        self.flags &= 255 ^ PLUGIN;
-    }
+    pub(crate) fn disable_plugins(&mut self) { self.flags &= 255 ^ PLUGIN; }
 
     pub(crate) fn read<I: IntoIterator>(&mut self, args: I) -> i32
     where
@@ -155,17 +154,11 @@ impl Variables {
         }
     }
 
-    pub fn get_map(&self, name: &str) -> Option<&HashMap> {
-        self.hashmaps.get(name)
-    }
+    pub fn get_map(&self, name: &str) -> Option<&HashMap> { self.hashmaps.get(name) }
 
-    pub fn get_array(&self, name: &str) -> Option<&Array> {
-        self.arrays.get(name)
-    }
+    pub fn get_array(&self, name: &str) -> Option<&Array> { self.arrays.get(name) }
 
-    pub fn unset_array(&mut self, name: &str) -> Option<Array> {
-        self.arrays.remove(name)
-    }
+    pub fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
 
     /// Obtains the value for the **SWD** variable.
     ///
@@ -224,9 +217,7 @@ impl Variables {
             match name {
                 "c" | "color" => Colors::collect(variable).into_string(),
                 "x" | "hex" => match u8::from_str_radix(variable, 16) {
-                    Ok(c) => {
-                        Some((c as char).to_string())
-                    },
+                    Ok(c) => Some((c as char).to_string()),
                     Err(why) => {
                         eprintln!("ion: hex parse error: {}: {}", variable, why);
                         None
@@ -274,13 +265,9 @@ impl Variables {
         }
     }
 
-    pub fn get_var_or_empty(&self, name: &str) -> Value {
-        self.get_var(name).unwrap_or_default()
-    }
+    pub fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
 
-    pub fn unset_var(&mut self, name: &str) -> Option<Value> {
-        self.variables.remove(name)
-    }
+    pub fn unset_var(&mut self, name: &str) -> Option<Value> { self.variables.remove(name) }
 
     pub fn get_vars<'a>(&'a self) -> impl Iterator<Item = Identifier> + 'a {
         self.variables
@@ -392,9 +379,7 @@ mod tests {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn variable(&self, var: &str, _: bool) -> Option<Value> {
-            self.0.get_var(var)
-        }
+        fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
     }
 
     #[test]

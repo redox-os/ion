@@ -123,8 +123,8 @@ pub struct Builtin {
 }
 
 pub struct BuiltinMap {
-    pub(crate) name: &'static [&'static str],
-    pub(crate) help: &'static [&'static str],
+    pub(crate) name:      &'static [&'static str],
+    pub(crate) help:      &'static [&'static str],
     pub(crate) functions: &'static [BuiltinFunction],
 }
 
@@ -139,13 +139,9 @@ impl BuiltinMap {
         })
     }
 
-    pub fn keys(&self) -> &'static [&'static str] {
-        self.name
-    }
+    pub fn keys(&self) -> &'static [&'static str] { self.name }
 
-    pub fn contains_key(&self, func: &str) -> bool {
-        self.name.iter().any(|&name| name == func)
-    }
+    pub fn contains_key(&self, func: &str) -> bool { self.name.iter().any(|&name| name == func) }
 }
 
 // Definitions of simple builtins go here
@@ -267,9 +263,7 @@ fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 {
 
 // TODO There is a man page for fn however the -h and --help flags are not
 // checked for.
-fn builtin_fn(_: &[&str], shell: &mut Shell) -> i32 {
-    fn_(&mut shell.functions)
-}
+fn builtin_fn(_: &[&str], shell: &mut Shell) -> i32 { fn_(&mut shell.functions) }
 
 fn builtin_read(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_READ) {

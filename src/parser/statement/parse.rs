@@ -19,9 +19,7 @@ where
     }
 }
 
-fn is_valid_name(name: &str) -> bool {
-    !name.chars().any(|c| !(c.is_alphanumeric() || c == '_'))
-}
+fn is_valid_name(name: &str) -> bool { !name.chars().any(|c| !(c.is_alphanumeric() || c == '_')) }
 
 pub(crate) fn parse(code: &str) -> Statement {
     let cmd = code.trim();
@@ -102,13 +100,11 @@ pub(crate) fn parse(code: &str) -> Statement {
             }
         }
         _ if cmd.starts_with("if ") => {
-            return collect(cmd[3..].trim_left(), |pipeline| {
-                Statement::If {
-                    expression: pipeline,
-                    success: Vec::new(),
-                    else_if: Vec::new(),
-                    failure: Vec::new(),
-                }
+            return collect(cmd[3..].trim_left(), |pipeline| Statement::If {
+                expression: pipeline,
+                success:    Vec::new(),
+                else_if:    Vec::new(),
+                failure:    Vec::new(),
             })
         }
         "else" => return Statement::Else,
@@ -120,17 +116,15 @@ pub(crate) fn parse(code: &str) -> Statement {
                 return collect(cmd[3..].trim_left(), |pipeline| {
                     Statement::ElseIf(ElseIf {
                         expression: pipeline,
-                        success: Vec::new(),
+                        success:    Vec::new(),
                     })
                 });
             }
         }
         _ if cmd.starts_with("while ") => {
-            return collect(cmd[6..].trim_left(), |pipeline| {
-                Statement::While {
-                    expression: pipeline,
-                    statements: Vec::new(),
-                }
+            return collect(cmd[6..].trim_left(), |pipeline| Statement::While {
+                expression: pipeline,
+                statements: Vec::new(),
             })
         }
         _ if cmd.starts_with("for ") => {
@@ -152,8 +146,8 @@ pub(crate) fn parse(code: &str) -> Statement {
             }
 
             return Statement::For {
-                variable: variable.into(),
-                values: ArgumentSplitter::new(cmd[3..].trim_left())
+                variable:   variable.into(),
+                values:     ArgumentSplitter::new(cmd[3..].trim_left())
                     .map(String::from)
                     .collect(),
                 statements: Vec::new(),
@@ -189,7 +183,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         _ if cmd.starts_with("match ") => {
             return Statement::Match {
                 expression: cmd[6..].trim_left().into(),
-                cases: Vec::new(),
+                cases:      Vec::new(),
             }
         }
         _ if cmd.starts_with("fn ") => {
@@ -198,8 +192,8 @@ pub(crate) fn parse(code: &str) -> Statement {
             let name = &cmd[..pos];
             if !is_valid_name(name) {
                 eprintln!(
-                    "ion: syntax error: '{}' is not a valid function name\n     \
-                     Function names may only contain alphanumeric characters",
+                    "ion: syntax error: '{}' is not a valid function name\n     Function names \
+                     may only contain alphanumeric characters",
                     name
                 );
                 return Statement::Default;
@@ -228,7 +222,6 @@ pub(crate) fn parse(code: &str) -> Statement {
         _ => (),
     }
 
-
     if cmd.is_empty() || cmd.starts_with('#') {
         Statement::Default
     } else {
@@ -252,7 +245,7 @@ mod tests {
             expression: Pipeline {
                 items: vec![
                     PipeItem {
-                        job: Job::new(
+                        job:     Job::new(
                             vec![
                                 "test".to_owned(),
                                 "1".to_owned(),
@@ -263,13 +256,13 @@ mod tests {
                             JobKind::Last,
                         ),
                         outputs: Vec::new(),
-                        inputs: Vec::new(),
+                        inputs:  Vec::new(),
                     },
                 ],
             },
-            success: vec![],
-            else_if: vec![],
-            failure: vec![],
+            success:    vec![],
+            else_if:    vec![],
+            failure:    vec![],
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -318,9 +311,9 @@ mod tests {
         let parsed_if = parse("fn bob");
         let correct_parse = Statement::Function {
             description: None,
-            name: "bob".into(),
-            args: Default::default(),
-            statements: Default::default(),
+            name:        "bob".into(),
+            args:        Default::default(),
+            statements:  Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -336,8 +329,8 @@ mod tests {
         let parsed_if = parse("fn bob a b");
         let correct_parse = Statement::Function {
             description: None,
-            name: "bob".into(),
-            args: vec![
+            name:        "bob".into(),
+            args:        vec![
                 KeyBuf {
                     name: "a".into(),
                     kind: Primitive::Any,
@@ -347,7 +340,7 @@ mod tests {
                     kind: Primitive::Any,
                 },
             ],
-            statements: Default::default(),
+            statements:  Default::default(),
         };
         assert_eq!(correct_parse, parsed_if);
 
@@ -358,8 +351,8 @@ mod tests {
         let parsed_if = parse("fn bob a b --bob is a nice function");
         let correct_parse = Statement::Function {
             description: Some("bob is a nice function".to_string()),
-            name: "bob".into(),
-            args: vec![
+            name:        "bob".into(),
+            args:        vec![
                 KeyBuf {
                     name: "a".into(),
                     kind: Primitive::Any,
@@ -369,7 +362,7 @@ mod tests {
                     kind: Primitive::Any,
                 },
             ],
-            statements: vec![],
+            statements:  vec![],
         };
         assert_eq!(correct_parse, parsed_if);
         let parsed_if = parse("fn bob a b --          bob is a nice function");
