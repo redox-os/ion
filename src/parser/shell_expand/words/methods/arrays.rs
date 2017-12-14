@@ -34,6 +34,7 @@ impl<'a> ArrayMethod<'a> {
             "graphemes" => self.graphemes(expand_func),
             "bytes" => self.bytes(expand_func),
             "chars" => self.chars(expand_func),
+            "lines" => self.lines(expand_func),
             _ => Err("invalid array method"),
         };
 
@@ -174,6 +175,11 @@ impl<'a> ArrayMethod<'a> {
             .map(|c| c.to_string())
             .select(self.selection.clone(), len))
     }
+
+    fn lines<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
+        let variable = self.resolve_var(expand_func);
+        Ok(variable.lines().into_iter().map(|line| line.to_string()).collect())
+    }
 }
 
 #[cfg(test)]
@@ -190,6 +196,7 @@ mod test {
             match variable {
                 "FOO" => Some("FOOBAR".to_owned()),
                 "SPACEDFOO" => Some("FOO BAR".to_owned()),
+                "MULTILINE" => Some("FOO\nBAR".to_owned()),
                 _ => None,
             }
         }
@@ -411,6 +418,20 @@ mod test {
         assert_eq!(
             method.handle_as_array(&VariableExpander),
             array!["F", "O", "O", "B", "A", "R"]
+        );
+    }
+
+    #[test]
+    fn test_lines() {
+        let method = ArrayMethod {
+            method:    "lines",
+            variable:  "$MULTILINE",
+            pattern:   Pattern::StringPattern("3"),
+            selection: Select::All,
+        };
+        assert_eq!(
+            method.handle_as_array(&VariableExpander),
+            array!["FOO", "BAR"]
         );
     }
 }
