@@ -35,6 +35,7 @@ impl<'a> ArrayMethod<'a> {
             "bytes" => self.bytes(expand_func),
             "chars" => self.chars(expand_func),
             "lines" => self.lines(expand_func),
+            "reverse" => self.reverse(expand_func),
             _ => Err("invalid array method"),
         };
 
@@ -52,6 +53,17 @@ impl<'a> ArrayMethod<'a> {
             expand_string(self.variable, expand_func, false).join(" ")
         } else {
             "".into()
+        }
+    }
+
+    #[inline]
+    fn resolve_array<E: Expander>(&self, expand_func: &E) -> Array {
+        if let Some(array) = expand_func.array(self.variable, Select::All) {
+            array.clone()
+        } else if is_expression(self.variable) {
+            expand_string(self.variable, expand_func, false)
+        } else {
+            array![]
         }
     }
 
@@ -178,7 +190,17 @@ impl<'a> ArrayMethod<'a> {
 
     fn lines<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
-        Ok(variable.lines().into_iter().map(|line| line.to_string()).collect())
+        Ok(variable
+            .lines()
+            .into_iter()
+            .map(|line| line.to_string())
+            .collect())
+    }
+
+    fn reverse<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
+        let mut result = self.resolve_array(expand_func);
+        result.reverse();
+        Ok(result)
     }
 }
 
@@ -197,6 +219,13 @@ mod test {
                 "FOO" => Some("FOOBAR".to_owned()),
                 "SPACEDFOO" => Some("FOO BAR".to_owned()),
                 "MULTILINE" => Some("FOO\nBAR".to_owned()),
+                _ => None,
+            }
+        }
+
+        fn array(&self, variable: &str, _: Select) -> Option<Array> {
+            match variable {
+                "$ARRAY" => Some(array!["a", "b", "c"].to_owned()),
                 _ => None,
             }
         }
@@ -432,6 +461,20 @@ mod test {
         assert_eq!(
             method.handle_as_array(&VariableExpander),
             array!["FOO", "BAR"]
+        );
+    }
+
+    #[test]
+    fn test_reverse() {
+        let method = ArrayMethod {
+            method:    "reverse",
+            variable:  "$ARRAY",
+            pattern:   Pattern::StringPattern("3"),
+            selection: Select::All,
+        };
+        assert_eq!(
+            method.handle_as_array(&VariableExpander),
+            array!["c", "b", "a"]
         );
     }
 }
