@@ -19,6 +19,29 @@ use std::io::ErrorKind;
 use std::iter::{self, FromIterator};
 use std::path::Path;
 use std::process;
+use std::io::{stdout, Write};
+use std::error::Error;
+
+const MAN_ION: &'static str = r#"NAME
+    ion - ion shell
+
+SYNOPSIS
+    ion [ -h | --help ] [-c] [-n] [-v]
+
+DESCRIPTION
+    ion is a commandline shell created to be a faster and easier to use alternative to the 
+    currently available shells. It is not POSIX compliant. 
+
+OPTIONS
+    -c
+        evaulates given commands instead of reading from the commandline.
+
+    -n or --no-execute
+        do not execute any commands, just do syntax checking.
+
+    -v or --version
+        prints the version, platform and revision of ion then exits.
+"#;
 
 pub(crate) trait Binary {
     /// Launches the shell, parses arguments, and then diverges into one of the `execution`
@@ -175,15 +198,22 @@ impl Binary for Shell {
         let mut args = env::args().skip(1);
         while let Some(path) = args.next() {
             match path.as_str() {
-                "-n" => {
+                "-n" | "--no-execute" => {
                     self.flags |= NO_EXEC;
                     continue;
                 }
                 "-c" => self.execute_arguments(args),
-                "--version" => self.display_version(),
+                "-v" | "--version" => self.display_version(),
                 "-h" | "--help" => {
-                    println!("usage: ion [--version] [-c] [-n] <command>");
-                    return;
+                    let stdout = stdout();
+                    let mut stdout = stdout.lock();
+                    match stdout
+                        .write_all(MAN_ION.as_bytes())
+                        .and_then(|_| stdout.flush())
+                        {
+                        Ok(_) => return,
+                        Err(err) => panic!("{}", err.description().to_owned()),
+                    }
                 }
                 _ => {
                     let mut array = SmallVec::from_iter(Some(path.clone().into()));
