@@ -74,7 +74,7 @@ match "@args[1..3]"
         sudo install target/release/ion ${DESTDIR}/ion
     case "install docs"
         echo "${c::0xF30,bold}Installing documentation with root${c::reset}"
-        sudo mkdir ${SHAREDIR}/docs/ -p
+        sudo mkdir -p ${SHAREDIR}/docs/
         sudo cp manual/book/* ${SHAREDIR}/docs/ -R
     case "install plugins"
         git clone https://github.com/mmstick/ion-plugins
