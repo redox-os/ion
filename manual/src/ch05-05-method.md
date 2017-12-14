@@ -455,11 +455,32 @@ echo $unescape($line)
 
 The following are the currently-supported array methods.
 
+- [lines](#lines)
 - [split](#split)
 - [split_at](#split_at)
 - [bytes](#bytes)
 - [chars](#chars)
 - [graphemes](#graphemes)
+
+### lines
+
+Defaults to string variables. The supplied string will be split into one string per line in the input argument.
+
+#### Examples
+
+```ion
+for line in @lines($unescape("first\nsecond\nthird")
+    echo $line
+end
+```
+
+#### Output
+
+```
+first
+second
+third
+```
 
 ### split
 
