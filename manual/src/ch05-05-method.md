@@ -461,6 +461,7 @@ The following are the currently-supported array methods.
 - [bytes](#bytes)
 - [chars](#chars)
 - [graphemes](#graphemes)
+- [reverse](#reverse)
 
 ### lines
 
@@ -594,4 +595,20 @@ o
 b
 a
 r
+```
+
+### reverse
+
+Defaults to array variables. Returns a reversed copy of the input array.
+
+#### Examples
+
+```ion
+echo @reverse([1 2 3])
+```
+
+#### Output
+
+```
+3 2 1
 ```
