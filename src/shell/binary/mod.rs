@@ -14,13 +14,13 @@ use super::status::*;
 use liner::{Buffer, Context};
 use smallvec::SmallVec;
 use std::env;
+use std::error::Error;
 use std::fs::File;
+use std::io::{stdout, Write};
 use std::io::ErrorKind;
 use std::iter::{self, FromIterator};
 use std::path::Path;
 use std::process;
-use std::io::{stdout, Write};
-use std::error::Error;
 
 const MAN_ION: &'static str = r#"NAME
     ion - ion shell
@@ -208,7 +208,7 @@ impl Binary for Shell {
                     match stdout
                         .write_all(MAN_ION.as_bytes())
                         .and_then(|_| stdout.flush())
-                        {
+                    {
                         Ok(_) => return,
                         Err(err) => panic!("{}", err.description().to_owned()),
                     }

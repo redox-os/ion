@@ -6,7 +6,7 @@ use fnv::FnvHashMap;
 use liner::Context;
 use std::env;
 use std::io::{self, BufRead};
-use sys::{self, getpid, is_root};
+use sys::{self, geteuid, getpid, getuid, is_root};
 use sys::variables as self_sys;
 use types::{
     Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value,
@@ -41,11 +41,20 @@ impl Default for Variables {
              ${c::reset}"
                 .into(),
         );
-        // Set the PID variable to the PID of the shell
-        let pid = getpid()
-            .map(|p| p.to_string())
-            .unwrap_or_else(|e| e.to_string());
-        map.insert("PID".into(), pid.into());
+
+        // Set the PID, UID, and EUID variables.
+        map.insert(
+            "PID".into(),
+            getpid().ok().map_or("?".into(), |id| id.to_string()),
+        );
+        map.insert(
+            "UID".into(),
+            getuid().ok().map_or("?".into(), |id| id.to_string()),
+        );
+        map.insert(
+            "EUID".into(),
+            geteuid().ok().map_or("?".into(), |id| id.to_string()),
+        );
 
         // Initialize the HISTFILE variable
         if let Ok(base_dirs) = BaseDirectories::with_prefix("ion") {
@@ -206,8 +215,8 @@ impl Variables {
 
     pub fn get_var(&self, name: &str) -> Option<Value> {
         match name {
-            "SWD" => return Some(self.get_simplified_directory()),
             "MWD" => return Some(self.get_minimal_directory()),
+            "SWD" => return Some(self.get_simplified_directory()),
             _ => (),
         }
         if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..]))
