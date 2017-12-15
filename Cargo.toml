@@ -13,7 +13,7 @@ license-file = "LICENSE"
 name = "ion-shell"
 readme = "README.md"
 repository = "https://github.com/redox-os/ion"
-version = "1.0.5"
+version = "1.0.0-alpha"
 
 [[bin]]
 name = "ion"
