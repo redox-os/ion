@@ -357,9 +357,8 @@ fn builtin_echo(args: &[&str], _: &mut Shell) -> i32 {
 }
 
 fn builtin_test(args: &[&str], _: &mut Shell) -> i32 {
-    if check_help(args, MAN_TEST) {
-        return SUCCESS;
-    }
+    // Do not use `check_help` for the `test` builtin. The
+    // `test` builtin contains a "-h" option.
     match test(args) {
         Ok(true) => SUCCESS,
         Ok(false) => FAILURE,
