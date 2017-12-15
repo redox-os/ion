@@ -225,7 +225,7 @@ mod test {
 
         fn array(&self, variable: &str, _: Select) -> Option<Array> {
             match variable {
-                "$ARRAY" => Some(array!["a", "b", "c"].to_owned()),
+                "ARRAY" => Some(array!["a", "b", "c"].to_owned()),
                 _ => None,
             }
         }
@@ -468,7 +468,7 @@ mod test {
     fn test_reverse() {
         let method = ArrayMethod {
             method:    "reverse",
-            variable:  "$ARRAY",
+            variable:  "@ARRAY",
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
