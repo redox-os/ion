@@ -1,9 +1,9 @@
+use super::man_pages::{print_man, MAN_TEST};
 use smallstring::SmallString;
 use std::fs;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::time::SystemTime;
-use super::man_pages::{print_man, MAN_TEST};
 
 pub(crate) fn test(args: &[&str]) -> Result<bool, String> {
     let arguments = &args[1..];
