@@ -84,7 +84,8 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 // Disable METHOD if enabled.
                 b')' if self.flags & METHOD != 0 => self.flags ^= METHOD,
                 // Otherwise decrement the parenthesis level.
-                b')' => level -= 1,
+                b')' if level > 0 =>
+                    level -= 1,
                 // Toggle double quote rules.
                 b'"' => self.flags ^= DOUBLE,
                 // Loop through characters until single quote rules are completed.
