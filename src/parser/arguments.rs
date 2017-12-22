@@ -67,6 +67,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
         }
         let start = self.read;
 
+        // parenthesis level and array bracket level
         let (mut level, mut alevel) = (0, 0);
         let mut bytes = data.iter().cloned().skip(self.read);
         while let Some(character) = bytes.next() {
@@ -102,10 +103,6 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 // Decrement the array level
                 b']' => alevel -= 1,
                 b'(' => {
-                    // If COMM_1 is enabled
-                    // i.e., a '$' was found last
-                    // Increment the parenthesis level.
-
                     // if VARIAB or ARRAY are set
                     // Disable VARIAB + ARRAY and enable METHOD.
                     if self.bitflags.intersects(
