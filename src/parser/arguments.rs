@@ -1,10 +1,3 @@
-const DOUBLE: u8 = 1;
-const COMM_1: u8 = 2;
-const COMM_2: u8 = 4;
-const VARIAB: u8 = 8;
-const ARRAY: u8 = 16;
-const METHOD: u8 = 32;
-
 bitflags! {
     struct ArgumentFlags: u8 {
         /// Double quotes 
@@ -25,7 +18,6 @@ pub struct ArgumentSplitter<'a> {
     data:  &'a str,
     /// Number of bytes read
     read:  usize,
-    flags: u8,
     bitflags: ArgumentFlags,
 }
 
@@ -34,7 +26,6 @@ impl<'a> ArgumentSplitter<'a> {
         ArgumentSplitter {
             data:  data,
             read:  0,
-            flags: 0,
             bitflags: ArgumentFlags::empty(),
         }
     }
@@ -67,10 +58,10 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
         }
         let start = self.read;
 
-        // parenthesis level and array bracket level
         let (mut level, mut alevel) = (0, 0);
         let mut bytes = data.iter().cloned().skip(self.read);
         while let Some(character) = bytes.next() {
+
             match character {
                 // Skip the next byte.
                 b'\\' => {
@@ -80,7 +71,6 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 }
                 // Disable COMM_1 and enable COMM_2 + ARRAY.
                 b'@' => {
-                    self.flags = (self.flags & (255 ^ COMM_1)) | (COMM_2 + ARRAY);
                     self.bitflags.remove(ArgumentFlags::COMM_1);
                     self.bitflags.insert(
                         ArgumentFlags::COMM_2 | ArgumentFlags::ARRAY
@@ -90,7 +80,6 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 }
                 // Disable COMM_2 and enable COMM_1 + VARIAB.
                 b'$' => {
-                    self.flags = (self.flags & (255 ^ COMM_2)) | (COMM_1 + VARIAB);
                     self.bitflags.remove(ArgumentFlags::COMM_2);
                     self.bitflags.insert(
                         ArgumentFlags::COMM_1 | ArgumentFlags::VARIAB
@@ -102,38 +91,53 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b'[' => alevel += 1,
                 // Decrement the array level
                 b']' => alevel -= 1,
+
                 b'(' => {
-                    // if VARIAB or ARRAY are set
                     // Disable VARIAB + ARRAY and enable METHOD.
+                    // if variab or array are set
                     if self.bitflags.intersects(
                         ArgumentFlags::VARIAB | ArgumentFlags::ARRAY
                     ) {
-                        self.flags = (self.flags & (255 ^ (VARIAB + ARRAY))) | METHOD;
                         self.bitflags.remove(
                             ArgumentFlags::VARIAB | ArgumentFlags::ARRAY
                         );
-                        self.bitflags.insert(ArgumentFlags::METHOD);
+                        self.bitflags.insert(ArgumentFlags::METHOD);                       
                     }
-                    level += 1;
+                    level += 1
                 }
+                b')' => {
+                    if self.bitflags.contains(ArgumentFlags::METHOD) {
+                        self.bitflags.remove(ArgumentFlags::METHOD);
+                    }
+                    level -= 1;
+                }
+
                 // Toggle double quote rules.
                 b'"' => {
-                    self.flags ^= DOUBLE;
                     self.bitflags.toggle(ArgumentFlags::DOUBLE);
                 }
                 // Loop through characters until single quote rules are completed.
-                b'\'' if self.flags & DOUBLE == 0 => {
+                b'\'' if !self.bitflags.contains(ArgumentFlags::DOUBLE) => {
                     self.scan_singlequotes(&mut bytes);
                     self.read += 2;
                     continue;
                 }
+                // b' ' if (!self.bitflags.contains(
+                //     ArgumentFlags::DOUBLE | ArgumentFlags::METHOD
+                // ) && level + alevel == 0) => break,
                 // Break from the loop once a root-level space is found.
-                b' ' if (self.flags & (DOUBLE + METHOD)) + level + alevel == 0 => break,
+                b' ' => {
+                    if !self.bitflags.intersects(
+                        ArgumentFlags::DOUBLE | ArgumentFlags::METHOD
+                    ) && level == 0 && alevel == 0 {
+                        break;
+                    }
+                }
                 _ => (),
             }
+
             self.read += 1;
             // disable COMM_1 and COMM_2
-            self.flags &= 255 ^ (COMM_1 + COMM_2);
             self.bitflags.remove(
                 ArgumentFlags::COMM_1 | ArgumentFlags::COMM_2
             );
