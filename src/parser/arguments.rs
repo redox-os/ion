@@ -1,15 +1,24 @@
-const DOUBLE: u8 = 1;
-const COMM_1: u8 = 2;
-const COMM_2: u8 = 4;
-const VARIAB: u8 = 8;
-const ARRAY: u8 = 16;
-const METHOD: u8 = 32;
+bitflags! {
+    struct ArgumentFlags: u8 {
+        /// Double quotes 
+        const DOUBLE = 0b00000001;
+        /// Command flags
+        const COMM_1 = 0b00000010; // found $
+        const COMM_2 = 0b00000100; // found ( after $
+        /// String variable 
+        const VARIAB = 0b00001000;
+        /// Array variable 
+        const ARRAY  = 0b00010000;
+        const METHOD = 0b00100000;       
+    }
+}
 
 /// An efficient `Iterator` structure for splitting arguments
 pub struct ArgumentSplitter<'a> {
     data:  &'a str,
+    /// Number of bytes read
     read:  usize,
-    flags: u8,
+    bitflags: ArgumentFlags,
 }
 
 impl<'a> ArgumentSplitter<'a> {
@@ -17,7 +26,7 @@ impl<'a> ArgumentSplitter<'a> {
         ArgumentSplitter {
             data:  data,
             read:  0,
-            flags: 0,
+            bitflags: ArgumentFlags::empty(),
         }
     }
 }
@@ -52,6 +61,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
         let (mut level, mut alevel) = (0, 0);
         let mut bytes = data.iter().cloned().skip(self.read);
         while let Some(character) = bytes.next() {
+
             match character {
                 // Skip the next byte.
                 b'\\' => {
@@ -61,13 +71,19 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 }
                 // Disable COMM_1 and enable COMM_2 + ARRAY.
                 b'@' => {
-                    self.flags = (self.flags & (255 ^ COMM_1)) | (COMM_2 + ARRAY);
+                    self.bitflags.remove(ArgumentFlags::COMM_1);
+                    self.bitflags.insert(
+                        ArgumentFlags::COMM_2 | ArgumentFlags::ARRAY
+                    );
                     self.read += 1;
                     continue;
                 }
                 // Disable COMM_2 and enable COMM_1 + VARIAB.
                 b'$' => {
-                    self.flags = (self.flags & (255 ^ COMM_2)) | (COMM_1 + VARIAB);
+                    self.bitflags.remove(ArgumentFlags::COMM_2);
+                    self.bitflags.insert(
+                        ArgumentFlags::COMM_1 | ArgumentFlags::VARIAB
+                    );
                     self.read += 1;
                     continue;
                 }
@@ -75,30 +91,56 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b'[' => alevel += 1,
                 // Decrement the array level
                 b']' => alevel -= 1,
-                // Increment the parenthesis level.
-                b'(' if self.flags & COMM_1 != 0 => level += 1,
-                // Disable VARIAB + ARRAY and enable METHOD.
-                b'(' if self.flags & (VARIAB + ARRAY) != 0 => {
-                    self.flags = (self.flags & (255 ^ (VARIAB + ARRAY))) | METHOD;
+
+                b'(' => {
+                    // Disable VARIAB + ARRAY and enable METHOD.
+                    // if variab or array are set
+                    if self.bitflags.intersects(
+                        ArgumentFlags::VARIAB | ArgumentFlags::ARRAY
+                    ) {
+                        self.bitflags.remove(
+                            ArgumentFlags::VARIAB | ArgumentFlags::ARRAY
+                        );
+                        self.bitflags.insert(ArgumentFlags::METHOD);                       
+                    }
+                    level += 1
                 }
-                // Disable METHOD if enabled.
-                b')' if self.flags & METHOD != 0 => self.flags ^= METHOD,
-                // Otherwise decrement the parenthesis level.
-                b')' => level -= 1,
+                b')' => {
+                    if self.bitflags.contains(ArgumentFlags::METHOD) {
+                        self.bitflags.remove(ArgumentFlags::METHOD);
+                    }
+                    level -= 1;
+                }
+
                 // Toggle double quote rules.
-                b'"' => self.flags ^= DOUBLE,
+                b'"' => {
+                    self.bitflags.toggle(ArgumentFlags::DOUBLE);
+                }
                 // Loop through characters until single quote rules are completed.
-                b'\'' if self.flags & DOUBLE == 0 => {
+                b'\'' if !self.bitflags.contains(ArgumentFlags::DOUBLE) => {
                     self.scan_singlequotes(&mut bytes);
                     self.read += 2;
                     continue;
                 }
+                // b' ' if (!self.bitflags.contains(
+                //     ArgumentFlags::DOUBLE | ArgumentFlags::METHOD
+                // ) && level + alevel == 0) => break,
                 // Break from the loop once a root-level space is found.
-                b' ' if (self.flags & (DOUBLE + METHOD)) + level + alevel == 0 => break,
+                b' ' => {
+                    if !self.bitflags.intersects(
+                        ArgumentFlags::DOUBLE | ArgumentFlags::METHOD
+                    ) && level == 0 && alevel == 0 {
+                        break;
+                    }
+                }
                 _ => (),
             }
+
             self.read += 1;
-            self.flags &= 255 ^ (COMM_1 + COMM_2);
+            // disable COMM_1 and COMM_2
+            self.bitflags.remove(
+                ArgumentFlags::COMM_1 | ArgumentFlags::COMM_2
+            );
         }
 
         if start == self.read {
