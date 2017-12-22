@@ -7,18 +7,23 @@ const METHOD: u8 = 32;
 
 bitflags! {
     struct ArgumentFlags: u8 {
-        const DOUBLE = 1;
-        const COMM_1 = 2;
-        const COMM_2 = 4;
-        const VARIAB = 8;
-        const ARRAY = 16;
-        const METHOD = 32;       
+        /// Double quotes 
+        const DOUBLE = 0b00000001;
+        /// Command flags
+        const COMM_1 = 0b00000010; // found $
+        const COMM_2 = 0b00000100; // found ( after $
+        /// String variable 
+        const VARIAB = 0b00001000;
+        /// Array variable 
+        const ARRAY  = 0b00010000;
+        const METHOD = 0b00100000;       
     }
 }
 
 /// An efficient `Iterator` structure for splitting arguments
 pub struct ArgumentSplitter<'a> {
     data:  &'a str,
+    /// Number of bytes read
     read:  usize,
     flags: u8,
     bitflags: ArgumentFlags,
@@ -65,11 +70,6 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
         let (mut level, mut alevel) = (0, 0);
         let mut bytes = data.iter().cloned().skip(self.read);
         while let Some(character) = bytes.next() {
-
-            eprintln!("character: {}", character as char);
-            eprintln!("flags:\t\t{:08b}", self.flags);
-            eprintln!("bitflags:\t{:08b}", self.bitflags.bits());
-
             match character {
                 // Skip the next byte.
                 b'\\' => {
@@ -101,28 +101,28 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b'[' => alevel += 1,
                 // Decrement the array level
                 b']' => alevel -= 1,
-                // Increment the parenthesis level.
-                b'(' if self.flags & COMM_1 != 0 => level += 1,
-                // Disable VARIAB + ARRAY and enable METHOD.
-                b'(' if self.flags & (VARIAB + ARRAY) != 0 => {
-                    self.flags = (self.flags & (255 ^ (VARIAB + ARRAY))) | METHOD;
-                    self.bitflags.remove(
+                b'(' => {
+                    // If COMM_1 is enabled
+                    // i.e., a '$' was found last
+                    // Increment the parenthesis level.
+
+                    // if VARIAB or ARRAY are set
+                    // Disable VARIAB + ARRAY and enable METHOD.
+                    if self.bitflags.intersects(
                         ArgumentFlags::VARIAB | ArgumentFlags::ARRAY
-                    );
-                    self.bitflags.insert(ArgumentFlags::METHOD);
+                    ) {
+                        self.flags = (self.flags & (255 ^ (VARIAB + ARRAY))) | METHOD;
+                        self.bitflags.remove(
+                            ArgumentFlags::VARIAB | ArgumentFlags::ARRAY
+                        );
+                        self.bitflags.insert(ArgumentFlags::METHOD);
+                    }
+                    level += 1;
                 }
-                // Disable METHOD if enabled.
-                b')' if self.flags & METHOD != 0 => {
-                    self.flags ^= METHOD;
-                    self.bitflags.remove(ArgumentFlags::METHOD);
-                }
-                // Otherwise decrement the parenthesis level.
-                b')' =>
-                    level -= 1,
                 // Toggle double quote rules.
                 b'"' => {
                     self.flags ^= DOUBLE;
-                    self.bitflags.remove(ArgumentFlags::DOUBLE);
+                    self.bitflags.toggle(ArgumentFlags::DOUBLE);
                 }
                 // Loop through characters until single quote rules are completed.
                 b'\'' if self.flags & DOUBLE == 0 => {
