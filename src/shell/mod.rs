@@ -461,7 +461,7 @@ impl<'a> Expander for Shell {
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<Value> {
         let mut output = None;
-        match self.fork(Capture::Stdout, move |shell| shell.on_command(command)) {
+        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command)) {
             Ok(result) => {
                 let mut string = String::new();
                 match result.stdout.unwrap().read_to_string(&mut string) {

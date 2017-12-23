@@ -10,6 +10,7 @@ use std::ffi::CString;
 use std::os::unix::io::RawFd;
 
 pub(crate) const PATH_SEPARATOR: &str = ":";
+pub(crate) const NULL_PATH: &str = "/dev/null";
 
 pub(crate) const O_CLOEXEC: usize = libc::O_CLOEXEC as usize;
 pub(crate) const SIGHUP: i32 = libc::SIGHUP;

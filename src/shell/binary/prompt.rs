@@ -20,7 +20,7 @@ pub(crate) fn prompt_fn(shell: &mut Shell) -> Option<String> {
 
     let mut output = None;
 
-    match shell.fork(Capture::Stdout, |child| unsafe {
+    match shell.fork(Capture::StdoutThenIgnoreStderr, |child| unsafe {
         let _ = function.read().execute(child, &["ion"]);
     }) {
         Ok(result) => {

@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use syscall::SigAction;
 
 pub(crate) const PATH_SEPARATOR: &str = ";";
+pub(crate) const NULL_PATH: &str = "null:";
 
 pub(crate) const O_CLOEXEC: usize = syscall::O_CLOEXEC;
 pub(crate) const SIGHUP: i32 = syscall::SIGHUP as i32;

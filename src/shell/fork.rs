@@ -11,13 +11,23 @@ use sys;
 /// A type that is utilized by the `Fork` structure.
 pub enum Capture {
     /// Don't capture any streams at all.
-    None = 0,
+    None = 0b0000,
     /// Capture just the standard output stream.
-    Stdout = 1,
+    Stdout = 0b0001,
     /// Capture just the standard error stream.
-    Stderr = 2,
+    Stderr = 0b0010,
     /// Capture both the standard output and error streams.
-    Both = 3,
+    Both = 0b0011,
+    /// Redirect just the stdandard output stream to /dev/null.
+    IgnoreStdout = 0b0100,
+    /// Redirect just the standard error stream to /dev/null.
+    IgnoreStderr = 0b1000,
+    /// Redirect both the standard output and error streams to /dev/null.
+    IgnoreBoth = 0b1100,
+    /// Capture standard output and ignore standard error.
+    StdoutThenIgnoreStderr = 0b1001,
+    /// Capture standard error and ignore standard output.
+    StderrThenIgnoreStdout = 0b0110,
 }
 
 /// Utilized by the shell for performing forks and capturing streams.
@@ -49,7 +59,7 @@ impl<'a> Fork<'a> {
         sys::signals::block();
 
         // If we are to capture stdout, create a pipe for capturing outputs.
-        let outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
+        let mut outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
             Some(sys::pipe2(sys::O_CLOEXEC)
                 .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
                 .map_err(|err| IonError::Fork { why: err })?)
@@ -58,7 +68,7 @@ impl<'a> Fork<'a> {
         };
 
         // And if we are to capture stderr, create a pipe for that as well.
-        let errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
+        let mut errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
             Some(sys::pipe2(sys::O_CLOEXEC)
                 .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
                 .map_err(|err| IonError::Fork { why: err })?)
@@ -66,28 +76,36 @@ impl<'a> Fork<'a> {
             None
         };
 
+        // TODO: Have a global static store a File that points to /dev/null (or :null for Redox)
+        // at the beginning of the program so that any request for /dev/null's fd doesn't need to
+        // be repeated.
+        let null_file = File::open(sys::NULL_PATH);
+
         match unsafe { sys::fork() } {
             Ok(0) => {
                 // Allow the child to handle it's own signal handling.
                 sys::signals::unblock();
 
-                // Redirect standard output to a pipe, if needed.
-                if let Some((read, write)) = outs {
+                // Redirect standard output to a pipe, or /dev/null, if needed.
+                if self.capture as u8 & Capture::IgnoreStdout as u8 != 0 {
+                    if let Ok(null) = null_file.as_ref() {
+                        let _ = sys::dup2(null.as_raw_fd(), sys::STDOUT_FILENO);
+                    }
+                } else if let Some((_read, write)) = outs.take() {
                     let _ = sys::dup2(write.as_raw_fd(), sys::STDOUT_FILENO);
-                    drop(write);
-                    drop(read);
                 }
 
-                // Redirect standard error to a pipe, if needed.
-                if let Some((read, write)) = errs {
+                // Redirect standard error to a pipe, or /dev/null, if needed.
+                if self.capture as u8 & Capture::IgnoreStderr as u8 != 0 {
+                    if let Ok(null) = null_file.as_ref() {
+                        let _ = sys::dup2(null.as_raw_fd(), sys::STDERR_FILENO);
+                    }
+                } else if let Some((_read, write)) = errs.take() {
                     let _ = sys::dup2(write.as_raw_fd(), sys::STDERR_FILENO);
-                    drop(write);
-                    drop(read);
                 }
 
                 // Execute the given closure within the child's shell.
                 let mut shell: Shell = unsafe { (self.shell as *const Shell).read() };
-                //  shell.context.take().map(|mut c| c.history.commit_history());
                 child_func(&mut shell);
 
                 // Reap the child, enabling the parent to get EOF from the read end of the pipe.
