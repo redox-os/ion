@@ -463,7 +463,7 @@ impl<'a> Expander for Shell {
         let mut output = None;
         match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command)) {
             Ok(result) => {
-                let mut string = String::new();
+                let mut string = String::with_capacity(1024);
                 match result.stdout.unwrap().read_to_string(&mut string) {
                     Ok(_) => output = Some(string),
                     Err(why) => {

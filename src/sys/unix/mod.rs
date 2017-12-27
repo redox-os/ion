@@ -24,6 +24,8 @@ pub(crate) const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
 pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
 pub(crate) const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 
+fn errno() -> i32 { unsafe { *libc::__errno_location() } }
+
 pub(crate) fn geteuid() -> io::Result<u32> { Ok(unsafe { libc::geteuid() } as u32) }
 
 pub(crate) fn getuid() -> io::Result<u32> { Ok(unsafe { libc::getuid() } as u32) }
@@ -31,6 +33,24 @@ pub(crate) fn getuid() -> io::Result<u32> { Ok(unsafe { libc::getuid() } as u32)
 pub(crate) fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
 
 pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
+
+pub fn wait_for_child(pid: u32) -> io::Result<u8> {
+    let mut status;
+    use libc::{waitpid, ECHILD, WEXITSTATUS};
+
+    loop {
+        status = 0;
+        match unsafe { waitpid(pid as i32, &mut status, 0) } {
+            -1 if errno() == ECHILD => break,
+            -1 => return Err(io::Error::from_raw_os_error(errno())),
+            _ => ()
+        }
+    }
+
+    Ok(unsafe { WEXITSTATUS(status) as u8 })
+}
+
+pub fn fork_exit(exit_status: i32) -> ! { unsafe { libc::_exit(exit_status) } }
 
 pub(crate) fn getpid() -> io::Result<u32> { cvt(unsafe { libc::getpid() }).map(|pid| pid as u32) }
 

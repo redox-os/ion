@@ -31,6 +31,25 @@ pub(crate) fn is_root() -> bool { syscall::geteuid().map(|id| id == 0).unwrap_or
 
 pub unsafe fn fork() -> io::Result<u32> { cvt(syscall::clone(0)).map(|pid| pid as u32) }
 
+pub fn fork_exit(status: usize) -> ! { syscall::exit(status) }
+
+pub fn wait_for_child(pid: u32) -> io::Result<u8> {
+    let mut status;
+    use syscall::{waitpid, ECHILD};
+
+    loop {
+        status = 0;
+        match unsafe { waitpid(pid as usize, &mut status, 0) } {
+            Err(error) if error.errno == ECHILD => break,
+            Err(error) => return Err(io::Error::from_raw_os_error(error.errono)),
+            => ()
+        }
+    }
+
+    // Ok(WEXITSTATUS(status) as u8)
+    Ok(0)
+}
+
 pub(crate) fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
 
 pub(crate) fn kill(pid: u32, signal: i32) -> io::Result<()> {

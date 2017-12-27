@@ -29,12 +29,8 @@ pub(crate) fn fork_pipe(
             // This ensures that the child fork has a unique PGID.
             create_process_group(0);
 
-            // Drop the context and it's background thread in the child.
-            // NOTE: Solves a memory leak.
-            // shell.context.take().map(|mut c| c.history.commit_history());
-
             // After execution of it's commands, exit with the last command's status.
-            exit(pipe(shell, commands, false));
+            sys::fork_exit(pipe(shell, commands, false));
         }
         Ok(pid) => {
             if state != ProcessState::Empty {

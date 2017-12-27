@@ -1,7 +1,6 @@
 use super::{IonError, Shell};
 use std::fs::File;
 use std::os::unix::io::{AsRawFd, FromRawFd};
-use std::process::exit;
 use sys;
 
 #[repr(u8)]
@@ -47,6 +46,7 @@ pub struct IonResult {
     pub pid:    u32,
     pub stdout: Option<File>,
     pub stderr: Option<File>,
+    pub status: u8,
 }
 
 impl<'a> Fork<'a> {
@@ -62,7 +62,7 @@ impl<'a> Fork<'a> {
         let mut outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
             Some(sys::pipe2(sys::O_CLOEXEC)
                 .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
-                .map_err(|err| IonError::Fork { why: err })?)
+                .map_err(|why| IonError::Fork { why })?)
         } else {
             None
         };
@@ -71,7 +71,7 @@ impl<'a> Fork<'a> {
         let mut errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
             Some(sys::pipe2(sys::O_CLOEXEC)
                 .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
-                .map_err(|err| IonError::Fork { why: err })?)
+                .map_err(|why| IonError::Fork { why })?)
         } else {
             None
         };
@@ -104,25 +104,38 @@ impl<'a> Fork<'a> {
                     let _ = sys::dup2(write.as_raw_fd(), sys::STDERR_FILENO);
                 }
 
-                // Execute the given closure within the child's shell.
-                let mut shell: Shell = unsafe { (self.shell as *const Shell).read() };
-                child_func(&mut shell);
+                // Drop all the file descriptors that we no longer need.
+                drop(null_file);
+                drop(outs);
+                drop(errs);
 
-                // Reap the child, enabling the parent to get EOF from the read end of the pipe.
-                exit(shell.previous_status);
+                // Obtain ownership of the child's copy of the shell, and then configure it.
+                let mut shell: Shell = unsafe { (self.shell as *const Shell).read() };
+                shell.set_var("PID", &sys::getpid().unwrap_or(0).to_string());
+                let _ = shell.context.take();
+
+                // Execute the given closure within the child's shell.
+                child_func(&mut shell);
+                sys::fork_exit(shell.previous_status);
             }
-            Ok(pid) => Ok(IonResult {
-                pid,
-                stdout: outs.map(|(read, write)| {
-                    drop(write);
-                    read
-                }),
-                stderr: errs.map(|(read, write)| {
-                    drop(write);
-                    read
-                }),
-            }),
-            Err(why) => Err(IonError::Fork { why: why }),
+            Ok(pid) => {
+                Ok(IonResult {
+                    pid,
+                    stdout: outs.map(|(read, write)| {
+                        drop(write);
+                        read
+                    }),
+                    stderr: errs.map(|(read, write)| {
+                        drop(write);
+                        read
+                    }),
+                    // `waitpid()` is required to reap the child.
+                    status: sys::wait_for_child(pid).map_err(|why| IonError::Fork { why })?,
+                })
+            },
+            Err(why) => {
+                Err(IonError::Fork { why: why })
+            },
         }
     }
 }
