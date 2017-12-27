@@ -43,7 +43,7 @@ OPTIONS
         prints the version, platform and revision of ion then exits.
 "#;
 
-pub(crate) trait Binary {
+pub trait Binary {
     /// Launches the shell, parses arguments, and then diverges into one of the `execution`
     /// paths.
     fn main(self);

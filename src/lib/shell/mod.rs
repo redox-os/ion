@@ -15,7 +15,7 @@ pub(crate) mod signals;
 pub mod status;
 pub mod variables;
 
-pub(crate) use self::binary::Binary;
+pub use self::binary::Binary;
 pub(crate) use self::flow::FlowLogic;
 pub use self::fork::{Capture, Fork, IonResult};
 pub(crate) use self::history::{IgnoreSetting, ShellHistory};
@@ -50,7 +50,6 @@ use sys;
 use types::*;
 use xdg::BaseDirectories;
 
-#[allow(dead_code)]
 #[derive(Debug, Fail)]
 pub enum IonError {
     #[fail(display = "failed to fork: {}", why)] Fork { why: io::Error },
@@ -106,33 +105,55 @@ pub struct Shell {
     ignore_setting: IgnoreSetting,
 }
 
-impl<'a> Shell {
-    #[allow(dead_code)]
-    /// Panics if DirectoryStack construction fails
-    pub(crate) fn new_bin() -> Shell {
-        Shell {
-            builtins:            BUILTINS,
-            context:             None,
-            variables:           Variables::default(),
-            flow_control:        FlowControl::default(),
-            directory_stack:     DirectoryStack::new(),
-            functions:           FnvHashMap::default(),
-            previous_job:        !0,
-            previous_status:     0,
-            flags:               0,
-            foreground:          Vec::new(),
-            background:          Arc::new(Mutex::new(Vec::new())),
-            is_background_shell: false,
-            is_library:          false,
-            break_flow:          false,
-            foreground_signals:  Arc::new(ForegroundSignals::new()),
-            ignore_setting:      IgnoreSetting::default(),
+pub struct ShellBuilder;
+
+impl ShellBuilder {
+    pub fn new() -> ShellBuilder { ShellBuilder }
+
+    pub fn install_signal_handler(self) -> ShellBuilder {
+        extern "C" fn handler(signal: i32) {
+            let signal = match signal {
+                sys::SIGINT => signals::SIGINT,
+                sys::SIGHUP => signals::SIGHUP,
+                sys::SIGTERM => signals::SIGTERM,
+                _ => unreachable!(),
+            };
+
+            signals::PENDING.store(signal, Ordering::SeqCst);
         }
+
+        let _ = sys::signal(sys::SIGHUP, handler);
+        let _ = sys::signal(sys::SIGINT, handler);
+        let _ = sys::signal(sys::SIGTERM, handler);
+
+        self
     }
 
-    #[allow(dead_code)]
-    /// Creates a new shell within memory.
-    pub fn new() -> Shell {
+    pub fn block_signals(self) -> ShellBuilder {
+        // This will block SIGTSTP, SIGTTOU, SIGTTIN, and SIGCHLD, which is required
+        // for this shell to manage its own process group / children / etc.
+        signals::block();
+
+        self
+    }
+
+    pub fn set_unique_pid(self) -> ShellBuilder {
+        if let Ok(pid) = sys::getpid() {
+            if sys::setpgid(0, pid).is_ok() {
+                let _ = sys::tcsetpgrp(0, pid);
+            }
+        }
+
+        self
+    }
+
+    pub fn as_library(self) -> Shell { Shell::new(true) }
+
+    pub fn as_binary(self) -> Shell { Shell::new(false) }
+}
+
+impl<'a> Shell {
+    pub(crate) fn new(is_library: bool) -> Shell {
         Shell {
             builtins:            BUILTINS,
             context:             None,
@@ -146,7 +167,7 @@ impl<'a> Shell {
             foreground:          Vec::new(),
             background:          Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
-            is_library:          true,
+            is_library,
             break_flow:          false,
             foreground_signals:  Arc::new(ForegroundSignals::new()),
             ignore_setting:      IgnoreSetting::default(),
@@ -327,7 +348,6 @@ impl<'a> Shell {
         self.variables.get_array(name).map(SmallVec::as_ref)
     }
 
-    #[allow(dead_code)]
     /// A method for executing commands in the Ion shell without capturing. It takes command(s)
     /// as
     /// a string argument, parses them, and executes them the same as it would if you had
@@ -348,7 +368,6 @@ impl<'a> Shell {
         }
     }
 
-    #[allow(dead_code)]
     /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
     /// method will attempt to execute that file as a script, and then returns the final exit
     /// status of the evaluated script.
@@ -363,7 +382,6 @@ impl<'a> Shell {
         Ok(self.previous_status)
     }
 
-    #[allow(dead_code)]
     /// A method for executing a function with the given `name`, using `args` as the input.
     /// If the function does not exist, an `IonError::DoesNotExist` is returned.
     pub fn execute_function(&mut self, name: &str, args: &[&str]) -> Result<i32, IonError> {

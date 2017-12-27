@@ -49,6 +49,6 @@ mod builtins;
 mod shell;
 mod ascii_helpers;
 
-pub use shell::{Capture, Fork, IonError, IonResult, Shell};
+pub use shell::{Binary, Capture, Fork, IonError, IonResult, Shell, ShellBuilder};
 pub use shell::flags;
 pub use shell::status;

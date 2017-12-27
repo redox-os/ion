@@ -45,7 +45,8 @@ fn get_var_string(name: &str, shell: &mut Shell) -> String {
 
 #[test]
 fn test_is() {
-    let mut shell = Shell::new();
+    use shell::ShellBuilder;
+    let mut shell = ShellBuilder::new().as_library();
     shell.set_var("x", "value");
     shell.set_var("y", "0");
 
