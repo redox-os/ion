@@ -41,7 +41,7 @@ pub fn wait_for_child(pid: u32) -> io::Result<u8> {
     loop {
         status = 0;
         match unsafe { waitpid(pid as usize, &mut status, 0) } {
-            Err(error) if error.errno == ECHILD => break,
+            Err(ref error) if error.errno == ECHILD => break,
             Err(error) => return Err(io::Error::from_raw_os_error(error.errno)),
             _ => ()
         }
