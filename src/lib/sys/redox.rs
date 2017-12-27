@@ -5,6 +5,7 @@ use std::env;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::RawFd;
 use std::path::PathBuf;
+use std::process::exit;
 
 use syscall::SigAction;
 
