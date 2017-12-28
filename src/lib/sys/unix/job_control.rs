@@ -78,58 +78,41 @@ pub(crate) fn watch_background(
     }
 }
 
-const FIRST: u8 = 1;
-const LAST: u8 = 2;
-
-pub(crate) fn watch_foreground<F, D>(
-    shell: &mut Shell,
-    first_pid: u32,
-    last_pid: u32,
-    get_command: F,
-    mut drop_command: D,
-) -> i32
-where
-    F: FnOnce() -> String,
-    D: FnMut(i32),
-{
+pub(crate) fn watch_foreground(shell: &mut Shell, pids: Vec<u32>, command: &str) -> i32 {
+    let mut signaled = 0;
     let mut exit_status = 0;
-    let mut found = 0;
+    let mut status;
+
     loop {
         unsafe {
-            let mut status = 0;
-            let pid = waitpid(-1, &mut status, WUNTRACED);
-            match pid {
+            status = 0;
+            match waitpid(-(pids[0] as i32), &mut status, WUNTRACED) {
                 -1 => {
                     let error = errno();
                     match error.0 {
-                        ECHILD => break exit_status,
+                        ECHILD if signaled == 0 => break exit_status,
+                        ECHILD => break signaled,
                         _ => {
-                            eprintln!("ion: {}", error);
+                            eprintln!("ion: waitpid error: {}", error);
                             break FAILURE;
                         }
                     }
                 }
                 0 => (),
-                _ if WIFEXITED(status) => {
-                    let status = WEXITSTATUS(status) as i32;
-                    if pid == (last_pid as i32) {
-                        found |= LAST;
-                    }
-
-                    if pid == (first_pid as i32) {
-                        found |= FIRST;
-                    }
-
-                    if found == FIRST + LAST {
-                        break status;
-                    } else {
-                        drop_command(pid);
-                        exit_status = status;
+                pid if WIFEXITED(status) => {
+                    exit_status = WEXITSTATUS(status) as i32;
+                    match pids.iter().position(|&p| p == pid as u32) {
+                        Some(0) => (),
+                        Some(pos) => {
+                            let _ = kill(pids[pos-1] as i32, SIGPIPE);
+                        }
+                        None => ()
                     }
                 }
-                _ if WIFSIGNALED(status) => {
-                    eprintln!("ion: process ended by signal");
+                _pid if WIFSIGNALED(status) => {
                     let signal = WTERMSIG(status);
+                    if signal == SIGPIPE { continue }
+                    eprintln!("ion: process ended by signal {}", signal);
                     match signal {
                         SIGINT => {
                             shell.foreground_send(signal as i32);
@@ -137,15 +120,14 @@ where
                         }
                         _ => {
                             shell.handle_signal(signal);
-                            shell.exit(TERMINATED);
                         }
                     }
-                    break TERMINATED;
+                    signaled = 128 + signal as i32;
                 }
-                _ if WIFSTOPPED(status) => {
-                    shell.send_to_background(pid as u32, ProcessState::Stopped, get_command());
+                pid if WIFSTOPPED(status) => {
+                    shell.send_to_background(pid as u32, ProcessState::Stopped, command.into());
                     shell.break_flow = true;
-                    break TERMINATED;
+                    break 128 + signal as i32;
                 }
                 _ => (),
             }

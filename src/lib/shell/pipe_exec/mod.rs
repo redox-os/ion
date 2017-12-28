@@ -486,7 +486,7 @@ impl PipelineExecution for Shell {
         Ok(results)
     }
 
-    fn wait(&mut self, mut children: Vec<u32>, mut commands: Vec<RefinedJob>) -> i32 {
+    fn wait(&mut self, children: Vec<u32>, commands: Vec<RefinedJob>) -> i32 {
         // TODO: Find a way to only do this when absolutely necessary.
         let as_string = commands
             .iter()
@@ -494,24 +494,9 @@ impl PipelineExecution for Shell {
             .collect::<Vec<String>>()
             .join(" | ");
 
-        // Each process in the pipe has the same PGID, which is the first process's PID.
-        let pgid = children[0];
-
-        // If the last process exits, we know that all processes should exit.
-        let last_pid = children[children.len() - 1];
 
         // Watch the foreground group, dropping all commands that exit as they exit.
-        self.watch_foreground(
-            pgid,
-            last_pid,
-            move || as_string,
-            move |pid| {
-                if let Some(id) = children.iter().position(|&x| x as i32 == pid) {
-                    commands.remove(id);
-                    children.remove(id);
-                }
-            },
-        )
+        self.watch_foreground(children, &as_string)
     }
 
     fn exec_job(&mut self, job: &mut RefinedJob, foreground: bool) -> i32 {
@@ -531,7 +516,7 @@ impl PipelineExecution for Shell {
                     if foreground && !self.is_library {
                         let _ = sys::tcsetpgrp(0, child.id());
                     }
-                    self.watch_foreground(child.id(), child.id(), move || long, |_| ())
+                    self.watch_foreground(vec![child.id()], &long)
                 }
                 Err(e) => if e.kind() == io::ErrorKind::NotFound {
                     if !command_not_found(self, &short) {

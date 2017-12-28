@@ -328,6 +328,7 @@ impl<'a> Shell {
             self.set_var("?", &code.to_string());
             self.previous_status = code;
         }
+
         exit_status
     }
 

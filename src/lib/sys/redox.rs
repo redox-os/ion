@@ -207,17 +207,8 @@ pub mod job_control {
         // TODO: Implement this using syscall::call::waitpid
     }
 
-    pub(crate) fn watch_foreground<F, D>(
-        shell: &mut Shell,
-        _pid: u32,
-        last_pid: u32,
-        _get_command: F,
-        mut drop_command: D,
-    ) -> i32
-    where
-        F: FnOnce() -> String,
-        D: FnMut(i32),
-    {
+    // TODO: This is very outdated -- copy code from the Linux side.
+    pub(crate) fn watch_foreground(shell: &mut Shell, _pids: Vec<i32>, _command: &str ) -> i32;
         let mut exit_status = 0;
         loop {
             let mut status_raw = 0;
@@ -228,7 +219,6 @@ pub mod job_control {
                         if pid == (last_pid as usize) {
                             break code;
                         } else {
-                            drop_command(pid as i32);
                             exit_status = code;
                         }
                     } else if let Some(signal) = status.signal() {
