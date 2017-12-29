@@ -506,7 +506,7 @@ impl PipelineExecution for Shell {
                 ref stdout,
                 ref stderr,
             } => {
-                let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
+                let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
                 return exec_external(&name, &args, stdin, stdout, stderr);
             }
             RefinedJob::Builtin {
@@ -954,13 +954,23 @@ fn spawn_proc(
         RefinedJob::External { ref name, ref args, ref stdout, ref stderr, ref stdin} => {
             match unsafe { sys::fork() } {
                 Ok(0) => {
+                    if let Some(ref file) = *stdin {
+                        redir(file.as_raw_fd(), sys::STDIN_FILENO);
+                    }
+                    if let Some(ref file) = *stdout {
+                        redir(file.as_raw_fd(), sys::STDOUT_FILENO);
+                    }
+                    if let Some(ref file) = *stderr {
+                        redir(file.as_raw_fd(), sys::STDERR_FILENO);
+                    }
                     prepare_child(child_blocked);
-                    let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
-                    if let Err(why) = sys::execve(&name, &args, false) {
+                    let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
+                    if let Err(_why) = sys::execve(&name, &args, false) {
                         sys::fork_exit(NO_SUCH_COMMAND);
                     }
                 },
                 Ok(pid) => {
+                    close(stdin);
                     close(stdout);
                     close(stderr);
                     shell.foreground.push(pid);
@@ -1072,16 +1082,12 @@ fn prepare_child(child_blocked: bool) {
     let _ = sys::reset_signal(sys::SIGHUP);
     let _ = sys::reset_signal(sys::SIGTERM);
     if child_blocked {
-        eprintln!("stopping {}", process::id());
         let _ = sys::kill(process::id(), sys::SIGSTOP);
     } else {
-        eprintln!("did not stop {}", process::id());
     }
 }
 
 fn resume_prior_process(last_pid: &mut u32, current_pid: u32, child_blocked: bool) {
-    eprintln!("Last {}, current_pid: {}", *last_pid, current_pid);
-
     if child_blocked {
         // Ensure that the process is stopped before continuing.
         if let Err(why) = sys::wait_for_interrupt(current_pid) {
@@ -1090,7 +1096,6 @@ fn resume_prior_process(last_pid: &mut u32, current_pid: u32, child_blocked: boo
     }
 
     if *last_pid != 0 {
-        eprintln!("Resuming {}", *last_pid);
         let _ = sys::kill(*last_pid, sys::SIGCONT);
     }
 
