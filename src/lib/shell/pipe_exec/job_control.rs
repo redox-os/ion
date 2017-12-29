@@ -33,7 +33,7 @@ pub(crate) trait JobControl {
     fn handle_signal(&self, signal: i32) -> bool;
     fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
-    fn watch_foreground(&mut self, pids: Vec<u32>, command: &str) -> i32;
+    fn watch_foreground(&mut self, pid: i32, command: &str) -> i32;
     fn send_to_background(&mut self, child: u32, state: ProcessState, command: String);
 }
 
@@ -148,8 +148,8 @@ impl JobControl for Shell {
         self.exit(sigcode);
     }
 
-    fn watch_foreground(&mut self, pids: Vec<u32>, command: &str) -> i32 {
-        self_sys::watch_foreground(self, pids, command)
+    fn watch_foreground(&mut self, pid: i32, command: &str) -> i32 {
+        self_sys::watch_foreground(self, pid, command)
     }
 
     /// Send a kill signal to all running foreground tasks.

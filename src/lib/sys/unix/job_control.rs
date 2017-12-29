@@ -78,7 +78,7 @@ pub(crate) fn watch_background(
     }
 }
 
-pub(crate) fn watch_foreground(shell: &mut Shell, pids: Vec<u32>, command: &str) -> i32 {
+pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i32 {
     let mut signaled = 0;
     let mut exit_status = 0;
     let mut status;
@@ -86,7 +86,7 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pids: Vec<u32>, command: &str)
     loop {
         unsafe {
             status = 0;
-            match waitpid(-(pids[0] as i32), &mut status, WUNTRACED) {
+            match waitpid(pid, &mut status, WUNTRACED) {
                 -1 => {
                     let error = errno();
                     match error.0 {
@@ -99,15 +99,8 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pids: Vec<u32>, command: &str)
                     }
                 }
                 0 => (),
-                pid if WIFEXITED(status) => {
+                _pid if WIFEXITED(status) => {
                     exit_status = WEXITSTATUS(status) as i32;
-                    match pids.iter().position(|&p| p == pid as u32) {
-                        Some(0) => (),
-                        Some(pos) => {
-                            let _ = kill(pids[pos-1] as i32, SIGPIPE);
-                        }
-                        None => ()
-                    }
                 }
                 _pid if WIFSIGNALED(status) => {
                     let signal = WTERMSIG(status);
@@ -124,7 +117,8 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pids: Vec<u32>, command: &str)
                     }
                     signaled = 128 + signal as i32;
                 }
-                pid if WIFSTOPPED(status) => {
+                _pid if WIFSTOPPED(status) => {
+                    // TODO: Rework background control
                     shell.send_to_background(pid as u32, ProcessState::Stopped, command.into());
                     shell.break_flow = true;
                     break 128 + signal as i32;

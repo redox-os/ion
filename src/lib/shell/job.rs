@@ -79,31 +79,27 @@ fn expand_arg(arg: &str, shell: &Shell) -> Array {
 /// as part of some pipeline
 pub(crate) enum RefinedJob {
     /// An external program that is executed by this shell
-    External(Command),
+    External {
+        name: Identifier,
+        args: Array,
+        stdin: Option<File>,
+        stdout: Option<File>,
+        stderr: Option<File>,
+    },
     /// A procedure embedded into Ion
     Builtin {
-        /// Name of the procedure
         main: BuiltinFunction,
-        /// Arguments to pass in to the procedure
         args: Array,
-        /// A file corresponding to the standard input for this builtin
         stdin: Option<File>,
-        /// A file corresponding to the standard output for this builtin
         stdout: Option<File>,
-        /// A file corresponding to the standard error for this builtin
         stderr: Option<File>,
     },
     /// Functions can act as commands too!
     Function {
-        /// Name of the procedure
         name: Identifier,
-        /// Arguments to pass in to the procedure
         args: Array,
-        /// A file corresponding to the standard input for this builtin
         stdin: Option<File>,
-        /// A file corresponding to the standard output for this builtin
         stdout: Option<File>,
-        /// A file corresponding to the standard error for this builtin
         stderr: Option<File>,
     },
     /// Represents redirection into stdin from more than one source
@@ -187,10 +183,8 @@ impl TeeItem {
 macro_rules! set_field {
     ($self:expr, $field:ident, $arg:expr) => {
         match *$self {
-            RefinedJob::External(ref mut command) => {
-                command.$field(Stdio::from($arg));
-            }
-            RefinedJob::Builtin { ref mut $field,  .. } |
+            RefinedJob::External { ref mut $field, .. } |
+                RefinedJob::Builtin { ref mut $field,  .. } |
                 RefinedJob::Function { ref mut $field, .. } |
                 RefinedJob::Tee { ref mut $field, .. } => {
                 *$field = Some($arg);
@@ -202,6 +196,16 @@ macro_rules! set_field {
 }
 
 impl RefinedJob {
+    pub(crate) fn external(name: Identifier, args: Array) -> Self {
+        RefinedJob::External {
+            name,
+            args,
+            stdin: None,
+            stdout: None,
+            stderr: None,
+        }
+    }
+
     pub(crate) fn builtin(main: BuiltinFunction, args: Array) -> Self {
         RefinedJob::Builtin {
             main,
@@ -263,13 +267,9 @@ impl RefinedJob {
     /// or builtin name
     pub(crate) fn short(&self) -> String {
         match *self {
-            RefinedJob::External(ref cmd) => format!("{:?}", cmd)
-                .split('"')
-                .nth(1)
-                .unwrap_or("")
-                .to_string(),
             RefinedJob::Builtin { .. } => String::from("Shell Builtin"),
-            RefinedJob::Function { ref name, .. } => name.to_string(),
+            RefinedJob::Function { ref name, .. } |
+                RefinedJob::External { ref name, .. } => name.to_string(),
             // TODO: Print for real
             RefinedJob::Cat { .. } => "multi-input".into(),
             RefinedJob::Tee { .. } => "multi-output".into(),
@@ -279,24 +279,9 @@ impl RefinedJob {
     /// Returns a long description of this job: the commands and arguments
     pub(crate) fn long(&self) -> String {
         match *self {
-            RefinedJob::External(ref cmd) => {
-                let command = format!("{:?}", cmd);
-                let mut arg_iter = command.split_whitespace();
-                let command = arg_iter.next().unwrap();
-                let mut output = String::from(&command[1..command.len() - 1]);
-                for argument in arg_iter {
-                    output.push(' ');
-                    if argument.len() > 2 {
-                        output.push_str(&argument[1..argument.len() - 1]);
-                    } else {
-                        output.push_str(&argument);
-                    }
-                }
-                output
-            }
-            RefinedJob::Builtin { ref args, .. } | RefinedJob::Function { ref args, .. } => {
-                format!("{}", args.join(" "))
-            }
+            RefinedJob::External { ref args, .. } |
+                RefinedJob::Builtin { ref args, .. } |
+                RefinedJob::Function { ref args, .. } => format!("{}", args.join(" ")),
             // TODO: Figure out real printing
             RefinedJob::Cat { .. } | RefinedJob::Tee { .. } => "".into(),
         }

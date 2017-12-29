@@ -3,7 +3,7 @@ extern crate libc;
 pub mod job_control;
 pub mod signals;
 
-use libc::{c_char, c_int, pid_t, sighandler_t};
+use libc::{c_char, c_int, fcntl, F_GETFL, F_SETFL, O_NONBLOCK, pid_t, sighandler_t, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED};
 use std::{io, ptr};
 use std::env;
 use std::ffi::CString;
@@ -34,20 +34,52 @@ pub(crate) fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
 
 pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
 
-pub fn wait_for_child(pid: u32) -> io::Result<u8> {
-    let mut status;
-    use libc::{waitpid, ECHILD, WEXITSTATUS};
+pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
+    let mut status = 0;
+    let mut result;
 
     loop {
-        status = 0;
-        match unsafe { waitpid(pid as i32, &mut status, 0) } {
-            -1 if errno() == ECHILD => break,
-            -1 => return Err(io::Error::from_raw_os_error(errno())),
-            _ => ()
+        result = unsafe { waitpid(pid as i32, &mut status, WUNTRACED) };
+        if result == -1 {
+            if errno() == EINTR { continue }
+            break Err(io::Error::from_raw_os_error(errno()));
+        }
+        break Ok(());
+    }
+}
+
+pub fn make_fd_blocking(fd: RawFd) -> io::Result<()> {
+    let mut err = 0;
+
+    unsafe {
+        let flags = fcntl(fd, F_GETFL, 0);
+        if flags & O_NONBLOCK != 0 {
+            err = fcntl(fd, F_SETFL, flags ^ O_NONBLOCK);
         }
     }
 
-    Ok(unsafe { WEXITSTATUS(status) as u8 })
+    if err == -1 {
+        Err(io::Error::from_raw_os_error(errno()))
+    } else {
+        Ok(())
+    }
+}
+
+pub fn wait_for_child(pid: u32) -> io::Result<u8> {
+    let mut status;
+    let mut result;
+
+    loop {
+        status = 0;
+        result = unsafe { waitpid(pid as i32, &mut status, WUNTRACED) };
+        if result == -1 {
+            break if errno() == ECHILD {
+                Ok(unsafe { WEXITSTATUS(status) as u8 })
+            } else {
+                Err(io::Error::from_raw_os_error(errno()))
+            };
+        }
+    }
 }
 
 pub fn fork_exit(exit_status: i32) -> ! { unsafe { libc::_exit(exit_status) } }

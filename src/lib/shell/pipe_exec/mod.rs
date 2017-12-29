@@ -348,9 +348,9 @@ pub(crate) trait PipelineExecution {
     /// associated will be marked as an `&&`, `||`, `|`, or final job.
     fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<RefinedItem>, i32>;
 
-    /// Waits for all of the children within a pipe to finish exuecting, returning the
+    /// Waits for all of the children of the assigned pgid to finish executing, returning the
     /// exit status of the last process in the queue.
-    fn wait(&mut self, children: Vec<u32>, commands: Vec<RefinedJob>) -> i32;
+    fn wait(&mut self, pgid: u32, commands: Vec<RefinedJob>) -> i32;
 
     /// Executes a `RefinedJob` that was created in the `generate_commands` method.
     ///
@@ -474,19 +474,16 @@ impl PipelineExecution for Shell {
                 } else if let Some(builtin) = job.builtin {
                     RefinedJob::builtin(builtin, job.args.drain().collect())
                 } else {
-                    let mut command = Command::new(job.args[0].clone());
-                    for arg in job.args.drain().skip(1) {
-                        command.arg(arg);
-                    }
-                    RefinedJob::External(command)
+                    RefinedJob::external(job.args[0].clone().into(), job.args.drain().collect())
                 }
             };
             results.push((refined, job.kind, outputs, inputs));
         }
+
         Ok(results)
     }
 
-    fn wait(&mut self, children: Vec<u32>, commands: Vec<RefinedJob>) -> i32 {
+    fn wait(&mut self, pgid: u32, commands: Vec<RefinedJob>) -> i32 {
         // TODO: Find a way to only do this when absolutely necessary.
         let as_string = commands
             .iter()
@@ -494,40 +491,24 @@ impl PipelineExecution for Shell {
             .collect::<Vec<String>>()
             .join(" | ");
 
-
         // Watch the foreground group, dropping all commands that exit as they exit.
-        self.watch_foreground(children, &as_string)
+        self.watch_foreground(-(pgid as i32), &as_string)
     }
 
     fn exec_job(&mut self, job: &mut RefinedJob, foreground: bool) -> i32 {
         let short = job.short();
         let long = job.long();
         match *job {
-            RefinedJob::External(ref mut command) => match {
-                command
-                    .before_exec(move || {
-                        signals::unblock();
-                        create_process_group(0);
-                        Ok(())
-                    })
-                    .spawn()
-            } {
-                Ok(child) => {
-                    if foreground && !self.is_library {
-                        let _ = sys::tcsetpgrp(0, child.id());
-                    }
-                    self.watch_foreground(vec![child.id()], &long)
-                }
-                Err(e) => if e.kind() == io::ErrorKind::NotFound {
-                    if !command_not_found(self, &short) {
-                        eprintln!("ion: command not found: {}", short);
-                    }
-                    NO_SUCH_COMMAND
-                } else {
-                    eprintln!("ion: error spawning process: {}", e);
-                    COULD_NOT_EXEC
-                },
-            },
+            RefinedJob::External {
+                ref name,
+                ref args,
+                ref stdin,
+                ref stdout,
+                ref stderr,
+            } => {
+                let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
+                return exec_external(&name, &args, stdin, stdout, stderr);
+            }
             RefinedJob::Builtin {
                 main,
                 ref args,
@@ -714,27 +695,63 @@ impl PipelineExecution for Shell {
     }
 }
 
+fn exec_external(
+    name: &str,
+    args: &[&str],
+    stdout: &Option<File>,
+    stderr: &Option<File>,
+    stdin: &Option<File>,
+) -> i32 {
+    return match unsafe { sys::fork() } {
+        Ok(0) => {
+            if let Some(ref file) = *stdin {
+                redir(file.as_raw_fd(), sys::STDIN_FILENO);
+                let _ = sys::close(file.as_raw_fd());
+            }
+
+            if let Some(ref file) = *stdout {
+                redir(file.as_raw_fd(), sys::STDOUT_FILENO);
+                let _ = sys::close(file.as_raw_fd());
+            }
+
+            if let Some(ref file) = *stderr {
+                redir(file.as_raw_fd(), sys::STDERR_FILENO);
+                let _ = sys::close(file.as_raw_fd());
+            }
+
+            prepare_child(false);
+            if let Err(_why) = sys::execve(name, &args, false) {
+                sys::fork_exit(NO_SUCH_COMMAND);
+            }
+            unreachable!()
+        },
+        Ok(pid) => match sys::wait_for_child(pid) {
+            Ok(status) => status as i32,
+            Err(why) => {
+                eprintln!("ion: waitpid error: {}", why);
+                FAILURE
+            }
+        }
+        Err(why) => {
+            eprintln!("ion: failed to fork: {}", why);
+            COULD_NOT_EXEC
+        }
+    }
+}
+
+/// Executes a piped job `job1 | job2 | job3`
+///
 /// This function will panic if called with an empty slice
 pub(crate) fn pipe(
     shell: &mut Shell,
     commands: Vec<(RefinedJob, JobKind)>,
     foreground: bool,
 ) -> i32 {
-    fn close(file: &Option<File>) {
-        if let &Some(ref file) = file {
-            if let Err(e) = sys::close(file.as_raw_fd()) {
-                eprintln!("ion: failed to close file '{:?}': {}", file, e);
-            }
-        }
-    }
-
     let mut previous_status = SUCCESS;
     let mut previous_kind = JobKind::And;
-    let mut commands = commands.into_iter();
-    // A vector to hold possible external command stdout/stderr pipes.
-    // If it is Some, then we close the various file descriptors after
-    // spawning a child job.
-    let mut ext_stdio: Option<Vec<RawFd>> = None;
+    let mut commands = commands.into_iter().peekable();
+    let mut possible_external_stdio_pipes: Option<Vec<File>> = None;
+
     loop {
         if let Some((mut parent, mut kind)) = commands.next() {
             // When an `&&` or `||` operator is utilized, execute commands based on the
@@ -759,219 +776,21 @@ pub(crate) fn pipe(
                 JobKind::Pipe(mut mode) => {
                     // We need to remember the commands as they own the file
                     // descriptors that are created by sys::pipe.
-                    // We purposfully drop the pipes that are owned by a given
-                    // command in `wait` in order to close those pipes, sending
-                    // EOF to the next command
                     let mut remember = Vec::new();
-                    // A list of the PIDs in the piped command
-                    let mut children: Vec<u32> = Vec::new();
-                    // The process group by which all of the PIDs belong to.
-                    let mut pgid = 0; // 0 means the PGID is not set yet.
 
-                    macro_rules! spawn_proc {
-                        ($cmd:expr) => {
-                            let short = $cmd.short();
-                            match $cmd {
-                                RefinedJob::External(ref mut command) => {
-                                    match {
-                                        command.before_exec(move || {
-                                            signals::unblock();
-                                            create_process_group(pgid);
-                                            Ok(())
-                                        }).spawn()
-                                    } {
-                                        Ok(child) => {
-                                            if pgid == 0 {
-                                                pgid = child.id();
-                                                if foreground && !shell.is_library {
-                                                    let _ = sys::tcsetpgrp(0, pgid);
-                                                }
-                                            }
-                                            shell.foreground.push(child.id());
-                                            children.push(child.id());
-                                        },
-                                        Err(e) => {
-                                            return if e.kind() == io::ErrorKind::NotFound {
-                                                if !command_not_found(shell, &short) {
-                                                    eprintln!("ion: command not found: {}", short);
-                                                }
-                                                NO_SUCH_COMMAND
-                                            } else {
-                                                eprintln!("ion: error spawning process: {}", e);
-                                                COULD_NOT_EXEC
-                                            }
-                                        }
-                                    }
-                                }
-                                RefinedJob::Builtin { main,
-                                                      ref args,
-                                                      ref stdout,
-                                                      ref stderr,
-                                                      ref stdin, } =>
-                                {
-                                    match unsafe { sys::fork() } {
-                                        Ok(0) => {
-                                            signals::unblock();
-                                            let _ = sys::reset_signal(sys::SIGINT);
-                                            let _ = sys::reset_signal(sys::SIGHUP);
-                                            let _ = sys::reset_signal(sys::SIGTERM);
-                                            create_process_group(pgid);
-                                            let args: Vec<&str> = args
-                                                .iter()
-                                                .map(|x| x as &str).collect();
-                                            let ret = shell.exec_builtin(main,
-                                                              &args,
-                                                              stdout,
-                                                              stderr,
-                                                              stdin);
-                                            close(stdout);
-                                            close(stderr);
-                                            close(stdin);
-                                            exit(ret)
-                                        },
-                                        Ok(pid) => {
-                                            close(stdout);
-                                            close(stderr);
-                                            if pgid == 0 {
-                                                pgid = pid;
-                                                if foreground && !shell.is_library {
-                                                    let _ = sys::tcsetpgrp(0, pgid);
-                                                }
-                                            }
-                                            shell.foreground.push(pid);
-                                            children.push(pid);
-                                        },
-                                        Err(e) => {
-                                            eprintln!("ion: failed to fork {}: {}",
-                                                      short,
-                                                      e);
-                                        }
-                                    }
-                                }
-                                RefinedJob::Function { ref name,
-                                                      ref args,
-                                                      ref stdout,
-                                                      ref stderr,
-                                                      ref stdin, } =>
-                                {
-                                    match unsafe { sys::fork() } {
-                                        Ok(0) => {
-                                            // signals::unblock();
-                                            let _ = sys::reset_signal(sys::SIGINT);
-                                            let _ = sys::reset_signal(sys::SIGHUP);
-                                            let _ = sys::reset_signal(sys::SIGTERM);
-                                            create_process_group(pgid);
-                                            let args: Vec<&str> = args
-                                                .iter()
-                                                .map(|x| x as &str).collect();
-                                            let ret = shell.exec_function(name,
-                                                              &args,
-                                                              stdout,
-                                                              stderr,
-                                                              stdin);
-                                            close(stdout);
-                                            close(stderr);
-                                            close(stdin);
-                                            exit(ret)
-                                        },
-                                        Ok(pid) => {
-                                            close(stdout);
-                                            close(stderr);
-                                            if pgid == 0 {
-                                                pgid = pid;
-                                                if foreground && !shell.is_library {
-                                                    let _ = sys::tcsetpgrp(0, pgid);
-                                                }
-                                            }
-                                            shell.foreground.push(pid);
-                                            children.push(pid);
-                                        },
-                                        Err(e) => {
-                                            eprintln!("ion: failed to fork {}: {}",
-                                                      short,
-                                                      e);
-                                        }
-                                    }
-                                }
-                                RefinedJob::Cat { ref mut sources,
-                                                  ref stdout,
-                                                  ref mut stdin } => {
-                                    match unsafe { sys::fork() } {
-                                        Ok(0) => {
-                                            let _ = sys::reset_signal(sys::SIGINT);
-                                            let _ = sys::reset_signal(sys::SIGHUP);
-                                            let _ = sys::reset_signal(sys::SIGTERM);
-                                            create_process_group(pgid);
-                                            let ret = shell.exec_multi_in(
-                                                sources,
-                                                stdout,
-                                                stdin,
-                                            );
-                                            close(stdout);
-                                            close(stdin);
-                                            exit(ret);
-                                        }
-                                        Ok(pid) => {
-                                            close(stdout);
-                                            if pgid == 0 {
-                                                pgid = pid;
-                                                if foreground && !shell.is_library {
-                                                    let _ = sys::tcsetpgrp(0, pgid);
-                                                }
-                                            }
-                                            shell.foreground.push(pid);
-                                            children.push(pid);
-                                        }
-                                        Err(e) => eprintln!("ion: failed to fork {}: {}", short, e),
-                                    }
-                                },
-                                RefinedJob::Tee { ref mut items,
-                                                  ref stdout,
-                                                  ref stderr,
-                                                  ref stdin } => {
-                                    match unsafe { sys::fork() } {
-                                        Ok(0) => {
-                                            let _ = sys::reset_signal(sys::SIGINT);
-                                            let _ = sys::reset_signal(sys::SIGHUP);
-                                            let _ = sys::reset_signal(sys::SIGTERM);
-                                            create_process_group(pgid);
-                                            let ret = shell.exec_multi_out(
-                                                items,
-                                                stdout,
-                                                stderr,
-                                                stdin,
-                                                kind,
-                                            );
-                                            close(stdout);
-                                            close(stderr);
-                                            close(stdin);
-                                            exit(ret);
-                                        },
-                                        Ok(pid) => {
-                                            close(stdout);
-                                            close(stderr);
-                                            if pgid == 0 {
-                                                pgid = pid;
-                                                if foreground && !shell.is_library {
-                                                    let _ = sys::tcsetpgrp(0, pgid);
-                                                }
-                                            }
-                                            shell.foreground.push(pid);
-                                            children.push(pid);
-                                        }
-                                        Err(e) => eprintln!("ion: failed to fork {}: {}", short, e),
-                                    }
-                                }
-                            }
-                        };
-                    }
+                    let mut pgid = 0;
+                    let mut last_pid = 0;
+                    let mut current_pid = 0;
 
-                    // Append other jobs until all piped jobs are running
+                    // When set to true, this command will be SIGSTOP'd  before it executes.
+                    let mut child_blocked;
+
+                    // Append jobs until all piped jobs are running
                     while let Some((mut child, ckind)) = commands.next() {
                         // If parent is a RefindJob::External, then we need to keep track of the
                         // output pipes, so we can properly close them after the job has been
                         // spawned.
-                        let is_external = if let RefinedJob::External(..) = parent {
+                        let is_external = if let RefinedJob::External { .. } = parent {
                             true
                         } else {
                             false
@@ -991,7 +810,7 @@ pub(crate) fn pipe(
                                         Some(unsafe { File::from_raw_fd(out_reader) });
                                     parent.stdout(unsafe { File::from_raw_fd(out_writer) });
                                     if is_external {
-                                        ext_stdio.get_or_insert(vec![]).push(out_writer);
+                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(out_writer) });
                                     }
                                 }
                             }
@@ -1002,7 +821,7 @@ pub(crate) fn pipe(
                                         Some(unsafe { File::from_raw_fd(err_reader) });
                                     parent.stderr(unsafe { File::from_raw_fd(err_writer) });
                                     if is_external {
-                                        ext_stdio.get_or_insert(vec![]).push(err_writer);
+                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(err_writer) });
                                     }
                                 }
                             }
@@ -1013,7 +832,7 @@ pub(crate) fn pipe(
                                 }
                                 Ok((reader, writer)) => {
                                     if is_external {
-                                        ext_stdio.get_or_insert(vec![]).push(writer);
+                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(writer) });
                                     }
                                     child.stdin(unsafe { File::from_raw_fd(reader) });
                                     match mode {
@@ -1047,15 +866,26 @@ pub(crate) fn pipe(
                                 }
                             }
                         }
-                        spawn_proc!(parent);
-                        remember.push(parent);
-                        if let Some(fds) = ext_stdio.take() {
-                            for fd in fds {
-                                if let Err(e) = sys::close(fd) {
-                                    eprintln!("ion: failed to close file '{:?}': {}", fd, e);
-                                }
-                            }
+
+                        child_blocked = match ckind {
+                            JobKind::Pipe(_) | JobKind::Last => true,
+                            _ => false
+                        };
+
+                        match spawn_proc(shell, parent, kind, child_blocked, &mut last_pid, &mut current_pid) {
+                            SUCCESS => (),
+                            error_code => return error_code
                         }
+
+                        // remember.push(parent);
+                        possible_external_stdio_pipes = None;
+
+                        if set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library {
+                            let _ = sys::tcsetpgrp(0, pgid);
+                        }
+
+                        resume_prior_process(&mut last_pid, current_pid, child_blocked);
+
                         if let JobKind::Pipe(m) = ckind {
                             parent = child;
                             mode = m;
@@ -1066,13 +896,26 @@ pub(crate) fn pipe(
                             // previous kind set to `And` after processing the
                             // initial pipeline
                             kind = ckind;
-                            spawn_proc!(child);
-                            remember.push(child);
+
+                            child_blocked = match commands.peek() {
+                                Some(&(_, JobKind::Pipe(_))) => true,
+                                Some(&(_, JobKind::Last)) => true,
+                                _ => false
+                            };
+
+                            match spawn_proc(shell, child, kind, child_blocked, &mut last_pid, &mut current_pid) {
+                                SUCCESS => (),
+                                error_code => return error_code
+                            }
+
+                            // remember.push(child);
+                            resume_prior_process(&mut last_pid, current_pid, child_blocked);
+
                             break;
                         }
                     }
                     previous_kind = kind;
-                    previous_status = shell.wait(children, remember);
+                    previous_status = shell.wait(pgid, remember);
                     if previous_status == TERMINATED {
                         shell.foreground_send(sys::SIGTERM);
                         return previous_status;
@@ -1088,4 +931,175 @@ pub(crate) fn pipe(
         }
     }
     previous_status
+}
+
+fn spawn_proc(
+    shell: &mut Shell,
+    mut cmd: RefinedJob,
+    kind: JobKind,
+    child_blocked: bool,
+    last_pid: &mut u32,
+    current_pid: &mut u32
+) -> i32 {
+    fn close(file: &Option<File>) {
+        if let &Some(ref file) = file {
+            if let Err(e) = sys::close(file.as_raw_fd()) {
+                eprintln!("ion: failed to close file '{:?}': {}", file, e);
+            }
+        }
+    }
+
+    let short = cmd.short();
+    match cmd {
+        RefinedJob::External { ref name, ref args, ref stdout, ref stderr, ref stdin} => {
+            match unsafe { sys::fork() } {
+                Ok(0) => {
+                    prepare_child(child_blocked);
+                    let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
+                    if let Err(why) = sys::execve(&name, &args, false) {
+                        sys::fork_exit(NO_SUCH_COMMAND);
+                    }
+                },
+                Ok(pid) => {
+                    close(stdout);
+                    close(stderr);
+                    shell.foreground.push(pid);
+                    *last_pid = *current_pid;
+                    *current_pid = pid;
+                },
+                Err(e) => {
+                    eprintln!("ion: failed to fork {}: {}", short, e);
+                }
+            }
+        }
+        RefinedJob::Builtin { main, ref args, ref stdout, ref stderr, ref stdin } => {
+            match unsafe { sys::fork() } {
+                Ok(0) => {
+                    prepare_child(child_blocked);
+
+                    let args: Vec<&str> = args
+                        .iter()
+                        .map(|x| x as &str).collect();
+                    let ret = shell.exec_builtin(main, &args, stdout, stderr, stdin);
+                    close(stdout);
+                    close(stderr);
+                    close(stdin);
+                    exit(ret)
+                },
+                Ok(pid) => {
+                    close(stdout);
+                    close(stderr);
+                    shell.foreground.push(pid);
+                    *last_pid = *current_pid;
+                    *current_pid = pid;
+                },
+                Err(e) => {
+                    eprintln!("ion: failed to fork {}: {}", short, e);
+                }
+            }
+        }
+        RefinedJob::Function { ref name, ref args, ref stdout, ref stderr, ref stdin, } => {
+            match unsafe { sys::fork() } {
+                Ok(0) => {
+                    prepare_child(child_blocked);
+
+                    let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
+                    let ret = shell.exec_function(name, &args, stdout, stderr, stdin);
+                    close(stdout);
+                    close(stderr);
+                    close(stdin);
+                    exit(ret)
+                },
+                Ok(pid) => {
+                    close(stdout);
+                    close(stderr);
+                    shell.foreground.push(pid);
+                    *last_pid = *current_pid;
+                    *current_pid = pid;
+                },
+                Err(e) => {
+                    eprintln!("ion: failed to fork {}: {}", short, e);
+                }
+            }
+        }
+        RefinedJob::Cat { ref mut sources, ref stdout, ref mut stdin } => {
+            match unsafe { sys::fork() } {
+                Ok(0) => {
+                    prepare_child(child_blocked);
+
+                    let ret = shell.exec_multi_in(sources, stdout, stdin);
+                    close(stdout);
+                    close(stdin);
+                    exit(ret);
+                }
+                Ok(pid) => {
+                    close(stdout);
+                    shell.foreground.push(pid);
+                    *last_pid = *current_pid;
+                    *current_pid = pid;
+                }
+                Err(e) => eprintln!("ion: failed to fork {}: {}", short, e),
+            }
+        },
+        RefinedJob::Tee { ref mut items, ref stdout, ref stderr, ref stdin } => {
+            match unsafe { sys::fork() } {
+                Ok(0) => {
+                    prepare_child(child_blocked);
+
+                    let ret = shell.exec_multi_out(items, stdout, stderr, stdin, kind);
+                    close(stdout);
+                    close(stderr);
+                    close(stdin);
+                    exit(ret);
+                },
+                Ok(pid) => {
+                    close(stdout);
+                    close(stderr);
+                    shell.foreground.push(pid);
+                    *last_pid = *current_pid;
+                    *current_pid = pid;
+                }
+                Err(e) => eprintln!("ion: failed to fork {}: {}", short, e),
+            }
+        }
+    }
+    SUCCESS
+}
+
+fn prepare_child(child_blocked: bool) {
+    signals::unblock();
+    let _ = sys::reset_signal(sys::SIGINT);
+    let _ = sys::reset_signal(sys::SIGHUP);
+    let _ = sys::reset_signal(sys::SIGTERM);
+    if child_blocked {
+        eprintln!("stopping {}", process::id());
+        let _ = sys::kill(process::id(), sys::SIGSTOP);
+    } else {
+        eprintln!("did not stop {}", process::id());
+    }
+}
+
+fn resume_prior_process(last_pid: &mut u32, current_pid: u32, child_blocked: bool) {
+    eprintln!("Last {}, current_pid: {}", *last_pid, current_pid);
+
+    if child_blocked {
+        // Ensure that the process is stopped before continuing.
+        if let Err(why) = sys::wait_for_interrupt(current_pid) {
+            eprintln!("ion: error waiting for sigstop: {}", why);
+        }
+    }
+
+    if *last_pid != 0 {
+        eprintln!("Resuming {}", *last_pid);
+        let _ = sys::kill(*last_pid, sys::SIGCONT);
+    }
+
+    *last_pid = current_pid;
+}
+
+fn set_process_group(pgid: &mut u32, pid: u32) -> bool {
+    let pgid_set = *pgid == 0;
+    if pgid_set { *pgid = pid; }
+    let _ = sys::setpgid(pid, *pgid);
+    pgid_set
 }
