@@ -5,7 +5,6 @@ use parser::pipelines::RedirectFrom;
 use smallstring::SmallString;
 use std::fmt;
 use std::fs::File;
-use std::process::{Command, Stdio};
 use std::str;
 use types::*;
 

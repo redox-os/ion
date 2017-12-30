@@ -3,7 +3,7 @@ extern crate libc;
 pub mod job_control;
 pub mod signals;
 
-use libc::{c_char, c_int, fcntl, F_GETFL, F_SETFL, O_NONBLOCK, pid_t, sighandler_t, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED};
+use libc::{c_char, c_int, pid_t, sighandler_t, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED};
 use std::{io, ptr};
 use std::env;
 use std::ffi::CString;

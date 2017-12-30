@@ -11,8 +11,9 @@ mod fork;
 pub mod job_control;
 mod streams;
 
+// TODO: Reintegrate this
 use self::command_not_found::command_not_found;
-use self::fork::{create_process_group, fork_pipe};
+use self::fork::fork_pipe;
 use self::job_control::{JobControl, ProcessState};
 use self::streams::{duplicate_streams, redir, redirect_streams};
 use super::{JobKind, Shell};
@@ -27,9 +28,8 @@ use std::fs::{File, OpenOptions};
 use std::io::{self, Error, Write};
 use std::iter;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::os::unix::process::CommandExt;
 use std::path::Path;
-use std::process::{self, exit, Command};
+use std::process::{self, exit};
 use sys;
 
 type RefinedItem = (RefinedJob, JobKind, Vec<Redirection>, Vec<Input>);
@@ -375,6 +375,15 @@ pub(crate) trait PipelineExecution {
         stdin: &Option<File>,
     ) -> i32;
 
+    fn exec_external(
+        &mut self,
+        name: &str,
+        args: &[&str],
+        stdout: &Option<File>,
+        stderr: &Option<File>,
+        stdin: &Option<File>,
+    ) -> i32;
+
     fn exec_function(
         &mut self,
         name: &str,
@@ -507,7 +516,7 @@ impl PipelineExecution for Shell {
                 ref stderr,
             } => {
                 let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
-                return exec_external(&name, &args, stdin, stdout, stderr);
+                return self.exec_external(&name, &args, stdin, stdout, stderr);
             }
             RefinedJob::Builtin {
                 main,
@@ -693,53 +702,49 @@ impl PipelineExecution for Shell {
             SUCCESS
         }
     }
-}
 
-fn exec_external(
-    name: &str,
-    args: &[&str],
-    stdin: &Option<File>,
-    stdout: &Option<File>,
-    stderr: &Option<File>,
-) -> i32 {
-    return match unsafe { sys::fork() } {
-        Ok(0) => {
-            if let Some(ref file) = *stdin {
-                redir(file.as_raw_fd(), sys::STDIN_FILENO);
-                let _ = sys::close(file.as_raw_fd());
-            }
-
-            if let Some(ref file) = *stdout {
-                redir(file.as_raw_fd(), sys::STDOUT_FILENO);
-                let _ = sys::close(file.as_raw_fd());
-            }
-
-            if let Some(ref file) = *stderr {
-                redir(file.as_raw_fd(), sys::STDERR_FILENO);
-                let _ = sys::close(file.as_raw_fd());
-            }
-
-            prepare_child(false);
-            if let Err(_why) = sys::execve(name, &args, false) {
-                sys::fork_exit(NO_SUCH_COMMAND);
-            }
-            unreachable!()
-        },
-        Ok(pid) => {
-            close(stdin);
-            close(stdout);
-            close(stderr);
-            match sys::wait_for_child(pid) {
-                Ok(status) => status as i32,
-                Err(why) => {
-                    eprintln!("ion: waitpid error: {}", why);
-                    FAILURE
+    fn exec_external(
+        &mut self,
+        name: &str,
+        args: &[&str],
+        stdin: &Option<File>,
+        stdout: &Option<File>,
+        stderr: &Option<File>,
+    ) -> i32 {
+        return match unsafe { sys::fork() } {
+            Ok(0) => {
+                if let Some(ref file) = *stdin {
+                    redir(file.as_raw_fd(), sys::STDIN_FILENO);
+                    let _ = sys::close(file.as_raw_fd());
                 }
+
+                if let Some(ref file) = *stdout {
+                    redir(file.as_raw_fd(), sys::STDOUT_FILENO);
+                    let _ = sys::close(file.as_raw_fd());
+                }
+
+                if let Some(ref file) = *stderr {
+                    redir(file.as_raw_fd(), sys::STDERR_FILENO);
+                    let _ = sys::close(file.as_raw_fd());
+                }
+
+                prepare_child(false);
+                if let Err(_why) = sys::execve(name, &args, false) {
+                    sys::fork_exit(NO_SUCH_COMMAND);
+                }
+                unreachable!()
+            },
+            Ok(pid) => {
+                close(stdin);
+                close(stdout);
+                close(stderr);
+                // TODO: get long string
+                self.watch_foreground(pid as i32, "")
             }
-        }
-        Err(why) => {
-            eprintln!("ion: failed to fork: {}", why);
-            COULD_NOT_EXEC
+            Err(why) => {
+                eprintln!("ion: failed to fork: {}", why);
+                COULD_NOT_EXEC
+            }
         }
     }
 }
