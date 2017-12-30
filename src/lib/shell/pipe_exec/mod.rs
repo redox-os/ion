@@ -952,19 +952,23 @@ fn spawn_proc(
     let short = cmd.short();
     match cmd {
         RefinedJob::External { ref name, ref args, ref stdout, ref stderr, ref stdin} => {
+            let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
                     if let Some(ref file) = *stdin {
                         redir(file.as_raw_fd(), sys::STDIN_FILENO);
+                        let _ = sys::close(file.as_raw_fd());
                     }
                     if let Some(ref file) = *stdout {
                         redir(file.as_raw_fd(), sys::STDOUT_FILENO);
+                        let _ = sys::close(file.as_raw_fd());
                     }
                     if let Some(ref file) = *stderr {
                         redir(file.as_raw_fd(), sys::STDERR_FILENO);
+                        let _ = sys::close(file.as_raw_fd());
                     }
+
                     prepare_child(child_blocked);
-                    let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
                     if let Err(_why) = sys::execve(&name, &args, false) {
                         sys::fork_exit(NO_SUCH_COMMAND);
                     }
@@ -983,13 +987,10 @@ fn spawn_proc(
             }
         }
         RefinedJob::Builtin { main, ref args, ref stdout, ref stderr, ref stdin } => {
+            let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
                     prepare_child(child_blocked);
-
-                    let args: Vec<&str> = args
-                        .iter()
-                        .map(|x| x as &str).collect();
                     let ret = shell.exec_builtin(main, &args, stdout, stderr, stdin);
                     close(stdout);
                     close(stderr);
@@ -1009,11 +1010,10 @@ fn spawn_proc(
             }
         }
         RefinedJob::Function { ref name, ref args, ref stdout, ref stderr, ref stdin, } => {
+            let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
                     prepare_child(child_blocked);
-
-                    let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
                     let ret = shell.exec_function(name, &args, stdout, stderr, stdin);
                     close(stdout);
                     close(stderr);
@@ -1081,6 +1081,7 @@ fn prepare_child(child_blocked: bool) {
     let _ = sys::reset_signal(sys::SIGINT);
     let _ = sys::reset_signal(sys::SIGHUP);
     let _ = sys::reset_signal(sys::SIGTERM);
+
     if child_blocked {
         let _ = sys::kill(process::id(), sys::SIGSTOP);
     } else {

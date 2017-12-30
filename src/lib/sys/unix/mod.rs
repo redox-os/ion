@@ -19,6 +19,7 @@ pub(crate) const SIGTERM: i32 = libc::SIGTERM;
 pub(crate) const SIGCONT: i32 = libc::SIGCONT;
 pub(crate) const SIGSTOP: i32 = libc::SIGSTOP;
 pub(crate) const SIGTSTP: i32 = libc::SIGTSTP;
+pub(crate) const SIGPIPE: i32 = libc::SIGPIPE;
 
 pub(crate) const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
 pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
@@ -45,23 +46,6 @@ pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
             break Err(io::Error::from_raw_os_error(errno()));
         }
         break Ok(());
-    }
-}
-
-pub fn make_fd_blocking(fd: RawFd) -> io::Result<()> {
-    let mut err = 0;
-
-    unsafe {
-        let flags = fcntl(fd, F_GETFL, 0);
-        if flags & O_NONBLOCK != 0 {
-            err = fcntl(fd, F_SETFL, flags ^ O_NONBLOCK);
-        }
-    }
-
-    if err == -1 {
-        Err(io::Error::from_raw_os_error(errno()))
-    } else {
-        Ok(())
     }
 }
 
