@@ -698,9 +698,9 @@ impl PipelineExecution for Shell {
 fn exec_external(
     name: &str,
     args: &[&str],
+    stdin: &Option<File>,
     stdout: &Option<File>,
     stderr: &Option<File>,
-    stdin: &Option<File>,
 ) -> i32 {
     return match unsafe { sys::fork() } {
         Ok(0) => {
@@ -725,11 +725,16 @@ fn exec_external(
             }
             unreachable!()
         },
-        Ok(pid) => match sys::wait_for_child(pid) {
-            Ok(status) => status as i32,
-            Err(why) => {
-                eprintln!("ion: waitpid error: {}", why);
-                FAILURE
+        Ok(pid) => {
+            close(stdin);
+            close(stdout);
+            close(stderr);
+            match sys::wait_for_child(pid) {
+                Ok(status) => status as i32,
+                Err(why) => {
+                    eprintln!("ion: waitpid error: {}", why);
+                    FAILURE
+                }
             }
         }
         Err(why) => {
@@ -941,14 +946,6 @@ fn spawn_proc(
     last_pid: &mut u32,
     current_pid: &mut u32
 ) -> i32 {
-    fn close(file: &Option<File>) {
-        if let &Some(ref file) = file {
-            if let Err(e) = sys::close(file.as_raw_fd()) {
-                eprintln!("ion: failed to close file '{:?}': {}", file, e);
-            }
-        }
-    }
-
     let short = cmd.short();
     match cmd {
         RefinedJob::External { ref name, ref args, ref stdout, ref stderr, ref stdin} => {
@@ -1074,6 +1071,15 @@ fn spawn_proc(
         }
     }
     SUCCESS
+}
+
+// TODO: Don't require this.
+fn close(file: &Option<File>) {
+    if let &Some(ref file) = file {
+        if let Err(e) = sys::close(file.as_raw_fd()) {
+            eprintln!("ion: failed to close file '{:?}': {}", file, e);
+        }
+    }
 }
 
 fn prepare_child(child_blocked: bool) {

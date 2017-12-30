@@ -128,7 +128,6 @@ impl ShellBuilder {
 
         extern "C" fn sigpipe_handler(signal: i32) {
             use std::process::exit;
-            eprintln!("received SIGPIPE");
             exit(127 + signal);
         }
 
