@@ -918,6 +918,8 @@ pub(crate) fn pipe(
                                 error_code => return error_code
                             }
 
+                            set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library;
+
                             // remember.push(child);
                             resume_prior_process(&mut last_pid, current_pid, child_blocked);
 
@@ -927,7 +929,9 @@ pub(crate) fn pipe(
                     previous_kind = kind;
                     previous_status = shell.wait(pgid, remember);
                     if previous_status == TERMINATED {
-                        shell.foreground_send(sys::SIGTERM);
+                        if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
+                            eprintln!("ion: failed to terminate foreground jobs: {}", why);
+                        }
                         return previous_status;
                     }
                 }
