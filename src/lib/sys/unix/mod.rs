@@ -3,7 +3,7 @@ extern crate libc;
 pub mod job_control;
 pub mod signals;
 
-use libc::{c_char, c_int, pid_t, sighandler_t};
+use libc::{c_char, c_int, pid_t, sighandler_t, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED};
 use std::{io, ptr};
 use std::env;
 use std::ffi::CString;
@@ -19,6 +19,7 @@ pub(crate) const SIGTERM: i32 = libc::SIGTERM;
 pub(crate) const SIGCONT: i32 = libc::SIGCONT;
 pub(crate) const SIGSTOP: i32 = libc::SIGSTOP;
 pub(crate) const SIGTSTP: i32 = libc::SIGTSTP;
+pub(crate) const SIGPIPE: i32 = libc::SIGPIPE;
 
 pub(crate) const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
 pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
@@ -34,20 +35,35 @@ pub(crate) fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
 
 pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
 
+pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
+    let mut status = 0;
+    let mut result;
+
+    loop {
+        result = unsafe { waitpid(pid as i32, &mut status, WUNTRACED) };
+        if result == -1 {
+            if errno() == EINTR { continue }
+            break Err(io::Error::from_raw_os_error(errno()));
+        }
+        break Ok(());
+    }
+}
+
 pub fn wait_for_child(pid: u32) -> io::Result<u8> {
     let mut status;
-    use libc::{waitpid, ECHILD, WEXITSTATUS};
+    let mut result;
 
     loop {
         status = 0;
-        match unsafe { waitpid(pid as i32, &mut status, 0) } {
-            -1 if errno() == ECHILD => break,
-            -1 => return Err(io::Error::from_raw_os_error(errno())),
-            _ => ()
+        result = unsafe { waitpid(pid as i32, &mut status, WUNTRACED) };
+        if result == -1 {
+            break if errno() == ECHILD {
+                Ok(unsafe { WEXITSTATUS(status) as u8 })
+            } else {
+                Err(io::Error::from_raw_os_error(errno()))
+            };
         }
     }
-
-    Ok(unsafe { WEXITSTATUS(status) as u8 })
 }
 
 pub fn fork_exit(exit_status: i32) -> ! { unsafe { libc::_exit(exit_status) } }

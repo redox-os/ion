@@ -5,9 +5,9 @@ use std::env;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::RawFd;
 use std::path::PathBuf;
-use std::process::exit;
-
-use syscall::SigAction;
+use std::process::{exit, ExitStatus};
+use std::os::unix::process::ExitStatusExt;
+use syscall::{EINTR, SigAction, waitpid};
 
 pub(crate) const PATH_SEPARATOR: &str = ";";
 pub(crate) const NULL_PATH: &str = "null:";
@@ -19,6 +19,7 @@ pub(crate) const SIGTERM: i32 = syscall::SIGTERM as i32;
 pub(crate) const SIGCONT: i32 = syscall::SIGCONT as i32;
 pub(crate) const SIGSTOP: i32 = syscall::SIGSTOP as i32;
 pub(crate) const SIGTSTP: i32 = syscall::SIGTSTP as i32;
+pub(crate) const SIGPIPE: i32 = syscall::SIGPIPE as i32;
 
 pub(crate) const STDIN_FILENO: RawFd = 0;
 pub(crate) const STDOUT_FILENO: RawFd = 1;
@@ -34,21 +35,33 @@ pub unsafe fn fork() -> io::Result<u32> { cvt(syscall::clone(0)).map(|pid| pid a
 
 pub fn fork_exit(status: i32) -> ! { exit(status) }
 
+pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
+    let mut status = 0;
+
+    loop {
+        match waitpid(pid as usize, &mut status, 0) {
+            Err(ref error) if error.errno == EINTR => continue,
+            Err(ref error) => break Err(io::Error::from_raw_os_error(error.errno)),
+            Ok(_) => break Ok(()),
+        }
+    }
+}
+
 pub fn wait_for_child(pid: u32) -> io::Result<u8> {
     let mut status;
     use syscall::{waitpid, ECHILD};
 
     loop {
         status = 0;
-        match unsafe { waitpid(pid as usize, &mut status, 0) } {
+        match waitpid(pid as usize, &mut status, 0) {
             Err(ref error) if error.errno == ECHILD => break,
             Err(error) => return Err(io::Error::from_raw_os_error(error.errno)),
             _ => ()
         }
     }
 
-    // Ok(WEXITSTATUS(status) as u8)
-    Ok(0)
+    let status = ExitStatus::from_raw(status as i32);
+    Ok(status.code().unwrap_or(0) as u8)
 }
 
 pub(crate) fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
@@ -192,11 +205,12 @@ pub mod job_control {
 
     use shell::Shell;
     use shell::foreground::ForegroundSignals;
-    use shell::status::{FAILURE, TERMINATED};
+    use shell::status::FAILURE;
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
     use std::sync::{Arc, Mutex};
-    use syscall;
+    use syscall::{ECHILD, waitpid};
+    use super::{SIGINT, SIGPIPE};
 
     pub(crate) fn watch_background(
         _fg: Arc<ForegroundSignals>,
@@ -207,54 +221,62 @@ pub mod job_control {
         // TODO: Implement this using syscall::call::waitpid
     }
 
-    pub(crate) fn watch_foreground<F, D>(
-        shell: &mut Shell,
-        _pid: u32,
-        last_pid: u32,
-        _get_command: F,
-        mut drop_command: D,
-    ) -> i32
-    where
-        F: FnOnce() -> String,
-        D: FnMut(i32),
-    {
+    pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str ) -> i32 {
+        let mut signaled = 0;
         let mut exit_status = 0;
+        let mut status;
+
+        fn get_pid_value(pid: i32) -> usize {
+            if pid < 0 {
+                !(pid.abs() as usize)
+            } else {
+                pid as usize
+            }
+        }
+
         loop {
-            let mut status_raw = 0;
-            match syscall::waitpid(0, &mut status_raw, 0) {
-                Ok(pid) => {
-                    let status = ExitStatus::from_raw(status_raw as i32);
-                    if let Some(code) = status.code() {
-                        if pid == (last_pid as usize) {
-                            break code;
-                        } else {
-                            drop_command(pid as i32);
-                            exit_status = code;
+            status = 0;
+            let result = waitpid(get_pid_value(pid), &mut status, 0);
+            match result {
+                Err(error) => {
+                    match error.errno {
+                        ECHILD if signaled == 0 => break exit_status,
+                        ECHILD => break signaled,
+                        _ => {
+                            eprintln!("ion: waitpid error: {}", error);
+                            break FAILURE;
                         }
-                    } else if let Some(signal) = status.signal() {
-                        eprintln!("ion: process ended by signal: {}", signal);
-                        if signal == syscall::SIGTERM as i32 {
-                            shell.handle_signal(signal);
-                            shell.exit(TERMINATED);
-                        } else if signal == syscall::SIGHUP as i32 {
-                            shell.handle_signal(signal);
-                            shell.exit(TERMINATED);
-                        } else if signal == syscall::SIGINT as i32 {
-                            shell.foreground_send(signal);
-                            shell.break_flow = true;
-                        }
-                        break TERMINATED;
-                    } else {
-                        eprintln!("ion: process ended with unknown status: {}", status);
-                        break TERMINATED;
                     }
                 }
-                Err(err) => if err.errno == syscall::ECHILD {
-                    break exit_status;
-                } else {
-                    eprintln!("ion: process doesn't exist: {}", err);
-                    break FAILURE;
-                },
+                Ok(0) => (),
+                Ok(pid) => {
+                    let es = ExitStatus::from_raw(status as i32);
+                    match es.signal() {
+                        Some(SIGPIPE) => continue,
+                        Some(signal) => {
+                            eprintln!("ion: process ended by signal {}", signal);
+                            match signal {
+                                SIGINT => {
+                                    shell.foreground_send(signal as i32);
+                                    shell.break_flow = true;
+                                }
+                                _ => {
+                                    shell.handle_signal(signal);
+                                }
+                            }
+                            signaled = 128 + signal as i32;
+                        }
+                        None => {
+                            exit_status = es.code().unwrap();
+                        }
+                    }
+                }
+                // TODO: Background job control for Redox
+                // _pid if WIFSTOPPED(status) => {
+                //     shell.send_to_background(pid as u32, ProcessState::Stopped, command.into());
+                //     shell.break_flow = true;
+                //     break 128 + signal as i32;
+                // }
             }
         }
     }

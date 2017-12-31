@@ -126,6 +126,12 @@ impl ShellBuilder {
         let _ = sys::signal(sys::SIGINT, handler);
         let _ = sys::signal(sys::SIGTERM, handler);
 
+        extern "C" fn sigpipe_handler(signal: i32) {
+            sys::fork_exit(127 + signal);
+        }
+
+        let _ = sys::signal(sys::SIGPIPE, sigpipe_handler);
+
         self
     }
 
@@ -328,6 +334,7 @@ impl<'a> Shell {
             self.set_var("?", &code.to_string());
             self.previous_status = code;
         }
+
         exit_status
     }
 
