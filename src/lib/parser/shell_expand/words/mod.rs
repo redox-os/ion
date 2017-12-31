@@ -749,9 +749,15 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
         while let Some(character) = iterator.next() {
             match character {
                 _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
-                b'\\' => {
+                b'\\' if !self.flags.contains(Flags::SQUOTE) => {
                     self.flags ^= Flags::BACKSL;
-                    let end = if self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) {
+
+                    let include_backsl = self.flags.contains(Flags::DQUOTE)
+                        && iterator.clone().next().map_or(false, |nextch| {
+                            nextch != b'$' && nextch != b'\\' && nextch != b'"'
+                        });
+
+                    let end = if include_backsl {
                         self.read + 1
                     } else {
                         self.read
