@@ -729,11 +729,19 @@ impl PipelineExecution for Shell {
                 }
 
                 prepare_child(false);
-                if let Err(_why) = sys::execve(name, &args, false) {
-                    command_not_found(self, name);
-                    sys::fork_exit(NO_SUCH_COMMAND);
-                }
-                unreachable!()
+                let code = match sys::execve(&name, &args, false) {
+                    ref err if err.kind() == io::ErrorKind::NotFound => {
+                        if !command_not_found(self, &name) {
+                            eprintln!("ion: command not found: {}", name);
+                        }
+                        NO_SUCH_COMMAND
+                    }
+                    ref err => {
+                        eprintln!("ion: command exec error: {}", err);
+                        FAILURE
+                    }
+                };
+                sys::fork_exit(code);
             },
             Ok(pid) => {
                 close(stdin);
@@ -976,10 +984,19 @@ fn spawn_proc(
                     }
 
                     prepare_child(child_blocked);
-                    if let Err(_why) = sys::execve(&name, &args, false) {
-                        command_not_found(shell, name);
-                        sys::fork_exit(NO_SUCH_COMMAND);
-                    }
+                    let code = match sys::execve(&name, &args, false) {
+                        ref err if err.kind() == io::ErrorKind::NotFound => {
+                            if !command_not_found(shell, &name) {
+                                eprintln!("ion: command not found: {}", name);
+                            }
+                            NO_SUCH_COMMAND
+                        }
+                        ref err => {
+                            eprintln!("ion: command exec error: {}", err);
+                            FAILURE
+                        }
+                    };
+                    sys::fork_exit(code);
                 },
                 Ok(pid) => {
                     close(stdin);
