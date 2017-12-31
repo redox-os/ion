@@ -3,6 +3,7 @@ pub mod namespaces;
 mod library_iter;
 mod string;
 
+#[cfg(not(target_os = "redox"))]
 pub(crate) use self::library_iter::*;
 pub(crate) use self::string::StringError;
 

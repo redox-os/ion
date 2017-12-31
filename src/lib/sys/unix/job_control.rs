@@ -83,7 +83,7 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
     let mut exit_status = 0;
     let mut status;
 
-    let exit_status = loop {
+    loop {
         unsafe {
             status = 0;
             match waitpid(pid, &mut status, WUNTRACED) {
@@ -126,7 +126,5 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                 _ => (),
             }
         }
-    };
-
-    exit_status
+    }
 }

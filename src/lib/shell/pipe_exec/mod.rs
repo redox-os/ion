@@ -504,7 +504,7 @@ impl PipelineExecution for Shell {
         self.watch_foreground(-(pgid as i32), &as_string)
     }
 
-    fn exec_job(&mut self, job: &mut RefinedJob, foreground: bool) -> i32 {
+    fn exec_job(&mut self, job: &mut RefinedJob, _foreground: bool) -> i32 {
         let short = job.short();
         let long = job.long();
         match *job {
@@ -730,6 +730,7 @@ impl PipelineExecution for Shell {
 
                 prepare_child(false);
                 if let Err(_why) = sys::execve(name, &args, false) {
+                    command_not_found(self, name);
                     sys::fork_exit(NO_SUCH_COMMAND);
                 }
                 unreachable!()
@@ -976,6 +977,7 @@ fn spawn_proc(
 
                     prepare_child(child_blocked);
                     if let Err(_why) = sys::execve(&name, &args, false) {
+                        command_not_found(shell, name);
                         sys::fork_exit(NO_SUCH_COMMAND);
                     }
                 },
