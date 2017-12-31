@@ -84,7 +84,104 @@ pub(crate) fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
     cvt(syscall::setpgid(pid as usize, pgid as usize)).and(Ok(()))
 }
 
-pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Result<()> {
+pub(crate) fn fork_and_exec<F: Fn()>(
+    prog: &str,
+    args: &[&str],
+    stdin: Option<RawFd>,
+    stdout: Option<RawFd>,
+    stderr: Option<RawFd>,
+    clear_env: bool,
+    before_exec: F
+) -> io::Result<u32> {
+    // Construct a valid set of arguments to pass to execve. Ensure
+    // that the program is the first argument.
+    let mut cvt_args: Vec<[usize; 2]> = Vec::new();
+    cvt_args.push([prog.as_ptr() as usize, prog.len()]);
+    for arg in args {
+        cvt_args.push([arg.as_ptr() as usize, arg.len()]);
+    }
+
+    // Get the PathBuf of the program if it exists.
+    let prog = if prog.contains(':') || prog.contains('/') {
+        // This is a fully specified scheme or path to an
+        // executable.
+        Some(PathBuf::from(prog))
+    } else if let Ok(paths) = env::var("PATH") {
+        // This is not a fully specified scheme or path.
+        // Iterate through the possible paths in the
+        // env var PATH that this executable may be found
+        // in and return the first one found.
+        env::split_paths(&paths)
+            .filter_map(|mut path| {
+                path.push(prog);
+                if path.exists() {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .next()
+    } else {
+        None
+    };
+
+    // If clear_env set, clear the env.
+    if clear_env {
+        for (key, _) in env::vars() {
+            env::remove_var(key);
+        }
+    }
+
+    if let Some(prog) = prog {
+        unsafe {
+            match fork()? {
+                0 => {
+                    if let Some(stdin) = stdin {
+                        let _ = dup2(stdin, STDIN_FILENO);
+                        let _ = close(stdin);
+                    }
+
+                    if let Some(stdout) = stdout {
+                        let _ = dup2(stdout, STDOUT_FILENO);
+                        let _ = close(stdout);
+                    }
+
+                    if let Some(stderr) = stderr {
+                        let _ = dup2(stderr, STDERR_FILENO);
+                        let _ = close(stderr);
+                    }
+
+                    before_exec();
+
+                    let error = syscall::execve(prog.as_os_str().as_bytes(), &cvt_args);
+                    let error = io::Error::from_raw_os_error(error.err().unwrap().errno);
+                    eprintln!("ion: command exec: {}", error);
+                    fork_exit(1);
+                }
+                pid => {
+                    if let Some(stdin) = stdin {
+                        let _ = close(stdin);
+                    }
+
+                    if let Some(stdout) = stdout {
+                        let _ = close(stdout);
+                    }
+
+                    if let Some(stderr) = stderr {
+                        let _ = close(stderr);
+                    }
+
+                    Ok(pid)
+                }
+            }
+        }
+    } else {
+        // The binary was not found.
+        Err(io::Error::from_raw_os_error(syscall::ENOENT))
+    }
+}
+
+pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Error {
     // Construct a valid set of arguments to pass to execve. Ensure
     // that the program is the first argument.
     let mut cvt_args: Vec<[usize; 2]> = Vec::new();
@@ -126,10 +223,11 @@ pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Result<(
 
     if let Some(prog) = prog {
         // If we found the program. Run it!
-        cvt(syscall::execve(prog.as_os_str().as_bytes(), &cvt_args)).and(Ok(()))
+        let error = syscall::execve(prog.as_os_str().as_bytes(), &cvt_args);
+        io::Error::from_raw_os_error(error.err().unwrap().errno)
     } else {
         // The binary was not found.
-        Err(io::Error::from_raw_os_error(syscall::ENOENT))
+        io::Error::from_raw_os_error(syscall::ENOENT)
     }
 }
 
@@ -209,7 +307,7 @@ pub mod job_control {
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
     use std::sync::{Arc, Mutex};
-    use syscall::{ECHILD, waitpid};
+    use syscall::{self, ECHILD, waitpid};
     use super::{SIGINT, SIGPIPE};
 
     pub(crate) fn watch_background(
@@ -234,11 +332,11 @@ pub mod job_control {
             }
         }
 
-        let pid = get_pid_value(pid);
+        let pgid = get_pid_value(pid);
 
         loop {
             status = 0;
-            let result = waitpid(pid, &mut status, 0);
+            let result = waitpid(pgid, &mut status, 0);
             match result {
                 Err(error) => {
                     match error.errno {
@@ -259,7 +357,7 @@ pub mod job_control {
                             eprintln!("ion: process ended by signal {}", signal);
                             match signal {
                                 SIGINT => {
-                                    let _ = syscall::kill(pid, signal as usize);
+                                    let _ = syscall::kill(pgid, signal as usize);
                                     shell.break_flow = true;
                                 }
                                 _ => {
