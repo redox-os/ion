@@ -31,7 +31,6 @@ pub(crate) trait JobControl {
     fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32;
     fn resume_stopped(&mut self);
     fn handle_signal(&self, signal: i32) -> bool;
-    fn foreground_send(&self, signal: i32);
     fn background_send(&self, signal: i32);
     fn watch_foreground(&mut self, pid: i32, command: &str) -> i32;
     fn send_to_background(&mut self, child: u32, state: ProcessState, command: String);
@@ -150,13 +149,6 @@ impl JobControl for Shell {
 
     fn watch_foreground(&mut self, pid: i32, command: &str) -> i32 {
         self_sys::watch_foreground(self, pid, command)
-    }
-
-    /// Send a kill signal to all running foreground tasks.
-    fn foreground_send(&self, signal: i32) {
-        for &process in self.foreground.iter() {
-            let _ = sys::killpg(process, signal);
-        }
     }
 
     /// Resumes all stopped background jobs

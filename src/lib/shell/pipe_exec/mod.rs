@@ -414,8 +414,6 @@ pub(crate) trait PipelineExecution {
 
 impl PipelineExecution for Shell {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
-        // Remove any leftover foreground tasks from the last execution.
-        self.foreground.clear();
         // If the supplied pipeline is a background, a string representing the command
         // and a boolean representing whether it should be disowned is stored here.
         let possible_background_name =
@@ -711,42 +709,31 @@ impl PipelineExecution for Shell {
         stdout: &Option<File>,
         stderr: &Option<File>,
     ) -> i32 {
-        return match unsafe { sys::fork() } {
-            Ok(0) => {
-                if let Some(ref file) = *stdin {
-                    redir(file.as_raw_fd(), sys::STDIN_FILENO);
-                    let _ = sys::close(file.as_raw_fd());
-                }
+        let result = sys::fork_and_exec(
+                name,
+                &args,
+                if let Some(ref f) = *stdin { Some(f.as_raw_fd()) } else { None },
+                if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
+                if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
+                false,
+                || prepare_child(false)
+            );
 
-                if let Some(ref file) = *stdout {
-                    redir(file.as_raw_fd(), sys::STDOUT_FILENO);
-                    let _ = sys::close(file.as_raw_fd());
+            match result {
+                Ok(pid) => {
+                    self.watch_foreground(pid as i32, "")
                 }
-
-                if let Some(ref file) = *stderr {
-                    redir(file.as_raw_fd(), sys::STDERR_FILENO);
-                    let _ = sys::close(file.as_raw_fd());
+                Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
+                    if !command_not_found(self, &name) {
+                        eprintln!("ion: command not found: {}", name);
+                    }
+                    NO_SUCH_COMMAND
                 }
-
-                prepare_child(false);
-                if let Err(_why) = sys::execve(name, &args, false) {
-                    command_not_found(self, name);
-                    sys::fork_exit(NO_SUCH_COMMAND);
+                Err(ref err) => {
+                    eprintln!("ion: command exec error: {}", err);
+                    FAILURE
                 }
-                unreachable!()
-            },
-            Ok(pid) => {
-                close(stdin);
-                close(stdout);
-                close(stderr);
-                // TODO: get long string
-                self.watch_foreground(pid as i32, "")
             }
-            Err(why) => {
-                eprintln!("ion: failed to fork: {}", why);
-                COULD_NOT_EXEC
-            }
-        }
     }
 }
 
@@ -960,37 +947,28 @@ fn spawn_proc(
     match cmd {
         RefinedJob::External { ref name, ref args, ref stdout, ref stderr, ref stdin} => {
             let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
-            match unsafe { sys::fork() } {
-                Ok(0) => {
-                    if let Some(ref file) = *stdin {
-                        redir(file.as_raw_fd(), sys::STDIN_FILENO);
-                        let _ = sys::close(file.as_raw_fd());
-                    }
-                    if let Some(ref file) = *stdout {
-                        redir(file.as_raw_fd(), sys::STDOUT_FILENO);
-                        let _ = sys::close(file.as_raw_fd());
-                    }
-                    if let Some(ref file) = *stderr {
-                        redir(file.as_raw_fd(), sys::STDERR_FILENO);
-                        let _ = sys::close(file.as_raw_fd());
-                    }
+            let result = sys::fork_and_exec(
+                name,
+                &args,
+                if let Some(ref f) = *stdin { Some(f.as_raw_fd()) } else { None },
+                if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
+                if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
+                false,
+                || prepare_child(child_blocked)
+            );
 
-                    prepare_child(child_blocked);
-                    if let Err(_why) = sys::execve(&name, &args, false) {
-                        command_not_found(shell, name);
-                        sys::fork_exit(NO_SUCH_COMMAND);
-                    }
-                },
+            match result {
                 Ok(pid) => {
-                    close(stdin);
-                    close(stdout);
-                    close(stderr);
-                    shell.foreground.push(pid);
                     *last_pid = *current_pid;
                     *current_pid = pid;
-                },
-                Err(e) => {
-                    eprintln!("ion: failed to fork {}: {}", short, e);
+                }
+                Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
+                    if !command_not_found(shell, &name) {
+                        eprintln!("ion: command not found: {}", name);
+                    }
+                }
+                Err(ref err) => {
+                    eprintln!("ion: command exec error: {}", err);
                 }
             }
         }
@@ -1008,7 +986,6 @@ fn spawn_proc(
                 Ok(pid) => {
                     close(stdout);
                     close(stderr);
-                    shell.foreground.push(pid);
                     *last_pid = *current_pid;
                     *current_pid = pid;
                 },
@@ -1031,7 +1008,6 @@ fn spawn_proc(
                 Ok(pid) => {
                     close(stdout);
                     close(stderr);
-                    shell.foreground.push(pid);
                     *last_pid = *current_pid;
                     *current_pid = pid;
                 },
@@ -1052,7 +1028,6 @@ fn spawn_proc(
                 }
                 Ok(pid) => {
                     close(stdout);
-                    shell.foreground.push(pid);
                     *last_pid = *current_pid;
                     *current_pid = pid;
                 }
@@ -1073,7 +1048,6 @@ fn spawn_proc(
                 Ok(pid) => {
                     close(stdout);
                     close(stderr);
-                    shell.foreground.push(pid);
                     *last_pid = *current_pid;
                     *current_pid = pid;
                 }

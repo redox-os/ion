@@ -1,4 +1,3 @@
-use errno::errno;
 use libc::*;
 use shell::Shell;
 use shell::foreground::ForegroundSignals;
@@ -7,6 +6,7 @@ use shell::status::{FAILURE, TERMINATED};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
+use super::{errno, write_errno};
 
 pub(crate) fn watch_background(
     fg: Arc<ForegroundSignals>,
@@ -88,12 +88,11 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
             status = 0;
             match waitpid(pid, &mut status, WUNTRACED) {
                 -1 => {
-                    let error = errno();
-                    match error.0 {
+                    match errno() {
                         ECHILD if signaled == 0 => break exit_status,
                         ECHILD => break signaled,
-                        _ => {
-                            eprintln!("ion: waitpid error: {}", error);
+                        errno => {
+                            write_errno("ion: waitpid error: ", errno);
                             break FAILURE;
                         }
                     }
@@ -108,7 +107,7 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     eprintln!("ion: process ended by signal {}", signal);
                     match signal {
                         SIGINT => {
-                            shell.foreground_send(signal as i32);
+                            let _ = kill(pid, signal as i32);
                             shell.break_flow = true;
                         }
                         _ => {

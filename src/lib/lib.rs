@@ -8,8 +8,6 @@
 #[macro_use]
 extern crate bitflags;
 extern crate calc;
-#[cfg(all(unix, not(target_os = "redox")))]
-extern crate errno;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
