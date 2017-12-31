@@ -2,3 +2,7 @@ echo hello?world
 echo hello*world
 echo hello^world
 echo hello%world
+echo "\$hello"
+echo "\\"
+echo "\n"
+echo "\""
