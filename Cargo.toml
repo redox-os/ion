@@ -48,7 +48,6 @@ path = "src/lib/lib.rs"
 lto = true
 panic = "abort"
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
-errno = "0.2.3"
 libc = "0.2"
 libloading = "0.4"
 users = "0.5.1"

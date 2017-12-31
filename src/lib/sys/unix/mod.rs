@@ -3,10 +3,10 @@ extern crate libc;
 pub mod job_control;
 pub mod signals;
 
-use libc::{c_char, c_int, pid_t, sighandler_t, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED};
-use std::{io, ptr};
-use std::env;
-use std::ffi::CString;
+use libc::{c_char, c_int, pid_t, sighandler_t, strerror, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED};
+use std::{io, ptr, env};
+use std::io::Write;
+use std::ffi::{CStr, CString};
 use std::os::unix::io::RawFd;
 
 pub(crate) const PATH_SEPARATOR: &str = ":";
@@ -26,6 +26,14 @@ pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
 pub(crate) const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 
 fn errno() -> i32 { unsafe { *libc::__errno_location() } }
+
+fn write_errno(msg: &str, errno: i32) {
+    let stderr = io::stderr();
+    let mut stderr = stderr.lock();
+    let _ = stderr.write(msg.as_bytes());
+    let _ = stderr.write(unsafe { CStr::from_ptr(strerror(errno)) }.to_bytes());
+    let _ = stderr.write_all(b"\n");
+}
 
 pub(crate) fn geteuid() -> io::Result<u32> { Ok(unsafe { libc::geteuid() } as u32) }
 
