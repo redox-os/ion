@@ -1,0 +1,3 @@
+for script in examples/a* examples/b*
+    target/debug/ion $script
+end
