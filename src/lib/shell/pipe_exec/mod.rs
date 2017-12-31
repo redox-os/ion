@@ -414,8 +414,6 @@ pub(crate) trait PipelineExecution {
 
 impl PipelineExecution for Shell {
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
-        // Remove any leftover foreground tasks from the last execution.
-        self.foreground.clear();
         // If the supplied pipeline is a background, a string representing the command
         // and a boolean representing whether it should be disowned is stored here.
         let possible_background_name =
@@ -1002,7 +1000,6 @@ fn spawn_proc(
                     close(stdin);
                     close(stdout);
                     close(stderr);
-                    shell.foreground.push(pid);
                     *last_pid = *current_pid;
                     *current_pid = pid;
                 },
@@ -1025,7 +1022,6 @@ fn spawn_proc(
                 Ok(pid) => {
                     close(stdout);
                     close(stderr);
-                    shell.foreground.push(pid);
                     *last_pid = *current_pid;
                     *current_pid = pid;
                 },
@@ -1048,7 +1044,6 @@ fn spawn_proc(
                 Ok(pid) => {
                     close(stdout);
                     close(stderr);
-                    shell.foreground.push(pid);
                     *last_pid = *current_pid;
                     *current_pid = pid;
                 },
@@ -1069,7 +1064,6 @@ fn spawn_proc(
                 }
                 Ok(pid) => {
                     close(stdout);
-                    shell.foreground.push(pid);
                     *last_pid = *current_pid;
                     *current_pid = pid;
                 }
@@ -1090,7 +1084,6 @@ fn spawn_proc(
                 Ok(pid) => {
                     close(stdout);
                     close(stderr);
-                    shell.foreground.push(pid);
                     *last_pid = *current_pid;
                     *current_pid = pid;
                 }

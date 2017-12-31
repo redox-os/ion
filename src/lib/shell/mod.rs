@@ -84,9 +84,6 @@ pub struct Shell {
     pub(crate) previous_job: u32,
     /// Contains all the boolean flags that control shell behavior.
     pub flags: u8,
-    /// A temporary field for storing foreground PIDs used by the pipeline
-    /// execution.
-    foreground: Vec<u32>,
     /// Contains information on all of the active background processes that are being managed
     /// by the shell.
     pub(crate) background: Arc<Mutex<Vec<BackgroundProcess>>>,
@@ -170,7 +167,6 @@ impl<'a> Shell {
             previous_job:        !0,
             previous_status:     0,
             flags:               0,
-            foreground:          Vec::new(),
             background:          Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
             is_library,

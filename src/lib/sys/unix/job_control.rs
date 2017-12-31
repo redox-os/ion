@@ -6,7 +6,6 @@ use shell::status::{FAILURE, TERMINATED};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
-use std::io;
 use super::{errno, write_errno};
 
 pub(crate) fn watch_background(
@@ -108,7 +107,7 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     eprintln!("ion: process ended by signal {}", signal);
                     match signal {
                         SIGINT => {
-                            shell.foreground_send(signal as i32);
+                            let _ = kill(pid, signal as i32);
                             shell.break_flow = true;
                         }
                         _ => {

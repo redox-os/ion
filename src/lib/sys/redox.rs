@@ -234,9 +234,11 @@ pub mod job_control {
             }
         }
 
+        let pid = get_pid_value(pid);
+
         loop {
             status = 0;
-            let result = waitpid(get_pid_value(pid), &mut status, 0);
+            let result = waitpid(pid, &mut status, 0);
             match result {
                 Err(error) => {
                     match error.errno {
@@ -257,7 +259,7 @@ pub mod job_control {
                             eprintln!("ion: process ended by signal {}", signal);
                             match signal {
                                 SIGINT => {
-                                    shell.foreground_send(signal as i32);
+                                    let _ = syscall::kill(pid, signal as usize);
                                     shell.break_flow = true;
                                 }
                                 _ => {
