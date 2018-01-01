@@ -735,6 +735,27 @@ impl PipelineExecution for Shell {
     }
 }
 
+/// When the `&&` or `||` operator is utilized, commands should be executed
+/// based on the previously-recorded exit status. This function will return
+/// **true** to indicate that the current job should be skipped. 
+fn should_skip(
+    previous: &mut JobKind,
+    previous_status: i32,
+    current: JobKind,
+) -> bool {
+    match *previous {
+        JobKind::And if previous_status != SUCCESS => {
+            *previous = if JobKind::Or == current { current } else { *previous };
+            true
+        }
+        JobKind::Or if previous_status == SUCCESS => {
+            *previous = if JobKind::And == current { current } else { *previous };
+            true
+        }
+        _ => false
+    }
+}
+
 /// Executes a piped job `job1 | job2 | job3`
 ///
 /// This function will panic if called with an empty slice
@@ -750,23 +771,7 @@ pub(crate) fn pipe(
 
     loop {
         if let Some((mut parent, mut kind)) = commands.next() {
-            // When an `&&` or `||` operator is utilized, execute commands based on the
-            // previous status.
-            match previous_kind {
-                JobKind::And => if previous_status != SUCCESS {
-                    if let JobKind::Or = kind {
-                        previous_kind = kind
-                    }
-                    continue;
-                },
-                JobKind::Or => if previous_status == SUCCESS {
-                    if let JobKind::And = kind {
-                        previous_kind = kind
-                    }
-                    continue;
-                },
-                _ => (),
-            }
+            if should_skip(&mut previous_kind, previous_status, kind) { continue }
 
             match kind {
                 JobKind::Pipe(mut mode) => {
@@ -787,6 +792,7 @@ pub(crate) fn pipe(
                             false
                         };
 
+                        // TODO: Refactor this part
                         // If we need to tee both stdout and stderr, we directly connect pipes to
                         // the relevant sources in both of them.
                         if let RefinedJob::Tee {
@@ -961,6 +967,7 @@ fn spawn_proc(
                     exit(ret)
                 },
                 Ok(pid) => {
+                    close(stdin);
                     close(stdout);
                     close(stderr);
                     *last_pid = *current_pid;
@@ -983,6 +990,7 @@ fn spawn_proc(
                     exit(ret)
                 },
                 Ok(pid) => {
+                    close(stdin);
                     close(stdout);
                     close(stderr);
                     *last_pid = *current_pid;
@@ -1004,6 +1012,7 @@ fn spawn_proc(
                     exit(ret);
                 }
                 Ok(pid) => {
+                    close(stdin);
                     close(stdout);
                     *last_pid = *current_pid;
                     *current_pid = pid;
@@ -1023,6 +1032,7 @@ fn spawn_proc(
                     exit(ret);
                 },
                 Ok(pid) => {
+                    close(stdin);
                     close(stdout);
                     close(stderr);
                     *last_pid = *current_pid;

@@ -4,3 +4,5 @@ two
 foo
 found foo
 did not find bar
+test
+found test
