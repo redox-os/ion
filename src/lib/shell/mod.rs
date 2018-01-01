@@ -38,7 +38,7 @@ use parser::Terminator;
 use parser::pipelines::Pipeline;
 use smallvec::SmallVec;
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::iter::FromIterator;
 use std::ops::Deref;
 use std::path::Path;
@@ -124,6 +124,8 @@ impl ShellBuilder {
         let _ = sys::signal(sys::SIGTERM, handler);
 
         extern "C" fn sigpipe_handler(signal: i32) {
+            let _ = io::stdout().flush();
+            let _ = io::stderr().flush();
             sys::fork_exit(127 + signal);
         }
 
