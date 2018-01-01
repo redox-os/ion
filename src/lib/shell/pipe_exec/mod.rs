@@ -336,9 +336,8 @@ pub(crate) trait PipelineExecution {
     /// that a job was signaled to stop or killed.
     ///
     /// If a job is stopped, the shell will add that job to a list of background jobs and
-    /// continue
-    /// to watch the job in the background, printing notifications on status changes of that job
-    /// over time.
+    /// continue to watch the job in the background, printing notifications on status changes
+    /// of that job over time.
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32;
 
     /// Generates a vector of commands from a given `Pipeline`.
@@ -429,10 +428,9 @@ impl PipelineExecution for Shell {
             return SUCCESS;
         }
 
-        let piped_commands = if let Some(c) = do_redirection(piped_commands) {
-            c
-        } else {
-            return COULD_NOT_EXEC;
+        let piped_commands = match do_redirection(piped_commands) {
+            Some(c) => c,
+            None => return COULD_NOT_EXEC
         };
 
         // If the given pipeline is a background task, fork the shell.
@@ -441,11 +439,7 @@ impl PipelineExecution for Shell {
                 self,
                 piped_commands,
                 command_name,
-                if disown {
-                    ProcessState::Empty
-                } else {
-                    ProcessState::Running
-                },
+                if disown { ProcessState::Empty } else { ProcessState::Running }
             )
         } else {
             // While active, the SIGTTOU signal will be ignored.
@@ -899,6 +893,8 @@ pub(crate) fn pipe(
 
                     previous_kind = kind;
                     previous_status = shell.wait(pgid, remember);
+                    let _ = io::stdout().flush();
+                    let _ = io::stderr().flush();
                     if previous_status == TERMINATED {
                         if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
                             eprintln!("ion: failed to terminate foreground jobs: {}", why);
@@ -909,6 +905,8 @@ pub(crate) fn pipe(
                 _ => {
                     previous_status = shell.exec_job(&mut parent, foreground);
                     previous_kind = kind;
+                    let _ = io::stdout().flush();
+                    let _ = io::stderr().flush();
                 }
             }
         } else {
