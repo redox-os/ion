@@ -11,7 +11,6 @@ mod fork;
 pub mod job_control;
 mod streams;
 
-// TODO: Reintegrate this
 use self::command_not_found::command_not_found;
 use self::fork::fork_pipe;
 use self::job_control::{JobControl, ProcessState};
@@ -503,7 +502,6 @@ impl PipelineExecution for Shell {
     }
 
     fn exec_job(&mut self, job: &mut RefinedJob, _foreground: bool) -> i32 {
-        let short = job.short();
         let long = job.long();
         match *job {
             RefinedJob::External {
@@ -775,13 +773,8 @@ pub(crate) fn pipe(
                     // We need to remember the commands as they own the file
                     // descriptors that are created by sys::pipe.
                     let mut remember = Vec::new();
-
-                    let mut pgid = 0;
-                    let mut last_pid = 0;
-                    let mut current_pid = 0;
-
-                    // When set to true, this command will be SIGSTOP'd  before it executes.
-                    let mut child_blocked;
+                    let mut child_blocked = true;
+                    let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
 
                     // Append jobs until all piped jobs are running
                     while let Some((mut child, ckind)) = commands.next() {
@@ -808,7 +801,8 @@ pub(crate) fn pipe(
                                         Some(unsafe { File::from_raw_fd(out_reader) });
                                     parent.stdout(unsafe { File::from_raw_fd(out_writer) });
                                     if is_external {
-                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(out_writer) });
+                                        possible_external_stdio_pipes.get_or_insert(vec![])
+                                            .push(unsafe { File::from_raw_fd(out_writer) });
                                     }
                                 }
                             }
@@ -819,7 +813,8 @@ pub(crate) fn pipe(
                                         Some(unsafe { File::from_raw_fd(err_reader) });
                                     parent.stderr(unsafe { File::from_raw_fd(err_writer) });
                                     if is_external {
-                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(err_writer) });
+                                        possible_external_stdio_pipes.get_or_insert(vec![])
+                                            .push(unsafe { File::from_raw_fd(err_writer) });
                                     }
                                 }
                             }
@@ -830,7 +825,8 @@ pub(crate) fn pipe(
                                 }
                                 Ok((reader, writer)) => {
                                     if is_external {
-                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(writer) });
+                                        possible_external_stdio_pipes.get_or_insert(vec![])
+                                            .push(unsafe { File::from_raw_fd(writer) });
                                     }
                                     child.stdin(unsafe { File::from_raw_fd(reader) });
                                     match mode {
@@ -865,17 +861,11 @@ pub(crate) fn pipe(
                             }
                         }
 
-                        child_blocked = match ckind {
-                            JobKind::Pipe(_) | JobKind::Last => true,
-                            _ => false
-                        };
-
                         match spawn_proc(shell, parent, kind, child_blocked, &mut last_pid, &mut current_pid) {
                             SUCCESS => (),
                             error_code => return error_code
                         }
 
-                        // remember.push(parent);
                         possible_external_stdio_pipes = None;
 
                         if set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library {
@@ -888,32 +878,19 @@ pub(crate) fn pipe(
                             parent = child;
                             mode = m;
                         } else {
-                            // We set the kind to the last child kind that was
-                            // processed. For example, the pipeline
-                            // `foo | bar | baz && zardoz` should have the
-                            // previous kind set to `And` after processing the
-                            // initial pipeline
                             kind = ckind;
-
-                            child_blocked = match commands.peek() {
-                                Some(&(_, JobKind::Pipe(_))) => true,
-                                Some(&(_, JobKind::Last)) => true,
-                                _ => false
-                            };
-
+                            child_blocked = false;
                             match spawn_proc(shell, child, kind, child_blocked, &mut last_pid, &mut current_pid) {
                                 SUCCESS => (),
                                 error_code => return error_code
                             }
 
-                            set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library;
-
-                            // remember.push(child);
+                            set_process_group(&mut pgid, current_pid);
                             resume_prior_process(&mut last_pid, current_pid, child_blocked);
-
                             break;
                         }
                     }
+
                     previous_kind = kind;
                     previous_status = shell.wait(pgid, remember);
                     if previous_status == TERMINATED {
