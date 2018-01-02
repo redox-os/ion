@@ -11,7 +11,6 @@ mod fork;
 pub mod job_control;
 mod streams;
 
-// TODO: Reintegrate this
 use self::command_not_found::command_not_found;
 use self::fork::fork_pipe;
 use self::job_control::{JobControl, ProcessState};
@@ -337,9 +336,8 @@ pub(crate) trait PipelineExecution {
     /// that a job was signaled to stop or killed.
     ///
     /// If a job is stopped, the shell will add that job to a list of background jobs and
-    /// continue
-    /// to watch the job in the background, printing notifications on status changes of that job
-    /// over time.
+    /// continue to watch the job in the background, printing notifications on status changes
+    /// of that job over time.
     fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32;
 
     /// Generates a vector of commands from a given `Pipeline`.
@@ -430,10 +428,9 @@ impl PipelineExecution for Shell {
             return SUCCESS;
         }
 
-        let piped_commands = if let Some(c) = do_redirection(piped_commands) {
-            c
-        } else {
-            return COULD_NOT_EXEC;
+        let piped_commands = match do_redirection(piped_commands) {
+            Some(c) => c,
+            None => return COULD_NOT_EXEC
         };
 
         // If the given pipeline is a background task, fork the shell.
@@ -442,11 +439,7 @@ impl PipelineExecution for Shell {
                 self,
                 piped_commands,
                 command_name,
-                if disown {
-                    ProcessState::Empty
-                } else {
-                    ProcessState::Running
-                },
+                if disown { ProcessState::Empty } else { ProcessState::Running }
             )
         } else {
             // While active, the SIGTTOU signal will be ignored.
@@ -503,7 +496,6 @@ impl PipelineExecution for Shell {
     }
 
     fn exec_job(&mut self, job: &mut RefinedJob, _foreground: bool) -> i32 {
-        let short = job.short();
         let long = job.long();
         match *job {
             RefinedJob::External {
@@ -513,8 +505,17 @@ impl PipelineExecution for Shell {
                 ref stdout,
                 ref stderr,
             } => {
-                let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
-                return self.exec_external(&name, &args, stdin, stdout, stderr);
+                if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
+                    let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
+                    let code = self.exec_external(&name, &args, stdin, stdout, stderr);
+                    redirect_streams(stdin_bk, stdout_bk, stderr_bk);
+                    return code;
+                }
+                eprintln!(
+                    "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
+                    long
+                );
+                COULD_NOT_EXEC
             }
             RefinedJob::Builtin {
                 main,
@@ -710,30 +711,55 @@ impl PipelineExecution for Shell {
         stderr: &Option<File>,
     ) -> i32 {
         let result = sys::fork_and_exec(
-                name,
-                &args,
-                if let Some(ref f) = *stdin { Some(f.as_raw_fd()) } else { None },
-                if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
-                if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
-                false,
-                || prepare_child(false)
-            );
+            name,
+            &args,
+            if let Some(ref f) = *stdin { Some(f.as_raw_fd()) } else { None },
+            if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
+            if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
+            false,
+            || prepare_child(true, 0)
+        );
 
-            match result {
-                Ok(pid) => {
-                    self.watch_foreground(pid as i32, "")
-                }
-                Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
-                    if !command_not_found(self, &name) {
-                        eprintln!("ion: command not found: {}", name);
-                    }
-                    NO_SUCH_COMMAND
-                }
-                Err(ref err) => {
-                    eprintln!("ion: command exec error: {}", err);
-                    FAILURE
-                }
+        match result {
+            Ok(pid) => {
+                let _ = sys::setpgid(pid, pid);
+                let _ = sys::tcsetpgrp(0, pid);
+                let _ = sys::wait_for_interrupt(pid);
+                let _ = sys::kill(pid, sys::SIGCONT);
+                self.watch_foreground(-(pid as i32), "")
             }
+            Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
+                if !command_not_found(self, &name) {
+                    eprintln!("ion: command not found: {}", name);
+                }
+                NO_SUCH_COMMAND
+            }
+            Err(ref err) => {
+                eprintln!("ion: command exec error: {}", err);
+                FAILURE
+            }
+        }
+    }
+}
+
+/// When the `&&` or `||` operator is utilized, commands should be executed
+/// based on the previously-recorded exit status. This function will return
+/// **true** to indicate that the current job should be skipped. 
+fn should_skip(
+    previous: &mut JobKind,
+    previous_status: i32,
+    current: JobKind,
+) -> bool {
+    match *previous {
+        JobKind::And if previous_status != SUCCESS => {
+            *previous = if JobKind::Or == current { current } else { *previous };
+            true
+        }
+        JobKind::Or if previous_status == SUCCESS => {
+            *previous = if JobKind::And == current { current } else { *previous };
+            true
+        }
+        _ => false
     }
 }
 
@@ -752,36 +778,15 @@ pub(crate) fn pipe(
 
     loop {
         if let Some((mut parent, mut kind)) = commands.next() {
-            // When an `&&` or `||` operator is utilized, execute commands based on the
-            // previous status.
-            match previous_kind {
-                JobKind::And => if previous_status != SUCCESS {
-                    if let JobKind::Or = kind {
-                        previous_kind = kind
-                    }
-                    continue;
-                },
-                JobKind::Or => if previous_status == SUCCESS {
-                    if let JobKind::And = kind {
-                        previous_kind = kind
-                    }
-                    continue;
-                },
-                _ => (),
-            }
+            if should_skip(&mut previous_kind, previous_status, kind) { continue }
 
             match kind {
                 JobKind::Pipe(mut mode) => {
                     // We need to remember the commands as they own the file
                     // descriptors that are created by sys::pipe.
                     let mut remember = Vec::new();
-
-                    let mut pgid = 0;
-                    let mut last_pid = 0;
-                    let mut current_pid = 0;
-
-                    // When set to true, this command will be SIGSTOP'd  before it executes.
-                    let mut child_blocked;
+                    let mut block_child = true;
+                    let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
 
                     // Append jobs until all piped jobs are running
                     while let Some((mut child, ckind)) = commands.next() {
@@ -794,6 +799,7 @@ pub(crate) fn pipe(
                             false
                         };
 
+                        // TODO: Refactor this part
                         // If we need to tee both stdout and stderr, we directly connect pipes to
                         // the relevant sources in both of them.
                         if let RefinedJob::Tee {
@@ -808,7 +814,8 @@ pub(crate) fn pipe(
                                         Some(unsafe { File::from_raw_fd(out_reader) });
                                     parent.stdout(unsafe { File::from_raw_fd(out_writer) });
                                     if is_external {
-                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(out_writer) });
+                                        possible_external_stdio_pipes.get_or_insert(vec![])
+                                            .push(unsafe { File::from_raw_fd(out_writer) });
                                     }
                                 }
                             }
@@ -819,7 +826,8 @@ pub(crate) fn pipe(
                                         Some(unsafe { File::from_raw_fd(err_reader) });
                                     parent.stderr(unsafe { File::from_raw_fd(err_writer) });
                                     if is_external {
-                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(err_writer) });
+                                        possible_external_stdio_pipes.get_or_insert(vec![])
+                                            .push(unsafe { File::from_raw_fd(err_writer) });
                                     }
                                 }
                             }
@@ -830,7 +838,8 @@ pub(crate) fn pipe(
                                 }
                                 Ok((reader, writer)) => {
                                     if is_external {
-                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(writer) });
+                                        possible_external_stdio_pipes.get_or_insert(vec![])
+                                            .push(unsafe { File::from_raw_fd(writer) });
                                     }
                                     child.stdin(unsafe { File::from_raw_fd(reader) });
                                     match mode {
@@ -865,57 +874,39 @@ pub(crate) fn pipe(
                             }
                         }
 
-                        child_blocked = match ckind {
-                            JobKind::Pipe(_) | JobKind::Last => true,
-                            _ => false
-                        };
-
-                        match spawn_proc(shell, parent, kind, child_blocked, &mut last_pid, &mut current_pid) {
+                        match spawn_proc(shell, parent, kind, block_child, &mut last_pid, &mut current_pid, pgid) {
                             SUCCESS => (),
                             error_code => return error_code
                         }
 
-                        // remember.push(parent);
                         possible_external_stdio_pipes = None;
 
                         if set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library {
                             let _ = sys::tcsetpgrp(0, pgid);
                         }
 
-                        resume_prior_process(&mut last_pid, current_pid, child_blocked);
+                        resume_prior_process(&mut last_pid, current_pid);
 
                         if let JobKind::Pipe(m) = ckind {
                             parent = child;
                             mode = m;
                         } else {
-                            // We set the kind to the last child kind that was
-                            // processed. For example, the pipeline
-                            // `foo | bar | baz && zardoz` should have the
-                            // previous kind set to `And` after processing the
-                            // initial pipeline
                             kind = ckind;
-
-                            child_blocked = match commands.peek() {
-                                Some(&(_, JobKind::Pipe(_))) => true,
-                                Some(&(_, JobKind::Last)) => true,
-                                _ => false
-                            };
-
-                            match spawn_proc(shell, child, kind, child_blocked, &mut last_pid, &mut current_pid) {
+                            block_child = false;
+                            match spawn_proc(shell, child, kind, block_child, &mut last_pid, &mut current_pid, pgid) {
                                 SUCCESS => (),
                                 error_code => return error_code
                             }
 
-                            set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library;
-
-                            // remember.push(child);
-                            resume_prior_process(&mut last_pid, current_pid, child_blocked);
-
+                            resume_prior_process(&mut last_pid, current_pid);
                             break;
                         }
                     }
+
                     previous_kind = kind;
                     previous_status = shell.wait(pgid, remember);
+                    let _ = io::stdout().flush();
+                    let _ = io::stderr().flush();
                     if previous_status == TERMINATED {
                         if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
                             eprintln!("ion: failed to terminate foreground jobs: {}", why);
@@ -926,6 +917,8 @@ pub(crate) fn pipe(
                 _ => {
                     previous_status = shell.exec_job(&mut parent, foreground);
                     previous_kind = kind;
+                    let _ = io::stdout().flush();
+                    let _ = io::stderr().flush();
                 }
             }
         } else {
@@ -939,9 +932,10 @@ fn spawn_proc(
     shell: &mut Shell,
     mut cmd: RefinedJob,
     kind: JobKind,
-    child_blocked: bool,
+    block_child: bool,
     last_pid: &mut u32,
-    current_pid: &mut u32
+    current_pid: &mut u32,
+    pgid: u32
 ) -> i32 {
     let short = cmd.short();
     match cmd {
@@ -954,7 +948,7 @@ fn spawn_proc(
                 if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
                 if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
                 false,
-                || prepare_child(child_blocked)
+                || prepare_child(block_child, pgid)
             );
 
             match result {
@@ -976,7 +970,7 @@ fn spawn_proc(
             let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
-                    prepare_child(child_blocked);
+                    prepare_child(block_child, pgid);
                     let ret = shell.exec_builtin(main, &args, stdout, stderr, stdin);
                     close(stdout);
                     close(stderr);
@@ -984,6 +978,7 @@ fn spawn_proc(
                     exit(ret)
                 },
                 Ok(pid) => {
+                    close(stdin);
                     close(stdout);
                     close(stderr);
                     *last_pid = *current_pid;
@@ -998,7 +993,7 @@ fn spawn_proc(
             let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
-                    prepare_child(child_blocked);
+                    prepare_child(block_child, pgid);
                     let ret = shell.exec_function(name, &args, stdout, stderr, stdin);
                     close(stdout);
                     close(stderr);
@@ -1006,6 +1001,7 @@ fn spawn_proc(
                     exit(ret)
                 },
                 Ok(pid) => {
+                    close(stdin);
                     close(stdout);
                     close(stderr);
                     *last_pid = *current_pid;
@@ -1019,7 +1015,7 @@ fn spawn_proc(
         RefinedJob::Cat { ref mut sources, ref stdout, ref mut stdin } => {
             match unsafe { sys::fork() } {
                 Ok(0) => {
-                    prepare_child(child_blocked);
+                    prepare_child(block_child, pgid);
 
                     let ret = shell.exec_multi_in(sources, stdout, stdin);
                     close(stdout);
@@ -1027,6 +1023,7 @@ fn spawn_proc(
                     exit(ret);
                 }
                 Ok(pid) => {
+                    close(stdin);
                     close(stdout);
                     *last_pid = *current_pid;
                     *current_pid = pid;
@@ -1037,7 +1034,7 @@ fn spawn_proc(
         RefinedJob::Tee { ref mut items, ref stdout, ref stderr, ref stdin } => {
             match unsafe { sys::fork() } {
                 Ok(0) => {
-                    prepare_child(child_blocked);
+                    prepare_child(block_child, pgid);
 
                     let ret = shell.exec_multi_out(items, stdout, stderr, stdin, kind);
                     close(stdout);
@@ -1046,6 +1043,7 @@ fn spawn_proc(
                     exit(ret);
                 },
                 Ok(pid) => {
+                    close(stdin);
                     close(stdout);
                     close(stderr);
                     *last_pid = *current_pid;
@@ -1067,27 +1065,25 @@ fn close(file: &Option<File>) {
     }
 }
 
-fn prepare_child(child_blocked: bool) {
+fn prepare_child(block_child: bool, pgid: u32) {
     signals::unblock();
     let _ = sys::reset_signal(sys::SIGINT);
     let _ = sys::reset_signal(sys::SIGHUP);
     let _ = sys::reset_signal(sys::SIGTERM);
 
-    if child_blocked {
+    if block_child {
         let _ = sys::kill(process::id(), sys::SIGSTOP);
     } else {
+        let _ = sys::setpgid(process::id(), pgid);
     }
 }
 
-fn resume_prior_process(last_pid: &mut u32, current_pid: u32, child_blocked: bool) {
-    if child_blocked {
+fn resume_prior_process(last_pid: &mut u32, current_pid: u32) {
+    if *last_pid != 0 {
         // Ensure that the process is stopped before continuing.
-        if let Err(why) = sys::wait_for_interrupt(current_pid) {
+        if let Err(why) = sys::wait_for_interrupt(*last_pid) {
             eprintln!("ion: error waiting for sigstop: {}", why);
         }
-    }
-
-    if *last_pid != 0 {
         let _ = sys::kill(*last_pid, sys::SIGCONT);
     }
 

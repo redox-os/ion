@@ -25,7 +25,19 @@ pub(crate) const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
 pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
 pub(crate) const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 
+// Why each platform wants to be unique in this regard is anyone's guess.
+
+#[cfg(target_os = "linux")]
 fn errno() -> i32 { unsafe { *libc::__errno_location() } }
+
+#[cfg(any(target_os = "openbsd", target_os = "bitrig", target_os = "android"))]
+fn errno() -> i32 { unsafe { *libc::__errno() } }
+
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
+fn errno() -> i32 { unsafe { *libc::__error() } }
+
+#[cfg(target_os = "dragonfly")]
+fn errno() -> i32 { unsafe { *libc::__dfly_error() } }
 
 fn write_errno(msg: &str, errno: i32) {
     let stderr = io::stderr();
@@ -44,16 +56,15 @@ pub(crate) fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
 pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
 
 pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
-    let mut status = 0;
-    let mut result;
+    let mut status;
 
     loop {
-        result = unsafe { waitpid(pid as i32, &mut status, WUNTRACED) };
-        if result == -1 {
-            if errno() == EINTR { continue }
-            break Err(io::Error::from_raw_os_error(errno()));
+        status = 0;
+        match unsafe { waitpid(pid as i32, &mut status, WUNTRACED) } {
+            -1 if errno() == EINTR => continue,
+            -1 => break Err(io::Error::from_raw_os_error(errno())),
+            _ => break Ok(())
         }
-        break Ok(());
     }
 }
 

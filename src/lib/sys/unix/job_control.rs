@@ -8,28 +8,38 @@ use std::thread::sleep;
 use std::time::Duration;
 use super::{errno, write_errno};
 
+const OPTS: i32 = WUNTRACED | WCONTINUED | WNOHANG;
+
 pub(crate) fn watch_background(
     fg: Arc<ForegroundSignals>,
     processes: Arc<Mutex<Vec<BackgroundProcess>>>,
-    pid: u32,
+    pgid: u32,
     njob: usize,
 ) {
     let mut fg_was_grabbed = false;
-    loop {
-        if !fg_was_grabbed {
-            if fg.was_grabbed(pid) {
-                fg_was_grabbed = true;
-            }
-        }
+    let mut status;
+    let mut exit_status = 0;
 
-        let opts = WUNTRACED | WCONTINUED | WNOHANG;
-        let mut status = 0;
+    loop {
+        fg_was_grabbed = !fg_was_grabbed && fg.was_grabbed(pgid);
 
         unsafe {
-            let pid = waitpid(-(pid as pid_t), &mut status, opts);
-            match pid {
+            status = 0;
+            match waitpid(-(pgid as pid_t), &mut status, OPTS) {
+                -1 if errno() == ECHILD => {
+                    if !fg_was_grabbed {
+                        eprintln!("ion: ([{}] {}) exited with {}", njob, pgid, status);
+                    }
+                    let mut processes = processes.lock().unwrap();
+                    let process = &mut processes.iter_mut().nth(njob).unwrap();
+                    process.state = ProcessState::Empty;
+                    if fg_was_grabbed {
+                        fg.reply_with(exit_status as i8);
+                    }
+                    break;
+                }
                 -1 => {
-                    eprintln!("ion: ([{}] {}) errored: {}", njob, pid, errno());
+                    eprintln!("ion: ([{}] {}) errored: {}", njob, pgid, errno());
                     let mut processes = processes.lock().unwrap();
                     let process = &mut processes.iter_mut().nth(njob).unwrap();
                     process.state = ProcessState::Empty;
@@ -39,21 +49,10 @@ pub(crate) fn watch_background(
                     break;
                 }
                 0 => (),
-                _ if WIFEXITED(status) => {
+                _pid if WIFEXITED(status) => exit_status = WEXITSTATUS(status),
+                _pid if WIFSTOPPED(status) => {
                     if !fg_was_grabbed {
-                        eprintln!("ion: ([{}] {}) exited with {}", njob, pid, status);
-                    }
-                    let mut processes = processes.lock().unwrap();
-                    let process = &mut processes.iter_mut().nth(njob).unwrap();
-                    process.state = ProcessState::Empty;
-                    if fg_was_grabbed {
-                        fg.reply_with(WEXITSTATUS(status) as i8);
-                    }
-                    break;
-                }
-                _ if WIFSTOPPED(status) => {
-                    if !fg_was_grabbed {
-                        eprintln!("ion: ([{}] {}) Stopped", njob, pid);
+                        eprintln!("ion: ([{}] {}) Stopped", njob, pgid);
                     }
                     let mut processes = processes.lock().unwrap();
                     let process = &mut processes.iter_mut().nth(njob).unwrap();
@@ -63,9 +62,9 @@ pub(crate) fn watch_background(
                     }
                     process.state = ProcessState::Stopped;
                 }
-                _ if WIFCONTINUED(status) => {
+                _pid if WIFCONTINUED(status) => {
                     if !fg_was_grabbed {
-                        eprintln!("ion: ([{}] {}) Running", njob, pid);
+                        eprintln!("ion: ([{}] {}) Running", njob, pgid);
                     }
                     let mut processes = processes.lock().unwrap();
                     let process = &mut processes.iter_mut().nth(njob).unwrap();
@@ -98,13 +97,17 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     }
                 }
                 0 => (),
-                _pid if WIFEXITED(status) => {
-                    exit_status = WEXITSTATUS(status) as i32;
-                }
-                _pid if WIFSIGNALED(status) => {
+                _pid if WIFEXITED(status) => exit_status = WEXITSTATUS(status),
+                pid if WIFSIGNALED(status) => {
                     let signal = WTERMSIG(status);
-                    if signal == SIGPIPE { continue }
-                    eprintln!("ion: process ended by signal {}", signal);
+                    if signal == SIGPIPE {
+                        continue
+                    } else if WCOREDUMP(status) {
+                        eprintln!("ion: process ({}) had a core dump", pid);
+                        continue
+                    }
+
+                    eprintln!("ion: process ({}) ended by signal {}", pid, signal);
                     match signal {
                         SIGINT => {
                             let _ = kill(pid, signal as i32);
@@ -116,11 +119,10 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     }
                     signaled = 128 + signal as i32;
                 }
-                _pid if WIFSTOPPED(status) => {
-                    // TODO: Rework background control
-                    shell.send_to_background(pid as u32, ProcessState::Stopped, command.into());
+                pid if WIFSTOPPED(status) => {
+                    shell.send_to_background(pid.abs() as u32, ProcessState::Stopped, command.into());
                     shell.break_flow = true;
-                    break 128 + signal as i32;
+                    break 128 + WSTOPSIG(status);
                 }
                 _ => (),
             }
