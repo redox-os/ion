@@ -97,13 +97,17 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     }
                 }
                 0 => (),
-                _pid if WIFEXITED(status) => {
-                    exit_status = WEXITSTATUS(status) as i32;
-                }
-                _pid if WIFSIGNALED(status) => {
+                _pid if WIFEXITED(status) => exit_status = WEXITSTATUS(status),
+                pid if WIFSIGNALED(status) => {
                     let signal = WTERMSIG(status);
-                    if signal == SIGPIPE { continue }
-                    eprintln!("ion: process ended by signal {}", signal);
+                    if signal == SIGPIPE {
+                        continue
+                    } else if WCOREDUMP(status) {
+                        eprintln!("ion: process ({}) had a core dump", pid);
+                        continue
+                    }
+
+                    eprintln!("ion: process ({}) ended by signal {}", pid, signal);
                     match signal {
                         SIGINT => {
                             let _ = kill(pid, signal as i32);
@@ -115,10 +119,10 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     }
                     signaled = 128 + signal as i32;
                 }
-                _pid if WIFSTOPPED(status) => {
+                pid if WIFSTOPPED(status) => {
                     shell.send_to_background(pid.abs() as u32, ProcessState::Stopped, command.into());
                     shell.break_flow = true;
-                    break 128 + signal as i32;
+                    break 128 + WSTOPSIG(status);
                 }
                 _ => (),
             }

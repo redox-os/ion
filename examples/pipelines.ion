@@ -1,0 +1,6 @@
+echo test | cat | cat
+echo one | cat <<< two
+echo foo | grep foo && echo found foo
+echo foo | grep bar || echo did not find bar
+echo test | grep test && echo found test | cat
+

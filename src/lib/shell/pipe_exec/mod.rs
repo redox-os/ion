@@ -717,13 +717,15 @@ impl PipelineExecution for Shell {
             if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
             if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
             false,
-            || prepare_child(false)
+            || prepare_child(true, 0)
         );
 
         match result {
             Ok(pid) => {
                 let _ = sys::setpgid(pid, pid);
                 let _ = sys::tcsetpgrp(0, pid);
+                let _ = sys::wait_for_interrupt(pid);
+                let _ = sys::kill(pid, sys::SIGCONT);
                 self.watch_foreground(-(pid as i32), "")
             }
             Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
@@ -783,7 +785,7 @@ pub(crate) fn pipe(
                     // We need to remember the commands as they own the file
                     // descriptors that are created by sys::pipe.
                     let mut remember = Vec::new();
-                    let mut child_blocked = true;
+                    let mut block_child = true;
                     let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
 
                     // Append jobs until all piped jobs are running
@@ -872,7 +874,7 @@ pub(crate) fn pipe(
                             }
                         }
 
-                        match spawn_proc(shell, parent, kind, child_blocked, &mut last_pid, &mut current_pid) {
+                        match spawn_proc(shell, parent, kind, block_child, &mut last_pid, &mut current_pid, pgid) {
                             SUCCESS => (),
                             error_code => return error_code
                         }
@@ -883,21 +885,20 @@ pub(crate) fn pipe(
                             let _ = sys::tcsetpgrp(0, pgid);
                         }
 
-                        resume_prior_process(&mut last_pid, current_pid, child_blocked);
+                        resume_prior_process(&mut last_pid, current_pid);
 
                         if let JobKind::Pipe(m) = ckind {
                             parent = child;
                             mode = m;
                         } else {
                             kind = ckind;
-                            child_blocked = false;
-                            match spawn_proc(shell, child, kind, child_blocked, &mut last_pid, &mut current_pid) {
+                            block_child = false;
+                            match spawn_proc(shell, child, kind, block_child, &mut last_pid, &mut current_pid, pgid) {
                                 SUCCESS => (),
                                 error_code => return error_code
                             }
 
-                            set_process_group(&mut pgid, current_pid);
-                            resume_prior_process(&mut last_pid, current_pid, child_blocked);
+                            resume_prior_process(&mut last_pid, current_pid);
                             break;
                         }
                     }
@@ -931,9 +932,10 @@ fn spawn_proc(
     shell: &mut Shell,
     mut cmd: RefinedJob,
     kind: JobKind,
-    child_blocked: bool,
+    block_child: bool,
     last_pid: &mut u32,
-    current_pid: &mut u32
+    current_pid: &mut u32,
+    pgid: u32
 ) -> i32 {
     let short = cmd.short();
     match cmd {
@@ -946,7 +948,7 @@ fn spawn_proc(
                 if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
                 if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
                 false,
-                || prepare_child(child_blocked)
+                || prepare_child(block_child, pgid)
             );
 
             match result {
@@ -968,7 +970,7 @@ fn spawn_proc(
             let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
-                    prepare_child(child_blocked);
+                    prepare_child(block_child, pgid);
                     let ret = shell.exec_builtin(main, &args, stdout, stderr, stdin);
                     close(stdout);
                     close(stderr);
@@ -991,7 +993,7 @@ fn spawn_proc(
             let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
-                    prepare_child(child_blocked);
+                    prepare_child(block_child, pgid);
                     let ret = shell.exec_function(name, &args, stdout, stderr, stdin);
                     close(stdout);
                     close(stderr);
@@ -1013,7 +1015,7 @@ fn spawn_proc(
         RefinedJob::Cat { ref mut sources, ref stdout, ref mut stdin } => {
             match unsafe { sys::fork() } {
                 Ok(0) => {
-                    prepare_child(child_blocked);
+                    prepare_child(block_child, pgid);
 
                     let ret = shell.exec_multi_in(sources, stdout, stdin);
                     close(stdout);
@@ -1032,7 +1034,7 @@ fn spawn_proc(
         RefinedJob::Tee { ref mut items, ref stdout, ref stderr, ref stdin } => {
             match unsafe { sys::fork() } {
                 Ok(0) => {
-                    prepare_child(child_blocked);
+                    prepare_child(block_child, pgid);
 
                     let ret = shell.exec_multi_out(items, stdout, stderr, stdin, kind);
                     close(stdout);
@@ -1063,26 +1065,25 @@ fn close(file: &Option<File>) {
     }
 }
 
-fn prepare_child(child_blocked: bool) {
+fn prepare_child(block_child: bool, pgid: u32) {
     signals::unblock();
     let _ = sys::reset_signal(sys::SIGINT);
     let _ = sys::reset_signal(sys::SIGHUP);
     let _ = sys::reset_signal(sys::SIGTERM);
 
-    if child_blocked {
+    if block_child {
         let _ = sys::kill(process::id(), sys::SIGSTOP);
+    } else {
+        let _ = sys::setpgid(process::id(), pgid);
     }
 }
 
-fn resume_prior_process(last_pid: &mut u32, current_pid: u32, child_blocked: bool) {
-    if child_blocked {
+fn resume_prior_process(last_pid: &mut u32, current_pid: u32) {
+    if *last_pid != 0 {
         // Ensure that the process is stopped before continuing.
-        if let Err(why) = sys::wait_for_interrupt(current_pid) {
+        if let Err(why) = sys::wait_for_interrupt(*last_pid) {
             eprintln!("ion: error waiting for sigstop: {}", why);
         }
-    }
-
-    if *last_pid != 0 {
         let _ = sys::kill(*last_pid, sys::SIGCONT);
     }
 
