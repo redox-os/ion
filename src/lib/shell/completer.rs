@@ -45,8 +45,7 @@ impl Completer for IonFileCompleter {
             // because no changes will occur to either of the underlying references in the
             // duration between creation of the completers and execution of their
             // completions.
-            if let Some(expanded) =
-                unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) }
+            if let Some(expanded) = unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) }
             {
                 // Now we obtain completions for the `expanded` form of the `start` value.
                 let completions = self.inner.completions(&expanded);

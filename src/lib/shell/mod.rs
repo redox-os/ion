@@ -123,9 +123,7 @@ impl ShellBuilder {
         let _ = sys::signal(sys::SIGINT, handler);
         let _ = sys::signal(sys::SIGTERM, handler);
 
-        extern "C" fn sigpipe_handler(signal: i32) {
-            sys::fork_exit(127 + signal);
-        }
+        extern "C" fn sigpipe_handler(signal: i32) { sys::fork_exit(127 + signal); }
 
         let _ = sys::signal(sys::SIGPIPE, sigpipe_handler);
 
@@ -158,21 +156,21 @@ impl ShellBuilder {
 impl<'a> Shell {
     pub(crate) fn new(is_library: bool) -> Shell {
         Shell {
-            builtins:            BUILTINS,
-            context:             None,
-            variables:           Variables::default(),
-            flow_control:        FlowControl::default(),
-            directory_stack:     DirectoryStack::new(),
-            functions:           FnvHashMap::default(),
-            previous_job:        !0,
-            previous_status:     0,
-            flags:               0,
-            background:          Arc::new(Mutex::new(Vec::new())),
+            builtins: BUILTINS,
+            context: None,
+            variables: Variables::default(),
+            flow_control: FlowControl::default(),
+            directory_stack: DirectoryStack::new(),
+            functions: FnvHashMap::default(),
+            previous_job: !0,
+            previous_status: 0,
+            flags: 0,
+            background: Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
             is_library,
-            break_flow:          false,
-            foreground_signals:  Arc::new(ForegroundSignals::new()),
-            ignore_setting:      IgnoreSetting::default(),
+            break_flow: false,
+            foreground_signals: Arc::new(ForegroundSignals::new()),
+            ignore_setting: IgnoreSetting::default(),
         }
     }
 
@@ -482,7 +480,9 @@ impl<'a> Expander for Shell {
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<Value> {
         let mut output = None;
-        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command)) {
+        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| {
+            shell.on_command(command)
+        }) {
             Ok(result) => {
                 let mut string = String::with_capacity(1024);
                 match result.stdout.unwrap().read_to_string(&mut string) {

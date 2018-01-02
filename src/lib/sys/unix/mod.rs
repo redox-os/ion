@@ -4,9 +4,9 @@ pub mod job_control;
 pub mod signals;
 
 use libc::{c_char, c_int, pid_t, sighandler_t, strerror, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED};
-use std::{io, ptr, env};
-use std::io::Write;
+use std::{env, io, ptr};
 use std::ffi::{CStr, CString};
+use std::io::Write;
 use std::os::unix::io::RawFd;
 
 pub(crate) const PATH_SEPARATOR: &str = ":";
@@ -54,7 +54,9 @@ pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
     loop {
         result = unsafe { waitpid(pid as i32, &mut status, WUNTRACED) };
         if result == -1 {
-            if errno() == EINTR { continue }
+            if errno() == EINTR {
+                continue;
+            }
             break Err(io::Error::from_raw_os_error(errno()));
         }
         break Ok(());

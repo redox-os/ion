@@ -710,30 +710,40 @@ impl PipelineExecution for Shell {
         stderr: &Option<File>,
     ) -> i32 {
         let result = sys::fork_and_exec(
-                name,
-                &args,
-                if let Some(ref f) = *stdin { Some(f.as_raw_fd()) } else { None },
-                if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
-                if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
-                false,
-                || prepare_child(false)
-            );
+            name,
+            &args,
+            if let Some(ref f) = *stdin {
+                Some(f.as_raw_fd())
+            } else {
+                None
+            },
+            if let Some(ref f) = *stdout {
+                Some(f.as_raw_fd())
+            } else {
+                None
+            },
+            if let Some(ref f) = *stderr {
+                Some(f.as_raw_fd())
+            } else {
+                None
+            },
+            false,
+            || prepare_child(false),
+        );
 
-            match result {
-                Ok(pid) => {
-                    self.watch_foreground(pid as i32, "")
+        match result {
+            Ok(pid) => self.watch_foreground(pid as i32, ""),
+            Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
+                if !command_not_found(self, &name) {
+                    eprintln!("ion: command not found: {}", name);
                 }
-                Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
-                    if !command_not_found(self, &name) {
-                        eprintln!("ion: command not found: {}", name);
-                    }
-                    NO_SUCH_COMMAND
-                }
-                Err(ref err) => {
-                    eprintln!("ion: command exec error: {}", err);
-                    FAILURE
-                }
+                NO_SUCH_COMMAND
             }
+            Err(ref err) => {
+                eprintln!("ion: command exec error: {}", err);
+                FAILURE
+            }
+        }
     }
 }
 
@@ -808,7 +818,9 @@ pub(crate) fn pipe(
                                         Some(unsafe { File::from_raw_fd(out_reader) });
                                     parent.stdout(unsafe { File::from_raw_fd(out_writer) });
                                     if is_external {
-                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(out_writer) });
+                                        possible_external_stdio_pipes
+                                            .get_or_insert(vec![])
+                                            .push(unsafe { File::from_raw_fd(out_writer) });
                                     }
                                 }
                             }
@@ -819,7 +831,9 @@ pub(crate) fn pipe(
                                         Some(unsafe { File::from_raw_fd(err_reader) });
                                     parent.stderr(unsafe { File::from_raw_fd(err_writer) });
                                     if is_external {
-                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(err_writer) });
+                                        possible_external_stdio_pipes
+                                            .get_or_insert(vec![])
+                                            .push(unsafe { File::from_raw_fd(err_writer) });
                                     }
                                 }
                             }
@@ -830,19 +844,17 @@ pub(crate) fn pipe(
                                 }
                                 Ok((reader, writer)) => {
                                     if is_external {
-                                        possible_external_stdio_pipes.get_or_insert(vec![]).push(unsafe { File::from_raw_fd(writer) });
+                                        possible_external_stdio_pipes
+                                            .get_or_insert(vec![])
+                                            .push(unsafe { File::from_raw_fd(writer) });
                                     }
                                     child.stdin(unsafe { File::from_raw_fd(reader) });
                                     match mode {
                                         RedirectFrom::Stderr => {
-                                            parent.stderr(unsafe {
-                                                File::from_raw_fd(writer)
-                                            });
+                                            parent.stderr(unsafe { File::from_raw_fd(writer) });
                                         }
                                         RedirectFrom::Stdout => {
-                                            parent.stdout(unsafe {
-                                                File::from_raw_fd(writer)
-                                            });
+                                            parent.stdout(unsafe { File::from_raw_fd(writer) });
                                         }
                                         RedirectFrom::Both => {
                                             let temp = unsafe { File::from_raw_fd(writer) };
@@ -867,18 +879,27 @@ pub(crate) fn pipe(
 
                         child_blocked = match ckind {
                             JobKind::Pipe(_) | JobKind::Last => true,
-                            _ => false
+                            _ => false,
                         };
 
-                        match spawn_proc(shell, parent, kind, child_blocked, &mut last_pid, &mut current_pid) {
+                        match spawn_proc(
+                            shell,
+                            parent,
+                            kind,
+                            child_blocked,
+                            &mut last_pid,
+                            &mut current_pid,
+                        ) {
                             SUCCESS => (),
-                            error_code => return error_code
+                            error_code => return error_code,
                         }
 
                         // remember.push(parent);
                         possible_external_stdio_pipes = None;
 
-                        if set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library {
+                        if set_process_group(&mut pgid, current_pid) && foreground
+                            && !shell.is_library
+                        {
                             let _ = sys::tcsetpgrp(0, pgid);
                         }
 
@@ -898,15 +919,23 @@ pub(crate) fn pipe(
                             child_blocked = match commands.peek() {
                                 Some(&(_, JobKind::Pipe(_))) => true,
                                 Some(&(_, JobKind::Last)) => true,
-                                _ => false
+                                _ => false,
                             };
 
-                            match spawn_proc(shell, child, kind, child_blocked, &mut last_pid, &mut current_pid) {
+                            match spawn_proc(
+                                shell,
+                                child,
+                                kind,
+                                child_blocked,
+                                &mut last_pid,
+                                &mut current_pid,
+                            ) {
                                 SUCCESS => (),
-                                error_code => return error_code
+                                error_code => return error_code,
                             }
 
-                            set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library;
+                            set_process_group(&mut pgid, current_pid) && foreground
+                                && !shell.is_library;
 
                             // remember.push(child);
                             resume_prior_process(&mut last_pid, current_pid, child_blocked);
@@ -941,20 +970,38 @@ fn spawn_proc(
     kind: JobKind,
     child_blocked: bool,
     last_pid: &mut u32,
-    current_pid: &mut u32
+    current_pid: &mut u32,
 ) -> i32 {
     let short = cmd.short();
     match cmd {
-        RefinedJob::External { ref name, ref args, ref stdout, ref stderr, ref stdin} => {
+        RefinedJob::External {
+            ref name,
+            ref args,
+            ref stdout,
+            ref stderr,
+            ref stdin,
+        } => {
             let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
             let result = sys::fork_and_exec(
                 name,
                 &args,
-                if let Some(ref f) = *stdin { Some(f.as_raw_fd()) } else { None },
-                if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
-                if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
+                if let Some(ref f) = *stdin {
+                    Some(f.as_raw_fd())
+                } else {
+                    None
+                },
+                if let Some(ref f) = *stdout {
+                    Some(f.as_raw_fd())
+                } else {
+                    None
+                },
+                if let Some(ref f) = *stderr {
+                    Some(f.as_raw_fd())
+                } else {
+                    None
+                },
                 false,
-                || prepare_child(child_blocked)
+                || prepare_child(child_blocked),
             );
 
             match result {
@@ -972,7 +1019,13 @@ fn spawn_proc(
                 }
             }
         }
-        RefinedJob::Builtin { main, ref args, ref stdout, ref stderr, ref stdin } => {
+        RefinedJob::Builtin {
+            main,
+            ref args,
+            ref stdout,
+            ref stderr,
+            ref stdin,
+        } => {
             let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
@@ -982,19 +1035,25 @@ fn spawn_proc(
                     close(stderr);
                     close(stdin);
                     exit(ret)
-                },
+                }
                 Ok(pid) => {
                     close(stdout);
                     close(stderr);
                     *last_pid = *current_pid;
                     *current_pid = pid;
-                },
+                }
                 Err(e) => {
                     eprintln!("ion: failed to fork {}: {}", short, e);
                 }
             }
         }
-        RefinedJob::Function { ref name, ref args, ref stdout, ref stderr, ref stdin, } => {
+        RefinedJob::Function {
+            ref name,
+            ref args,
+            ref stdout,
+            ref stderr,
+            ref stdin,
+        } => {
             let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
@@ -1004,56 +1063,61 @@ fn spawn_proc(
                     close(stderr);
                     close(stdin);
                     exit(ret)
-                },
+                }
                 Ok(pid) => {
                     close(stdout);
                     close(stderr);
                     *last_pid = *current_pid;
                     *current_pid = pid;
-                },
+                }
                 Err(e) => {
                     eprintln!("ion: failed to fork {}: {}", short, e);
                 }
             }
         }
-        RefinedJob::Cat { ref mut sources, ref stdout, ref mut stdin } => {
-            match unsafe { sys::fork() } {
-                Ok(0) => {
-                    prepare_child(child_blocked);
+        RefinedJob::Cat {
+            ref mut sources,
+            ref stdout,
+            ref mut stdin,
+        } => match unsafe { sys::fork() } {
+            Ok(0) => {
+                prepare_child(child_blocked);
 
-                    let ret = shell.exec_multi_in(sources, stdout, stdin);
-                    close(stdout);
-                    close(stdin);
-                    exit(ret);
-                }
-                Ok(pid) => {
-                    close(stdout);
-                    *last_pid = *current_pid;
-                    *current_pid = pid;
-                }
-                Err(e) => eprintln!("ion: failed to fork {}: {}", short, e),
+                let ret = shell.exec_multi_in(sources, stdout, stdin);
+                close(stdout);
+                close(stdin);
+                exit(ret);
             }
+            Ok(pid) => {
+                close(stdout);
+                *last_pid = *current_pid;
+                *current_pid = pid;
+            }
+            Err(e) => eprintln!("ion: failed to fork {}: {}", short, e),
         },
-        RefinedJob::Tee { ref mut items, ref stdout, ref stderr, ref stdin } => {
-            match unsafe { sys::fork() } {
-                Ok(0) => {
-                    prepare_child(child_blocked);
+        RefinedJob::Tee {
+            ref mut items,
+            ref stdout,
+            ref stderr,
+            ref stdin,
+        } => match unsafe { sys::fork() } {
+            Ok(0) => {
+                prepare_child(child_blocked);
 
-                    let ret = shell.exec_multi_out(items, stdout, stderr, stdin, kind);
-                    close(stdout);
-                    close(stderr);
-                    close(stdin);
-                    exit(ret);
-                },
-                Ok(pid) => {
-                    close(stdout);
-                    close(stderr);
-                    *last_pid = *current_pid;
-                    *current_pid = pid;
-                }
-                Err(e) => eprintln!("ion: failed to fork {}: {}", short, e),
+                let ret = shell.exec_multi_out(items, stdout, stderr, stdin, kind);
+                close(stdout);
+                close(stderr);
+                close(stdin);
+                exit(ret);
             }
-        }
+            Ok(pid) => {
+                close(stdout);
+                close(stderr);
+                *last_pid = *current_pid;
+                *current_pid = pid;
+            }
+            Err(e) => eprintln!("ion: failed to fork {}: {}", short, e),
+        },
     }
     SUCCESS
 }
@@ -1096,7 +1160,9 @@ fn resume_prior_process(last_pid: &mut u32, current_pid: u32, child_blocked: boo
 
 fn set_process_group(pgid: &mut u32, pid: u32) -> bool {
     let pgid_set = *pgid == 0;
-    if pgid_set { *pgid = pid; }
+    if pgid_set {
+        *pgid = pid;
+    }
     let _ = sys::setpgid(pid, *pgid);
     pgid_set
 }

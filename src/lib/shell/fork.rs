@@ -132,10 +132,8 @@ impl<'a> Fork<'a> {
                     // `waitpid()` is required to reap the child.
                     status: sys::wait_for_child(pid).map_err(|why| IonError::Fork { why })?,
                 })
-            },
-            Err(why) => {
-                Err(IonError::Fork { why: why })
-            },
+            }
+            Err(why) => Err(IonError::Fork { why: why }),
         }
     }
 }
