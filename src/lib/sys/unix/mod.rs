@@ -25,7 +25,11 @@ pub(crate) const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
 pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
 pub(crate) const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 
+#[cfg(not(target_os = "macos"))]
 fn errno() -> i32 { unsafe { *libc::__errno_location() } }
+
+#[cfg(target_os = "macos")]
+fn errno() -> i32 { unsafe { *libc::__error() } }
 
 fn write_errno(msg: &str, errno: i32) {
     let stderr = io::stderr();
