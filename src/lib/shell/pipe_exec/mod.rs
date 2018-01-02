@@ -505,8 +505,17 @@ impl PipelineExecution for Shell {
                 ref stdout,
                 ref stderr,
             } => {
-                let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
-                return self.exec_external(&name, &args, stdin, stdout, stderr);
+                if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
+                    let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
+                    let code = self.exec_external(&name, &args, stdin, stdout, stderr);
+                    redirect_streams(stdin_bk, stdout_bk, stderr_bk);
+                    return code;
+                }
+                eprintln!(
+                    "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
+                    long
+                );
+                COULD_NOT_EXEC
             }
             RefinedJob::Builtin {
                 main,
@@ -702,30 +711,32 @@ impl PipelineExecution for Shell {
         stderr: &Option<File>,
     ) -> i32 {
         let result = sys::fork_and_exec(
-                name,
-                &args,
-                if let Some(ref f) = *stdin { Some(f.as_raw_fd()) } else { None },
-                if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
-                if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
-                false,
-                || prepare_child(false)
-            );
+            name,
+            &args,
+            if let Some(ref f) = *stdin { Some(f.as_raw_fd()) } else { None },
+            if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
+            if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
+            false,
+            || prepare_child(false)
+        );
 
-            match result {
-                Ok(pid) => {
-                    self.watch_foreground(pid as i32, "")
-                }
-                Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
-                    if !command_not_found(self, &name) {
-                        eprintln!("ion: command not found: {}", name);
-                    }
-                    NO_SUCH_COMMAND
-                }
-                Err(ref err) => {
-                    eprintln!("ion: command exec error: {}", err);
-                    FAILURE
-                }
+        match result {
+            Ok(pid) => {
+                let _ = sys::setpgid(pid, pid);
+                let _ = sys::tcsetpgrp(0, pid);
+                self.watch_foreground(-(pid as i32), "")
             }
+            Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
+                if !command_not_found(self, &name) {
+                    eprintln!("ion: command not found: {}", name);
+                }
+                NO_SUCH_COMMAND
+            }
+            Err(ref err) => {
+                eprintln!("ion: command exec error: {}", err);
+                FAILURE
+            }
+        }
     }
 }
 
@@ -1060,7 +1071,6 @@ fn prepare_child(child_blocked: bool) {
 
     if child_blocked {
         let _ = sys::kill(process::id(), sys::SIGSTOP);
-    } else {
     }
 }
 

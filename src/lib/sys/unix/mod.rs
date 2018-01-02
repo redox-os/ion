@@ -25,7 +25,19 @@ pub(crate) const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
 pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
 pub(crate) const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 
+// Why each platform wants to be unique in this regard is anyone's guess.
+
+#[cfg(target_os = "linux")]
 fn errno() -> i32 { unsafe { *libc::__errno_location() } }
+
+#[cfg(any(target_os = "openbsd", target_os = "bitrig", target_os = "android"))]
+fn errno() -> i32 { unsafe { *libc::__errno() } }
+
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
+fn errno() -> i32 { unsafe { *libc::__error() } }
+
+#[cfg(target_os = "dragonfly")]
+fn errno() -> i32 { unsafe { *libc::__dfly_error() } }
 
 fn write_errno(msg: &str, errno: i32) {
     let stderr = io::stderr();
