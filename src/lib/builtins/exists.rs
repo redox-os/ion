@@ -5,11 +5,11 @@ use smallvec::SmallVec;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 
+#[cfg(test)]
+use shell;
 use shell::Shell;
 #[cfg(test)]
 use shell::flow_control::{Function, Statement};
-#[cfg(test)]
-use shell;
 
 pub(crate) fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
     let arguments = &args[1..];

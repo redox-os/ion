@@ -4,10 +4,10 @@ use std::{io, mem, slice};
 use std::env;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::RawFd;
+use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::{exit, ExitStatus};
-use std::os::unix::process::ExitStatusExt;
-use syscall::{EINTR, SigAction, waitpid};
+use syscall::{waitpid, SigAction, EINTR};
 
 pub(crate) const PATH_SEPARATOR: &str = ";";
 pub(crate) const NULL_PATH: &str = "null:";
@@ -56,7 +56,7 @@ pub fn wait_for_child(pid: u32) -> io::Result<u8> {
         match waitpid(pid as usize, &mut status, 0) {
             Err(ref error) if error.errno == ECHILD => break,
             Err(error) => return Err(io::Error::from_raw_os_error(error.errno)),
-            _ => ()
+            _ => (),
         }
     }
 
@@ -91,7 +91,7 @@ pub(crate) fn fork_and_exec<F: Fn()>(
     stdout: Option<RawFd>,
     stderr: Option<RawFd>,
     clear_env: bool,
-    before_exec: F
+    before_exec: F,
 ) -> io::Result<u32> {
     // Construct a valid set of arguments to pass to execve. Ensure
     // that the program is the first argument.
@@ -301,14 +301,14 @@ pub mod signals {
 pub mod job_control {
     use shell::job_control::*;
 
+    use super::{SIGINT, SIGPIPE};
     use shell::Shell;
     use shell::foreground::ForegroundSignals;
     use shell::status::FAILURE;
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
     use std::sync::{Arc, Mutex};
-    use syscall::{self, ECHILD, waitpid};
-    use super::{SIGINT, SIGPIPE};
+    use syscall::{self, waitpid, ECHILD};
 
     pub(crate) fn watch_background(
         _fg: Arc<ForegroundSignals>,
@@ -319,7 +319,7 @@ pub mod job_control {
         // TODO: Implement this using syscall::call::waitpid
     }
 
-    pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str ) -> i32 {
+    pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i32 {
         let mut signaled = 0;
         let mut exit_status = 0;
         let mut status;
@@ -338,16 +338,14 @@ pub mod job_control {
             status = 0;
             let result = waitpid(pgid, &mut status, 0);
             match result {
-                Err(error) => {
-                    match error.errno {
-                        ECHILD if signaled == 0 => break exit_status,
-                        ECHILD => break signaled,
-                        _ => {
-                            eprintln!("ion: waitpid error: {}", error);
-                            break FAILURE;
-                        }
+                Err(error) => match error.errno {
+                    ECHILD if signaled == 0 => break exit_status,
+                    ECHILD => break signaled,
+                    _ => {
+                        eprintln!("ion: waitpid error: {}", error);
+                        break FAILURE;
                     }
-                }
+                },
                 Ok(0) => (),
                 Ok(pid) => {
                     let es = ExitStatus::from_raw(status as i32);
@@ -370,13 +368,12 @@ pub mod job_control {
                             exit_status = es.code().unwrap();
                         }
                     }
-                }
-                // TODO: Background job control for Redox
-                // _pid if WIFSTOPPED(status) => {
-                //     shell.send_to_background(pid as u32, ProcessState::Stopped, command.into());
-                //     shell.break_flow = true;
-                //     break 128 + signal as i32;
-                // }
+                } /* TODO: Background job control for Redox
+                   * _pid if WIFSTOPPED(status) => {
+                   * shell.send_to_background(pid as u32, ProcessState::Stopped,
+                   * command.into());     shell.break_flow = true;
+                   *     break 128 + signal as i32;
+                   * } */
             }
         }
     }

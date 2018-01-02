@@ -79,25 +79,25 @@ fn expand_arg(arg: &str, shell: &Shell) -> Array {
 pub(crate) enum RefinedJob {
     /// An external program that is executed by this shell
     External {
-        name: Identifier,
-        args: Array,
-        stdin: Option<File>,
+        name:   Identifier,
+        args:   Array,
+        stdin:  Option<File>,
         stdout: Option<File>,
         stderr: Option<File>,
     },
     /// A procedure embedded into Ion
     Builtin {
-        main: BuiltinFunction,
-        args: Array,
-        stdin: Option<File>,
+        main:   BuiltinFunction,
+        args:   Array,
+        stdin:  Option<File>,
         stdout: Option<File>,
         stderr: Option<File>,
     },
     /// Functions can act as commands too!
     Function {
-        name: Identifier,
-        args: Array,
-        stdin: Option<File>,
+        name:   Identifier,
+        args:   Array,
+        stdin:  Option<File>,
         stdout: Option<File>,
         stderr: Option<File>,
     },
@@ -267,8 +267,9 @@ impl RefinedJob {
     pub(crate) fn short(&self) -> String {
         match *self {
             RefinedJob::Builtin { .. } => String::from("Shell Builtin"),
-            RefinedJob::Function { ref name, .. } |
-                RefinedJob::External { ref name, .. } => name.to_string(),
+            RefinedJob::Function { ref name, .. } | RefinedJob::External { ref name, .. } => {
+                name.to_string()
+            }
             // TODO: Print for real
             RefinedJob::Cat { .. } => "multi-input".into(),
             RefinedJob::Tee { .. } => "multi-output".into(),
@@ -278,9 +279,9 @@ impl RefinedJob {
     /// Returns a long description of this job: the commands and arguments
     pub(crate) fn long(&self) -> String {
         match *self {
-            RefinedJob::External { ref args, .. } |
-                RefinedJob::Builtin { ref args, .. } |
-                RefinedJob::Function { ref args, .. } => format!("{}", args.join(" ")),
+            RefinedJob::External { ref args, .. }
+            | RefinedJob::Builtin { ref args, .. }
+            | RefinedJob::Function { ref args, .. } => format!("{}", args.join(" ")),
             // TODO: Figure out real printing
             RefinedJob::Cat { .. } | RefinedJob::Tee { .. } => "".into(),
         }

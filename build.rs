@@ -34,8 +34,14 @@ fn main() {
             panic!("Aborting compilation due to incompatible compiler.")
         }
         _ => {
-            eprintln!("cargo:warning={}", "Ion was unable to check rustc compatibility.");
-            eprintln!("cargo:warning={}", "Build may fail due to incompatible rustc version.");
+            eprintln!(
+                "cargo:warning={}",
+                "Ion was unable to check rustc compatibility."
+            );
+            eprintln!(
+                "cargo:warning={}",
+                "Build may fail due to incompatible rustc version."
+            );
         }
     }
     match write_version_file() {
