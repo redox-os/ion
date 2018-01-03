@@ -188,6 +188,29 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
     }
 }
 
+#[cfg(target_os = "redox")]
+fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
+    if check_help(args, MAN_ISATTY) {
+        return SUCCESS
+    }
+
+    let stderr = io::stderr();
+    let mut stderr = stderr.lock();
+    if args.len() > 1 {
+        match args[1].parse::<usize>() {
+            Ok(r) => if sys::isatty(r) {
+                return SUCCESS
+            },
+            Err(_) => { let _ = stderr.write_all("ion: isatty given bad number".as_bytes()); }
+        }
+    } else {
+        return SUCCESS
+    }
+
+    FAILURE
+}
+
+#[cfg(not(target_os = "redox"))]
 fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_ISATTY) {
         return SUCCESS
