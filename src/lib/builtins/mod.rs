@@ -64,7 +64,7 @@ macro_rules! map {
 
 /// If you are implementing a builtin add it to the table below, create a well named manpage in
 /// man_pages and check for help flags by adding to the start of your builtin the following
-/// if check_help(args, MAN_CD) {
+/// if check_help(args, MAN_BUILTIN_NAME) {
 ///     return SUCCESS
 /// }
 
@@ -93,6 +93,7 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "history" => builtin_history : "Display a log of all commands previously executed",
     "ion-docs" => ion_docs : "Opens the Ion manual",
     "is" => builtin_is : "Simple alternative to == and !=",
+    "isatty" => builtin_isatty : "Returns 0 exit status if the supplied FD is a tty",
     "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
     "matches" => builtin_matches : "Checks if a string matches a given regex",
     "not" => builtin_not : "Reverses the exit status value of the given command.",
@@ -185,6 +186,27 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
             FAILURE
         }
     }
+}
+
+fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
+    if check_help(args, MAN_ISATTY) {
+        return SUCCESS
+    }
+
+    let stderr = io::stderr();
+    let mut stderr = stderr.lock();
+    if args.len() > 1 {
+        match args[1].parse::<i32>() {
+            Ok(r) => if sys::isatty(r) {
+                return SUCCESS
+            },
+            Err(_) => { let _ = stderr.write_all("ion: isatty given bad number".as_bytes()); }
+        }
+    } else {
+        return SUCCESS
+    }
+
+    FAILURE
 }
 
 fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
