@@ -78,6 +78,16 @@ OPTIONS
         returns 0 if the two arguments are not equal.
 "#;
 
+pub(crate) const MAN_ISATTY: &'static str = r#"
+    isatty - Checks if argument is a file descriptor
+
+SYNOPSIS
+    isatty [FD]
+
+DESCRIPTION
+    Returns 0 exit status if the supplied file descriptor is a tty.
+"#;
+
 pub(crate) const MAN_DIRS: &'static str = r#"NAME
     dirs - prints the directory stack
 
