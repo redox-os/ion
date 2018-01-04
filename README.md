@@ -54,7 +54,7 @@ integration tests.
 
 ## Issue Board
 
-Please visit the [issue board](https://github.com/redox-os/ion/issuesi) for a list of curated
+Please visit the [issue board](https://github.com/redox-os/ion/issues) for a list of curated
 issues that need to be worked on. If an issue has the **WIP** tag, then that issue is currently
 being worked on. Otherwise, the issue is free game. Issues are also labeled to guide contributors
 into finding problems to tackle at a given skill level. Not to worry though, because most issues
