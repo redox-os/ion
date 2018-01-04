@@ -93,91 +93,46 @@ pub(crate) fn fork_and_exec<F: Fn()>(
     clear_env: bool,
     before_exec: F
 ) -> io::Result<u32> {
-    // Construct a valid set of arguments to pass to execve. Ensure
-    // that the program is the first argument.
-    let mut cvt_args: Vec<[usize; 2]> = Vec::new();
-    cvt_args.push([prog.as_ptr() as usize, prog.len()]);
-    for arg in args {
-        cvt_args.push([arg.as_ptr() as usize, arg.len()]);
-    }
-
-    // Get the PathBuf of the program if it exists.
-    let prog = if prog.contains(':') || prog.contains('/') {
-        // This is a fully specified scheme or path to an
-        // executable.
-        Some(PathBuf::from(prog))
-    } else if let Ok(paths) = env::var("PATH") {
-        // This is not a fully specified scheme or path.
-        // Iterate through the possible paths in the
-        // env var PATH that this executable may be found
-        // in and return the first one found.
-        env::split_paths(&paths)
-            .filter_map(|mut path| {
-                path.push(prog);
-                if path.exists() {
-                    Some(path)
-                } else {
-                    None
+    unsafe {
+        match fork()? {
+            0 => {
+                if let Some(stdin) = stdin {
+                    let _ = dup2(stdin, STDIN_FILENO);
+                    let _ = close(stdin);
                 }
-            })
-            .next()
-    } else {
-        None
-    };
 
-    // If clear_env set, clear the env.
-    if clear_env {
-        for (key, _) in env::vars() {
-            env::remove_var(key);
-        }
-    }
-
-    if let Some(prog) = prog {
-        unsafe {
-            match fork()? {
-                0 => {
-                    if let Some(stdin) = stdin {
-                        let _ = dup2(stdin, STDIN_FILENO);
-                        let _ = close(stdin);
-                    }
-
-                    if let Some(stdout) = stdout {
-                        let _ = dup2(stdout, STDOUT_FILENO);
-                        let _ = close(stdout);
-                    }
-
-                    if let Some(stderr) = stderr {
-                        let _ = dup2(stderr, STDERR_FILENO);
-                        let _ = close(stderr);
-                    }
-
-                    before_exec();
-
-                    let error = syscall::execve(prog.as_os_str().as_bytes(), &cvt_args);
-                    let error = io::Error::from_raw_os_error(error.err().unwrap().errno);
-                    eprintln!("ion: command exec: {}", error);
-                    fork_exit(1);
+                if let Some(stdout) = stdout {
+                    let _ = dup2(stdout, STDOUT_FILENO);
+                    let _ = close(stdout);
                 }
-                pid => {
-                    if let Some(stdin) = stdin {
-                        let _ = close(stdin);
-                    }
 
-                    if let Some(stdout) = stdout {
-                        let _ = close(stdout);
-                    }
-
-                    if let Some(stderr) = stderr {
-                        let _ = close(stderr);
-                    }
-
-                    Ok(pid)
+                if let Some(stderr) = stderr {
+                    let _ = dup2(stderr, STDERR_FILENO);
+                    let _ = close(stderr);
                 }
+
+                before_exec();
+
+                let error = execve(prog, args, clear_env);
+                eprintln!("ion: command exec: {}", error);
+                fork_exit(1);
+            }
+            pid => {
+                if let Some(stdin) = stdin {
+                    let _ = close(stdin);
+                }
+
+                if let Some(stdout) = stdout {
+                    let _ = close(stdout);
+                }
+
+                if let Some(stderr) = stderr {
+                    let _ = close(stderr);
+                }
+
+                Ok(pid)
             }
         }
-    } else {
-        // The binary was not found.
-        Err(io::Error::from_raw_os_error(syscall::ENOENT))
     }
 }
 
