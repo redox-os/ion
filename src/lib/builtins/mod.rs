@@ -639,45 +639,27 @@ fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
     result
 }
 
-/// There are two different `builtin_isatty()` functions because 
-/// `sys::isatty()` when built for redox expects a usize while otherwise expecting a i32.
-/// This could probably be done more elegantly.
-#[cfg(target_os = "redox")]
 fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_ISATTY) {
         return SUCCESS
     }
 
-    let stderr = io::stderr();
-    let mut stderr = stderr.lock();
     if args.len() > 1 {
+        // sys::isatty expects a usize if compiled for redox but otherwise a i32.
+        #[cfg(target_os = "redox")]
         match args[1].parse::<usize>() {
             Ok(r) => if sys::isatty(r) {
                 return SUCCESS
             },
-            Err(_) => { let _ = stderr.write_all("ion: isatty given bad number".as_bytes()); }
+            Err(_) => eprintln!("ion: isatty given bad number")
         }
-    } else {
-        return SUCCESS
-    }
 
-    FAILURE
-}
-
-#[cfg(not(target_os = "redox"))]
-fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
-    if check_help(args, MAN_ISATTY) {
-        return SUCCESS
-    }
-
-    let stderr = io::stderr();
-    let mut stderr = stderr.lock();
-    if args.len() > 1 {
+        #[cfg(not(target_os = "redox"))]
         match args[1].parse::<i32>() {
             Ok(r) => if sys::isatty(r) {
                 return SUCCESS
             },
-            Err(_) => { let _ = stderr.write_all("ion: isatty given bad number".as_bytes()); }
+            Err(_) => eprintln!("ion: isatty given bad number")
         }
     } else {
         return SUCCESS
