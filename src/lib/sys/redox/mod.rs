@@ -9,6 +9,8 @@ use std::process::{exit, ExitStatus};
 use std::os::unix::process::ExitStatusExt;
 use syscall::{EINTR, WUNTRACED, SigAction, waitpid};
 
+pub mod job_control;
+
 pub(crate) const PATH_SEPARATOR: &str = ";";
 pub(crate) const NULL_PATH: &str = "null:";
 
@@ -251,90 +253,6 @@ pub mod signals {
     /// controlled
     /// by the shell.
     pub(crate) fn unblock() {}
-}
-
-pub mod job_control {
-    use shell::job_control::*;
-
-    use shell::Shell;
-    use shell::foreground::ForegroundSignals;
-    use shell::status::FAILURE;
-    use std::os::unix::process::ExitStatusExt;
-    use std::process::ExitStatus;
-    use std::sync::{Arc, Mutex};
-    use syscall::{self, ECHILD, WUNTRACED, waitpid};
-    use super::{SIGINT, SIGPIPE};
-
-    pub(crate) fn watch_background(
-        _fg: Arc<ForegroundSignals>,
-        _processes: Arc<Mutex<Vec<BackgroundProcess>>>,
-        _pid: u32,
-        _njob: usize,
-    ) {
-        // TODO: Implement this using syscall::call::waitpid
-    }
-
-    pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str ) -> i32 {
-        let mut signaled = 0;
-        let mut exit_status = 0;
-        let mut status;
-
-        fn get_pid_value(pid: i32) -> usize {
-            if pid < 0 {
-                !(pid.abs() as usize)
-            } else {
-                pid as usize
-            }
-        }
-
-        let pgid = get_pid_value(pid);
-
-        loop {
-            status = 0;
-            let result = waitpid(pgid, &mut status, WUNTRACED);
-            match result {
-                Err(error) => {
-                    match error.errno {
-                        ECHILD if signaled == 0 => break exit_status,
-                        ECHILD => break signaled,
-                        _ => {
-                            eprintln!("ion: waitpid error: {}", error);
-                            break FAILURE;
-                        }
-                    }
-                }
-                Ok(0) => (),
-                Ok(pid) => {
-                    let es = ExitStatus::from_raw(status as i32);
-                    match es.signal() {
-                        Some(SIGPIPE) => continue,
-                        Some(signal) => {
-                            eprintln!("ion: process ended by signal {}", signal);
-                            match signal {
-                                SIGINT => {
-                                    let _ = syscall::kill(pgid, signal as usize);
-                                    shell.break_flow = true;
-                                }
-                                _ => {
-                                    shell.handle_signal(signal);
-                                }
-                            }
-                            signaled = 128 + signal as i32;
-                        }
-                        None => {
-                            exit_status = es.code().unwrap();
-                        }
-                    }
-                }
-                // TODO: Background job control for Redox
-                // _pid if WIFSTOPPED(status) => {
-                //     shell.send_to_background(pid as u32, ProcessState::Stopped, command.into());
-                //     shell.break_flow = true;
-                //     break 128 + signal as i32;
-                // }
-            }
-        }
-    }
 }
 
 pub mod variables {
