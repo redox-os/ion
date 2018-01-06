@@ -85,7 +85,6 @@ pub(crate) fn watch_background(
 
 pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i32 {
     let mut signaled = 0;
-    let mut exit_status = 0;
     let mut status;
 
     loop {
@@ -94,7 +93,6 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
             match waitpid(pid as usize, &mut status, WUNTRACED) {
                 Err(err) => {
                     match err.errno {
-                        ECHILD if signaled == 0 => break exit_status,
                         ECHILD => break signaled,
                         errno => {
                             eprintln!("ion: waitpid error: {}", errno);
@@ -103,7 +101,7 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     }
                 }
                 Ok(0) => (),
-                Ok(_pid) if wifexited(status) => exit_status = wexitstatus(status) as i32,
+                Ok(_pid) if wifexited(status) => break wexitstatus(status) as i32,
                 Ok(pid) if wifsignaled(status) => {
                     let signal = wtermsig(status);
                     if signal == SIGPIPE {
