@@ -1,6 +1,5 @@
 extern crate rand;
 use self::rand::Rng;
-use std::io::{self, Write};
 
 #[allow(unused_must_use)]
 fn rand_list(args: &[&str]) -> Result<(), String> {
