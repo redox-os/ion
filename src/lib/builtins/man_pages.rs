@@ -1,22 +1,7 @@
-use std::error::Error;
-use std::io::{stdout, Write};
-
-pub(crate) fn print_man(man_page: &'static str) {
-    let stdout = stdout();
-    let mut stdout = stdout.lock();
-    match stdout
-        .write_all(man_page.as_bytes())
-        .and_then(|_| stdout.flush())
-    {
-        Ok(_) => (),
-        Err(err) => panic!("{}", err.description().to_owned()),
-    }
-}
-
 pub(crate) fn check_help(args: &[&str], man_page: &'static str) -> bool {
     for arg in args {
         if *arg == "-h" || *arg == "--help" {
-            print_man(man_page);
+            print!("{}", man_page);
             return true;
         }
     }
