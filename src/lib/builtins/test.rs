@@ -3,7 +3,7 @@ use std::fs;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::time::SystemTime;
-use super::man_pages::{print_man, MAN_TEST};
+use super::man_pages::MAN_TEST;
 
 pub(crate) fn test(args: &[&str]) -> Result<bool, String> {
     let arguments = &args[1..];
@@ -27,7 +27,7 @@ fn evaluate_arguments(arguments: &[&str]) -> Result<bool, String> {
         Some(&s) if s == "--help" => {
             // "--help" only makes sense if it is the first option. Only look for it
             // in the first position.
-            print_man(MAN_TEST);
+            print!("{}", MAN_TEST);
             Ok(true)
         }
         Some(arg) => {

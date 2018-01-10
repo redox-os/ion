@@ -4,8 +4,6 @@ use std::io::{self, Write};
 
 #[allow(unused_must_use)]
 fn rand_list(args: &[&str]) -> Result<(), String> {
-    let stdout = io::stdout();
-    let mut stdout = stdout.lock();
     let mut output = Vec::new();
     let arg1 = match args[0].parse::<usize>() {
         Ok(v) => v,
@@ -17,26 +15,19 @@ fn rand_list(args: &[&str]) -> Result<(), String> {
         output.dedup();
     }
     for out in output {
-        write!(stdout, "{} ", out);
+        print!("{} ", out);
     }
-    writeln!(stdout);
+    print!("\n");
     Ok(())
 }
 #[allow(unused_must_use)]
 pub(crate) fn random(args: &[&str]) -> Result<(), String> {
-    let stdout = io::stdout();
-    let mut stdout = stdout.lock();
     match args.len() {
         0 => {
             let rand_num = rand::thread_rng().gen_range(0, 32767);
-            writeln!(stdout, "{}", rand_num);
+            println!("{}", rand_num);
         }
-        1 => {
-            writeln!(
-                stdout,
-                "Ion Shell does not currently support changing the seed"
-            );
-        }
+        1 => println!("Ion Shell does not currently support changing the seed"),
         2 => {
             let arg1 = match args[0].parse::<u64>() {
                 Ok(v) => v,
@@ -50,7 +41,7 @@ pub(crate) fn random(args: &[&str]) -> Result<(), String> {
                 return Err(String::from("END must be greater than START"));
             }
             let rand_num = rand::thread_rng().gen_range(arg1, arg2);
-            writeln!(stdout, "{}", rand_num);
+            println!("{}", rand_num);
         }
         3 => {
             let arg1 = match args[0].parse::<u64>() {
@@ -71,7 +62,7 @@ pub(crate) fn random(args: &[&str]) -> Result<(), String> {
                         end += 1;
                     }
                     let rand_num = rand::thread_rng().gen_range(arg1 / arg2, end);
-                    writeln!(stdout, "{}", rand_num * arg2);
+                    println!("{}", rand_num * arg2);
                 }
                 Err(_) => return rand_list(args),
             };

@@ -150,9 +150,7 @@ fn builtin_status(args: &[&str], shell: &mut Shell) -> i32 {
     match status(args, shell) {
         Ok(()) => SUCCESS,
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
+            eprint!("{}", why);
             FAILURE
         }
     }
@@ -180,9 +178,7 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
             SUCCESS
         }
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
+            eprint!("{}", why);
             FAILURE
         }
     }
@@ -190,9 +186,7 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
 
 fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
     if args.len() != 2 {
-        let stderr = io::stderr();
-        let mut stderr = stderr.lock();
-        let _ = stderr.write_all(b"bool requires one argument\n");
+        eprintln!("{}", "bool requires one argument");
         return FAILURE;
     }
 
@@ -208,8 +202,8 @@ fn builtin_bool(args: &[&str], shell: &mut Shell) -> i32 {
         _ => match args[1] {
             "1" => (),
             "true" => (),
-            "--help" => print_man(MAN_BOOL),
-            "-h" => print_man(MAN_BOOL),
+            "--help" => print!("{}", MAN_BOOL),
+            "-h" => print!("{}", MAN_BOOL),
             _ => return FAILURE,
         },
     }
@@ -220,9 +214,7 @@ fn builtin_is(args: &[&str], shell: &mut Shell) -> i32 {
     match is(args, shell) {
         Ok(()) => SUCCESS,
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
+            eprint!("{}", why);
             FAILURE
         }
     }
@@ -243,9 +235,7 @@ fn builtin_pushd(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.directory_stack.pushd(args, &shell.variables) {
         Ok(()) => SUCCESS,
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
+            eprint!("{}", why);
             FAILURE
         }
     }
@@ -259,9 +249,7 @@ fn builtin_popd(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.directory_stack.popd(args) {
         Ok(()) => SUCCESS,
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
+            eprint!("{}", why);
             FAILURE
         }
     }
@@ -334,9 +322,7 @@ fn builtin_source(args: &[&str], shell: &mut Shell) -> i32 {
     match source(shell, args) {
         Ok(()) => SUCCESS,
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
+            eprint!("{}", why);
             FAILURE
         }
     }
@@ -349,9 +335,7 @@ fn builtin_echo(args: &[&str], _: &mut Shell) -> i32 {
     match echo(args) {
         Ok(()) => SUCCESS,
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.description().as_bytes());
+            eprint!("{}", why.description());
             FAILURE
         }
     }
@@ -364,7 +348,7 @@ fn builtin_test(args: &[&str], _: &mut Shell) -> i32 {
         Ok(true) => SUCCESS,
         Ok(false) => FAILURE,
         Err(why) => {
-            eprintln!("{}", why);
+            eprint!("{}", why);
             FAILURE
         }
     }
@@ -375,7 +359,7 @@ fn builtin_calc(args: &[&str], _: &mut Shell) -> i32 {
     match calc::calc(&args[1..]) {
         Ok(()) => SUCCESS,
         Err(why) => {
-            eprintln!("{}", why);
+            eprint!("{}", why);
             FAILURE
         }
     }
@@ -388,7 +372,7 @@ fn builtin_random(args: &[&str], _: &mut Shell) -> i32 {
     match random::random(&args[1..]) {
         Ok(()) => SUCCESS,
         Err(why) => {
-            eprintln!("{}", why);
+            eprint!("{}", why);
             FAILURE
         }
     }
@@ -443,7 +427,7 @@ fn builtin_suspend(args: &[&str], _: &mut Shell) -> i32 {
 fn builtin_disown(args: &[&str], shell: &mut Shell) -> i32 {
     for arg in args {
         if *arg == "--help" {
-            print_man(MAN_DISOWN);
+            print!("{}", MAN_DISOWN);
             return SUCCESS;
         }
     }
@@ -505,9 +489,7 @@ fn builtin_exec(args: &[&str], shell: &mut Shell) -> i32 {
         // Shouldn't ever hit this case.
         Ok(()) => SUCCESS,
         Err(err) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "ion: exec: {}", err);
+            eprint!("ion: exec: {}", err);
             FAILURE
         }
     }
@@ -528,10 +510,7 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
     let re = match Regex::new(args[2]) {
         Ok(r) => r,
         Err(e) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr
-                .write_all(format!("couldn't compile input regex {}: {}\n", args[2], e).as_bytes());
+            eprintln!("couldn't compile input regex {}: {}\n", args[2], e);
             return FAILURE;
         }
     };
@@ -599,7 +578,7 @@ fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
         Ok(true) => SUCCESS,
         Ok(false) => FAILURE,
         Err(why) => {
-            eprintln!("{}", why);
+            eprint!("{}", why);
             FAILURE
         }
     }

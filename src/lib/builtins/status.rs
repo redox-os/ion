@@ -1,4 +1,4 @@
-use builtins::man_pages::{print_man, MAN_STATUS};
+use builtins::man_pages::MAN_STATUS;
 use shell::Shell;
 
 use std::env;
@@ -74,7 +74,7 @@ pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
         }
 
         if flags.contains(Flags::HELP) {
-            print_man(MAN_STATUS);
+            print!("{}", MAN_STATUS);
         }
     }
     Ok(())
