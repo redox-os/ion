@@ -574,8 +574,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 b' ' | b'"' | b'\'' | b'$' | b'{' | b'}' => break,
                 b']' => {
                     // If the glob is less than three bytes in width, then it's empty and thus
-                    // invalid.
-                    if !(moves <= 3 && square_bracket == 1) {
+                    // invalid. If it's not adjacent to text, it's not a glob.
+                    let next_char = iter.clone().next();
+                    if !(moves <= 3 && square_bracket == 1)
+                        && (next_char != None && next_char != Some(b' '))
+                    {
                         glob = true;
                         break;
                     }
