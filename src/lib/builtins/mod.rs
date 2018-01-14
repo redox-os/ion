@@ -37,9 +37,10 @@ use std::path::Path;
 
 use parser::Terminator;
 use parser::pipelines::{PipeItem, Pipeline};
-use shell::{self, FlowLogic, Job, JobKind, Shell, ShellHistory};
 use shell::job_control::{JobControl, ProcessState};
+use shell::fork_function::fork_function;
 use shell::status::*;
+use shell::{self, FlowLogic, Job, JobKind, Shell, ShellHistory};
 use sys;
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
@@ -171,10 +172,12 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
                     let pwd = shell.get_var_or_empty("PWD");
                     let pwd: &str = &pwd;
                     let current_dir = path.to_str().unwrap_or("?");
+
                     if pwd != current_dir {
                         env::set_var("OLDPWD", pwd);
                         env::set_var("PWD", current_dir);
                     }
+                    fork_function(shell, "CD_CHANGE", &["ion"]);
                 },
             );
             SUCCESS

@@ -5,30 +5,29 @@
 //! the background, handling pipeline and conditional operators, and
 //! std{in,out,err} redirections.
 
-mod command_not_found;
-pub mod foreground;
 mod fork;
-pub mod job_control;
 mod streams;
+pub mod foreground;
+pub mod job_control;
 
-use self::command_not_found::command_not_found;
+use builtins::{self, BuiltinFunction};
+use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use self::fork::fork_pipe;
 use self::job_control::{JobControl, ProcessState};
 use self::streams::{duplicate_streams, redir, redirect_streams};
-use super::{JobKind, Shell};
-use super::flags::*;
-use super::flow_control::FunctionError;
-use super::job::{RefinedJob, TeeItem};
-use super::signals::{self, SignalHandler};
-use super::status::*;
-use builtins::{self, BuiltinFunction};
-use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Error, Write};
 use std::iter;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::path::Path;
 use std::process::{self, exit};
+use super::flags::*;
+use super::flow_control::FunctionError;
+use super::fork_function::command_not_found;
+use super::job::{RefinedJob, TeeItem};
+use super::signals::{self, SignalHandler};
+use super::status::*;
+use super::{JobKind, Shell};
 use sys;
 
 type RefinedItem = (RefinedJob, JobKind, Vec<Redirection>, Vec<Input>);
