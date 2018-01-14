@@ -1,3 +1,3 @@
-for script in examples/a* examples/b*
+for script in examples/script_exec/a* examples/script_exec/b*
     target/debug/ion $script
 end

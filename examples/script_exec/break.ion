@@ -1,0 +1,15 @@
+for i in 1..10
+    echo $i
+    if test $i -eq 5
+        break
+    end
+end
+
+let a = 1
+while test $a -lt 10
+    echo $a
+    if test $a -eq 5
+        break
+    end
+    let a += 1
+end

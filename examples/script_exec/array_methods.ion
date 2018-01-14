@@ -1,0 +1,10 @@
+echo @split("onetwoone", "two")
+echo @split_at("onetwoone", "3")
+echo @graphemes("onetwo", "3")
+echo @bytes("onetwo")
+echo @chars("onetwo")
+echo @lines($unescape("firstline\nsecondline"))
+echo @reverse([1 2 3])
+echo @reverse(["a"])
+let foo = [1 2 3]
+echo @reverse(@foo)
