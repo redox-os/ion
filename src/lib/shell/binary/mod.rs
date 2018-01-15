@@ -7,22 +7,18 @@ mod terminate;
 use self::prompt::{prompt, prompt_fn};
 use self::readln::readln;
 use self::terminate::{terminate_quotes, terminate_script_quotes};
-use super::{FlowLogic, JobControl, Shell, ShellHistory};
-use super::flags::*;
+use super::{FlowLogic, Shell, ShellHistory};
 use super::flow_control::Statement;
 use super::status::*;
 use liner::{Buffer, Context};
-use smallvec::SmallVec;
 use std::env;
-use std::error::Error;
 use std::fs::File;
-use std::io::{stdout, Write};
 use std::io::ErrorKind;
-use std::iter::{self, FromIterator};
+use std::iter;
 use std::path::Path;
 use std::process;
 
-const MAN_ION: &'static str = r#"NAME
+pub const MAN_ION: &'static str = r#"NAME
     ion - ion shell
 
 SYNOPSIS
@@ -44,9 +40,6 @@ OPTIONS
 "#;
 
 pub trait Binary {
-    /// Launches the shell, parses arguments, and then diverges into one of the `execution`
-    /// paths.
-    fn main(self);
     /// Parses and executes the arguments that were supplied to the shell.
     fn execute_arguments<A: Iterator<Item = String>>(&mut self, args: A);
     /// Creates an interactive session that reads from a prompt provided by
@@ -190,47 +183,6 @@ impl Binary for Shell {
         } else {
             self.save_command_in_history(cmd);
         }
-    }
-
-    fn main(mut self) {
-        let mut args = env::args().skip(1);
-        while let Some(path) = args.next() {
-            match path.as_str() {
-                "-n" | "--no-execute" => {
-                    self.flags |= NO_EXEC;
-                    continue;
-                }
-                "-c" => self.execute_arguments(args),
-                "-v" | "--version" => self.display_version(),
-                "-h" | "--help" => {
-                    let stdout = stdout();
-                    let mut stdout = stdout.lock();
-                    match stdout
-                        .write_all(MAN_ION.as_bytes())
-                        .and_then(|_| stdout.flush())
-                    {
-                        Ok(_) => return,
-                        Err(err) => panic!("{}", err.description().to_owned()),
-                    }
-                }
-                _ => {
-                    let mut array = SmallVec::from_iter(Some(path.clone().into()));
-                    for arg in args {
-                        array.push(arg.into());
-                    }
-                    self.variables.set_array("args", array);
-                    if let Err(err) = self.execute_script(&path) {
-                        eprintln!("ion: {}", err);
-                    }
-                }
-            }
-
-            self.wait_for_background();
-            let previous_status = self.previous_status;
-            self.exit(previous_status);
-        }
-
-        self.execute_interactive();
     }
 
     fn display_version(&self) {
