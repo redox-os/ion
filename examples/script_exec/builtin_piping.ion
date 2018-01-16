@@ -1,0 +1,5 @@
+matches Foo '([A-Z])\w+' && echo true
+matches foo '([A-Z])\w+' || echo false
+echo foo | cat
+read foo <<< $(echo bar)
+echo $foo
