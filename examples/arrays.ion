@@ -1,5 +1,13 @@
 # Standard Arrays
 
+let array = []
+echo @array
+
+let array = [1]
+for i in @array
+    echo $i
+end
+
 let array = [1  [2 3]  4 [5 6]]
 for i in @array
     echo $i
