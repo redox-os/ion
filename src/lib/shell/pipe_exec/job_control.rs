@@ -20,7 +20,7 @@ pub(crate) fn set_foreground_as(pid: u32) {
     signals::unblock();
 }
 
-pub(crate) trait JobControl {
+pub trait JobControl {
     /// Waits for background jobs to finish before returning.
     fn wait_for_background(&mut self);
     /// Takes a background tasks's PID and whether or not it needs to be continued; resumes the
