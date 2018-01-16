@@ -1,19 +1,20 @@
 mod assignments;
-mod binary;
 mod completer;
 mod flow;
 mod fork;
 mod history;
 mod job;
-mod pipe_exec;
-pub(crate) mod colors;
-pub(crate) mod directory_stack;
 pub mod flags;
-pub(crate) mod plugins;
-pub(crate) mod flow_control;
-pub(crate) mod signals;
+pub mod fork_function;
 pub mod status;
 pub mod variables;
+pub(crate) mod binary;
+pub(crate) mod colors;
+pub(crate) mod directory_stack;
+pub(crate) mod flow_control;
+pub(crate) mod pipe_exec;
+pub(crate) mod plugins;
+pub(crate) mod signals;
 
 pub use self::binary::Binary;
 pub(crate) use self::flow::FlowLogic;
@@ -70,7 +71,7 @@ pub struct Shell {
     /// Note that the context is only available in an interactive session.
     pub(crate) context: Option<Context>,
     /// Contains the aliases, strings, and array variable maps.
-    pub(crate) variables: Variables,
+    pub variables: Variables,
     /// Contains the current state of flow control parameters.
     flow_control: FlowControl,
     /// Contains the directory stack parameters.
@@ -202,7 +203,8 @@ impl<'a> Shell {
         }
     }
 
-    pub(crate) fn exit(&mut self, status: i32) -> ! {
+    /// Cleanly exit ion
+    pub fn exit(&mut self, status: i32) -> ! {
         self.prep_for_exit();
         process::exit(status);
     }

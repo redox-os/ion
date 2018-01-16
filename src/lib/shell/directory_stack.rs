@@ -1,9 +1,9 @@
-use super::status::{FAILURE, SUCCESS};
-use super::variables::Variables;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::env::{current_dir, home_dir, set_current_dir};
 use std::path::PathBuf;
+use super::status::{FAILURE, SUCCESS};
+use super::variables::Variables;
 
 pub struct DirectoryStack {
     dirs: VecDeque<PathBuf>, // The top is always the current directory
