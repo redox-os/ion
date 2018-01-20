@@ -32,7 +32,7 @@ extern crate users as users_unix;
 extern crate xdg;
 
 #[cfg(target_os = "redox")]
-#[path = "sys/redox.rs"]
+#[path = "sys/redox/mod.rs"]
 mod sys;
 
 #[cfg(unix)]
