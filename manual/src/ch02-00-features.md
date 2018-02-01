@@ -1,10 +1,10 @@
 # Features
 
-## Miscellanious Features
+## Miscellaneous Features
 
 Small features that don't belong in any specific category.
 
-[Miscellanious Features](ch03-00-miscellaneous.html)
+[Miscellaneous Features](ch03-00-miscellaneous.html)
 
 
 ## Shell Expansions / Substitutions
