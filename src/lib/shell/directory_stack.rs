@@ -40,7 +40,7 @@ impl DirectoryStack {
 
     /// Attempts to set the current directory to the directory stack's previous directory,
     /// and then removes the front directory from the stack.
-    pub(crate) fn popd<I: IntoIterator>(&mut self, args: I) -> Result<(), Cow<'static, str>>
+    pub(crate) fn popd<I: IntoIterator>(&mut self, args: I, variables: &mut Variables) -> Result<(), Cow<'static, str>>
     where
         I::Item: AsRef<str>,
     {
@@ -101,6 +101,8 @@ impl DirectoryStack {
             )));
         }
 
+        // Manually update $PWD
+        variables.set_var("PWD", current_dir().unwrap().to_str().unwrap());
         self.print_dirs();
         Ok(())
     }
@@ -108,7 +110,7 @@ impl DirectoryStack {
     pub(crate) fn pushd<I: IntoIterator>(
         &mut self,
         args: I,
-        variables: &Variables,
+        variables: &mut Variables,
     ) -> Result<(), Cow<'static, str>>
     where
         I::Item: AsRef<str>,
@@ -164,8 +166,9 @@ impl DirectoryStack {
             }
         };
 
+        // Manually update $PWD
+        variables.set_var("PWD", current_dir().unwrap().to_str().unwrap());
         self.print_dirs();
-
         Ok(())
     }
 
