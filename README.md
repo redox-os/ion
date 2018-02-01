@@ -1,3 +1,12 @@
+# Introduction
+
+Ion is a modern system shell that features a simple, yet powerful, syntax. It is written entirely
+in Rust, which greatly increases the overall quality and security of the shell, eliminating the
+possibilities of a [ShellShock](http://www.wikiwand.com/en/Shellshock_(software_bug))-like vulnerability
+, and making development easier. It also offers a level of performance that exceeds that of Dash,
+when taking advantage of Ion's features. While it is developed alongside, and primarily for, RedoxOS,
+it is a fully capable on other \*nix platforms.
+
 # Ion Shell
 
 [![Build Status](https://travis-ci.org/redox-os/ion.svg)](https://travis-ci.org/redox-os/ion)
@@ -73,15 +82,6 @@ issues, to seeking mentorship on how to implement solutions for specific issues 
 In addition to the chatroom, there's a [thread in the Redox forums](https://discourse.redox-os.org/t/ion-shell-development-discussion/682)
 that can be used for discussions relating to Ion and Ion shell development. These are mostly served
 by the GitHub issue board, but general discussions can take place there instead.
-
-# Introduction
-
-Ion is a modern system shell that features a simple, yet powerful, syntax. It is written entirely
-in Rust, which greatly increases the overall quality and security of the shell, eliminating the
-possibilities of a [ShellShock](http://www.wikiwand.com/en/Shellshock_(software_bug))-like vulnerability
-, and making development easier. It also offers a level of performance that exceeds that of Dash,
-when taking advantage of Ion's features. While it is developed alongside, and primarily for, RedoxOS,
-it is a fully capable on other \*nix platforms.
 
 ## Why Not Windows Support?
 

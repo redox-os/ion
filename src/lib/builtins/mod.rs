@@ -243,7 +243,7 @@ fn builtin_pushd(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_PUSHD) {
         return SUCCESS;
     }
-    match shell.directory_stack.pushd(args, &shell.variables) {
+    match shell.directory_stack.pushd(args, &mut shell.variables) {
         Ok(()) => SUCCESS,
         Err(why) => {
             let stderr = io::stderr();
@@ -258,8 +258,7 @@ fn builtin_popd(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_POPD) {
         return SUCCESS;
     }
-
-    match shell.directory_stack.popd(args) {
+    match shell.directory_stack.popd(args, &mut shell.variables) {
         Ok(()) => SUCCESS,
         Err(why) => {
             let stderr = io::stderr();
