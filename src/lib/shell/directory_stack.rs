@@ -235,18 +235,35 @@ impl DirectoryStack {
         dir: &str,
         variables: &Variables,
     ) -> Result<(), Cow<'static, str>> {
-        match (set_current_dir(dir), current_dir()) {
-            (Ok(()), Ok(cur_dir)) => {
-                self.push_dir(cur_dir, variables);
+        use std::path::{Component, Path};
+
+        // Create a clone of the current directory.
+        let mut new_dir = match self.dirs.front() {
+            Some(cur_dir) => cur_dir.clone(),
+            None => PathBuf::new()
+        };
+
+        // Iterate through components of the specified directory
+        // and calculate the new path based on them.
+        for component in Path::new(dir).components() {
+            match component {
+                Component::CurDir => { },
+                Component::ParentDir => { new_dir.pop(); },
+                _ => { new_dir.push(component); }
+            };
+        }
+
+        // Try to change into the new directory
+        match set_current_dir(&new_dir) {
+            Ok(()) => {
+                // Push the new current directory onto the directory stack.
+                self.push_dir(new_dir, variables);
                 Ok(())
             }
-            (Err(err), _) => Err(Cow::Owned(format!(
+            Err(err) => Err(Cow::Owned(format!(
                 "ion: failed to set current dir to {}: {}\n",
-                dir, err
-            ))),
-            (..) => Err(Cow::Borrowed(
-                "ion: change_and_push_dir(): error occurred that should never happen\n",
-            )), // This should not happen
+                new_dir.to_string_lossy(), err
+            )))
         }
     }
 
