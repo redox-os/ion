@@ -14,7 +14,7 @@ it is a fully capable on other \*nix platforms.
 [![crates.io](http://meritbadge.herokuapp.com/ion-shell)](https://crates.io/crates/ion-shell)
 ![LOC](https://tokei.rs/b1/github/redox-os/ion)
 
-> Ion is still a WIP, and both it's syntax and rules are subject to change over time. It is
+> Ion is still a WIP, and both its syntax and rules are subject to change over time. It is
 > still quite a ways from becoming stabilized, but we are getting very close. Changes to the
 > syntax at this time are likely to be minimal.
 
@@ -88,7 +88,7 @@ by the GitHub issue board, but general discussions can take place there instead.
 Windows is not, and may never be supported due to certain limitations in the NT kernel. Namely,
 where in all non-Windows operating systems, the kernel takes an array of strings that defines
 the command to execute, and all of that command's arguments; Windows instead takes a single
-string that contains both the command and all of it's arguments. This pushes the job of parsing
+string that contains both the command and all of its arguments. This pushes the job of parsing
 arguments from the system shell onto the individual program, and may account for why the command-line
 in Windows is so funky.
 
@@ -100,7 +100,7 @@ among piping builtins and functions.
 # Goals
 
 Syntax and feature decisions for Ion are made based upon three measurements: is the feature useful,
-is it simple to use, and will it's implementation be efficient to parse and execute? A feature is
+is it simple to use, and will its implementation be efficient to parse and execute? A feature is
 considered useful if there's a valid use case for it, in the concept of a shell language. The
 syntax for the feature should be simple for a human to read and write, with extra emphasis on
 readability, given that most time is spent reading scripts than writing them. The implementation
