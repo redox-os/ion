@@ -66,7 +66,7 @@ match "@args[1..3]"
         cargo build --release
     case "build docs"
         if not exists -b "mdbook"
-            echo "${c::09F}Installing mdbook from Crates.io${c::reset}"
+            echo "${c::0x09F}Installing mdbook from Crates.io${c::reset}"
             cargo install mdbook --force
         end
         cd manual && mdbook build
