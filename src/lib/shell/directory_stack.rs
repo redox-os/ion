@@ -163,6 +163,7 @@ impl DirectoryStack {
             Action::Push(dir) => {
                 let index = if keep_front { 1 } else { 0 };
                 self.insert_dir(index, dir, variables);
+                self.set_current_dir_by_index(index, "pushd")?;
             }
         };
 
