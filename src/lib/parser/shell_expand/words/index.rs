@@ -13,7 +13,7 @@ impl Index {
     /// Construct an index using the following convetions:
     /// - A positive value `n` represents `Forward(n)`
     /// - A negative value `-n` reprents `Backwards(n - 1)` such that:
-    /// ```
+    /// ```ignore,rust
     /// assert_eq!(Index::new(-1), Index::Backward(0))
     /// ```
     pub(crate) fn new(input: isize) -> Index {
