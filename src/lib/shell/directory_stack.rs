@@ -187,6 +187,7 @@ impl DirectoryStack {
                 if dir == "-" {
                     self.switch_to_previous_directory(variables)
                 } else {
+                    let _ = self.dirs.pop_front();
                     self.change_and_push_dir(dir, variables)
                 }
             }
