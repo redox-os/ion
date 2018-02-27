@@ -101,8 +101,7 @@ impl DirectoryStack {
             )));
         }
 
-        // Manually update $PWD
-        variables.set_var("PWD", current_dir().unwrap().to_str().unwrap());
+        self.update_env_variables(variables);
         self.print_dirs();
         Ok(())
     }
@@ -167,8 +166,7 @@ impl DirectoryStack {
             }
         };
 
-        // Manually update $PWD
-        variables.set_var("PWD", current_dir().unwrap().to_str().unwrap());
+        self.update_env_variables(variables);
         self.print_dirs();
         Ok(())
     }
@@ -187,11 +185,30 @@ impl DirectoryStack {
                 if dir == "-" {
                     self.switch_to_previous_directory(variables)
                 } else {
-                    let _ = self.dirs.pop_front();
-                    self.change_and_push_dir(dir, variables)
+                    let res = self.change_and_push_dir(dir, variables);
+                    self.dirs.remove(1);
+                    res
                 }
             }
             None => self.switch_to_home_directory(variables),
+        }
+    }
+
+    fn update_env_variables(&mut self, variables: &mut Variables) {
+        // Update $OLDPWD
+        let old_pwd = variables.get_var_or_empty("PWD");
+        if &old_pwd == "" {
+            variables.set_var("OLDPWD", "?");
+        } else {
+            variables.set_var("OLDPWD", &old_pwd);
+        }
+
+        // Update $PWD
+        let current_dir = current_dir();
+        if current_dir.is_ok() {
+            variables.set_var("PWD", current_dir.unwrap().to_str().unwrap_or("?"));
+        } else {
+            variables.set_var("PWD", "?");
         }
     }
 
@@ -213,22 +230,23 @@ impl DirectoryStack {
         &mut self,
         variables: &Variables,
     ) -> Result<(), Cow<'static, str>> {
-        self.get_previous_dir().cloned().map_or_else(
-            || Err(Cow::Borrowed("ion: no previous directory to switch to")),
-            |prev| {
-                self.dirs.remove(1);
-                let prev = prev.to_string_lossy().to_string();
+        match self.get_previous_dir(variables) {
+            Some(prev) => {
+                self.dirs.remove(0);
+                let prev = prev.to_string();
                 println!("{}", prev);
                 self.change_and_push_dir(&prev, variables)
             },
-        )
+            None => Err(Cow::Borrowed("ion: no previous directory to switch to")),
+        }
     }
 
-    fn get_previous_dir(&self) -> Option<&PathBuf> {
-        if self.dirs.len() < 2 {
+    fn get_previous_dir(&self, variables: &Variables) -> Option<String> {
+        let previous_pwd = variables.get_var_or_empty("OLDPWD");
+        if previous_pwd == "?" || previous_pwd == "" {
             None
         } else {
-            self.dirs.get(1)
+            Some(previous_pwd)
         }
     }
 

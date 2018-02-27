@@ -166,16 +166,15 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
 
     match shell.directory_stack.cd(args, &shell.variables) {
         Ok(()) => {
-            let path = env::current_dir();
-            match path {
-                Ok(dir) => {
+            match env::current_dir() {
+                Ok(cwd) => {
                     let pwd = shell.get_var_or_empty("PWD");
                     let pwd = &pwd;
-                    let current_dir = dir.to_str().unwrap_or("?");
+                    let current_dir = cwd.to_str().unwrap_or("?");
 
                     if pwd != current_dir {
-                        shell.variables.set_var("OLDPWD", pwd);
-                        shell.variables.set_var("PWD", current_dir);
+                        shell.set_var("OLDPWD", pwd);
+                        shell.set_var("PWD", current_dir);
                     }
                     fork_function(shell, "CD_CHANGE", &["ion"]);
                 },
@@ -187,6 +186,7 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
             let stderr = io::stderr();
             let mut stderr = stderr.lock();
             let _ = stderr.write_all(why.as_bytes());
+            let _ = stderr.write_all("Problem".as_bytes());
             FAILURE
         }
     }
