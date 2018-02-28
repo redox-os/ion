@@ -166,26 +166,24 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
 
     match shell.directory_stack.cd(args, &shell.variables) {
         Ok(()) => {
-            env::current_dir().ok().map_or_else(
-                || env::set_var("PWD", "?"),
-                |path| {
+            match env::current_dir() {
+                Ok(cwd) => {
                     let pwd = shell.get_var_or_empty("PWD");
-                    let pwd: &str = &pwd;
-                    let current_dir = path.to_str().unwrap_or("?");
+                    let pwd = &pwd;
+                    let current_dir = cwd.to_str().unwrap_or("?");
 
                     if pwd != current_dir {
-                        env::set_var("OLDPWD", pwd);
-                        env::set_var("PWD", current_dir);
+                        shell.set_var("OLDPWD", pwd);
+                        shell.set_var("PWD", current_dir);
                     }
                     fork_function(shell, "CD_CHANGE", &["ion"]);
                 },
-            );
+                Err(_) => env::set_var("PWD", "?"),
+            };
             SUCCESS
         }
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
+            eprintln!("{}", why);
             FAILURE
         }
     }
