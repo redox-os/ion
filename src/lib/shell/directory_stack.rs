@@ -197,18 +197,16 @@ impl DirectoryStack {
     fn update_env_variables(&mut self, variables: &mut Variables) {
         // Update $OLDPWD
         let old_pwd = variables.get_var_or_empty("PWD");
-        if &old_pwd == "" {
+        if old_pwd.is_empty() {
             variables.set_var("OLDPWD", "?");
         } else {
             variables.set_var("OLDPWD", &old_pwd);
         }
 
         // Update $PWD
-        let current_dir = current_dir();
-        if current_dir.is_ok() {
-            variables.set_var("PWD", current_dir.unwrap().to_str().unwrap_or("?"));
-        } else {
-            variables.set_var("PWD", "?");
+        match current_dir() {
+            Ok(current_dir) => variables.set_var("PWD", current_dir.to_str().unwrap_or("?")),
+            Err(_) => variables.set_var("PWD", "?"),
         }
     }
 

@@ -183,10 +183,7 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
             SUCCESS
         }
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
-            let _ = stderr.write_all("Problem".as_bytes());
+            eprintln!("{}", why);
             FAILURE
         }
     }
