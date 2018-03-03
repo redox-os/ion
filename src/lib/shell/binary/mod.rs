@@ -39,7 +39,7 @@ OPTIONS
         prints the version, platform and revision of ion then exits.
 
     -l or --login
-        currently does nothing, however in the futere will run ion as a login shell.
+        currently does nothing, however in the future will run ion as a login shell.
 "#;
 
 pub trait Binary {
