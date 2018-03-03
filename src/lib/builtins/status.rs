@@ -49,7 +49,7 @@ pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
             }
         }
         let err = "".to_string();
-
+        
         if flags.contains(Flags::LOGIN_SHELL) && !is_login {
             return Err(err);
         }
