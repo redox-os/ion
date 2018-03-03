@@ -22,7 +22,7 @@ pub const MAN_ION: &'static str = r#"NAME
     ion - ion shell
 
 SYNOPSIS
-    ion [ -h | --help ] [-c] [-n] [-v]
+    ion [ -h | --help ] [-c] [-n] [-v] [-l]
 
 DESCRIPTION
     ion is a commandline shell created to be a faster and easier to use alternative to the 
@@ -37,6 +37,9 @@ OPTIONS
 
     -v or --version
         prints the version, platform and revision of ion then exits.
+
+    -l or --login
+        currently does nothing, however in the futere will run ion as a login shell.
 "#;
 
 pub trait Binary {
