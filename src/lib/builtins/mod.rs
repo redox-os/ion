@@ -148,6 +148,10 @@ impl BuiltinMap {
 
 // Definitions of simple builtins go here
 fn builtin_status(args: &[&str], shell: &mut Shell) -> i32 {
+    if check_help(args, MAN_STATUS) {
+        return SUCCESS;
+    }
+
     match status(args, shell) {
         Ok(()) => SUCCESS,
         Err(why) => {

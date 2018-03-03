@@ -25,6 +25,9 @@ fn main() {
                 shell.flags |= NO_EXEC;
                 continue;
             }
+            // Ion currently does not do anything when invoked as a login shell, however some scripts 
+            // automatically pass `-l` as an argument so we need to ignore it explicitly.
+            "-l" | "--login" => continue,
             "-c" => shell.execute_arguments(args),
             "-v" | "--version" => shell.display_version(),
             "-h" | "--help" => {
