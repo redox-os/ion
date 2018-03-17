@@ -27,7 +27,7 @@ use self::man_pages::*;
 use self::source::source;
 use self::status::status;
 use self::test::test;
-use self::variables::{alias, drop_alias, drop_array, drop_variable};
+use self::variables::{drop_alias, drop_array, drop_variable};
 use types::Array;
 
 use std::env;
@@ -71,7 +71,6 @@ macro_rules! map {
 
 /// Builtins are in A-Z order.
 pub const BUILTINS: &'static BuiltinMap = &map!(
-    "alias" => builtin_alias : "View, set or unset aliases",
     "and" => builtin_and : "Execute the command if the shell's previous status is success",
     "bg" => builtin_bg : "Resumes a stopped background process",
     "bool" => builtin_bool : "If the value is '1' or 'true', return 0 exit status",
@@ -265,11 +264,6 @@ fn builtin_popd(args: &[&str], shell: &mut Shell) -> i32 {
             FAILURE
         }
     }
-}
-
-fn builtin_alias(args: &[&str], shell: &mut Shell) -> i32 {
-    let args_str = args[1..].join(" ");
-    alias(&mut shell.variables, &args_str)
 }
 
 fn builtin_unalias(args: &[&str], shell: &mut Shell) -> i32 {

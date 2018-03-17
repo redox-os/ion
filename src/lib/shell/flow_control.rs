@@ -53,6 +53,11 @@ pub(crate) enum ExportAction {
     LocalExport(String),
     Assign(String, Operator, String),
 }
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum AliasAction {
+    List,
+    Assign(String)
+}
 
 // TODO: Enable statements and expressions to contain &str values.
 #[derive(Debug, PartialEq, Clone)]
@@ -93,6 +98,7 @@ pub(crate) enum Statement {
     Continue,
     Pipeline(Pipeline),
     Time(Box<Statement>),
+    Alias(AliasAction),
     Default,
 }
 
@@ -115,6 +121,7 @@ impl Statement {
             Statement::Continue => "Continue",
             Statement::Pipeline(_) => "Pipeline { .. }",
             Statement::Time(_) => "Time { .. }",
+            Statement::Alias(_) => "Alias { .. }",
             Statement::Default => "Default",
         }
     }
@@ -291,6 +298,7 @@ where
             | Statement::Let { .. }
             | Statement::Pipeline(_)
             | Statement::Time(_)
+            | Statement::Alias(_)
             | Statement::Break => {
                 // This is the default case with all of the other statements explicitly listed
                 add_to_case!(statement);

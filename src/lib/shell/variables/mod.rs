@@ -286,7 +286,7 @@ impl Variables {
     }
 
     pub(crate) fn is_valid_variable_character(c: char) -> bool {
-        c.is_alphanumeric() || c == '_' || c == '?'
+        c.is_alphanumeric() || c == '_' || c == '+' || c == '-'
     }
 
     pub(crate) fn is_valid_variable_name(name: &str) -> bool {

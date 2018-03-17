@@ -1,9 +1,9 @@
 use super::Shell;
 use super::flags::*;
-use super::flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function, Statement};
+use super::flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function, Statement, AliasAction};
 use super::job_control::JobControl;
 use super::status::*;
-use parser::{expand_string, parse_and_validate, ForExpression, StatementSplitter};
+use parser::{expand_string, parse_and_validate, variables, ForExpression, StatementSplitter};
 use parser::assignments::{is_array, ReturnValue};
 use parser::pipelines::Pipeline;
 use shell::assignments::VariableStore;
@@ -781,6 +781,16 @@ impl FlowLogic for Shell {
                     self.flow_control.current_statement =
                         Statement::Time(Box::new(self.flow_control.current_statement.clone()));
                 }
+            }
+            Statement::Alias(stmt) => {
+                match stmt {
+                    AliasAction::List => {
+                        variables::print_list(&self.variables.aliases);
+                    }
+                    AliasAction::Assign(args) => {
+                        variables::alias(&mut self.variables, &args);
+                    }
+                };
             }
             // At this level, else and else if keywords are forbidden.
             Statement::ElseIf { .. } | Statement::Else => {
