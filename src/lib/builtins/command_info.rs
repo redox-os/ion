@@ -5,6 +5,7 @@ use builtins::man_pages::*;
 
 use std::env;
 use std::path::Path;
+use std::borrow::Cow;
 
 pub(crate) fn which(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
     if check_help(args, MAN_WHICH) {
@@ -19,7 +20,7 @@ pub(crate) fn which(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
     let mut result = SUCCESS;
     for &command in &args[1..] {
         if let Ok(c_type) = get_command_info(command, shell) {
-            match c_type.as_str() {
+            match c_type.as_ref() {
                 "alias" => {
                     let alias = shell.variables.aliases.get(command).unwrap();
                     println!("{}: alias to {}", command, alias);
@@ -45,7 +46,7 @@ pub(crate) fn find_type(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
     let mut result = FAILURE;
     for &command in &args[1..] {
         if let Ok(c_type) = get_command_info(command, shell) {
-            match c_type.as_str() {
+            match c_type.as_ref() {
                 "alias" => {
                     let alias = shell.variables.aliases.get(command).unwrap();
                     println!("{} is aliased to `{}`", command, alias);
@@ -63,13 +64,13 @@ pub(crate) fn find_type(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
     Ok(result)
 }
 
-pub(crate) fn get_command_info(command: &str, shell: &mut Shell) -> Result<String, ()> {
+pub(crate) fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<Cow<'a, str>, ()> {
     if shell.variables.aliases.get(command).is_some() {
-        return Ok(String::from("alias"))
+        return Ok("alias".into())
     } else if shell.functions.contains_key(command) {
-        return Ok(String::from("function"))
+        return Ok("function".into())
     } else if shell.builtins.contains_key(command) {
-        return Ok(String::from("builtin"))
+        return Ok("builtin".into())
     } else {
         for path in env::var("PATH")
             .unwrap_or("/bin".to_string())
@@ -77,7 +78,7 @@ pub(crate) fn get_command_info(command: &str, shell: &mut Shell) -> Result<Strin
         {
             let executable = Path::new(path).join(command);
             if executable.is_file() {
-                return Ok(executable.display().to_string())
+                return Ok(executable.display().to_string().into())
             }
         }
     }
