@@ -6,20 +6,20 @@ use builtins::man_pages::*;
 use std::env;
 use std::path::Path;
 
-pub(crate) fn which(args: &[&str], shell: &mut Shell) -> Result<i32, String> {
+pub(crate) fn which(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
     if check_help(args, MAN_WHICH) {
         return Ok(SUCCESS)
     }
 
     if args.len() == 1 {
-        return Err(String::from("which: Expected at least 1 args, got only 0"))
+        eprintln!("which: Expected at least 1 args, got only 0");
+        return Err(())
     }
 
     let mut result = SUCCESS;
     for &command in &args[1..] {
-        let c_type = get_command_info(command, shell);
-        if c_type.is_ok() {
-            match c_type.unwrap().as_str() {
+        if let Ok(c_type) = get_command_info(command, shell) {
+            match c_type.as_str() {
                 "alias" => {
                     let alias = shell.variables.aliases.get(command).unwrap();
                     println!("{}: alias to {}", command, alias);
@@ -35,17 +35,17 @@ pub(crate) fn which(args: &[&str], shell: &mut Shell) -> Result<i32, String> {
     Ok(result)
 }
 
-pub(crate) fn find_type(args: &[&str], shell: &mut Shell) -> Result<i32, String> {
+pub(crate) fn find_type(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
     // Type does not accept help flags, aka "--help".
     if args.len() == 1 {
-        return Err(String::from("which: Expected at least 1 args, got only 0"))
+        eprintln!("type: Expected at least 1 args, got only 0");
+        return Err(())
     }
 
     let mut result = FAILURE;
     for &command in &args[1..] {
-        let c_type = get_command_info(command, shell);
-        if c_type.is_ok() {
-            match c_type.unwrap().as_str() {
+        if let Ok(c_type) = get_command_info(command, shell) {
+            match c_type.as_str() {
                 "alias" => {
                     let alias = shell.variables.aliases.get(command).unwrap();
                     println!("{} is aliased to `{}`", command, alias);

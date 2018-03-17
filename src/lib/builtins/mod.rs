@@ -610,20 +610,14 @@ fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
 fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
     match which(args, shell) {
         Ok(result) => result,
-        Err(err) => {
-            eprintln!("{}", err);
-            FAILURE
-        }
+        Err(()) => FAILURE
     }
 }
 
 fn builtin_type(args: &[&str], shell: &mut Shell) -> i32 {
     match find_type(args, shell) {
         Ok(result) => result,
-        Err(err) => {
-            eprintln!("{}", err);
-            FAILURE
-        }
+        Err(()) => FAILURE
     }
 }
 
