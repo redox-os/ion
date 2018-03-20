@@ -63,12 +63,16 @@ fn parse_alias(args: &str) -> Binding {
         let value: Value = char_iter.skip_while(|&x| x == ' ').collect();
         if value.is_empty() {
             Binding::KeyOnly(key)
-        } else if !Variables::is_valid_variable_name(&key) {
+        } else if !is_valid_key(&key) {
             Binding::InvalidKey(key)
         } else {
             Binding::KeyValue(key, value)
         }
     }
+}
+
+fn is_valid_key(name: &str) -> bool {
+    name.chars().all(|x| x.is_alphanumeric() || x == '_' || x == '+' || x == '-')
 }
 
 /// The `alias` command will define an alias for another command, and thus may be used as a
