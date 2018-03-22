@@ -60,7 +60,9 @@ fn parse_alias(args: &str) -> Binding {
     if !found_key && key.is_empty() {
         Binding::ListEntries
     } else {
-        let value: Value = char_iter.skip_while(|&x| x == ' ').collect();
+        let mut value: Value = char_iter.skip_while(|&x| x == ' ').collect();
+        value = value.trim_matches(|x| x == '\"' || x == '\'').to_owned();
+
         if value.is_empty() {
             Binding::KeyOnly(key)
         } else if !is_valid_key(&key) {

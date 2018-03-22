@@ -34,7 +34,7 @@ use self::variables::Variables;
 use builtins::{BuiltinMap, BUILTINS};
 use fnv::FnvHashMap;
 use liner::Context;
-use parser::{ArgumentSplitter, Expander, Select};
+use parser::{Expander, Select};
 use parser::Terminator;
 use parser::pipelines::Pipeline;
 use smallvec::SmallVec;
@@ -236,32 +236,9 @@ impl<'a> Shell {
     pub(crate) fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
         let command_start_time = SystemTime::now();
 
-        // Expand any aliases found
         for job_no in 0..pipeline.items.len() {
-            let mut last_command = String::with_capacity(32);
-            loop {
-                let possible_alias = {
-                    let key: &str = pipeline.items[job_no].job.command.as_ref();
-                    if &last_command == key {
-                        break;
-                    }
-                    last_command.clear();
-                    last_command.push_str(key);
-                    self.variables.aliases.get(key)
-                };
-
-                if let Some(alias) = possible_alias {
-                    let new_args = ArgumentSplitter::new(alias)
-                        .map(String::from)
-                        .chain(pipeline.items[job_no].job.args.drain().skip(1))
-                        .collect::<Array>();
-                    if let Some(builtin) = BUILTINS.get(&new_args[0]) {
-                        pipeline.items[job_no].job.builtin = Some(builtin.main);
-                    } else {
-                        pipeline.items[job_no].job.command = new_args[0].clone().into();
-                    }
-                    pipeline.items[job_no].job.args = new_args;
-                }
+            if let Some(builtin) = BUILTINS.get(&pipeline.items[job_no].job.command) {
+                pipeline.items[job_no].job.builtin = Some(builtin.main);
             }
         }
 

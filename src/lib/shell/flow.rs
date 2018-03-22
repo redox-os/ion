@@ -82,6 +82,7 @@ impl FlowLogic for Shell {
                 // Executes all statements that it can, and stores the last remaining partial
                 // statement in memory if needed. We can tell if there is a partial statement
                 // later if the value of `level` is not set to `0`.
+                //
                 if let Err(why) = self.execute_toplevel(&mut iterator, statement) {
                     eprintln!("{}", why);
                     self.flow_control.level = 0;
@@ -297,7 +298,7 @@ impl FlowLogic for Shell {
                             self.set_var(&bind, &value.join(" "));
                         }
                     }
-
+ 
                     if let Some(statement) = case.conditional {
                         self.on_command(&statement);
                         if self.previous_status != SUCCESS {
@@ -317,7 +318,6 @@ impl FlowLogic for Shell {
                             }
                         }
                     }
-
                     break;
                 }
                 Some(ref v) if matches(v, &value) => {
@@ -741,6 +741,42 @@ impl FlowLogic for Shell {
             }
             // Simply executes a provided pipeline, immediately.
             Statement::Pipeline(mut pipeline) => {
+                // Expand Alias
+                for job_no in 0..pipeline.items.len() {
+                    let possible_alias = {
+                        let key: &str = pipeline.items[job_no].job.command.as_ref();
+                        match self.variables.aliases.get(key) {
+                            Some(alias) => Some(alias.to_owned()),
+                            None => None,
+                        }
+                    };
+
+                    match possible_alias {
+                        Some(alias) => {
+                           let mut iterator = StatementSplitter::new(&alias).map(parse_and_validate);
+
+                           while let Some(statement) = iterator.next() {
+                                let job_kind = pipeline.items[job_no].job.kind;
+                                // Remove the job that was an alias and expanded
+                                pipeline.items.remove(job_no);
+                                match statement {
+                                    // Replace it with the expanded items
+                                    Statement::Pipeline(mut new_pipeline) => {
+                                        let new_pipeline_len = new_pipeline.items.len();
+                                        for (index, item) in new_pipeline.items.into_iter().enumerate() {
+                                            pipeline.items.insert(job_no+index, item);
+                                        }
+                                        // Change the Kind of last item to the kind of job
+                                        pipeline.items[job_no+new_pipeline_len-1].job.kind = job_kind;
+                                    },
+                                    _ => (),
+                                }
+                            }
+                        },
+                        None => (),
+                    }
+                }
+ 
                 self.run_pipeline(&mut pipeline);
                 if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
                     let status = self.previous_status;
