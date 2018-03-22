@@ -741,8 +741,9 @@ impl FlowLogic for Shell {
             }
             // Simply executes a provided pipeline, immediately.
             Statement::Pipeline(mut pipeline) => {
+                let mut job_no = 0;
                 // Expand Alias
-                for job_no in 0..pipeline.items.len() {
+                while job_no < pipeline.items.len() {
                     let possible_alias = {
                         let key: &str = pipeline.items[job_no].job.command.as_ref();
                         match self.variables.aliases.get(key) {
@@ -757,24 +758,32 @@ impl FlowLogic for Shell {
 
                            while let Some(statement) = iterator.next() {
                                 let job_kind = pipeline.items[job_no].job.kind;
+                                let mut job_args = pipeline.items[job_no].job.args.clone();
                                 // Remove the job that was an alias and expanded
                                 pipeline.items.remove(job_no);
                                 match statement {
                                     // Replace it with the expanded items
-                                    Statement::Pipeline(mut new_pipeline) => {
-                                        let new_pipeline_len = new_pipeline.items.len();
-                                        for (index, item) in new_pipeline.items.into_iter().enumerate() {
+                                    Statement::Pipeline(mut expand_pipeline) => {
+                                        let expand_pipeline_len = expand_pipeline.items.len();
+                                        for (index, item) in expand_pipeline.items.into_iter().enumerate() {
                                             pipeline.items.insert(job_no+index, item);
                                         }
+
                                         // Change the Kind of last item to the kind of job
-                                        pipeline.items[job_no+new_pipeline_len-1].job.kind = job_kind;
+                                        pipeline.items[job_no+expand_pipeline_len-1].job.kind = job_kind;
+                                        pipeline.items[job_no+expand_pipeline_len-1].job.args
+                                            .extend(job_args.drain().skip(1).collect::<Array>());
                                     },
+                                    // This code assumes that all the values stored in alias
+                                    // hashmap will resolve to Statement::Pipeline
+                                    // Anything else will be ignored
                                     _ => (),
                                 }
                             }
                         },
                         None => (),
-                    }
+                    };
+                    job_no += 1;
                 }
  
                 self.run_pipeline(&mut pipeline);
