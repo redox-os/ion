@@ -559,6 +559,10 @@ fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_NOT) {
         return SUCCESS;
     }
+    if args.len() < 2 {
+        eprintln!("not requires at least one argument");
+        return FAILURE;
+    }
     shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
     match shell.previous_status {
         SUCCESS => FAILURE,
@@ -570,6 +574,10 @@ fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
 fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_AND) {
         return SUCCESS;
+    }
+    if args.len() < 2 {
+        eprintln!("and requires at least one argument");
+        return FAILURE;
     }
     match shell.previous_status {
         SUCCESS => {
@@ -583,6 +591,10 @@ fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
 fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_OR) {
         return SUCCESS;
+    }
+    if args.len() < 2 {
+        eprintln!("or requires at least one argument");
+        return FAILURE;
     }
     match shell.previous_status {
         FAILURE => {
