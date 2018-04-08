@@ -30,18 +30,16 @@ use self::source::source;
 use self::status::status;
 use self::test::test;
 use self::variables::{alias, drop_alias, drop_array, drop_variable};
-use types::Array;
 
 use std::env;
 use std::error::Error;
 use std::io::{self, Write};
 
 use parser::Terminator;
-use parser::pipelines::{PipeItem, Pipeline};
 use shell::job_control::{JobControl, ProcessState};
 use shell::fork_function::fork_function;
 use shell::status::*;
-use shell::{self, FlowLogic, Job, JobKind, Shell, ShellHistory};
+use shell::{self, FlowLogic, Shell, ShellHistory};
 use sys;
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
@@ -97,7 +95,6 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "isatty" => builtin_isatty : "Returns 0 exit status if the supplied FD is a tty",
     "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
     "matches" => builtin_matches : "Checks if a string matches a given regex",
-    "not" => builtin_not : "Reverses the exit status value of the given command.",
     "popd" => builtin_popd : "Pop a directory from the stack",
     "pushd" => builtin_pushd : "Push a directory to the stack",
     "random" => builtin_random : "Outputs a random u64",
@@ -540,28 +537,6 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
         SUCCESS
     } else {
         FAILURE
-    }
-}
-
-fn args_to_pipeline(args: &[&str]) -> Pipeline {
-    let owned = args.into_iter()
-        .map(|&x| String::from(x))
-        .collect::<Array>();
-    let pipe_item = PipeItem::new(Job::new(owned, JobKind::And), Vec::new(), Vec::new());
-    Pipeline {
-        items: vec![pipe_item],
-    }
-}
-
-fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
-    if check_help(args, MAN_NOT) {
-        return SUCCESS;
-    }
-    shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
-    match shell.previous_status {
-        SUCCESS => FAILURE,
-        FAILURE => SUCCESS,
-        _ => shell.previous_status,
     }
 }
 

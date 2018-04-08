@@ -143,6 +143,9 @@ impl FlowLogic for Shell {
                     &mut Statement::Or(ref mut box_stmt) => {
                         append_new_commands(iterator, box_stmt.as_mut(), level, current_if_mode);
                     }
+                    &mut Statement::Not(ref mut box_stmt) => {
+                        append_new_commands(iterator, box_stmt.as_mut(), level, current_if_mode);
+                    }
                     _ => (),
                 }
             }
@@ -257,6 +260,14 @@ impl FlowLogic for Shell {
                                 FAILURE => {
                                     execute_final(shell, *box_stmt);
                                 },
+                                _ => ()
+                            }
+                        }
+                        Statement::Not(box_stmt) => {
+                            execute_final(shell, *box_stmt);
+                            match shell.previous_status {
+                                FAILURE => shell.previous_status = SUCCESS,
+                                SUCCESS => shell.previous_status = FAILURE,
                                 _ => ()
                             }
                         }
@@ -530,6 +541,20 @@ impl FlowLogic for Shell {
                     _ => condition = Condition::NoOp
                 }
 
+                match condition {
+                    Condition::Break => return Condition::Break,
+                    Condition::Continue => return Condition::Continue,
+                    Condition::NoOp => (),
+                    Condition::SigInt => return Condition::SigInt,
+                }
+            }
+            Statement::Not(box_statement) => {
+                let condition = self.execute_statement(iterator, *box_statement);
+                match self.previous_status {
+                    FAILURE => self.previous_status = SUCCESS,
+                    SUCCESS => self.previous_status = FAILURE,
+                    _ => ()
+                }
                 match condition {
                     Condition::Break => return Condition::Break,
                     Condition::Continue => return Condition::Continue,
@@ -839,24 +864,30 @@ impl FlowLogic for Shell {
                 if self.flow_control.level == 0 {
                     match self.previous_status {
                         SUCCESS => {
-                            self.execute_toplevel(iterator, *box_statement);
+                            if let Err(why) = self.execute_toplevel(iterator, *box_statement) {
+                                eprintln!("{}", why);
+                                self.flow_control.level = 0;
+                                self.flow_control.current_if_mode = 0;
+                            }
                         },
                         _ => ()
                     }
-
                 } else {
                     // A statement wasn't executed , which means that current_statement has been
                     // set to the inner statement. We fix this here.
                     self.flow_control.current_statement =
                         Statement::And(Box::new(self.flow_control.current_statement.clone()));
                 }
-
             }
             Statement::Or(box_statement) => {
                 if self.flow_control.level == 0 {
                     match self.previous_status {
                         FAILURE => {
-                            self.execute_toplevel(iterator, *box_statement);
+                            if let Err(why) = self.execute_toplevel(iterator, *box_statement) {
+                                eprintln!("{}", why);
+                                self.flow_control.level = 0;
+                                self.flow_control.current_if_mode = 0;
+                            }
                         },
                         _ => ()
                     }
@@ -868,6 +899,25 @@ impl FlowLogic for Shell {
                         Statement::Or(Box::new(self.flow_control.current_statement.clone()));
                 }
 
+            }
+            Statement::Not(box_statement) => {
+                if self.flow_control.level == 0 {
+                    if let Err(why) = self.execute_toplevel(iterator, *box_statement) {
+                        eprintln!("{}", why);
+                        self.flow_control.level = 0;
+                        self.flow_control.current_if_mode = 0;
+                    }
+                    match self.previous_status {
+                        FAILURE => self.previous_status = SUCCESS,
+                        SUCCESS => self.previous_status = FAILURE,
+                        _ => ()
+                    }
+                } else {
+                    // A statement wasn't executed , which means that current_statement has been
+                    // set to the inner statement. We fix this here.
+                    self.flow_control.current_statement =
+                        Statement::Not(Box::new(self.flow_control.current_statement.clone()));
+                }
             }
             // At this level, else and else if keywords are forbidden.
             Statement::ElseIf { .. } | Statement::Else => {

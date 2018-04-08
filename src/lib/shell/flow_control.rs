@@ -95,6 +95,7 @@ pub(crate) enum Statement {
     Time(Box<Statement>),
     And(Box<Statement>),
     Or(Box<Statement>),
+    Not(Box<Statement>),
     Default,
 }
 
@@ -119,6 +120,7 @@ impl Statement {
             Statement::Time(_) => "Time { .. }",
             Statement::And(_) => "And { .. }",
             Statement::Or(_) => "Or { .. }",
+            Statement::Not(_) => "Not { .. }",
             Statement::Default => "Default",
         }
     }
@@ -297,6 +299,7 @@ where
             | Statement::Time(_)
             | Statement::And(_)
             | Statement::Or(_)
+            | Statement::Not(_)
             | Statement::Break => {
                 // This is the default case with all of the other statements explicitly listed
                 add_to_case!(statement);
@@ -346,6 +349,19 @@ pub(crate) fn collect_loops<I: Iterator<Item = Statement>>(
                 _ => (),
             },
             Statement::Or(ref box_stmt) => match box_stmt.as_ref() {
+                &Statement::While { .. }
+                | &Statement::For { .. }
+                | &Statement::If { .. }
+                | &Statement::Function { .. }
+                | &Statement::Match { .. } => *level += 1,
+                &Statement::End if *level == 1 => {
+                    *level = 0;
+                    break;
+                }
+                &Statement::End => *level -= 1,
+                _ => (),
+            },
+            Statement::Not(ref box_stmt) => match box_stmt.as_ref() {
                 &Statement::While { .. }
                 | &Statement::For { .. }
                 | &Statement::If { .. }

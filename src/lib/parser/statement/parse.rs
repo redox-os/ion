@@ -227,6 +227,10 @@ pub(crate) fn parse(code: &str) -> Statement {
             return Statement::Or(Box::new(parse(cmd[2..].trim_left())))
         }
         _ if cmd.eq("or") => return Statement::Or(Box::new(Statement::Default)),
+        _ if cmd.starts_with("not ") => {
+            return Statement::Not(Box::new(parse(cmd[3..].trim_left())))
+        }
+        _ if cmd.eq("not") => return Statement::Not(Box::new(Statement::Default)),
         _ => (),
     }
 
