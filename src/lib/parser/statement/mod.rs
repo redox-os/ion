@@ -9,9 +9,9 @@ use shell::flow_control::Statement;
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
-pub(crate) fn parse_and_validate<'a>(statement: Result<&str, StatementError<'a>>) -> Statement {
+pub(crate) fn parse_and_validate<'a>(statement: Result<String, StatementError>) -> Statement {
     match statement {
-        Ok(statement) => parse(statement),
+        Ok(statement) => parse(statement.as_str()),
         Err(err) => {
             eprintln!("ion: {}", err);
             Statement::Error(-1)
