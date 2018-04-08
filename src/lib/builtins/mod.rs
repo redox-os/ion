@@ -73,7 +73,6 @@ macro_rules! map {
 /// Builtins are in A-Z order.
 pub const BUILTINS: &'static BuiltinMap = &map!(
     "alias" => builtin_alias : "View, set or unset aliases",
-    "and" => builtin_and : "Execute the command if the shell's previous status is success",
     "bg" => builtin_bg : "Resumes a stopped background process",
     "bool" => builtin_bool : "If the value is '1' or 'true', return 0 exit status",
     "calc" => builtin_calc : "Calculate a mathematical expression",
@@ -99,7 +98,6 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
     "matches" => builtin_matches : "Checks if a string matches a given regex",
     "not" => builtin_not : "Reverses the exit status value of the given command.",
-    "or" => builtin_or : "Execute the command if the shell's previous status is failure",
     "popd" => builtin_popd : "Pop a directory from the stack",
     "pushd" => builtin_pushd : "Push a directory to the stack",
     "random" => builtin_random : "Outputs a random u64",
@@ -563,32 +561,6 @@ fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
     match shell.previous_status {
         SUCCESS => FAILURE,
         FAILURE => SUCCESS,
-        _ => shell.previous_status,
-    }
-}
-
-fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
-    if check_help(args, MAN_AND) {
-        return SUCCESS;
-    }
-    match shell.previous_status {
-        SUCCESS => {
-            shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
-            shell.previous_status
-        }
-        _ => shell.previous_status,
-    }
-}
-
-fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
-    if check_help(args, MAN_OR) {
-        return SUCCESS;
-    }
-    match shell.previous_status {
-        FAILURE => {
-            shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
-            shell.previous_status
-        }
         _ => shell.previous_status,
     }
 }
