@@ -270,6 +270,7 @@ impl FlowLogic for Shell {
                                 SUCCESS => shell.previous_status = FAILURE,
                                 _ => ()
                             }
+                            shell.variables.set_var("?", &shell.previous_status.to_string());
                         }
                         _ => (),
                     }
@@ -555,12 +556,8 @@ impl FlowLogic for Shell {
                     SUCCESS => self.previous_status = FAILURE,
                     _ => ()
                 }
-                match condition {
-                    Condition::Break => return Condition::Break,
-                    Condition::Continue => return Condition::Continue,
-                    Condition::NoOp => (),
-                    Condition::SigInt => return Condition::SigInt,
-                }
+                let status = self.previous_status.to_string();
+                self.set_var("?", &status);
             }
             Statement::Break => return Condition::Break,
             Statement::Continue => return Condition::Continue,
@@ -912,6 +909,8 @@ impl FlowLogic for Shell {
                         SUCCESS => self.previous_status = FAILURE,
                         _ => ()
                     }
+                    let status = self.previous_status.to_string();
+                    self.set_var("?", &status);
                 } else {
                     // A statement wasn't executed , which means that current_statement has been
                     // set to the inner statement. We fix this here.
