@@ -97,41 +97,51 @@ impl<'a> StringMethod<'a> {
         let pattern = MethodArgs::new(self.pattern, expand);
 
         macro_rules! string_eval {
-            ($variable:ident $method:tt) => {{
+            ($variable: ident $method: tt) => {{
                 let pattern = pattern.join(" ");
                 let is_true = if let Some(value) = expand.variable($variable, false) {
                     value.$method(&pattern)
                 } else if is_expression($variable) {
-                    expand_string($variable, expand, false).join(" ").$method(&pattern)
+                    expand_string($variable, expand, false)
+                        .join(" ")
+                        .$method(&pattern)
                 } else {
                     false
                 };
                 output.push_str(if is_true { "1" } else { "0" });
-            }}
+            }};
         }
 
         macro_rules! path_eval {
-            ($method:tt) => {{
+            ($method: tt) => {{
                 if let Some(value) = expand.variable(variable, false) {
-                    output.push_str(Path::new(&value).$method()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
+                    output.push_str(
+                        Path::new(&value)
+                            .$method()
+                            .and_then(|os_str| os_str.to_str())
+                            .unwrap_or(value.as_str()),
+                    );
                 } else if is_expression(variable) {
                     let word = expand_string(variable, expand, false).join(" ");
-                    output.push_str(Path::new(&word).$method()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
+                    output.push_str(
+                        Path::new(&word)
+                            .$method()
+                            .and_then(|os_str| os_str.to_str())
+                            .unwrap_or(word.as_str()),
+                    );
                 }
-            }}
+            }};
         }
 
         macro_rules! string_case {
-            ($method:tt) => {{
+            ($method: tt) => {{
                 if let Some(value) = expand.variable(variable, false) {
                     output.push_str(value.$method().as_str());
                 } else if is_expression(variable) {
                     let word = expand_string(variable, expand, false).join(" ");
                     output.push_str(word.$method().as_str());
                 }
-            }}
+            }};
         }
 
         macro_rules! get_var {
@@ -141,7 +151,7 @@ impl<'a> StringMethod<'a> {
                 } else {
                     expand_string(variable, expand, false).join(" ")
                 }
-            }}
+            }};
         }
 
         match self.method {

@@ -53,10 +53,14 @@ use xdg::BaseDirectories;
 
 #[derive(Debug, Fail)]
 pub enum IonError {
-    #[fail(display = "failed to fork: {}", why)] Fork { why: io::Error },
-    #[fail(display = "element does not exist")] DoesNotExist,
-    #[fail(display = "input was not terminated")] Unterminated,
-    #[fail(display = "function error: {}", why)] Function { why: FunctionError },
+    #[fail(display = "failed to fork: {}", why)]
+    Fork { why: io::Error },
+    #[fail(display = "element does not exist")]
+    DoesNotExist,
+    #[fail(display = "input was not terminated")]
+    Unterminated,
+    #[fail(display = "function error: {}", why)]
+    Function { why: FunctionError },
 }
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
@@ -161,21 +165,21 @@ impl ShellBuilder {
 impl<'a> Shell {
     pub(crate) fn new(is_library: bool) -> Shell {
         Shell {
-            builtins:            BUILTINS,
-            context:             None,
-            variables:           Variables::default(),
-            flow_control:        FlowControl::default(),
-            directory_stack:     DirectoryStack::new(),
-            functions:           FnvHashMap::default(),
-            previous_job:        !0,
-            previous_status:     0,
-            flags:               0,
-            background:          Arc::new(Mutex::new(Vec::new())),
+            builtins: BUILTINS,
+            context: None,
+            variables: Variables::default(),
+            flow_control: FlowControl::default(),
+            directory_stack: DirectoryStack::new(),
+            functions: FnvHashMap::default(),
+            previous_job: !0,
+            previous_status: 0,
+            flags: 0,
+            background: Arc::new(Mutex::new(Vec::new())),
             is_background_shell: false,
             is_library,
-            break_flow:          false,
-            foreground_signals:  Arc::new(ForegroundSignals::new()),
-            ignore_setting:      IgnoreSetting::default(),
+            break_flow: false,
+            foreground_signals: Arc::new(ForegroundSignals::new()),
+            ignore_setting: IgnoreSetting::default(),
         }
     }
 
@@ -486,7 +490,9 @@ impl<'a> Expander for Shell {
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<Value> {
         let mut output = None;
-        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command)) {
+        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| {
+            shell.on_command(command)
+        }) {
             Ok(result) => {
                 let mut string = String::with_capacity(1024);
                 match result.stdout.unwrap().read_to_string(&mut string) {

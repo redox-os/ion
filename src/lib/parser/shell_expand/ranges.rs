@@ -134,7 +134,7 @@ pub(crate) fn parse_range(input: &str) -> Option<Vec<String>> {
                 }
 
                 macro_rules! finish_char {
-                    ($inclusive:expr, $end_str:expr, $step:expr) => {
+                    ($inclusive: expr, $end_str: expr, $step: expr) => {
                         if first.len() == 1 && $end_str.len() == 1 {
                             let start = first.as_bytes()[0];
                             let end = $end_str.as_bytes()[0];
@@ -142,19 +142,24 @@ pub(crate) fn parse_range(input: &str) -> Option<Vec<String>> {
                         } else {
                             return None;
                         }
-                    }
+                    };
                 }
 
                 macro_rules! finish {
-                    ($inclusive:expr, $read:expr) => {
+                    ($inclusive: expr, $read: expr) => {
                         let end_str = &input[$read..];
                         if let Some((start, end)) = strings_to_isizes(first, end_str) {
-                            return numeric_range(start, end, if start < end { 1 } else { -1 }, $inclusive);
+                            return numeric_range(
+                                start,
+                                end,
+                                if start < end { 1 } else { -1 },
+                                $inclusive,
+                            );
                         } else {
                             finish_char!($inclusive, end_str, 1);
                         }
                     };
-                    ($inclusive:expr, $read:expr, $step:expr) => {
+                    ($inclusive: expr, $read: expr, $step: expr) => {
                         let end_str = &input[$read..];
                         if let Some((start, end)) = strings_to_isizes(first, end_str) {
                             return numeric_range(start, end, $step, $inclusive);

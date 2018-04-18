@@ -102,7 +102,7 @@ impl Variables {
             let mut con = Context::new();
             for arg in args.into_iter().skip(1) {
                 match con.read_line(format!("{}=", arg.as_ref().trim()), &mut |_| {}) {
-                    Ok(buffer) => self.set_var(arg.as_ref(), buffer.trim()),
+                    | Ok(buffer) => self.set_var(arg.as_ref(), buffer.trim()),
                     Err(_) => return FAILURE,
                 }
             }

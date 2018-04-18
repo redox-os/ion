@@ -197,7 +197,7 @@ fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
     let mut word_start = None;
 
     macro_rules! check_boundary {
-        ($c:expr, $index:expr, $escaped:expr) => {{
+        ($c: expr, $index: expr, $escaped: expr) => {{
             if let Some(start) = word_start {
                 if $c == ' ' && !$escaped {
                     res.push((start, $index));
@@ -208,7 +208,7 @@ fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
                     word_start = Some($index);
                 }
             }
-        }}
+        }};
     }
 
     let mut iter = buf.chars().enumerate();

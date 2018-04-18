@@ -47,8 +47,8 @@ mod builtins;
 mod shell;
 mod ascii_helpers;
 
+pub use shell::{Binary, Capture, Fork, IonError, IonResult, Shell, ShellBuilder};
 pub use shell::binary::MAN_ION;
 pub use shell::flags;
-pub use shell::status;
-pub use shell::{Binary, Capture, Fork, IonError, IonResult, Shell, ShellBuilder};
 pub use shell::pipe_exec::job_control::JobControl;
+pub use shell::status;

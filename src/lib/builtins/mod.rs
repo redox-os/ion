@@ -38,10 +38,10 @@ use std::io::{self, Write};
 
 use parser::Terminator;
 use parser::pipelines::{PipeItem, Pipeline};
-use shell::job_control::{JobControl, ProcessState};
-use shell::fork_function::fork_function;
-use shell::status::*;
 use shell::{self, FlowLogic, Job, JobKind, Shell, ShellHistory};
+use shell::fork_function::fork_function;
+use shell::job_control::{JobControl, ProcessState};
+use shell::status::*;
 use sys;
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
@@ -179,7 +179,7 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
                         shell.set_var("PWD", current_dir);
                     }
                     fork_function(shell, "CD_CHANGE", &["ion"]);
-                },
+                }
                 Err(_) => env::set_var("PWD", "?"),
             };
             SUCCESS
@@ -610,20 +610,20 @@ fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
 fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
     match which(args, shell) {
         Ok(result) => result,
-        Err(()) => FAILURE
+        Err(()) => FAILURE,
     }
 }
 
 fn builtin_type(args: &[&str], shell: &mut Shell) -> i32 {
     match find_type(args, shell) {
         Ok(result) => result,
-        Err(()) => FAILURE
+        Err(()) => FAILURE,
     }
 }
 
 fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_ISATTY) {
-        return SUCCESS
+        return SUCCESS;
     }
 
     if args.len() > 1 {
@@ -631,20 +631,20 @@ fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
         #[cfg(target_os = "redox")]
         match args[1].parse::<usize>() {
             Ok(r) => if sys::isatty(r) {
-                return SUCCESS
+                return SUCCESS;
             },
-            Err(_) => eprintln!("ion: isatty given bad number")
+            Err(_) => eprintln!("ion: isatty given bad number"),
         }
 
         #[cfg(not(target_os = "redox"))]
         match args[1].parse::<i32>() {
             Ok(r) => if sys::isatty(r) {
-                return SUCCESS
+                return SUCCESS;
             },
-            Err(_) => eprintln!("ion: isatty given bad number")
+            Err(_) => eprintln!("ion: isatty given bad number"),
         }
     } else {
-        return SUCCESS
+        return SUCCESS;
     }
 
     FAILURE

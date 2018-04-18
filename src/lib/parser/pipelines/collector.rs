@@ -90,7 +90,11 @@ impl<'a> Collector<'a> {
         let mut start = None;
         let mut end = None;
 
-        macro_rules! is_toplevel { () => (array_level + proc_level + brace_level == 0) }
+        macro_rules! is_toplevel {
+            () => {
+                array_level + proc_level + brace_level == 0
+            };
+        }
 
         // Skip over any leading whitespace
         while let Some(&(_, b)) = bytes.peek() {
@@ -213,13 +217,15 @@ impl<'a> Collector<'a> {
                 if let Some(v) = self.arg(&mut bytes)? {
                     args.push(v.into());
                 }
-            }}
+            }};
         }
 
         /// Attempt to add a redirection
         macro_rules! try_redir_out {
-            ($from:expr) => {{
-                if let None = outputs { outputs = Some(Vec::new()); }
+            ($from: expr) => {{
+                if let None = outputs {
+                    outputs = Some(Vec::new());
+                }
                 let append = if let Some(&(_, b'>')) = bytes.peek() {
                     bytes.next();
                     true
@@ -227,21 +233,23 @@ impl<'a> Collector<'a> {
                     false
                 };
                 if let Some(file) = self.arg(&mut bytes)? {
-                    outputs.as_mut().map(|o| o.push(Redirection {
-                        from: $from,
-                        file: file.into(),
-                        append
-                    }));
+                    outputs.as_mut().map(|o| {
+                        o.push(Redirection {
+                            from: $from,
+                            file: file.into(),
+                            append,
+                        })
+                    });
                 } else {
                     return Err("expected file argument after redirection for output");
                 }
-            }}
+            }};
         };
 
         /// Attempt to create a pipeitem and append it to the pipeline
         macro_rules! try_add_item {
-            ($job_kind:expr) => {{
-                if ! args.is_empty() {
+            ($job_kind: expr) => {{
+                if !args.is_empty() {
                     let job = Job::new(args.clone(), $job_kind);
                     args.clear();
                     let item_out = if let Some(out_tmp) = outputs.take() {
@@ -256,7 +264,7 @@ impl<'a> Collector<'a> {
                     };
                     pipeline.items.push(PipeItem::new(job, item_out, item_in));
                 }
-            }}
+            }};
         }
 
         while let Some(&(i, b)) = bytes.peek() {

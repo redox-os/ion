@@ -27,7 +27,10 @@ pub(crate) struct ElseIf {
 /// ```
 /// would be represented by the Case object:
 /// ```rust,ignore
-/// Case { value: Some(value), statements: vec![statement0, statement1, ... statementN]}
+/// Case {
+///     value:      Some(value),
+///     statements: vec![statement0, statement1, ... statementN],
+/// }
 /// ```
 /// The wildcard branch, a branch that matches any value, is represented as such:
 /// ```rust,ignore
@@ -245,15 +248,19 @@ where
     I: Iterator<Item = Statement>,
 {
     macro_rules! add_to_case {
-        ($statement:expr) => {
+        ($statement: expr) => {
             match cases.last_mut() {
                 // XXX: When does this actually happen? What syntax error is this???
-                None => return Err(["ion: syntax error: encountered ",
-                                     $statement.short(),
-                                     " outside of `case ...` block"].concat()),
+                None => {
+                    return Err([
+                        "ion: syntax error: encountered ",
+                        $statement.short(),
+                        " outside of `case ...` block",
+                    ].concat())
+                }
                 Some(ref mut case) => case.statements.push($statement),
             }
-        }
+        };
     }
 
     while let Some(statement) = iterator.next() {

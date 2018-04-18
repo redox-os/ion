@@ -1,9 +1,9 @@
+use super::status::{FAILURE, SUCCESS};
+use super::variables::Variables;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::env::{current_dir, home_dir, set_current_dir};
 use std::path::PathBuf;
-use super::status::{FAILURE, SUCCESS};
-use super::variables::Variables;
 
 pub struct DirectoryStack {
     dirs: VecDeque<PathBuf>, // The top is always the current directory
@@ -40,7 +40,11 @@ impl DirectoryStack {
 
     /// Attempts to set the current directory to the directory stack's previous directory,
     /// and then removes the front directory from the stack.
-    pub(crate) fn popd<I: IntoIterator>(&mut self, args: I, variables: &mut Variables) -> Result<(), Cow<'static, str>>
+    pub(crate) fn popd<I: IntoIterator>(
+        &mut self,
+        args: I,
+        variables: &mut Variables,
+    ) -> Result<(), Cow<'static, str>>
     where
         I::Item: AsRef<str>,
     {
@@ -234,7 +238,7 @@ impl DirectoryStack {
                 let prev = prev.to_string();
                 println!("{}", prev);
                 self.change_and_push_dir(&prev, variables)
-            },
+            }
             None => Err(Cow::Borrowed("ion: no previous directory to switch to")),
         }
     }
@@ -258,16 +262,20 @@ impl DirectoryStack {
         // Create a clone of the current directory.
         let mut new_dir = match self.dirs.front() {
             Some(cur_dir) => cur_dir.clone(),
-            None => PathBuf::new()
+            None => PathBuf::new(),
         };
 
         // Iterate through components of the specified directory
         // and calculate the new path based on them.
         for component in Path::new(dir).components() {
             match component {
-                Component::CurDir => { },
-                Component::ParentDir => { new_dir.pop(); },
-                _ => { new_dir.push(component); }
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    new_dir.pop();
+                }
+                _ => {
+                    new_dir.push(component);
+                }
             };
         }
 
@@ -280,8 +288,9 @@ impl DirectoryStack {
             }
             Err(err) => Err(Cow::Owned(format!(
                 "ion: failed to set current dir to {}: {}\n",
-                new_dir.to_string_lossy(), err
-            )))
+                new_dir.to_string_lossy(),
+                err
+            ))),
         }
     }
 

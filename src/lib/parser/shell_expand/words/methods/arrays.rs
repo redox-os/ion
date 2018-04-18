@@ -72,8 +72,7 @@ impl<'a> ArrayMethod<'a> {
         let res = match (&self.pattern, self.selection.clone()) {
             (_, Select::None) => Some("".into()).into_iter().collect(),
             (&Pattern::StringPattern(pattern), Select::All) => variable
-                .split(&unescape(&expand_string(pattern, expand_func, false)
-                    .join(" "))?)
+                .split(&unescape(&expand_string(pattern, expand_func, false).join(" "))?)
                 .map(From::from)
                 .collect(),
             (&Pattern::Whitespace, Select::All) => variable
@@ -82,8 +81,7 @@ impl<'a> ArrayMethod<'a> {
                 .map(From::from)
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => variable
-                .split(&unescape(&expand_string(pattern, expand_func, false)
-                    .join(" "))?)
+                .split(&unescape(&expand_string(pattern, expand_func, false).join(" "))?)
                 .nth(id)
                 .map(From::from)
                 .into_iter()
@@ -96,8 +94,7 @@ impl<'a> ArrayMethod<'a> {
                 .into_iter()
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => variable
-                .rsplit(&unescape(&expand_string(pattern, expand_func, false)
-                    .join(" "))?)
+                .rsplit(&unescape(&expand_string(pattern, expand_func, false).join(" "))?)
                 .nth(id)
                 .map(From::from)
                 .into_iter()

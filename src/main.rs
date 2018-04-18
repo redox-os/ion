@@ -1,10 +1,10 @@
 extern crate ion_shell;
 extern crate smallvec;
 
+use ion_shell::{Binary, ShellBuilder};
 use ion_shell::JobControl;
 use ion_shell::MAN_ION;
 use ion_shell::flags::NO_EXEC;
-use ion_shell::{Binary, ShellBuilder};
 use smallvec::SmallVec;
 use std::env;
 use std::error::Error;
