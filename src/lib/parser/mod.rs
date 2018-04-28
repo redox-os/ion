@@ -3,6 +3,7 @@ pub(crate) mod assignments;
 mod loops;
 pub(crate) mod pipelines;
 pub(crate) mod shell_expand;
+pub(crate) mod variables;
 mod statement;
 mod quotes;
 

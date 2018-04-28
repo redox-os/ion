@@ -1,9 +1,9 @@
 use super::Shell;
 use super::flags::*;
-use super::flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function, Statement};
+use super::flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function, Statement, AliasAction};
 use super::job_control::JobControl;
 use super::status::*;
-use parser::{expand_string, parse_and_validate, ForExpression, StatementSplitter};
+use parser::{expand_string, parse_and_validate, variables, ForExpression, StatementSplitter};
 use parser::assignments::{is_array, ReturnValue};
 use parser::pipelines::Pipeline;
 use shell::assignments::VariableStore;
@@ -82,6 +82,7 @@ impl FlowLogic for Shell {
                 // Executes all statements that it can, and stores the last remaining partial
                 // statement in memory if needed. We can tell if there is a partial statement
                 // later if the value of `level` is not set to `0`.
+                //
                 if let Err(why) = self.execute_toplevel(&mut iterator, statement) {
                     eprintln!("{}", why);
                     self.flow_control.level = 0;
@@ -297,7 +298,7 @@ impl FlowLogic for Shell {
                             self.set_var(&bind, &value.join(" "));
                         }
                     }
-
+ 
                     if let Some(statement) = case.conditional {
                         self.on_command(&statement);
                         if self.previous_status != SUCCESS {
@@ -317,7 +318,6 @@ impl FlowLogic for Shell {
                             }
                         }
                     }
-
                     break;
                 }
                 Some(ref v) if matches(v, &value) => {
@@ -741,6 +741,51 @@ impl FlowLogic for Shell {
             }
             // Simply executes a provided pipeline, immediately.
             Statement::Pipeline(mut pipeline) => {
+                let mut job_no = 0;
+                // Expand Alias
+                while job_no < pipeline.items.len() {
+                    let possible_alias = {
+                        let key: &str = pipeline.items[job_no].job.command.as_ref();
+                        match self.variables.aliases.get(key) {
+                            Some(alias) => Some(alias.to_owned()),
+                            None => None,
+                        }
+                    };
+
+                    match possible_alias {
+                        Some(alias) => {
+                           let mut iterator = StatementSplitter::new(&alias).map(parse_and_validate);
+
+                           while let Some(statement) = iterator.next() {
+                                let job_kind = pipeline.items[job_no].job.kind;
+                                let mut job_args = pipeline.items[job_no].job.args.clone();
+                                // Remove the job that was an alias and expanded
+                                pipeline.items.remove(job_no);
+                                match statement {
+                                    // Replace it with the expanded items
+                                    Statement::Pipeline(mut expand_pipeline) => {
+                                        let expand_pipeline_len = expand_pipeline.items.len();
+                                        for (index, item) in expand_pipeline.items.into_iter().enumerate() {
+                                            pipeline.items.insert(job_no+index, item);
+                                        }
+
+                                        // Change the Kind of last item to the kind of job
+                                        pipeline.items[job_no+expand_pipeline_len-1].job.kind = job_kind;
+                                        pipeline.items[job_no+expand_pipeline_len-1].job.args
+                                            .extend(job_args.drain().skip(1).collect::<Array>());
+                                    },
+                                    // This code assumes that all the values stored in alias
+                                    // hashmap will resolve to Statement::Pipeline
+                                    // Anything else will be ignored
+                                    _ => (),
+                                }
+                            }
+                        },
+                        None => (),
+                    };
+                    job_no += 1;
+                }
+ 
                 self.run_pipeline(&mut pipeline);
                 if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
                     let status = self.previous_status;
@@ -781,6 +826,16 @@ impl FlowLogic for Shell {
                     self.flow_control.current_statement =
                         Statement::Time(Box::new(self.flow_control.current_statement.clone()));
                 }
+            }
+            Statement::Alias(stmt) => {
+                match stmt {
+                    AliasAction::List => {
+                        variables::print_list(&self.variables.aliases);
+                    }
+                    AliasAction::Assign(args) => {
+                        variables::alias(&mut self.variables, &args);
+                    }
+                };
             }
             // At this level, else and else if keywords are forbidden.
             Statement::ElseIf { .. } | Statement::Else => {

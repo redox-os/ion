@@ -3,7 +3,7 @@ use super::functions::{collect_arguments, parse_function};
 use super::super::{pipelines, ArgumentSplitter};
 use super::super::assignments::{split_assignment, Operator};
 use super::super::pipelines::Pipeline;
-use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};
+use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement, AliasAction};
 use std::char;
 
 fn collect<F>(arguments: &str, statement: F) -> Statement
@@ -219,6 +219,11 @@ pub(crate) fn parse(code: &str) -> Statement {
             return Statement::Time(Box::new(parse(cmd[4..].trim_left())))
         }
         _ if cmd.eq("time") => return Statement::Time(Box::new(Statement::Default)),
+        _ if cmd.eq("alias") => return Statement::Alias(AliasAction::List),
+        _ if cmd.starts_with("alias ") => {
+            let args = cmd[6..].trim_left();
+            return Statement::Alias(AliasAction::Assign(args.to_owned()));
+        }
         _ => (),
     }
 
