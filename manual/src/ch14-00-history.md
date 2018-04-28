@@ -100,4 +100,4 @@ Defaults to **$HOME/.local/share/ion/history**
 ### HISTFILE_SIZE
 Specifies how many commands should be saved in `HISTFILE` at most.
 Ideally, this should have the same value as `HISTORY_SIZE`.
-Defaults to **1000**.
+Defaults to **100000**.
