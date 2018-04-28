@@ -4,6 +4,7 @@ pub mod functions;
 pub mod calc;
 pub mod random;
 
+mod command_info;
 mod conditionals;
 mod job_control;
 mod man_pages;
@@ -16,6 +17,7 @@ mod exec;
 mod ion;
 mod is;
 
+use self::command_info::*;
 use self::conditionals::{contains, ends_with, starts_with};
 use self::echo::echo;
 use self::exec::exec;
@@ -33,7 +35,6 @@ use types::Array;
 use std::env;
 use std::error::Error;
 use std::io::{self, Write};
-use std::path::Path;
 
 use parser::Terminator;
 use parser::pipelines::{PipeItem, Pipeline};
@@ -110,6 +111,7 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "suspend" => builtin_suspend : "Suspends the shell with a SIGTSTOP signal",
     "test" => builtin_test : "Performs tests on files and text",
     "true" => builtin_true : "Do nothing, successfully",
+    "type" => builtin_type : "indicates how a command would be interpreted",
     "unalias" => builtin_unalias : "Delete an alias",
     "wait" => builtin_wait : "Waits until all running background processes have completed",
     "which" => builtin_which : "Shows the full path of commands"
@@ -606,37 +608,17 @@ fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
 }
 
 fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
-    if check_help(args, MAN_WHICH) {
-        return SUCCESS;
+    match which(args, shell) {
+        Ok(result) => result,
+        Err(()) => FAILURE
     }
+}
 
-    let mut result = SUCCESS;
-    'outer: for &command in &args[1..] {
-        if let Some(alias) = shell.variables.aliases.get(command) {
-            println!("{}: alias to {}", command, alias);
-            continue;
-        } else if shell.functions.contains_key(command) {
-            println!("{}: function", command);
-            continue;
-        } else if shell.builtins.contains_key(command) {
-            println!("{}: built-in shell command", command);
-            continue;
-        } else {
-            for path in env::var("PATH")
-                .unwrap_or("/bin".to_string())
-                .split(sys::PATH_SEPARATOR)
-            {
-                let executable = Path::new(path).join(command);
-                if executable.is_file() {
-                    println!("{}", executable.display());
-                    continue 'outer;
-                }
-            }
-            result = FAILURE;
-            println!("{} not found", command);
-        }
+fn builtin_type(args: &[&str], shell: &mut Shell) -> i32 {
+    match find_type(args, shell) {
+        Ok(result) => result,
+        Err(()) => FAILURE
     }
-    result
 }
 
 fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {

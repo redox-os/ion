@@ -636,6 +636,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
         let mut start = self.read;
         let mut glob = false;
         let mut tilde = false;
+
         loop {
             if let Some(character) = iterator.next() {
                 match character {
@@ -748,7 +749,6 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                 return None;
             }
         }
-
         while let Some(character) = iterator.next() {
             match character {
                 _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
@@ -808,14 +808,6 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                 }
                 b'*' | b'?' if !self.flags.contains(Flags::SQUOTE) => {
                     glob = true;
-                }
-                b'~' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
-                    let output = &self.data[start..self.read];
-                    if output != "" {
-                        return Some(WordToken::Normal(output, glob, tilde));
-                    } else {
-                        return self.next();
-                    }
                 }
                 _ => (),
             }
