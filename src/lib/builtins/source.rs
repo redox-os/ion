@@ -1,6 +1,5 @@
 use shell::{FlowLogic, Shell};
-use std::fs::File;
-use std::io::Read;
+use std::{fs::File, io::Read};
 
 /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
 pub(crate) fn source(shell: &mut Shell, arguments: &[&str]) -> Result<(), String> {

@@ -1,15 +1,17 @@
 mod actions;
 mod checker;
-mod splitter;
 mod keys;
 mod operator;
+mod splitter;
 
-pub(crate) use self::actions::{Action, AssignmentActions, AssignmentError};
-pub(crate) use self::checker::{is_array, value_check};
-pub(crate) use self::keys::{Key, KeyBuf, KeyIterator, TypeError};
 pub use self::keys::Primitive;
-pub(crate) use self::operator::Operator;
-pub(crate) use self::splitter::split_assignment;
+pub(crate) use self::{
+    actions::{Action, AssignmentActions, AssignmentError},
+    checker::{is_array, value_check},
+    keys::{Key, KeyBuf, KeyIterator, TypeError},
+    operator::Operator,
+    splitter::split_assignment,
+};
 
 use types::{Array, Value};
 

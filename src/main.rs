@@ -1,15 +1,14 @@
 extern crate ion_shell;
 extern crate smallvec;
 
-use ion_shell::JobControl;
-use ion_shell::MAN_ION;
-use ion_shell::flags::NO_EXEC;
-use ion_shell::{Binary, ShellBuilder};
+use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};
 use smallvec::SmallVec;
-use std::env;
-use std::error::Error;
-use std::io::{stdout, Write};
-use std::iter::FromIterator;
+use std::{
+    env,
+    error::Error,
+    io::{stdout, Write},
+    iter::FromIterator,
+};
 
 fn main() {
     let mut shell = ShellBuilder::new()

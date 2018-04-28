@@ -3,8 +3,10 @@ mod functions;
 mod parse;
 mod splitter;
 
-pub(crate) use self::parse::parse;
-pub(crate) use self::splitter::{StatementError, StatementSplitter};
+pub(crate) use self::{
+    parse::parse,
+    splitter::{StatementError, StatementSplitter},
+};
 use shell::flow_control::Statement;
 
 /// Parses a given statement string and return's the corresponding mapped

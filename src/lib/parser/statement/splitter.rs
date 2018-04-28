@@ -2,9 +2,11 @@
 // - Rewrite this in the same style as shell_expand::words.
 // - Validate syntax in methods
 
-use std::fmt::{self, Display, Formatter};
-use std::u16;
-use std::cmp::max;
+use std::{
+    cmp::max,
+    fmt::{self, Display, Formatter},
+    u16,
+};
 
 bitflags! {
     pub struct Flags : u16 {
@@ -80,19 +82,6 @@ pub(crate) struct StatementSplitter {
 }
 
 impl<'a> StatementSplitter {
-    pub(crate) fn new(data: String) -> StatementSplitter {
-        StatementSplitter {
-            data:             data,
-            read:             0,
-            flags:            Flags::empty(),
-            a_level:          0,
-            ap_level:         0,
-            p_level:          0,
-            brace_level:      0,
-            math_paren_level: 0,
-        }
-    }
-
     fn single_quote<B: Iterator<Item = u8>>(&mut self, bytes: &mut B) -> usize {
         let mut read = 0;
         while let Some(character) = bytes.next() {
@@ -106,10 +95,24 @@ impl<'a> StatementSplitter {
         }
         read
     }
+
+    pub(crate) fn new(data: String) -> StatementSplitter {
+        StatementSplitter {
+            data,
+            read:             0,
+            flags:            Flags::empty(),
+            a_level:          0,
+            ap_level:         0,
+            p_level:          0,
+            brace_level:      0,
+            math_paren_level: 0,
+        }
+    }
 }
 
 impl Iterator for StatementSplitter {
     type Item = Result<String, StatementError>;
+
     fn next(&mut self) -> Option<Result<String, StatementError>> {
         let start = self.read;
         let mut first_arg_found = false;
@@ -251,10 +254,12 @@ impl Iterator for StatementSplitter {
                                 self.read = 0;
                                 return match error {
                                     Some(error) => Some(Err(error)),
-                                    None => Some(Ok(String::from(statement[..max(statement.len()-2,0)].trim()))),
-                                }
+                                    None => Some(Ok(String::from(
+                                        statement[..max(statement.len() - 2, 0)].trim(),
+                                    ))),
+                                };
                             }
-                            _ => ()
+                            _ => (),
                         }
                     }
                 }
@@ -272,10 +277,12 @@ impl Iterator for StatementSplitter {
                                 self.read = 0;
                                 return match error {
                                     Some(error) => Some(Err(error)),
-                                    None => Some(Ok(String::from(statement[..max(statement.len()-2,0)].trim()))),
-                                }
+                                    None => Some(Ok(String::from(
+                                        statement[..max(statement.len() - 2, 0)].trim(),
+                                    ))),
+                                };
                             }
-                            _ => ()
+                            _ => (),
                         }
                     }
                 }
@@ -358,9 +365,9 @@ impl Iterator for StatementSplitter {
                         }
                         b'|' => Some(Err(StatementError::ExpectedCommandButFound("pipe"))),
                         b'&' => Some(Err(StatementError::ExpectedCommandButFound("&"))),
-                        b'*' | b'%' | b'?' | b'{' | b'}' => {
-                            Some(Err(StatementError::IllegalCommandName(String::from(output))))
-                        }
+                        b'*' | b'%' | b'?' | b'{' | b'}' => Some(Err(
+                            StatementError::IllegalCommandName(String::from(output)),
+                        )),
                         _ => Some(Ok(String::from(output))),
                     }
                 }
@@ -372,7 +379,8 @@ impl Iterator for StatementSplitter {
 #[test]
 fn syntax_errors() {
     let command = "echo (echo one); echo $( (echo one); echo ) two; echo $(echo one";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(String::from(command))
+        .collect::<Vec<Result<String, StatementError>>>();
     assert_eq!(results[0], Err(StatementError::InvalidCharacter('(', 6)));
     assert_eq!(results[1], Err(StatementError::InvalidCharacter('(', 26)));
     assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 43)));
@@ -380,7 +388,8 @@ fn syntax_errors() {
     assert_eq!(results.len(), 4);
 
     let command = ">echo";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(String::from(command))
+        .collect::<Vec<Result<String, StatementError>>>();
     assert_eq!(
         results[0],
         Err(StatementError::ExpectedCommandButFound("redirection"))
@@ -429,16 +438,21 @@ fn process_with_statements() {
 #[test]
 fn quotes() {
     let command = "echo \"This ;'is a test\"; echo 'This ;\" is also a test'";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(String::from(command))
+        .collect::<Vec<Result<String, StatementError>>>();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0], Ok(String::from("echo \"This ;'is a test\"")));
-    assert_eq!(results[1], Ok(String::from("echo 'This ;\" is also a test'")));
+    assert_eq!(
+        results[1],
+        Ok(String::from("echo 'This ;\" is also a test'"))
+    );
 }
 
 #[test]
 fn comments() {
     let command = "echo $(echo one # two); echo three # four";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(String::from(command))
+        .collect::<Vec<Result<String, StatementError>>>();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0], Ok(String::from("echo $(echo one # two)")));
     assert_eq!(results[1], Ok(String::from("echo three")));
@@ -447,12 +461,14 @@ fn comments() {
 #[test]
 fn nested_process() {
     let command = "echo $(echo one $(echo two) three)";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(String::from(command))
+        .collect::<Vec<Result<String, StatementError>>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], Ok(String::from(command)));
 
     let command = "echo $(echo $(echo one; echo two); echo two)";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(String::from(command))
+        .collect::<Vec<Result<String, StatementError>>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], Ok(String::from(command)));
 }
@@ -460,12 +476,14 @@ fn nested_process() {
 #[test]
 fn nested_array_process() {
     let command = "echo @(echo one @(echo two) three)";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(String::from(command))
+        .collect::<Vec<Result<String, StatementError>>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], Ok(String::from(command)));
 
     let command = "echo @(echo @(echo one; echo two); echo two)";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(String::from(command))
+        .collect::<Vec<Result<String, StatementError>>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], Ok(String::from(command)));
 }
@@ -473,7 +491,8 @@ fn nested_array_process() {
 #[test]
 fn braced_variables() {
     let command = "echo ${foo}bar ${bar}baz ${baz}quux @{zardoz}wibble";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(String::from(command))
+        .collect::<Vec<Result<String, StatementError>>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results, vec![Ok(String::from(command))]);
 }

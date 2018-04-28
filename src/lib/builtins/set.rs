@@ -1,6 +1,5 @@
 use liner::KeyBindings;
-use shell::Shell;
-use shell::flags::*;
+use shell::{flags::*, Shell};
 use std::iter;
 
 enum PositionalArgs {

@@ -1,5 +1,7 @@
-use std::error::Error;
-use std::io::{stdout, Write};
+use std::{
+    error::Error,
+    io::{stdout, Write},
+};
 
 pub(crate) fn print_man(man_page: &'static str) {
     let stdout = stdout();

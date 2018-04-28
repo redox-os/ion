@@ -2,8 +2,7 @@
 
 use std::io::{self, Write};
 
-use shell::status::*;
-use shell::variables::Variables;
+use shell::{status::*, variables::Variables};
 use types::*;
 
 fn print_list(list: &VariableContext) {
