@@ -33,7 +33,7 @@ impl Default for Variables {
         let mut map = FnvHashMap::with_capacity_and_hasher(64, Default::default());
         map.insert("DIRECTORY_STACK_SIZE".into(), "1000".into());
         map.insert("HISTORY_SIZE".into(), "1000".into());
-        map.insert("HISTFILE_SIZE".into(), "1000".into());
+        map.insert("HISTFILE_SIZE".into(), "100000".into());
         map.insert(
             "PROMPT".into(),
             "${x::1B}]0;${USER}: \
