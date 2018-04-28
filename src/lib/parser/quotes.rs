@@ -35,29 +35,8 @@ impl From<String> for Terminator {
 }
 
 impl Terminator {
-    pub fn new(input: String) -> Terminator {
-        Terminator {
-            buffer:     input,
-            eof:        None,
-            eof_buffer: String::new(),
-            array:      0,
-            read:       0,
-            flags:      Flags::empty(),
-        }
-    }
-
-    /// Appends a string to the internal buffer.
-    pub fn append(&mut self, input: &str) {
-        if self.eof.is_none() {
-            self.buffer.push_str(if self.flags.contains(Flags::TRIM) {
-                input.trim()
-            } else {
-                input
-            });
-        } else {
-            self.eof_buffer.push_str(input);
-        }
-    }
+    /// Consumes the `Terminator`, and returns the underlying `String`.
+    pub fn consume(self) -> String { self.buffer }
 
     pub fn is_terminated(&mut self) -> bool {
         let mut eof_line = None;
@@ -181,6 +160,27 @@ impl Terminator {
         status
     }
 
-    /// Consumes the `Terminator`, and returns the underlying `String`.
-    pub fn consume(self) -> String { self.buffer }
+    /// Appends a string to the internal buffer.
+    pub fn append(&mut self, input: &str) {
+        if self.eof.is_none() {
+            self.buffer.push_str(if self.flags.contains(Flags::TRIM) {
+                input.trim()
+            } else {
+                input
+            });
+        } else {
+            self.eof_buffer.push_str(input);
+        }
+    }
+
+    pub fn new(input: String) -> Terminator {
+        Terminator {
+            buffer:     input,
+            eof:        None,
+            eof_buffer: String::new(),
+            array:      0,
+            read:       0,
+            flags:      Flags::empty(),
+        }
+    }
 }

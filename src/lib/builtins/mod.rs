@@ -1,45 +1,54 @@
+pub mod calc;
+pub mod functions;
+pub mod random;
 pub mod source;
 pub mod variables;
-pub mod functions;
-pub mod calc;
-pub mod random;
 
 mod command_info;
 mod conditionals;
-mod job_control;
-mod man_pages;
-mod test;
 mod echo;
-mod set;
-mod status;
-mod exists;
 mod exec;
+mod exists;
 mod ion;
 mod is;
+mod job_control;
+mod man_pages;
+mod set;
+mod status;
+mod test;
 
-use self::command_info::*;
-use self::conditionals::{contains, ends_with, starts_with};
-use self::echo::echo;
-use self::exec::exec;
-use self::exists::exists;
-use self::functions::fn_;
-use self::ion::ion_docs;
-use self::is::is;
-use self::man_pages::*;
-use self::source::source;
-use self::status::status;
-use self::test::test;
-use self::variables::{alias, drop_alias, drop_array, drop_variable};
+use self::{
+    command_info::*,
+    conditionals::{contains, ends_with, starts_with},
+    echo::echo,
+    exec::exec,
+    exists::exists,
+    functions::fn_,
+    ion::ion_docs,
+    is::is,
+    man_pages::*,
+    source::source,
+    status::status,
+    test::test,
+    variables::{alias, drop_alias, drop_array, drop_variable},
+};
 
-use std::env;
-use std::error::Error;
-use std::io::{self, Write};
+use std::{
+    env,
+    error::Error,
+    io::{self, Write},
+};
 
 use parser::Terminator;
-use shell::job_control::{JobControl, ProcessState};
-use shell::fork_function::fork_function;
-use shell::status::*;
-use shell::{self, FlowLogic, Shell, ShellHistory};
+use shell::{
+    self,
+    fork_function::fork_function,
+    job_control::{JobControl, ProcessState},
+    status::*,
+    FlowLogic,
+    Shell,
+    ShellHistory,
+};
 use sys;
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
@@ -128,6 +137,10 @@ pub struct BuiltinMap {
 }
 
 impl BuiltinMap {
+    pub fn contains_key(&self, func: &str) -> bool { self.name.iter().any(|&name| name == func) }
+
+    pub fn keys(&self) -> &'static [&'static str] { self.name }
+
     pub fn get(&self, func: &str) -> Option<Builtin> {
         self.name.binary_search(&func).ok().map(|pos| unsafe {
             Builtin {
@@ -137,10 +150,6 @@ impl BuiltinMap {
             }
         })
     }
-
-    pub fn keys(&self) -> &'static [&'static str] { self.name }
-
-    pub fn contains_key(&self, func: &str) -> bool { self.name.iter().any(|&name| name == func) }
 }
 
 // Definitions of simple builtins go here
@@ -174,7 +183,7 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
                         shell.set_var("PWD", current_dir);
                     }
                     fork_function(shell, "CD_CHANGE", &["ion"]);
-                },
+                }
                 Err(_) => env::set_var("PWD", "?"),
             };
             SUCCESS
@@ -557,20 +566,20 @@ fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
 fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
     match which(args, shell) {
         Ok(result) => result,
-        Err(()) => FAILURE
+        Err(()) => FAILURE,
     }
 }
 
 fn builtin_type(args: &[&str], shell: &mut Shell) -> i32 {
     match find_type(args, shell) {
         Ok(result) => result,
-        Err(()) => FAILURE
+        Err(()) => FAILURE,
     }
 }
 
 fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_ISATTY) {
-        return SUCCESS
+        return SUCCESS;
     }
 
     if args.len() > 1 {
@@ -578,20 +587,20 @@ fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
         #[cfg(target_os = "redox")]
         match args[1].parse::<usize>() {
             Ok(r) => if sys::isatty(r) {
-                return SUCCESS
+                return SUCCESS;
             },
-            Err(_) => eprintln!("ion: isatty given bad number")
+            Err(_) => eprintln!("ion: isatty given bad number"),
         }
 
         #[cfg(not(target_os = "redox"))]
         match args[1].parse::<i32>() {
             Ok(r) => if sys::isatty(r) {
-                return SUCCESS
+                return SUCCESS;
             },
-            Err(_) => eprintln!("ion: isatty given bad number")
+            Err(_) => eprintln!("ion: isatty given bad number"),
         }
     } else {
-        return SUCCESS
+        return SUCCESS;
     }
 
     FAILURE

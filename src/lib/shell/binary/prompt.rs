@@ -1,7 +1,6 @@
 use super::super::{Capture, Function, Shell};
 use parser::shell_expand::expand_string;
-use std::io::Read;
-use std::process;
+use std::{io::Read, process};
 use sys;
 
 pub(crate) fn prompt(shell: &mut Shell) -> String {

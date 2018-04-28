@@ -1,14 +1,7 @@
 use super::super::{config_dir, LibraryIterator, StringError};
 use fnv::FnvHashMap;
-use libloading::{Library, Symbol};
-use libloading::os::unix::Symbol as RawSymbol;
-use std::ffi::CString;
-use std::fs::read_dir;
-use std::mem::forget;
-use std::os::raw::c_char;
-use std::ptr;
-use std::slice;
-use std::str;
+use libloading::{os::unix::Symbol as RawSymbol, Library, Symbol};
+use std::{ffi::CString, fs::read_dir, mem::forget, os::raw::c_char, ptr, slice, str};
 use types::Identifier;
 
 /// Either one or the other will be set. Optional status can be conveyed by setting the
@@ -109,10 +102,28 @@ pub(crate) struct StringMethodPlugins {
 }
 
 impl StringMethodPlugins {
-    pub(crate) fn new() -> StringMethodPlugins {
-        StringMethodPlugins {
-            libraries: Vec::new(),
-            symbols:   FnvHashMap::default(),
+    /// Attempts to execute a function within a dynamically-loaded namespace.
+    ///
+    /// If the function exists, it is executed, and it's return value is then converted into a
+    /// proper Rusty type.
+    pub(crate) fn execute(
+        &self,
+        function: &str,
+        arguments: MethodArguments,
+    ) -> Result<Option<String>, StringError> {
+        let func = self.symbols
+            .get(function.into())
+            .ok_or(StringError::FunctionMissing(function.into()))?;
+        unsafe {
+            let data = (*func)(RawMethodArguments::from(arguments));
+            if data.is_null() {
+                Ok(None)
+            } else {
+                match CString::from_raw(data as *mut c_char).to_str() {
+                    Ok(string) => Ok(Some(string.to_owned())),
+                    Err(_) => Err(StringError::UTF8Result),
+                }
+            }
         }
     }
 
@@ -199,28 +210,10 @@ impl StringMethodPlugins {
         }
     }
 
-    /// Attempts to execute a function within a dynamically-loaded namespace.
-    ///
-    /// If the function exists, it is executed, and it's return value is then converted into a
-    /// proper Rusty type.
-    pub(crate) fn execute(
-        &self,
-        function: &str,
-        arguments: MethodArguments,
-    ) -> Result<Option<String>, StringError> {
-        let func = self.symbols
-            .get(function.into())
-            .ok_or(StringError::FunctionMissing(function.into()))?;
-        unsafe {
-            let data = (*func)(RawMethodArguments::from(arguments));
-            if data.is_null() {
-                Ok(None)
-            } else {
-                match CString::from_raw(data as *mut c_char).to_str() {
-                    Ok(string) => Ok(Some(string.to_owned())),
-                    Err(_) => Err(StringError::UTF8Result),
-                }
-            }
+    pub(crate) fn new() -> StringMethodPlugins {
+        StringMethodPlugins {
+            libraries: Vec::new(),
+            symbols:   FnvHashMap::default(),
         }
     }
 }

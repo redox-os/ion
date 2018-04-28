@@ -1,12 +1,10 @@
 mod arrays;
 mod strings;
 
-pub(crate) use self::arrays::ArrayMethod;
-pub(crate) use self::strings::StringMethod;
+pub(crate) use self::{arrays::ArrayMethod, strings::StringMethod};
 
 use self::strings::unescape;
-use super::{expand_string, Expander};
-use super::super::super::ArgumentSplitter;
+use super::{super::super::ArgumentSplitter, expand_string, Expander};
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Pattern<'a> {
@@ -20,9 +18,10 @@ pub(crate) struct Key {
 }
 
 impl Key {
+    pub(crate) fn get(&self) -> &::types::Key { return &self.key; }
+
     #[cfg(test)]
     pub(crate) fn new<K: Into<::types::Key>>(key: K) -> Key { Key { key: key.into() } }
-    pub(crate) fn get(&self) -> &::types::Key { return &self.key; }
 }
 
 pub(crate) struct MethodArgs<'a, 'b, E: 'b + Expander> {
@@ -31,8 +30,10 @@ pub(crate) struct MethodArgs<'a, 'b, E: 'b + Expander> {
 }
 
 impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
-    pub(crate) fn new(args: &'a str, expand: &'b E) -> MethodArgs<'a, 'b, E> {
-        MethodArgs { args, expand }
+    pub(crate) fn array<'c>(&'c self) -> impl Iterator<Item = String> + 'c {
+        ArgumentSplitter::new(self.args)
+            .flat_map(move |x| expand_string(x, self.expand, false).into_iter())
+            .map(|s| unescape(&s).unwrap_or(String::from("")))
     }
 
     pub(crate) fn join(self, pattern: &str) -> String {
@@ -40,9 +41,7 @@ impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
             .unwrap_or(String::from(""))
     }
 
-    pub(crate) fn array<'c>(&'c self) -> impl Iterator<Item = String> + 'c {
-        ArgumentSplitter::new(self.args)
-            .flat_map(move |x| expand_string(x, self.expand, false).into_iter())
-            .map(|s| unescape(&s).unwrap_or(String::from("")))
+    pub(crate) fn new(args: &'a str, expand: &'b E) -> MethodArgs<'a, 'b, E> {
+        MethodArgs { args, expand }
     }
 }

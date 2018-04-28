@@ -1,6 +1,5 @@
 use libc::*;
-use std::mem;
-use std::ptr;
+use std::{mem, ptr};
 
 /// Blocks the SIGTSTP/SIGTTOU/SIGTTIN/SIGCHLD signals so that the shell never receives
 /// them.

@@ -1,6 +1,10 @@
-use super::MethodArgs;
-use super::super::Select;
-use super::super::super::{expand_string, is_expression, slice, Expander};
+use super::{
+    super::{
+        super::{expand_string, is_expression, slice, Expander},
+        Select,
+    },
+    MethodArgs,
+};
 use parser::assignments::is_array;
 use regex::Regex;
 use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};
@@ -102,25 +106,35 @@ impl<'a> StringMethod<'a> {
                 let is_true = if let Some(value) = expand.variable($variable, false) {
                     value.$method(&pattern)
                 } else if is_expression($variable) {
-                    expand_string($variable, expand, false).join(" ").$method(&pattern)
+                    expand_string($variable, expand, false)
+                        .join(" ")
+                        .$method(&pattern)
                 } else {
                     false
                 };
                 output.push_str(if is_true { "1" } else { "0" });
-            }}
+            }};
         }
 
         macro_rules! path_eval {
             ($method:tt) => {{
                 if let Some(value) = expand.variable(variable, false) {
-                    output.push_str(Path::new(&value).$method()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(value.as_str()));
+                    output.push_str(
+                        Path::new(&value)
+                            .$method()
+                            .and_then(|os_str| os_str.to_str())
+                            .unwrap_or(value.as_str()),
+                    );
                 } else if is_expression(variable) {
                     let word = expand_string(variable, expand, false).join(" ");
-                    output.push_str(Path::new(&word).$method()
-                        .and_then(|os_str| os_str.to_str()).unwrap_or(word.as_str()));
+                    output.push_str(
+                        Path::new(&word)
+                            .$method()
+                            .and_then(|os_str| os_str.to_str())
+                            .unwrap_or(word.as_str()),
+                    );
                 }
-            }}
+            }};
         }
 
         macro_rules! string_case {
@@ -131,7 +145,7 @@ impl<'a> StringMethod<'a> {
                     let word = expand_string(variable, expand, false).join(" ");
                     output.push_str(word.$method().as_str());
                 }
-            }}
+            }};
         }
 
         macro_rules! get_var {
@@ -141,7 +155,7 @@ impl<'a> StringMethod<'a> {
                 } else {
                     expand_string(variable, expand, false).join(" ")
                 }
-            }}
+            }};
         }
 
         match self.method {

@@ -1,6 +1,9 @@
-use super::{Primitive, ReturnValue, TypeError};
-use super::super::Expander;
-use super::super::expand_string;
+use super::{
+    super::{expand_string, Expander},
+    Primitive,
+    ReturnValue,
+    TypeError,
+};
 
 use std::iter::Iterator;
 
@@ -155,8 +158,16 @@ pub(crate) fn value_check<'a, E: Expander>(
     value: &'a str,
     expected: Primitive,
 ) -> Result<ReturnValue, TypeError<'a>> {
-    macro_rules! string { () => { get_string(shell, value) } }
-    macro_rules! array { () => { get_array(shell, value) } }
+    macro_rules! string {
+        () => {
+            get_string(shell, value)
+        };
+    }
+    macro_rules! array {
+        () => {
+            get_array(shell, value)
+        };
+    }
     let is_array = is_array(value);
     match expected {
         Primitive::Any if is_array => Ok(array!()),
@@ -195,8 +206,7 @@ pub(crate) fn value_check<'a, E: Expander>(
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use super::super::*;
+    use super::{super::*, *};
 
     #[test]
     fn is_array_() {

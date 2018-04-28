@@ -1,11 +1,12 @@
-use super::super::{Binary, DirectoryStack, Shell, Variables};
-use super::super::completer::*;
+use super::super::{completer::*, Binary, DirectoryStack, Shell, Variables};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use smallstring::SmallString;
-use std::env;
-use std::io::{self, ErrorKind, Write};
-use std::mem;
-use std::path::PathBuf;
+use std::{
+    env,
+    io::{self, ErrorKind, Write},
+    mem,
+    path::PathBuf,
+};
 use sys;
 use types::*;
 

@@ -1,11 +1,8 @@
 use super::Shell;
 use builtins::{BuiltinFunction, BUILTINS};
-use parser::expand_string;
-use parser::pipelines::RedirectFrom;
+use parser::{expand_string, pipelines::RedirectFrom};
 use smallstring::SmallString;
-use std::fmt;
-use std::fs::File;
-use std::str;
+use std::{fmt, fs::File, str};
 use types::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -27,6 +24,15 @@ pub(crate) struct Job {
 }
 
 impl Job {
+    /// Takes the current job's arguments and expands them, one argument at a
+    /// time, returning a new `Job` with the expanded arguments.
+    pub(crate) fn expand(&mut self, shell: &Shell) {
+        let mut expanded = Array::new();
+        expanded.grow(self.args.len());
+        expanded.extend(self.args.drain().flat_map(|arg| expand_arg(&arg, shell)));
+        self.args = expanded;
+    }
+
     pub(crate) fn new(args: Array, kind: JobKind) -> Self {
         let command = SmallString::from_str(&args[0]);
         let builtin = BUILTINS.get(command.as_ref()).map(|b| b.main);
@@ -36,15 +42,6 @@ impl Job {
             kind,
             builtin,
         }
-    }
-
-    /// Takes the current job's arguments and expands them, one argument at a
-    /// time, returning a new `Job` with the expanded arguments.
-    pub(crate) fn expand(&mut self, shell: &Shell) {
-        let mut expanded = Array::new();
-        expanded.grow(self.args.len());
-        expanded.extend(self.args.drain().flat_map(|arg| expand_arg(&arg, shell)));
-        self.args = expanded;
     }
 }
 
@@ -79,25 +76,25 @@ fn expand_arg(arg: &str, shell: &Shell) -> Array {
 pub(crate) enum RefinedJob {
     /// An external program that is executed by this shell
     External {
-        name: Identifier,
-        args: Array,
-        stdin: Option<File>,
+        name:   Identifier,
+        args:   Array,
+        stdin:  Option<File>,
         stdout: Option<File>,
         stderr: Option<File>,
     },
     /// A procedure embedded into Ion
     Builtin {
-        main: BuiltinFunction,
-        args: Array,
-        stdin: Option<File>,
+        main:   BuiltinFunction,
+        args:   Array,
+        stdin:  Option<File>,
         stdout: Option<File>,
         stderr: Option<File>,
     },
     /// Functions can act as commands too!
     Function {
-        name: Identifier,
-        args: Array,
-        stdin: Option<File>,
+        name:   Identifier,
+        args:   Array,
+        stdin:  Option<File>,
         stdout: Option<File>,
         stderr: Option<File>,
     },
@@ -130,8 +127,10 @@ impl TeeItem {
     /// should
     /// never be `RedirectFrom`::Both`
     pub(crate) fn write_to_all(&mut self, extra: Option<RedirectFrom>) -> ::std::io::Result<()> {
-        use std::io::{self, Read, Write};
-        use std::os::unix::io::*;
+        use std::{
+            io::{self, Read, Write},
+            os::unix::io::*,
+        };
         fn write_out<R>(source: &mut R, sinks: &mut [File]) -> io::Result<()>
         where
             R: Read,
@@ -182,21 +181,83 @@ impl TeeItem {
 macro_rules! set_field {
     ($self:expr, $field:ident, $arg:expr) => {
         match *$self {
-            RefinedJob::External { ref mut $field, .. } |
-                RefinedJob::Builtin { ref mut $field,  .. } |
-                RefinedJob::Function { ref mut $field, .. } |
-                RefinedJob::Tee { ref mut $field, .. } => {
+            RefinedJob::External { ref mut $field, .. }
+            | RefinedJob::Builtin { ref mut $field, .. }
+            | RefinedJob::Function { ref mut $field, .. }
+            | RefinedJob::Tee { ref mut $field, .. } => {
                 *$field = Some($arg);
             }
             // Do nothing for Cat
             _ => {}
         }
-    }
+    };
 }
 
 impl RefinedJob {
-    pub(crate) fn external(name: Identifier, args: Array) -> Self {
-        RefinedJob::External {
+    /// Returns a long description of this job: the commands and arguments
+    pub(crate) fn long(&self) -> String {
+        match *self {
+            RefinedJob::External { ref args, .. }
+            | RefinedJob::Builtin { ref args, .. }
+            | RefinedJob::Function { ref args, .. } => format!("{}", args.join(" ")),
+            // TODO: Figure out real printing
+            RefinedJob::Cat { .. } | RefinedJob::Tee { .. } => "".into(),
+        }
+    }
+
+    /// Returns a short description of this job: often just the command
+    /// or builtin name
+    pub(crate) fn short(&self) -> String {
+        match *self {
+            RefinedJob::Builtin { .. } => String::from("Shell Builtin"),
+            RefinedJob::Function { ref name, .. } | RefinedJob::External { ref name, .. } => {
+                name.to_string()
+            }
+            // TODO: Print for real
+            RefinedJob::Cat { .. } => "multi-input".into(),
+            RefinedJob::Tee { .. } => "multi-output".into(),
+        }
+    }
+
+    pub(crate) fn stderr(&mut self, file: File) {
+        set_field!(self, stderr, file);
+    }
+
+    pub(crate) fn stdout(&mut self, file: File) {
+        if let &mut RefinedJob::Cat { ref mut stdout, .. } = self {
+            *stdout = Some(file);
+        } else {
+            set_field!(self, stdout, file);
+        }
+    }
+
+    pub(crate) fn stdin(&mut self, file: File) {
+        if let &mut RefinedJob::Cat { ref mut stdin, .. } = self {
+            *stdin = Some(file);
+        } else {
+            set_field!(self, stdin, file);
+        }
+    }
+
+    pub(crate) fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
+        RefinedJob::Tee {
+            items:  (tee_out, tee_err),
+            stdin:  None,
+            stdout: None,
+            stderr: None,
+        }
+    }
+
+    pub(crate) fn cat(sources: Vec<File>) -> Self {
+        RefinedJob::Cat {
+            sources,
+            stdin: None,
+            stdout: None,
+        }
+    }
+
+    pub(crate) fn function(name: Identifier, args: Array) -> Self {
+        RefinedJob::Function {
             name,
             args,
             stdin: None,
@@ -215,74 +276,13 @@ impl RefinedJob {
         }
     }
 
-    pub(crate) fn function(name: Identifier, args: Array) -> Self {
-        RefinedJob::Function {
+    pub(crate) fn external(name: Identifier, args: Array) -> Self {
+        RefinedJob::External {
             name,
             args,
             stdin: None,
             stdout: None,
             stderr: None,
-        }
-    }
-
-    pub(crate) fn cat(sources: Vec<File>) -> Self {
-        RefinedJob::Cat {
-            sources,
-            stdin: None,
-            stdout: None,
-        }
-    }
-
-    pub(crate) fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
-        RefinedJob::Tee {
-            items:  (tee_out, tee_err),
-            stdin:  None,
-            stdout: None,
-            stderr: None,
-        }
-    }
-
-    pub(crate) fn stdin(&mut self, file: File) {
-        if let &mut RefinedJob::Cat { ref mut stdin, .. } = self {
-            *stdin = Some(file);
-        } else {
-            set_field!(self, stdin, file);
-        }
-    }
-
-    pub(crate) fn stdout(&mut self, file: File) {
-        if let &mut RefinedJob::Cat { ref mut stdout, .. } = self {
-            *stdout = Some(file);
-        } else {
-            set_field!(self, stdout, file);
-        }
-    }
-
-    pub(crate) fn stderr(&mut self, file: File) {
-        set_field!(self, stderr, file);
-    }
-
-    /// Returns a short description of this job: often just the command
-    /// or builtin name
-    pub(crate) fn short(&self) -> String {
-        match *self {
-            RefinedJob::Builtin { .. } => String::from("Shell Builtin"),
-            RefinedJob::Function { ref name, .. } |
-                RefinedJob::External { ref name, .. } => name.to_string(),
-            // TODO: Print for real
-            RefinedJob::Cat { .. } => "multi-input".into(),
-            RefinedJob::Tee { .. } => "multi-output".into(),
-        }
-    }
-
-    /// Returns a long description of this job: the commands and arguments
-    pub(crate) fn long(&self) -> String {
-        match *self {
-            RefinedJob::External { ref args, .. } |
-                RefinedJob::Builtin { ref args, .. } |
-                RefinedJob::Function { ref args, .. } => format!("{}", args.join(" ")),
-            // TODO: Figure out real printing
-            RefinedJob::Cat { .. } | RefinedJob::Tee { .. } => "".into(),
         }
     }
 }

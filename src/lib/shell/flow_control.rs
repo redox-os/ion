@@ -1,11 +1,8 @@
-use super::Shell;
-use super::flow::FlowLogic;
+use super::{flow::FlowLogic, Shell};
 use fnv::*;
-use parser::assignments::*;
-use parser::pipelines::Pipeline;
+use parser::{assignments::*, pipelines::Pipeline};
 use std::fmt::{self, Display, Formatter};
-use types::*;
-use types::Identifier;
+use types::{Identifier, *};
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ElseIf {
@@ -27,7 +24,10 @@ pub(crate) struct ElseIf {
 /// ```
 /// would be represented by the Case object:
 /// ```rust,ignore
-/// Case { value: Some(value), statements: vec![statement0, statement1, ... statementN]}
+/// Case {
+///     value:      Some(value),
+///     statements: vec![statement0, statement1, ... statementN],
+/// }
 /// ```
 /// The wildcard branch, a branch that matches any value, is represented as such:
 /// ```rust,ignore
@@ -167,22 +167,6 @@ impl Display for FunctionError {
 }
 
 impl Function {
-    pub(crate) fn new(
-        description: Option<String>,
-        name: Identifier,
-        args: Vec<KeyBuf>,
-        statements: Vec<Statement>,
-    ) -> Function {
-        Function {
-            description,
-            name,
-            args,
-            statements,
-        }
-    }
-
-    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> { self.description.as_ref() }
-
     pub(crate) fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
             return Err(FunctionError::InvalidArgumentCount);
@@ -240,6 +224,22 @@ impl Function {
 
         Ok(())
     }
+
+    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> { self.description.as_ref() }
+
+    pub(crate) fn new(
+        description: Option<String>,
+        name: Identifier,
+        args: Vec<KeyBuf>,
+        statements: Vec<Statement>,
+    ) -> Function {
+        Function {
+            description,
+            name,
+            args,
+            statements,
+        }
+    }
 }
 
 pub(crate) fn collect_cases<I>(
@@ -254,12 +254,16 @@ where
         ($statement:expr) => {
             match cases.last_mut() {
                 // XXX: When does this actually happen? What syntax error is this???
-                None => return Err(["ion: syntax error: encountered ",
-                                     $statement.short(),
-                                     " outside of `case ...` block"].concat()),
+                None => {
+                    return Err([
+                        "ion: syntax error: encountered ",
+                        $statement.short(),
+                        " outside of `case ...` block",
+                    ].concat())
+                }
                 Some(ref mut case) => case.statements.push($statement),
             }
-        }
+        };
     }
 
     while let Some(statement) = iterator.next() {

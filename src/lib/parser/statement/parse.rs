@@ -1,8 +1,12 @@
-use super::case;
-use super::functions::{collect_arguments, parse_function};
-use super::super::{pipelines, ArgumentSplitter};
-use super::super::assignments::{split_assignment, Operator};
-use super::super::pipelines::Pipeline;
+use super::{
+    super::{
+        assignments::{split_assignment, Operator},
+        pipelines::{self, Pipeline},
+        ArgumentSplitter,
+    },
+    case,
+    functions::{collect_arguments, parse_function},
+};
 use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};
 use std::char;
 
@@ -223,9 +227,7 @@ pub(crate) fn parse(code: &str) -> Statement {
             return Statement::And(Box::new(parse(cmd[3..].trim_left())))
         }
         _ if cmd.eq("and") => return Statement::And(Box::new(Statement::Default)),
-        _ if cmd.starts_with("or ") => {
-            return Statement::Or(Box::new(parse(cmd[2..].trim_left())))
-        }
+        _ if cmd.starts_with("or ") => return Statement::Or(Box::new(parse(cmd[2..].trim_left()))),
         _ if cmd.eq("or") => return Statement::Or(Box::new(Statement::Default)),
         _ if cmd.starts_with("not ") => {
             return Statement::Not(Box::new(parse(cmd[3..].trim_left())))
@@ -246,8 +248,7 @@ mod tests {
     use self::pipelines::PipeItem;
     use super::*;
     use parser::assignments::{KeyBuf, Primitive};
-    use shell::{Job, JobKind};
-    use shell::flow_control::Statement;
+    use shell::{flow_control::Statement, Job, JobKind};
 
     #[test]
     fn parsing_ifs() {
@@ -255,22 +256,20 @@ mod tests {
         let parsed_if = parse("if test 1 -eq 2");
         let correct_parse = Statement::If {
             expression: Pipeline {
-                items: vec![
-                    PipeItem {
-                        job:     Job::new(
-                            vec![
-                                "test".to_owned(),
-                                "1".to_owned(),
-                                "-eq".to_owned(),
-                                "2".to_owned(),
-                            ].into_iter()
-                                .collect(),
-                            JobKind::Last,
-                        ),
-                        outputs: Vec::new(),
-                        inputs:  Vec::new(),
-                    },
-                ],
+                items: vec![PipeItem {
+                    job:     Job::new(
+                        vec![
+                            "test".to_owned(),
+                            "1".to_owned(),
+                            "-eq".to_owned(),
+                            "2".to_owned(),
+                        ].into_iter()
+                            .collect(),
+                        JobKind::Last,
+                    ),
+                    outputs: Vec::new(),
+                    inputs:  Vec::new(),
+                }],
             },
             success:    vec![],
             else_if:    vec![],

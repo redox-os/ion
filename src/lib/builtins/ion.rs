@@ -1,5 +1,4 @@
-use shell::Shell;
-use shell::status::*;
+use shell::{status::*, Shell};
 use std::path::Path;
 
 use std::process::Command;

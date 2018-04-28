@@ -28,7 +28,9 @@ pub(crate) fn exec(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
                 &[]
             };
             shell.prep_for_exit();
-            Err(execve(argument, args, (flags & CLEAR_ENV) == 1).description().to_owned())
+            Err(execve(argument, args, (flags & CLEAR_ENV) == 1)
+                .description()
+                .to_owned())
         }
         None => Err("no command provided".to_owned()),
     }
