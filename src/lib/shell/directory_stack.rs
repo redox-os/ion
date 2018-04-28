@@ -161,7 +161,8 @@ impl DirectoryStack {
             },
             Action::Push(dir) => {
                 let index = if keep_front { 1 } else { 0 };
-                self.insert_dir(index, dir, variables);
+                let new_dir = self.normalize_path(dir.to_str().unwrap());
+                self.insert_dir(index, new_dir, variables);
                 self.set_current_dir_by_index(index, "pushd")?;
             }
         };
@@ -253,23 +254,8 @@ impl DirectoryStack {
         dir: &str,
         variables: &Variables,
     ) -> Result<(), Cow<'static, str>> {
-        use std::path::{Component, Path};
 
-        // Create a clone of the current directory.
-        let mut new_dir = match self.dirs.front() {
-            Some(cur_dir) => cur_dir.clone(),
-            None => PathBuf::new()
-        };
-
-        // Iterate through components of the specified directory
-        // and calculate the new path based on them.
-        for component in Path::new(dir).components() {
-            match component {
-                Component::CurDir => { },
-                Component::ParentDir => { new_dir.pop(); },
-                _ => { new_dir.push(component); }
-            };
-        }
+        let new_dir = self.normalize_path(dir);
 
         // Try to change into the new directory
         match set_current_dir(&new_dir) {
@@ -408,6 +394,27 @@ impl DirectoryStack {
     fn rotate_right(&mut self, num: usize) {
         let len = self.dirs.len();
         self.rotate_left(len - (num % len));
+    }
+
+    fn normalize_path(&mut self, dir: &str) -> PathBuf {
+        use std::path::{Component, Path};
+        // Create a clone of the current directory.
+        let mut new_dir = match self.dirs.front() {
+            Some(cur_dir) => cur_dir.clone(),
+            None => PathBuf::new()
+        };
+
+        // Iterate through components of the specified directory
+        // and calculate the new path based on them.
+        for component in Path::new(dir).components() {
+            match component {
+                Component::CurDir => { },
+                Component::ParentDir => { new_dir.pop(); },
+                _ => { new_dir.push(component); }
+            };
+        }
+
+        return new_dir;
     }
 }
 
