@@ -6,10 +6,10 @@ notifications:
   email: false
 env:
   - REDOX=
-  - REDOX=1 CC=x86_64-unknown-redox-gcc CARGO_ARGS='--target=x86_64-unknown-redox'
+  # - REDOX=1 CC=x86_64-unknown-redox-gcc CARGO_ARGS='--target=x86_64-unknown-redox'
 before_install:
   - if [ $REDOX ]; then ./.travis/redox-toolchain.sh; fi
 script:
-  - cargo build $CARGO_ARGS 
+  - cargo build $CARGO_ARGS
   - if [ ! $REDOX ]; then cargo test; fi
   - if [ ! $REDOX ]; then bash examples/run_examples.sh; fi
