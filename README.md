@@ -1,11 +1,9 @@
 # Introduction
 
 Ion is a modern system shell that features a simple, yet powerful, syntax. It is written entirely
-in Rust, which greatly increases the overall quality and security of the shell, eliminating the
-possibilities of a [ShellShock](http://www.wikiwand.com/en/Shellshock_(software_bug))-like vulnerability
-, and making development easier. It also offers a level of performance that exceeds that of Dash,
-when taking advantage of Ion's features. While it is developed alongside, and primarily for, RedoxOS,
-it is a fully capable on other \*nix platforms.
+in Rust, which greatly increases the overall quality and security of the shell. It also offers a
+level of performance that exceeds that of Dash, when taking advantage of Ion's features. While it
+is developed alongside, and primarily for, RedoxOS, it is a fully capable on other \*nix platforms.
 
 # Ion Shell
 
@@ -37,11 +35,12 @@ We are providing our manual for Ion in the form of a markdown-based book, which 
 
 ### Code Formatting
 
-When submitting a pull request, be sure to run
-`env CFG_RELEASE_CHANNEL=nightly cargo +nightly fmt` on your project with a
-nightly version of **rustfmt**. This will prevent me from having to push PR's specifically
-to format the code base from time to time. To install **rustfmt-nightly**, simply run
-`cargo install rustfmt-nightly --force`.
+When submitting a pull request, be sure to run `rustfmt`:
+
+```
+rustup component add rustfmt-preview
+cargo +nightly fmt
+```
 
 ### On Unit & Integration Tests
 

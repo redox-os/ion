@@ -1,6 +1,10 @@
-use super::MethodArgs;
-use super::super::Select;
-use super::super::super::{expand_string, is_expression, slice, Expander};
+use super::{
+    super::{
+        super::{expand_string, is_expression, slice, Expander},
+        Select,
+    },
+    MethodArgs,
+};
 use parser::assignments::is_array;
 use regex::Regex;
 use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};

@@ -1,6 +1,9 @@
-use super::{Primitive, ReturnValue, TypeError};
-use super::super::Expander;
-use super::super::expand_string;
+use super::{
+    super::{expand_string, Expander},
+    Primitive,
+    ReturnValue,
+    TypeError,
+};
 
 use std::iter::Iterator;
 
@@ -203,8 +206,7 @@ pub(crate) fn value_check<'a, E: Expander>(
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use super::super::*;
+    use super::{super::*, *};
 
     #[test]
     fn is_array_() {

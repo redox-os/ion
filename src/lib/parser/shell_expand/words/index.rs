@@ -10,6 +10,17 @@ pub(crate) enum Index {
 }
 
 impl Index {
+    pub(crate) fn resolve(&self, vector_length: usize) -> Option<usize> {
+        match *self {
+            Index::Forward(n) => Some(n),
+            Index::Backward(n) => if n >= vector_length {
+                None
+            } else {
+                Some(vector_length - (n + 1))
+            },
+        }
+    }
+
     /// Construct an index using the following convetions:
     /// - A positive value `n` represents `Forward(n)`
     /// - A negative value `-n` reprents `Backwards(n - 1)` such that:
@@ -21,17 +32,6 @@ impl Index {
             Index::Backward((input.abs() as usize) - 1)
         } else {
             Index::Forward(input.abs() as usize)
-        }
-    }
-
-    pub(crate) fn resolve(&self, vector_length: usize) -> Option<usize> {
-        match *self {
-            Index::Forward(n) => Some(n),
-            Index::Backward(n) => if n >= vector_length {
-                None
-            } else {
-                Some(vector_length - (n + 1))
-            },
         }
     }
 }

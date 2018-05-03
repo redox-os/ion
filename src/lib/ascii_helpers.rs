@@ -1,5 +1,4 @@
-use std::mem::transmute;
-use std::ops::DerefMut;
+use std::{mem::transmute, ops::DerefMut};
 
 // TODO: These could be generalised to work on non-ASCII characters (and even
 //       strings!) as long as the byte size of the needle and haystack match.

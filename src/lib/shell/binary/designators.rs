@@ -1,7 +1,6 @@
 use parser::ArgumentSplitter;
 use shell::Shell;
-use std::borrow::Cow;
-use std::str;
+use std::{borrow::Cow, str};
 
 bitflags! {
     struct Flags: u8 {
@@ -23,17 +22,17 @@ struct DesignatorSearcher<'a> {
 }
 
 impl<'a> DesignatorSearcher<'a> {
+    fn grab_and_shorten(&mut self, id: usize) -> &'a str {
+        let output = unsafe { str::from_utf8_unchecked(&self.data[..id]) };
+        self.data = &self.data[id..];
+        output
+    }
+
     fn new(data: &'a [u8]) -> DesignatorSearcher {
         DesignatorSearcher {
             data,
             flags: Flags::empty(),
         }
-    }
-
-    fn grab_and_shorten(&mut self, id: usize) -> &'a str {
-        let output = unsafe { str::from_utf8_unchecked(&self.data[..id]) };
-        self.data = &self.data[id..];
-        output
     }
 }
 

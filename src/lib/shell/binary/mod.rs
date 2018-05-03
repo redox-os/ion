@@ -4,19 +4,14 @@ mod prompt;
 mod readln;
 mod terminate;
 
-use self::prompt::{prompt, prompt_fn};
-use self::readln::readln;
-use self::terminate::{terminate_quotes, terminate_script_quotes};
-use super::{FlowLogic, Shell, ShellHistory};
-use super::flow_control::Statement;
-use super::status::*;
+use self::{
+    prompt::{prompt, prompt_fn},
+    readln::readln,
+    terminate::{terminate_quotes, terminate_script_quotes},
+};
+use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
 use liner::{Buffer, Context};
-use std::env;
-use std::fs::File;
-use std::io::ErrorKind;
-use std::iter;
-use std::path::Path;
-use std::process;
+use std::{env, fs::File, io::ErrorKind, iter, path::Path, process};
 
 pub const MAN_ION: &'static str = r#"NAME
     ion - ion shell
@@ -65,43 +60,36 @@ pub trait Binary {
 }
 
 impl Binary for Shell {
-    fn prompt(&mut self) -> String { prompt(self) }
-
-    fn prompt_fn(&mut self) -> Option<String> { prompt_fn(self) }
-
-    fn readln(&mut self) -> Option<String> { readln(self) }
-
-    fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I) -> i32 {
-        terminate_script_quotes(self, lines)
+    fn display_version(&self) {
+        println!("{}", include!(concat!(env!("OUT_DIR"), "/version_string")));
+        process::exit(0);
     }
 
-    fn terminate_quotes(&mut self, command: String) -> Result<String, ()> {
-        terminate_quotes(self, command)
-    }
-
-    fn execute_arguments<A: Iterator<Item = String>>(&mut self, mut args: A) {
-        if let Some(mut arg) = args.next() {
-            for argument in args {
-                arg.push(' ');
-                if argument == "" {
-                    arg.push_str("''");
-                } else {
-                    arg.push_str(&argument);
-                }
+    fn save_command(&mut self, cmd: &str) {
+        if cmd.starts_with('~') {
+            if !cmd.ends_with('/')
+                && self.variables
+                    .tilde_expansion(cmd, &self.directory_stack)
+                    .map_or(false, |ref path| Path::new(path).is_dir())
+            {
+                self.save_command_in_history(&[cmd, "/"].concat());
+            } else {
+                self.save_command_in_history(cmd);
             }
-            self.on_command(&arg);
-        } else {
-            eprintln!("ion: -c requires an argument");
-            self.exit(FAILURE);
+            return;
         }
 
-        if self.flow_control.level != 0 {
-            eprintln!(
-                "ion: unexpected end of arguments: expected end block for `{}`",
-                self.flow_control.current_statement.short()
-            );
-            self.exit(FAILURE);
+        if Path::new(cmd).is_dir() & !cmd.ends_with('/') {
+            self.save_command_in_history(&[cmd, "/"].concat());
+        } else {
+            self.save_command_in_history(cmd);
         }
+    }
+
+    fn reset_flow(&mut self) {
+        self.flow_control.level = 0;
+        self.flow_control.current_if_mode = 0;
+        self.flow_control.current_statement = Statement::Default;
     }
 
     fn execute_interactive(mut self) {
@@ -158,37 +146,44 @@ impl Binary for Shell {
         }
     }
 
-    fn reset_flow(&mut self) {
-        self.flow_control.level = 0;
-        self.flow_control.current_if_mode = 0;
-        self.flow_control.current_statement = Statement::Default;
-    }
-
-    fn save_command(&mut self, cmd: &str) {
-        if cmd.starts_with('~') {
-            if !cmd.ends_with('/')
-                && self.variables
-                    .tilde_expansion(cmd, &self.directory_stack)
-                    .map_or(false, |ref path| Path::new(path).is_dir())
-            {
-                self.save_command_in_history(&[cmd, "/"].concat());
-            } else {
-                self.save_command_in_history(cmd);
+    fn execute_arguments<A: Iterator<Item = String>>(&mut self, mut args: A) {
+        if let Some(mut arg) = args.next() {
+            for argument in args {
+                arg.push(' ');
+                if argument == "" {
+                    arg.push_str("''");
+                } else {
+                    arg.push_str(&argument);
+                }
             }
-            return;
-        }
-
-        if Path::new(cmd).is_dir() & !cmd.ends_with('/') {
-            self.save_command_in_history(&[cmd, "/"].concat());
+            self.on_command(&arg);
         } else {
-            self.save_command_in_history(cmd);
+            eprintln!("ion: -c requires an argument");
+            self.exit(FAILURE);
+        }
+
+        if self.flow_control.level != 0 {
+            eprintln!(
+                "ion: unexpected end of arguments: expected end block for `{}`",
+                self.flow_control.current_statement.short()
+            );
+            self.exit(FAILURE);
         }
     }
 
-    fn display_version(&self) {
-        println!("{}", include!(concat!(env!("OUT_DIR"), "/version_string")));
-        process::exit(0);
+    fn terminate_quotes(&mut self, command: String) -> Result<String, ()> {
+        terminate_quotes(self, command)
     }
+
+    fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I) -> i32 {
+        terminate_script_quotes(self, lines)
+    }
+
+    fn readln(&mut self) -> Option<String> { readln(self) }
+
+    fn prompt_fn(&mut self) -> Option<String> { prompt_fn(self) }
+
+    fn prompt(&mut self) -> String { prompt(self) }
 }
 
 // TODO: Convert this into an iterator to eliminate heap allocations.

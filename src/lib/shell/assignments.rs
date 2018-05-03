@@ -1,16 +1,20 @@
-use super::Shell;
-use super::flow_control::{ExportAction, LocalAction};
-use super::status::*;
+use super::{
+    flow_control::{ExportAction, LocalAction},
+    status::*,
+    Shell,
+};
 use itoa;
 use parser::assignments::*;
 use shell::history::ShellHistory;
-use std::env;
-use std::ffi::OsStr;
-use std::fmt::{self, Display};
-use std::io::{self, BufWriter, Write};
-use std::mem;
-use std::os::unix::ffi::OsStrExt;
-use std::str;
+use std::{
+    env,
+    ffi::OsStr,
+    fmt::{self, Display},
+    io::{self, BufWriter, Write},
+    mem,
+    os::unix::ffi::OsStrExt,
+    str,
+};
 
 fn list_vars(shell: &Shell) {
     let stdout = io::stdout();
@@ -58,6 +62,83 @@ pub(crate) trait VariableStore {
 }
 
 impl VariableStore for Shell {
+    fn export(&mut self, action: ExportAction) -> i32 {
+        let actions = match action {
+            ExportAction::Assign(ref keys, op, ref vals) => AssignmentActions::new(keys, op, vals),
+            ExportAction::LocalExport(ref key) => match self.get_var(key) {
+                Some(var) => {
+                    env::set_var(key, &var);
+                    return SUCCESS;
+                }
+                None => {
+                    eprintln!("ion: cannot export {} because it does not exist.", key);
+                    return FAILURE;
+                }
+            },
+            ExportAction::List => {
+                let stdout = io::stdout();
+                let mut stdout = stdout.lock();
+                for (key, val) in env::vars() {
+                    let _ = writeln!(stdout, "{} =\"{}\"", key, val);
+                }
+                return SUCCESS;
+            }
+        };
+
+        for action in actions {
+            match action {
+                Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
+                    match value_check(self, &expression, key.kind) {
+                        Ok(ReturnValue::Vector(values)) => env::set_var(key.name, values.join(" ")),
+                        Err(why) => {
+                            eprintln!("ion: assignment error: {}: {}", key.name, why);
+                            return FAILURE;
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                Ok(Action::UpdateArray(..)) => {
+                    eprintln!(
+                        "ion: arithmetic operators on array expressions aren't supported yet."
+                    );
+                    return FAILURE;
+                }
+                Ok(Action::UpdateString(key, operator, expression)) => {
+                    match value_check(self, &expression, key.kind) {
+                        Ok(ReturnValue::Str(value)) => {
+                            let key_name: &str = &key.name;
+                            let lhs = self.variables
+                                .variables
+                                .get(key_name)
+                                .map(|x| x.as_str())
+                                .unwrap_or("0");
+
+                            let result = math(&lhs, key.kind, operator, &value, |value| {
+                                env::set_var(key_name, &OsStr::from_bytes(value))
+                            });
+
+                            if let Err(why) = result {
+                                eprintln!("ion: assignment error: {}", why);
+                                return FAILURE;
+                            }
+                        }
+                        Err(why) => {
+                            eprintln!("ion: assignment error: {}: {}", key.name, why);
+                            return FAILURE;
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                Err(why) => {
+                    eprintln!("ion: assignment error: {}", why);
+                    return FAILURE;
+                }
+            }
+        }
+
+        SUCCESS
+    }
+
     fn local(&mut self, action: LocalAction) -> i32 {
         let actions = match action {
             LocalAction::List => {
@@ -113,83 +194,6 @@ impl VariableStore for Shell {
                                         str::from_utf8_unchecked(value)
                                     })
                                 });
-
-                            if let Err(why) = result {
-                                eprintln!("ion: assignment error: {}", why);
-                                return FAILURE;
-                            }
-                        }
-                        Err(why) => {
-                            eprintln!("ion: assignment error: {}: {}", key.name, why);
-                            return FAILURE;
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-                Err(why) => {
-                    eprintln!("ion: assignment error: {}", why);
-                    return FAILURE;
-                }
-            }
-        }
-
-        SUCCESS
-    }
-
-    fn export(&mut self, action: ExportAction) -> i32 {
-        let actions = match action {
-            ExportAction::Assign(ref keys, op, ref vals) => AssignmentActions::new(keys, op, vals),
-            ExportAction::LocalExport(ref key) => match self.get_var(key) {
-                Some(var) => {
-                    env::set_var(key, &var);
-                    return SUCCESS;
-                }
-                None => {
-                    eprintln!("ion: cannot export {} because it does not exist.", key);
-                    return FAILURE;
-                }
-            },
-            ExportAction::List => {
-                let stdout = io::stdout();
-                let mut stdout = stdout.lock();
-                for (key, val) in env::vars() {
-                    let _ = writeln!(stdout, "{} =\"{}\"", key, val);
-                }
-                return SUCCESS;
-            }
-        };
-
-        for action in actions {
-            match action {
-                Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
-                    match value_check(self, &expression, key.kind) {
-                        Ok(ReturnValue::Vector(values)) => env::set_var(key.name, values.join(" ")),
-                        Err(why) => {
-                            eprintln!("ion: assignment error: {}: {}", key.name, why);
-                            return FAILURE;
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-                Ok(Action::UpdateArray(..)) => {
-                    eprintln!(
-                        "ion: arithmetic operators on array expressions aren't supported yet."
-                    );
-                    return FAILURE;
-                }
-                Ok(Action::UpdateString(key, operator, expression)) => {
-                    match value_check(self, &expression, key.kind) {
-                        Ok(ReturnValue::Str(value)) => {
-                            let key_name: &str = &key.name;
-                            let lhs = self.variables
-                                .variables
-                                .get(key_name)
-                                .map(|x| x.as_str())
-                                .unwrap_or("0");
-
-                            let result = math(&lhs, key.kind, operator, &value, |value| {
-                                env::set_var(key_name, &OsStr::from_bytes(value))
-                            });
 
                             if let Err(why) = result {
                                 eprintln!("ion: assignment error: {}", why);

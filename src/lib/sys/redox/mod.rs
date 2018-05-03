@@ -1,12 +1,14 @@
 extern crate syscall;
 
-use std::{io, mem, slice};
-use std::env;
-use std::os::unix::ffi::OsStrExt;
-use std::os::unix::io::RawFd;
-use std::os::unix::process::ExitStatusExt;
-use std::path::PathBuf;
-use std::process::{exit, ExitStatus};
+use std::{
+    env,
+    io,
+    mem,
+    os::unix::{ffi::OsStrExt, io::RawFd, process::ExitStatusExt},
+    path::PathBuf,
+    process::{exit, ExitStatus},
+    slice,
+};
 use syscall::{waitpid, SigAction, EINTR, WUNTRACED};
 
 pub mod job_control;

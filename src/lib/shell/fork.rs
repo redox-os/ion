@@ -1,6 +1,8 @@
 use super::{IonError, Shell};
-use std::fs::File;
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::{
+    fs::File,
+    os::unix::io::{AsRawFd, FromRawFd},
+};
 use sys;
 
 #[repr(u8)]
@@ -50,9 +52,6 @@ pub struct IonResult {
 }
 
 impl<'a> Fork<'a> {
-    /// Creates a new `Fork` state from an existing shell.
-    pub fn new(shell: &'a Shell, capture: Capture) -> Fork<'a> { Fork { shell, capture } }
-
     /// Executes a closure within the child of the fork, and returning an `IonResult` in a
     /// non-blocking fashion.
     pub fn exec<F: FnMut(&mut Shell)>(&self, mut child_func: F) -> Result<IonResult, IonError> {
@@ -133,7 +132,10 @@ impl<'a> Fork<'a> {
                     status: sys::wait_for_child(pid).map_err(|why| IonError::Fork { why })?,
                 })
             }
-            Err(why) => Err(IonError::Fork { why: why }),
+            Err(why) => Err(IonError::Fork { why }),
         }
     }
+
+    /// Creates a new `Fork` state from an existing shell.
+    pub fn new(shell: &'a Shell, capture: Capture) -> Fork<'a> { Fork { shell, capture } }
 }

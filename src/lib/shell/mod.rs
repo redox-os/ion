@@ -1,52 +1,57 @@
 mod assignments;
-mod completer;
-mod flow;
-mod fork;
-mod history;
-mod job;
-pub mod flags;
-pub mod fork_function;
-pub mod status;
-pub mod variables;
 pub(crate) mod binary;
 pub(crate) mod colors;
+mod completer;
 pub(crate) mod directory_stack;
+pub mod flags;
+mod flow;
 pub(crate) mod flow_control;
+mod fork;
+pub mod fork_function;
+mod history;
+mod job;
 pub(crate) mod pipe_exec;
 pub(crate) mod plugins;
 pub(crate) mod signals;
+pub mod status;
+pub mod variables;
 
-pub use self::binary::Binary;
-pub(crate) use self::flow::FlowLogic;
-pub use self::fork::{Capture, Fork, IonResult};
-pub(crate) use self::history::{IgnoreSetting, ShellHistory};
-pub(crate) use self::job::{Job, JobKind};
-pub(crate) use self::pipe_exec::{foreground, job_control};
+pub use self::{
+    binary::Binary,
+    fork::{Capture, Fork, IonResult},
+};
+pub(crate) use self::{
+    flow::FlowLogic,
+    history::{IgnoreSetting, ShellHistory},
+    job::{Job, JobKind},
+    pipe_exec::{foreground, job_control},
+};
 
-use self::directory_stack::DirectoryStack;
-use self::flags::*;
-use self::flow_control::{FlowControl, Function, FunctionError};
-use self::foreground::ForegroundSignals;
-use self::job_control::{BackgroundProcess, JobControl};
-use self::pipe_exec::PipelineExecution;
-use self::status::*;
-use self::variables::Variables;
+use self::{
+    directory_stack::DirectoryStack,
+    flags::*,
+    flow_control::{FlowControl, Function, FunctionError},
+    foreground::ForegroundSignals,
+    job_control::{BackgroundProcess, JobControl},
+    pipe_exec::PipelineExecution,
+    status::*,
+    variables::Variables,
+};
 use builtins::{BuiltinMap, BUILTINS};
 use fnv::FnvHashMap;
 use liner::Context;
-use parser::{ArgumentSplitter, Expander, Select};
-use parser::Terminator;
-use parser::pipelines::Pipeline;
+use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
 use smallvec::SmallVec;
-use std::fs::File;
-use std::io::{self, Read, Write};
-use std::iter::FromIterator;
-use std::ops::Deref;
-use std::path::Path;
-use std::process;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::Ordering;
-use std::time::SystemTime;
+use std::{
+    fs::File,
+    io::{self, Read, Write},
+    iter::FromIterator,
+    ops::Deref,
+    path::Path,
+    process,
+    sync::{atomic::Ordering, Arc, Mutex},
+    time::SystemTime,
+};
 use sys;
 use types::*;
 use xdg::BaseDirectories;
@@ -110,7 +115,27 @@ pub struct Shell {
 pub struct ShellBuilder;
 
 impl ShellBuilder {
-    pub fn new() -> ShellBuilder { ShellBuilder }
+    pub fn as_binary(self) -> Shell { Shell::new(false) }
+
+    pub fn as_library(self) -> Shell { Shell::new(true) }
+
+    pub fn set_unique_pid(self) -> ShellBuilder {
+        if let Ok(pid) = sys::getpid() {
+            if sys::setpgid(0, pid).is_ok() {
+                let _ = sys::tcsetpgrp(0, pid);
+            }
+        }
+
+        self
+    }
+
+    pub fn block_signals(self) -> ShellBuilder {
+        // This will block SIGTSTP, SIGTTOU, SIGTTIN, and SIGCHLD, which is required
+        // for this shell to manage its own process group / children / etc.
+        signals::block();
+
+        self
+    }
 
     pub fn install_signal_handler(self) -> ShellBuilder {
         extern "C" fn handler(signal: i32) {
@@ -139,102 +164,90 @@ impl ShellBuilder {
         self
     }
 
-    pub fn block_signals(self) -> ShellBuilder {
-        // This will block SIGTSTP, SIGTTOU, SIGTTIN, and SIGCHLD, which is required
-        // for this shell to manage its own process group / children / etc.
-        signals::block();
-
-        self
-    }
-
-    pub fn set_unique_pid(self) -> ShellBuilder {
-        if let Ok(pid) = sys::getpid() {
-            if sys::setpgid(0, pid).is_ok() {
-                let _ = sys::tcsetpgrp(0, pid);
-            }
-        }
-
-        self
-    }
-
-    pub fn as_library(self) -> Shell { Shell::new(true) }
-
-    pub fn as_binary(self) -> Shell { Shell::new(false) }
+    pub fn new() -> ShellBuilder { ShellBuilder }
 }
 
 impl<'a> Shell {
-    pub(crate) fn new(is_library: bool) -> Shell {
-        Shell {
-            builtins: BUILTINS,
-            context: None,
-            variables: Variables::default(),
-            flow_control: FlowControl::default(),
-            directory_stack: DirectoryStack::new(),
-            functions: FnvHashMap::default(),
-            previous_job: !0,
-            previous_status: 0,
-            flags: 0,
-            background: Arc::new(Mutex::new(Vec::new())),
-            is_background_shell: false,
-            is_library,
-            break_flow: false,
-            foreground_signals: Arc::new(ForegroundSignals::new()),
-            ignore_setting: IgnoreSetting::default(),
+    /// A method for capturing the output of the shell, and performing actions without modifying
+    /// the state of the original shell. This performs a fork, taking a closure that controls
+    /// the shell in the child of the fork.
+    ///
+    /// The method is non-blocking, and therefore will immediately return file handles to the
+    /// stdout and stderr of the child. The PID of the child is returned, which may be used to
+    /// wait for and obtain the exit status.
+    pub fn fork<F: FnMut(&mut Shell)>(
+        &self,
+        capture: Capture,
+        child_func: F,
+    ) -> Result<IonResult, IonError> {
+        Fork::new(self, capture).exec(child_func)
+    }
+
+    /// A method for executing a function with the given `name`, using `args` as the input.
+    /// If the function does not exist, an `IonError::DoesNotExist` is returned.
+    pub fn execute_function(&mut self, name: &str, args: &[&str]) -> Result<i32, IonError> {
+        self.functions
+            .get_mut(name.into())
+            .ok_or(IonError::DoesNotExist)
+            .map(|fnc| fnc.clone())
+            .and_then(|function| {
+                function
+                    .execute(self, args)
+                    .map(|_| self.previous_status)
+                    .map_err(|err| IonError::Function { why: err })
+            })
+    }
+
+    /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
+    /// method will attempt to execute that file as a script, and then returns the final exit
+    /// status of the evaluated script.
+    pub fn execute_script<SCRIPT: AsRef<Path>>(&mut self, script: SCRIPT) -> io::Result<i32> {
+        let mut script = File::open(script.as_ref())?;
+        let capacity = script.metadata().ok().map_or(0, |x| x.len());
+        let mut command_list = String::with_capacity(capacity as usize);
+        let _ = script.read_to_string(&mut command_list)?;
+        if FAILURE == self.terminate_script_quotes(command_list.lines().map(|x| x.to_owned())) {
+            self.previous_status = FAILURE;
+        }
+        Ok(self.previous_status)
+    }
+
+    /// A method for executing commands in the Ion shell without capturing. It takes command(s)
+    /// as
+    /// a string argument, parses them, and executes them the same as it would if you had
+    /// executed
+    /// the command(s) in the command line REPL interface for Ion. If the supplied command is
+    /// not
+    /// terminated, then an error will be returned.
+    pub fn execute_command<CMD>(&mut self, command: CMD) -> Result<i32, IonError>
+    where
+        CMD: Into<Terminator>,
+    {
+        let mut terminator = command.into();
+        if terminator.is_terminated() {
+            self.on_command(&terminator.consume());
+            Ok(self.previous_status)
+        } else {
+            Err(IonError::Unterminated)
         }
     }
 
-    pub(crate) fn next_signal(&self) -> Option<i32> {
-        match signals::PENDING.swap(0, Ordering::SeqCst) {
-            0 => None,
-            signals::SIGINT => Some(sys::SIGINT),
-            signals::SIGHUP => Some(sys::SIGHUP),
-            signals::SIGTERM => Some(sys::SIGTERM),
-            _ => unreachable!(),
-        }
+    /// Gets an array variable, if it exists within the shell's array map.
+    pub fn get_array(&self, name: &str) -> Option<&[String]> {
+        self.variables.get_array(name).map(SmallVec::as_ref)
     }
 
-    pub(crate) fn prep_for_exit(&mut self) {
-        // The context has two purposes: if it exists, this is an interactive shell; and the
-        // context will also be sent a signal to commit all changes to the history file,
-        // and waiting for the history thread in the background to finish.
-        if self.context.is_some() {
-            if self.flags & HUPONEXIT != 0 {
-                self.resume_stopped();
-                self.background_send(sys::SIGHUP);
-            }
-            let context = self.context.as_mut().unwrap();
-            context.history.commit_history();
-        }
+    /// Obtains a variable, returning an empty string if it does not exist.
+    pub(crate) fn get_var_or_empty(&self, name: &str) -> String {
+        self.variables.get_var_or_empty(name)
     }
 
-    /// Cleanly exit ion
-    pub fn exit(&mut self, status: i32) -> ! {
-        self.prep_for_exit();
-        process::exit(status);
-    }
+    /// Gets a string variable, if it exists within the shell's variable map.
+    pub fn get_var(&self, name: &str) -> Option<String> { self.variables.get_var(name) }
 
-    /// Evaluates the source init file in the user's home directory.
-    pub fn evaluate_init_file(&mut self) {
-        let base_dirs = match BaseDirectories::with_prefix("ion") {
-            Ok(base_dirs) => base_dirs,
-            Err(err) => {
-                eprintln!("ion: unable to get base directory: {}", err);
-                return;
-            }
-        };
-        match base_dirs.find_config_file("initrc") {
-            Some(initrc) => {
-                if let Err(err) = self.execute_script(&initrc) {
-                    eprintln!("ion: {}", err);
-                }
-            }
-            None => {
-                if let Err(err) = base_dirs.place_config_file("initrc") {
-                    eprintln!("ion: could not create initrc file: {}", err);
-                }
-            }
-        }
-    }
+    /// Sets a variable of `name` with the given `value` in the shell's
+    /// variable map.
+    pub fn set_var(&mut self, name: &str, value: &str) { self.variables.set_var(name, value); }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
     pub(crate) fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
@@ -342,91 +355,115 @@ impl<'a> Shell {
         exit_status
     }
 
-    /// Sets a variable of `name` with the given `value` in the shell's
-    /// variable map.
-    pub fn set_var(&mut self, name: &str, value: &str) { self.variables.set_var(name, value); }
-
-    /// Gets a string variable, if it exists within the shell's variable map.
-    pub fn get_var(&self, name: &str) -> Option<String> { self.variables.get_var(name) }
-
-    /// Obtains a variable, returning an empty string if it does not exist.
-    pub(crate) fn get_var_or_empty(&self, name: &str) -> String {
-        self.variables.get_var_or_empty(name)
-    }
-
-    /// Gets an array variable, if it exists within the shell's array map.
-    pub fn get_array(&self, name: &str) -> Option<&[String]> {
-        self.variables.get_array(name).map(SmallVec::as_ref)
-    }
-
-    /// A method for executing commands in the Ion shell without capturing. It takes command(s)
-    /// as
-    /// a string argument, parses them, and executes them the same as it would if you had
-    /// executed
-    /// the command(s) in the command line REPL interface for Ion. If the supplied command is
-    /// not
-    /// terminated, then an error will be returned.
-    pub fn execute_command<CMD>(&mut self, command: CMD) -> Result<i32, IonError>
-    where
-        CMD: Into<Terminator>,
-    {
-        let mut terminator = command.into();
-        if terminator.is_terminated() {
-            self.on_command(&terminator.consume());
-            Ok(self.previous_status)
-        } else {
-            Err(IonError::Unterminated)
+    /// Evaluates the source init file in the user's home directory.
+    pub fn evaluate_init_file(&mut self) {
+        let base_dirs = match BaseDirectories::with_prefix("ion") {
+            Ok(base_dirs) => base_dirs,
+            Err(err) => {
+                eprintln!("ion: unable to get base directory: {}", err);
+                return;
+            }
+        };
+        match base_dirs.find_config_file("initrc") {
+            Some(initrc) => {
+                if let Err(err) = self.execute_script(&initrc) {
+                    eprintln!("ion: {}", err);
+                }
+            }
+            None => {
+                if let Err(err) = base_dirs.place_config_file("initrc") {
+                    eprintln!("ion: could not create initrc file: {}", err);
+                }
+            }
         }
     }
 
-    /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
-    /// method will attempt to execute that file as a script, and then returns the final exit
-    /// status of the evaluated script.
-    pub fn execute_script<SCRIPT: AsRef<Path>>(&mut self, script: SCRIPT) -> io::Result<i32> {
-        let mut script = File::open(script.as_ref())?;
-        let capacity = script.metadata().ok().map_or(0, |x| x.len());
-        let mut command_list = String::with_capacity(capacity as usize);
-        let _ = script.read_to_string(&mut command_list)?;
-        if FAILURE == self.terminate_script_quotes(command_list.lines().map(|x| x.to_owned())) {
-            self.previous_status = FAILURE;
+    /// Cleanly exit ion
+    pub fn exit(&mut self, status: i32) -> ! {
+        self.prep_for_exit();
+        process::exit(status);
+    }
+
+    pub(crate) fn prep_for_exit(&mut self) {
+        // The context has two purposes: if it exists, this is an interactive shell; and the
+        // context will also be sent a signal to commit all changes to the history file,
+        // and waiting for the history thread in the background to finish.
+        if self.context.is_some() {
+            if self.flags & HUPONEXIT != 0 {
+                self.resume_stopped();
+                self.background_send(sys::SIGHUP);
+            }
+            let context = self.context.as_mut().unwrap();
+            context.history.commit_history();
         }
-        Ok(self.previous_status)
     }
 
-    /// A method for executing a function with the given `name`, using `args` as the input.
-    /// If the function does not exist, an `IonError::DoesNotExist` is returned.
-    pub fn execute_function(&mut self, name: &str, args: &[&str]) -> Result<i32, IonError> {
-        self.functions
-            .get_mut(name.into())
-            .ok_or(IonError::DoesNotExist)
-            .map(|fnc| fnc.clone())
-            .and_then(|function| {
-                function
-                    .execute(self, args)
-                    .map(|_| self.previous_status)
-                    .map_err(|err| IonError::Function { why: err })
-            })
+    pub(crate) fn next_signal(&self) -> Option<i32> {
+        match signals::PENDING.swap(0, Ordering::SeqCst) {
+            0 => None,
+            signals::SIGINT => Some(sys::SIGINT),
+            signals::SIGHUP => Some(sys::SIGHUP),
+            signals::SIGTERM => Some(sys::SIGTERM),
+            _ => unreachable!(),
+        }
     }
 
-    /// A method for capturing the output of the shell, and performing actions without modifying
-    /// the state of the original shell. This performs a fork, taking a closure that controls
-    /// the shell in the child of the fork.
-    ///
-    /// The method is non-blocking, and therefore will immediately return file handles to the
-    /// stdout and stderr of the child. The PID of the child is returned, which may be used to
-    /// wait for and obtain the exit status.
-    pub fn fork<F: FnMut(&mut Shell)>(
-        &self,
-        capture: Capture,
-        child_func: F,
-    ) -> Result<IonResult, IonError> {
-        Fork::new(self, capture).exec(child_func)
+    pub(crate) fn new(is_library: bool) -> Shell {
+        Shell {
+            builtins: BUILTINS,
+            context: None,
+            variables: Variables::default(),
+            flow_control: FlowControl::default(),
+            directory_stack: DirectoryStack::new(),
+            functions: FnvHashMap::default(),
+            previous_job: !0,
+            previous_status: 0,
+            flags: 0,
+            background: Arc::new(Mutex::new(Vec::new())),
+            is_background_shell: false,
+            is_library,
+            break_flow: false,
+            foreground_signals: Arc::new(ForegroundSignals::new()),
+            ignore_setting: IgnoreSetting::default(),
+        }
     }
 }
 
 impl<'a> Expander for Shell {
-    fn tilde(&self, input: &str) -> Option<String> {
-        self.variables.tilde_expansion(input, &self.directory_stack)
+    /// Uses a subshell to expand a given command.
+    fn command(&self, command: &str) -> Option<Value> {
+        let mut output = None;
+        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| {
+            shell.on_command(command)
+        }) {
+            Ok(result) => {
+                let mut string = String::with_capacity(1024);
+                match result.stdout.unwrap().read_to_string(&mut string) {
+                    Ok(_) => output = Some(string),
+                    Err(why) => {
+                        eprintln!("ion: error reading stdout of child: {}", why);
+                    }
+                }
+            }
+            Err(why) => {
+                eprintln!("ion: fork error: {}", why);
+            }
+        }
+
+        // Ensure that the parent retains ownership of the terminal before exiting.
+        let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
+        output
+    }
+
+    /// Expand a string variable given if its quoted / unquoted
+    fn variable(&self, variable: &str, quoted: bool) -> Option<Value> {
+        use ascii_helpers::AsciiReplace;
+        if quoted {
+            self.get_var(variable)
+        } else {
+            self.get_var(variable)
+                .map(|x| x.ascii_replace('\n', ' ').into())
+        }
     }
 
     /// Expand an array variable with some selection
@@ -476,39 +513,8 @@ impl<'a> Expander for Shell {
         }
         found
     }
-    /// Expand a string variable given if its quoted / unquoted
-    fn variable(&self, variable: &str, quoted: bool) -> Option<Value> {
-        use ascii_helpers::AsciiReplace;
-        if quoted {
-            self.get_var(variable)
-        } else {
-            self.get_var(variable)
-                .map(|x| x.ascii_replace('\n', ' ').into())
-        }
-    }
 
-    /// Uses a subshell to expand a given command.
-    fn command(&self, command: &str) -> Option<Value> {
-        let mut output = None;
-        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| {
-            shell.on_command(command)
-        }) {
-            Ok(result) => {
-                let mut string = String::with_capacity(1024);
-                match result.stdout.unwrap().read_to_string(&mut string) {
-                    Ok(_) => output = Some(string),
-                    Err(why) => {
-                        eprintln!("ion: error reading stdout of child: {}", why);
-                    }
-                }
-            }
-            Err(why) => {
-                eprintln!("ion: fork error: {}", why);
-            }
-        }
-
-        // Ensure that the parent retains ownership of the terminal before exiting.
-        let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
-        output
+    fn tilde(&self, input: &str) -> Option<String> {
+        self.variables.tilde_expansion(input, &self.directory_stack)
     }
 }

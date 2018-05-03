@@ -1,5 +1,7 @@
-use std::error::Error;
-use std::io::{stdout, Write};
+use std::{
+    error::Error,
+    io::{stdout, Write},
+};
 
 pub(crate) fn print_man(man_page: &'static str) {
     let stdout = stdout();
@@ -493,57 +495,6 @@ EXAMPLES
         matches xs x
     Returns false:
         matches x xs
-"#;
-
-pub(crate) const MAN_NOT: &'static str = r#"NAME
-    not - reverses the exit status of a job
-
-SYNOPSIS
-    not
-
-DESCRIPTION
-    not reverses the exit status of a job. If the exit status is 1 not returns 0 and vice versa.
-"#;
-
-pub(crate) const MAN_AND: &'static str = r#"NAME
-    and - check if to execute another command and a boolean gate.
-
-SYNOPSIS
-    COMMAND and COMMAND
-    COMMAND; and COMMAND
-
-DESCRIPTION
-    and changes the exit status to 0 if the previous command and the next command are true. 
-    and can also be used to execute multiple commands if they all are successful. '&&' is preferred to 'and'
-    in if, while and all other similar conditional statements.  
-
-EXAMPLES
-    Returns an exit of status 0:
-        true and true
-    Returns an exit of status 1:
-        true and false
-
-    Executes all the commands:
-        echo "1"; and echo "2"
-    Executes no commands:
-        false; and echo "1"
-"#;
-
-pub(crate) const MAN_OR: &'static str = r#"NAME
-    or - conditionally run a command
-
-SYNOPSIS
-    COMMAND; or COMMAND
-
-DESCRIPTION
-    or can be used to execute a command if the exit status of the previous command is not 0.
-    or can also be used in if, while and other similar statements, however '||' is preferred.
-
-EXAMPLE
-    Executes all of the code block, prints 2:
-        false; or echo "2" 
-    Does not execute all of the code block, prints 1:
-        echo "1"; or echo "2"
 "#;
 
 pub(crate) const MAN_EXISTS: &'static str = r#"NAME

@@ -1,7 +1,13 @@
-use super::Pattern;
-use super::strings::unescape;
-use super::super::{Index, Select, SelectWithSize};
-use super::super::super::{expand_string, is_expression, Expander};
+use super::{
+    super::{
+        super::{expand_string, is_expression, Expander},
+        Index,
+        Select,
+        SelectWithSize,
+    },
+    strings::unescape,
+    Pattern,
+};
 use smallstring::SmallString;
 use std::char;
 use types::Array;
@@ -16,54 +22,66 @@ pub(crate) struct ArrayMethod<'a> {
 }
 
 impl<'a> ArrayMethod<'a> {
-    pub(crate) fn handle<E: Expander>(&self, current: &mut String, expand_func: &E) {
-        let res = match self.method {
-            "split" => self.split(expand_func).map(|r| r.join(" ")),
-            _ => Err("invalid array method"),
-        };
-        match res {
-            Ok(output) => current.push_str(&output),
-            Err(msg) => eprintln!("ion: {}: {}", self.method, msg),
-        }
+    fn reverse<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
+        let mut result = self.resolve_array(expand_func);
+        result.reverse();
+        Ok(result)
     }
 
-    pub(crate) fn handle_as_array<E: Expander>(&self, expand_func: &E) -> Array {
-        let res = match self.method {
-            "split" => self.split(expand_func),
-            "split_at" => self.split_at(expand_func),
-            "graphemes" => self.graphemes(expand_func),
-            "bytes" => self.bytes(expand_func),
-            "chars" => self.chars(expand_func),
-            "lines" => self.lines(expand_func),
-            "reverse" => self.reverse(expand_func),
-            _ => Err("invalid array method"),
-        };
-
-        res.unwrap_or_else(|m| {
-            eprintln!("ion: {}: {}", self.method, m);
-            array![]
-        })
+    fn lines<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
+        let variable = self.resolve_var(expand_func);
+        Ok(variable
+            .lines()
+            .into_iter()
+            .map(|line| line.to_string())
+            .collect())
     }
 
-    #[inline]
-    fn resolve_var<E: Expander>(&self, expand_func: &E) -> String {
-        if let Some(variable) = expand_func.variable(self.variable, false) {
-            variable
-        } else if is_expression(self.variable) {
-            expand_string(self.variable, expand_func, false).join(" ")
-        } else {
-            "".into()
-        }
+    fn chars<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
+        let variable = self.resolve_var(expand_func);
+        let len = variable.chars().count();
+        Ok(variable
+            .chars()
+            .map(|c| c.to_string())
+            .select(self.selection.clone(), len))
     }
 
-    #[inline]
-    fn resolve_array<E: Expander>(&self, expand_func: &E) -> Array {
-        if let Some(array) = expand_func.array(self.variable, Select::All) {
-            array.clone()
-        } else if is_expression(self.variable) {
-            expand_string(self.variable, expand_func, false)
-        } else {
-            array![]
+    fn bytes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
+        let variable = self.resolve_var(expand_func);
+        let len = variable.as_bytes().len();
+        Ok(variable
+            .bytes()
+            .map(|b| b.to_string())
+            .select(self.selection.clone(), len))
+    }
+
+    fn graphemes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
+        let variable = self.resolve_var(expand_func);
+        let graphemes: Vec<String> = UnicodeSegmentation::graphemes(variable.as_str(), true)
+            .map(From::from)
+            .collect();
+        let len = graphemes.len();
+        Ok(graphemes.into_iter().select(self.selection.clone(), len))
+    }
+
+    fn split_at<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
+        let variable = self.resolve_var(expand_func);
+        match self.pattern {
+            Pattern::StringPattern(string) => if let Ok(value) =
+                expand_string(string, expand_func, false)
+                    .join(" ")
+                    .parse::<usize>()
+            {
+                if value < variable.len() {
+                    let (l, r) = variable.split_at(value);
+                    Ok(array![SmallString::from(l), SmallString::from(r)])
+                } else {
+                    Err("value is out of bounds")
+                }
+            } else {
+                Err("requires a valid number as an argument")
+            },
+            Pattern::Whitespace => Err("requires an argument"),
         }
     }
 
@@ -137,92 +155,81 @@ impl<'a> ArrayMethod<'a> {
         Ok(res)
     }
 
-    fn split_at<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
-        let variable = self.resolve_var(expand_func);
-        match self.pattern {
-            Pattern::StringPattern(string) => if let Ok(value) =
-                expand_string(string, expand_func, false)
-                    .join(" ")
-                    .parse::<usize>()
-            {
-                if value < variable.len() {
-                    let (l, r) = variable.split_at(value);
-                    Ok(array![SmallString::from(l), SmallString::from(r)])
-                } else {
-                    Err("value is out of bounds")
-                }
-            } else {
-                Err("requires a valid number as an argument")
-            },
-            Pattern::Whitespace => Err("requires an argument"),
+    #[inline]
+    fn resolve_array<E: Expander>(&self, expand_func: &E) -> Array {
+        if let Some(array) = expand_func.array(self.variable, Select::All) {
+            array.clone()
+        } else if is_expression(self.variable) {
+            expand_string(self.variable, expand_func, false)
+        } else {
+            array![]
         }
     }
 
-    fn graphemes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
-        let variable = self.resolve_var(expand_func);
-        let graphemes: Vec<String> = UnicodeSegmentation::graphemes(variable.as_str(), true)
-            .map(From::from)
-            .collect();
-        let len = graphemes.len();
-        Ok(graphemes.into_iter().select(self.selection.clone(), len))
+    #[inline]
+    fn resolve_var<E: Expander>(&self, expand_func: &E) -> String {
+        if let Some(variable) = expand_func.variable(self.variable, false) {
+            variable
+        } else if is_expression(self.variable) {
+            expand_string(self.variable, expand_func, false).join(" ")
+        } else {
+            "".into()
+        }
     }
 
-    fn bytes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
-        let variable = self.resolve_var(expand_func);
-        let len = variable.as_bytes().len();
-        Ok(variable
-            .bytes()
-            .map(|b| b.to_string())
-            .select(self.selection.clone(), len))
+    pub(crate) fn handle_as_array<E: Expander>(&self, expand_func: &E) -> Array {
+        let res = match self.method {
+            "split" => self.split(expand_func),
+            "split_at" => self.split_at(expand_func),
+            "graphemes" => self.graphemes(expand_func),
+            "bytes" => self.bytes(expand_func),
+            "chars" => self.chars(expand_func),
+            "lines" => self.lines(expand_func),
+            "reverse" => self.reverse(expand_func),
+            _ => Err("invalid array method"),
+        };
+
+        res.unwrap_or_else(|m| {
+            eprintln!("ion: {}: {}", self.method, m);
+            array![]
+        })
     }
 
-    fn chars<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
-        let variable = self.resolve_var(expand_func);
-        let len = variable.chars().count();
-        Ok(variable
-            .chars()
-            .map(|c| c.to_string())
-            .select(self.selection.clone(), len))
-    }
-
-    fn lines<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
-        let variable = self.resolve_var(expand_func);
-        Ok(variable
-            .lines()
-            .into_iter()
-            .map(|line| line.to_string())
-            .collect())
-    }
-
-    fn reverse<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
-        let mut result = self.resolve_array(expand_func);
-        result.reverse();
-        Ok(result)
+    pub(crate) fn handle<E: Expander>(&self, current: &mut String, expand_func: &E) {
+        let res = match self.method {
+            "split" => self.split(expand_func).map(|r| r.join(" ")),
+            _ => Err("invalid array method"),
+        };
+        match res {
+            Ok(output) => current.push_str(&output),
+            Err(msg) => eprintln!("ion: {}: {}", self.method, msg),
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use super::super::Key;
-    use super::super::super::Range;
+    use super::{
+        super::{super::Range, Key},
+        *,
+    };
     use types::Value;
 
     struct VariableExpander;
 
     impl Expander for VariableExpander {
+        fn array(&self, variable: &str, _: Select) -> Option<Array> {
+            match variable {
+                "ARRAY" => Some(array!["a", "b", "c"].to_owned()),
+                _ => None,
+            }
+        }
+
         fn variable(&self, variable: &str, _: bool) -> Option<Value> {
             match variable {
                 "FOO" => Some("FOOBAR".to_owned()),
                 "SPACEDFOO" => Some("FOO BAR".to_owned()),
                 "MULTILINE" => Some("FOO\nBAR".to_owned()),
-                _ => None,
-            }
-        }
-
-        fn array(&self, variable: &str, _: Select) -> Option<Array> {
-            match variable {
-                "ARRAY" => Some(array!["a", "b", "c"].to_owned()),
                 _ => None,
             }
         }

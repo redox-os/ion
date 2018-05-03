@@ -1,5 +1,4 @@
-use super::directory_stack::DirectoryStack;
-use super::variables::Variables;
+use super::{directory_stack::DirectoryStack, variables::Variables};
 use liner::{Completer, FilenameCompleter};
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
@@ -22,8 +21,8 @@ impl IonFileCompleter {
     ) -> IonFileCompleter {
         IonFileCompleter {
             inner:     FilenameCompleter::new(path),
-            dir_stack: dir_stack,
-            vars:      vars,
+            dir_stack,
+            vars,
         }
     }
 }
@@ -150,7 +149,7 @@ where
     A: Completer,
     B: Completer,
 {
-    pub(crate) fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> { MultiCompleter { a: a, b: b } }
+    pub(crate) fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> { MultiCompleter { a, b } }
 }
 
 impl<A, B> Completer for MultiCompleter<A, B>

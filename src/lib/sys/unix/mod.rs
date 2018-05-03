@@ -3,11 +3,16 @@ extern crate libc;
 pub mod job_control;
 pub mod signals;
 
-use libc::{c_char, c_int, pid_t, sighandler_t, strerror, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED};
-use std::{env, io, ptr};
-use std::ffi::{CStr, CString};
-use std::io::Write;
-use std::os::unix::io::RawFd;
+use libc::{
+    c_char, c_int, pid_t, sighandler_t, strerror, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED,
+};
+use std::{
+    env,
+    ffi::{CStr, CString},
+    io::{self, Write},
+    os::unix::io::RawFd,
+    ptr,
+};
 
 pub(crate) const PATH_SEPARATOR: &str = ":";
 pub(crate) const NULL_PATH: &str = "/dev/null";
@@ -358,8 +363,7 @@ fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
 }
 
 pub mod variables {
-    use users_unix::get_user_by_name;
-    use users_unix::os::unix::UserExt;
+    use users_unix::{get_user_by_name, os::unix::UserExt};
 
     pub(crate) fn get_user_home(username: &str) -> Option<String> {
         match get_user_by_name(username) {

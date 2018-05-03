@@ -87,48 +87,43 @@ pub(crate) struct Colors {
 }
 
 impl Colors {
-    /// Parses the given input and returns a structure obtaining the text data needed for proper
-    /// transformation into ANSI code parameters, which may be obtained by calling the
-    /// `into_string()` method on the newly-created `Colors` structure.
-    pub(crate) fn collect(input: &str) -> Colors {
-        let mut colors = Colors {
-            foreground: None,
-            background: None,
-            attributes: None,
-        };
-        for variable in input.split(",") {
-            if variable == "reset" {
-                return Colors {
-                    foreground: None,
-                    background: None,
-                    attributes: Some(vec!["0"]),
-                };
-            } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
-                colors.append_attribute(attribute);
-            } else if let Some(color) = COLORS.get(&variable) {
-                colors.foreground = Some(Mode::Name(color));
-            } else if let Some(color) = BG_COLORS.get(&variable) {
-                colors.background = Some(Mode::Name(color));
-            } else if !colors.parse_colors(variable) {
-                eprintln!("ion: {} is not a valid color", variable)
-            }
-        }
-        colors
-    }
+    /// Attempts to transform the data in the structure into the corresponding ANSI code
+    /// representation. It would very ugly to require shell scripters to have to interface
+    /// with these codes directly.
+    pub(crate) fn into_string(self) -> Option<String> {
+        let mut output = String::from("\x1b[");
 
-    /// Attributes can be stacked, so this function serves to enable that
-    /// stacking.
-    fn append_attribute(&mut self, attribute: &'static str) {
-        let vec_exists = match self.attributes.as_mut() {
-            Some(vec) => {
-                vec.push(attribute);
-                true
+        let foreground = match self.foreground {
+            Some(Mode::Name(string)) => Some(string.to_owned()),
+            Some(Mode::Range256(value)) => Some(format!("38;5;{}", value)),
+            Some(Mode::TrueColor(red, green, blue)) => {
+                Some(format!("38;2;{};{};{}", red, green, blue))
             }
-            None => false,
+            None => None,
         };
 
-        if !vec_exists {
-            self.attributes = Some(vec![attribute]);
+        let background = match self.background {
+            Some(Mode::Name(string)) => Some(string.to_owned()),
+            Some(Mode::Range256(value)) => Some(format!("48;5;{}", value)),
+            Some(Mode::TrueColor(red, green, blue)) => {
+                Some(format!("48;2;{};{};{}", red, green, blue))
+            }
+            None => None,
+        };
+
+        if let Some(attr) = self.attributes {
+            output.push_str(&attr.join(";"));
+            match (foreground, background) {
+                (Some(c), None) | (None, Some(c)) => Some([&output, ";", &c, "m"].concat()),
+                (None, None) => Some([&output, "m"].concat()),
+                (Some(fg), Some(bg)) => Some([&output, ";", &fg, ";", &bg, "m"].concat()),
+            }
+        } else {
+            match (foreground, background) {
+                (Some(c), None) | (None, Some(c)) => Some([&output, &c, "m"].concat()),
+                (None, None) => None,
+                (Some(fg), Some(bg)) => Some([&output, &fg, ";", &bg, "m"].concat()),
+            }
         }
     }
 
@@ -186,44 +181,49 @@ impl Colors {
         false
     }
 
-    /// Attempts to transform the data in the structure into the corresponding ANSI code
-    /// representation. It would very ugly to require shell scripters to have to interface
-    /// with these codes directly.
-    pub(crate) fn into_string(self) -> Option<String> {
-        let mut output = String::from("\x1b[");
-
-        let foreground = match self.foreground {
-            Some(Mode::Name(string)) => Some(string.to_owned()),
-            Some(Mode::Range256(value)) => Some(format!("38;5;{}", value)),
-            Some(Mode::TrueColor(red, green, blue)) => {
-                Some(format!("38;2;{};{};{}", red, green, blue))
+    /// Attributes can be stacked, so this function serves to enable that
+    /// stacking.
+    fn append_attribute(&mut self, attribute: &'static str) {
+        let vec_exists = match self.attributes.as_mut() {
+            Some(vec) => {
+                vec.push(attribute);
+                true
             }
-            None => None,
+            None => false,
         };
 
-        let background = match self.background {
-            Some(Mode::Name(string)) => Some(string.to_owned()),
-            Some(Mode::Range256(value)) => Some(format!("48;5;{}", value)),
-            Some(Mode::TrueColor(red, green, blue)) => {
-                Some(format!("48;2;{};{};{}", red, green, blue))
-            }
-            None => None,
-        };
+        if !vec_exists {
+            self.attributes = Some(vec![attribute]);
+        }
+    }
 
-        if let Some(attr) = self.attributes {
-            output.push_str(&attr.join(";"));
-            match (foreground, background) {
-                (Some(c), None) | (None, Some(c)) => Some([&output, ";", &c, "m"].concat()),
-                (None, None) => Some([&output, "m"].concat()),
-                (Some(fg), Some(bg)) => Some([&output, ";", &fg, ";", &bg, "m"].concat()),
-            }
-        } else {
-            match (foreground, background) {
-                (Some(c), None) | (None, Some(c)) => Some([&output, &c, "m"].concat()),
-                (None, None) => None,
-                (Some(fg), Some(bg)) => Some([&output, &fg, ";", &bg, "m"].concat()),
+    /// Parses the given input and returns a structure obtaining the text data needed for proper
+    /// transformation into ANSI code parameters, which may be obtained by calling the
+    /// `into_string()` method on the newly-created `Colors` structure.
+    pub(crate) fn collect(input: &str) -> Colors {
+        let mut colors = Colors {
+            foreground: None,
+            background: None,
+            attributes: None,
+        };
+        for variable in input.split(",") {
+            if variable == "reset" {
+                return Colors {
+                    foreground: None,
+                    background: None,
+                    attributes: Some(vec!["0"]),
+                };
+            } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
+                colors.append_attribute(attribute);
+            } else if let Some(color) = COLORS.get(&variable) {
+                colors.foreground = Some(Mode::Name(color));
+            } else if let Some(color) = BG_COLORS.get(&variable) {
+                colors.background = Some(Mode::Name(color));
+            } else if !colors.parse_colors(variable) {
+                eprintln!("ion: {} is not a valid color", variable)
             }
         }
+        colors
     }
 }
 

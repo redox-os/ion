@@ -1,10 +1,14 @@
-use shell::Shell;
-use shell::foreground::ForegroundSignals;
-use shell::job_control::*;
-use shell::status::{FAILURE, TERMINATED};
-use std::sync::{Arc, Mutex};
-use std::thread::sleep;
-use std::time::Duration;
+use shell::{
+    foreground::ForegroundSignals,
+    job_control::*,
+    status::{FAILURE, TERMINATED},
+    Shell,
+};
+use std::{
+    sync::{Arc, Mutex},
+    thread::sleep,
+    time::Duration,
+};
 use syscall::{
     kill, waitpid, wcoredump, wexitstatus, wifcontinued, wifexited, wifsignaled, wifstopped,
     wstopsig, wtermsig, ECHILD, SIGINT, SIGPIPE, WCONTINUED, WNOHANG, WUNTRACED,

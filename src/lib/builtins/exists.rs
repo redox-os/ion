@@ -2,14 +2,13 @@
 use smallstring::SmallString;
 #[cfg(test)]
 use smallvec::SmallVec;
-use std::fs;
-use std::os::unix::fs::PermissionsExt;
+use std::{fs, os::unix::fs::PermissionsExt};
 
 #[cfg(test)]
 use shell;
-use shell::Shell;
 #[cfg(test)]
 use shell::flow_control::{Function, Statement};
+use shell::Shell;
 
 pub(crate) fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
     let arguments = &args[1..];

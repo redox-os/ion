@@ -9,11 +9,13 @@ use version_check::is_nightly;
 // `loop` (RFC 1624, rust-lang/rust GitHub issue #37339).
 // const MIN_VERSION: &'static str = "1.19.0";
 
-use std::env;
-use std::fs::File;
-use std::io::{self, Read, Write};
-use std::path::Path;
-use std::process::Command;
+use std::{
+    env,
+    fs::File,
+    io::{self, Read, Write},
+    path::Path,
+    process::Command,
+};
 
 fn main() {
     match is_nightly() {

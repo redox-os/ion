@@ -13,38 +13,6 @@ pub(crate) struct Range {
 }
 
 impl Range {
-    pub(crate) fn to(end: Index) -> Range {
-        Range {
-            start: Index::new(0),
-            end,
-            inclusive: false,
-        }
-    }
-
-    pub(crate) fn from(start: Index) -> Range {
-        Range {
-            start,
-            end: Index::new(-1),
-            inclusive: true,
-        }
-    }
-
-    pub(crate) fn inclusive(start: Index, end: Index) -> Range {
-        Range {
-            start,
-            end,
-            inclusive: true,
-        }
-    }
-
-    pub(crate) fn exclusive(start: Index, end: Index) -> Range {
-        Range {
-            start,
-            end,
-            inclusive: false,
-        }
-    }
-
     /// Returns the bounds of this range as a tuple containing:
     /// - The starting point of the range
     /// - The length of the range
@@ -71,6 +39,38 @@ impl Range {
             }
         } else {
             None
+        }
+    }
+
+    pub(crate) fn exclusive(start: Index, end: Index) -> Range {
+        Range {
+            start,
+            end,
+            inclusive: false,
+        }
+    }
+
+    pub(crate) fn inclusive(start: Index, end: Index) -> Range {
+        Range {
+            start,
+            end,
+            inclusive: true,
+        }
+    }
+
+    pub(crate) fn from(start: Index) -> Range {
+        Range {
+            start,
+            end: Index::new(-1),
+            inclusive: true,
+        }
+    }
+
+    pub(crate) fn to(end: Index) -> Range {
+        Range {
+            start: Index::new(0),
+            end,
+            inclusive: false,
         }
     }
 }

@@ -1,8 +1,8 @@
-use super::{Index, Range};
-use super::methods::Key;
-use super::super::ranges::parse_index_range;
-use std::iter::{empty, FromIterator};
-use std::str::FromStr;
+use super::{super::ranges::parse_index_range, methods::Key, Index, Range};
+use std::{
+    iter::{empty, FromIterator},
+    str::FromStr,
+};
 
 /// Represents a filter on a vector-like object
 #[derive(Debug, PartialEq, Clone)]
@@ -31,6 +31,7 @@ where
     I: Iterator<Item = T>,
 {
     type Item = T;
+
     fn select<O>(&mut self, s: Select, size: usize) -> O
     where
         O: FromIterator<Self::Item>,
@@ -54,6 +55,7 @@ where
 
 impl FromStr for Select {
     type Err = ();
+
     fn from_str(data: &str) -> Result<Select, ()> {
         if ".." == data {
             return Ok(Select::All);

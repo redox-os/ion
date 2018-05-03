@@ -1,11 +1,8 @@
 use builtins::man_pages::*;
-use shell::Shell;
-use shell::status::*;
+use shell::{status::*, Shell};
 use sys;
 
-use std::borrow::Cow;
-use std::env;
-use std::path::Path;
+use std::{borrow::Cow, env, path::Path};
 
 pub(crate) fn which(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
     if check_help(args, MAN_WHICH) {

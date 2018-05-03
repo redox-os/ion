@@ -1,8 +1,7 @@
-use shell::Shell;
-use shell::status::*;
+use shell::{status::*, Shell};
 
 macro_rules! string_function {
-    ($method: tt) => {
+    ($method:tt) => {
         pub(crate) fn $method(args: &[&str], _: &mut Shell) -> i32 {
             match args.len() {
                 0...2 => {

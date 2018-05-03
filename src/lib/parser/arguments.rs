@@ -24,7 +24,7 @@ pub struct ArgumentSplitter<'a> {
 impl<'a> ArgumentSplitter<'a> {
     pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
         ArgumentSplitter {
-            data:     data,
+            data,
             read:     0,
             bitflags: ArgumentFlags::empty(),
         }
