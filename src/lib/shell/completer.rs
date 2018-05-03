@@ -174,19 +174,24 @@ mod tests {
 
     #[test]
     fn filename_completion() {
-        let current_dir = env::current_dir()
-            .expect("Unable to get current directory");
+        let current_dir = env::current_dir().expect("Unable to get current directory");
 
-        let completer = IonFileCompleter::new(current_dir.to_str(), 
-                                              &DirectoryStack::new(), 
-                                              &Variables::default());
+        let completer = IonFileCompleter::new(
+            current_dir.to_str(),
+            &DirectoryStack::new(),
+            &Variables::default(),
+        );
 
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
-        assert_eq!(completer.completions("testing/filename_complet"), 
-                   vec!["testing/filename_completion/"]);
-        
-        assert_eq!(completer.completions("testing/file"), 
-                   vec!["testing/filename_completion/", "testing/file_with_text"]);
+        assert_eq!(
+            completer.completions("testing/filename_complet"),
+            vec!["testing/filename_completion/"]
+        );
+
+        assert_eq!(
+            completer.completions("testing/file"),
+            vec!["testing/filename_completion/", "testing/file_with_text"]
+        );
 
         assert_eq!(completer.completions("~"), vec!["~/"]);
     }
