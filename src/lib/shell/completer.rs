@@ -213,5 +213,7 @@ mod tests {
         );
 
         assert_eq!(completer.completions("~"), vec!["~/"]);
+
+        assert_eq!(completer.completions("tes/fil"), vec!["testing/file_with_text"]);
     }
 }
