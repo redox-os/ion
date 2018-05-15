@@ -1,5 +1,6 @@
 use super::{directory_stack::DirectoryStack, variables::Variables};
 use liner::{Completer, FilenameCompleter};
+use glob::glob;
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
@@ -90,9 +91,22 @@ impl Completer for IonFileCompleter {
                 return completions;
             }
         }
+        let unescaped_start = unescape(start);
+        let start_for_glob: Vec<&str> = unescaped_start.split("/").collect();
+        let mut inner_glob: Vec<String> = match glob(&start_for_glob.join("*/")) {
+            Ok(completions) => {
+                completions.filter_map(Result::ok)
+                    .map(|x| escape(&x.to_string_lossy()))
+                    .collect()
+            },
+            _ => vec![]
+        };
+        if inner_glob.len() == 0 {
+            inner_glob.push(start.to_string());
+        }
 
         self.inner
-            .completions(&unescape(start))
+            .completions(&unescape(&inner_glob[0]))
             .iter()
             .map(|x| escape(x.as_str()))
             .collect()
@@ -180,16 +194,10 @@ mod tests {
             &DirectoryStack::new(),
             &Variables::default(),
         );
-
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
         assert_eq!(
-            completer.completions("testing/filename_complet"),
-            vec!["testing/filename_completion/"]
-        );
-
-        assert_eq!(
             completer.completions("testing/file"),
-            vec!["testing/filename_completion/", "testing/file_with_text"]
+            vec!["testing/file_with_text"]
         );
 
         assert_eq!(completer.completions("~"), vec!["~/"]);
