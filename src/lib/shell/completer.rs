@@ -93,7 +93,8 @@ impl Completer for IonFileCompleter {
         }
         let unescaped_start = unescape(start);
         let start_for_glob: Vec<&str> = unescaped_start.split("/").collect();
-        let mut inner_glob: Vec<String> = match glob(&start_for_glob.join("*/")) {
+
+        let mut inner_glob: Vec<String> = match glob(&[&start_for_glob.join("*/"), "*"].concat()) {
             Ok(completions) => {
                 completions.filter_map(Result::ok)
                     .map(|x| escape(&x.to_string_lossy()))
@@ -104,7 +105,7 @@ impl Completer for IonFileCompleter {
         if inner_glob.len() == 0 {
             inner_glob.push(start.to_string());
         }
-
+       
         self.inner
             .completions(&unescape(&inner_glob[0]))
             .iter()
