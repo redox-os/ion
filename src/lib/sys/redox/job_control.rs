@@ -101,7 +101,7 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     }
                 },
                 Ok(0) => (),
-                Ok(_pid) if wifexited(status) => exit_status = wexitstatus(status),
+                Ok(_pid) if wifexited(status) => exit_status = wexitstatus(status) as i32,
                 Ok(pid) if wifsignaled(status) => {
                     let signal = wtermsig(status);
                     if signal == SIGPIPE {
@@ -125,7 +125,7 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                 }
                 Ok(pid) if wifstopped(status) => {
                     shell.send_to_background(
-                        pid.abs() as u32,
+                        pid as u32,
                         ProcessState::Stopped,
                         command.into()
                     );
