@@ -101,7 +101,7 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     }
                 },
                 Ok(0) => (),
-                Ok(_pid) if wifexited(status) => exit_status = WEXITSTATUS(status),
+                Ok(_pid) if wifexited(status) => exit_status = wexitstatus(status),
                 Ok(pid) if wifsignaled(status) => {
                     let signal = wtermsig(status);
                     if signal == SIGPIPE {
