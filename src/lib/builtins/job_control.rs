@@ -1,10 +1,12 @@
 //! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job
 //! control in the shell.
 
-use shell::Shell;
-use shell::job_control::{JobControl, ProcessState};
-use shell::signals;
-use shell::status::*;
+use shell::{
+    job_control::{JobControl, ProcessState},
+    signals,
+    status::*,
+    Shell,
+};
 
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark

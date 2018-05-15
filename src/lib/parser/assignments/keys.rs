@@ -106,27 +106,6 @@ pub(crate) struct KeyIterator<'a> {
 }
 
 impl<'a> KeyIterator<'a> {
-    pub(crate) fn new(data: &'a str) -> KeyIterator<'a> { KeyIterator { data, read: 0 } }
-
-    // Parameters are values that follow the semicolon (':').
-    fn parse_parameter(&mut self, name: &'a str) -> Result<Key<'a>, TypeError<'a>> {
-        let mut start = self.read;
-        for byte in self.data.bytes().skip(self.read) {
-            self.read += 1;
-            match byte {
-                b' ' if start + 1 == self.read => start += 1,
-                b' ' => return Key::new(name, &self.data[start..self.read].trim()),
-                _ => (),
-            }
-        }
-
-        if start == self.read {
-            Err(TypeError::Invalid(""))
-        } else {
-            Key::new(name, &self.data[start..self.read].trim())
-        }
-    }
-
     // Executes when a semicolon was not found, but an array character was.
     fn parse_array(&mut self, name: &'a str) -> Result<Key<'a>, TypeError<'a>> {
         let start = self.read;
@@ -155,10 +134,32 @@ impl<'a> KeyIterator<'a> {
             data @ _ => return Err(TypeError::Invalid(data)),
         }
     }
+
+    // Parameters are values that follow the semicolon (':').
+    fn parse_parameter(&mut self, name: &'a str) -> Result<Key<'a>, TypeError<'a>> {
+        let mut start = self.read;
+        for byte in self.data.bytes().skip(self.read) {
+            self.read += 1;
+            match byte {
+                b' ' if start + 1 == self.read => start += 1,
+                b' ' => return Key::new(name, &self.data[start..self.read].trim()),
+                _ => (),
+            }
+        }
+
+        if start == self.read {
+            Err(TypeError::Invalid(""))
+        } else {
+            Key::new(name, &self.data[start..self.read].trim())
+        }
+    }
+
+    pub(crate) fn new(data: &'a str) -> KeyIterator<'a> { KeyIterator { data, read: 0 } }
 }
 
 impl<'a> Iterator for KeyIterator<'a> {
     type Item = Result<Key<'a>, TypeError<'a>>;
+
     fn next(&mut self) -> Option<Result<Key<'a>, TypeError<'a>>> {
         let mut start = self.read;
         for byte in self.data.bytes().skip(self.read) {

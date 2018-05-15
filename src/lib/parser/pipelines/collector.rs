@@ -1,7 +1,6 @@
 #![allow(eq_op)] // Required as a macro sets this clippy warning off.
 
-use std::collections::HashSet;
-use std::iter::Peekable;
+use std::{collections::HashSet, iter::Peekable};
 
 use super::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use shell::{Job, JobKind};
@@ -17,189 +16,6 @@ lazy_static! {
 }
 
 impl<'a> Collector<'a> {
-    pub(crate) fn new(data: &'a str) -> Self { Collector { data } }
-
-    pub(crate) fn run(data: &'a str) -> Result<Pipeline, &'static str> {
-        Collector::new(data).parse()
-    }
-
-    fn peek(&self, index: usize) -> Option<u8> {
-        if index < self.data.len() {
-            Some(self.data.as_bytes()[index])
-        } else {
-            None
-        }
-    }
-
-    fn single_quoted<I>(
-        &self,
-        bytes: &mut Peekable<I>,
-        start: usize,
-    ) -> Result<&'a str, &'static str>
-    where
-        I: Iterator<Item = (usize, u8)>,
-    {
-        while let Some(&(i, b)) = bytes.peek() {
-            match b {
-                // We return an inclusive range to keep the quote type intact
-                b'\'' => {
-                    bytes.next();
-                    return Ok(&self.data[start..i + 1]);
-                }
-                _ => (),
-            }
-            bytes.next();
-        }
-        Err("ion: syntax error: unterminated single quote")
-    }
-
-    fn double_quoted<I>(
-        &self,
-        bytes: &mut Peekable<I>,
-        start: usize,
-    ) -> Result<&'a str, &'static str>
-    where
-        I: Iterator<Item = (usize, u8)>,
-    {
-        while let Some(&(i, b)) = bytes.peek() {
-            match b {
-                b'\\' => {
-                    bytes.next();
-                }
-                // We return an inclusive range to keep the quote type intact
-                b'"' => {
-                    bytes.next();
-                    return Ok(&self.data[start..i + 1]);
-                }
-                _ => (),
-            }
-            bytes.next();
-        }
-        Err("ion: syntax error: unterminated quote")
-    }
-
-    fn arg<I>(&self, bytes: &mut Peekable<I>) -> Result<Option<&'a str>, &'static str>
-    where
-        I: Iterator<Item = (usize, u8)>,
-    {
-        // XXX: I don't think its the responsibility of the pipeline parser to do this
-        // but I'm not sure of a better solution
-        let mut array_level = 0;
-        let mut proc_level = 0;
-        let mut brace_level = 0;
-        let mut start = None;
-        let mut end = None;
-
-        macro_rules! is_toplevel { () => (array_level + proc_level + brace_level == 0) }
-
-        // Skip over any leading whitespace
-        while let Some(&(_, b)) = bytes.peek() {
-            match b {
-                b' ' | b'\t' => {
-                    bytes.next();
-                }
-                _ => break,
-            }
-        }
-
-        while let Some(&(i, b)) = bytes.peek() {
-            if start.is_none() {
-                start = Some(i)
-            }
-            match b {
-                b'(' => {
-                    proc_level += 1;
-                    bytes.next();
-                }
-                b')' => {
-                    proc_level -= 1;
-                    bytes.next();
-                }
-                b'[' => {
-                    array_level += 1;
-                    bytes.next();
-                }
-                b']' => {
-                    array_level -= 1;
-                    bytes.next();
-                }
-                b'{' => {
-                    brace_level += 1;
-                    bytes.next();
-                }
-                b'}' => {
-                    brace_level -= 1;
-                    bytes.next();
-                }
-                // This is a tricky one: we only end the argment if `^` is followed by a
-                // redirection character
-                b'^' => {
-                    if is_toplevel!() {
-                        if let Some(next_byte) = self.peek(i + 1) {
-                            // If the next byte is for stderr to file or next process, end this
-                            // argument
-                            if next_byte == b'>' || next_byte == b'|' {
-                                end = Some(i);
-                                break;
-                            }
-                        }
-                        // Reaching this block means that either there is no next byte, or the next
-                        // byte is none of '>' or '|', indicating that this is not the beginning of
-                        // a redirection for stderr
-                        bytes.next();
-                    }
-                }
-                // Evaluate a quoted string but do not return it
-                // We pass in i, the index of a quote, but start a character later. This ensures
-                // the production rules will produce strings with the quotes intact
-                b'"' => {
-                    bytes.next();
-                    self.double_quoted(bytes, i)?;
-                }
-                b'\'' => {
-                    bytes.next();
-                    self.single_quoted(bytes, i)?;
-                }
-                // If we see a backslash, assume that it is leading up to an escaped character
-                // and skip the next character
-                b'\\' => {
-                    bytes.next();
-                    bytes.next();
-                }
-                // If we see a byte from the follow set, we've definitely reached the end of
-                // the arguments
-                c if FOLLOW_ARGS.contains(&c) && is_toplevel!() => {
-                    end = Some(i);
-                    break;
-                }
-                // By default just pop the next byte: it will be part of the argument
-                _ => {
-                    bytes.next();
-                }
-            }
-        }
-        if proc_level > 0 {
-            return Err("ion: syntax error: unmatched left paren");
-        }
-        if array_level > 0 {
-            return Err("ion: syntax error: unmatched left bracket");
-        }
-        if brace_level > 0 {
-            return Err("ion: syntax error: unmatched left brace");
-        }
-        if proc_level < 0 {
-            return Err("ion: syntax error: extra right paren(s)");
-        }
-        if array_level < 0 {
-            return Err("ion: syntax error: extra right bracket(s)");
-        }
-        match (start, end) {
-            (Some(i), Some(j)) if i < j => Ok(Some(&self.data[i..j])),
-            (Some(i), None) => Ok(Some(&self.data[i..])),
-            _ => Ok(None),
-        }
-    }
-
     pub(crate) fn parse(&self) -> Result<Pipeline, &'static str> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Array::new();
@@ -213,13 +29,15 @@ impl<'a> Collector<'a> {
                 if let Some(v) = self.arg(&mut bytes)? {
                     args.push(v.into());
                 }
-            }}
+            }};
         }
 
         /// Attempt to add a redirection
         macro_rules! try_redir_out {
             ($from:expr) => {{
-                if let None = outputs { outputs = Some(Vec::new()); }
+                if let None = outputs {
+                    outputs = Some(Vec::new());
+                }
                 let append = if let Some(&(_, b'>')) = bytes.peek() {
                     bytes.next();
                     true
@@ -227,21 +45,23 @@ impl<'a> Collector<'a> {
                     false
                 };
                 if let Some(file) = self.arg(&mut bytes)? {
-                    outputs.as_mut().map(|o| o.push(Redirection {
-                        from: $from,
-                        file: file.into(),
-                        append
-                    }));
+                    outputs.as_mut().map(|o| {
+                        o.push(Redirection {
+                            from: $from,
+                            file: file.into(),
+                            append,
+                        })
+                    });
                 } else {
                     return Err("expected file argument after redirection for output");
                 }
-            }}
+            }};
         };
 
         /// Attempt to create a pipeitem and append it to the pipeline
         macro_rules! try_add_item {
             ($job_kind:expr) => {{
-                if ! args.is_empty() {
+                if !args.is_empty() {
                     let job = Job::new(args.clone(), $job_kind);
                     args.clear();
                     let item_out = if let Some(out_tmp) = outputs.take() {
@@ -256,7 +76,7 @@ impl<'a> Collector<'a> {
                     };
                     pipeline.items.push(PipeItem::new(job, item_out, item_in));
                 }
-            }}
+            }};
         }
 
         while let Some(&(i, b)) = bytes.peek() {
@@ -381,14 +201,202 @@ impl<'a> Collector<'a> {
 
         Ok(pipeline)
     }
+
+    fn arg<I>(&self, bytes: &mut Peekable<I>) -> Result<Option<&'a str>, &'static str>
+    where
+        I: Iterator<Item = (usize, u8)>,
+    {
+        // XXX: I don't think its the responsibility of the pipeline parser to do this
+        // but I'm not sure of a better solution
+        let mut array_level = 0;
+        let mut proc_level = 0;
+        let mut brace_level = 0;
+        let mut start = None;
+        let mut end = None;
+
+        macro_rules! is_toplevel {
+            () => {
+                array_level + proc_level + brace_level == 0
+            };
+        }
+
+        // Skip over any leading whitespace
+        while let Some(&(_, b)) = bytes.peek() {
+            match b {
+                b' ' | b'\t' => {
+                    bytes.next();
+                }
+                _ => break,
+            }
+        }
+
+        while let Some(&(i, b)) = bytes.peek() {
+            if start.is_none() {
+                start = Some(i)
+            }
+            match b {
+                b'(' => {
+                    proc_level += 1;
+                    bytes.next();
+                }
+                b')' => {
+                    proc_level -= 1;
+                    bytes.next();
+                }
+                b'[' => {
+                    array_level += 1;
+                    bytes.next();
+                }
+                b']' => {
+                    array_level -= 1;
+                    bytes.next();
+                }
+                b'{' => {
+                    brace_level += 1;
+                    bytes.next();
+                }
+                b'}' => {
+                    brace_level -= 1;
+                    bytes.next();
+                }
+                // This is a tricky one: we only end the argment if `^` is followed by a
+                // redirection character
+                b'^' => {
+                    if is_toplevel!() {
+                        if let Some(next_byte) = self.peek(i + 1) {
+                            // If the next byte is for stderr to file or next process, end this
+                            // argument
+                            if next_byte == b'>' || next_byte == b'|' {
+                                end = Some(i);
+                                break;
+                            }
+                        }
+                        // Reaching this block means that either there is no next byte, or the next
+                        // byte is none of '>' or '|', indicating that this is not the beginning of
+                        // a redirection for stderr
+                        bytes.next();
+                    }
+                }
+                // Evaluate a quoted string but do not return it
+                // We pass in i, the index of a quote, but start a character later. This ensures
+                // the production rules will produce strings with the quotes intact
+                b'"' => {
+                    bytes.next();
+                    self.double_quoted(bytes, i)?;
+                }
+                b'\'' => {
+                    bytes.next();
+                    self.single_quoted(bytes, i)?;
+                }
+                // If we see a backslash, assume that it is leading up to an escaped character
+                // and skip the next character
+                b'\\' => {
+                    bytes.next();
+                    bytes.next();
+                }
+                // If we see a byte from the follow set, we've definitely reached the end of
+                // the arguments
+                c if FOLLOW_ARGS.contains(&c) && is_toplevel!() => {
+                    end = Some(i);
+                    break;
+                }
+                // By default just pop the next byte: it will be part of the argument
+                _ => {
+                    bytes.next();
+                }
+            }
+        }
+        if proc_level > 0 {
+            return Err("ion: syntax error: unmatched left paren");
+        }
+        if array_level > 0 {
+            return Err("ion: syntax error: unmatched left bracket");
+        }
+        if brace_level > 0 {
+            return Err("ion: syntax error: unmatched left brace");
+        }
+        if proc_level < 0 {
+            return Err("ion: syntax error: extra right paren(s)");
+        }
+        if array_level < 0 {
+            return Err("ion: syntax error: extra right bracket(s)");
+        }
+        match (start, end) {
+            (Some(i), Some(j)) if i < j => Ok(Some(&self.data[i..j])),
+            (Some(i), None) => Ok(Some(&self.data[i..])),
+            _ => Ok(None),
+        }
+    }
+
+    fn double_quoted<I>(
+        &self,
+        bytes: &mut Peekable<I>,
+        start: usize,
+    ) -> Result<&'a str, &'static str>
+    where
+        I: Iterator<Item = (usize, u8)>,
+    {
+        while let Some(&(i, b)) = bytes.peek() {
+            match b {
+                b'\\' => {
+                    bytes.next();
+                }
+                // We return an inclusive range to keep the quote type intact
+                b'"' => {
+                    bytes.next();
+                    return Ok(&self.data[start..i + 1]);
+                }
+                _ => (),
+            }
+            bytes.next();
+        }
+        Err("ion: syntax error: unterminated quote")
+    }
+
+    fn single_quoted<I>(
+        &self,
+        bytes: &mut Peekable<I>,
+        start: usize,
+    ) -> Result<&'a str, &'static str>
+    where
+        I: Iterator<Item = (usize, u8)>,
+    {
+        while let Some(&(i, b)) = bytes.peek() {
+            match b {
+                // We return an inclusive range to keep the quote type intact
+                b'\'' => {
+                    bytes.next();
+                    return Ok(&self.data[start..i + 1]);
+                }
+                _ => (),
+            }
+            bytes.next();
+        }
+        Err("ion: syntax error: unterminated single quote")
+    }
+
+    fn peek(&self, index: usize) -> Option<u8> {
+        if index < self.data.len() {
+            Some(self.data.as_bytes()[index])
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn run(data: &'a str) -> Result<Pipeline, &'static str> {
+        Collector::new(data).parse()
+    }
+
+    pub(crate) fn new(data: &'a str) -> Self { Collector { data } }
 }
 
 #[cfg(test)]
 mod tests {
-    use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
-    use parser::statement::parse;
-    use shell::{Job, JobKind};
-    use shell::flow_control::Statement;
+    use parser::{
+        pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection},
+        statement::parse,
+    };
+    use shell::{flow_control::Statement, Job, JobKind};
     use types::Array;
 
     #[test]
@@ -400,13 +408,11 @@ mod tests {
             assert_eq!("--abbrev-ref", pipeline.items[0].job.args[2]);
             assert_eq!("HEAD", pipeline.items[0].job.args[3]);
 
-            let expected = vec![
-                Redirection {
-                    from:   RedirectFrom::Stderr,
-                    file:   "/dev/null".to_owned(),
-                    append: false,
-                },
-            ];
+            let expected = vec![Redirection {
+                from:   RedirectFrom::Stderr,
+                file:   "/dev/null".to_owned(),
+                append: false,
+            }];
 
             assert_eq!(expected, pipeline.items[0].outputs);
         } else {
@@ -830,13 +836,11 @@ mod tests {
                 PipeItem {
                     job:     Job::new(array!["cat"], JobKind::Last),
                     inputs:  vec![Input::File("stuff".into())],
-                    outputs: vec![
-                        Redirection {
-                            from:   RedirectFrom::Stderr,
-                            file:   "other".into(),
-                            append: true,
-                        },
-                    ],
+                    outputs: vec![Redirection {
+                        from:   RedirectFrom::Stderr,
+                        file:   "other".into(),
+                        append: true,
+                    }],
                 },
             ],
         };
@@ -863,13 +867,11 @@ mod tests {
                 PipeItem {
                     job:     Job::new(array!["cat"], JobKind::Last),
                     inputs:  vec![Input::File("stuff".into())],
-                    outputs: vec![
-                        Redirection {
-                            from:   RedirectFrom::Both,
-                            file:   "other".into(),
-                            append: true,
-                        },
-                    ],
+                    outputs: vec![Redirection {
+                        from:   RedirectFrom::Both,
+                        file:   "other".into(),
+                        append: true,
+                    }],
                 },
             ],
         };
@@ -915,13 +917,11 @@ mod tests {
     fn herestring() {
         let input = "calc <<< $(cat math.txt)";
         let expected = Pipeline {
-            items: vec![
-                PipeItem {
-                    job:     Job::new(array!["calc"], JobKind::Last),
-                    inputs:  vec![Input::HereString("$(cat math.txt)".into())],
-                    outputs: vec![],
-                },
-            ],
+            items: vec![PipeItem {
+                job:     Job::new(array!["calc"], JobKind::Last),
+                inputs:  vec![Input::HereString("$(cat math.txt)".into())],
+                outputs: vec![],
+            }],
         };
         assert_eq!(Statement::Pipeline(expected), parse(input));
     }
@@ -930,13 +930,11 @@ mod tests {
     fn heredoc() {
         let input = "calc << EOF\n1 + 2\n3 + 4\nEOF";
         let expected = Pipeline {
-            items: vec![
-                PipeItem {
-                    job:     Job::new(array!["calc"], JobKind::Last),
-                    inputs:  vec![Input::HereString("1 + 2\n3 + 4".into())],
-                    outputs: vec![],
-                },
-            ],
+            items: vec![PipeItem {
+                job:     Job::new(array!["calc"], JobKind::Last),
+                inputs:  vec![Input::HereString("1 + 2\n3 + 4".into())],
+                outputs: vec![],
+            }],
         };
         assert_eq!(Statement::Pipeline(expected), parse(input));
     }
@@ -956,13 +954,11 @@ mod tests {
                 PipeItem {
                     job:     Job::new(array!["tr", "'o'", "'x'"], JobKind::Last),
                     inputs:  vec![Input::HereString("$VAR".into())],
-                    outputs: vec![
-                        Redirection {
-                            from:   RedirectFrom::Stdout,
-                            file:   "out.log".into(),
-                            append: false,
-                        },
-                    ],
+                    outputs: vec![Redirection {
+                        from:   RedirectFrom::Stdout,
+                        file:   "out.log".into(),
+                        append: false,
+                    }],
                 },
             ],
         };
@@ -990,19 +986,15 @@ mod tests {
     fn escaped_filenames() {
         let input = "echo zardoz >> foo\\'bar";
         let expected = Pipeline {
-            items: vec![
-                PipeItem {
-                    job:     Job::new(array!["echo", "zardoz"], JobKind::Last),
-                    inputs:  Vec::new(),
-                    outputs: vec![
-                        Redirection {
-                            from:   RedirectFrom::Stdout,
-                            file:   "foo\\'bar".into(),
-                            append: true,
-                        },
-                    ],
-                },
-            ],
+            items: vec![PipeItem {
+                job:     Job::new(array!["echo", "zardoz"], JobKind::Last),
+                inputs:  Vec::new(),
+                outputs: vec![Redirection {
+                    from:   RedirectFrom::Stdout,
+                    file:   "foo\\'bar".into(),
+                    append: true,
+                }],
+            }],
         };
         assert_eq!(parse(input), Statement::Pipeline(expected));
     }

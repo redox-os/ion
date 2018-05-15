@@ -1,13 +1,16 @@
-use super::colors::Colors;
-use super::directory_stack::DirectoryStack;
-use super::plugins::namespaces::{self, StringNamespace};
-use super::status::{FAILURE, SUCCESS};
+use super::{
+    colors::Colors,
+    directory_stack::DirectoryStack,
+    plugins::namespaces::{self, StringNamespace},
+    status::{FAILURE, SUCCESS},
+};
 use fnv::FnvHashMap;
 use liner::Context;
-use std::env;
-use std::io::{self, BufRead};
-use sys::{self, geteuid, getpid, getuid, is_root};
-use sys::variables as self_sys;
+use std::{
+    env,
+    io::{self, BufRead},
+};
+use sys::{self, geteuid, getpid, getuid, is_root, variables as self_sys};
 use types::{
     Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value,
     VariableContext,
@@ -33,7 +36,7 @@ impl Default for Variables {
         let mut map = FnvHashMap::with_capacity_and_hasher(64, Default::default());
         map.insert("DIRECTORY_STACK_SIZE".into(), "1000".into());
         map.insert("HISTORY_SIZE".into(), "1000".into());
-        map.insert("HISTFILE_SIZE".into(), "1000".into());
+        map.insert("HISTFILE_SIZE".into(), "100000".into());
         map.insert(
             "PROMPT".into(),
             "${x::1B}]0;${USER}: \
@@ -88,209 +91,22 @@ impl Default for Variables {
 const PLUGIN: u8 = 1;
 
 impl Variables {
-    pub(crate) fn has_plugin_support(&self) -> bool { self.flags & PLUGIN != 0 }
-
-    pub(crate) fn enable_plugins(&mut self) { self.flags |= PLUGIN; }
-
-    pub(crate) fn disable_plugins(&mut self) { self.flags &= 255 ^ PLUGIN; }
-
-    pub(crate) fn read<I: IntoIterator>(&mut self, args: I) -> i32
-    where
-        I::Item: AsRef<str>,
-    {
-        if sys::isatty(sys::STDIN_FILENO) {
-            let mut con = Context::new();
-            for arg in args.into_iter().skip(1) {
-                match con.read_line(format!("{}=", arg.as_ref().trim()), &mut |_| {}) {
-                    Ok(buffer) => self.set_var(arg.as_ref(), buffer.trim()),
-                    Err(_) => return FAILURE,
-                }
-            }
-        } else {
-            let stdin = io::stdin();
-            let handle = stdin.lock();
-            let mut lines = handle.lines();
-            for arg in args.into_iter().skip(1) {
-                if let Some(Ok(line)) = lines.next() {
-                    self.set_var(arg.as_ref(), line.trim());
-                }
-            }
-        }
-        SUCCESS
-    }
-
-    pub fn set_var(&mut self, name: &str, value: &str) {
-        if !name.is_empty() {
-            if value.is_empty() {
-                self.variables.remove(name);
-            } else {
-                if name == "NS_PLUGINS" {
-                    match value {
-                        "0" => self.disable_plugins(),
-                        "1" => self.enable_plugins(),
-                        _ => eprintln!(
-                            "ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1."
-                        ),
-                    }
-                    return;
-                }
-                self.variables.insert(name.into(), value.into());
-            }
-        }
-    }
-
-    pub fn set_array(&mut self, name: &str, value: Array) {
-        if !name.is_empty() {
-            if value.is_empty() {
-                self.arrays.remove(name);
-            } else {
-                self.arrays.insert(name.into(), value);
-            }
-        }
-    }
-
     #[allow(dead_code)]
-    pub(crate) fn set_hashmap_value(&mut self, name: &str, key: &str, value: &str) {
-        if !name.is_empty() {
-            if let Some(map) = self.hashmaps.get_mut(name) {
-                map.insert(key.into(), value.into());
-                return;
-            }
+    pub(crate) fn is_hashmap_reference(key: &str) -> Option<(Identifier, Key)> {
+        let mut key_iter = key.split('[');
 
-            let mut map = HashMap::with_capacity_and_hasher(4, Default::default());
-            map.insert(key.into(), value.into());
-            self.hashmaps.insert(name.into(), map);
-        }
-    }
-
-    pub fn get_map(&self, name: &str) -> Option<&HashMap> { self.hashmaps.get(name) }
-
-    pub fn get_array(&self, name: &str) -> Option<&Array> { self.arrays.get(name) }
-
-    pub fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
-
-    /// Obtains the value for the **SWD** variable.
-    ///
-    /// Useful for getting smaller prompts, this will produce a simplified variant of the
-    /// working directory which the leading `HOME` prefix replaced with a tilde character.
-    fn get_simplified_directory(&self) -> Value {
-        self.get_var("PWD")
-            .unwrap()
-            .replace(&self.get_var("HOME").unwrap(), "~")
-    }
-
-    /// Obtains the value for the **MWD** variable.
-    ///
-    /// Further minimizes the directory path in the same manner that Fish does by default.
-    /// That is, if more than two parents are visible in the path, all parent directories
-    /// of the current directory will be reduced to a single character.
-    fn get_minimal_directory(&self) -> Value {
-        let swd = self.get_simplified_directory();
-
-        {
-            // Temporarily borrow the `swd` variable while we attempt to assemble a minimal
-            // variant of the directory path. If that is not possible, we will cancel the
-            // borrow and return `swd` itself as the minified path.
-            let elements = swd.split("/")
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<&str>>();
-            if elements.len() > 2 {
-                let mut output = String::new();
-                for element in &elements[0..elements.len() - 1] {
-                    let mut segmenter = UnicodeSegmentation::graphemes(*element, true);
-                    let grapheme = segmenter.next().unwrap();
-                    output.push_str(grapheme);
-                    if grapheme == "." {
-                        output.push_str(segmenter.next().unwrap());
-                    }
-                    output.push('/');
-                }
-                output.push_str(&elements[elements.len() - 1]);
-                return output;
-            }
-        }
-
-        swd
-    }
-
-    pub fn get_var(&self, name: &str) -> Option<Value> {
-        match name {
-            "MWD" => return Some(self.get_minimal_directory()),
-            "SWD" => return Some(self.get_simplified_directory()),
-            _ => (),
-        }
-        if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..]))
-        {
-            // If the parsed name contains the '::' pattern, then a namespace was
-            // designated. Find it.
-            match name {
-                "c" | "color" => Colors::collect(variable).into_string(),
-                "x" | "hex" => match u8::from_str_radix(variable, 16) {
-                    Ok(c) => Some((c as char).to_string()),
-                    Err(why) => {
-                        eprintln!("ion: hex parse error: {}: {}", variable, why);
-                        None
-                    }
-                },
-                "env" => env::var(variable).map(Into::into).ok(),
-                _ => {
-                    if is_root() {
-                        eprintln!("ion: root is not allowed to execute plugins");
-                        return None;
-                    }
-
-                    if !self.has_plugin_support() {
-                        eprintln!(
-                            "ion: plugins are disabled. Considering enabling them with `let \
-                             NS_PLUGINS = 1`"
-                        );
-                        return None;
-                    }
-
-                    // Attempt to obtain the given namespace from our lazily-generated map of
-                    // namespaces.
-                    if let Some(namespace) = STRING_NAMESPACES.get(name.into()) {
-                        // Attempt to execute the given function from that namespace, and map it's
-                        // results.
-                        match namespace.execute(variable.into()) {
-                            Ok(value) => value.map(Into::into),
-                            Err(why) => {
-                                eprintln!("ion: string namespace error: {}: {}", name, why);
-                                None
-                            }
-                        }
-                    } else {
-                        eprintln!("ion: unsupported namespace: '{}'", name);
-                        None
+        if let Some(map_name) = key_iter.next() {
+            if Variables::is_valid_variable_name(map_name) {
+                if let Some(mut inner_key) = key_iter.next() {
+                    if inner_key.ends_with(']') {
+                        inner_key = inner_key.split(']').next().unwrap_or("");
+                        inner_key = inner_key.trim_matches(|c| c == '\'' || c == '\"');
+                        return Some((map_name.into(), inner_key.into()));
                     }
                 }
             }
-        } else {
-            // Otherwise, it's just a simple variable name.
-            self.variables
-                .get(name)
-                .cloned()
-                .or_else(|| env::var(name).map(Into::into).ok())
         }
-    }
-
-    pub fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
-
-    pub fn unset_var(&mut self, name: &str) -> Option<Value> { self.variables.remove(name) }
-
-    pub fn get_vars<'a>(&'a self) -> impl Iterator<Item = Identifier> + 'a {
-        self.variables
-            .keys()
-            .cloned()
-            .chain(env::vars().map(|(k, _)| k.into()))
-    }
-
-    pub(crate) fn is_valid_variable_character(c: char) -> bool {
-        c.is_alphanumeric() || c == '_' || c == '?'
-    }
-
-    pub(crate) fn is_valid_variable_name(name: &str) -> bool {
-        name.chars().all(Variables::is_valid_variable_character)
+        None
     }
 
     pub(crate) fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> Option<String> {
@@ -361,23 +177,210 @@ impl Variables {
         None
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn is_hashmap_reference(key: &str) -> Option<(Identifier, Key)> {
-        let mut key_iter = key.split('[');
+    pub(crate) fn is_valid_variable_name(name: &str) -> bool {
+        name.chars().all(Variables::is_valid_variable_character)
+    }
 
-        if let Some(map_name) = key_iter.next() {
-            if Variables::is_valid_variable_name(map_name) {
-                if let Some(mut inner_key) = key_iter.next() {
-                    if inner_key.ends_with(']') {
-                        inner_key = inner_key.split(']').next().unwrap_or("");
-                        inner_key = inner_key.trim_matches(|c| c == '\'' || c == '\"');
-                        return Some((map_name.into(), inner_key.into()));
+    pub(crate) fn is_valid_variable_character(c: char) -> bool {
+        c.is_alphanumeric() || c == '_' || c == '?'
+    }
+
+    pub fn get_vars<'a>(&'a self) -> impl Iterator<Item = Identifier> + 'a {
+        self.variables
+            .keys()
+            .cloned()
+            .chain(env::vars().map(|(k, _)| k.into()))
+    }
+
+    pub fn unset_var(&mut self, name: &str) -> Option<Value> { self.variables.remove(name) }
+
+    pub fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
+
+    pub fn get_var(&self, name: &str) -> Option<Value> {
+        match name {
+            "MWD" => return Some(self.get_minimal_directory()),
+            "SWD" => return Some(self.get_simplified_directory()),
+            _ => (),
+        }
+        if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..]))
+        {
+            // If the parsed name contains the '::' pattern, then a namespace was
+            // designated. Find it.
+            match name {
+                "c" | "color" => Colors::collect(variable).into_string(),
+                "x" | "hex" => match u8::from_str_radix(variable, 16) {
+                    Ok(c) => Some((c as char).to_string()),
+                    Err(why) => {
+                        eprintln!("ion: hex parse error: {}: {}", variable, why);
+                        None
+                    }
+                },
+                "env" => env::var(variable).map(Into::into).ok(),
+                _ => {
+                    if is_root() {
+                        eprintln!("ion: root is not allowed to execute plugins");
+                        return None;
+                    }
+
+                    if !self.has_plugin_support() {
+                        eprintln!(
+                            "ion: plugins are disabled. Considering enabling them with `let \
+                             NS_PLUGINS = 1`"
+                        );
+                        return None;
+                    }
+
+                    // Attempt to obtain the given namespace from our lazily-generated map of
+                    // namespaces.
+                    if let Some(namespace) = STRING_NAMESPACES.get(name.into()) {
+                        // Attempt to execute the given function from that namespace, and map it's
+                        // results.
+                        match namespace.execute(variable.into()) {
+                            Ok(value) => value.map(Into::into),
+                            Err(why) => {
+                                eprintln!("ion: string namespace error: {}: {}", name, why);
+                                None
+                            }
+                        }
+                    } else {
+                        eprintln!("ion: unsupported namespace: '{}'", name);
+                        None
                     }
                 }
             }
+        } else {
+            // Otherwise, it's just a simple variable name.
+            self.variables
+                .get(name)
+                .cloned()
+                .or_else(|| env::var(name).map(Into::into).ok())
         }
-        None
     }
+
+    /// Obtains the value for the **MWD** variable.
+    ///
+    /// Further minimizes the directory path in the same manner that Fish does by default.
+    /// That is, if more than two parents are visible in the path, all parent directories
+    /// of the current directory will be reduced to a single character.
+    fn get_minimal_directory(&self) -> Value {
+        let swd = self.get_simplified_directory();
+
+        {
+            // Temporarily borrow the `swd` variable while we attempt to assemble a minimal
+            // variant of the directory path. If that is not possible, we will cancel the
+            // borrow and return `swd` itself as the minified path.
+            let elements = swd.split("/")
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<&str>>();
+            if elements.len() > 2 {
+                let mut output = String::new();
+                for element in &elements[0..elements.len() - 1] {
+                    let mut segmenter = UnicodeSegmentation::graphemes(*element, true);
+                    let grapheme = segmenter.next().unwrap();
+                    output.push_str(grapheme);
+                    if grapheme == "." {
+                        output.push_str(segmenter.next().unwrap());
+                    }
+                    output.push('/');
+                }
+                output.push_str(&elements[elements.len() - 1]);
+                return output;
+            }
+        }
+
+        swd
+    }
+
+    /// Obtains the value for the **SWD** variable.
+    ///
+    /// Useful for getting smaller prompts, this will produce a simplified variant of the
+    /// working directory which the leading `HOME` prefix replaced with a tilde character.
+    fn get_simplified_directory(&self) -> Value {
+        self.get_var("PWD")
+            .unwrap()
+            .replace(&self.get_var("HOME").unwrap(), "~")
+    }
+
+    pub fn unset_array(&mut self, name: &str) -> Option<Array> { self.arrays.remove(name) }
+
+    pub fn get_array(&self, name: &str) -> Option<&Array> { self.arrays.get(name) }
+
+    pub fn get_map(&self, name: &str) -> Option<&HashMap> { self.hashmaps.get(name) }
+
+    #[allow(dead_code)]
+    pub(crate) fn set_hashmap_value(&mut self, name: &str, key: &str, value: &str) {
+        if !name.is_empty() {
+            if let Some(map) = self.hashmaps.get_mut(name) {
+                map.insert(key.into(), value.into());
+                return;
+            }
+
+            let mut map = HashMap::with_capacity_and_hasher(4, Default::default());
+            map.insert(key.into(), value.into());
+            self.hashmaps.insert(name.into(), map);
+        }
+    }
+
+    pub fn set_array(&mut self, name: &str, value: Array) {
+        if !name.is_empty() {
+            if value.is_empty() {
+                self.arrays.remove(name);
+            } else {
+                self.arrays.insert(name.into(), value);
+            }
+        }
+    }
+
+    pub fn set_var(&mut self, name: &str, value: &str) {
+        if !name.is_empty() {
+            if value.is_empty() {
+                self.variables.remove(name);
+            } else {
+                if name == "NS_PLUGINS" {
+                    match value {
+                        "0" => self.disable_plugins(),
+                        "1" => self.enable_plugins(),
+                        _ => eprintln!(
+                            "ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1."
+                        ),
+                    }
+                    return;
+                }
+                self.variables.insert(name.into(), value.into());
+            }
+        }
+    }
+
+    pub(crate) fn read<I: IntoIterator>(&mut self, args: I) -> i32
+    where
+        I::Item: AsRef<str>,
+    {
+        if sys::isatty(sys::STDIN_FILENO) {
+            let mut con = Context::new();
+            for arg in args.into_iter().skip(1) {
+                match con.read_line(format!("{}=", arg.as_ref().trim()), &mut |_| {}) {
+                    Ok(buffer) => self.set_var(arg.as_ref(), buffer.trim()),
+                    Err(_) => return FAILURE,
+                }
+            }
+        } else {
+            let stdin = io::stdin();
+            let handle = stdin.lock();
+            let mut lines = handle.lines();
+            for arg in args.into_iter().skip(1) {
+                if let Some(Ok(line)) = lines.next() {
+                    self.set_var(arg.as_ref(), line.trim());
+                }
+            }
+        }
+        SUCCESS
+    }
+
+    pub(crate) fn disable_plugins(&mut self) { self.flags &= 255 ^ PLUGIN; }
+
+    pub(crate) fn enable_plugins(&mut self) { self.flags |= PLUGIN; }
+
+    pub(crate) fn has_plugin_support(&self) -> bool { self.flags & PLUGIN != 0 }
 }
 
 #[cfg(test)]

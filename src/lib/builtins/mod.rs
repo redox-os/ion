@@ -1,46 +1,54 @@
+pub mod calc;
+pub mod functions;
+pub mod random;
 pub mod source;
 pub mod variables;
-pub mod functions;
-pub mod calc;
-pub mod random;
 
+mod command_info;
 mod conditionals;
-mod job_control;
-mod man_pages;
-mod test;
 mod echo;
-mod set;
-mod status;
-mod exists;
 mod exec;
+mod exists;
 mod ion;
 mod is;
+mod job_control;
+mod man_pages;
+mod set;
+mod status;
+mod test;
 
-use self::conditionals::{contains, ends_with, starts_with};
-use self::echo::echo;
-use self::exec::exec;
-use self::exists::exists;
-use self::functions::fn_;
-use self::ion::ion_docs;
-use self::is::is;
-use self::man_pages::*;
-use self::source::source;
-use self::status::status;
-use self::test::test;
-use self::variables::{alias, drop_alias, drop_array, drop_variable};
-use types::Array;
+use self::{
+    command_info::*,
+    conditionals::{contains, ends_with, starts_with},
+    echo::echo,
+    exec::exec,
+    exists::exists,
+    functions::fn_,
+    ion::ion_docs,
+    is::is,
+    man_pages::*,
+    source::source,
+    status::status,
+    test::test,
+    variables::{alias, drop_alias, drop_array, drop_variable},
+};
 
-use std::env;
-use std::error::Error;
-use std::io::{self, Write};
-use std::path::Path;
+use std::{
+    env,
+    error::Error,
+    io::{self, Write},
+};
 
 use parser::Terminator;
-use parser::pipelines::{PipeItem, Pipeline};
-use shell::job_control::{JobControl, ProcessState};
-use shell::fork_function::fork_function;
-use shell::status::*;
-use shell::{self, FlowLogic, Job, JobKind, Shell, ShellHistory};
+use shell::{
+    self,
+    fork_function::fork_function,
+    job_control::{JobControl, ProcessState},
+    status::*,
+    FlowLogic,
+    Shell,
+    ShellHistory,
+};
 use sys;
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
@@ -72,7 +80,6 @@ macro_rules! map {
 /// Builtins are in A-Z order.
 pub const BUILTINS: &'static BuiltinMap = &map!(
     "alias" => builtin_alias : "View, set or unset aliases",
-    "and" => builtin_and : "Execute the command if the shell's previous status is success",
     "bg" => builtin_bg : "Resumes a stopped background process",
     "bool" => builtin_bool : "If the value is '1' or 'true', return 0 exit status",
     "calc" => builtin_calc : "Calculate a mathematical expression",
@@ -97,8 +104,6 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "isatty" => builtin_isatty : "Returns 0 exit status if the supplied FD is a tty",
     "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
     "matches" => builtin_matches : "Checks if a string matches a given regex",
-    "not" => builtin_not : "Reverses the exit status value of the given command.",
-    "or" => builtin_or : "Execute the command if the shell's previous status is failure",
     "popd" => builtin_popd : "Pop a directory from the stack",
     "pushd" => builtin_pushd : "Push a directory to the stack",
     "random" => builtin_random : "Outputs a random u64",
@@ -110,6 +115,7 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "suspend" => builtin_suspend : "Suspends the shell with a SIGTSTOP signal",
     "test" => builtin_test : "Performs tests on files and text",
     "true" => builtin_true : "Do nothing, successfully",
+    "type" => builtin_type : "indicates how a command would be interpreted",
     "unalias" => builtin_unalias : "Delete an alias",
     "wait" => builtin_wait : "Waits until all running background processes have completed",
     "which" => builtin_which : "Shows the full path of commands"
@@ -131,6 +137,10 @@ pub struct BuiltinMap {
 }
 
 impl BuiltinMap {
+    pub fn contains_key(&self, func: &str) -> bool { self.name.iter().any(|&name| name == func) }
+
+    pub fn keys(&self) -> &'static [&'static str] { self.name }
+
     pub fn get(&self, func: &str) -> Option<Builtin> {
         self.name.binary_search(&func).ok().map(|pos| unsafe {
             Builtin {
@@ -140,10 +150,6 @@ impl BuiltinMap {
             }
         })
     }
-
-    pub fn keys(&self) -> &'static [&'static str] { self.name }
-
-    pub fn contains_key(&self, func: &str) -> bool { self.name.iter().any(|&name| name == func) }
 }
 
 // Definitions of simple builtins go here
@@ -166,26 +172,24 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
 
     match shell.directory_stack.cd(args, &shell.variables) {
         Ok(()) => {
-            env::current_dir().ok().map_or_else(
-                || env::set_var("PWD", "?"),
-                |path| {
+            match env::current_dir() {
+                Ok(cwd) => {
                     let pwd = shell.get_var_or_empty("PWD");
-                    let pwd: &str = &pwd;
-                    let current_dir = path.to_str().unwrap_or("?");
+                    let pwd = &pwd;
+                    let current_dir = cwd.to_str().unwrap_or("?");
 
                     if pwd != current_dir {
-                        env::set_var("OLDPWD", pwd);
-                        env::set_var("PWD", current_dir);
+                        shell.set_var("OLDPWD", pwd);
+                        shell.set_var("PWD", current_dir);
                     }
                     fork_function(shell, "CD_CHANGE", &["ion"]);
-                },
-            );
+                }
+                Err(_) => env::set_var("PWD", "?"),
+            };
             SUCCESS
         }
         Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
+            eprintln!("{}", why);
             FAILURE
         }
     }
@@ -545,54 +549,6 @@ fn builtin_matches(args: &[&str], _: &mut Shell) -> i32 {
     }
 }
 
-fn args_to_pipeline(args: &[&str]) -> Pipeline {
-    let owned = args.into_iter()
-        .map(|&x| String::from(x))
-        .collect::<Array>();
-    let pipe_item = PipeItem::new(Job::new(owned, JobKind::And), Vec::new(), Vec::new());
-    Pipeline {
-        items: vec![pipe_item],
-    }
-}
-
-fn builtin_not(args: &[&str], shell: &mut Shell) -> i32 {
-    if check_help(args, MAN_NOT) {
-        return SUCCESS;
-    }
-    shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
-    match shell.previous_status {
-        SUCCESS => FAILURE,
-        FAILURE => SUCCESS,
-        _ => shell.previous_status,
-    }
-}
-
-fn builtin_and(args: &[&str], shell: &mut Shell) -> i32 {
-    if check_help(args, MAN_AND) {
-        return SUCCESS;
-    }
-    match shell.previous_status {
-        SUCCESS => {
-            shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
-            shell.previous_status
-        }
-        _ => shell.previous_status,
-    }
-}
-
-fn builtin_or(args: &[&str], shell: &mut Shell) -> i32 {
-    if check_help(args, MAN_OR) {
-        return SUCCESS;
-    }
-    match shell.previous_status {
-        FAILURE => {
-            shell.run_pipeline(&mut args_to_pipeline(&args[1..]));
-            shell.previous_status
-        }
-        _ => shell.previous_status,
-    }
-}
-
 fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_EXISTS) {
         return SUCCESS;
@@ -608,42 +564,22 @@ fn builtin_exists(args: &[&str], shell: &mut Shell) -> i32 {
 }
 
 fn builtin_which(args: &[&str], shell: &mut Shell) -> i32 {
-    if check_help(args, MAN_WHICH) {
-        return SUCCESS;
+    match which(args, shell) {
+        Ok(result) => result,
+        Err(()) => FAILURE,
     }
+}
 
-    let mut result = SUCCESS;
-    'outer: for &command in &args[1..] {
-        if let Some(alias) = shell.variables.aliases.get(command) {
-            println!("{}: alias to {}", command, alias);
-            continue;
-        } else if shell.functions.contains_key(command) {
-            println!("{}: function", command);
-            continue;
-        } else if shell.builtins.contains_key(command) {
-            println!("{}: built-in shell command", command);
-            continue;
-        } else {
-            for path in env::var("PATH")
-                .unwrap_or("/bin".to_string())
-                .split(sys::PATH_SEPARATOR)
-            {
-                let executable = Path::new(path).join(command);
-                if executable.is_file() {
-                    println!("{}", executable.display());
-                    continue 'outer;
-                }
-            }
-            result = FAILURE;
-            println!("{} not found", command);
-        }
+fn builtin_type(args: &[&str], shell: &mut Shell) -> i32 {
+    match find_type(args, shell) {
+        Ok(result) => result,
+        Err(()) => FAILURE,
     }
-    result
 }
 
 fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
     if check_help(args, MAN_ISATTY) {
-        return SUCCESS
+        return SUCCESS;
     }
 
     if args.len() > 1 {
@@ -651,20 +587,20 @@ fn builtin_isatty(args: &[&str], _: &mut Shell) -> i32 {
         #[cfg(target_os = "redox")]
         match args[1].parse::<usize>() {
             Ok(r) => if sys::isatty(r) {
-                return SUCCESS
+                return SUCCESS;
             },
-            Err(_) => eprintln!("ion: isatty given bad number")
+            Err(_) => eprintln!("ion: isatty given bad number"),
         }
 
         #[cfg(not(target_os = "redox"))]
         match args[1].parse::<i32>() {
             Ok(r) => if sys::isatty(r) {
-                return SUCCESS
+                return SUCCESS;
             },
-            Err(_) => eprintln!("ion: isatty given bad number")
+            Err(_) => eprintln!("ion: isatty given bad number"),
         }
     } else {
-        return SUCCESS
+        return SUCCESS;
     }
 
     FAILURE

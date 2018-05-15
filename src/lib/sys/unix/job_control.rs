@@ -1,12 +1,16 @@
-use libc::*;
-use shell::Shell;
-use shell::foreground::ForegroundSignals;
-use shell::job_control::*;
-use shell::status::{FAILURE, TERMINATED};
-use std::sync::{Arc, Mutex};
-use std::thread::sleep;
-use std::time::Duration;
 use super::{errno, write_errno};
+use libc::*;
+use shell::{
+    foreground::ForegroundSignals,
+    job_control::*,
+    status::{FAILURE, TERMINATED},
+    Shell,
+};
+use std::{
+    sync::{Arc, Mutex},
+    thread::sleep,
+    time::Duration,
+};
 
 const OPTS: i32 = WUNTRACED | WCONTINUED | WNOHANG;
 
@@ -86,25 +90,23 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
         unsafe {
             status = 0;
             match waitpid(pid, &mut status, WUNTRACED) {
-                -1 => {
-                    match errno() {
-                        ECHILD if signaled == 0 => break exit_status,
-                        ECHILD => break signaled,
-                        errno => {
-                            write_errno("ion: waitpid error: ", errno);
-                            break FAILURE;
-                        }
+                -1 => match errno() {
+                    ECHILD if signaled == 0 => break exit_status,
+                    ECHILD => break signaled,
+                    errno => {
+                        write_errno("ion: waitpid error: ", errno);
+                        break FAILURE;
                     }
-                }
+                },
                 0 => (),
                 _pid if WIFEXITED(status) => exit_status = WEXITSTATUS(status),
                 pid if WIFSIGNALED(status) => {
                     let signal = WTERMSIG(status);
                     if signal == SIGPIPE {
-                        continue
+                        continue;
                     } else if WCOREDUMP(status) {
                         eprintln!("ion: process ({}) had a core dump", pid);
-                        continue
+                        continue;
                     }
 
                     eprintln!("ion: process ({}) ended by signal {}", pid, signal);
@@ -120,7 +122,11 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     signaled = 128 + signal as i32;
                 }
                 pid if WIFSTOPPED(status) => {
-                    shell.send_to_background(pid.abs() as u32, ProcessState::Stopped, command.into());
+                    shell.send_to_background(
+                        pid.abs() as u32,
+                        ProcessState::Stopped,
+                        command.into(),
+                    );
                     shell.break_flow = true;
                     break 128 + WSTOPSIG(status);
                 }

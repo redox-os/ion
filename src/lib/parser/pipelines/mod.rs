@@ -44,14 +44,6 @@ pub(crate) struct PipeItem {
 }
 
 impl PipeItem {
-    pub(crate) fn new(job: Job, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
-        PipeItem {
-            job,
-            outputs,
-            inputs,
-        }
-    }
-
     pub(crate) fn expand(&mut self, shell: &Shell) {
         self.job.expand(shell);
 
@@ -68,21 +60,29 @@ impl PipeItem {
             output.file = expand_string(output.file.as_str(), shell, false).join(" ");
         }
     }
+
+    pub(crate) fn new(job: Job, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
+        PipeItem {
+            job,
+            outputs,
+            inputs,
+        }
+    }
 }
 
 impl Pipeline {
-    pub(crate) fn new() -> Self { Pipeline { items: Vec::new() } }
-
-    pub(crate) fn expand(&mut self, shell: &Shell) {
-        self.items.iter_mut().for_each(|i| i.expand(shell));
-    }
-
     pub(crate) fn requires_piping(&self) -> bool {
         self.items.len() > 1 || self.items.iter().any(|it| it.outputs.len() > 0)
             || self.items.iter().any(|it| it.inputs.len() > 0)
             || self.items.last().unwrap().job.kind == JobKind::Background
             || self.items.last().unwrap().job.kind == JobKind::Disown
     }
+
+    pub(crate) fn expand(&mut self, shell: &Shell) {
+        self.items.iter_mut().for_each(|i| i.expand(shell));
+    }
+
+    pub(crate) fn new() -> Self { Pipeline { items: Vec::new() } }
 }
 
 impl fmt::Display for Pipeline {

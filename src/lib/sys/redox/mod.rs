@@ -1,13 +1,15 @@
 extern crate syscall;
 
-use std::{io, mem, slice};
-use std::env;
-use std::os::unix::ffi::OsStrExt;
-use std::os::unix::io::RawFd;
-use std::path::PathBuf;
-use std::process::{exit, ExitStatus};
-use std::os::unix::process::ExitStatusExt;
-use syscall::{EINTR, WUNTRACED, SigAction, waitpid};
+use std::{
+    env,
+    io,
+    mem,
+    os::unix::{ffi::OsStrExt, io::RawFd, process::ExitStatusExt},
+    path::PathBuf,
+    process::{exit, ExitStatus},
+    slice,
+};
+use syscall::{waitpid, SigAction, EINTR, WUNTRACED};
 
 pub mod job_control;
 
@@ -58,7 +60,7 @@ pub fn wait_for_child(pid: u32) -> io::Result<u8> {
         match waitpid(pid as usize, &mut status, WUNTRACED) {
             Err(ref error) if error.errno == ECHILD => break,
             Err(error) => return Err(io::Error::from_raw_os_error(error.errno)),
-            _ => ()
+            _ => (),
         }
     }
 
@@ -93,7 +95,7 @@ pub(crate) fn fork_and_exec<F: Fn()>(
     stdout: Option<RawFd>,
     stderr: Option<RawFd>,
     clear_env: bool,
-    before_exec: F
+    before_exec: F,
 ) -> io::Result<u32> {
     unsafe {
         match fork()? {

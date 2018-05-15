@@ -1,5 +1,4 @@
-use super::super::{Binary, FlowLogic, Shell};
-use super::super::status::*;
+use super::super::{status::*, Binary, FlowLogic, Shell};
 use parser::Terminator;
 
 pub(crate) fn terminate_script_quotes<I: Iterator<Item = String>>(

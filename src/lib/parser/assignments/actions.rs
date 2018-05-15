@@ -1,6 +1,4 @@
-use super::*;
-use super::checker::*;
-use super::super::ArgumentSplitter;
+use super::{super::ArgumentSplitter, checker::*, *};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
@@ -49,6 +47,7 @@ impl<'a> AssignmentActions<'a> {
 
 impl<'a> Iterator for AssignmentActions<'a> {
     type Item = Result<Action<'a>, AssignmentError<'a>>;
+
     fn next(&mut self) -> Option<Result<Action<'a>, AssignmentError<'a>>> {
         if let Some(key) = self.keys.next() {
             match key {

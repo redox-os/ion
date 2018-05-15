@@ -1,6 +1,5 @@
 use fnv::FnvHashMap;
-use shell::flow_control::Function;
-use shell::status::*;
+use shell::{flow_control::Function, status::*};
 use std::io::{self, Write};
 use types::Identifier;
 

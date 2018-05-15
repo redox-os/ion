@@ -9,8 +9,6 @@ pub(crate) enum MethodArguments {
 pub(crate) struct StringMethodPlugins;
 
 impl StringMethodPlugins {
-    pub(crate) fn new() -> StringMethodPlugins { StringMethodPlugins }
-
     pub(crate) fn execute(
         &self,
         _function: &str,
@@ -18,6 +16,8 @@ impl StringMethodPlugins {
     ) -> Result<Option<String>, StringError> {
         Ok(None)
     }
+
+    pub(crate) fn new() -> StringMethodPlugins { StringMethodPlugins }
 }
 
 /// Collects all dynamically-loaded namespaces and their associated symbols all at once.

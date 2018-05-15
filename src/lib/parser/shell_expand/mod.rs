@@ -6,12 +6,10 @@ mod braces;
 mod ranges;
 mod words;
 
-use self::braces::BraceToken;
-use self::ranges::parse_range;
 pub(crate) use self::words::{Index, Range, Select, WordIterator, WordToken};
+use self::{braces::BraceToken, ranges::parse_range};
 use glob::glob;
-use std::ptr;
-use std::str;
+use std::{ptr, str};
 use types::*;
 use unicode_segmentation::UnicodeSegmentation;
 

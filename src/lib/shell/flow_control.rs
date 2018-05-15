@@ -1,11 +1,8 @@
-use super::Shell;
-use super::flow::FlowLogic;
+use super::{flow::FlowLogic, Shell};
 use fnv::*;
-use parser::assignments::*;
-use parser::pipelines::Pipeline;
+use parser::{assignments::*, pipelines::Pipeline};
 use std::fmt::{self, Display, Formatter};
-use types::*;
-use types::Identifier;
+use types::{Identifier, *};
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ElseIf {
@@ -27,7 +24,10 @@ pub(crate) struct ElseIf {
 /// ```
 /// would be represented by the Case object:
 /// ```rust,ignore
-/// Case { value: Some(value), statements: vec![statement0, statement1, ... statementN]}
+/// Case {
+///     value:      Some(value),
+///     statements: vec![statement0, statement1, ... statementN],
+/// }
 /// ```
 /// The wildcard branch, a branch that matches any value, is represented as such:
 /// ```rust,ignore
@@ -93,6 +93,9 @@ pub(crate) enum Statement {
     Continue,
     Pipeline(Pipeline),
     Time(Box<Statement>),
+    And(Box<Statement>),
+    Or(Box<Statement>),
+    Not(Box<Statement>),
     Default,
 }
 
@@ -115,6 +118,9 @@ impl Statement {
             Statement::Continue => "Continue",
             Statement::Pipeline(_) => "Pipeline { .. }",
             Statement::Time(_) => "Time { .. }",
+            Statement::And(_) => "And { .. }",
+            Statement::Or(_) => "Or { .. }",
+            Statement::Not(_) => "Not { .. }",
             Statement::Default => "Default",
         }
     }
@@ -161,22 +167,6 @@ impl Display for FunctionError {
 }
 
 impl Function {
-    pub(crate) fn new(
-        description: Option<String>,
-        name: Identifier,
-        args: Vec<KeyBuf>,
-        statements: Vec<Statement>,
-    ) -> Function {
-        Function {
-            description,
-            name,
-            args,
-            statements,
-        }
-    }
-
-    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> { self.description.as_ref() }
-
     pub(crate) fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
             return Err(FunctionError::InvalidArgumentCount);
@@ -234,6 +224,22 @@ impl Function {
 
         Ok(())
     }
+
+    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> { self.description.as_ref() }
+
+    pub(crate) fn new(
+        description: Option<String>,
+        name: Identifier,
+        args: Vec<KeyBuf>,
+        statements: Vec<Statement>,
+    ) -> Function {
+        Function {
+            description,
+            name,
+            args,
+            statements,
+        }
+    }
 }
 
 pub(crate) fn collect_cases<I>(
@@ -248,12 +254,16 @@ where
         ($statement:expr) => {
             match cases.last_mut() {
                 // XXX: When does this actually happen? What syntax error is this???
-                None => return Err(["ion: syntax error: encountered ",
-                                     $statement.short(),
-                                     " outside of `case ...` block"].concat()),
+                None => {
+                    return Err([
+                        "ion: syntax error: encountered ",
+                        $statement.short(),
+                        " outside of `case ...` block",
+                    ].concat())
+                }
                 Some(ref mut case) => case.statements.push($statement),
             }
-        }
+        };
     }
 
     while let Some(statement) = iterator.next() {
@@ -291,6 +301,9 @@ where
             | Statement::Let { .. }
             | Statement::Pipeline(_)
             | Statement::Time(_)
+            | Statement::And(_)
+            | Statement::Or(_)
+            | Statement::Not(_)
             | Statement::Break => {
                 // This is the default case with all of the other statements explicitly listed
                 add_to_case!(statement);
@@ -314,6 +327,45 @@ pub(crate) fn collect_loops<I: Iterator<Item = Statement>>(
             | Statement::Function { .. }
             | Statement::Match { .. } => *level += 1,
             Statement::Time(ref box_stmt) => match box_stmt.as_ref() {
+                &Statement::While { .. }
+                | &Statement::For { .. }
+                | &Statement::If { .. }
+                | &Statement::Function { .. }
+                | &Statement::Match { .. } => *level += 1,
+                &Statement::End if *level == 1 => {
+                    *level = 0;
+                    break;
+                }
+                &Statement::End => *level -= 1,
+                _ => (),
+            },
+            Statement::And(ref box_stmt) => match box_stmt.as_ref() {
+                &Statement::While { .. }
+                | &Statement::For { .. }
+                | &Statement::If { .. }
+                | &Statement::Function { .. }
+                | &Statement::Match { .. } => *level += 1,
+                &Statement::End if *level == 1 => {
+                    *level = 0;
+                    break;
+                }
+                &Statement::End => *level -= 1,
+                _ => (),
+            },
+            Statement::Or(ref box_stmt) => match box_stmt.as_ref() {
+                &Statement::While { .. }
+                | &Statement::For { .. }
+                | &Statement::If { .. }
+                | &Statement::Function { .. }
+                | &Statement::Match { .. } => *level += 1,
+                &Statement::End if *level == 1 => {
+                    *level = 0;
+                    break;
+                }
+                &Statement::End => *level -= 1,
+                _ => (),
+            },
+            Statement::Not(ref box_stmt) => match box_stmt.as_ref() {
                 &Statement::While { .. }
                 | &Statement::For { .. }
                 | &Statement::If { .. }

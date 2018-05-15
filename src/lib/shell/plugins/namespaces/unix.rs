@@ -1,12 +1,7 @@
 use super::super::{config_dir, LibraryIterator, StringError};
 use fnv::FnvHashMap;
-use libloading::{Library, Symbol};
-use libloading::os::unix::Symbol as RawSymbol;
-use std::ffi::CString;
-use std::fs::read_dir;
-use std::os::raw::c_char;
-use std::slice;
-use std::str;
+use libloading::{os::unix::Symbol as RawSymbol, Library, Symbol};
+use std::{ffi::CString, fs::read_dir, os::raw::c_char, slice, str};
 use types::Identifier;
 
 /// A dynamically-loaded string namespace from an external library.
@@ -27,6 +22,27 @@ pub(crate) struct StringNamespace {
 }
 
 impl StringNamespace {
+    /// Attempts to execute a function within a dynamically-loaded namespace.
+    ///
+    /// If the function exists, it is executed, and it's return value is then converted into a
+    /// proper Rusty type.
+    pub(crate) fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> {
+        let func = self.symbols
+            .get(&function)
+            .ok_or(StringError::FunctionMissing(function.clone()))?;
+        unsafe {
+            let data = (*func)();
+            if data.is_null() {
+                Ok(None)
+            } else {
+                match CString::from_raw(data as *mut c_char).to_str() {
+                    Ok(string) => Ok(Some(string.to_owned())),
+                    Err(_) => Err(StringError::UTF8Result),
+                }
+            }
+        }
+    }
+
     pub(crate) fn new(library: Library) -> Result<StringNamespace, StringError> {
         unsafe {
             let mut symbols = FnvHashMap::default();
@@ -105,27 +121,6 @@ impl StringNamespace {
             }
 
             Ok(StringNamespace { library, symbols })
-        }
-    }
-
-    /// Attempts to execute a function within a dynamically-loaded namespace.
-    ///
-    /// If the function exists, it is executed, and it's return value is then converted into a
-    /// proper Rusty type.
-    pub(crate) fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> {
-        let func = self.symbols
-            .get(&function)
-            .ok_or(StringError::FunctionMissing(function.clone()))?;
-        unsafe {
-            let data = (*func)();
-            if data.is_null() {
-                Ok(None)
-            } else {
-                match CString::from_raw(data as *mut c_char).to_str() {
-                    Ok(string) => Ok(Some(string.to_owned())),
-                    Err(_) => Err(StringError::UTF8Result),
-                }
-            }
         }
     }
 }
