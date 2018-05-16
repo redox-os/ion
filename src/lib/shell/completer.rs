@@ -48,7 +48,7 @@ impl Completer for IonFileCompleter {
             if let Some(expanded) = unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) }
             {
                 // Now we obtain completions for the `expanded` form of the `start` value.
-                let completions = self.inner.completions(&expanded);
+                let completions = filename_completion(&expanded, |x| self.inner.completions(x));
                 let mut iterator = completions.iter();
 
                 // And then we will need to take those completions and remove the expanded form
@@ -78,7 +78,7 @@ impl Completer for IonFileCompleter {
                     // search pattern begins, and re-use that index to slice the completions so
                     // that we may re-add the tilde character with the completion that follows.
                     if let Some(completion) = iterator.next() {
-                        if let Some(e_index) = completion.rfind(search) {
+                        if let Some(e_index) = expanded.rfind(search) {
                             completions.push(escape(&[tilde, &completion[e_index..]].concat()));
                             for completion in iterator {
                                 let expanded = &completion[e_index..];
