@@ -1,6 +1,6 @@
 use super::{directory_stack::DirectoryStack, variables::Variables};
-use liner::{Completer, FilenameCompleter};
 use glob::glob;
+use liner::{Completer, FilenameCompleter};
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
@@ -21,7 +21,7 @@ impl IonFileCompleter {
         vars: *const Variables,
     ) -> IonFileCompleter {
         IonFileCompleter {
-            inner:     FilenameCompleter::new(path),
+            inner: FilenameCompleter::new(path),
             dir_stack,
             vars,
         }
@@ -96,8 +96,10 @@ impl Completer for IonFileCompleter {
     }
 }
 
-fn filename_completion<LC>(start: &str, liner_complete: LC) -> Vec<String> 
-    where LC: Fn(&str) -> Vec<String> {
+fn filename_completion<LC>(start: &str, liner_complete: LC) -> Vec<String>
+where
+    LC: Fn(&str) -> Vec<String>,
+{
     let unescaped_start = unescape(start);
 
     let start_split: Vec<&str> = unescaped_start.split("/").collect();
@@ -106,16 +108,15 @@ fn filename_completion<LC>(start: &str, liner_complete: LC) -> Vec<String>
     // So we ignore the first element and add "/" to the start of the string
     let start_for_glob = match unescaped_start.starts_with("/") {
         true => ["/", &start_split[1..].join("*/"), "*"].concat(),
-        false => [&start_split.join("*/"), "*"].concat()
+        false => [&start_split.join("*/"), "*"].concat(),
     };
 
     let mut inner_glob: Vec<String> = match glob(&start_for_glob) {
-        Ok(completions) => {
-            completions.filter_map(Result::ok)
-                .map(|x| x.to_string_lossy().into_owned())
-                .collect()
-        },
-        _ => vec![]
+        Ok(completions) => completions
+            .filter_map(Result::ok)
+            .map(|x| x.to_string_lossy().into_owned())
+            .collect(),
+        _ => vec![],
     };
     if inner_glob.len() == 0 {
         inner_glob.push(escape(&start.to_string()));
@@ -123,8 +124,8 @@ fn filename_completion<LC>(start: &str, liner_complete: LC) -> Vec<String>
 
     let mut completions = vec![];
 
-    //Use Liner::Completer as well, to preserve the previous behaviour
-    //around single-directory completions
+    // Use Liner::Completer as well, to preserve the previous behaviour
+    // around single-directory completions
     for path in inner_glob {
         let liner_completions: Vec<String> = liner_complete(&path)
             .iter()
@@ -134,7 +135,7 @@ fn filename_completion<LC>(start: &str, liner_complete: LC) -> Vec<String>
             completions.push(c)
         }
     }
-    completions   
+    completions
 }
 
 /// Escapes filenames from the completer so that special characters will be properly escaped.
@@ -226,6 +227,9 @@ mod tests {
 
         assert_eq!(completer.completions("~"), vec!["~/"]);
 
-        assert_eq!(completer.completions("tes/fil"), vec!["testing/file_with_text"]);
+        assert_eq!(
+            completer.completions("tes/fil"),
+            vec!["testing/file_with_text"]
+        );
     }
 }
