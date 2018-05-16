@@ -91,38 +91,45 @@ impl Completer for IonFileCompleter {
                 return completions;
             }
         }
-        let unescaped_start = unescape(start);
-        let start_split: Vec<&str> = unescaped_start.split("/").collect();
-        let start_for_glob = match unescaped_start.starts_with("/") {
-            true => ["/", &start_split[1..].join("*/"), "*"].concat(),
-            false => [&start_split.join("*/"), "*"].concat()
-        };
 
-        let mut inner_glob: Vec<String> = match glob(&start_for_glob) {
-            Ok(completions) => {
-                completions.filter_map(Result::ok)
-                    .map(|x| escape(&x.to_string_lossy()))
-                    .collect()
-            },
-            _ => vec![]
-        };
-        if inner_glob.len() == 0 {
-            inner_glob.push(start.to_string());
-        }
-
-        let mut completions = vec![];
-
-        for path in inner_glob {
-            let inner_completions: Vec<String> = self.inner.completions(&unescape(&path))
-                .iter()
-                .map(|x| escape(x.as_str()))
-                .collect();
-            for c in inner_completions {
-                completions.push(c)
-            }
-        }
-        completions   
+        filename_completion(&start, |x| self.inner.completions(x))
     }
+}
+
+fn filename_completion<LC>(start: &str, liner_complete: LC) -> Vec<String> 
+    where LC: Fn(&str) -> Vec<String> {
+    let unescaped_start = unescape(start);
+
+    let start_split: Vec<&str> = unescaped_start.split("/").collect();
+    let start_for_glob = match unescaped_start.starts_with("/") {
+        true => ["/", &start_split[1..].join("*/"), "*"].concat(),
+        false => [&start_split.join("*/"), "*"].concat()
+    };
+
+    let mut inner_glob: Vec<String> = match glob(&start_for_glob) {
+        Ok(completions) => {
+            completions.filter_map(Result::ok)
+                .map(|x| x.to_string_lossy().into_owned())
+                .collect()
+        },
+        _ => vec![]
+    };
+    if inner_glob.len() == 0 {
+        inner_glob.push(escape(&start.to_string()));
+    }
+
+    let mut completions = vec![];
+
+    for path in inner_glob {
+        let liner_completions: Vec<String> = liner_complete(&path)
+            .iter()
+            .map(|x| escape(x.as_str()))
+            .collect();
+        for c in liner_completions {
+            completions.push(c)
+        }
+    }
+    completions   
 }
 
 /// Escapes filenames from the completer so that special characters will be properly escaped.
