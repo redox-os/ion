@@ -1,15 +1,23 @@
-**Reproduction**: [describe how you are able to reproduce ("trigger") this bug/issue.]
+**Reproduction**: <!--- describe how you are able to reproduce ("trigger") this bug/issue. -->
 
-**Expected behavior**: [describe the behavior you would expect the repro to yield.]
+**Expected behavior**: <!---  describe the behavior you would expect the repro to yield. -->
 
-**Actual behavior**: [describe the actual behavior, which is presented through the repro.].
+**Actual behavior**: <!---  describe the actual behavior, which is presented through the repro. .-->
 
-**Build information**: [output of `rustc -V`, `git rev-parse HEAD`, `qemu-i386 -version`, `uname -a`, `ion --version`, etc.]
+**Build information**:
+<!--- output of `rustc -V`-->
 
-**Blocking/related**: [issues or PRs blocking or being related to this issue.]
+<!--- `git rev-parse HEAD` -->
 
-**Misc**: [optional: for other relevant information that should be known or cannot be described in the other fields.]
+<!--- `qemu-i386 -version` -->
 
-------
+<!--- `uname -a` -->
 
-_If the above does not fit the nature of the issue feel free to modify it._
+<!--- `ion --version` -->
+
+**Blocking/related**: <!---  issues or PRs blocking or being related to this issue. -->
+
+**Misc**: <!---  optional: for other relevant information that should be known or cannot be described in the other fields. -->
+
+
+<!--- _If the above does not fit the nature of the issue feel free to modify it._-->
