@@ -58,7 +58,7 @@ fn numeric_range(
         stepped_range_numeric(start, end, step)
     } else if start > end {
         if inclusive {
-            end += if end <= 0 { -1 } else { 1 };
+            end -= 1;
         }
         stepped_range_numeric(start, end, step)
     } else {
