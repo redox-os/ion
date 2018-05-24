@@ -58,7 +58,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
         }
         let start = self.read;
 
-        let (mut level, mut alevel) = (0, 0);
+        let (mut level, mut alevel, mut blevel) = (0, 0, 0);
         let mut bytes = data.iter().cloned().skip(self.read);
         while let Some(character) = bytes.next() {
             match character {
@@ -88,6 +88,9 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b'[' => alevel += 1,
                 // Decrement the array level
                 b']' => alevel -= 1,
+
+                b'{' => blevel += 1,
+                b'}' => blevel -= 1,
 
                 b'(' => {
                     // Disable VARIAB + ARRAY and enable METHOD.
@@ -125,7 +128,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b' ' => {
                     if !self.bitflags
                         .intersects(ArgumentFlags::DOUBLE | ArgumentFlags::METHOD)
-                        && level == 0 && alevel == 0
+                        && level == 0 && alevel == 0 && blevel == 0
                     {
                         break;
                     }
