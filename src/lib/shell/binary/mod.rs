@@ -11,6 +11,7 @@ use self::{
 };
 use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
 use liner::{Buffer, Context};
+use iter::Batching;
 use std::{env, fs::File, io::ErrorKind, iter, path::Path, process};
 
 pub const MAN_ION: &'static str = r#"NAME
@@ -186,41 +187,46 @@ impl Binary for Shell {
     fn prompt(&mut self) -> String { prompt(self) }
 }
 
-// TODO: Convert this into an iterator to eliminate heap allocations.
-fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
-    let mut res = Vec::new();
+fn word_divide<'a>(buf: &'a Buffer) -> Vec<(usize, usize)> {  // -> impl Iterator<Item = (usize, usize)> + 'a
+
     let mut word_start = None;
 
-    macro_rules! check_boundary {
-        ($c: expr, $index: expr, $escaped: expr) => {{
-            if let Some(start) = word_start {
-                if $c == ' ' && !$escaped {
-                    res.push((start, $index));
-                    word_start = None;
-                }
+    #[inline]
+    fn check_boundary(word_start: &mut Option<usize>, c: char, index: usize, escaped: bool) -> Option<Result<(usize, usize), ()>> {
+        if let &mut Some(start) = word_start {
+            if c == ' ' && !escaped {
+                *word_start = None;
+                Some(Ok((start, index)))
             } else {
-                if $c != ' ' {
-                    word_start = Some($index);
-                }
+                Some(Err(()))
             }
-        }};
-    }
-
-    let mut iter = buf.chars().enumerate();
-    while let Some((i, &c)) = iter.next() {
-        match c {
-            '\\' => {
-                if let Some((_, &cnext)) = iter.next() {
-                    // We use `i` in order to include the backslash as part of the word
-                    check_boundary!(cnext, i, true);
-                }
+        } else {
+            if c != ' ' {
+                *word_start = Some(index);
             }
-            c => check_boundary!(c, i, false),
+            Some(Err(()))
         }
     }
-    if let Some(start) = word_start {
-        // When start has been set, that means we have encountered a full word.
-        res.push((start, buf.num_chars()));
-    }
-    res
+
+    buf.chars().enumerate().batching(|iter| {
+        match iter.next() {
+            Some((i, '\\')) => {
+                if let Some((_, &cnext)) = iter.next() {
+                    // We use `i` in order to include the backslash as part of the word
+                    check_boundary(&mut word_start, cnext, i, true)
+                } else {
+                    Some(Err(()))
+                }
+            }
+            Some((i, c)) => check_boundary(&mut word_start, *c, i, false),
+            None => {
+                // When start has been set, that means we have encountered a full word.
+                word_start.map(|start| Ok((start, buf.num_chars())))
+            }
+        }
+    })
+    .filter_map(|item| {
+        item.ok()
+    })
+    .collect()
 }
