@@ -179,7 +179,7 @@ impl TeeItem {
 }
 
 macro_rules! set_field {
-    ($self:expr, $field:ident, $arg:expr) => {
+    ($self: expr, $field: ident, $arg: expr) => {
         match *$self {
             RefinedJob::External { ref mut $field, .. }
             | RefinedJob::Builtin { ref mut $field, .. }

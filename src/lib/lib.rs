@@ -3,6 +3,7 @@
 #![feature(integer_atomics)]
 #![feature(pointer_methods)]
 #![feature(getpid)]
+#![feature(nll)]
 
 #[macro_use]
 extern crate bitflags;
@@ -44,6 +45,7 @@ mod types;
 pub mod parser;
 mod ascii_helpers;
 mod builtins;
+mod iter;
 mod shell;
 
 pub use shell::{
