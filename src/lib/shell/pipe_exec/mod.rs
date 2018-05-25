@@ -90,7 +90,7 @@ fn is_implicit_cd(argument: &str) -> bool {
 /// redirection if necessary.
 fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, JobKind)>> {
     macro_rules! get_infile {
-        ($input:expr) => {
+        ($input: expr) => {
             match $input {
                 Input::File(ref filename) => match File::open(filename) {
                     Ok(file) => Some(file),
@@ -147,7 +147,7 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
     };
 
     macro_rules! set_no_tee {
-        ($outputs:ident, $job:ident) => {
+        ($outputs: ident, $job: ident) => {
             // XXX: Possibly add an assertion here for correctness
             for output in $outputs {
                 match if output.append {
