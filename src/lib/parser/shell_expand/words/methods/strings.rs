@@ -101,7 +101,7 @@ impl<'a> StringMethod<'a> {
         let pattern = MethodArgs::new(self.pattern, expand);
 
         macro_rules! string_eval {
-            ($variable:ident $method:tt) => {{
+            ($variable: ident $method: tt) => {{
                 let pattern = pattern.join(" ");
                 let is_true = if let Some(value) = expand.variable($variable, false) {
                     value.$method(&pattern)
@@ -117,7 +117,7 @@ impl<'a> StringMethod<'a> {
         }
 
         macro_rules! path_eval {
-            ($method:tt) => {{
+            ($method: tt) => {{
                 if let Some(value) = expand.variable(variable, false) {
                     output.push_str(
                         Path::new(&value)
@@ -138,7 +138,7 @@ impl<'a> StringMethod<'a> {
         }
 
         macro_rules! string_case {
-            ($method:tt) => {{
+            ($method: tt) => {{
                 if let Some(value) = expand.variable(variable, false) {
                     output.push_str(value.$method().as_str());
                 } else if is_expression(variable) {

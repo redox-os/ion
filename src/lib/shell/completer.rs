@@ -1,4 +1,5 @@
 use super::{directory_stack::DirectoryStack, variables::Variables};
+use glob::glob;
 use liner::{Completer, FilenameCompleter};
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
@@ -20,7 +21,7 @@ impl IonFileCompleter {
         vars: *const Variables,
     ) -> IonFileCompleter {
         IonFileCompleter {
-            inner:     FilenameCompleter::new(path),
+            inner: FilenameCompleter::new(path),
             dir_stack,
             vars,
         }
@@ -47,7 +48,7 @@ impl Completer for IonFileCompleter {
             if let Some(expanded) = unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) }
             {
                 // Now we obtain completions for the `expanded` form of the `start` value.
-                let completions = self.inner.completions(&expanded);
+                let completions = filename_completion(&expanded, |x| self.inner.completions(x));
                 let mut iterator = completions.iter();
 
                 // And then we will need to take those completions and remove the expanded form
@@ -77,7 +78,7 @@ impl Completer for IonFileCompleter {
                     // search pattern begins, and re-use that index to slice the completions so
                     // that we may re-add the tilde character with the completion that follows.
                     if let Some(completion) = iterator.next() {
-                        if let Some(e_index) = completion.rfind(search) {
+                        if let Some(e_index) = expanded.rfind(search) {
                             completions.push(escape(&[tilde, &completion[e_index..]].concat()));
                             for completion in iterator {
                                 let expanded = &completion[e_index..];
@@ -91,12 +92,50 @@ impl Completer for IonFileCompleter {
             }
         }
 
-        self.inner
-            .completions(&unescape(start))
+        filename_completion(&start, |x| self.inner.completions(x))
+    }
+}
+
+fn filename_completion<LC>(start: &str, liner_complete: LC) -> Vec<String>
+where
+    LC: Fn(&str) -> Vec<String>,
+{
+    let unescaped_start = unescape(start);
+
+    let start_split: Vec<&str> = unescaped_start.split("/").collect();
+
+    // When 'start' is an absolute path, "/..." gets split to ["", "..."]
+    // So we ignore the first element and add "/" to the start of the string
+    let start_for_glob = match unescaped_start.starts_with("/") {
+        true => ["/", &start_split[1..].join("*/"), "*"].concat(),
+        false => [&start_split.join("*/"), "*"].concat(),
+    };
+
+    let mut inner_glob: Vec<String> = match glob(&start_for_glob) {
+        Ok(completions) => completions
+            .filter_map(Result::ok)
+            .map(|x| x.to_string_lossy().into_owned())
+            .collect(),
+        _ => vec![],
+    };
+    if inner_glob.len() == 0 {
+        inner_glob.push(escape(&start.to_string()));
+    }
+
+    let mut completions = vec![];
+
+    // Use Liner::Completer as well, to preserve the previous behaviour
+    // around single-directory completions
+    for path in inner_glob {
+        let liner_completions: Vec<String> = liner_complete(&path)
             .iter()
             .map(|x| escape(x.as_str()))
-            .collect()
+            .collect();
+        for c in liner_completions {
+            completions.push(c)
+        }
     }
+    completions
 }
 
 /// Escapes filenames from the completer so that special characters will be properly escaped.
@@ -163,5 +202,34 @@ where
             completions.extend_from_slice(&x.completions(start));
         }
         completions
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn filename_completion() {
+        let current_dir = env::current_dir().expect("Unable to get current directory");
+
+        let completer = IonFileCompleter::new(
+            current_dir.to_str(),
+            &DirectoryStack::new(),
+            &Variables::default(),
+        );
+        assert_eq!(completer.completions("testing"), vec!["testing/"]);
+        assert_eq!(
+            completer.completions("testing/file"),
+            vec!["testing/file_with_text"]
+        );
+
+        assert_eq!(completer.completions("~"), vec!["~/"]);
+
+        assert_eq!(
+            completer.completions("tes/fil"),
+            vec!["testing/file_with_text"]
+        );
     }
 }
