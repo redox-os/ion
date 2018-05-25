@@ -251,7 +251,7 @@ where
     I: Iterator<Item = Statement>,
 {
     macro_rules! add_to_case {
-        ($statement:expr) => {
+        ($statement: expr) => {
             match cases.last_mut() {
                 // XXX: When does this actually happen? What syntax error is this???
                 None => {

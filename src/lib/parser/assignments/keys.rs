@@ -208,35 +208,35 @@ mod tests {
             Ok(Key {
                 name: "a",
                 kind: Primitive::Integer,
-            })
+            },)
         );
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key {
                 name: "b",
                 kind: Primitive::AnyArray,
-            })
+            },)
         );
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key {
                 name: "c",
                 kind: Primitive::Boolean,
-            })
+            },)
         );
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key {
                 name: "d",
                 kind: Primitive::Any,
-            })
+            },)
         );
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key {
                 name: "e",
                 kind: Primitive::IntegerArray,
-            })
+            },)
         );
         assert_eq!(parser.next().unwrap(), Err(TypeError::Invalid("a")));
     }
