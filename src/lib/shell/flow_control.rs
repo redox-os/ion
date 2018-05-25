@@ -168,7 +168,7 @@ impl Display for FunctionError {
 
 impl Function {
     pub(crate) fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
-        if args.len() - 1 != self.args.len() {
+        if args.len() - 1 > self.args.len() {
             return Err(FunctionError::InvalidArgumentCount);
         }
 
