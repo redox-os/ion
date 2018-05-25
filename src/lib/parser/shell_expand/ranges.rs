@@ -1,6 +1,6 @@
 use super::words::{Index, Range};
 
-fn stepped_range_numeric(mut start: isize, end: isize, step: isize) -> Option<Vec<String>> {
+fn stepped_range_numeric(mut start: isize, end: isize, step: isize, nb_digits: usize) -> Option<Vec<String>> {
     return if step == 0 {
         None
     } else if start < end && step < 0 {
@@ -15,7 +15,7 @@ fn stepped_range_numeric(mut start: isize, end: isize, step: isize) -> Option<Ve
             |a: isize, b: isize| -> bool { a > b }
         };
         while cmp(start, end) {
-            out.push(start.to_string());
+            out.push(format!("{:0width$}", start, width=nb_digits));
             start += step;
         }
         Some(out)
@@ -50,17 +50,18 @@ fn numeric_range(
     mut end: isize,
     step: isize,
     inclusive: bool,
+    nb_digits: usize,
 ) -> Option<Vec<String>> {
     if start < end {
         if inclusive {
             end += 1;
         }
-        stepped_range_numeric(start, end, step)
+        stepped_range_numeric(start, end, step, nb_digits)
     } else if start > end {
         if inclusive {
             end -= 1;
         }
-        stepped_range_numeric(start, end, step)
+        stepped_range_numeric(start, end, step, nb_digits)
     } else {
         Some(vec![start.to_string()])
     }
@@ -98,10 +99,28 @@ fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Ve
     }
 }
 
-fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize)> {
+fn count_minimum_digits(a: &str) -> usize {
+    let mut has_leading_zero = false;
+    for c in a.chars() {
+        match c {
+            '-' => (),
+            '0' => {
+                has_leading_zero = true;
+                break;
+            },
+            '1'...'9' => break,
+            _ => panic!("count_minimum_digits should only be called for a valid number.")
+        }
+    }
+    if !has_leading_zero { 0 }
+    else { a.len() }
+}
+
+fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize, usize)> {
     if let Ok(first) = a.parse::<isize>() {
         if let Ok(sec) = b.parse::<isize>() {
-            Some((first, sec))
+            let nb_digits = usize::max(count_minimum_digits(a), count_minimum_digits(b));
+            Some((first, sec, nb_digits))
         } else {
             None
         }
@@ -148,12 +167,13 @@ pub(crate) fn parse_range(input: &str) -> Option<Vec<String>> {
                 macro_rules! finish {
                     ($inclusive: expr, $read: expr) => {
                         let end_str = &input[$read..];
-                        if let Some((start, end)) = strings_to_isizes(first, end_str) {
+                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str) {
                             return numeric_range(
                                 start,
                                 end,
                                 if start < end { 1 } else { -1 },
                                 $inclusive,
+                                nb_digits,
                             );
                         } else {
                             finish_char!($inclusive, end_str, 1);
@@ -161,8 +181,8 @@ pub(crate) fn parse_range(input: &str) -> Option<Vec<String>> {
                     };
                     ($inclusive: expr, $read: expr, $step: expr) => {
                         let end_str = &input[$read..];
-                        if let Some((start, end)) = strings_to_isizes(first, end_str) {
-                            return numeric_range(start, end, $step, $inclusive);
+                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str) {
+                            return numeric_range(start, end, $step, $inclusive, nb_digits);
                         } else {
                             finish_char!($inclusive, end_str, $step);
                         }
@@ -341,6 +361,38 @@ fn range_expand() {
 
     assert_eq!(actual, expected);
 
+    let actual = parse_range("07...12");
+    let expected = Some(vec![
+        "07".to_owned(),
+        "08".to_owned(),
+        "09".to_owned(),
+        "10".to_owned(),
+        "11".to_owned(),
+        "12".to_owned(),
+    ]);
+
+    assert_eq!(actual, expected);
+
+    let actual = parse_range("-3...10");
+    let expected = Some(vec![
+        "-3".to_owned(),
+        "-2".to_owned(),
+        "-1".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "2".to_owned(),
+        "3".to_owned(),
+        "4".to_owned(),
+        "5".to_owned(),
+        "6".to_owned(),
+        "7".to_owned(),
+        "8".to_owned(),
+        "9".to_owned(),
+        "10".to_owned(),
+    ]);
+
+    assert_eq!(actual, expected);
+
     let actual = parse_range("3...-3");
     let expected = Some(vec![
         "3".to_owned(),
@@ -350,6 +402,32 @@ fn range_expand() {
         "-1".to_owned(),
         "-2".to_owned(),
         "-3".to_owned(),
+    ]);
+
+    assert_eq!(actual, expected);
+
+    let actual = parse_range("03...-3");
+    let expected = Some(vec![
+        "03".to_owned(),
+        "02".to_owned(),
+        "01".to_owned(),
+        "00".to_owned(),
+        "-1".to_owned(),
+        "-2".to_owned(),
+        "-3".to_owned(),
+    ]);
+
+    assert_eq!(actual, expected);
+
+    let actual = parse_range("3...-03");
+    let expected = Some(vec![
+        "003".to_owned(),
+        "002".to_owned(),
+        "001".to_owned(),
+        "000".to_owned(),
+        "-01".to_owned(),
+        "-02".to_owned(),
+        "-03".to_owned(),
     ]);
 
     assert_eq!(actual, expected);
