@@ -221,7 +221,7 @@ fn word_divide<'a>(buf: &'a Buffer) -> Vec<(usize, usize)> {  // -> impl Iterato
             Some((i, c)) => check_boundary(&mut word_start, *c, i, false),
             None => {
                 // When start has been set, that means we have encountered a full word.
-                word_start.map(|start| Ok((start, buf.num_chars())))
+                word_start.take().map(|start| Ok((start, buf.num_chars())))
             }
         }
     })
