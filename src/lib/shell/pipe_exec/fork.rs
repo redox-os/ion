@@ -1,4 +1,5 @@
 use sys;
+use smallvec::SmallVec;
 
 /// Ensures that the forked child is given a unique process ID.
 pub(crate) fn create_process_group(pgid: u32) { let _ = sys::setpgid(0, pgid); }
@@ -18,7 +19,7 @@ use std::process::exit;
 /// the given commands in the child fork.
 pub(crate) fn fork_pipe(
     shell: &mut Shell,
-    commands: Vec<(RefinedJob, JobKind)>,
+    commands: SmallVec<[(RefinedJob, JobKind); 16]>,
     command_name: String,
     state: ProcessState,
 ) -> i32 {

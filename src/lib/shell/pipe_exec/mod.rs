@@ -89,7 +89,9 @@ fn is_implicit_cd(argument: &str) -> bool {
 
 /// Insert the multiple redirects as pipelines if necessary. Handle both input and output
 /// redirection if necessary.
-fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, JobKind)>> {
+fn do_redirection(
+    piped_commands: SmallVec<[RefinedItem; 16]>
+) -> Option<SmallVec<[(RefinedJob, JobKind); 16]>> {
     macro_rules! get_infile {
         ($input: expr) => {
             match $input {
@@ -246,7 +248,7 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
     }
 
     // Real logic begins here
-    let mut new_commands = Vec::new();
+    let mut new_commands = SmallVec::new();
     let mut prev_kind = JobKind::Last;
     for (mut job, kind, outputs, mut inputs) in piped_commands {
         match (inputs.len(), prev_kind) {
@@ -365,7 +367,7 @@ pub(crate) trait PipelineExecution {
     ///
     /// Each generated command will either be a builtin or external command, and will be
     /// associated will be marked as an `&&`, `||`, `|`, or final job.
-    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<RefinedItem>, i32>;
+    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<SmallVec<[RefinedItem; 16]>, i32>;
 
     /// Waits for all of the children of the assigned pgid to finish executing, returning the
     /// exit status of the last process in the queue.
@@ -658,8 +660,8 @@ impl PipelineExecution for Shell {
         self.watch_foreground(-(pgid as i32), &as_string)
     }
 
-    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<RefinedItem>, i32> {
-        let mut results = Vec::new();
+    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<SmallVec<[RefinedItem; 16]>, i32> {
+        let mut results: SmallVec<[RefinedItem; 16]> = SmallVec::new();
         for item in pipeline.items.drain(..) {
             let PipeItem {
                 mut job,
@@ -740,7 +742,7 @@ impl PipelineExecution for Shell {
 /// This function will panic if called with an empty slice
 pub(crate) fn pipe(
     shell: &mut Shell,
-    commands: Vec<(RefinedJob, JobKind)>,
+    commands: SmallVec<[(RefinedJob, JobKind); 16]>,
     foreground: bool,
 ) -> i32 {
     let mut previous_status = SUCCESS;
