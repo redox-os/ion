@@ -11,7 +11,6 @@ use self::{
 };
 use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
 use liner::{Buffer, Context};
-use iter::Batching;
 use std::{env, fs::File, io::ErrorKind, iter, path::Path, process};
 
 pub const MAN_ION: &'static str = r#"NAME
@@ -187,46 +186,62 @@ impl Binary for Shell {
     fn prompt(&mut self) -> String { prompt(self) }
 }
 
-fn word_divide<'a>(buf: &'a Buffer) -> Vec<(usize, usize)> {  // -> impl Iterator<Item = (usize, usize)> + 'a
-
-    let mut word_start = None;
-
+struct WordDivide<I>
+    where I: Iterator<Item = (usize, char)>
+{
+    iter: I,
+    count: usize,
+    word_start: Option<usize>
+}
+impl<I> WordDivide<I>
+    where I: Iterator<Item = (usize, char)>
+{
     #[inline]
-    fn check_boundary(word_start: &mut Option<usize>, c: char, index: usize, escaped: bool) -> Option<Result<(usize, usize), ()>> {
-        if let &mut Some(start) = word_start {
+    fn check_boundary(&mut self, c: char, index: usize, escaped: bool) -> Option<(usize, usize)> {
+        if let Some(start) = self.word_start {
             if c == ' ' && !escaped {
-                *word_start = None;
-                Some(Ok((start, index)))
+                self.word_start = None;
+                Some((start, index))
             } else {
-                Some(Err(()))
+                self.next()
             }
         } else {
             if c != ' ' {
-                *word_start = Some(index);
+                self.word_start = Some(index);
             }
-            Some(Err(()))
+            self.next()
         }
     }
-
-    buf.chars().enumerate().batching(|iter| {
-        match iter.next() {
+}
+impl<I> Iterator for WordDivide<I>
+    where I: Iterator<Item = (usize, char)>
+{
+    type Item = (usize, usize);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.count += 1;
+        match self.iter.next() {
             Some((i, '\\')) => {
-                if let Some((_, &cnext)) = iter.next() {
+                if let Some((_, cnext)) = self.iter.next() {
                     // We use `i` in order to include the backslash as part of the word
-                    check_boundary(&mut word_start, cnext, i, true)
+                    self.check_boundary(cnext, i, true)
                 } else {
-                    Some(Err(()))
+                    self.next()
                 }
             }
-            Some((i, c)) => check_boundary(&mut word_start, *c, i, false),
+            Some((i, c)) => self.check_boundary(c, i, false),
             None => {
                 // When start has been set, that means we have encountered a full word.
-                word_start.take().map(|start| Ok((start, buf.num_chars())))
+                self.word_start.take().map(|start| (start, self.count-1))
             }
         }
-    })
-    .filter_map(|item| {
-        item.ok()
-    })
-    .collect()
+    }
+}
+
+fn word_divide<'a>(buf: &'a Buffer) -> Vec<(usize, usize)> {  // -> impl Iterator<Item = (usize, usize)> + 'a
+    WordDivide {
+        iter: buf.chars().cloned().enumerate(),
+        count: 0,
+        word_start: None
+    }
+    .collect() // TODO: return iterator directly :D
 }
