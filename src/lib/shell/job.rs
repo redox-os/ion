@@ -1,17 +1,17 @@
 use super::Shell;
+use shell::pipe_exec::PipelineExecution;
 use builtins::{BuiltinFunction, BUILTINS};
 use parser::{expand_string, pipelines::RedirectFrom};
 use smallstring::SmallString;
+use smallvec::SmallVec;
 use std::{fmt, fs::File, str};
 use types::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) enum JobKind {
-    And,
     Background,
     Disown,
     Last,
-    Or,
     Pipe(RedirectFrom),
 }
 
@@ -193,6 +193,10 @@ macro_rules! set_field {
     };
 }
 
+fn collect_args(args: &[String]) -> SmallVec<[&str; 16]> {
+    args.iter().map(|x| x as &str).collect::<SmallVec<[&str; 16]>>()
+}
+
 impl RefinedJob {
     /// Returns a long description of this job: the commands and arguments
     pub(crate) fn long(&self) -> String {
@@ -216,6 +220,42 @@ impl RefinedJob {
             // TODO: Print for real
             RefinedJob::Cat { .. } => "multi-input".into(),
             RefinedJob::Tee { .. } => "multi-output".into(),
+        }
+    }
+
+    pub(crate) fn exec<S: PipelineExecution>(&self, shell: &mut S) -> i32 {
+        match *self {
+            RefinedJob::External {
+                ref name,
+                ref args,
+                ref stdin,
+                ref stdout,
+                ref stderr,
+            } => {
+                let args = collect_args(&args[1..]);
+                shell.exec_external(&name, &args, stdin, stdout, stderr)
+            }
+            RefinedJob::Builtin {
+                main,
+                ref args,
+                ref stdin,
+                ref stdout,
+                ref stderr,
+            } => {
+                let args = collect_args(&args);
+                shell.exec_builtin(main, &args, stdout, stderr, stdin)
+            }
+            RefinedJob::Function {
+                ref name,
+                ref args,
+                ref stdin,
+                ref stdout,
+                ref stderr,
+            } => {
+                let args = collect_args(&args);
+                shell.exec_function(name, &args, stdout, stderr, stdin)
+            }
+            _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
         }
     }
 
