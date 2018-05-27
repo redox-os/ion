@@ -37,19 +37,21 @@ fn stepped_range_chars<'a>(start: u8, end: u8, step: u8) -> Option<Box<Iterator<
         None
     } else {
         if start < end {
-            Some(Box::new((start..end).scan(start - 1, move |index, _| {
+            Some(Box::new((start..end).scan(start, move |index, _| {
                 if *index < end {
+                    let index_holder = *index;
                     *index = index.wrapping_add(step);
-                    Some((*index as char).to_string())
+                    Some((index_holder as char).to_string())
                 } else {
                     None
                 }
             })))
         } else {
-            Some(Box::new((end..start).scan(start + 1, move |index, _| {
+            Some(Box::new((end..start).scan(start, move |index, _| {
                 if *index > end {
+                    let index_holder = *index;
                     *index = index.wrapping_sub(step);
-                    Some((*index as char).to_string())
+                    Some((index_holder as char).to_string())
                 } else {
                     None
                 }
