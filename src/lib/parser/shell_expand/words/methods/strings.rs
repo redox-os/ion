@@ -1,7 +1,6 @@
 use super::{
     super::{
-        super::{expand_string, is_expression, slice, Expander},
-        Select,
+        super::{expand_string, is_expression, slice, Expander}, Select,
     },
     MethodArgs,
 };
@@ -68,7 +67,9 @@ fn escape(input: &str) -> Result<String, &'static str> {
             13 => output.push_str("\\r"),
             27 => output.push_str("\\e"),
             n if n != 59 && n != 95
-                && ((n >= 33 && n < 48) || (n >= 58 && n < 65) || (n >= 91 && n < 97)
+                && ((n >= 33 && n < 48)
+                    || (n >= 58 && n < 65)
+                    || (n >= 91 && n < 97)
                     || (n >= 123 && n < 127)) =>
             {
                 output.push('\\');
@@ -101,7 +102,7 @@ impl<'a> StringMethod<'a> {
         let pattern = MethodArgs::new(self.pattern, expand);
 
         macro_rules! string_eval {
-            ($variable: ident $method: tt) => {{
+            ($variable:ident $method:tt) => {{
                 let pattern = pattern.join(" ");
                 let is_true = if let Some(value) = expand.variable($variable, false) {
                     value.$method(&pattern)
@@ -117,7 +118,7 @@ impl<'a> StringMethod<'a> {
         }
 
         macro_rules! path_eval {
-            ($method: tt) => {{
+            ($method:tt) => {{
                 if let Some(value) = expand.variable(variable, false) {
                     output.push_str(
                         Path::new(&value)
@@ -138,7 +139,7 @@ impl<'a> StringMethod<'a> {
         }
 
         macro_rules! string_case {
-            ($method: tt) => {{
+            ($method:tt) => {{
                 if let Some(value) = expand.variable(variable, false) {
                     output.push_str(value.$method().as_str());
                 } else if is_expression(variable) {

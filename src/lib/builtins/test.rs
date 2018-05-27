@@ -1,10 +1,7 @@
 use super::man_pages::{print_man, MAN_TEST};
 use smallstring::SmallString;
 use std::{
-    fs,
-    os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt},
-    path::Path,
-    time::SystemTime,
+    fs, os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt}, path::Path, time::SystemTime,
 };
 
 pub(crate) fn test(args: &[&str]) -> Result<bool, String> {

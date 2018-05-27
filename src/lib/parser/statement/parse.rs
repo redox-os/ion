@@ -1,11 +1,8 @@
 use super::{
     super::{
-        assignments::{split_assignment, Operator},
-        pipelines::{self, Pipeline},
-        ArgumentSplitter,
+        assignments::{split_assignment, Operator}, pipelines::{self, Pipeline}, ArgumentSplitter,
     },
-    case,
-    functions::{collect_arguments, parse_function},
+    case, functions::{collect_arguments, parse_function},
 };
 use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};
 use std::char;

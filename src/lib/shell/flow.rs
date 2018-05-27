@@ -1,23 +1,15 @@
 use super::{
     flags::*,
     flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function, Statement},
-    job_control::JobControl,
-    status::*,
-    Shell,
+    job_control::JobControl, status::*, Shell,
 };
 use parser::{
-    assignments::{is_array, ReturnValue},
-    expand_string,
-    parse_and_validate,
-    pipelines::Pipeline,
-    ForExpression,
-    StatementSplitter,
+    assignments::{is_array, ReturnValue}, expand_string, parse_and_validate, pipelines::Pipeline,
+    ForExpression, StatementSplitter,
 };
 use shell::assignments::VariableStore;
 use std::{
-    io::{stdout, Write},
-    iter,
-    mem,
+    io::{stdout, Write}, iter, mem,
 };
 use types::Array;
 
@@ -658,7 +650,8 @@ impl FlowLogic for Shell {
                     let mut previous_bind = None;
                     if let Some(ref bind) = case.binding {
                         if is_array {
-                            previous_bind = self.variables
+                            previous_bind = self
+                                .variables
                                 .get_array(bind)
                                 .map(|x| ReturnValue::Vector(x.clone()));
                             self.variables.set_array(&bind, value.clone());
@@ -694,7 +687,8 @@ impl FlowLogic for Shell {
                     let mut previous_bind = None;
                     if let Some(ref bind) = case.binding {
                         if is_array {
-                            previous_bind = self.variables
+                            previous_bind = self
+                                .variables
                                 .get_array(bind)
                                 .map(|x| ReturnValue::Vector(x.clone()));
                             self.variables.set_array(&bind, value.clone());

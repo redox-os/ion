@@ -4,10 +4,7 @@ extern crate smallvec;
 use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};
 use smallvec::SmallVec;
 use std::{
-    env,
-    error::Error,
-    io::{stdout, Write},
-    iter::FromIterator,
+    env, error::Error, io::{stdout, Write}, iter::FromIterator,
 };
 
 fn main() {

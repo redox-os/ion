@@ -7,11 +7,7 @@ use libc::{
     c_char, c_int, pid_t, sighandler_t, strerror, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED,
 };
 use std::{
-    env,
-    ffi::{CStr, CString},
-    io::{self, Write},
-    os::unix::io::RawFd,
-    ptr,
+    env, ffi::{CStr, CString}, io::{self, Write}, os::unix::io::RawFd, ptr,
 };
 
 pub(crate) const PATH_SEPARATOR: &str = ":";

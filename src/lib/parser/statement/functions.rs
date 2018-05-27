@@ -1,6 +1,5 @@
 use super::{
-    super::assignments::{KeyBuf, KeyIterator, TypeError},
-    split_pattern,
+    super::assignments::{KeyBuf, KeyIterator, TypeError}, split_pattern,
 };
 
 /// The arguments expression given to a function declaration goes into here, which will be
@@ -22,8 +21,7 @@ pub(crate) fn collect_arguments<'a>(args: KeyIterator<'a>) -> Result<Vec<KeyBuf>
 #[cfg(test)]
 mod tests {
     use super::{
-        super::super::assignments::{KeyBuf, Primitive},
-        *,
+        super::super::assignments::{KeyBuf, Primitive}, *,
     };
 
     #[test]

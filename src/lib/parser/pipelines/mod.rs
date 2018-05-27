@@ -72,7 +72,8 @@ impl PipeItem {
 
 impl Pipeline {
     pub(crate) fn requires_piping(&self) -> bool {
-        self.items.len() > 1 || self.items.iter().any(|it| it.outputs.len() > 0)
+        self.items.len() > 1
+            || self.items.iter().any(|it| it.outputs.len() > 0)
             || self.items.iter().any(|it| it.inputs.len() > 0)
             || self.items.last().unwrap().job.kind == JobKind::Background
             || self.items.last().unwrap().job.kind == JobKind::Disown

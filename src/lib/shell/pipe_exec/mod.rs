@@ -11,31 +11,20 @@ pub mod job_control;
 pub mod streams;
 
 use self::{
-    fork::fork_pipe,
-    job_control::{JobControl, ProcessState},
+    fork::fork_pipe, job_control::{JobControl, ProcessState},
     streams::{duplicate_streams, redir, redirect_streams},
 };
 use super::{
-    flags::*,
-    flow_control::FunctionError,
-    fork_function::command_not_found,
-    job::{RefinedJob, TeeItem},
-    signals::{self, SignalHandler},
-    status::*,
-    JobKind,
-    Shell,
+    flags::*, flow_control::FunctionError, fork_function::command_not_found,
+    job::{RefinedJob, TeeItem}, signals::{self, SignalHandler}, status::*, JobKind, Shell,
 };
 use builtins::{self, BuiltinFunction};
 use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
-use std::{
-    fs::{File, OpenOptions},
-    io::{self, Error, Write},
-    iter,
-    os::unix::io::{AsRawFd, FromRawFd, RawFd},
-    path::Path,
-    process::{self, exit},
-};
 use smallvec::SmallVec;
+use std::{
+    fs::{File, OpenOptions}, io::{self, Error, Write}, iter,
+    os::unix::io::{AsRawFd, FromRawFd, RawFd}, path::Path, process::{self, exit},
+};
 use sys;
 
 type RefinedItem = (RefinedJob, JobKind, Vec<Redirection>, Vec<Input>);
@@ -90,10 +79,10 @@ fn is_implicit_cd(argument: &str) -> bool {
 /// Insert the multiple redirects as pipelines if necessary. Handle both input and output
 /// redirection if necessary.
 fn do_redirection(
-    piped_commands: SmallVec<[RefinedItem; 16]>
+    piped_commands: SmallVec<[RefinedItem; 16]>,
 ) -> Option<SmallVec<[(RefinedJob, JobKind); 16]>> {
     macro_rules! get_infile {
-        ($input: expr) => {
+        ($input:expr) => {
             match $input {
                 Input::File(ref filename) => match File::open(filename) {
                     Ok(file) => Some(file),
@@ -150,7 +139,7 @@ fn do_redirection(
     };
 
     macro_rules! set_no_tee {
-        ($outputs: ident, $job: ident) => {
+        ($outputs:ident, $job:ident) => {
             // XXX: Possibly add an assertion here for correctness
             for output in $outputs {
                 match if output.append {
@@ -367,7 +356,10 @@ pub(crate) trait PipelineExecution {
     ///
     /// Each generated command will either be a builtin or external command, and will be
     /// associated will be marked as an `&&`, `||`, `|`, or final job.
-    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<SmallVec<[RefinedItem; 16]>, i32>;
+    fn generate_commands(
+        &self,
+        pipeline: &mut Pipeline,
+    ) -> Result<SmallVec<[RefinedItem; 16]>, i32>;
 
     /// Waits for all of the children of the assigned pgid to finish executing, returning the
     /// exit status of the last process in the queue.
@@ -660,7 +652,10 @@ impl PipelineExecution for Shell {
         self.watch_foreground(-(pgid as i32), &as_string)
     }
 
-    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<SmallVec<[RefinedItem; 16]>, i32> {
+    fn generate_commands(
+        &self,
+        pipeline: &mut Pipeline,
+    ) -> Result<SmallVec<[RefinedItem; 16]>, i32> {
         let mut results: SmallVec<[RefinedItem; 16]> = SmallVec::new();
         for item in pipeline.items.drain(..) {
             let PipeItem {
@@ -859,7 +854,8 @@ pub(crate) fn pipe(
 
                         possible_external_stdio_pipes = None;
 
-                        if set_process_group(&mut pgid, current_pid) && foreground
+                        if set_process_group(&mut pgid, current_pid)
+                            && foreground
                             && !shell.is_library
                         {
                             let _ = sys::tcsetpgrp(0, pgid);
