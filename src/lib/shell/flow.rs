@@ -352,7 +352,7 @@ impl FlowLogic for Shell {
             .into_iter()
             .map(|cond| (cond.expression, cond.success));
 
-        for (mut condition, mut statements) in first_condition.chain(else_conditions) {
+        for (mut condition, statements) in first_condition.chain(else_conditions) {
             if self.run_pipeline(&mut condition) == Some(SUCCESS) {
                 return self.execute_statements(statements);
             }

@@ -53,7 +53,7 @@ fn expand_process<E: Expander>(
         } else {
             // If we ever do something with UTF-8, this won't work
             unsafe {
-                let mut bytes = output.as_bytes_mut();
+                let bytes = output.as_bytes_mut();
                 let bytes_v = bytes.as_mut_ptr();
                 let mut size = bytes.len();
                 let mut i = 0;
