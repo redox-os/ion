@@ -9,25 +9,20 @@ pub(crate) enum BraceToken {
     Expander,
 }
 
-pub(crate) fn expand_braces<'a>(tokens: &'a [BraceToken], mut expanders: Vec<Vec<String>>) -> Box<Iterator<Item = String> + 'a> {
+pub(crate) fn expand_braces<'a>(tokens: &'a [BraceToken], expanders: &'a [&'a [&'a str]]) -> Box<Iterator<Item = String> + 'a> {
     if expanders.len() > 1 {
-        let tmp: Vec<Vec<&str>> = expanders
-            .iter()
-            .map(|list| list.iter().map(AsRef::as_ref).collect::<Vec<&str>>())
-            .collect();
-        let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
         let multiple_brace_expand = MultipleBraceExpand {
-                permutator: Permutator::new(&vector_of_arrays),
+                permutator: Permutator::new(expanders),
                 tokens: tokens,
             };
         Box::new(multiple_brace_expand)
     } else if expanders.len() == 1 {
-        let elements = expanders
-            .drain(..)
-            .next()
-            .expect("there should be at least one value");
+        //let elements = expanders
+        //    .drain(..)
+        //    .next()
+        //    .expect("there should be at least one value");
         let single_brace_expand = SingleBraceExpand {
-                elements: elements.iter().map(AsRef::as_ref),
+                elements: expanders[0].iter().map(|element| *element),
                 tokens: tokens,
                 loop_count: 0,
             };

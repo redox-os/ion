@@ -306,7 +306,12 @@ fn expand_braces<E: Expander>(
         if !output.is_empty() {
             tokens.push(BraceToken::Normal(output));
         }
-        for word in braces::expand_braces(&tokens, expanders) {
+        let tmp: Vec<Vec<&str>> = expanders
+            .iter()
+            .map(|list| list.iter().map(AsRef::as_ref).collect::<Vec<&str>>())
+            .collect();
+        let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
+        for word in braces::expand_braces(&tokens, &*vector_of_arrays) {
             expanded_words.push(word.into());
         }
     }
