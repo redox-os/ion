@@ -122,8 +122,6 @@ impl fmt::Display for Pipeline {
             }
             match kind {
                 JobKind::Last => (),
-                JobKind::And => tokens.push("&&".into()),
-                JobKind::Or => tokens.push("||".into()),
                 JobKind::Background => tokens.push("&".into()),
                 JobKind::Disown => tokens.push("&!".into()),
                 JobKind::Pipe(RedirectFrom::Stdout) => tokens.push("|".into()),

@@ -3,6 +3,7 @@
 #![feature(integer_atomics)]
 #![feature(pointer_methods)]
 #![feature(getpid)]
+#![feature(nll)]
 
 #[macro_use]
 extern crate bitflags;

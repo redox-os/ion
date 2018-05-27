@@ -186,41 +186,62 @@ impl Binary for Shell {
     fn prompt(&mut self) -> String { prompt(self) }
 }
 
-// TODO: Convert this into an iterator to eliminate heap allocations.
-fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
-    let mut res = Vec::new();
-    let mut word_start = None;
-
-    macro_rules! check_boundary {
-        ($c:expr, $index:expr, $escaped:expr) => {{
-            if let Some(start) = word_start {
-                if $c == ' ' && !$escaped {
-                    res.push((start, $index));
-                    word_start = None;
-                }
+struct WordDivide<I>
+    where I: Iterator<Item = (usize, char)>
+{
+    iter: I,
+    count: usize,
+    word_start: Option<usize>
+}
+impl<I> WordDivide<I>
+    where I: Iterator<Item = (usize, char)>
+{
+    #[inline]
+    fn check_boundary(&mut self, c: char, index: usize, escaped: bool) -> Option<(usize, usize)> {
+        if let Some(start) = self.word_start {
+            if c == ' ' && !escaped {
+                self.word_start = None;
+                Some((start, index))
             } else {
-                if $c != ' ' {
-                    word_start = Some($index);
-                }
+                self.next()
             }
-        }};
-    }
-
-    let mut iter = buf.chars().enumerate();
-    while let Some((i, &c)) = iter.next() {
-        match c {
-            '\\' => {
-                if let Some((_, &cnext)) = iter.next() {
-                    // We use `i` in order to include the backslash as part of the word
-                    check_boundary!(cnext, i, true);
-                }
+        } else {
+            if c != ' ' {
+                self.word_start = Some(index);
             }
-            c => check_boundary!(c, i, false),
+            self.next()
         }
     }
-    if let Some(start) = word_start {
-        // When start has been set, that means we have encountered a full word.
-        res.push((start, buf.num_chars()));
+}
+impl<I> Iterator for WordDivide<I>
+    where I: Iterator<Item = (usize, char)>
+{
+    type Item = (usize, usize);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.count += 1;
+        match self.iter.next() {
+            Some((i, '\\')) => {
+                if let Some((_, cnext)) = self.iter.next() {
+                    // We use `i` in order to include the backslash as part of the word
+                    self.check_boundary(cnext, i, true)
+                } else {
+                    self.next()
+                }
+            }
+            Some((i, c)) => self.check_boundary(c, i, false),
+            None => {
+                // When start has been set, that means we have encountered a full word.
+                self.word_start.take().map(|start| (start, self.count-1))
+            }
+        }
     }
-    res
+}
+
+fn word_divide<'a>(buf: &'a Buffer) -> Vec<(usize, usize)> {  // -> impl Iterator<Item = (usize, usize)> + 'a
+    WordDivide {
+        iter: buf.chars().cloned().enumerate(),
+        count: 0,
+        word_start: None
+    }
+    .collect() // TODO: return iterator directly :D
 }
