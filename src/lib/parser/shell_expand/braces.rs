@@ -17,10 +17,6 @@ pub(crate) fn expand_braces<'a>(tokens: &'a [BraceToken], expanders: &'a [&'a [&
             };
         Box::new(multiple_brace_expand)
     } else if expanders.len() == 1 {
-        //let elements = expanders
-        //    .drain(..)
-        //    .next()
-        //    .expect("there should be at least one value");
         let single_brace_expand = SingleBraceExpand {
                 elements: expanders[0].iter().map(|element| *element),
                 tokens: tokens,
@@ -148,9 +144,11 @@ fn test_multiple_brace_expand() {
         BraceToken::Expander,
         BraceToken::Normal("GH".to_owned()),
     ];
-    let out = multiple_brace_expand(expanders, tokens);
     assert_eq!(
-        out,
+        MultipleBraceExpand {
+            permutator: Permutator::new(expanders),
+            tokens: tokens,
+        }.collect::<Vec<String>>(),
         vec![
             "AB1CD3EF5GH".to_owned(),
             "AB1CD3EF6GH".to_owned(),
@@ -168,9 +166,12 @@ fn test_multiple_brace_expand() {
 fn test_single_brace_expand() {
     let elements = &["one", "two", "three"];
     let tokens: &[BraceToken] = &[BraceToken::Normal("A=".to_owned()), BraceToken::Expander];
-    let out = single_brace_expand(elements, &tokens);
     assert_eq!(
-        out,
+        SingleBraceExpand {
+            elements: elements.iter().map(|element| *element),
+            tokens: tokens,
+            loop_count: 0,
+        }.collect::<Vec<String>>(),
         vec!["A=one".to_owned(), "A=two".to_owned(), "A=three".to_owned()]
     );
 }
