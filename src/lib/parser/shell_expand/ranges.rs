@@ -1,6 +1,6 @@
 use super::words::{Index, Range};
 
-fn stepped_range_numeric(mut start: isize, end: isize, step: isize, nb_digits: usize) -> Option<Vec<String>> {
+fn stepped_range_numeric<'a>(start: isize, end: isize, step: isize, nb_digits: usize) -> Option<Box<Iterator<Item = String> + 'a>> {
     return if step == 0 {
         None
     } else if start < end && step < 0 {
@@ -8,50 +8,58 @@ fn stepped_range_numeric(mut start: isize, end: isize, step: isize, nb_digits: u
     } else if start > end && step > 0 {
         None
     } else {
-        let mut out = Vec::new();
-        let cmp: fn(isize, isize) -> bool = if start < end {
-            |a: isize, b: isize| -> bool { a < b }
+        if start < end {
+            Some(Box::new((start..end).scan(start, move |index, _| {
+                if *index < end {
+                    let index_holder = *index;
+                    *index += step; // This step adds
+                    Some(format!("{:0width$}", index_holder, width=nb_digits))
+                } else {
+                    None
+                }
+            })))
         } else {
-            |a: isize, b: isize| -> bool { a > b }
-        };
-        while cmp(start, end) {
-            out.push(format!("{:0width$}", start, width=nb_digits));
-            start += step;
+            Some(Box::new((end..start).scan(start, move |index, _| {
+                if *index > end {
+                    let index_holder = *index;
+                    *index += step; // This step subtracts
+                    Some(format!("{:0width$}", index_holder, width=nb_digits))
+                } else {
+                    None
+                }
+            })))
         }
-        Some(out)
     };
 }
 
-fn stepped_range_chars(mut start: u8, end: u8, step: u8) -> Option<Vec<String>> {
+fn stepped_range_chars<'a>(start: u8, end: u8, step: u8) -> Option<Box<Iterator<Item = String> + 'a>> {
     if step == 0 {
         None
     } else {
-        let mut out = Vec::new();
-        let cmp: fn(u8, u8) -> bool = if start < end {
-            |a: u8, b: u8| -> bool { a < b }
+        if start < end {
+            Some(Box::new((start..end).scan(start, move |index, _| {
+                if *index < end {
+                    *index = index.wrapping_add(step);
+                    Some((start as char).to_string())
+                } else {
+                    None
+                }
+            })))
         } else {
-            |a: u8, b: u8| -> bool { a > b }
-        };
-        let step_func: fn(u8, u8) -> u8 = if start > end {
-            |cur: u8, step: u8| -> u8 { cur.wrapping_sub(step) }
-        } else {
-            |cur: u8, step: u8| -> u8 { cur.wrapping_add(step) }
-        };
-        while cmp(start, end) {
-            out.push((start as char).to_string());
-            start = step_func(start, step);
+            Some(Box::new((end..start).scan(start, move |index, _| {
+                if *index > end {
+                    *index = index.wrapping_sub(step);
+                    Some((start as char).to_string())
+                } else {
+                    None
+                }
+            })))
         }
-        Some(out)
     }
 }
 
-fn numeric_range(
-    start: isize,
-    mut end: isize,
-    step: isize,
-    inclusive: bool,
-    nb_digits: usize,
-) -> Option<Vec<String>> {
+fn numeric_range<'a>(start: isize, mut end: isize, step: isize, inclusive: bool, nb_digits: usize)
+    -> Option<Box<Iterator<Item = String> + 'a>> {
     if start < end {
         if inclusive {
             end += 1;
@@ -63,7 +71,7 @@ fn numeric_range(
         }
         stepped_range_numeric(start, end, step, nb_digits)
     } else {
-        Some(vec![start.to_string()])
+        Some(Box::new(Some(start.to_string()).into_iter()))
     }
 }
 
@@ -71,7 +79,7 @@ fn numeric_range(
 fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') }
 
 use std::u8;
-fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Vec<String>> {
+fn char_range<'a>(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Box<Iterator<Item = String> + 'a>> {
     if !byte_is_valid_range(start) || !byte_is_valid_range(end) {
         return None;
     }
@@ -88,14 +96,14 @@ fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Ve
         if inclusive {
             end += 1;
         }
-        return stepped_range_chars(start, end, char_step);
+        stepped_range_chars(start, end, char_step)
     } else if start > end {
         if inclusive {
             end -= 1;
         }
-        return stepped_range_chars(start, end, char_step);
+        stepped_range_chars(start, end, char_step)
     } else {
-        return Some(vec![(start as char).to_string()]);
+        Some(Box::new(Some((start as char).to_string()).into_iter()))
     }
 }
 
@@ -134,7 +142,7 @@ fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize, usize)> {
 //      Inclusive nonstepped: {start...end}
 //      Exclusive stepped: {start..step..end}
 //      Inclusive stepped: {start..step...end}
-pub(crate) fn parse_range(input: &str) -> Option<Vec<String>> {
+pub(crate) fn parse_range<'a>(input: &str) -> Option<Box<Iterator<Item = String> + 'a>> {
     let mut read = 0;
     let mut bytes_iterator = input.bytes();
     while let Some(byte) = bytes_iterator.next() {
