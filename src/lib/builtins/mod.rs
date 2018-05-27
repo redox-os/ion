@@ -477,7 +477,7 @@ fn builtin_help(args: &[&str], shell: &mut Shell) -> i32 {
             let _ = stdout.write_all(b"\n");
         }
     } else {
-        let mut commands = builtins.keys();
+        let commands = builtins.keys();
 
         let mut buffer: Vec<u8> = Vec::new();
         for command in commands {

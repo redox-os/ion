@@ -61,7 +61,7 @@ impl Default for Variables {
 
         // Initialize the HISTFILE variable
         if let Ok(base_dirs) = BaseDirectories::with_prefix("ion") {
-            if let Ok(mut path) = base_dirs.place_data_file("history") {
+            if let Ok(path) = base_dirs.place_data_file("history") {
                 map.insert("HISTFILE".into(), path.to_str().unwrap_or("?").into());
                 map.insert("HISTFILE_ENABLED".into(), "1".into());
             }
