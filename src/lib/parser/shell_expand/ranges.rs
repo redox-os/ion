@@ -37,19 +37,19 @@ fn stepped_range_chars<'a>(start: u8, end: u8, step: u8) -> Option<Box<Iterator<
         None
     } else {
         if start < end {
-            Some(Box::new((start..end).scan(start, move |index, _| {
+            Some(Box::new((start..end).scan(start - 1, move |index, _| {
                 if *index < end {
                     *index = index.wrapping_add(step);
-                    Some((start as char).to_string())
+                    Some((*index as char).to_string())
                 } else {
                     None
                 }
             })))
         } else {
-            Some(Box::new((end..start).scan(start, move |index, _| {
+            Some(Box::new((end..start).scan(start + 1, move |index, _| {
                 if *index > end {
                     *index = index.wrapping_sub(step);
-                    Some((start as char).to_string())
+                    Some((*index as char).to_string())
                 } else {
                     None
                 }
@@ -354,35 +354,37 @@ fn index_ranges() {
 
 #[test]
 fn range_expand() {
-    assert_eq!(None, parse_range("abc"));
+    if let Some(_) = parse_range("abc") {
+        panic!("parse_range() failed");
+    }
 
-    let actual = parse_range("-3...3");
-    let expected = Some(vec![
-        "-3".to_owned(),
-        "-2".to_owned(),
-        "-1".to_owned(),
-        "0".to_owned(),
-        "1".to_owned(),
-        "2".to_owned(),
-        "3".to_owned(),
-    ]);
+    let actual: Vec<String> = parse_range("-3...3").unwrap().collect();
+    let expected: Vec<String> = vec![
+            "-3".to_owned(),
+            "-2".to_owned(),
+            "-1".to_owned(),
+            "0".to_owned(),
+            "1".to_owned(),
+            "2".to_owned(),
+            "3".to_owned(),
+        ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("07...12");
-    let expected = Some(vec![
+    let actual: Vec<String> = parse_range("07...12").unwrap().collect();
+    let expected: Vec<String> = vec![
         "07".to_owned(),
         "08".to_owned(),
         "09".to_owned(),
         "10".to_owned(),
         "11".to_owned(),
         "12".to_owned(),
-    ]);
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("-3...10");
-    let expected = Some(vec![
+    let actual: Vec<String> = parse_range("-3...10").unwrap().collect();
+    let expected: Vec<String> = vec![
         "-3".to_owned(),
         "-2".to_owned(),
         "-1".to_owned(),
@@ -397,12 +399,12 @@ fn range_expand() {
         "8".to_owned(),
         "9".to_owned(),
         "10".to_owned(),
-    ]);
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("3...-3");
-    let expected = Some(vec![
+    let actual: Vec<String> = parse_range("3...-3").unwrap().collect();
+    let expected: Vec<String> = vec![
         "3".to_owned(),
         "2".to_owned(),
         "1".to_owned(),
@@ -410,12 +412,12 @@ fn range_expand() {
         "-1".to_owned(),
         "-2".to_owned(),
         "-3".to_owned(),
-    ]);
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("03...-3");
-    let expected = Some(vec![
+    let actual: Vec<String> = parse_range("03...-3").unwrap().collect();
+    let expected: Vec<String> = vec![
         "03".to_owned(),
         "02".to_owned(),
         "01".to_owned(),
@@ -423,12 +425,12 @@ fn range_expand() {
         "-1".to_owned(),
         "-2".to_owned(),
         "-3".to_owned(),
-    ]);
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("3...-03");
-    let expected = Some(vec![
+    let actual: Vec<String> = parse_range("3...-03").unwrap().collect();
+    let expected: Vec<String> = vec![
         "003".to_owned(),
         "002".to_owned(),
         "001".to_owned(),
@@ -436,40 +438,40 @@ fn range_expand() {
         "-01".to_owned(),
         "-02".to_owned(),
         "-03".to_owned(),
-    ]);
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("a...c");
-    let expected = Some(vec!["a".to_owned(), "b".to_owned(), "c".to_owned()]);
+    let actual: Vec<String> = parse_range("a...c").unwrap().collect();
+    let expected: Vec<String> = vec!["a".to_owned(), "b".to_owned(), "c".to_owned()];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("c...a");
-    let expected = Some(vec!["c".to_owned(), "b".to_owned(), "a".to_owned()]);
+    let actual: Vec<String> = parse_range("c...a").unwrap().collect();
+    let expected: Vec<String> = vec!["c".to_owned(), "b".to_owned(), "a".to_owned()];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("A...C");
-    let expected = Some(vec!["A".to_owned(), "B".to_owned(), "C".to_owned()]);
+    let actual: Vec<String> = parse_range("A...C").unwrap().collect();
+    let expected: Vec<String> = vec!["A".to_owned(), "B".to_owned(), "C".to_owned()];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("C...A");
-    let expected = Some(vec!["C".to_owned(), "B".to_owned(), "A".to_owned()]);
+    let actual: Vec<String> = parse_range("C...A").unwrap().collect();
+    let expected: Vec<String> = vec!["C".to_owned(), "B".to_owned(), "A".to_owned()];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("C..A");
-    let expected = Some(vec!["C".to_owned(), "B".to_owned()]);
+    let actual: Vec<String> = parse_range("C..A").unwrap().collect();
+    let expected: Vec<String> = vec!["C".to_owned(), "B".to_owned()];
     assert_eq!(actual, expected);
 
-    let actual = parse_range("c..a");
-    let expected = Some(vec!["c".to_owned(), "b".to_owned()]);
+    let actual: Vec<String> = parse_range("c..a").unwrap().collect();
+    let expected: Vec<String> = vec!["c".to_owned(), "b".to_owned()];
     assert_eq!(actual, expected);
 
-    let actual = parse_range("-3..4");
-    let expected = Some(vec![
+    let actual: Vec<String> = parse_range("-3..4").unwrap().collect();
+    let expected: Vec<String> = vec![
         "-3".to_owned(),
         "-2".to_owned(),
         "-1".to_owned(),
@@ -477,12 +479,12 @@ fn range_expand() {
         "1".to_owned(),
         "2".to_owned(),
         "3".to_owned(),
-    ]);
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("3..-4");
-    let expected = Some(vec![
+    let actual: Vec<String> = parse_range("3..-4").unwrap().collect();
+    let expected: Vec<String> = vec![
         "3".to_owned(),
         "2".to_owned(),
         "1".to_owned(),
@@ -490,15 +492,15 @@ fn range_expand() {
         "-1".to_owned(),
         "-2".to_owned(),
         "-3".to_owned(),
-    ]);
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("-3...0");
-    let expected = Some(vec!["-3".into(), "-2".into(), "-1".into(), "0".into()]);
+    let actual: Vec<String> = parse_range("-3...0").unwrap().collect();
+    let expected: Vec<String> = vec!["-3".into(), "-2".into(), "-1".into(), "0".into()];
     assert_eq!(actual, expected);
 
-    let actual = parse_range("-3..0");
-    let expected = Some(vec!["-3".into(), "-2".into(), "-1".into()]);
+    let actual: Vec<String> = parse_range("-3..0").unwrap().collect();
+    let expected: Vec<String> = vec!["-3".into(), "-2".into(), "-1".into()];
     assert_eq!(actual, expected);
 }
