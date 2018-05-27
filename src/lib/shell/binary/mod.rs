@@ -5,8 +5,7 @@ mod readln;
 mod terminate;
 
 use self::{
-    prompt::{prompt, prompt_fn},
-    readln::readln,
+    prompt::{prompt, prompt_fn}, readln::readln,
     terminate::{terminate_quotes, terminate_script_quotes},
 };
 use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
@@ -68,7 +67,8 @@ impl Binary for Shell {
     fn save_command(&mut self, cmd: &str) {
         if cmd.starts_with('~') {
             if !cmd.ends_with('/')
-                && self.variables
+                && self
+                    .variables
                     .tilde_expansion(cmd, &self.directory_stack)
                     .map_or(false, |ref path| Path::new(path).is_dir())
             {
@@ -187,14 +187,16 @@ impl Binary for Shell {
 }
 
 struct WordDivide<I>
-    where I: Iterator<Item = (usize, char)>
+where
+    I: Iterator<Item = (usize, char)>,
 {
-    iter: I,
-    count: usize,
-    word_start: Option<usize>
+    iter:       I,
+    count:      usize,
+    word_start: Option<usize>,
 }
 impl<I> WordDivide<I>
-    where I: Iterator<Item = (usize, char)>
+where
+    I: Iterator<Item = (usize, char)>,
 {
     #[inline]
     fn check_boundary(&mut self, c: char, index: usize, escaped: bool) -> Option<(usize, usize)> {
@@ -214,9 +216,11 @@ impl<I> WordDivide<I>
     }
 }
 impl<I> Iterator for WordDivide<I>
-    where I: Iterator<Item = (usize, char)>
+where
+    I: Iterator<Item = (usize, char)>,
 {
     type Item = (usize, usize);
+
     fn next(&mut self) -> Option<Self::Item> {
         self.count += 1;
         match self.iter.next() {
@@ -231,17 +235,17 @@ impl<I> Iterator for WordDivide<I>
             Some((i, c)) => self.check_boundary(c, i, false),
             None => {
                 // When start has been set, that means we have encountered a full word.
-                self.word_start.take().map(|start| (start, self.count-1))
+                self.word_start.take().map(|start| (start, self.count - 1))
             }
         }
     }
 }
 
-fn word_divide<'a>(buf: &'a Buffer) -> Vec<(usize, usize)> {  // -> impl Iterator<Item = (usize, usize)> + 'a
+fn word_divide<'a>(buf: &'a Buffer) -> Vec<(usize, usize)> {
+    // -> impl Iterator<Item = (usize, usize)> + 'a
     WordDivide {
-        iter: buf.chars().cloned().enumerate(),
-        count: 0,
-        word_start: None
-    }
-    .collect() // TODO: return iterator directly :D
+        iter:       buf.chars().cloned().enumerate(),
+        count:      0,
+        word_start: None,
+    }.collect() // TODO: return iterator directly :D
 }

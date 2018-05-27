@@ -1,7 +1,6 @@
 use super::{IonError, Shell};
 use std::{
-    fs::File,
-    os::unix::io::{AsRawFd, FromRawFd},
+    fs::File, os::unix::io::{AsRawFd, FromRawFd},
 };
 use sys;
 

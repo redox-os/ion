@@ -1,7 +1,7 @@
 use super::Shell;
-use shell::pipe_exec::PipelineExecution;
 use builtins::{BuiltinFunction, BUILTINS};
 use parser::{expand_string, pipelines::RedirectFrom};
+use shell::pipe_exec::PipelineExecution;
 use smallstring::SmallString;
 use smallvec::SmallVec;
 use std::{fmt, fs::File, str};
@@ -128,8 +128,7 @@ impl TeeItem {
     /// never be `RedirectFrom`::Both`
     pub(crate) fn write_to_all(&mut self, extra: Option<RedirectFrom>) -> ::std::io::Result<()> {
         use std::{
-            io::{self, Read, Write},
-            os::unix::io::*,
+            io::{self, Read, Write}, os::unix::io::*,
         };
         fn write_out<R>(source: &mut R, sinks: &mut [File]) -> io::Result<()>
         where
@@ -179,7 +178,7 @@ impl TeeItem {
 }
 
 macro_rules! set_field {
-    ($self: expr, $field: ident, $arg: expr) => {
+    ($self:expr, $field:ident, $arg:expr) => {
         match *$self {
             RefinedJob::External { ref mut $field, .. }
             | RefinedJob::Builtin { ref mut $field, .. }
@@ -194,7 +193,9 @@ macro_rules! set_field {
 }
 
 fn collect_args(args: &[String]) -> SmallVec<[&str; 16]> {
-    args.iter().map(|x| x as &str).collect::<SmallVec<[&str; 16]>>()
+    args.iter()
+        .map(|x| x as &str)
+        .collect::<SmallVec<[&str; 16]>>()
 }
 
 impl RefinedJob {

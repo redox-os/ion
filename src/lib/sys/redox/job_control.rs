@@ -1,13 +1,8 @@
 use shell::{
-    foreground::ForegroundSignals,
-    job_control::*,
-    status::{FAILURE, TERMINATED},
-    Shell,
+    foreground::ForegroundSignals, job_control::*, status::{FAILURE, TERMINATED}, Shell,
 };
 use std::{
-    sync::{Arc, Mutex},
-    thread::sleep,
-    time::Duration,
+    sync::{Arc, Mutex}, thread::sleep, time::Duration,
 };
 use syscall::{
     kill, waitpid, wcoredump, wexitstatus, wifcontinued, wifexited, wifsignaled, wifstopped,
@@ -124,11 +119,7 @@ pub(crate) fn watch_foreground(shell: &mut Shell, pid: i32, command: &str) -> i3
                     signaled = 128 + signal as i32;
                 }
                 Ok(pid) if wifstopped(status) => {
-                    shell.send_to_background(
-                        pid as u32,
-                        ProcessState::Stopped,
-                        command.into()
-                    );
+                    shell.send_to_background(pid as u32, ProcessState::Stopped, command.into());
                     shell.break_flow = true;
                     break 128 + wstopsig(status) as i32;
                 }

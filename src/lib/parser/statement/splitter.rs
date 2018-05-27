@@ -3,9 +3,7 @@
 // - Validate syntax in methods
 
 use std::{
-    cmp::max,
-    fmt::{self, Display, Formatter},
-    u16,
+    cmp::max, fmt::{self, Display, Formatter}, u16,
 };
 
 bitflags! {
@@ -66,7 +64,10 @@ impl Display for StatementError {
 
 /// Returns true if the byte matches [^A-Za-z0-9_]
 fn is_invalid(byte: u8) -> bool {
-    byte <= 47 || (byte >= 58 && byte <= 64) || (byte >= 91 && byte <= 94) || byte == 96
+    byte <= 47
+        || (byte >= 58 && byte <= 64)
+        || (byte >= 91 && byte <= 94)
+        || byte == 96
         || (byte >= 123 && byte <= 127)
 }
 
@@ -99,12 +100,12 @@ impl<'a> StatementSplitter {
     pub(crate) fn new(data: String) -> StatementSplitter {
         StatementSplitter {
             data,
-            read:             0,
-            flags:            Flags::empty(),
-            a_level:          0,
-            ap_level:         0,
-            p_level:          0,
-            brace_level:      0,
+            read: 0,
+            flags: Flags::empty(),
+            a_level: 0,
+            ap_level: 0,
+            p_level: 0,
+            brace_level: 0,
             math_paren_level: 0,
         }
     }
@@ -176,7 +177,8 @@ impl Iterator for StatementSplitter {
                 b'(' if self.flags.contains(Flags::MATHEXPR) => {
                     self.math_paren_level += 1;
                 }
-                b'(' if !self.flags
+                b'(' if !self
+                    .flags
                     .intersects(Flags::COMM_1 | Flags::VARIAB | Flags::ARRAY) =>
                 {
                     if error.is_none() && !self.flags.contains(Flags::DQUOTE) {
@@ -232,7 +234,8 @@ impl Iterator for StatementSplitter {
                 }
                 b')' if self.p_level != 0 => self.p_level -= 1,
                 b')' => self.ap_level -= 1,
-                b';' if !self.flags.contains(Flags::DQUOTE) && self.p_level == 0
+                b';' if !self.flags.contains(Flags::DQUOTE)
+                    && self.p_level == 0
                     && self.ap_level == 0 =>
                 {
                     return match error {
@@ -240,7 +243,8 @@ impl Iterator for StatementSplitter {
                         None => Some(Ok(String::from(self.data[start..self.read - 1].trim()))),
                     }
                 }
-                b'&' if !self.flags.contains(Flags::DQUOTE) && self.p_level == 0
+                b'&' if !self.flags.contains(Flags::DQUOTE)
+                    && self.p_level == 0
                     && self.ap_level == 0 =>
                 {
                     if self.data.len() > self.read {
@@ -263,7 +267,8 @@ impl Iterator for StatementSplitter {
                         }
                     }
                 }
-                b'|' if !self.flags.contains(Flags::DQUOTE) && self.p_level == 0
+                b'|' if !self.flags.contains(Flags::DQUOTE)
+                    && self.p_level == 0
                     && self.ap_level == 0 =>
                 {
                     if self.data.len() > self.read {

@@ -1,7 +1,5 @@
 use std::{
-    fs::File,
-    io,
-    os::unix::io::{AsRawFd, FromRawFd, RawFd},
+    fs::File, io, os::unix::io::{AsRawFd, FromRawFd, RawFd},
 };
 use sys;
 

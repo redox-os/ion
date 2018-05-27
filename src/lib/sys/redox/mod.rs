@@ -1,13 +1,8 @@
 extern crate syscall;
 
 use std::{
-    env,
-    io,
-    mem,
-    os::unix::{ffi::OsStrExt, io::RawFd, process::ExitStatusExt},
-    path::PathBuf,
-    process::{exit, ExitStatus},
-    slice,
+    env, io, mem, os::unix::{ffi::OsStrExt, io::RawFd, process::ExitStatusExt}, path::PathBuf,
+    process::{exit, ExitStatus}, slice,
 };
 use syscall::{waitpid, SigAction, EINTR, WUNTRACED};
 

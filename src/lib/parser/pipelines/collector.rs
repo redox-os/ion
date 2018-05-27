@@ -381,8 +381,7 @@ impl<'a> Collector<'a> {
 #[cfg(test)]
 mod tests {
     use parser::{
-        pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection},
-        statement::parse,
+        pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection}, statement::parse,
     };
     use shell::{flow_control::Statement, Job, JobKind};
     use types::Array;

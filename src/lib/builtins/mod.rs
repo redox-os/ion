@@ -18,36 +18,19 @@ mod status;
 mod test;
 
 use self::{
-    command_info::*,
-    conditionals::{contains, ends_with, starts_with},
-    echo::echo,
-    exec::exec,
-    exists::exists,
-    functions::fn_,
-    ion::ion_docs,
-    is::is,
-    man_pages::*,
-    source::source,
-    status::status,
-    test::test,
-    variables::{alias, drop_alias, drop_array, drop_variable},
+    command_info::*, conditionals::{contains, ends_with, starts_with}, echo::echo, exec::exec,
+    exists::exists, functions::fn_, ion::ion_docs, is::is, man_pages::*, source::source,
+    status::status, test::test, variables::{alias, drop_alias, drop_array, drop_variable},
 };
 
 use std::{
-    env,
-    error::Error,
-    io::{self, Write},
+    env, error::Error, io::{self, Write},
 };
 
 use parser::Terminator;
 use shell::{
-    self,
-    fork_function::fork_function,
-    job_control::{JobControl, ProcessState},
-    status::*,
-    FlowLogic,
-    Shell,
-    ShellHistory,
+    self, fork_function::fork_function, job_control::{JobControl, ProcessState}, status::*,
+    FlowLogic, Shell, ShellHistory,
 };
 use sys;
 

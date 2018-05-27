@@ -1,7 +1,12 @@
 use super::words::{Index, Range};
 use std::cmp::Ordering;
 
-fn stepped_range_numeric<'a>(start: isize, end: isize, step: isize, nb_digits: usize) -> Option<Box<Iterator<Item = String> + 'a>> {
+fn stepped_range_numeric<'a>(
+    start: isize,
+    end: isize,
+    step: isize,
+    nb_digits: usize,
+) -> Option<Box<Iterator<Item = String> + 'a>> {
     return if step == 0 {
         None
     } else if start < end && step < 0 {
@@ -19,7 +24,7 @@ fn stepped_range_numeric<'a>(start: isize, end: isize, step: isize, nb_digits: u
             if end.cmp(index) == ordering {
                 let index_holder = *index;
                 *index += step; // This step adds
-                Some(format!("{:0width$}", index_holder, width=nb_digits))
+                Some(format!("{:0width$}", index_holder, width = nb_digits))
             } else {
                 None
             }
@@ -29,7 +34,11 @@ fn stepped_range_numeric<'a>(start: isize, end: isize, step: isize, nb_digits: u
     };
 }
 
-fn stepped_range_chars<'a>(start: u8, end: u8, step: u8) -> Option<Box<Iterator<Item = String> + 'a>> {
+fn stepped_range_chars<'a>(
+    start: u8,
+    end: u8,
+    step: u8,
+) -> Option<Box<Iterator<Item = String> + 'a>> {
     if step == 0 {
         None
     } else {
@@ -45,7 +54,7 @@ fn stepped_range_chars<'a>(start: u8, end: u8, step: u8) -> Option<Box<Iterator<
                 *index = match ordering {
                     Ordering::Greater => index.wrapping_add(step),
                     Ordering::Less => index.wrapping_sub(step),
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 };
                 Some((index_holder as char).to_string())
             } else {
@@ -57,8 +66,13 @@ fn stepped_range_chars<'a>(start: u8, end: u8, step: u8) -> Option<Box<Iterator<
     }
 }
 
-fn numeric_range<'a>(start: isize, mut end: isize, step: isize, inclusive: bool, nb_digits: usize)
-    -> Option<Box<Iterator<Item = String> + 'a>> {
+fn numeric_range<'a>(
+    start: isize,
+    mut end: isize,
+    step: isize,
+    inclusive: bool,
+    nb_digits: usize,
+) -> Option<Box<Iterator<Item = String> + 'a>> {
     if start < end {
         if inclusive {
             end += 1;
@@ -78,7 +92,12 @@ fn numeric_range<'a>(start: isize, mut end: isize, step: isize, inclusive: bool,
 fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') }
 
 use std::u8;
-fn char_range<'a>(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Box<Iterator<Item = String> + 'a>> {
+fn char_range<'a>(
+    start: u8,
+    mut end: u8,
+    step: isize,
+    inclusive: bool,
+) -> Option<Box<Iterator<Item = String> + 'a>> {
     if !byte_is_valid_range(start) || !byte_is_valid_range(end) {
         return None;
     }
@@ -114,13 +133,16 @@ fn count_minimum_digits(a: &str) -> usize {
             '0' => {
                 has_leading_zero = true;
                 break;
-            },
+            }
             '1'...'9' => break,
-            _ => panic!("count_minimum_digits should only be called for a valid number.")
+            _ => panic!("count_minimum_digits should only be called for a valid number."),
         }
     }
-    if !has_leading_zero { 0 }
-    else { a.len() }
+    if !has_leading_zero {
+        0
+    } else {
+        a.len()
+    }
 }
 
 fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize, usize)> {
@@ -160,7 +182,7 @@ pub(crate) fn parse_range<'a>(input: &str) -> Option<Box<Iterator<Item = String>
                 }
 
                 macro_rules! finish_char {
-                    ($inclusive: expr, $end_str: expr, $step: expr) => {
+                    ($inclusive:expr, $end_str:expr, $step:expr) => {
                         if first.len() == 1 && $end_str.len() == 1 {
                             let start = first.as_bytes()[0];
                             let end = $end_str.as_bytes()[0];
@@ -172,9 +194,10 @@ pub(crate) fn parse_range<'a>(input: &str) -> Option<Box<Iterator<Item = String>
                 }
 
                 macro_rules! finish {
-                    ($inclusive: expr, $read: expr) => {
+                    ($inclusive:expr, $read:expr) => {
                         let end_str = &input[$read..];
-                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str) {
+                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str)
+                        {
                             return numeric_range(
                                 start,
                                 end,
@@ -186,9 +209,10 @@ pub(crate) fn parse_range<'a>(input: &str) -> Option<Box<Iterator<Item = String>
                             finish_char!($inclusive, end_str, 1);
                         }
                     };
-                    ($inclusive: expr, $read: expr, $step: expr) => {
+                    ($inclusive:expr, $read:expr, $step:expr) => {
                         let end_str = &input[$read..];
-                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str) {
+                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str)
+                        {
                             return numeric_range(start, end, $step, $inclusive, nb_digits);
                         } else {
                             finish_char!($inclusive, end_str, $step);
@@ -359,14 +383,14 @@ fn range_expand() {
 
     let actual: Vec<String> = parse_range("-3...3").unwrap().collect();
     let expected: Vec<String> = vec![
-            "-3".to_owned(),
-            "-2".to_owned(),
-            "-1".to_owned(),
-            "0".to_owned(),
-            "1".to_owned(),
-            "2".to_owned(),
-            "3".to_owned(),
-        ];
+        "-3".to_owned(),
+        "-2".to_owned(),
+        "-1".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "2".to_owned(),
+        "3".to_owned(),
+    ];
 
     assert_eq!(actual, expected);
 
