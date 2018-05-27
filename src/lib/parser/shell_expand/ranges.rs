@@ -1,4 +1,5 @@
 use super::words::{Index, Range};
+use std::cmp::Ordering;
 
 fn stepped_range_numeric<'a>(start: isize, end: isize, step: isize, nb_digits: usize) -> Option<Box<Iterator<Item = String> + 'a>> {
     return if step == 0 {
@@ -8,27 +9,23 @@ fn stepped_range_numeric<'a>(start: isize, end: isize, step: isize, nb_digits: u
     } else if start > end && step > 0 {
         None
     } else {
-        if start < end {
-            Some(Box::new((start..end).scan(start, move |index, _| {
-                if *index < end {
-                    let index_holder = *index;
-                    *index += step; // This step adds
-                    Some(format!("{:0width$}", index_holder, width=nb_digits))
-                } else {
-                    None
-                }
-            })))
+        let (x, y, ordering) = if start < end {
+            (start, end, Ordering::Greater)
         } else {
-            Some(Box::new((end..start).scan(start, move |index, _| {
-                if *index > end {
-                    let index_holder = *index;
-                    *index += step; // This step subtracts
-                    Some(format!("{:0width$}", index_holder, width=nb_digits))
-                } else {
-                    None
-                }
-            })))
-        }
+            (end, start, Ordering::Less)
+        };
+
+        let iter = (x..y).scan(start, move |index, _| {
+            if end.cmp(index) == ordering {
+                let index_holder = *index;
+                *index += step; // This step adds
+                Some(format!("{:0width$}", index_holder, width=nb_digits))
+            } else {
+                None
+            }
+        });
+
+        Some(Box::new(iter))
     };
 }
 
