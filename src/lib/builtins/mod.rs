@@ -165,7 +165,7 @@ pub fn builtin_cd(args: &[&str], shell: &mut Shell) -> i32 {
                         shell.set_var("OLDPWD", pwd);
                         shell.set_var("PWD", current_dir);
                     }
-                    fork_function(shell, "CD_CHANGE", &["ion"]);
+                    fork_function(shell, "CD_CHANGE", &mut ["ion"].iter());
                 }
                 Err(_) => env::set_var("PWD", "?"),
             };

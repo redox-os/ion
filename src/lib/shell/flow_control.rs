@@ -2,6 +2,7 @@ use super::{flow::FlowLogic, Shell};
 use fnv::*;
 use parser::{assignments::*, pipelines::Pipeline};
 use std::fmt::{self, Display, Formatter};
+use std::iter::ExactSizeIterator;
 use types::{Identifier, *};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -167,7 +168,11 @@ impl Display for FunctionError {
 }
 
 impl Function {
-    pub(crate) fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
+    pub(crate) fn execute<'a, I>(self, shell: &mut Shell, args: &mut I) -> Result<(), FunctionError>
+        where
+            I: ExactSizeIterator,
+            <I as Iterator>::Item: AsRef<str>,
+    {
         if args.len() - 1 != self.args.len() {
             return Err(FunctionError::InvalidArgumentCount);
         }
@@ -178,13 +183,13 @@ impl Function {
         let mut arrays_backup: FnvHashMap<&str, Option<Array>> =
             FnvHashMap::with_capacity_and_hasher(64, Default::default());
 
-        for (type_, value) in self.args.iter().zip(args.iter().skip(1)) {
-            let value = match value_check(shell, value, type_.kind) {
+        for (type_, value) in self.args.iter().zip(args.skip(1)) {
+            let value = match value_check(shell, value.as_ref(), type_.kind) {
                 Ok(value) => value,
                 Err(_) => {
                     return Err(FunctionError::InvalidArgumentType(
                         type_.kind,
-                        (*value).into(),
+                        value.as_ref().into(),
                     ))
                 }
             };
