@@ -36,7 +36,7 @@ use liner::Context;
 use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
 use smallvec::SmallVec;
 use std::{
-    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
+    fs::File, io::{self, Read, Write}, iter::{ExactSizeIterator, FromIterator}, ops::Deref, path::Path, process,
     sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
@@ -172,11 +172,15 @@ impl<'a> Shell {
 
     /// A method for executing a function with the given `name`, using `args` as the input.
     /// If the function does not exist, an `IonError::DoesNotExist` is returned.
-    pub fn execute_function(&mut self, name: &str, args: &[&str]) -> Result<i32, IonError> {
+    pub fn execute_function<I>(&mut self, name: &str, args: &mut I) -> Result<i32, IonError>
+        where
+            I: ExactSizeIterator,
+            <I as Iterator>::Item: AsRef<str>,
+    {
         self.functions
             .get_mut(name.into())
             .ok_or(IonError::DoesNotExist)
-            .map(|fnc| fnc.clone())
+            .map(|func| func.clone())
             .and_then(|function| {
                 function
                     .execute(self, args)
@@ -291,8 +295,8 @@ impl<'a> Shell {
         } else if let Some(function) = self.functions.get(&pipeline.items[0].job.command).cloned() {
             if !pipeline.requires_piping() {
                 let args: &[String] = pipeline.items[0].job.args.deref();
-                let args: Vec<&str> = args.iter().map(AsRef::as_ref).collect();
-                match function.execute(self, &args) {
+                let mut args = args.iter();
+                match function.execute(self, &mut args) {
                     Ok(()) => None,
                     Err(FunctionError::InvalidArgumentCount) => {
                         eprintln!("ion: invalid number of function arguments supplied");

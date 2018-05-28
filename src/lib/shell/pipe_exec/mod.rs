@@ -22,7 +22,7 @@ use builtins::{self, BuiltinFunction};
 use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use smallvec::SmallVec;
 use std::{
-    fs::{File, OpenOptions}, io::{self, Error, Write}, iter,
+    fs::{File, OpenOptions}, io::{self, Error, Write}, iter::{self, ExactSizeIterator},
     os::unix::io::{AsRawFd, FromRawFd, RawFd}, path::Path, process::{self, exit},
 };
 use sys;
@@ -397,14 +397,16 @@ pub(crate) trait PipelineExecution {
         stdin: &Option<File>,
     ) -> i32;
 
-    fn exec_function(
+    fn exec_function<I>(
         &mut self,
         name: &str,
-        args: &[&str],
+        args: &mut I,
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
-    ) -> i32;
+    ) -> i32
+        where I: ExactSizeIterator,
+              <I as Iterator>::Item: AsRef<str>;
 
     /// For cat jobs
     fn exec_multi_in(
@@ -564,14 +566,18 @@ impl PipelineExecution for Shell {
         SUCCESS
     }
 
-    fn exec_function(
+    fn exec_function<I>(
         &mut self,
         name: &str,
-        args: &[&str],
+        args: &mut I,
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
-    ) -> i32 {
+    ) -> i32
+        where 
+            I: ExactSizeIterator,
+            <I as Iterator>::Item: AsRef<str>,
+    {
         if let Some(ref file) = *stdin {
             redir(file.as_raw_fd(), sys::STDIN_FILENO);
         }
@@ -1002,11 +1008,11 @@ fn spawn_proc(
             ref stderr,
             ref stdin,
         } => {
-            let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
+            let mut args = args.iter().map(|x| x as &str);
             match unsafe { sys::fork() } {
                 Ok(0) => {
                     prepare_child(block_child, pgid);
-                    let ret = shell.exec_function(name, &args, stdout, stderr, stdin);
+                    let ret = shell.exec_function(name, &mut args, stdout, stderr, stdin);
                     close(stdout);
                     close(stderr);
                     close(stdin);

@@ -198,6 +198,11 @@ fn collect_args(args: &[String]) -> SmallVec<[&str; 16]> {
         .collect::<SmallVec<[&str; 16]>>()
 }
 
+fn iter_args<'a>(args: &'a [String]) -> impl ExactSizeIterator<Item = &'a str> {
+    args.iter()
+        .map(|x| x as &str)
+}
+
 impl RefinedJob {
     /// Returns a long description of this job: the commands and arguments
     pub(crate) fn long(&self) -> String {
@@ -253,8 +258,8 @@ impl RefinedJob {
                 ref stdout,
                 ref stderr,
             } => {
-                let args = collect_args(&args);
-                shell.exec_function(name, &args, stdout, stderr, stdin)
+                let mut args = iter_args(&args);
+                shell.exec_function(name, &mut args, stdout, stderr, stdin)
             }
             _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
         }
