@@ -233,8 +233,7 @@ impl RefinedJob {
                 ref stdout,
                 ref stderr,
             } => {
-                let args = collect_args(&args[1..]);
-                shell.exec_external(&name, &args, stdin, stdout, stderr)
+                shell.exec_external(&name, args[1..].iter().map(|s| s.as_ref()), stdin, stdout, stderr)
             }
             RefinedJob::Builtin {
                 main,
@@ -253,8 +252,7 @@ impl RefinedJob {
                 ref stdout,
                 ref stderr,
             } => {
-                let args = collect_args(&args);
-                shell.exec_function(name, &args, stdout, stderr, stdin)
+                shell.exec_function(name, &mut args.iter(), stdout, stderr, stdin)
             }
             _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
         }

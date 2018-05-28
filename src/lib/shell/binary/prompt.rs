@@ -20,7 +20,7 @@ pub(crate) fn prompt_fn(shell: &mut Shell) -> Option<String> {
     let mut output = None;
 
     match shell.fork(Capture::StdoutThenIgnoreStderr, |child| unsafe {
-        let _ = function.read().execute(child, &["ion"]);
+        let _ = function.read().execute(child, &mut ["ion"].iter());
     }) {
         Ok(result) => {
             let mut string = String::with_capacity(1024);
