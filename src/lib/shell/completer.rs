@@ -1,6 +1,8 @@
 use super::{directory_stack::DirectoryStack, variables::Variables};
 use glob::glob;
 use liner::{Completer, FilenameCompleter};
+use smallvec::SmallVec;
+use std::{iter, str};
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
@@ -102,39 +104,40 @@ where
     let unescaped_start = unescape(start);
 
     let split_start = unescaped_start.split("/");
-    let mut string = String::with_capacity(5);
+    let mut string: SmallVec<[u8; 128]> = SmallVec::with_capacity(128);
 
     // When 'start' is an absolute path, "/..." gets split to ["", "..."]
     // So we skip the first element and add "/" to the start of the string
-    let mut start_for_glob = if unescaped_start.starts_with("/") {
-        string.push('/');
-        split_start.skip(1).fold(string, |mut state, element| {
-            state.push_str(element);
-            state.push_str("*/");
-            state
-        })
+    let skip = if unescaped_start.starts_with("/") {
+        string.push(b'/');
+        1
     } else {
-        split_start.fold(string, |mut state, element| {
-            state.push_str(element);
-            state.push_str("*/");
-            state
-        })
+        0
     };
-    start_for_glob.pop(); // pop out the last '/' character
 
-    let iter_inner_glob: Box<Iterator<Item = String>> = match glob(&start_for_glob) {
-        Ok(completions) => {
-            let mut iter = completions
-                .filter_map(Result::ok)
-                .map(|x| x.to_string_lossy().into_owned())
-                .peekable();
-            if iter.peek().is_some() {
-                Box::new(iter)
-            } else {
-                Box::new(Some(escape(start)).into_iter())
-            }
+    for element in split_start.skip(skip) {
+        string.extend_from_slice(element.as_bytes());
+        string.extend_from_slice(b"*/");
+    }
+
+    string.pop(); // pop out the last '/' character
+    let string = unsafe { &str::from_utf8_unchecked(&string) };
+
+    let globs = glob(string).ok().and_then(|completions| {
+        let mut completions = completions
+            .filter_map(Result::ok)
+            .map(|x| x.to_string_lossy().into_owned());
+
+        if let Some(first) = completions.next() {
+            Some(iter::once(first).chain(completions))
+        } else {
+            None
         }
-        _ => Box::new(Some(escape(start)).into_iter()),
+    });
+
+    let iter_inner_glob: Box<Iterator<Item = String>> = match globs {
+        Some(iter) => Box::new(iter),
+        None => Box::new(iter::once(escape(start)))
     };
 
     // Use Liner::Completer as well, to preserve the previous behaviour
