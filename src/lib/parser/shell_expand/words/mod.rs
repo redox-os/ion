@@ -8,9 +8,7 @@ mod tests;
 #[cfg(test)]
 pub(crate) use self::methods::Key;
 pub(crate) use self::{
-    index::Index,
-    methods::{ArrayMethod, Pattern, StringMethod},
-    range::Range,
+    index::Index, methods::{ArrayMethod, Pattern, StringMethod}, range::Range,
     select::{Select, SelectWithSize},
 };
 use super::{super::ArgumentSplitter, expand_string, Expander};

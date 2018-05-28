@@ -1,6 +1,5 @@
 use std::{
-    error::Error,
-    io::{stdout, Write},
+    error::Error, io::{stdout, Write},
 };
 
 pub(crate) fn print_man(man_page: &'static str) {

@@ -17,24 +17,17 @@ pub mod status;
 pub mod variables;
 
 pub use self::{
-    binary::Binary,
-    fork::{Capture, Fork, IonResult},
+    binary::Binary, fork::{Capture, Fork, IonResult},
 };
 pub(crate) use self::{
-    flow::FlowLogic,
-    history::{IgnoreSetting, ShellHistory},
-    job::{Job, JobKind},
+    flow::FlowLogic, history::{IgnoreSetting, ShellHistory}, job::{Job, JobKind},
     pipe_exec::{foreground, job_control},
 };
 
 use self::{
-    directory_stack::DirectoryStack,
-    flags::*,
-    flow_control::{FlowControl, Function, FunctionError},
-    foreground::ForegroundSignals,
-    job_control::{BackgroundProcess, JobControl},
-    pipe_exec::PipelineExecution,
-    status::*,
+    directory_stack::DirectoryStack, flags::*,
+    flow_control::{FlowControl, Function, FunctionError}, foreground::ForegroundSignals,
+    job_control::{BackgroundProcess, JobControl}, pipe_exec::PipelineExecution, status::*,
     variables::Variables,
 };
 use builtins::{BuiltinMap, BUILTINS};
@@ -43,14 +36,8 @@ use liner::Context;
 use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
 use smallvec::SmallVec;
 use std::{
-    fs::File,
-    io::{self, Read, Write},
-    iter::FromIterator,
-    ops::Deref,
-    path::Path,
-    process,
-    sync::{atomic::Ordering, Arc, Mutex},
-    time::SystemTime,
+    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
+    sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
 use types::*;
@@ -472,7 +459,8 @@ impl<'a> Expander for Shell {
             Some(array) => match selection {
                 Select::None => None,
                 Select::All => Some(array.clone()),
-                Select::Index(id) => id.resolve(array.len())
+                Select::Index(id) => id
+                    .resolve(array.len())
                     .and_then(|n| array.get(n))
                     .map(|x| Array::from_iter(Some(x.to_owned()))),
                 Select::Range(range) => if let Some((start, length)) = range.bounds(array.len()) {

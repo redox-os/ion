@@ -1,14 +1,11 @@
 use super::{
-    colors::Colors,
-    directory_stack::DirectoryStack,
-    plugins::namespaces::{self, StringNamespace},
+    colors::Colors, directory_stack::DirectoryStack, plugins::namespaces::{self, StringNamespace},
     status::{FAILURE, SUCCESS},
 };
 use fnv::FnvHashMap;
 use liner::Context;
 use std::{
-    env,
-    io::{self, BufRead},
+    env, io::{self, BufRead},
 };
 use sys::{self, geteuid, getpid, getuid, is_root, variables as self_sys};
 use types::{
@@ -61,7 +58,7 @@ impl Default for Variables {
 
         // Initialize the HISTFILE variable
         if let Ok(base_dirs) = BaseDirectories::with_prefix("ion") {
-            if let Ok(mut path) = base_dirs.place_data_file("history") {
+            if let Ok(path) = base_dirs.place_data_file("history") {
                 map.insert("HISTFILE".into(), path.to_str().unwrap_or("?").into());
                 map.insert("HISTFILE_ENABLED".into(), "1".into());
             }
@@ -269,7 +266,8 @@ impl Variables {
             // Temporarily borrow the `swd` variable while we attempt to assemble a minimal
             // variant of the directory path. If that is not possible, we will cancel the
             // borrow and return `swd` itself as the minified path.
-            let elements = swd.split("/")
+            let elements = swd
+                .split("/")
                 .filter(|s| !s.is_empty())
                 .collect::<Vec<&str>>();
             if elements.len() > 2 {

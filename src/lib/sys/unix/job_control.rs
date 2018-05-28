@@ -1,15 +1,10 @@
 use super::{errno, write_errno};
 use libc::*;
 use shell::{
-    foreground::ForegroundSignals,
-    job_control::*,
-    status::{FAILURE, TERMINATED},
-    Shell,
+    foreground::ForegroundSignals, job_control::*, status::{FAILURE, TERMINATED}, Shell,
 };
 use std::{
-    sync::{Arc, Mutex},
-    thread::sleep,
-    time::Duration,
+    sync::{Arc, Mutex}, thread::sleep, time::Duration,
 };
 
 const OPTS: i32 = WUNTRACED | WCONTINUED | WNOHANG;

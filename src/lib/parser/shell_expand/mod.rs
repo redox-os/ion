@@ -17,7 +17,10 @@ use unicode_segmentation::UnicodeSegmentation;
 /// bare word. For example, strings starting with '"', '\'', '@', or '$' are
 /// all expressions
 pub(crate) fn is_expression(s: &str) -> bool {
-    s.starts_with('@') || s.starts_with('[') || s.starts_with('$') || s.starts_with('"')
+    s.starts_with('@')
+        || s.starts_with('[')
+        || s.starts_with('$')
+        || s.starts_with('"')
         || s.starts_with('\'')
 }
 
@@ -53,7 +56,7 @@ fn expand_process<E: Expander>(
         } else {
             // If we ever do something with UTF-8, this won't work
             unsafe {
-                let mut bytes = output.as_bytes_mut();
+                let bytes = output.as_bytes_mut();
                 let bytes_v = bytes.as_mut_ptr();
                 let mut size = bytes.len();
                 let mut i = 0;
@@ -249,7 +252,8 @@ fn expand_braces<E: Expander>(
                     expand_process(&mut temp, command, Select::All, expand_func, false);
                     let len = temp.split_whitespace().count();
                     if let Some((start, length)) = range.bounds(len) {
-                        let res = temp.split_whitespace()
+                        let res = temp
+                            .split_whitespace()
                             .skip(start)
                             .take(length)
                             .collect::<Vec<&str>>();
@@ -521,7 +525,8 @@ pub(crate) fn expand_tokens<E: Expander>(
                         expand_process(&mut temp, command, Select::All, expand_func, false);
                         if let Some((start, length)) = range.bounds(temp.split_whitespace().count())
                         {
-                            let temp = temp.split_whitespace()
+                            let temp = temp
+                                .split_whitespace()
                                 .skip(start)
                                 .take(length)
                                 .collect::<Vec<_>>();

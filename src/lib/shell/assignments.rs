@@ -1,19 +1,12 @@
 use super::{
-    flow_control::{ExportAction, LocalAction},
-    status::*,
-    Shell,
+    flow_control::{ExportAction, LocalAction}, status::*, Shell,
 };
 use itoa;
 use parser::assignments::*;
 use shell::history::ShellHistory;
 use std::{
-    env,
-    ffi::OsStr,
-    fmt::{self, Display},
-    io::{self, BufWriter, Write},
-    mem,
-    os::unix::ffi::OsStrExt,
-    str,
+    env, ffi::OsStr, fmt::{self, Display}, io::{self, BufWriter, Write}, mem,
+    os::unix::ffi::OsStrExt, str,
 };
 
 fn list_vars(shell: &Shell) {
@@ -107,7 +100,8 @@ impl VariableStore for Shell {
                     match value_check(self, &expression, key.kind) {
                         Ok(ReturnValue::Str(value)) => {
                             let key_name: &str = &key.name;
-                            let lhs = self.variables
+                            let lhs = self
+                                .variables
                                 .variables
                                 .get(key_name)
                                 .map(|x| x.as_str())
@@ -182,7 +176,8 @@ impl VariableStore for Shell {
                     match value_check(self, &expression, key.kind) {
                         Ok(ReturnValue::Str(value)) => {
                             let key_name: &str = &key.name;
-                            let lhs = self.variables
+                            let lhs = self
+                                .variables
                                 .variables
                                 .get(key_name)
                                 .map(|x| x.as_str())

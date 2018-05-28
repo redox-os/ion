@@ -2,10 +2,7 @@
 //! control in the shell.
 
 use shell::{
-    job_control::{JobControl, ProcessState},
-    signals,
-    status::*,
-    Shell,
+    job_control::{JobControl, ProcessState}, signals, status::*, Shell,
 };
 
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
@@ -28,7 +25,8 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
             "-h" => flags |= NO_SIGHUP,
             "-r" => flags |= RUN_JOBS,
             _ => {
-                let jobspec = arg.parse::<u32>()
+                let jobspec = arg
+                    .parse::<u32>()
                     .map_err(|_| format!("invalid jobspec: '{}'", arg))?;
                 collected_jobs.push(jobspec);
             }

@@ -102,14 +102,26 @@ where
 {
     let unescaped_start = unescape(start);
 
-    let start_split: Vec<&str> = unescaped_start.split("/").collect();
+    let split_start = unescaped_start.split("/");
+    let mut string = String::with_capacity(5);
 
     // When 'start' is an absolute path, "/..." gets split to ["", "..."]
-    // So we ignore the first element and add "/" to the start of the string
-    let start_for_glob = match unescaped_start.starts_with("/") {
-        true => ["/", &start_split[1..].join("*/"), "*"].concat(),
-        false => [&start_split.join("*/"), "*"].concat(),
+    // So we skip the first element and add "/" to the start of the string
+    let mut start_for_glob = if unescaped_start.starts_with("/") {
+        string.push('/');
+        split_start.skip(1).fold(string, |mut state, element| {
+            state.push_str(element);
+            state.push_str("*/");
+            state
+        })
+    } else {
+        split_start.fold(string, |mut state, element| {
+            state.push_str(element);
+            state.push_str("*/");
+            state
+        })
     };
+    start_for_glob.pop(); // pop out the last '/' character
 
     let mut inner_glob: Vec<String> = match glob(&start_for_glob) {
         Ok(completions) => completions

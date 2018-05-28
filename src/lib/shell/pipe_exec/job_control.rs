@@ -1,13 +1,8 @@
 use super::{
-    super::{signals, status::*, Shell},
-    foreground::BackgroundResult,
+    super::{signals, status::*, Shell}, foreground::BackgroundResult,
 };
 use std::{
-    fmt,
-    process,
-    sync::{Arc, Mutex},
-    thread::{sleep, spawn},
-    time::Duration,
+    fmt, process, sync::{Arc, Mutex}, thread::{sleep, spawn}, time::Duration,
 };
 use sys;
 
@@ -72,7 +67,7 @@ pub(crate) fn add_to_background(
                 pid,
                 ignore_sighup: false,
                 state,
-                name:          command,
+                name: command,
             };
             id as u32
         }
@@ -82,7 +77,7 @@ pub(crate) fn add_to_background(
                 pid,
                 ignore_sighup: false,
                 state,
-                name:          command,
+                name: command,
             });
             njobs as u32
         }
