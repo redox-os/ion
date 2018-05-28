@@ -48,7 +48,7 @@ impl Completer for IonFileCompleter {
             if let Some(expanded) = unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) }
             {
                 // Now we obtain completions for the `expanded` form of the `start` value.
-                let mut iterator = FilenameCompletion::new(&expanded, |x| self.inner.completions(x));
+                let mut iterator = filename_completion(&expanded, |x| self.inner.completions(x));
 
                 // And then we will need to take those completions and remove the expanded form
                 // of the tilde pattern and replace it with that pattern yet again.
@@ -91,74 +91,59 @@ impl Completer for IonFileCompleter {
             }
         }
 
-        FilenameCompletion::new(&start, |x| self.inner.completions(x)).collect()
+        filename_completion(&start, |x| self.inner.completions(x)).collect()
     }
 }
 
-pub struct FilenameCompletion<'a> {
-    iter: Box<Iterator<Item = String> + 'a>,
-}
+fn filename_completion<'a, LC>(start: &'a str, liner_complete: LC) -> impl Iterator<Item = String> + 'a
+where
+    LC: Fn(&str) -> Vec<String> + 'a
+{
+    let unescaped_start = unescape(start);
 
-impl<'a> FilenameCompletion<'a> {
-    pub fn new<LC: Fn(&str) -> Vec<String> + 'a>(start: &'a str, liner_complete: LC) -> Self {
-        let unescaped_start = unescape(start);
+    let split_start = unescaped_start.split("/");
+    let mut string = String::with_capacity(5);
 
-        let split_start = unescaped_start.split("/");
-        let mut string = String::with_capacity(5);
+    // When 'start' is an absolute path, "/..." gets split to ["", "..."]
+    // So we skip the first element and add "/" to the start of the string
+    let mut start_for_glob = if unescaped_start.starts_with("/") {
+        string.push('/');
+        split_start.skip(1).fold(string, |mut state, element| {
+            state.push_str(element);
+            state.push_str("*/");
+            state
+        })
+    } else {
+        split_start.fold(string, |mut state, element| {
+            state.push_str(element);
+            state.push_str("*/");
+            state
+        })
+    };
+    start_for_glob.pop(); // pop out the last '/' character
 
-        // When 'start' is an absolute path, "/..." gets split to ["", "..."]
-        // So we skip the first element and add "/" to the start of the string
-        let mut start_for_glob = if unescaped_start.starts_with("/") {
-            string.push('/');
-            split_start.skip(1).fold(string, |mut state, element| {
-                state.push_str(element);
-                state.push_str("*/");
-                state
-            })
-        } else {
-            split_start.fold(string, |mut state, element| {
-                state.push_str(element);
-                state.push_str("*/");
-                state
-            })
-        };
-        start_for_glob.pop(); // pop out the last '/' character
-
-        let iter_inner_glob: Box<Iterator<Item = String>> = match glob(&start_for_glob) {
-            Ok(completions) => {
-                let mut iter = completions
-                    .filter_map(Result::ok)
-                    .map(|x| x.to_string_lossy().into_owned())
-                    .peekable();
-                if iter.peek().is_some() {
-                    Box::new(iter)
-                } else {
-                    Box::new(Some(escape(start)).into_iter())
-                }
+    let iter_inner_glob: Box<Iterator<Item = String>> = match glob(&start_for_glob) {
+        Ok(completions) => {
+            let mut iter = completions
+                .filter_map(Result::ok)
+                .map(|x| x.to_string_lossy().into_owned())
+                .peekable();
+            if iter.peek().is_some() {
+                Box::new(iter)
+            } else {
+                Box::new(Some(escape(start)).into_iter())
             }
-            _ => Box::new(Some(escape(start)).into_iter()),
-        };
-
-        // Use Liner::Completer as well, to preserve the previous behaviour
-        // around single-directory completions
-        let iter = iter_inner_glob.flat_map(move |path| {
-            liner_complete(&path)
-                .into_iter()
-                .map(|x| escape(x.as_str()))
-        });
-
-        FilenameCompletion {
-            iter: Box::new(iter),
         }
-    }
-}
+        _ => Box::new(Some(escape(start)).into_iter()),
+    };
 
-impl<'a> Iterator for FilenameCompletion<'a> {
-    type Item = String;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next()
-    }
+    // Use Liner::Completer as well, to preserve the previous behaviour
+    // around single-directory completions
+    iter_inner_glob.flat_map(move |path| {
+        liner_complete(&path)
+            .into_iter()
+            .map(|x| escape(x.as_str()))
+    })
 }
 
 /// Escapes filenames from the completer so that special characters will be properly escaped.
