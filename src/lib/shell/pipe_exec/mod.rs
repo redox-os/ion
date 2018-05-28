@@ -388,14 +388,17 @@ pub(crate) trait PipelineExecution {
         stdin: &Option<File>,
     ) -> i32;
 
-    fn exec_external(
+    fn exec_external<'a, I>(
         &mut self,
         name: &str,
-        args: &[&str],
+        args: I,
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
-    ) -> i32;
+    ) -> i32
+        where I: Iterator,
+              I::Item: AsRef<str> + 'a,
+              Vec<&'a str>: ::std::iter::FromIterator<I::Item>;
 
     fn exec_function<I>(
         &mut self,
@@ -428,17 +431,21 @@ pub(crate) trait PipelineExecution {
 }
 
 impl PipelineExecution for Shell {
-    fn exec_external(
+    fn exec_external<'a, I>(
         &mut self,
         name: &str,
-        args: &[&str],
+        args: I,
         stdin: &Option<File>,
         stdout: &Option<File>,
         stderr: &Option<File>,
-    ) -> i32 {
+    ) -> i32
+        where I: Iterator,
+              I::Item: AsRef<str> + 'a,
+              Vec<&'a str>: ::std::iter::FromIterator<I::Item>,
+    {
         let result = sys::fork_and_exec(
             name,
-            &args,
+            &args.collect::<Vec<_>>(),
             if let Some(ref f) = *stdin {
                 Some(f.as_raw_fd())
             } else {
