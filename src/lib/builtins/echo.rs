@@ -1,4 +1,5 @@
 use std::io::{self, BufWriter, Write};
+use smallvec::SmallVec;
 
 bitflags! {
     struct Flags : u8 {
@@ -10,7 +11,7 @@ bitflags! {
 
 pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
     let mut flags = Flags::empty();
-    let mut data: Vec<&str> = vec![];
+    let mut data: SmallVec<[&str; 16]> = SmallVec::with_capacity(16);
 
     for arg in args {
         match *arg {
