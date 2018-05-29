@@ -172,11 +172,7 @@ impl<'a> Shell {
 
     /// A method for executing a function with the given `name`, using `args` as the input.
     /// If the function does not exist, an `IonError::DoesNotExist` is returned.
-    pub fn execute_function<I>(&mut self, name: &str, args: &mut I) -> Result<i32, IonError>
-        where
-            I: ExactSizeIterator,
-            <I as Iterator>::Item: AsRef<str>,
-    {
+    pub fn execute_function<S: AsRef<str>>(&mut self, name: &str, args: &[S]) -> Result<i32, IonError> {
         self.functions
             .get_mut(name.into())
             .ok_or(IonError::DoesNotExist)
@@ -295,8 +291,7 @@ impl<'a> Shell {
         } else if let Some(function) = self.functions.get(&pipeline.items[0].job.command).cloned() {
             if !pipeline.requires_piping() {
                 let args: &[String] = pipeline.items[0].job.args.deref();
-                let mut args = args.iter();
-                match function.execute(self, &mut args) {
+                match function.execute(self, args) {
                     Ok(()) => None,
                     Err(FunctionError::InvalidArgumentCount) => {
                         eprintln!("ion: invalid number of function arguments supplied");
