@@ -4,6 +4,7 @@
 use shell::{
     job_control::{JobControl, ProcessState}, signals, status::*, Shell,
 };
+use smallvec::SmallVec;
 
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
@@ -17,7 +18,7 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
     const RUN_JOBS: u8 = 4;
 
     // Set flags and collect all job specs listed as arguments.
-    let mut collected_jobs = Vec::new();
+    let mut collected_jobs: SmallVec<[u32; 16]> = SmallVec::with_capacity(16);
     let mut flags = 0u8;
     for &arg in args {
         match arg {
