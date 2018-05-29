@@ -226,7 +226,7 @@ mod test {
     fn drop_deletes_variable() {
         let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
-        let return_status = drop_variable(&mut variables, vec!["drop", "FOO"]);
+        let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
         let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
         assert_eq!("", expanded);
@@ -235,14 +235,14 @@ mod test {
     #[test]
     fn drop_fails_with_no_arguments() {
         let mut variables = Variables::default();
-        let return_status = drop_variable(&mut variables, vec!["drop"]);
+        let return_status = drop_variable(&mut variables, &["drop"]);
         assert_eq!(FAILURE, return_status);
     }
 
     #[test]
     fn drop_fails_with_undefined_variable() {
         let mut variables = Variables::default();
-        let return_status = drop_variable(&mut variables, vec!["drop", "FOO"]);
+        let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
 
@@ -250,7 +250,7 @@ mod test {
     fn drop_deletes_array() {
         let mut variables = Variables::default();
         variables.set_array("FOO", array!["BAR"]);
-        let return_status = drop_array(&mut variables, vec!["drop", "-a", "FOO"]);
+        let return_status = drop_array(&mut variables, &["drop", "-a", "FOO"]);
         assert_eq!(SUCCESS, return_status);
         let expanded = expand_string("@FOO", &VariableExpander(variables), false).join("");
         assert_eq!("", expanded);
@@ -259,14 +259,14 @@ mod test {
     #[test]
     fn drop_array_fails_with_no_arguments() {
         let mut variables = Variables::default();
-        let return_status = drop_array(&mut variables, vec!["drop", "-a"]);
+        let return_status = drop_array(&mut variables, &["drop", "-a"]);
         assert_eq!(FAILURE, return_status);
     }
 
     #[test]
     fn drop_array_fails_with_undefined_array() {
         let mut variables = Variables::default();
-        let return_status = drop_array(&mut variables, vec!["drop", "FOO"]);
+        let return_status = drop_array(&mut variables, &["drop", "FOO"]);
         assert_eq!(FAILURE, return_status);
     }
 }
