@@ -134,11 +134,7 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
 }
 
 /// Dropping an alias will erase it from the shell.
-pub(crate) fn drop_alias<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
-where
-    I::Item: AsRef<str>,
-{
-    let args = args.into_iter().collect::<Vec<I::Item>>();
+pub(crate) fn drop_alias<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
     if args.len() <= 1 {
         eprintln!("ion: you must specify an alias name");
         return FAILURE;
@@ -153,11 +149,7 @@ where
 }
 
 /// Dropping an array will erase it from the shell.
-pub(crate) fn drop_array<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
-where
-    I::Item: AsRef<str>,
-{
-    let args = args.into_iter().collect::<Vec<I::Item>>();
+pub(crate) fn drop_array<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
     if args.len() <= 2 {
         eprintln!("ion: you must specify an array name");
         return FAILURE;
@@ -178,11 +170,7 @@ where
 }
 
 /// Dropping a variable will erase it from the shell.
-pub(crate) fn drop_variable<I: IntoIterator>(vars: &mut Variables, args: I) -> i32
-where
-    I::Item: AsRef<str>,
-{
-    let args = args.into_iter().collect::<Vec<I::Item>>();
+pub(crate) fn drop_variable<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
     if args.len() <= 1 {
         eprintln!("ion: you must specify a variable name");
         return FAILURE;
