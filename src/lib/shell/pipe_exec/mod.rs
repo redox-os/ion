@@ -22,7 +22,7 @@ use builtins::{self, BuiltinFunction};
 use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use smallvec::SmallVec;
 use std::{
-    fs::{File, OpenOptions}, io::{self, Error, Write}, iter::{self, ExactSizeIterator},
+    fs::{File, OpenOptions}, io::{self, Error, Write}, iter,
     os::unix::io::{AsRawFd, FromRawFd, RawFd}, path::Path, process::{self, exit},
 };
 use sys;
@@ -388,28 +388,23 @@ pub(crate) trait PipelineExecution {
         stdin: &Option<File>,
     ) -> i32;
 
-    fn exec_external<'a, I>(
+    fn exec_external<'a, S: AsRef<str>>(
         &mut self,
-        name: &str,
-        args: I,
+        name: &'a str,
+        args: &'a [S],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
-    ) -> i32
-        where I: Iterator,
-              I::Item: AsRef<str> + 'a,
-              Vec<&'a str>: ::std::iter::FromIterator<I::Item>;
+    ) -> i32;
 
-    fn exec_function<I>(
+    fn exec_function<S: AsRef<str>>(
         &mut self,
         name: &str,
-        args: &mut I,
+        args: &[S],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
-    ) -> i32
-        where I: ExactSizeIterator,
-              <I as Iterator>::Item: AsRef<str>;
+    ) -> i32;
 
     /// For cat jobs
     fn exec_multi_in(
@@ -431,21 +426,17 @@ pub(crate) trait PipelineExecution {
 }
 
 impl PipelineExecution for Shell {
-    fn exec_external<'a, I>(
+    fn exec_external<'a, S: AsRef<str>>(
         &mut self,
-        name: &str,
-        args: I,
+        name: &'a str,
+        args: &'a [S],
         stdin: &Option<File>,
         stdout: &Option<File>,
         stderr: &Option<File>,
-    ) -> i32
-        where I: Iterator,
-              I::Item: AsRef<str> + 'a,
-              Vec<&'a str>: ::std::iter::FromIterator<I::Item>,
-    {
+    ) -> i32 {
         let result = sys::fork_and_exec(
             name,
-            &args.collect::<Vec<_>>(),
+            &args.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
             if let Some(ref f) = *stdin {
                 Some(f.as_raw_fd())
             } else {
@@ -493,7 +484,8 @@ impl PipelineExecution for Shell {
         stderr: &Option<File>,
         stdin: &Option<File>,
         kind: JobKind,
-    ) -> i32 {
+    ) -> i32
+    {
         if let Some(ref file) = *stdin {
             redir(file.as_raw_fd(), sys::STDIN_FILENO);
         }
@@ -537,7 +529,8 @@ impl PipelineExecution for Shell {
         sources: &mut [File],
         stdout: &Option<File>,
         stdin: &mut Option<File>,
-    ) -> i32 {
+    ) -> i32
+    {
         if let Some(ref file) = *stdin {
             redir(file.as_raw_fd(), sys::STDIN_FILENO)
         }
@@ -573,18 +566,14 @@ impl PipelineExecution for Shell {
         SUCCESS
     }
 
-    fn exec_function<I>(
+    fn exec_function<S: AsRef<str>>(
         &mut self,
         name: &str,
-        args: &mut I,
+        args: &[S],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
-    ) -> i32
-        where 
-            I: ExactSizeIterator,
-            <I as Iterator>::Item: AsRef<str>,
-    {
+    ) -> i32 {
         if let Some(ref file) = *stdin {
             redir(file.as_raw_fd(), sys::STDIN_FILENO);
         }
@@ -1015,11 +1004,10 @@ fn spawn_proc(
             ref stderr,
             ref stdin,
         } => {
-            let mut args = args.iter().map(|x| x as &str);
             match unsafe { sys::fork() } {
                 Ok(0) => {
                     prepare_child(block_child, pgid);
-                    let ret = shell.exec_function(name, &mut args, stdout, stderr, stdin);
+                    let ret = shell.exec_function(name, &args, stdout, stderr, stdin);
                     close(stdout);
                     close(stderr);
                     close(stdin);
