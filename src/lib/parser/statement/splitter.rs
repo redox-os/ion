@@ -121,17 +121,25 @@ impl<'a> StatementSplitter<'a> {
         }
     }
 
-    fn get_statement(&mut self, flags: Flags) -> StatementVariant<'a> {
-        let variant = if flags.contains(Flags::AND) {
+    fn get_statement(&mut self, character: u8) -> StatementVariant<'a> {
+        let variant = if self.flags.contains(Flags::AND) {
                 self.flags.remove(Flags::AND);
-                StatementVariant::And(&self.data[..self.read - 1].trim())
-            } else if flags.contains(Flags::OR) {
+                self.data = &self.data[self.read + 1..].trim();
+                StatementVariant::And(&self.data)
+            } else if self.flags.contains(Flags::OR) {
                 self.flags.remove(Flags::OR);
-                StatementVariant::Or(&self.data[..self.read - 1].trim())
+                self.data = &self.data[self.read + 1..].trim();
+                StatementVariant::Or(&self.data)
             } else {
-                StatementVariant::Default(&self.data[self.start..self.read - 1].trim())
+                if character == b'&' {
+                    self.flags.insert(Flags::AND);
+                }
+                if character == b'|' {
+                    self.flags.insert(Flags::OR);
+                }
+                let statement = &self.data[self.start..self.read - 1].trim();
+                StatementVariant::Default(statement)
             };
-        self.flags.insert(flags);
         variant
     }
 }
@@ -262,7 +270,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     && self.p_level == 0
                     && self.ap_level == 0 =>
                 {
-                    let statement = self.get_statement(Flags::empty());
+                    let statement = self.get_statement(b';');
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(statement)),
@@ -272,37 +280,21 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     && self.p_level == 0
                     && self.ap_level == 0 =>
                 {
-                    if self.data.len() > self.read {
-                        match self.data.as_bytes()[self.read] {
-                            b'&' => {
-                                let statement = self.get_statement(Flags::AND);
-                                self.read = 0;
-                                return match error {
-                                    Some(error) => Some(Err(error)),
-                                    None => Some(Ok(statement)),
-                                };
-                            }
-                            _ => (),
-                        }
-                    }
+                    let statement = self.get_statement(b'&');
+                    return match error {
+                        Some(error) => Some(Err(error)),
+                        None => Some(Ok(statement)),
+                    };
                 }
                 b'|' if !self.flags.contains(Flags::DQUOTE)
                     && self.p_level == 0
                     && self.ap_level == 0 =>
                 {
-                    if self.data.len() > self.read {
-                        match self.data.as_bytes()[self.read] {
-                            b'|' => {
-                                let statement = self.get_statement(Flags::OR);
-                                self.read = 0;
-                                return match error {
-                                    Some(error) => Some(Err(error)),
-                                    None => Some(Ok(statement)),
-                                };
-                            }
-                            _ => (),
-                        }
-                    }
+                    let statement = self.get_statement(b'|');
+                    return match error {
+                        Some(error) => Some(Err(error)),
+                        None => Some(Ok(statement)),
+                    };
                 }
 
                 b'#' if self.read == 1
@@ -312,7 +304,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                             _ => false,
                         }) =>
                 {
-                    let statement = self.get_statement(Flags::empty());
+                    let statement = self.get_statement(b'#');
                     self.read = self.data.len();
                     return match error {
                         Some(error) => Some(Err(error)),
