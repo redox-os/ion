@@ -9,12 +9,12 @@ bitflags! {
     }
 }
 
-pub(crate) fn echo(args: &[&str]) -> Result<(), io::Error> {
+pub(crate) fn echo(args: &[String]) -> Result<(), io::Error> {
     let mut flags = Flags::empty();
     let mut data: SmallVec<[&str; 16]> = SmallVec::with_capacity(16);
 
     for arg in args {
-        match *arg {
+        match &**arg {
             "--escape" => flags |= Flags::ESCAPE,
             "--no-newline" => flags |= Flags::NO_NEWLINE,
             "--no-spaces" => flags |= Flags::NO_SPACES,

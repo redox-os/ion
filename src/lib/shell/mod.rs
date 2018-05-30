@@ -281,8 +281,7 @@ impl<'a> Shell {
                     Some(SUCCESS)
                 } else {
                     let borrowed = &pipeline.items[0].job.args;
-                    let small: SmallVec<[&str; 4]> = borrowed.iter().map(|x| x as &str).collect();
-                    Some(main(&small, self))
+                    Some(main(&borrowed, self))
                 }
             } else {
                 Some(self.execute_pipeline(pipeline))

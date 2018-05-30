@@ -192,12 +192,6 @@ macro_rules! set_field {
     };
 }
 
-fn collect_args(args: &[String]) -> SmallVec<[&str; 16]> {
-    args.iter()
-        .map(|x| x as &str)
-        .collect::<SmallVec<[&str; 16]>>()
-}
-
 impl RefinedJob {
     /// Returns a long description of this job: the commands and arguments
     pub(crate) fn long(&self) -> String {
@@ -242,8 +236,7 @@ impl RefinedJob {
                 ref stdout,
                 ref stderr,
             } => {
-                let args = collect_args(&args);
-                shell.exec_builtin(main, &args, stdout, stderr, stdin)
+                shell.exec_builtin(main, args, stdout, stderr, stdin)
             }
             RefinedJob::Function {
                 ref name,

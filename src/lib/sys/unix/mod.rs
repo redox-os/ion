@@ -216,7 +216,7 @@ pub(crate) fn fork_and_exec<F: Fn()>(
     }
 }
 
-pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Error {
+pub(crate) fn execve(prog: &str, args: &[String], clear_env: bool) -> io::Error {
     let prog_str = match CString::new(prog) {
         Ok(prog) => prog,
         Err(_) => {
@@ -227,8 +227,8 @@ pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Error {
     // Create a vector of null-terminated strings.
     let mut cvt_args: Vec<CString> = Vec::new();
     cvt_args.push(prog_str.clone());
-    for &arg in args.iter() {
-        match CString::new(arg) {
+    for arg in args.iter() {
+        match CString::new(&**arg) {
             Ok(arg) => cvt_args.push(arg),
             Err(_) => {
                 return io::Error::last_os_error();

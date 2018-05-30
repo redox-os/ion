@@ -8,7 +8,7 @@ fn calc_or_polish_calc(args: String) -> Result<Value, CalcError> {
     }
 }
 
-pub(crate) fn calc(args: &[&str]) -> Result<(), String> {
+pub(crate) fn calc(args: &[String]) -> Result<(), String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     if !args.is_empty() {
