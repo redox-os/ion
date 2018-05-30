@@ -436,7 +436,7 @@ impl PipelineExecution for Shell {
     ) -> i32 {
         let result = sys::fork_and_exec(
             name,
-            &args.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+            args,
             if let Some(ref f) = *stdin {
                 Some(f.as_raw_fd())
             } else {
