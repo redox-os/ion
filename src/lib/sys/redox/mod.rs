@@ -83,9 +83,9 @@ pub(crate) fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
     cvt(syscall::setpgid(pid as usize, pgid as usize)).and(Ok(()))
 }
 
-pub(crate) fn fork_and_exec<F: Fn()>(
+pub(crate) fn fork_and_exec<F: Fn(), S: AsRef<str>>(
     prog: &str,
-    args: &[&str],
+    args: &[S],
     stdin: Option<RawFd>,
     stdout: Option<RawFd>,
     stderr: Option<RawFd>,
@@ -135,12 +135,13 @@ pub(crate) fn fork_and_exec<F: Fn()>(
     }
 }
 
-pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Error {
+pub(crate) fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Error {
     // Construct a valid set of arguments to pass to execve. Ensure
     // that the program is the first argument.
     let mut cvt_args: Vec<[usize; 2]> = Vec::new();
     cvt_args.push([prog.as_ptr() as usize, prog.len()]);
     for arg in args {
+        let arg: &str = arg.as_ref();
         cvt_args.push([arg.as_ptr() as usize, arg.len()]);
     }
 
