@@ -729,7 +729,7 @@ impl FlowLogic for Shell {
     fn on_command(&mut self, command_string: &str) {
         self.break_flow = false;
         let mut iterator =
-            StatementSplitter::new(String::from(command_string)).map(parse_and_validate);
+            StatementSplitter::new(command_string).map(parse_and_validate);
 
         // If the value is set to `0`, this means that we don't need to append to an
         // existing partial statement block in memory, but can read and execute

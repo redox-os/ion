@@ -18,6 +18,8 @@ bitflags! {
         /// Set while parsing through an inline arithmetic expression, e.g. $((foo * bar / baz))
         const MATHEXPR = 128;
         const POST_MATHEXPR = 256;
+        const AND = 512;
+        const OR = 1024;
     }
 }
 
@@ -71,9 +73,17 @@ fn is_invalid(byte: u8) -> bool {
         || (byte >= 123 && byte <= 127)
 }
 
-pub(crate) struct StatementSplitter {
-    data:             String,
+#[derive(Debug, PartialEq)]
+pub(crate) enum StatementVariant<'a> {
+    And(&'a str),
+    Or(&'a str),
+    Default(&'a str),
+}
+
+pub(crate) struct StatementSplitter<'a> {
+    data:             &'a str,
     read:             usize,
+    start:            usize,
     flags:            Flags,
     a_level:          u8,
     ap_level:         u8,
@@ -82,7 +92,7 @@ pub(crate) struct StatementSplitter {
     math_paren_level: i8,
 }
 
-impl<'a> StatementSplitter {
+impl<'a> StatementSplitter<'a> {
     fn single_quote<B: Iterator<Item = u8>>(&mut self, bytes: &mut B) -> usize {
         let mut read = 0;
         while let Some(character) = bytes.next() {
@@ -97,10 +107,11 @@ impl<'a> StatementSplitter {
         read
     }
 
-    pub(crate) fn new(data: String) -> StatementSplitter {
+    pub(crate) fn new(data: &'a str) -> Self {
         StatementSplitter {
             data,
             read: 0,
+            start: 0,
             flags: Flags::empty(),
             a_level: 0,
             ap_level: 0,
@@ -109,18 +120,33 @@ impl<'a> StatementSplitter {
             math_paren_level: 0,
         }
     }
+
+    fn get_statement(&mut self, flags: Flags) -> StatementVariant<'a> {
+        self.flags.insert(flags);
+        match self.flags {
+            Flags::AND => {
+                StatementVariant::And(&self.data[..self.read - 1].trim())
+            }
+            Flags::OR => {
+                StatementVariant::Or(&self.data[..self.read - 1].trim())
+            }
+            _ => {
+                StatementVariant::Default(&self.data[self.start..self.read - 1].trim())
+            }
+        }
+    }
 }
 
-impl Iterator for StatementSplitter {
-    type Item = Result<String, StatementError>;
+impl<'a> Iterator for StatementSplitter<'a> {
+    type Item = Result<StatementVariant<'a>, StatementError>;
 
-    fn next(&mut self) -> Option<Result<String, StatementError>> {
-        let start = self.read;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.start = self.read;
         let mut first_arg_found = false;
         let mut else_found = false;
         let mut else_pos = 0;
         let mut error = None;
-        let c = self.data.clone();
+        let c = self.data;
         let mut bytes = c.bytes().skip(self.read);
         while let Some(character) = bytes.next() {
             self.read += 1;
@@ -238,9 +264,10 @@ impl Iterator for StatementSplitter {
                     && self.p_level == 0
                     && self.ap_level == 0 =>
                 {
+                    let statement = self.get_statement(Flags::empty());
                     return match error {
                         Some(error) => Some(Err(error)),
-                        None => Some(Ok(String::from(self.data[start..self.read - 1].trim()))),
+                        None => Some(Ok(statement)),
                     }
                 }
                 b'&' if !self.flags.contains(Flags::DQUOTE)
@@ -250,17 +277,11 @@ impl Iterator for StatementSplitter {
                     if self.data.len() > self.read {
                         match self.data.as_bytes()[self.read] {
                             b'&' => {
-                                // insert and into data
-                                let c = self.data.clone();
-                                let (statement, rest) = c.split_at(self.read);
-                                self.data = String::from("and ");
-                                self.data.push_str(&rest[1..]);
+                                let statement = self.get_statement(Flags::AND);
                                 self.read = 0;
                                 return match error {
                                     Some(error) => Some(Err(error)),
-                                    None => Some(Ok(String::from(
-                                        statement[..max(statement.len() - 2, 0)].trim(),
-                                    ))),
+                                    None => Some(Ok(statement)),
                                 };
                             }
                             _ => (),
@@ -274,17 +295,11 @@ impl Iterator for StatementSplitter {
                     if self.data.len() > self.read {
                         match self.data.as_bytes()[self.read] {
                             b'|' => {
-                                // insert and into data
-                                let c = self.data.clone();
-                                let (statement, rest) = c.split_at(self.read);
-                                self.data = String::from("or ");
-                                self.data.push_str(&rest[1..]);
+                                let statement = self.get_statement(Flags::OR);
                                 self.read = 0;
                                 return match error {
                                     Some(error) => Some(Err(error)),
-                                    None => Some(Ok(String::from(
-                                        statement[..max(statement.len() - 2, 0)].trim(),
-                                    ))),
+                                    None => Some(Ok(statement)),
                                 };
                             }
                             _ => (),
@@ -299,11 +314,11 @@ impl Iterator for StatementSplitter {
                             _ => false,
                         }) =>
                 {
-                    let output = self.data[start..self.read - 1].trim();
+                    let statement = self.get_statement(Flags::empty());
                     self.read = self.data.len();
                     return match error {
                         Some(error) => Some(Err(error)),
-                        None => Some(Ok(String::from(output))),
+                        None => Some(Ok(statement)),
                     };
                 }
                 b' ' if else_found => {
@@ -311,13 +326,13 @@ impl Iterator for StatementSplitter {
                     if !output.is_empty() {
                         if "if" != *output {
                             self.read = else_pos;
-                            return Some(Ok(String::from("else")));
+                            return Some(Ok(StatementVariant::Default("else")));
                         }
                     }
                     else_found = false;
                 }
                 b' ' if !first_arg_found => {
-                    let output = &self.data[start..self.read - 1].trim();
+                    let output = &self.data[self.start..self.read - 1].trim();
                     if !output.is_empty() {
                         match *output {
                             "else" => {
@@ -340,7 +355,7 @@ impl Iterator for StatementSplitter {
             self.flags -= Flags::COMM_1 | Flags::COMM_2;
         }
 
-        if start == self.read {
+        if self.start == self.read {
             None
         } else {
             self.read = self.data.len();
@@ -360,9 +375,9 @@ impl Iterator for StatementSplitter {
                     Some(Err(StatementError::UnterminatedArithmetic))
                 }
                 None => {
-                    let output = self.data[start..].trim();
+                    let output = self.data[self.start..].trim();
                     if output.is_empty() {
-                        return Some(Ok(String::from(output)));
+                        return Some(Ok(StatementVariant::Default(output)));
                     }
                     match output.as_bytes()[0] {
                         b'>' | b'<' | b'^' => {
@@ -373,7 +388,7 @@ impl Iterator for StatementSplitter {
                         b'*' | b'%' | b'?' | b'{' | b'}' => Some(Err(
                             StatementError::IllegalCommandName(String::from(output)),
                         )),
-                        _ => Some(Ok(String::from(output))),
+                        _ => Some(Ok(StatementVariant::Default(output))),
                     }
                 }
             }
