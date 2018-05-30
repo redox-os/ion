@@ -3,7 +3,7 @@
 // - Validate syntax in methods
 
 use std::{
-    cmp::max, fmt::{self, Display, Formatter}, u16,
+    fmt::{self, Display, Formatter}, u16,
 };
 
 bitflags! {
@@ -122,18 +122,17 @@ impl<'a> StatementSplitter<'a> {
     }
 
     fn get_statement(&mut self, flags: Flags) -> StatementVariant<'a> {
-        self.flags.insert(flags);
-        match self.flags {
-            Flags::AND => {
+        let variant = if flags.contains(Flags::AND) {
+                self.flags.remove(Flags::AND);
                 StatementVariant::And(&self.data[..self.read - 1].trim())
-            }
-            Flags::OR => {
+            } else if flags.contains(Flags::OR) {
+                self.flags.remove(Flags::OR);
                 StatementVariant::Or(&self.data[..self.read - 1].trim())
-            }
-            _ => {
+            } else {
                 StatementVariant::Default(&self.data[self.start..self.read - 1].trim())
-            }
-        }
+            };
+        self.flags.insert(flags);
+        variant
     }
 }
 
@@ -146,8 +145,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
         let mut else_found = false;
         let mut else_pos = 0;
         let mut error = None;
-        let c = self.data;
-        let mut bytes = c.bytes().skip(self.read);
+        let mut bytes = self.data.bytes().skip(self.read);
         while let Some(character) = bytes.next() {
             self.read += 1;
             match character {
@@ -326,6 +324,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     if !output.is_empty() {
                         if "if" != *output {
                             self.read = else_pos;
+                            self.flags.remove(Flags::AND);
+                            self.flags.remove(Flags::OR);
                             return Some(Ok(StatementVariant::Default("else")));
                         }
                     }

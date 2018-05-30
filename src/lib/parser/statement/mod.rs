@@ -12,8 +12,8 @@ use shell::flow_control::Statement;
 /// `Statement`
 pub(crate) fn parse_and_validate<'a>(statement: Result<StatementVariant, StatementError>) -> Statement {
     match statement {
-        Ok(StatementVariant::And(statement)) => parse(statement),
-        Ok(StatementVariant::Or(statement)) => parse(statement),
+        Ok(StatementVariant::And(statement)) => Statement::And(Box::new(parse(statement))),
+        Ok(StatementVariant::Or(statement)) => Statement::Or(Box::new(parse(statement))),
         Ok(StatementVariant::Default(statement)) => parse(statement),
         Err(err) => {
             eprintln!("ion: {}", err);
