@@ -1,14 +1,14 @@
 use builtins::man_pages::{check_help, MAN_IS};
 use shell::Shell;
 
-pub(crate) fn is(args: &[&str], shell: &mut Shell) -> Result<(), String> {
+pub(crate) fn is(args: &[String], shell: &mut Shell) -> Result<(), String> {
     match args.len() {
         4 => if args[1] != "not" {
             return Err(format!("Expected 'not' instead found '{}'\n", args[1]).to_string());
-        } else if eval_arg(args[2], shell) == eval_arg(args[3], shell) {
+        } else if eval_arg(&*args[2], shell) == eval_arg(&*args[3], shell) {
             return Err("".to_string());
         },
-        3 => if eval_arg(args[1], shell) != eval_arg(args[2], shell) {
+        3 => if eval_arg(&*args[1], shell) != eval_arg(&*args[2], shell) {
             return Err("".to_string());
         },
         2 => if !check_help(args, MAN_IS) {

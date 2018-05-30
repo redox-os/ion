@@ -37,7 +37,7 @@ impl IgnoreSetting {
 pub(crate) trait ShellHistory {
     /// Prints the commands contained within the history buffers to standard
     /// output.
-    fn print_history(&self, _arguments: &[&str]) -> i32;
+    fn print_history(&self, _arguments: &[String]) -> i32;
 
     /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if
     /// it
@@ -134,7 +134,7 @@ impl ShellHistory for Shell {
         }
     }
 
-    fn print_history(&self, _arguments: &[&str]) -> i32 {
+    fn print_history(&self, _arguments: &[String]) -> i32 {
         if let Some(context) = self.context.as_ref() {
             let mut buffer = Vec::with_capacity(8 * 1024);
             for command in &context.history.buffers {

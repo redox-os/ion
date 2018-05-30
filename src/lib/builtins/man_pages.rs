@@ -14,9 +14,9 @@ pub(crate) fn print_man(man_page: &'static str) {
     }
 }
 
-pub(crate) fn check_help(args: &[&str], man_page: &'static str) -> bool {
+pub(crate) fn check_help(args: &[String], man_page: &'static str) -> bool {
     for arg in args {
-        if *arg == "-h" || *arg == "--help" {
+        if &**arg == "-h" || &**arg == "--help" {
             print_man(man_page);
             return true;
         }

@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
 /// SIGHUP ignoral.
-pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
+pub(crate) fn disown(shell: &mut Shell, args: &[String]) -> Result<(), String> {
     // Specifies that a process should be set to not receive SIGHUP signals.
     const NO_SIGHUP: u8 = 1;
     // Specifies that all jobs in the process table should be manipulated.
@@ -20,8 +20,8 @@ pub(crate) fn disown(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
     // Set flags and collect all job specs listed as arguments.
     let mut collected_jobs: SmallVec<[u32; 16]> = SmallVec::with_capacity(16);
     let mut flags = 0u8;
-    for &arg in args {
-        match arg {
+    for arg in args {
+        match &**arg {
             "-a" => flags |= ALL_JOBS,
             "-h" => flags |= NO_SIGHUP,
             "-r" => flags |= RUN_JOBS,
@@ -97,7 +97,7 @@ pub(crate) fn jobs(shell: &mut Shell) {
 /// Hands control of the foreground process to the specified jobs, recording their exit status.
 /// If the job is stopped, the job will be resumed.
 /// If multiple jobs are given, then only the last job's exit status will be returned.
-pub(crate) fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
+pub(crate) fn fg(shell: &mut Shell, args: &[String]) -> i32 {
     fn fg_job(shell: &mut Shell, njob: u32) -> i32 {
         let job = if let Some(borrowed_job) =
             shell.background.lock().unwrap().iter().nth(njob as usize)
@@ -146,7 +146,7 @@ pub(crate) fn fg(shell: &mut Shell, args: &[&str]) -> i32 {
 }
 
 /// Resumes a stopped background process, if it was stopped.
-pub(crate) fn bg(shell: &mut Shell, args: &[&str]) -> i32 {
+pub(crate) fn bg(shell: &mut Shell, args: &[String]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
         if let Some(job) = shell
             .background

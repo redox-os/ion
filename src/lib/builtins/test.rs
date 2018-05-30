@@ -4,14 +4,14 @@ use std::{
     fs, os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt}, path::Path, time::SystemTime,
 };
 
-pub(crate) fn test(args: &[&str]) -> Result<bool, String> {
+pub(crate) fn test(args: &[String]) -> Result<bool, String> {
     let arguments = &args[1..];
     evaluate_arguments(arguments)
 }
 
-fn evaluate_arguments(arguments: &[&str]) -> Result<bool, String> {
+fn evaluate_arguments(arguments: &[String]) -> Result<bool, String> {
     match arguments.first() {
-        Some(&s) if s.starts_with("-") && s[1..].starts_with(char::is_alphabetic) => {
+        Some(ref s) if s.starts_with("-") && s[1..].starts_with(char::is_alphabetic) => {
             // Access the second character in the flag string: this will be type of the
             // flag. If no flag was given, return `SUCCESS`
             s.chars().nth(1).map_or(Ok(true), |flag| {
@@ -23,7 +23,7 @@ fn evaluate_arguments(arguments: &[&str]) -> Result<bool, String> {
                 })
             })
         }
-        Some(&s) if s == "--help" => {
+        Some(ref s) if *s == "--help" => {
             // "--help" only makes sense if it is the first option. Only look for it
             // in the first position.
             print_man(MAN_TEST);

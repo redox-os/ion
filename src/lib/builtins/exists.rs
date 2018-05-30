@@ -10,14 +10,14 @@ use shell;
 use shell::flow_control::{Function, Statement};
 use shell::Shell;
 
-pub(crate) fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
+pub(crate) fn exists(args: &[String], shell: &Shell) -> Result<bool, String> {
     let arguments = &args[1..];
     evaluate_arguments(arguments, shell)
 }
 
-fn evaluate_arguments(arguments: &[&str], shell: &Shell) -> Result<bool, String> {
+fn evaluate_arguments(arguments: &[String], shell: &Shell) -> Result<bool, String> {
     match arguments.first() {
-        Some(&s) if s.starts_with("--") => {
+        Some(ref s) if s.starts_with("--") => {
             let (_, option) = s.split_at(2);
             // If no argument was given, return `SUCCESS`, as this means a string starting
             // with a dash was given
@@ -27,7 +27,7 @@ fn evaluate_arguments(arguments: &[&str], shell: &Shell) -> Result<bool, String>
                 Ok(match_option_argument(option, arg, shell))
             })
         }
-        Some(&s) if s.starts_with("-") => {
+        Some(ref s) if s.starts_with("-") => {
             // Access the second character in the flag string: this will be type of the
             // flag. If no flag was given, return `SUCCESS`, as this means a
             // string with value "-" was checked.

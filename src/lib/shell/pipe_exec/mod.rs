@@ -382,7 +382,7 @@ pub(crate) trait PipelineExecution {
     fn exec_builtin(
         &mut self,
         main: BuiltinFunction,
-        args: &[&str],
+        args: &[String],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
@@ -604,7 +604,7 @@ impl PipelineExecution for Shell {
     fn exec_builtin(
         &mut self,
         main: BuiltinFunction,
-        args: &[&str],
+        args: &[String],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
@@ -975,7 +975,6 @@ fn spawn_proc(
             ref stderr,
             ref stdin,
         } => {
-            let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
                     prepare_child(block_child, pgid);

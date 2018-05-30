@@ -12,7 +12,7 @@ bitflags! {
     }
 }
 
-pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
+pub(crate) fn status(args: &[String], shell: &mut Shell) -> Result<(), String> {
     let mut flags = Flags::empty();
     let shell_args: Vec<_> = env::args().collect();
 
@@ -32,7 +32,7 @@ pub(crate) fn status(args: &[&str], shell: &mut Shell) -> Result<(), String> {
         return Err("status takes one argument\n".to_string());
     } else {
         for arg in args {
-            match *arg {
+            match &**arg {
                 "--help" => flags |= Flags::HELP,
                 "--is-login" => flags |= Flags::LOGIN_SHELL,
                 "--is-interactive" => flags |= Flags::INTERACTIVE,

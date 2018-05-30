@@ -4,7 +4,7 @@ use sys;
 
 use std::{borrow::Cow, env, path::Path};
 
-pub(crate) fn which(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
+pub(crate) fn which(args: &[String], shell: &mut Shell) -> Result<i32, ()> {
     if check_help(args, MAN_WHICH) {
         return Ok(SUCCESS);
     }
@@ -15,11 +15,11 @@ pub(crate) fn which(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
     }
 
     let mut result = SUCCESS;
-    for &command in &args[1..] {
-        if let Ok(c_type) = get_command_info(command, shell) {
+    for command in &args[1..] {
+        if let Ok(c_type) = get_command_info(&**command, shell) {
             match c_type.as_ref() {
                 "alias" => {
-                    let alias = shell.variables.aliases.get(command).unwrap();
+                    let alias = shell.variables.aliases.get(&**command).unwrap();
                     println!("{}: alias to {}", command, alias);
                 }
                 "function" => println!("{}: function", command),
@@ -33,7 +33,7 @@ pub(crate) fn which(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
     Ok(result)
 }
 
-pub(crate) fn find_type(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
+pub(crate) fn find_type(args: &[String], shell: &mut Shell) -> Result<i32, ()> {
     // Type does not accept help flags, aka "--help".
     if args.len() == 1 {
         eprintln!("type: Expected at least 1 args, got only 0");
@@ -41,11 +41,11 @@ pub(crate) fn find_type(args: &[&str], shell: &mut Shell) -> Result<i32, ()> {
     }
 
     let mut result = FAILURE;
-    for &command in &args[1..] {
-        if let Ok(c_type) = get_command_info(command, shell) {
+    for command in &args[1..] {
+        if let Ok(c_type) = get_command_info(&**command, shell) {
             match c_type.as_ref() {
                 "alias" => {
-                    let alias = shell.variables.aliases.get(command).unwrap();
+                    let alias = shell.variables.aliases.get(&**command).unwrap();
                     println!("{} is aliased to `{}`", command, alias);
                 }
                 // TODO Make it print the function.
