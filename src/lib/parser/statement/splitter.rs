@@ -399,8 +399,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
 #[test]
 fn syntax_errors() {
     let command = "echo (echo one); echo $( (echo one); echo ) two; echo $(echo one";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command)
+        .collect::<Vec<_>>();
     assert_eq!(results[0], Err(StatementError::InvalidCharacter('(', 6)));
     assert_eq!(results[1], Err(StatementError::InvalidCharacter('(', 26)));
     assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 43)));
@@ -408,8 +408,7 @@ fn syntax_errors() {
     assert_eq!(results.len(), 4);
 
     let command = ">echo";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(
         results[0],
         Err(StatementError::ExpectedCommandButFound("redirection"))
@@ -417,7 +416,7 @@ fn syntax_errors() {
     assert_eq!(results.len(), 1);
 
     let command = "echo $((foo bar baz)";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<_>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results[0], Err(StatementError::UnterminatedArithmetic));
     assert_eq!(results.len(), 1);
 }
@@ -425,94 +424,84 @@ fn syntax_errors() {
 #[test]
 fn methods() {
     let command = "echo $join(array, ', '); echo @join(var, ', ')";
-    let statements = StatementSplitter::new(String::from(command)).collect::<Vec<_>>();
-    assert_eq!(statements[0], Ok(String::from("echo $join(array, ', ')")));
-    assert_eq!(statements[1], Ok(String::from("echo @join(var, ', ')")));
+    let statements = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(statements[0], Ok(StatementVariant::Default("echo $join(array, ', ')")));
+    assert_eq!(statements[1], Ok(StatementVariant::Default("echo @join(var, ', ')")));
     assert_eq!(statements.len(), 2);
 }
 
 #[test]
 fn processes() {
     let command = "echo $(seq 1 10); echo $(seq 1 10)";
-    for statement in StatementSplitter::new(String::from(command)) {
-        assert_eq!(statement, Ok(String::from("echo $(seq 1 10)")));
+    for statement in StatementSplitter::new(command) {
+        assert_eq!(statement, Ok(StatementVariant::Default("echo $(seq 1 10)")));
     }
 }
 
 #[test]
 fn array_processes() {
     let command = "echo @(echo one; sleep 1); echo @(echo one; sleep 1)";
-    for statement in StatementSplitter::new(String::from(command)) {
-        assert_eq!(statement, Ok(String::from("echo @(echo one; sleep 1)")));
+    for statement in StatementSplitter::new(command) {
+        assert_eq!(statement, Ok(StatementVariant::Default("echo @(echo one; sleep 1)")));
     }
 }
 
 #[test]
 fn process_with_statements() {
     let command = "echo $(seq 1 10; seq 1 10)";
-    for statement in StatementSplitter::new(String::from(command)) {
-        assert_eq!(statement, Ok(String::from(command)));
+    for statement in StatementSplitter::new(command) {
+        assert_eq!(statement, Ok(StatementVariant::Default(command)));
     }
 }
 
 #[test]
 fn quotes() {
     let command = "echo \"This ;'is a test\"; echo 'This ;\" is also a test'";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0], Ok(String::from("echo \"This ;'is a test\"")));
-    assert_eq!(
-        results[1],
-        Ok(String::from("echo 'This ;\" is also a test'"))
-    );
+    assert_eq!(results[0], Ok(StatementVariant::Default("echo \"This ;'is a test\"")));
+    assert_eq!(results[1], Ok(StatementVariant::Default("echo 'This ;\" is also a test'")));
 }
 
 #[test]
 fn comments() {
     let command = "echo $(echo one # two); echo three # four";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0], Ok(String::from("echo $(echo one # two)")));
-    assert_eq!(results[1], Ok(String::from("echo three")));
+    assert_eq!(results[0], Ok(StatementVariant::Default("echo $(echo one # two)")));
+    assert_eq!(results[1], Ok(StatementVariant::Default("echo three")));
 }
 
 #[test]
 fn nested_process() {
     let command = "echo $(echo one $(echo two) three)";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0], Ok(String::from(command)));
+    assert_eq!(results[0], Ok(StatementVariant::Default(command)));
 
     let command = "echo $(echo $(echo one; echo two); echo two)";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0], Ok(String::from(command)));
+    assert_eq!(results[0], Ok(StatementVariant::Default(command)));
 }
 
 #[test]
 fn nested_array_process() {
     let command = "echo @(echo one @(echo two) three)";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0], Ok(String::from(command)));
+    assert_eq!(results[0], Ok(StatementVariant::Default(command)));
 
     let command = "echo @(echo @(echo one; echo two); echo two)";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0], Ok(String::from(command)));
+    assert_eq!(results[0], Ok(StatementVariant::Default(command)));
 }
 
 #[test]
 fn braced_variables() {
     let command = "echo ${foo}bar ${bar}baz ${baz}quux @{zardoz}wibble";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results, vec![Ok(String::from(command))]);
+    assert_eq!(results[0], Ok(StatementVariant::Default(command)));
 }
