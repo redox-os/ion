@@ -36,7 +36,7 @@ use liner::Context;
 use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
 use smallvec::SmallVec;
 use std::{
-    fs::File, io::{self, Read, Write}, iter::{ExactSizeIterator, FromIterator}, ops::Deref, path::Path, process,
+    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
     sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
@@ -281,8 +281,7 @@ impl<'a> Shell {
                     Some(SUCCESS)
                 } else {
                     let borrowed = &pipeline.items[0].job.args;
-                    let small: SmallVec<[&str; 4]> = borrowed.iter().map(|x| x as &str).collect();
-                    Some(main(&small, self))
+                    Some(main(&borrowed, self))
                 }
             } else {
                 Some(self.execute_pipeline(pipeline))

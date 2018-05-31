@@ -4,15 +4,17 @@ mod parse;
 mod splitter;
 
 pub(crate) use self::{
-    parse::parse, splitter::{StatementError, StatementSplitter},
+    parse::parse, splitter::{StatementVariant, StatementError, StatementSplitter},
 };
 use shell::flow_control::Statement;
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
-pub(crate) fn parse_and_validate<'a>(statement: Result<String, StatementError>) -> Statement {
+pub(crate) fn parse_and_validate<'a>(statement: Result<StatementVariant, StatementError>) -> Statement {
     match statement {
-        Ok(statement) => parse(statement.as_str()),
+        Ok(StatementVariant::And(statement)) => Statement::And(Box::new(parse(statement))),
+        Ok(StatementVariant::Or(statement)) => Statement::Or(Box::new(parse(statement))),
+        Ok(StatementVariant::Default(statement)) => parse(statement),
         Err(err) => {
             eprintln!("ion: {}", err);
             Statement::Error(-1)

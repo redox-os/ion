@@ -533,13 +533,10 @@ impl FlowLogic for Shell {
                 }
             }
             Statement::And(box_statement) => {
-                let condition;
-                match self.previous_status {
-                    SUCCESS => {
-                        condition = self.execute_statement(iterator, *box_statement);
-                    }
-                    _ => condition = Condition::NoOp,
-                }
+                let condition = match self.previous_status {
+                    SUCCESS => self.execute_statement(iterator, *box_statement),
+                    _ => Condition::NoOp,
+                };
 
                 match condition {
                     Condition::Break => return Condition::Break,
@@ -549,13 +546,10 @@ impl FlowLogic for Shell {
                 }
             }
             Statement::Or(box_statement) => {
-                let condition;
-                match self.previous_status {
-                    FAILURE => {
-                        condition = self.execute_statement(iterator, *box_statement);
-                    }
-                    _ => condition = Condition::NoOp,
-                }
+                let condition = match self.previous_status {
+                    FAILURE => self.execute_statement(iterator, *box_statement),
+                    _ => Condition::NoOp,
+                };
 
                 match condition {
                     Condition::Break => return Condition::Break,
@@ -565,7 +559,8 @@ impl FlowLogic for Shell {
                 }
             }
             Statement::Not(box_statement) => {
-                let condition = self.execute_statement(iterator, *box_statement);
+                // NOTE: Should the condition be used?
+                let _condition = self.execute_statement(iterator, *box_statement);
                 match self.previous_status {
                     FAILURE => self.previous_status = SUCCESS,
                     SUCCESS => self.previous_status = FAILURE,
@@ -729,7 +724,7 @@ impl FlowLogic for Shell {
     fn on_command(&mut self, command_string: &str) {
         self.break_flow = false;
         let mut iterator =
-            StatementSplitter::new(String::from(command_string)).map(parse_and_validate);
+            StatementSplitter::new(command_string).map(parse_and_validate);
 
         // If the value is set to `0`, this means that we don't need to append to an
         // existing partial statement block in memory, but can read and execute

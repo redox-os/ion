@@ -20,7 +20,7 @@ fn list_vars(shell: &Shell) {
             let mut vars = array.iter();
             if let Some(ref var) = vars.next() {
                 let _ = buffer.write(["'", var, "', "].concat().as_bytes());
-                vars.for_each(|ref var| {
+                vars.for_each(|var| {
                     let _ = buffer.write(["'", var, "' "].concat().as_bytes());
                 });
             }
