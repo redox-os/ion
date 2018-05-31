@@ -182,7 +182,7 @@ impl Variables {
         c.is_alphanumeric() || c == '_' || c == '?'
     }
 
-    pub fn get_vars<'a>(&'a self) -> impl Iterator<Item = Identifier> + 'a {
+    pub fn strings<'a>(&'a self) -> impl Iterator<Item = Identifier> + 'a {
         self.variables
             .keys()
             .cloned()

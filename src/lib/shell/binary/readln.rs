@@ -74,7 +74,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                                 // Add the list of available variables to the completer's definitions.
                                 // TODO: We should make it free to do String->SmallString
                                 //       and mostly free to go back (free if allocated)
-                                .chain(vars.get_vars().map(|s| ["$", &s].concat().into()))
+                                .chain(vars.strings().map(|s| ["$", &s].concat().into()))
                                 .collect();
 
                             // Initialize a new completer from the definitions collected.
