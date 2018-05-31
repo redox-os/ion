@@ -121,22 +121,15 @@ impl<'a> StatementSplitter<'a> {
         }
     }
 
-    fn get_statement(&mut self, character: u8) -> StatementVariant<'a> {
+    fn get_statement(&mut self, new_flag: Flags) -> StatementVariant<'a> {
         let variant = if self.flags.contains(Flags::AND) {
-                self.flags.remove(Flags::AND);
-                self.data = &self.data[self.read + 1..].trim();
-                StatementVariant::And(&self.data)
+                self.flags = self.flags - Flags::AND | new_flag;
+                StatementVariant::And(&self.data[self.start + 1..self.read - 1].trim())
             } else if self.flags.contains(Flags::OR) {
-                self.flags.remove(Flags::OR);
-                self.data = &self.data[self.read + 1..].trim();
-                StatementVariant::Or(&self.data)
+                self.flags = self.flags - Flags::OR | new_flag;
+                StatementVariant::Or(&self.data[self.start + 1..self.read - 1].trim())
             } else {
-                if character == b'&' {
-                    self.flags.insert(Flags::AND);
-                }
-                if character == b'|' {
-                    self.flags.insert(Flags::OR);
-                }
+                self.flags |= new_flag;
                 let statement = &self.data[self.start..self.read - 1].trim();
                 StatementVariant::Default(statement)
             };
@@ -153,7 +146,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
         let mut else_found = false;
         let mut else_pos = 0;
         let mut error = None;
-        let mut bytes = self.data.bytes().skip(self.read);
+        let mut bytes = self.data.bytes().skip(self.read).peekable();
         while let Some(character) = bytes.next() {
             self.read += 1;
             match character {
@@ -270,7 +263,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     && self.p_level == 0
                     && self.ap_level == 0 =>
                 {
-                    let statement = self.get_statement(b';');
+                    let statement = self.get_statement(Flags::empty());
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(statement)),
@@ -280,21 +273,27 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     && self.p_level == 0
                     && self.ap_level == 0 =>
                 {
-                    let statement = self.get_statement(b'&');
-                    return match error {
-                        Some(error) => Some(Err(error)),
-                        None => Some(Ok(statement)),
-                    };
+                    if bytes.peek() == Some(&b'&') { // Detecting if there is a 2nd `&` character
+                        let statement = self.get_statement(Flags::AND);
+                        self.read += 1; // Have `read` skip the 2nd `&` character after reading
+                        return match error {
+                            Some(error) => Some(Err(error)),
+                            None => Some(Ok(statement)),
+                        };
+                    }
                 }
                 b'|' if !self.flags.contains(Flags::DQUOTE)
                     && self.p_level == 0
                     && self.ap_level == 0 =>
                 {
-                    let statement = self.get_statement(b'|');
-                    return match error {
-                        Some(error) => Some(Err(error)),
-                        None => Some(Ok(statement)),
-                    };
+                    if bytes.peek() == Some(&b'|') { // Detecting if there is a 2nd `|` character
+                        let statement = self.get_statement(Flags::OR);
+                        self.read += 1; // Have `read` skip the 2nd `|` character after reading
+                        return match error {
+                            Some(error) => Some(Err(error)),
+                            None => Some(Ok(statement)),
+                        };
+                    }
                 }
 
                 b'#' if self.read == 1
@@ -304,7 +303,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                             _ => false,
                         }) =>
                 {
-                    let statement = self.get_statement(b'#');
+                    let statement = self.get_statement(Flags::empty());
                     self.read = self.data.len();
                     return match error {
                         Some(error) => Some(Err(error)),
@@ -316,8 +315,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     if !output.is_empty() {
                         if "if" != *output {
                             self.read = else_pos;
-                            self.flags.remove(Flags::AND);
-                            self.flags.remove(Flags::OR);
+                            self.flags.remove(Flags::AND | Flags::OR);
                             return Some(Ok(StatementVariant::Default("else")));
                         }
                     }
@@ -496,4 +494,16 @@ fn braced_variables() {
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0], Ok(StatementVariant::Default(command)));
+}
+
+#[test]
+fn variants() {
+    let command = r#"echo "Hello!"; echo "How are you doing?" && echo "I'm just an ordinary test." || echo "Helping by making sure your code works right."; echo "Have a good day!""#;
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results.len(), 5);
+    assert_eq!(results[0], Ok(StatementVariant::Default(r#"echo "Hello!""#)));
+    assert_eq!(results[1], Ok(StatementVariant::Default(r#"echo "How are you doing?""#)));
+    assert_eq!(results[2], Ok(StatementVariant::And(r#"echo "I'm just an ordinary test.""#)));
+    assert_eq!(results[3], Ok(StatementVariant::Or(r#"echo "Helping by making sure your code works right.""#)));
+    assert_eq!(results[4], Ok(StatementVariant::Default(r#"echo "Have a good day!""#)));
 }
