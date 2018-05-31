@@ -36,7 +36,7 @@ use liner::Context;
 use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
 use smallvec::SmallVec;
 use std::{
-    fs::File, io::{self, Read, Write}, iter::{ExactSizeIterator, FromIterator}, ops::Deref, path::Path, process,
+    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
     sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;

@@ -3,7 +3,6 @@ use builtins::{BuiltinFunction, BUILTINS};
 use parser::{expand_string, pipelines::RedirectFrom};
 use shell::pipe_exec::PipelineExecution;
 use smallstring::SmallString;
-use smallvec::SmallVec;
 use std::{fmt, fs::File, str};
 use types::*;
 

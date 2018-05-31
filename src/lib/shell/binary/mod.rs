@@ -19,8 +19,8 @@ SYNOPSIS
     ion [ -h | --help ] [-c] [-n] [-v]
 
 DESCRIPTION
-    ion is a commandline shell created to be a faster and easier to use alternative to the 
-    currently available shells. It is not POSIX compliant. 
+    ion is a commandline shell created to be a faster and easier to use alternative to the
+    currently available shells. It is not POSIX compliant.
 
 OPTIONS
     -c
@@ -70,7 +70,7 @@ impl Binary for Shell {
                 && self
                     .variables
                     .tilde_expansion(cmd, &self.directory_stack)
-                    .map_or(false, |ref path| Path::new(path).is_dir())
+                    .map_or(false, |path| Path::new(&path).is_dir())
             {
                 self.save_command_in_history(&[cmd, "/"].concat());
             } else {
