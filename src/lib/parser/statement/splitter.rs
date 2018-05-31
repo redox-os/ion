@@ -122,18 +122,29 @@ impl<'a> StatementSplitter<'a> {
     }
 
     fn get_statement(&mut self, new_flag: Flags) -> StatementVariant<'a> {
-        let variant = if self.flags.contains(Flags::AND) {
-                self.flags = self.flags - Flags::AND | new_flag;
-                StatementVariant::And(&self.data[self.start + 1..self.read - 1].trim())
-            } else if self.flags.contains(Flags::OR) {
-                self.flags = self.flags - Flags::OR | new_flag;
-                StatementVariant::Or(&self.data[self.start + 1..self.read - 1].trim())
-            } else {
-                self.flags |= new_flag;
-                let statement = &self.data[self.start..self.read - 1].trim();
-                StatementVariant::Default(statement)
-            };
-        variant
+        if self.flags.contains(Flags::AND) {
+            self.flags = (self.flags - Flags::AND) | new_flag;
+            StatementVariant::And(&self.data[self.start + 1..self.read - 1].trim())
+        } else if self.flags.contains(Flags::OR) {
+            self.flags = (self.flags - Flags::OR) | new_flag;
+            StatementVariant::Or(&self.data[self.start + 1..self.read - 1].trim())
+        } else {
+            self.flags |= new_flag;
+            let statement = &self.data[self.start..self.read - 1].trim();
+            StatementVariant::Default(statement)
+        }
+    }
+
+    fn get_statement_from(&mut self, input: &'a str) -> StatementVariant<'a> {
+        if self.flags.contains(Flags::AND) {
+            self.flags -= Flags::AND;
+            StatementVariant::And(input)
+        } else if self.flags.contains(Flags::OR) {
+            self.flags -= Flags::OR;
+            StatementVariant::Or(input)
+        } else {
+            StatementVariant::Default(input)
+        }
     }
 }
 
@@ -367,7 +378,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 None => {
                     let output = self.data[self.start..].trim();
                     if output.is_empty() {
-                        return Some(Ok(StatementVariant::Default(output)));
+                        return Some(Ok(self.get_statement_from(output)));
                     }
                     match output.as_bytes()[0] {
                         b'>' | b'<' | b'^' => {
@@ -378,7 +389,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         b'*' | b'%' | b'?' | b'{' | b'}' => Some(Err(
                             StatementError::IllegalCommandName(String::from(output)),
                         )),
-                        _ => Some(Ok(StatementVariant::Default(output))),
+                        _ => Some(Ok(self.get_statement_from(output))),
                     }
                 }
             }
