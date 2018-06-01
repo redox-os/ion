@@ -13,13 +13,14 @@ mod ion;
 mod is;
 mod job_control;
 mod man_pages;
+mod prompt;
 mod set;
 mod status;
 mod test;
 
 use self::{
     command_info::*, conditionals::{contains, ends_with, starts_with}, echo::echo, exec::exec,
-    exists::exists, functions::fn_, ion::ion_docs, is::is, man_pages::*, source::source,
+    exists::exists, functions::fn_, ion::ion_docs, is::is, man_pages::*, prompt::prompt, source::source,
     status::status, test::test, variables::{alias, drop_alias, drop_array, drop_variable},
 };
 
@@ -89,6 +90,7 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
     "matches" => builtin_matches : "Checks if a string matches a given regex",
     "popd" => builtin_popd : "Pop a directory from the stack",
+    "prompt" => builtin_prompt : "Select or customize the prompt",
     "pushd" => builtin_pushd : "Push a directory to the stack",
     "random" => builtin_random : "Outputs a random u64",
     "read" => builtin_read : "Read some variables\n    read <variable>",
@@ -608,4 +610,11 @@ fn builtin_isatty(args: &[String], _: &mut Shell) -> i32 {
     }
 
     FAILURE
+}
+
+fn builtin_prompt(args: &[String], shell: &mut Shell) -> i32 {
+    match prompt(args, shell) {
+        Ok(()) => SUCCESS,
+        Err(_) => FAILURE,
+    }
 }
