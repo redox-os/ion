@@ -615,6 +615,9 @@ fn builtin_isatty(args: &[String], _: &mut Shell) -> i32 {
 fn builtin_prompt(args: &[String], shell: &mut Shell) -> i32 {
     match prompt(args, shell) {
         Ok(()) => SUCCESS,
-        Err(_) => FAILURE,
+        Err(why) => {
+            eprintln!("{}", why);
+            FAILURE
+        }
     }
 }

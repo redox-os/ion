@@ -13,32 +13,34 @@ impl<'a> AskColor for StdoutLock<'a> {
         }
         let _ = writeln!(self, "or default");
         let _ = self.flush();
-        let mut input = String::new();
-        let _ = io::stdin().read_line(&mut input);
-        new_prompt.push_str(&["${c::", input.trim(), "}"].concat());
+        let mut color_input = String::new();
+        let _ = io::stdin().read_line(&mut color_input);
+        new_prompt.push_str(&["${c::", color_input.trim(), "}"].concat());
         new_prompt.push_str(value);
+        new_prompt.push_str("${c::default}");
     }
 }
 
 pub(crate) fn prompt(args: &[String], shell: &mut Shell) -> Result<(), String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    let options_list = format!("Select the variables on how you want to customize your prompt:\n\
-                                a) USER\n\
-                                b) PWD\n\
-                                c) SWD\n\
-                                For example: \'$a:$b>\' becomes \'{}:{}>\' as the prompt\n", shell.get_var("USER").unwrap(), shell.get_var("PWD").unwrap());
+    let options_list = format!("Write any variables in the order you want to customize your prompt:\n\
+                                $a for user name\n\
+                                $b for host name\n\
+                                $c for working directory\n\
+                                $d for simplified working directory\n\
+                                For example: \'($a):$d>\' becomes \'({}):{}>\' as the prompt\n", shell.get_var("USER").unwrap(), shell.get_var("SWD").unwrap());
 
     if args.len() == 1 {
         let _ = writeln!(stdout, "This part is unimplemented, it will list the different set of prompts to choose from.\n\
                                   For now use `prompt config`");
     } else if args[1] == "config" {
         let _ = writeln!(&mut stdout, "{}", options_list);
-        let _ = stdout.flush();
         let mut input = String::new();
         let _ = io::stdin().read_line(&mut input);
+        let input = input.trim();
         if input.is_empty() {
-            let _ = writeln!(stdout, "Nothing inputted. Going back to Ion shell");
+            return Err(String::from("Nothing inputted. Going back to Ion shell"));
         } else {
             let mut new_prompt = String::new();
             let mut input_iter = input.trim().chars().peekable();
@@ -47,17 +49,9 @@ pub(crate) fn prompt(args: &[String], shell: &mut Shell) -> Result<(), String> {
                     '$' => {
                         match input_iter.next() {
                             Some('a') => { stdout.ask_color_for("${USER}", &mut new_prompt); }
-                            Some('b') => { stdout.ask_color_for("${PWD}", &mut new_prompt); }
-                            Some('c') => { stdout.ask_color_for("${SWD}", &mut new_prompt); }
-                            _ => (),
-                        }
-                    }
-                    '@' => {
-                        new_prompt.push('@');
-                        match input_iter.peek() {
-                            Some('$') => {
-                                let _ = writeln!(stdout, "Invalid use of '@' character, do not use them right before a variables, please try again");
-                            }
+                            Some('b') => { stdout.ask_color_for("${HOST}", &mut new_prompt); }
+                            Some('c') => { stdout.ask_color_for("${PWD}", &mut new_prompt); }
+                            Some('d') => { stdout.ask_color_for("${SWD}", &mut new_prompt); }
                             _ => (),
                         }
                     }
@@ -73,5 +67,6 @@ pub(crate) fn prompt(args: &[String], shell: &mut Shell) -> Result<(), String> {
             shell.set_var("PROMPT", &new_prompt);
         }
     }
+    let _ = stdout.flush();
     Ok(())
 }
