@@ -39,7 +39,12 @@ regex = "1.0"
 smallstring = "0.1"
 smallvec = "0.6"
 unicode-segmentation = "1.2"
-xdg = { git = "https://github.com/whitequark/rust-xdg" }
+
+[dependencies.arg_parser]
+git = "https://github.com/redox-os/arg-parser"
+
+[dependencies.xdg]
+git = "https://github.com/whitequark/rust-xdg"
 
 [lib]
 path = "src/lib/lib.rs"
