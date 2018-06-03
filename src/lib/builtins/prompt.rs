@@ -1,11 +1,11 @@
 use shell::{colors::COLORS, Shell};
 use std::io::{self, Write, StdoutLock};
 
-trait AskColor {
+trait AskColorFor {
     fn ask_color_for(&mut self, value: &str, new_prompt: &mut String);
 }
 
-impl<'a> AskColor for StdoutLock<'a> {
+impl<'a> AskColorFor for StdoutLock<'a> {
     fn ask_color_for(&mut self, value: &str, new_prompt: &mut String) {
         let _ = self.write(b"Choose a color for the variable:\n");
         for &color in COLORS.keys {
@@ -24,12 +24,18 @@ impl<'a> AskColor for StdoutLock<'a> {
 pub(crate) fn prompt(args: &[String], shell: &mut Shell) -> Result<(), String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    let options_list = format!("Write any variables in the order you want to customize your prompt:\n\
-                                $a for user name\n\
-                                $b for host name\n\
-                                $c for working directory\n\
-                                $d for simplified working directory\n\
-                                For example: \'($a):$d>\' becomes \'({}):{}>\' as the prompt\n", shell.get_var("USER").unwrap(), shell.get_var("SWD").unwrap());
+    let options_list = format!(
+r#"Write any variables in the order you want to customize your prompt:
+$a for user name
+$b for host name
+$c1 for working directory
+$c2 for simplified working directory
+$d for CPU usage, as in TotalCPU%
+$e for Memory usage, as in: Used%/Total%
+For example:
+    '($a):$d>' becomes '({0}):{1}>' for the prompt
+    '\[$a\]:$d>' becomes '[{0}]:{1}>' for the prompt"#,
+shell.get_var("USER").unwrap(), shell.get_var("SWD").unwrap());
 
     if args.len() == 1 {
         let _ = writeln!(stdout, "This part is unimplemented, it will list the different set of prompts to choose from.\n\
@@ -43,16 +49,27 @@ pub(crate) fn prompt(args: &[String], shell: &mut Shell) -> Result<(), String> {
             return Err(String::from("Nothing inputted. Going back to Ion shell"));
         } else {
             let mut new_prompt = String::new();
-            let mut input_iter = input.trim().chars().peekable();
+            let mut input_iter = input.trim().chars();
             while let Some(character) = input_iter.next() {
                 match character {
                     '$' => {
                         match input_iter.next() {
                             Some('a') => { stdout.ask_color_for("${USER}", &mut new_prompt); }
                             Some('b') => { stdout.ask_color_for("${HOST}", &mut new_prompt); }
-                            Some('c') => { stdout.ask_color_for("${PWD}", &mut new_prompt); }
-                            Some('d') => { stdout.ask_color_for("${SWD}", &mut new_prompt); }
-                            _ => (),
+                            Some('c') => { 
+                                match input_iter.next() {
+                                    Some('1') => stdout.ask_color_for("${PWD}", &mut new_prompt),
+                                    Some('2') => stdout.ask_color_for("${SWD}", &mut new_prompt),
+                                    _ => continue,
+                                }
+                            }
+                            Some('d') => { 
+                                stdout.ask_color_for(r"$(let cpu_usage = [@(top -bn1 | grep Cpu)]; echo @cpu_usage[1]%)", &mut new_prompt);
+                            }
+                            Some('e') => { 
+                                stdout.ask_color_for(r"$(let free=[@(free -h)]; echo @free[8]/@free[7])", &mut new_prompt);
+                            }
+                            _ => continue,
                         }
                     }
                     character => {
