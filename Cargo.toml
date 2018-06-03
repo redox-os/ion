@@ -33,7 +33,7 @@ fnv = "1.0"
 glob = "0.2"
 itoa = "0.4"
 lazy_static = "1.0"
-liner = "0.4.4"
+liner = { git = "https://github.com/redox-os/liner" }
 permutate = "0.3"
 rand = "0.4"
 regex = "1.0"
