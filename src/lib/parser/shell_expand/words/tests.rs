@@ -95,6 +95,22 @@ fn array_processes() {
 }
 
 #[test]
+fn array_process_within_string_process() {
+    compare(
+        "echo $(let free=[@(free -h)]; echo @free[6]@free[8]/@free[7])",
+        vec![
+            WordToken::Normal("echo", false, false),
+            WordToken::Whitespace(" "),
+            WordToken::Process(
+                "let free=[@(free -h)]; echo @free[6]@free[8]/@free[7]",
+                false,
+                Select::All
+            )
+        ]
+    )
+}
+
+#[test]
 fn indexes() {
     let input = "@array[0..3] @array[0...3] @array[abc] @array[..3] @array[3..]";
     let expected = vec![
