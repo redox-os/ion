@@ -241,11 +241,11 @@ impl<'a> Shell {
         let command_start_time = SystemTime::now();
 
         // Expand any aliases found
-        for job_no in 0..pipeline.items.len() {
+        for item in pipeline.items.iter_mut() {
             let mut last_command = String::with_capacity(32);
             loop {
                 let possible_alias = {
-                    let key: &str = pipeline.items[job_no].job.command.as_ref();
+                    let key: &str = item.job.command.as_ref();
                     if &last_command == key {
                         break;
                     }
@@ -257,14 +257,14 @@ impl<'a> Shell {
                 if let Some(alias) = possible_alias {
                     let new_args = ArgumentSplitter::new(alias)
                         .map(String::from)
-                        .chain(pipeline.items[job_no].job.args.drain().skip(1))
+                        .chain(item.job.args.drain().skip(1))
                         .collect::<Array>();
                     if let Some(builtin) = BUILTINS.get(&new_args[0]) {
-                        pipeline.items[job_no].job.builtin = Some(builtin.main);
+                        item.job.builtin = Some(builtin.main);
                     } else {
-                        pipeline.items[job_no].job.command = new_args[0].clone().into();
+                        item.job.command = new_args[0].clone().into();
                     }
-                    pipeline.items[job_no].job.args = new_args;
+                    item.job.args = new_args;
                 }
             }
         }

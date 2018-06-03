@@ -85,9 +85,7 @@ pub(crate) struct StatementSplitter<'a> {
     read:             usize,
     start:            usize,
     flags:            Flags,
-    a_level:          u8,
-    ap_level:         u8,
-    p_level:          u8,
+    paren_level:      u8,
     brace_level:      u8,
     math_paren_level: i8,
 }
@@ -113,9 +111,7 @@ impl<'a> StatementSplitter<'a> {
             read: 0,
             start: 0,
             flags: Flags::empty(),
-            a_level: 0,
-            ap_level: 0,
-            p_level: 0,
+            paren_level: 0,
             brace_level: 0,
             math_paren_level: 0,
         }
@@ -231,11 +227,11 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         // The next character will always be a left paren in this branch;
                         self.math_paren_level = -1;
                     } else {
-                        self.p_level += 1;
+                        self.paren_level += 1;
                     }
                 }
                 b'(' if self.flags.contains(Flags::COMM_2) => {
-                    self.ap_level += 1;
+                    self.paren_level += 1;
                 }
                 b'(' if self.flags.intersects(Flags::VARIAB | Flags::ARRAY) => {
                     self.flags = (self.flags - (Flags::VARIAB | Flags::ARRAY)) | Flags::METHOD;
@@ -257,10 +253,10 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 } else {
                     self.math_paren_level -= 1;
                 },
-                b')' if self.flags.contains(Flags::METHOD) && self.p_level == 0 => {
+                b')' if self.flags.contains(Flags::METHOD) && self.paren_level == 0 => {
                     self.flags ^= Flags::METHOD;
                 }
-                b')' if self.p_level + self.ap_level == 0 => {
+                b')' if self.paren_level == 0 => {
                     if error.is_none() && !self.flags.contains(Flags::DQUOTE) {
                         error = Some(StatementError::InvalidCharacter(
                             character as char,
@@ -268,11 +264,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         ))
                     }
                 }
-                b')' if self.p_level != 0 => self.p_level -= 1,
-                b')' => self.ap_level -= 1,
-                b';' if !self.flags.contains(Flags::DQUOTE)
-                    && self.p_level == 0
-                    && self.ap_level == 0 =>
+                b')' => self.paren_level -= 1,
+                b';' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 =>
                 {
                     let statement = self.get_statement(Flags::empty());
                     return match error {
@@ -280,9 +273,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         None => Some(Ok(statement)),
                     }
                 }
-                b'&' if !self.flags.contains(Flags::DQUOTE)
-                    && self.p_level == 0
-                    && self.ap_level == 0 =>
+                b'&' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 =>
                 {
                     if bytes.peek() == Some(&b'&') { // Detecting if there is a 2nd `&` character
                         let statement = self.get_statement(Flags::AND);
@@ -293,9 +284,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         };
                     }
                 }
-                b'|' if !self.flags.contains(Flags::DQUOTE)
-                    && self.p_level == 0
-                    && self.ap_level == 0 =>
+                b'|' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 =>
                 {
                     if bytes.peek() == Some(&b'|') { // Detecting if there is a 2nd `|` character
                         let statement = self.get_statement(Flags::OR);
@@ -307,8 +296,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     }
                 }
 
-                b'#' if self.read == 1
-                    || (!self.flags.contains(Flags::DQUOTE) && self.p_level + self.ap_level == 0
+                b'#' if self.read == 1 || (!self.flags.contains(Flags::DQUOTE) && self.paren_level == 0
                         && match self.data.as_bytes()[self.read - 2] {
                             b' ' | b'\t' => true,
                             _ => false,
@@ -362,7 +350,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
             self.read = self.data.len();
             match error {
                 Some(error) => Some(Err(error)),
-                None if self.p_level != 0 || self.ap_level != 0 || self.a_level != 0 => {
+                None if self.paren_level != 0 => {
                     Some(Err(StatementError::UnterminatedSubshell))
                 }
                 None if self.flags.contains(Flags::METHOD) => {

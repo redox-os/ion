@@ -1,0 +1,6 @@
+echo $(let echo_array=[@(echo me myself I)]; echo @echo_array[0] @echo_array[1] @echo_array[2])
+echo $(let echo_array=[@(echo me myself I)]; echo @echo_array[0] @echo_array[2] @echo_array[1])
+echo $(let echo_array=[@(echo me myself I)]; echo @echo_array[1] @echo_array[2] @echo_array[0])
+echo $(let echo_array=[@(echo me myself I)]; echo @echo_array[1] @echo_array[0] @echo_array[2])
+echo $(let echo_array=[@(echo me myself I)]; echo @echo_array[2] @echo_array[1] @echo_array[0])
+echo $(let echo_array=[@(echo me myself I)]; echo @echo_array[2] @echo_array[0] @echo_array[1])
