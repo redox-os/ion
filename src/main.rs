@@ -1,10 +1,11 @@
 extern crate ion_shell;
 extern crate smallvec;
+extern crate libc;
 
 use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};
 use smallvec::SmallVec;
 use std::{
-    env, error::Error, io::{stdout, Write}, iter::FromIterator,
+    env, error::Error, io::{stdout, stdin, Write, BufRead, BufReader}, iter::FromIterator,
 };
 
 fn main() {
@@ -51,5 +52,10 @@ fn main() {
         shell.exit(previous_status);
     }
 
-    shell.execute_interactive();
+    if unsafe { libc::isatty(libc::STDIN_FILENO) == 1 } {
+        shell.execute_interactive();
+    } else {
+        let reader = BufReader::new(stdin());
+        shell.terminate_script_quotes(reader.lines().filter_map(|line| line.ok())); 
+    } 
 }
