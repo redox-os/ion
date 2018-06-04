@@ -27,7 +27,8 @@ impl StringNamespace {
     /// If the function exists, it is executed, and it's return value is then converted into a
     /// proper Rusty type.
     pub(crate) fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> {
-        let func = self.symbols
+        let func = self
+            .symbols
             .get(&function)
             .ok_or(StringError::FunctionMissing(function.clone()))?;
         unsafe {

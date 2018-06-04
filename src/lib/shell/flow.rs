@@ -1,23 +1,15 @@
 use super::{
     flags::*,
     flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function, Statement},
-    job_control::JobControl,
-    status::*,
-    Shell,
+    job_control::JobControl, status::*, Shell,
 };
 use parser::{
-    assignments::{is_array, ReturnValue},
-    expand_string,
-    parse_and_validate,
-    pipelines::Pipeline,
-    ForExpression,
-    StatementSplitter,
+    assignments::{is_array, ReturnValue}, expand_string, parse_and_validate, pipelines::Pipeline,
+    ForExpression, StatementSplitter,
 };
 use shell::assignments::VariableStore;
 use std::{
-    io::{stdout, Write},
-    iter,
-    mem,
+    io::{stdout, Write}, iter, mem,
 };
 use types::Array;
 
@@ -352,7 +344,7 @@ impl FlowLogic for Shell {
             .into_iter()
             .map(|cond| (cond.expression, cond.success));
 
-        for (mut condition, mut statements) in first_condition.chain(else_conditions) {
+        for (mut condition, statements) in first_condition.chain(else_conditions) {
             if self.run_pipeline(&mut condition) == Some(SUCCESS) {
                 return self.execute_statements(statements);
             }
@@ -541,13 +533,10 @@ impl FlowLogic for Shell {
                 }
             }
             Statement::And(box_statement) => {
-                let condition;
-                match self.previous_status {
-                    SUCCESS => {
-                        condition = self.execute_statement(iterator, *box_statement);
-                    }
-                    _ => condition = Condition::NoOp,
-                }
+                let condition = match self.previous_status {
+                    SUCCESS => self.execute_statement(iterator, *box_statement),
+                    _ => Condition::NoOp,
+                };
 
                 match condition {
                     Condition::Break => return Condition::Break,
@@ -557,13 +546,10 @@ impl FlowLogic for Shell {
                 }
             }
             Statement::Or(box_statement) => {
-                let condition;
-                match self.previous_status {
-                    FAILURE => {
-                        condition = self.execute_statement(iterator, *box_statement);
-                    }
-                    _ => condition = Condition::NoOp,
-                }
+                let condition = match self.previous_status {
+                    FAILURE => self.execute_statement(iterator, *box_statement),
+                    _ => Condition::NoOp,
+                };
 
                 match condition {
                     Condition::Break => return Condition::Break,
@@ -573,7 +559,8 @@ impl FlowLogic for Shell {
                 }
             }
             Statement::Not(box_statement) => {
-                let condition = self.execute_statement(iterator, *box_statement);
+                // NOTE: Should the condition be used?
+                let _condition = self.execute_statement(iterator, *box_statement);
                 match self.previous_status {
                     FAILURE => self.previous_status = SUCCESS,
                     SUCCESS => self.previous_status = FAILURE,
@@ -658,7 +645,8 @@ impl FlowLogic for Shell {
                     let mut previous_bind = None;
                     if let Some(ref bind) = case.binding {
                         if is_array {
-                            previous_bind = self.variables
+                            previous_bind = self
+                                .variables
                                 .get_array(bind)
                                 .map(|x| ReturnValue::Vector(x.clone()));
                             self.variables.set_array(&bind, value.clone());
@@ -694,7 +682,8 @@ impl FlowLogic for Shell {
                     let mut previous_bind = None;
                     if let Some(ref bind) = case.binding {
                         if is_array {
-                            previous_bind = self.variables
+                            previous_bind = self
+                                .variables
                                 .get_array(bind)
                                 .map(|x| ReturnValue::Vector(x.clone()));
                             self.variables.set_array(&bind, value.clone());
@@ -735,7 +724,7 @@ impl FlowLogic for Shell {
     fn on_command(&mut self, command_string: &str) {
         self.break_flow = false;
         let mut iterator =
-            StatementSplitter::new(String::from(command_string)).map(parse_and_validate);
+            StatementSplitter::new(command_string).map(parse_and_validate);
 
         // If the value is set to `0`, this means that we don't need to append to an
         // existing partial statement block in memory, but can read and execute

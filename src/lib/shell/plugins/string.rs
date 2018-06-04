@@ -1,6 +1,5 @@
 use std::{
-    fmt::{self, Display, Formatter},
-    io,
+    fmt::{self, Display, Formatter}, io,
 };
 use types::Identifier;
 

@@ -8,32 +8,22 @@
 pub mod foreground;
 mod fork;
 pub mod job_control;
-mod streams;
+pub mod streams;
 
 use self::{
-    fork::fork_pipe,
-    job_control::{JobControl, ProcessState},
+    fork::fork_pipe, job_control::{JobControl, ProcessState},
     streams::{duplicate_streams, redir, redirect_streams},
 };
 use super::{
-    flags::*,
-    flow_control::FunctionError,
-    fork_function::command_not_found,
-    job::{RefinedJob, TeeItem},
-    signals::{self, SignalHandler},
-    status::*,
-    JobKind,
-    Shell,
+    flags::*, flow_control::FunctionError, fork_function::command_not_found,
+    job::{RefinedJob, TeeItem}, signals::{self, SignalHandler}, status::*, JobKind, Shell,
 };
 use builtins::{self, BuiltinFunction};
 use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
+use smallvec::SmallVec;
 use std::{
-    fs::{File, OpenOptions},
-    io::{self, Error, Write},
-    iter,
-    os::unix::io::{AsRawFd, FromRawFd, RawFd},
-    path::Path,
-    process::{self, exit},
+    fs::{File, OpenOptions}, io::{self, Error, Write}, iter,
+    os::unix::io::{AsRawFd, FromRawFd, RawFd}, path::Path, process::{self, exit},
 };
 use sys;
 
@@ -88,9 +78,11 @@ fn is_implicit_cd(argument: &str) -> bool {
 
 /// Insert the multiple redirects as pipelines if necessary. Handle both input and output
 /// redirection if necessary.
-fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, JobKind)>> {
+fn do_redirection(
+    piped_commands: SmallVec<[RefinedItem; 16]>,
+) -> Option<SmallVec<[(RefinedJob, JobKind); 16]>> {
     macro_rules! get_infile {
-        ($input: expr) => {
+        ($input:expr) => {
             match $input {
                 Input::File(ref filename) => match File::open(filename) {
                     Ok(file) => Some(file),
@@ -147,7 +139,7 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
     };
 
     macro_rules! set_no_tee {
-        ($outputs: ident, $job: ident) => {
+        ($outputs:ident, $job:ident) => {
             // XXX: Possibly add an assertion here for correctness
             for output in $outputs {
                 match if output.append {
@@ -245,8 +237,8 @@ fn do_redirection(piped_commands: Vec<RefinedItem>) -> Option<Vec<(RefinedJob, J
     }
 
     // Real logic begins here
-    let mut new_commands = Vec::new();
-    let mut prev_kind = JobKind::And;
+    let mut new_commands = SmallVec::new();
+    let mut prev_kind = JobKind::Last;
     for (mut job, kind, outputs, mut inputs) in piped_commands {
         match (inputs.len(), prev_kind) {
             (0, _) => {}
@@ -364,11 +356,14 @@ pub(crate) trait PipelineExecution {
     ///
     /// Each generated command will either be a builtin or external command, and will be
     /// associated will be marked as an `&&`, `||`, `|`, or final job.
-    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<RefinedItem>, i32>;
+    fn generate_commands(
+        &self,
+        pipeline: &mut Pipeline,
+    ) -> Result<SmallVec<[RefinedItem; 16]>, i32>;
 
     /// Waits for all of the children of the assigned pgid to finish executing, returning the
     /// exit status of the last process in the queue.
-    fn wait(&mut self, pgid: u32, commands: Vec<RefinedJob>) -> i32;
+    fn wait(&mut self, pgid: u32, commands: SmallVec<[RefinedJob; 16]>) -> i32;
 
     /// Executes a `RefinedJob` that was created in the `generate_commands` method.
     ///
@@ -387,25 +382,25 @@ pub(crate) trait PipelineExecution {
     fn exec_builtin(
         &mut self,
         main: BuiltinFunction,
-        args: &[&str],
+        args: &[String],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
     ) -> i32;
 
-    fn exec_external(
+    fn exec_external<'a, S: AsRef<str>>(
         &mut self,
-        name: &str,
-        args: &[&str],
+        name: &'a str,
+        args: &'a [S],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
     ) -> i32;
 
-    fn exec_function(
+    fn exec_function<S: AsRef<str>>(
         &mut self,
         name: &str,
-        args: &[&str],
+        args: &[S],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
@@ -431,17 +426,17 @@ pub(crate) trait PipelineExecution {
 }
 
 impl PipelineExecution for Shell {
-    fn exec_external(
+    fn exec_external<'a, S: AsRef<str>>(
         &mut self,
-        name: &str,
-        args: &[&str],
+        name: &'a str,
+        args: &'a [S],
         stdin: &Option<File>,
         stdout: &Option<File>,
         stderr: &Option<File>,
     ) -> i32 {
         let result = sys::fork_and_exec(
             name,
-            &args,
+            args,
             if let Some(ref f) = *stdin {
                 Some(f.as_raw_fd())
             } else {
@@ -489,7 +484,8 @@ impl PipelineExecution for Shell {
         stderr: &Option<File>,
         stdin: &Option<File>,
         kind: JobKind,
-    ) -> i32 {
+    ) -> i32
+    {
         if let Some(ref file) = *stdin {
             redir(file.as_raw_fd(), sys::STDIN_FILENO);
         }
@@ -533,7 +529,8 @@ impl PipelineExecution for Shell {
         sources: &mut [File],
         stdout: &Option<File>,
         stdin: &mut Option<File>,
-    ) -> i32 {
+    ) -> i32
+    {
         if let Some(ref file) = *stdin {
             redir(file.as_raw_fd(), sys::STDIN_FILENO)
         }
@@ -569,10 +566,10 @@ impl PipelineExecution for Shell {
         SUCCESS
     }
 
-    fn exec_function(
+    fn exec_function<S: AsRef<str>>(
         &mut self,
         name: &str,
-        args: &[&str],
+        args: &[S],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
@@ -607,7 +604,7 @@ impl PipelineExecution for Shell {
     fn exec_builtin(
         &mut self,
         main: BuiltinFunction,
-        args: &[&str],
+        args: &[String],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
@@ -626,70 +623,26 @@ impl PipelineExecution for Shell {
     }
 
     fn exec_job(&mut self, job: &mut RefinedJob, _foreground: bool) -> i32 {
-        let long = job.long();
-        match *job {
-            RefinedJob::External {
-                ref name,
-                ref args,
-                ref stdin,
-                ref stdout,
-                ref stderr,
-            } => {
-                if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
-                    let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
-                    let code = self.exec_external(&name, &args, stdin, stdout, stderr);
-                    redirect_streams(stdin_bk, stdout_bk, stderr_bk);
-                    return code;
-                }
-                eprintln!(
-                    "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
-                    long
-                );
-                COULD_NOT_EXEC
+        // Duplicate file descriptors, execute command, and redirect back.
+        fn duplicate<F: FnMut() -> i32>(long: &str, mut func: F) -> i32 {
+            if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
+                let code = func();
+                redirect_streams(stdin_bk, stdout_bk, stderr_bk);
+                return code;
             }
-            RefinedJob::Builtin {
-                main,
-                ref args,
-                ref stdin,
-                ref stdout,
-                ref stderr,
-            } => {
-                if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
-                    let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
-                    let code = self.exec_builtin(main, &args, stdout, stderr, stdin);
-                    redirect_streams(stdin_bk, stdout_bk, stderr_bk);
-                    return code;
-                }
-                eprintln!(
-                    "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
-                    long
-                );
-                COULD_NOT_EXEC
-            }
-            RefinedJob::Function {
-                ref name,
-                ref args,
-                ref stdin,
-                ref stdout,
-                ref stderr,
-            } => {
-                if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
-                    let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
-                    let code = self.exec_function(name, &args, stdout, stderr, stdin);
-                    redirect_streams(stdin_bk, stdout_bk, stderr_bk);
-                    return code;
-                }
-                eprintln!(
-                    "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
-                    long
-                );
-                COULD_NOT_EXEC
-            }
-            _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
+
+            eprintln!(
+                "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
+                long
+            );
+
+            COULD_NOT_EXEC
         }
+
+        duplicate(&job.long(), move || job.exec(self))
     }
 
-    fn wait(&mut self, pgid: u32, commands: Vec<RefinedJob>) -> i32 {
+    fn wait(&mut self, pgid: u32, commands: SmallVec<[RefinedJob; 16]>) -> i32 {
         // TODO: Find a way to only do this when absolutely necessary.
         let as_string = commands
             .iter()
@@ -701,8 +654,11 @@ impl PipelineExecution for Shell {
         self.watch_foreground(-(pgid as i32), &as_string)
     }
 
-    fn generate_commands(&self, pipeline: &mut Pipeline) -> Result<Vec<RefinedItem>, i32> {
-        let mut results = Vec::new();
+    fn generate_commands(
+        &self,
+        pipeline: &mut Pipeline,
+    ) -> Result<SmallVec<[RefinedItem; 16]>, i32> {
+        let mut results: SmallVec<[RefinedItem; 16]> = SmallVec::new();
         for item in pipeline.items.drain(..) {
             let PipeItem {
                 mut job,
@@ -778,55 +734,25 @@ impl PipelineExecution for Shell {
     }
 }
 
-/// When the `&&` or `||` operator is utilized, commands should be executed
-/// based on the previously-recorded exit status. This function will return
-/// **true** to indicate that the current job should be skipped.
-fn should_skip(previous: &mut JobKind, previous_status: i32, current: JobKind) -> bool {
-    match *previous {
-        JobKind::And if previous_status != SUCCESS => {
-            *previous = if JobKind::Or == current {
-                current
-            } else {
-                *previous
-            };
-            true
-        }
-        JobKind::Or if previous_status == SUCCESS => {
-            *previous = if JobKind::And == current {
-                current
-            } else {
-                *previous
-            };
-            true
-        }
-        _ => false,
-    }
-}
-
 /// Executes a piped job `job1 | job2 | job3`
 ///
 /// This function will panic if called with an empty slice
 pub(crate) fn pipe(
     shell: &mut Shell,
-    commands: Vec<(RefinedJob, JobKind)>,
+    commands: SmallVec<[(RefinedJob, JobKind); 16]>,
     foreground: bool,
 ) -> i32 {
     let mut previous_status = SUCCESS;
-    let mut previous_kind = JobKind::And;
     let mut commands = commands.into_iter().peekable();
     let mut possible_external_stdio_pipes: Option<Vec<File>> = None;
 
     loop {
         if let Some((mut parent, mut kind)) = commands.next() {
-            if should_skip(&mut previous_kind, previous_status, kind) {
-                continue;
-            }
-
             match kind {
                 JobKind::Pipe(mut mode) => {
                     // We need to remember the commands as they own the file
                     // descriptors that are created by sys::pipe.
-                    let mut remember = Vec::new();
+                    let remember: SmallVec<[RefinedJob; 16]> = SmallVec::new();
                     let mut block_child = true;
                     let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
 
@@ -930,7 +856,8 @@ pub(crate) fn pipe(
 
                         possible_external_stdio_pipes = None;
 
-                        if set_process_group(&mut pgid, current_pid) && foreground
+                        if set_process_group(&mut pgid, current_pid)
+                            && foreground
                             && !shell.is_library
                         {
                             let _ = sys::tcsetpgrp(0, pgid);
@@ -962,7 +889,6 @@ pub(crate) fn pipe(
                         }
                     }
 
-                    previous_kind = kind;
                     previous_status = shell.wait(pgid, remember);
                     let _ = io::stdout().flush();
                     let _ = io::stderr().flush();
@@ -975,7 +901,6 @@ pub(crate) fn pipe(
                 }
                 _ => {
                     previous_status = shell.exec_job(&mut parent, foreground);
-                    previous_kind = kind;
                     let _ = io::stdout().flush();
                     let _ = io::stderr().flush();
                 }
@@ -1050,7 +975,6 @@ fn spawn_proc(
             ref stderr,
             ref stdin,
         } => {
-            let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
                     prepare_child(block_child, pgid);
@@ -1079,7 +1003,6 @@ fn spawn_proc(
             ref stderr,
             ref stdin,
         } => {
-            let args: Vec<&str> = args.iter().map(|x| x as &str).collect();
             match unsafe { sys::fork() } {
                 Ok(0) => {
                     prepare_child(block_child, pgid);

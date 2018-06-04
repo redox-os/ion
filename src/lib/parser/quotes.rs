@@ -108,12 +108,14 @@ impl Terminator {
                     return false;
                 } else if instance.contains(Flags::COMM) {
                     self.buffer.truncate(self.read - 1);
-                    return !self.flags
+                    return !self
+                        .flags
                         .intersects(Flags::SQUOTE | Flags::DQUOTE | Flags::ARRAY);
                 }
             }
 
-            if self.flags
+            if self
+                .flags
                 .intersects(Flags::SQUOTE | Flags::DQUOTE | Flags::ARRAY)
             {
                 if let Some(b'\\') = self.buffer.bytes().last() {

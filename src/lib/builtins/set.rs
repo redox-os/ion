@@ -9,7 +9,7 @@ enum PositionalArgs {
 
 use self::PositionalArgs::*;
 
-pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
+pub(crate) fn set(args: &[String], shell: &mut Shell) -> i32 {
     let mut args_iter = args.iter();
     let mut positionals = None;
 
@@ -28,14 +28,14 @@ pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
             for flag in arg.bytes().skip(1) {
                 match flag {
                     b'e' => shell.flags |= ERR_EXIT,
-                    b'o' => match args_iter.next() {
-                        Some(&"vi") => if let Some(context) = shell.context.as_mut() {
+                    b'o' => match args_iter.next().map(|s| s as &str) {
+                        Some("vi") => if let Some(context) = shell.context.as_mut() {
                             context.key_bindings = KeyBindings::Vi;
                         },
-                        Some(&"emacs") => if let Some(context) = shell.context.as_mut() {
+                        Some("emacs") => if let Some(context) = shell.context.as_mut() {
                             context.key_bindings = KeyBindings::Emacs;
                         },
-                        Some(&"huponexit") => shell.flags |= HUPONEXIT,
+                        Some("huponexit") => shell.flags |= HUPONEXIT,
                         Some(_) => {
                             eprintln!("ion: set: invalid option");
                             return 0;
@@ -54,8 +54,8 @@ pub(crate) fn set(args: &[&str], shell: &mut Shell) -> i32 {
                 match flag {
                     b'e' => shell.flags &= 255 ^ ERR_EXIT,
                     b'x' => shell.flags &= 255 ^ PRINT_COMMS,
-                    b'o' => match args_iter.next() {
-                        Some(&"huponexit") => shell.flags &= 255 ^ HUPONEXIT,
+                    b'o' => match args_iter.next().map(|s| s as &str) {
+                        Some("huponexit") => shell.flags &= 255 ^ HUPONEXIT,
                         Some(_) => {
                             eprintln!("ion: set: invalid option");
                             return 0;

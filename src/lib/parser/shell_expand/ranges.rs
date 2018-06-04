@@ -1,6 +1,12 @@
 use super::words::{Index, Range};
+use std::cmp::Ordering;
 
-fn stepped_range_numeric(mut start: isize, end: isize, step: isize) -> Option<Vec<String>> {
+fn stepped_range_numeric<'a>(
+    start: isize,
+    end: isize,
+    step: isize,
+    nb_digits: usize,
+) -> Option<Box<Iterator<Item = String> + 'a>> {
     return if step == 0 {
         None
     } else if start < end && step < 0 {
@@ -8,61 +14,77 @@ fn stepped_range_numeric(mut start: isize, end: isize, step: isize) -> Option<Ve
     } else if start > end && step > 0 {
         None
     } else {
-        let mut out = Vec::new();
-        let cmp: fn(isize, isize) -> bool = if start < end {
-            |a: isize, b: isize| -> bool { a < b }
+        let (x, y, ordering) = if start < end {
+            (start, end, Ordering::Greater)
         } else {
-            |a: isize, b: isize| -> bool { a > b }
+            (end, start, Ordering::Less)
         };
-        while cmp(start, end) {
-            out.push(start.to_string());
-            start += step;
-        }
-        Some(out)
+
+        let iter = (x..y).scan(start, move |index, _| {
+            if end.cmp(index) == ordering {
+                let index_holder = *index;
+                *index += step; // This step adds
+                Some(format!("{:0width$}", index_holder, width = nb_digits))
+            } else {
+                None
+            }
+        });
+
+        Some(Box::new(iter))
     };
 }
 
-fn stepped_range_chars(mut start: u8, end: u8, step: u8) -> Option<Vec<String>> {
+fn stepped_range_chars<'a>(
+    start: u8,
+    end: u8,
+    step: u8,
+) -> Option<Box<Iterator<Item = String> + 'a>> {
     if step == 0 {
         None
     } else {
-        let mut out = Vec::new();
-        let cmp: fn(u8, u8) -> bool = if start < end {
-            |a: u8, b: u8| -> bool { a < b }
+        let (x, y, ordering) = if start < end {
+            (start, end, Ordering::Greater)
         } else {
-            |a: u8, b: u8| -> bool { a > b }
+            (end, start, Ordering::Less)
         };
-        let step_func: fn(u8, u8) -> u8 = if start > end {
-            |cur: u8, step: u8| -> u8 { cur.wrapping_sub(step) }
-        } else {
-            |cur: u8, step: u8| -> u8 { cur.wrapping_add(step) }
-        };
-        while cmp(start, end) {
-            out.push((start as char).to_string());
-            start = step_func(start, step);
-        }
-        Some(out)
+
+        let iter = (x..y).scan(start, move |index, _| {
+            if end.cmp(index) == ordering {
+                let index_holder = *index;
+                *index = match ordering {
+                    Ordering::Greater => index.wrapping_add(step),
+                    Ordering::Less => index.wrapping_sub(step),
+                    _ => unreachable!(),
+                };
+                Some((index_holder as char).to_string())
+            } else {
+                None
+            }
+        });
+
+        Some(Box::new(iter))
     }
 }
 
-fn numeric_range(
+fn numeric_range<'a>(
     start: isize,
     mut end: isize,
     step: isize,
     inclusive: bool,
-) -> Option<Vec<String>> {
+    nb_digits: usize,
+) -> Option<Box<Iterator<Item = String> + 'a>> {
     if start < end {
         if inclusive {
             end += 1;
         }
-        stepped_range_numeric(start, end, step)
+        stepped_range_numeric(start, end, step, nb_digits)
     } else if start > end {
         if inclusive {
             end -= 1;
         }
-        stepped_range_numeric(start, end, step)
+        stepped_range_numeric(start, end, step, nb_digits)
     } else {
-        Some(vec![start.to_string()])
+        Some(Box::new(Some(start.to_string()).into_iter()))
     }
 }
 
@@ -70,7 +92,12 @@ fn numeric_range(
 fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') }
 
 use std::u8;
-fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Vec<String>> {
+fn char_range<'a>(
+    start: u8,
+    mut end: u8,
+    step: isize,
+    inclusive: bool,
+) -> Option<Box<Iterator<Item = String> + 'a>> {
     if !byte_is_valid_range(start) || !byte_is_valid_range(end) {
         return None;
     }
@@ -87,21 +114,42 @@ fn char_range(start: u8, mut end: u8, step: isize, inclusive: bool) -> Option<Ve
         if inclusive {
             end += 1;
         }
-        return stepped_range_chars(start, end, char_step);
+        stepped_range_chars(start, end, char_step)
     } else if start > end {
         if inclusive {
             end -= 1;
         }
-        return stepped_range_chars(start, end, char_step);
+        stepped_range_chars(start, end, char_step)
     } else {
-        return Some(vec![(start as char).to_string()]);
+        Some(Box::new(Some((start as char).to_string()).into_iter()))
     }
 }
 
-fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize)> {
+fn count_minimum_digits(a: &str) -> usize {
+    let mut has_leading_zero = false;
+    for c in a.chars() {
+        match c {
+            '-' => (),
+            '0' => {
+                has_leading_zero = true;
+                break;
+            }
+            '1'...'9' => break,
+            _ => panic!("count_minimum_digits should only be called for a valid number."),
+        }
+    }
+    if !has_leading_zero {
+        0
+    } else {
+        a.len()
+    }
+}
+
+fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize, usize)> {
     if let Ok(first) = a.parse::<isize>() {
         if let Ok(sec) = b.parse::<isize>() {
-            Some((first, sec))
+            let nb_digits = usize::max(count_minimum_digits(a), count_minimum_digits(b));
+            Some((first, sec, nb_digits))
         } else {
             None
         }
@@ -115,7 +163,7 @@ fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize)> {
 //      Inclusive nonstepped: {start...end}
 //      Exclusive stepped: {start..step..end}
 //      Inclusive stepped: {start..step...end}
-pub(crate) fn parse_range(input: &str) -> Option<Vec<String>> {
+pub(crate) fn parse_range<'a>(input: &str) -> Option<Box<Iterator<Item = String> + 'a>> {
     let mut read = 0;
     let mut bytes_iterator = input.bytes();
     while let Some(byte) = bytes_iterator.next() {
@@ -134,7 +182,7 @@ pub(crate) fn parse_range(input: &str) -> Option<Vec<String>> {
                 }
 
                 macro_rules! finish_char {
-                    ($inclusive: expr, $end_str: expr, $step: expr) => {
+                    ($inclusive:expr, $end_str:expr, $step:expr) => {
                         if first.len() == 1 && $end_str.len() == 1 {
                             let start = first.as_bytes()[0];
                             let end = $end_str.as_bytes()[0];
@@ -146,23 +194,26 @@ pub(crate) fn parse_range(input: &str) -> Option<Vec<String>> {
                 }
 
                 macro_rules! finish {
-                    ($inclusive: expr, $read: expr) => {
+                    ($inclusive:expr, $read:expr) => {
                         let end_str = &input[$read..];
-                        if let Some((start, end)) = strings_to_isizes(first, end_str) {
+                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str)
+                        {
                             return numeric_range(
                                 start,
                                 end,
                                 if start < end { 1 } else { -1 },
                                 $inclusive,
+                                nb_digits,
                             );
                         } else {
                             finish_char!($inclusive, end_str, 1);
                         }
                     };
-                    ($inclusive: expr, $read: expr, $step: expr) => {
+                    ($inclusive:expr, $read:expr, $step:expr) => {
                         let end_str = &input[$read..];
-                        if let Some((start, end)) = strings_to_isizes(first, end_str) {
-                            return numeric_range(start, end, $step, $inclusive);
+                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str)
+                        {
+                            return numeric_range(start, end, $step, $inclusive, nb_digits);
                         } else {
                             finish_char!($inclusive, end_str, $step);
                         }
@@ -326,10 +377,12 @@ fn index_ranges() {
 
 #[test]
 fn range_expand() {
-    assert_eq!(None, parse_range("abc"));
+    if let Some(_) = parse_range("abc") {
+        panic!("parse_range() failed");
+    }
 
-    let actual = parse_range("-3...3");
-    let expected = Some(vec![
+    let actual: Vec<String> = parse_range("-3...3").unwrap().collect();
+    let expected: Vec<String> = vec![
         "-3".to_owned(),
         "-2".to_owned(),
         "-1".to_owned(),
@@ -337,53 +390,24 @@ fn range_expand() {
         "1".to_owned(),
         "2".to_owned(),
         "3".to_owned(),
-    ]);
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("3...-3");
-    let expected = Some(vec![
-        "3".to_owned(),
-        "2".to_owned(),
-        "1".to_owned(),
-        "0".to_owned(),
-        "-1".to_owned(),
-        "-2".to_owned(),
-        "-3".to_owned(),
-    ]);
+    let actual: Vec<String> = parse_range("07...12").unwrap().collect();
+    let expected: Vec<String> = vec![
+        "07".to_owned(),
+        "08".to_owned(),
+        "09".to_owned(),
+        "10".to_owned(),
+        "11".to_owned(),
+        "12".to_owned(),
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("a...c");
-    let expected = Some(vec!["a".to_owned(), "b".to_owned(), "c".to_owned()]);
-
-    assert_eq!(actual, expected);
-
-    let actual = parse_range("c...a");
-    let expected = Some(vec!["c".to_owned(), "b".to_owned(), "a".to_owned()]);
-
-    assert_eq!(actual, expected);
-
-    let actual = parse_range("A...C");
-    let expected = Some(vec!["A".to_owned(), "B".to_owned(), "C".to_owned()]);
-
-    assert_eq!(actual, expected);
-
-    let actual = parse_range("C...A");
-    let expected = Some(vec!["C".to_owned(), "B".to_owned(), "A".to_owned()]);
-
-    assert_eq!(actual, expected);
-
-    let actual = parse_range("C..A");
-    let expected = Some(vec!["C".to_owned(), "B".to_owned()]);
-    assert_eq!(actual, expected);
-
-    let actual = parse_range("c..a");
-    let expected = Some(vec!["c".to_owned(), "b".to_owned()]);
-    assert_eq!(actual, expected);
-
-    let actual = parse_range("-3..4");
-    let expected = Some(vec![
+    let actual: Vec<String> = parse_range("-3...10").unwrap().collect();
+    let expected: Vec<String> = vec![
         "-3".to_owned(),
         "-2".to_owned(),
         "-1".to_owned(),
@@ -391,12 +415,19 @@ fn range_expand() {
         "1".to_owned(),
         "2".to_owned(),
         "3".to_owned(),
-    ]);
+        "4".to_owned(),
+        "5".to_owned(),
+        "6".to_owned(),
+        "7".to_owned(),
+        "8".to_owned(),
+        "9".to_owned(),
+        "10".to_owned(),
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("3..-4");
-    let expected = Some(vec![
+    let actual: Vec<String> = parse_range("3...-3").unwrap().collect();
+    let expected: Vec<String> = vec![
         "3".to_owned(),
         "2".to_owned(),
         "1".to_owned(),
@@ -404,15 +435,95 @@ fn range_expand() {
         "-1".to_owned(),
         "-2".to_owned(),
         "-3".to_owned(),
-    ]);
+    ];
 
     assert_eq!(actual, expected);
 
-    let actual = parse_range("-3...0");
-    let expected = Some(vec!["-3".into(), "-2".into(), "-1".into(), "0".into()]);
+    let actual: Vec<String> = parse_range("03...-3").unwrap().collect();
+    let expected: Vec<String> = vec![
+        "03".to_owned(),
+        "02".to_owned(),
+        "01".to_owned(),
+        "00".to_owned(),
+        "-1".to_owned(),
+        "-2".to_owned(),
+        "-3".to_owned(),
+    ];
+
     assert_eq!(actual, expected);
 
-    let actual = parse_range("-3..0");
-    let expected = Some(vec!["-3".into(), "-2".into(), "-1".into()]);
+    let actual: Vec<String> = parse_range("3...-03").unwrap().collect();
+    let expected: Vec<String> = vec![
+        "003".to_owned(),
+        "002".to_owned(),
+        "001".to_owned(),
+        "000".to_owned(),
+        "-01".to_owned(),
+        "-02".to_owned(),
+        "-03".to_owned(),
+    ];
+
+    assert_eq!(actual, expected);
+
+    let actual: Vec<String> = parse_range("a...c").unwrap().collect();
+    let expected: Vec<String> = vec!["a".to_owned(), "b".to_owned(), "c".to_owned()];
+
+    assert_eq!(actual, expected);
+
+    let actual: Vec<String> = parse_range("c...a").unwrap().collect();
+    let expected: Vec<String> = vec!["c".to_owned(), "b".to_owned(), "a".to_owned()];
+
+    assert_eq!(actual, expected);
+
+    let actual: Vec<String> = parse_range("A...C").unwrap().collect();
+    let expected: Vec<String> = vec!["A".to_owned(), "B".to_owned(), "C".to_owned()];
+
+    assert_eq!(actual, expected);
+
+    let actual: Vec<String> = parse_range("C...A").unwrap().collect();
+    let expected: Vec<String> = vec!["C".to_owned(), "B".to_owned(), "A".to_owned()];
+
+    assert_eq!(actual, expected);
+
+    let actual: Vec<String> = parse_range("C..A").unwrap().collect();
+    let expected: Vec<String> = vec!["C".to_owned(), "B".to_owned()];
+    assert_eq!(actual, expected);
+
+    let actual: Vec<String> = parse_range("c..a").unwrap().collect();
+    let expected: Vec<String> = vec!["c".to_owned(), "b".to_owned()];
+    assert_eq!(actual, expected);
+
+    let actual: Vec<String> = parse_range("-3..4").unwrap().collect();
+    let expected: Vec<String> = vec![
+        "-3".to_owned(),
+        "-2".to_owned(),
+        "-1".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "2".to_owned(),
+        "3".to_owned(),
+    ];
+
+    assert_eq!(actual, expected);
+
+    let actual: Vec<String> = parse_range("3..-4").unwrap().collect();
+    let expected: Vec<String> = vec![
+        "3".to_owned(),
+        "2".to_owned(),
+        "1".to_owned(),
+        "0".to_owned(),
+        "-1".to_owned(),
+        "-2".to_owned(),
+        "-3".to_owned(),
+    ];
+
+    assert_eq!(actual, expected);
+
+    let actual: Vec<String> = parse_range("-3...0").unwrap().collect();
+    let expected: Vec<String> = vec!["-3".into(), "-2".into(), "-1".into(), "0".into()];
+    assert_eq!(actual, expected);
+
+    let actual: Vec<String> = parse_range("-3..0").unwrap().collect();
+    let expected: Vec<String> = vec!["-3".into(), "-2".into(), "-1".into()];
     assert_eq!(actual, expected);
 }

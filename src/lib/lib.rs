@@ -45,7 +45,6 @@ mod types;
 pub mod parser;
 mod ascii_helpers;
 mod builtins;
-mod iter;
 mod shell;
 
 pub use shell::{

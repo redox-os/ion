@@ -8,9 +8,7 @@ mod tests;
 #[cfg(test)]
 pub(crate) use self::methods::Key;
 pub(crate) use self::{
-    index::Index,
-    methods::{ArrayMethod, Pattern, StringMethod},
-    range::Range,
+    index::Index, methods::{ArrayMethod, Pattern, StringMethod}, range::Range,
     select::{Select, SelectWithSize},
 };
 use super::{super::ArgumentSplitter, expand_string, Expander};
@@ -256,6 +254,17 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 b'"' if !self.flags.contains(Flags::SQUOTE) => self.flags ^= Flags::DQUOTE,
                 b'$' if !self.flags.contains(Flags::SQUOTE) => {
                     if self.data.as_bytes()[self.read + 1] == b'(' {
+                        // Pop out the '(' char
+                        iterator.next();
+                        self.read += 1;
+                        level += 1;
+                    }
+                }
+                b'@' if !self.flags.contains(Flags::SQUOTE) => {
+                    if self.data.as_bytes()[self.read + 1] == b'(' {
+                        // Pop out the '(' char
+                        iterator.next();
+                        self.read += 1;
                         level += 1;
                     }
                 }

@@ -26,7 +26,8 @@ impl From<MethodArguments> for RawMethodArguments {
         match arg {
             MethodArguments::StringArg(string, args) => {
                 let args_len = args.len();
-                let mut args = args.iter()
+                let mut args = args
+                    .iter()
                     .map(|x| unsafe {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
                     })
@@ -57,7 +58,8 @@ impl From<MethodArguments> for RawMethodArguments {
                 forget(key_array);
 
                 let args_len = args.len();
-                let mut args = args.iter()
+                let mut args = args
+                    .iter()
                     .map(|x| unsafe {
                         CString::from_vec_unchecked(x.as_bytes().to_owned()).into_raw()
                     })
@@ -111,7 +113,8 @@ impl StringMethodPlugins {
         function: &str,
         arguments: MethodArguments,
     ) -> Result<Option<String>, StringError> {
-        let func = self.symbols
+        let func = self
+            .symbols
             .get(function.into())
             .ok_or(StringError::FunctionMissing(function.into()))?;
         unsafe {

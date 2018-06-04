@@ -4,13 +4,13 @@ use std::error::Error;
 use sys::execve;
 
 /// Executes the givent commmand.
-pub(crate) fn exec(shell: &mut Shell, args: &[&str]) -> Result<(), String> {
+pub(crate) fn exec(shell: &mut Shell, args: &[String]) -> Result<(), String> {
     const CLEAR_ENV: u8 = 1;
 
     let mut flags = 0u8;
     let mut idx = 0;
-    for &arg in args.iter() {
-        match arg {
+    for arg in args.iter() {
+        match &**arg {
             "-c" => flags |= CLEAR_ENV,
             _ if check_help(args, MAN_EXEC) => {
                 return Ok(());

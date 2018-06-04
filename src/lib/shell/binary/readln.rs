@@ -2,10 +2,7 @@ use super::super::{completer::*, Binary, DirectoryStack, Shell, Variables};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use smallstring::SmallString;
 use std::{
-    env,
-    io::{self, ErrorKind, Write},
-    mem,
-    path::PathBuf,
+    env, io::{self, ErrorKind, Write}, mem, path::PathBuf,
 };
 use sys;
 use types::*;
@@ -77,7 +74,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                                 // Add the list of available variables to the completer's definitions.
                                 // TODO: We should make it free to do String->SmallString
                                 //       and mostly free to go back (free if allocated)
-                                .chain(vars.get_vars().map(|s| ["$", &s].concat().into()))
+                                .chain(vars.strings().map(|s| ["$", &s].concat().into()))
                                 .collect();
 
                             // Initialize a new completer from the definitions collected.

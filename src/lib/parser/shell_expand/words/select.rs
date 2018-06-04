@@ -1,7 +1,6 @@
 use super::{super::ranges::parse_index_range, methods::Key, Index, Range};
 use std::{
-    iter::{empty, FromIterator},
-    str::FromStr,
+    iter::{empty, FromIterator}, str::FromStr,
 };
 
 /// Represents a filter on a vector-like object
@@ -39,7 +38,8 @@ where
         match s {
             Select::None => empty().collect(),
             Select::All => self.collect(),
-            Select::Index(idx) => idx.resolve(size)
+            Select::Index(idx) => idx
+                .resolve(size)
                 .and_then(|idx| self.nth(idx))
                 .into_iter()
                 .collect(),

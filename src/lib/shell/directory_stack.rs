@@ -1,11 +1,8 @@
 use super::{
-    status::{FAILURE, SUCCESS},
-    variables::Variables,
+    status::{FAILURE, SUCCESS}, variables::Variables,
 };
 use std::{
-    borrow::Cow,
-    collections::VecDeque,
-    env::{current_dir, home_dir, set_current_dir},
+    borrow::Cow, collections::VecDeque, env::{current_dir, home_dir, set_current_dir},
     path::PathBuf,
 };
 

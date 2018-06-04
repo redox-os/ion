@@ -1,21 +1,24 @@
 extern crate ion_shell;
 extern crate smallvec;
+extern crate libc;
 
 use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};
 use smallvec::SmallVec;
 use std::{
-    env,
-    error::Error,
-    io::{stdout, Write},
-    iter::FromIterator,
+    env, error::Error, io::{stdout, stdin, Write, BufRead, BufReader}, iter::FromIterator,
 };
 
 fn main() {
+    let stdin_is_a_tty = unsafe { libc::isatty(libc::STDIN_FILENO) == 1 };
     let mut shell = ShellBuilder::new()
         .install_signal_handler()
-        .block_signals()
-        .set_unique_pid()
-        .as_binary();
+        .block_signals();
+
+    if stdin_is_a_tty {
+        shell = shell.set_unique_pid();
+    }
+
+    let mut shell = shell.as_binary();
 
     let mut args = env::args().skip(1);
     while let Some(path) = args.next() {
@@ -54,5 +57,12 @@ fn main() {
         shell.exit(previous_status);
     }
 
-    shell.execute_interactive();
+    if stdin_is_a_tty {
+        shell.execute_interactive();
+    } else {
+        let reader = BufReader::new(stdin());
+        let lines = reader.lines().filter_map(|line| line.ok());
+        let status = shell.terminate_script_quotes(lines);
+        shell.exit(status);
+    }
 }

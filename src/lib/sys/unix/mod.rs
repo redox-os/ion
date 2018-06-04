@@ -7,11 +7,7 @@ use libc::{
     c_char, c_int, pid_t, sighandler_t, strerror, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED,
 };
 use std::{
-    env,
-    ffi::{CStr, CString},
-    io::{self, Write},
-    os::unix::io::RawFd,
-    ptr,
+    env, ffi::{CStr, CString}, io::{self, Write}, os::unix::io::RawFd, ptr,
 };
 
 pub(crate) const PATH_SEPARATOR: &str = ":";
@@ -102,9 +98,9 @@ pub(crate) fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
     cvt(unsafe { libc::kill(-(pgid as pid_t), signal as c_int) }).and(Ok(()))
 }
 
-pub(crate) fn fork_and_exec<F: Fn()>(
+pub(crate) fn fork_and_exec<F: Fn(), S: AsRef<str>>(
     prog: &str,
-    args: &[&str],
+    args: &[S],
     stdin: Option<RawFd>,
     stdout: Option<RawFd>,
     stderr: Option<RawFd>,
@@ -121,8 +117,8 @@ pub(crate) fn fork_and_exec<F: Fn()>(
     // Create a vector of null-terminated strings.
     let mut cvt_args: Vec<CString> = Vec::new();
     cvt_args.push(prog_str.clone());
-    for &arg in args.iter() {
-        match CString::new(arg) {
+    for arg in args.iter() {
+        match CString::new(arg.as_ref()) {
             Ok(arg) => cvt_args.push(arg),
             Err(_) => {
                 return Err(io::Error::last_os_error());
@@ -220,7 +216,7 @@ pub(crate) fn fork_and_exec<F: Fn()>(
     }
 }
 
-pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Error {
+pub(crate) fn execve<'a, S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Error {
     let prog_str = match CString::new(prog) {
         Ok(prog) => prog,
         Err(_) => {
@@ -231,8 +227,8 @@ pub(crate) fn execve(prog: &str, args: &[&str], clear_env: bool) -> io::Error {
     // Create a vector of null-terminated strings.
     let mut cvt_args: Vec<CString> = Vec::new();
     cvt_args.push(prog_str.clone());
-    for &arg in args.iter() {
-        match CString::new(arg) {
+    for arg in args.iter() {
+        match CString::new(&*arg.as_ref()) {
             Ok(arg) => cvt_args.push(arg),
             Err(_) => {
                 return io::Error::last_os_error();

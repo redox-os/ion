@@ -1,8 +1,5 @@
 use super::{
-    super::{expand_string, Expander},
-    Primitive,
-    ReturnValue,
-    TypeError,
+    super::{expand_string, Expander}, Primitive, ReturnValue, TypeError,
 };
 
 use std::iter::Iterator;

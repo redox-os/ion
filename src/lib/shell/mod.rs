@@ -17,24 +17,17 @@ pub mod status;
 pub mod variables;
 
 pub use self::{
-    binary::Binary,
-    fork::{Capture, Fork, IonResult},
+    binary::Binary, fork::{Capture, Fork, IonResult},
 };
 pub(crate) use self::{
-    flow::FlowLogic,
-    history::{IgnoreSetting, ShellHistory},
-    job::{Job, JobKind},
+    flow::FlowLogic, history::{IgnoreSetting, ShellHistory}, job::{Job, JobKind},
     pipe_exec::{foreground, job_control},
 };
 
 use self::{
-    directory_stack::DirectoryStack,
-    flags::*,
-    flow_control::{FlowControl, Function, FunctionError},
-    foreground::ForegroundSignals,
-    job_control::{BackgroundProcess, JobControl},
-    pipe_exec::PipelineExecution,
-    status::*,
+    directory_stack::DirectoryStack, flags::*,
+    flow_control::{FlowControl, Function, FunctionError}, foreground::ForegroundSignals,
+    job_control::{BackgroundProcess, JobControl}, pipe_exec::PipelineExecution, status::*,
     variables::Variables,
 };
 use builtins::{BuiltinMap, BUILTINS};
@@ -43,14 +36,8 @@ use liner::Context;
 use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
 use smallvec::SmallVec;
 use std::{
-    fs::File,
-    io::{self, Read, Write},
-    iter::FromIterator,
-    ops::Deref,
-    path::Path,
-    process,
-    sync::{atomic::Ordering, Arc, Mutex},
-    time::SystemTime,
+    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
+    sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
 use types::*;
@@ -185,11 +172,11 @@ impl<'a> Shell {
 
     /// A method for executing a function with the given `name`, using `args` as the input.
     /// If the function does not exist, an `IonError::DoesNotExist` is returned.
-    pub fn execute_function(&mut self, name: &str, args: &[&str]) -> Result<i32, IonError> {
+    pub fn execute_function<S: AsRef<str>>(&mut self, name: &str, args: &[S]) -> Result<i32, IonError> {
         self.functions
             .get_mut(name.into())
             .ok_or(IonError::DoesNotExist)
-            .map(|fnc| fnc.clone())
+            .map(|func| func.clone())
             .and_then(|function| {
                 function
                     .execute(self, args)
@@ -254,11 +241,11 @@ impl<'a> Shell {
         let command_start_time = SystemTime::now();
 
         // Expand any aliases found
-        for job_no in 0..pipeline.items.len() {
+        for item in pipeline.items.iter_mut() {
             let mut last_command = String::with_capacity(32);
             loop {
                 let possible_alias = {
-                    let key: &str = pipeline.items[job_no].job.command.as_ref();
+                    let key: &str = item.job.command.as_ref();
                     if &last_command == key {
                         break;
                     }
@@ -270,14 +257,14 @@ impl<'a> Shell {
                 if let Some(alias) = possible_alias {
                     let new_args = ArgumentSplitter::new(alias)
                         .map(String::from)
-                        .chain(pipeline.items[job_no].job.args.drain().skip(1))
+                        .chain(item.job.args.drain().skip(1))
                         .collect::<Array>();
                     if let Some(builtin) = BUILTINS.get(&new_args[0]) {
-                        pipeline.items[job_no].job.builtin = Some(builtin.main);
+                        item.job.builtin = Some(builtin.main);
                     } else {
-                        pipeline.items[job_no].job.command = new_args[0].clone().into();
+                        item.job.command = new_args[0].clone().into();
                     }
-                    pipeline.items[job_no].job.args = new_args;
+                    item.job.args = new_args;
                 }
             }
         }
@@ -294,8 +281,7 @@ impl<'a> Shell {
                     Some(SUCCESS)
                 } else {
                     let borrowed = &pipeline.items[0].job.args;
-                    let small: SmallVec<[&str; 4]> = borrowed.iter().map(|x| x as &str).collect();
-                    Some(main(&small, self))
+                    Some(main(&borrowed, self))
                 }
             } else {
                 Some(self.execute_pipeline(pipeline))
@@ -304,8 +290,7 @@ impl<'a> Shell {
         } else if let Some(function) = self.functions.get(&pipeline.items[0].job.command).cloned() {
             if !pipeline.requires_piping() {
                 let args: &[String] = pipeline.items[0].job.args.deref();
-                let args: Vec<&str> = args.iter().map(AsRef::as_ref).collect();
-                match function.execute(self, &args) {
+                match function.execute(self, args) {
                     Ok(()) => None,
                     Err(FunctionError::InvalidArgumentCount) => {
                         eprintln!("ion: invalid number of function arguments supplied");
@@ -472,7 +457,8 @@ impl<'a> Expander for Shell {
             Some(array) => match selection {
                 Select::None => None,
                 Select::All => Some(array.clone()),
-                Select::Index(id) => id.resolve(array.len())
+                Select::Index(id) => id
+                    .resolve(array.len())
                     .and_then(|n| array.get(n))
                     .map(|x| Array::from_iter(Some(x.to_owned()))),
                 Select::Range(range) => if let Some((start, length)) = range.bounds(array.len()) {

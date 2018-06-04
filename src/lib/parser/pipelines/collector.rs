@@ -95,10 +95,6 @@ impl<'a> Collector<'a> {
                             bytes.next();
                             try_add_item!(JobKind::Pipe(RedirectFrom::Both));
                         }
-                        Some(&(_, b'&')) => {
-                            bytes.next();
-                            try_add_item!(JobKind::And);
-                        }
                         Some(&(_, b'!')) => {
                             bytes.next();
                             try_add_item!(JobKind::Disown);
@@ -127,15 +123,7 @@ impl<'a> Collector<'a> {
                 }
                 b'|' => {
                     bytes.next();
-                    match bytes.peek() {
-                        Some(&(_, b'|')) => {
-                            bytes.next();
-                            try_add_item!(JobKind::Or);
-                        }
-                        Some(_) | None => {
-                            try_add_item!(JobKind::Pipe(RedirectFrom::Stdout));
-                        }
-                    }
+                    try_add_item!(JobKind::Pipe(RedirectFrom::Stdout));
                 }
                 b'>' => {
                     bytes.next();
@@ -393,8 +381,7 @@ impl<'a> Collector<'a> {
 #[cfg(test)]
 mod tests {
     use parser::{
-        pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection},
-        statement::parse,
+        pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection}, statement::parse,
     };
     use shell::{flow_control::Statement, Job, JobKind};
     use types::Array;
@@ -657,30 +644,6 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo hello world&!") {
             let items = pipeline.items;
             assert_eq!(JobKind::Disown, items[0].job.kind);
-        } else {
-            assert!(false);
-        }
-    }
-
-    #[test]
-    fn and_job() {
-        if let Statement::Pipeline(pipeline) = parse("echo one && echo two") {
-            let items = pipeline.items;
-            assert_eq!(JobKind::And, items[0].job.kind);
-            assert_eq!(array!["echo", "one"], items[0].job.args);
-            assert_eq!(array!["echo", "two"], items[1].job.args);
-        } else {
-            assert!(false);
-        }
-    }
-
-    #[test]
-    fn or_job() {
-        if let Statement::Pipeline(pipeline) = parse("echo one || echo two") {
-            let items = pipeline.items;
-            assert_eq!(JobKind::Or, items[0].job.kind);
-            assert_eq!(array!["echo", "one"], items[0].job.args);
-            assert_eq!(array!["echo", "two"], items[1].job.args);
         } else {
             assert!(false);
         }
