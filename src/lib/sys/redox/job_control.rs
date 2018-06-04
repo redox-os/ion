@@ -17,12 +17,19 @@ pub(crate) fn watch_background(
     pgid: u32,
     njob: usize,
 ) {
-    let mut fg_was_grabbed = false;
-    let mut status;
+    let (mut fg_was_grabbed, mut status);
     let mut exit_status = 0;
 
+    macro_rules! get_process {
+        (|$ident:ident| $func:expr) => {
+            let mut processes = processes.lock().unwrap();
+            let $ident = &mut processes.iter_mut().nth(njob).unwrap();
+            $func
+        }
+    }
+
     loop {
-        fg_was_grabbed = !fg_was_grabbed && fg.was_grabbed(pgid);
+        fg_was_grabbed = fg.was_grabbed(pgid);
 
         unsafe {
             status = 0;
@@ -31,22 +38,26 @@ pub(crate) fn watch_background(
                     if !fg_was_grabbed {
                         eprintln!("ion: ([{}] {}) exited with {}", njob, pgid, status);
                     }
-                    let mut processes = processes.lock().unwrap();
-                    let process = &mut processes.iter_mut().nth(njob).unwrap();
-                    process.state = ProcessState::Empty;
-                    if fg_was_grabbed {
-                        fg.reply_with(exit_status as i8);
-                    }
+
+                    get_process!(|process| {
+                        process.state = ProcessState::Empty;
+                        if fg_was_grabbed {
+                            fg.reply_with(exit_status as i8);
+                        }
+                    });
+
                     break;
                 }
                 Err(err) => {
                     eprintln!("ion: ([{}] {}) errored: {}", njob, pgid, err);
-                    let mut processes = processes.lock().unwrap();
-                    let process = &mut processes.iter_mut().nth(njob).unwrap();
-                    process.state = ProcessState::Empty;
-                    if fg_was_grabbed {
-                        fg.errored();
-                    }
+
+                    get_process!(|process| {
+                        process.state = ProcessState::Empty;
+                        if fg_was_grabbed {
+                            fg.errored();
+                        }
+                    });
+
                     break;
                 }
                 Ok(0) => (),
@@ -55,21 +66,20 @@ pub(crate) fn watch_background(
                     if !fg_was_grabbed {
                         eprintln!("ion: ([{}] {}) Stopped", njob, pgid);
                     }
-                    let mut processes = processes.lock().unwrap();
-                    let process = &mut processes.iter_mut().nth(njob).unwrap();
-                    if fg_was_grabbed {
-                        fg.reply_with(TERMINATED as i8);
-                        fg_was_grabbed = false;
-                    }
-                    process.state = ProcessState::Stopped;
+
+                    get_process!(|process| {
+                        if fg_was_grabbed {
+                            fg.reply_with(TERMINATED as i8);
+                        }
+                        process.state = ProcessState::Stopped;
+                    });
                 }
                 Ok(_pid) if wifcontinued(status) => {
                     if !fg_was_grabbed {
                         eprintln!("ion: ([{}] {}) Running", njob, pgid);
                     }
-                    let mut processes = processes.lock().unwrap();
-                    let process = &mut processes.iter_mut().nth(njob).unwrap();
-                    process.state = ProcessState::Running;
+
+                    get_process!(|process| process.state = ProcessState::Running);
                 }
                 _ => (),
             }
