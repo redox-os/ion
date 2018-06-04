@@ -9,11 +9,16 @@ use std::{
 };
 
 fn main() {
+    let stdin_is_a_tty = unsafe { libc::isatty(libc::STDIN_FILENO) == 1 };
     let mut shell = ShellBuilder::new()
         .install_signal_handler()
-        .block_signals()
-        .set_unique_pid()
-        .as_binary();
+        .block_signals();
+
+    if stdin_is_a_tty {
+        shell = shell.set_unique_pid();
+    }
+
+    let mut shell = shell.as_binary();
 
     let mut args = env::args().skip(1);
     while let Some(path) = args.next() {
@@ -52,11 +57,12 @@ fn main() {
         shell.exit(previous_status);
     }
 
-    if unsafe { libc::isatty(libc::STDIN_FILENO) == 1 } {
+    if stdin_is_a_tty {
         shell.execute_interactive();
     } else {
         let reader = BufReader::new(stdin());
-        let status = shell.terminate_script_quotes(reader.lines().filter_map(|line| line.ok())); 
+        let lines = reader.lines().filter_map(|line| line.ok());
+        let status = shell.terminate_script_quotes(lines);
         shell.exit(status);
-    } 
+    }
 }
