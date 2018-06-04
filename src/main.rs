@@ -56,6 +56,7 @@ fn main() {
         shell.execute_interactive();
     } else {
         let reader = BufReader::new(stdin());
-        shell.terminate_script_quotes(reader.lines().filter_map(|line| line.ok())); 
+        let status = shell.terminate_script_quotes(reader.lines().filter_map(|line| line.ok())); 
+        shell.exit(status);
     } 
 }
