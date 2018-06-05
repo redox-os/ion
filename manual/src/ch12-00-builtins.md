@@ -133,6 +133,15 @@ exists [-a ARRAY] [-b BINARY] [-d PATH] [--fn FUNCTION] [[-s] STRING]
 
 Performs tests on files and text
 
+## exec 
+
+```
+exec [-ch] [--help] [command [arguments ...]]
+```
+
+Execute a command, replacing the shell with the specified program.
+The arguments following the command become the arguments to the command.
+
 #### options
 
 - **-a ARRAY**:      array var is not empty
@@ -420,6 +429,14 @@ is VALUE VALUE
 ```
 
 Returns 0 if the two arguments are equal
+
+## isatty
+
+```
+isatty [FD]
+```
+
+Returns 0 exit status if the supplied file descriptor is a tty.
 
 ### Options
 - **not**: returns 0 if the two arguments are not equal.
