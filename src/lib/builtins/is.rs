@@ -11,9 +11,6 @@ pub(crate) fn is(args: &[String], shell: &mut Shell) -> Result<(), String> {
         3 => if eval_arg(&*args[1], shell) != eval_arg(&*args[2], shell) {
             return Err("".to_string());
         },
-        2 => if !check_help(args, MAN_IS) {
-            return Err("is needs 3 or 4 arguments\n".to_string());
-        },
         _ => return Err("is needs 3 or 4 arguments\n".to_string()),
     }
 
