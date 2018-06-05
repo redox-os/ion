@@ -85,11 +85,12 @@ impl Terminator {
                                 if self.array > 0 {
                                     self.array -= 1;
                                 } else if self.array == 0 && self.flags.contains(Flags::ARRAY) {
-                                    self.flags -= Flags::ARRAY
-                                } else {
                                     instance |= Flags::ERROR;
-                                    eprintln!("ion: syntax error: ion: syntax error: extra right bracket(s)");
                                     break;
+                                }
+
+                                if self.array == 0 {
+                                    self.flags -= Flags::ARRAY
                                 }
                             }
                             b'#' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
@@ -111,6 +112,7 @@ impl Terminator {
                 }
                 if instance.contains(Flags::ERROR) {
                     self.buffer.clear();
+                    self.buffer.push('\n');
                     return true;
                 } else if instance.contains(Flags::EOF) {
                     self.buffer.push('\n');
