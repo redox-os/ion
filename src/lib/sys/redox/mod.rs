@@ -20,7 +20,7 @@ pub(crate) const SIGSTOP: i32 = syscall::SIGSTOP as i32;
 pub(crate) const SIGTSTP: i32 = syscall::SIGTSTP as i32;
 pub(crate) const SIGPIPE: i32 = syscall::SIGPIPE as i32;
 
-pub(crate) const STDIN_FILENO: RawFd = 0;
+pub const STDIN_FILENO: RawFd = 0;
 pub(crate) const STDOUT_FILENO: RawFd = 1;
 pub(crate) const STDERR_FILENO: RawFd = 2;
 
@@ -229,7 +229,7 @@ pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
 
 pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(syscall::close(fd)).and(Ok(())) }
 
-pub(crate) fn isatty(fd: RawFd) -> bool {
+pub fn isatty(fd: RawFd) -> bool {
     if let Ok(tfd) = syscall::dup(fd, b"termios") {
         let _ = syscall::close(tfd);
         true

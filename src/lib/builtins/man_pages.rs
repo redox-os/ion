@@ -197,6 +197,20 @@ OPTIONS
         If no arguments are suppled, arguments will not be unset.
 "#;
 
+pub(crate) const MAN_EQ: &'static str = r#"NAME
+    eq - Checks if two arguments are the same
+
+SYNOPSIS
+    eq [ -h | --help ] [not]
+
+DESCRIPTION
+    Returns 0 if the two arguments are equal
+
+OPTIONS
+    not
+        returns 0 if the two arguments are not equal.
+"#;
+
 pub(crate) const MAN_EVAL: &'static str = r#"NAME
     eval - evaluates the specified commands
 

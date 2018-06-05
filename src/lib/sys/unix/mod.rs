@@ -24,7 +24,7 @@ pub(crate) const SIGPIPE: i32 = libc::SIGPIPE;
 
 pub(crate) const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
 pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
-pub(crate) const STDIN_FILENO: i32 = libc::STDIN_FILENO;
+pub const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 
 // Why each platform wants to be unique in this regard is anyone's guess.
 
@@ -334,7 +334,7 @@ pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
 
 pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
 
-pub(crate) fn isatty(fd: RawFd) -> bool { unsafe { libc::isatty(fd) == 1 } }
+pub fn isatty(fd: RawFd) -> bool { unsafe { libc::isatty(fd) == 1 } }
 
 trait IsMinusOne {
     fn is_minus_one(&self) -> bool;
