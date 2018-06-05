@@ -339,6 +339,8 @@ impl FlowLogic for Shell {
         else_if: Vec<ElseIf>,
         failure: Vec<Statement>,
     ) -> Condition {
+        // In cases when the level is not 0, just reset it to 0
+        self.flow_control.level = 0;
         let first_condition = iter::once((expression, success));
         let else_conditions = else_if
             .into_iter()
