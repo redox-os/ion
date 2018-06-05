@@ -77,7 +77,6 @@ fn test_is() {
         is(&vec_string(&["is", " "]), &mut shell),
         Err("is needs 3 or 4 arguments\n".to_string())
     );
-    assert_eq!(is(&vec_string(&["is", "-h"]), &mut shell), Ok(()));
 
     // One argument
     assert_eq!(
