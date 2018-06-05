@@ -72,7 +72,8 @@ pub const BUILTINS: &'static BuiltinMap = &map!(
     "disown" => builtin_disown : DISOWN_DESC,
     "drop" => builtin_drop : "Delete a variable",
     "echo" => builtin_echo : "Display a line of text",
-    "ends-with" => ends_with :"Evaluates if the supplied argument ends with a given string",
+    "ends-with" => ends_with : "Evaluates if the supplied argument ends with a given string",
+    "eq" => builtin_eq : "Simple alternative to == and !=",
     "eval" => builtin_eval : "Evaluates the evaluated expression",
     "exec" => builtin_exec : "Replace the shell with the given command.",
     "exists" => builtin_exists : "Performs tests on files and text",
@@ -207,6 +208,10 @@ fn builtin_bool(args: &[String], shell: &mut Shell) -> i32 {
 }
 
 fn builtin_is(args: &[String], shell: &mut Shell) -> i32 {
+    if check_help(args, MAN_IS) {
+        return SUCCESS;
+    }
+
     match is(args, shell) {
         Ok(()) => SUCCESS,
         Err(why) => {
@@ -292,6 +297,22 @@ fn builtin_set(args: &[String], shell: &mut Shell) -> i32 {
         return SUCCESS;
     }
     set::set(args, shell)
+}
+
+fn builtin_eq(args: &[String], shell: &mut Shell) -> i32 {
+    if check_help(args, MAN_EQ) {
+        return SUCCESS;
+    }
+
+    match is(args, shell) {
+        Ok(()) => SUCCESS,
+        Err(why) => {
+            let stderr = io::stderr();
+            let mut stderr = stderr.lock();
+            let _ = stderr.write_all(why.as_bytes());
+            FAILURE
+        }
+    }
 }
 
 fn builtin_eval(args: &[String], shell: &mut Shell) -> i32 {

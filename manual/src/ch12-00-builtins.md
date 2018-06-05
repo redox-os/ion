@@ -117,6 +117,14 @@ ends-with KEY [VALUE...]
 
 Evaluates if the supplied argument ends with a given string
 
+## eq
+
+```
+eq [ -h | --help ] [not]
+```
+
+Returns 0 if the two arguments are equal
+
 ## eval
 
 ```
