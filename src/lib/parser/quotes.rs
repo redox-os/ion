@@ -8,6 +8,7 @@ bitflags! {
         const ARRAY  = 8;
         const COMM   = 16;
         const EOF    = 32;
+        const ERROR  = 64;
     }
 }
 
@@ -81,7 +82,13 @@ impl Terminator {
                                 self.array += 1;
                             }
                             b']' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
-                                self.array -= 1;
+                                if self.array > 0 {
+                                    self.array -= 1;
+                                } else if self.array == 0 && self.flags.contains(Flags::ARRAY) {
+                                    instance |= Flags::ERROR;
+                                    break;
+                                }
+
                                 if self.array == 0 {
                                     self.flags -= Flags::ARRAY
                                 }
@@ -103,7 +110,11 @@ impl Terminator {
                         }
                     }
                 }
-                if instance.contains(Flags::EOF) {
+                if instance.contains(Flags::ERROR) {
+                    self.buffer.clear();
+                    self.buffer.push('\n');
+                    return true;
+                } else if instance.contains(Flags::EOF) {
                     self.buffer.push('\n');
                     return false;
                 } else if instance.contains(Flags::COMM) {
