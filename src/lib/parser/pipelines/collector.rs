@@ -259,11 +259,11 @@ impl<'a> Collector<'a> {
                                 break;
                             }
                         }
-                        // Reaching this block means that either there is no next byte, or the next
-                        // byte is none of '>' or '|', indicating that this is not the beginning of
-                        // a redirection for stderr
-                        bytes.next();
                     }
+                    // Reaching this block means that either there is no next byte, or the next
+                    // byte is none of '>' or '|', indicating that this is not the beginning of
+                    // a redirection for stderr
+                    bytes.next();
                 }
                 // Evaluate a quoted string but do not return it
                 // We pass in i, the index of a quote, but start a character later. This ensures
@@ -733,6 +733,18 @@ mod tests {
             assert_eq!(Input::File("stuff".into()), pipeline.items[2].inputs[0]);
             assert_eq!("other", pipeline.items[2].outputs[0].file);
             assert!(pipeline.items[2].outputs[0].append);
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    // Ensures no regression for infinite loop when 'args' is given
+    // a '^' character which is not in the top level
+    fn args_loop_terminates() {
+        if let Statement::Pipeline(pipeline) = parse("$(^) '$(^)'") {
+            assert_eq!("$(^)", pipeline.items[0].job.args[0]);
+            assert_eq!("\'$(^)\'", pipeline.items[0].job.args[1]);
         } else {
             assert!(false);
         }
