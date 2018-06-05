@@ -8,6 +8,7 @@ bitflags! {
         const ARRAY  = 8;
         const COMM   = 16;
         const EOF    = 32;
+        const ERROR  = 64;
     }
 }
 
@@ -81,9 +82,14 @@ impl Terminator {
                                 self.array += 1;
                             }
                             b']' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
-                                self.array -= 1;
-                                if self.array == 0 {
+                                if self.array > 0 {
+                                    self.array -= 1;
+                                } else if self.array == 0 && self.flags.contains(Flags::ARRAY) {
                                     self.flags -= Flags::ARRAY
+                                } else {
+                                    instance |= Flags::ERROR;
+                                    eprintln!("ion: syntax error: ion: syntax error: extra right bracket(s)");
+                                    break;
                                 }
                             }
                             b'#' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
@@ -103,7 +109,10 @@ impl Terminator {
                         }
                     }
                 }
-                if instance.contains(Flags::EOF) {
+                if instance.contains(Flags::ERROR) {
+                    self.buffer.clear();
+                    return true;
+                } else if instance.contains(Flags::EOF) {
                     self.buffer.push('\n');
                     return false;
                 } else if instance.contains(Flags::COMM) {
