@@ -421,5 +421,13 @@ is VALUE VALUE
 
 Returns 0 if the two arguments are equal
 
+## isatty
+
+```
+isatty [FD]
+```
+
+Returns 0 exit status if the supplied file descriptor is a tty.
+
 ### Options
 - **not**: returns 0 if the two arguments are not equal.
