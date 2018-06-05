@@ -1,15 +1,14 @@
 extern crate ion_shell;
 extern crate smallvec;
-extern crate libc;
 
-use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};
+use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION, sys};
 use smallvec::SmallVec;
 use std::{
     env, error::Error, io::{stdout, stdin, Write, BufRead, BufReader}, iter::FromIterator,
 };
 
 fn main() {
-    let stdin_is_a_tty = unsafe { libc::isatty(libc::STDIN_FILENO) == 1 };
+    let stdin_is_a_tty = sys::isatty(sys::STDIN_FILENO);
     let mut shell = ShellBuilder::new()
         .install_signal_handler()
         .block_signals();
