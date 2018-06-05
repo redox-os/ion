@@ -1,8 +1,60 @@
 use super::{directory_stack::DirectoryStack, variables::Variables};
+use fnv::FnvHashMap;
 use glob::glob;
-use liner::{Completer, FilenameCompleter};
+use liner::{Completer, CursorPosition, FilenameCompleter};
 use smallvec::SmallVec;
 use std::{iter, str};
+
+pub(crate) struct IonCmdCompleter {
+    ///
+    completions: *const FnvHashMap<String, CmdCompletion>,
+    /// The entered command so far
+    cmd_so_far: String,
+    /// Where in the command we are
+    pos: CursorPosition,
+    /// A pointer to the directory stack in the shell.
+    dir_stack: *const DirectoryStack,
+    /// A pointer to the variables map in the shell.
+    vars: *const Variables,
+}
+
+impl IonCmdCompleter {
+    pub(crate) fn new(
+        completions: *const FnvHashMap<String, CmdCompletion>,
+        cmd_so_far: String,
+        pos: CursorPosition,
+        dir_stack: *const DirectoryStack,
+        vars: *const Variables,
+    ) -> IonCmdCompleter {
+        IonCmdCompleter {
+            completions: completions,
+            cmd_so_far: cmd_so_far,
+            pos: pos,
+            dir_stack: dir_stack,
+            vars: vars,
+        }
+    }
+}
+
+impl Completer for IonCmdCompleter {
+    /// When the tab key is pressed, **Liner** will use this method to perform completions of
+    /// command parameters.
+    fn completions(&self, start: &str) -> Vec<String> {
+        eprintln!("[cmd={}|start={}|pos={:?}]", self.cmd_so_far, start, self.pos);
+        // TODO: Split at the right edge of the first word
+        // let application = self.cmd_so_far.split
+        //match self.completions.get(application) {
+        //    Some(cmdCompletion) => // get completions for application
+        //    None => // return default (file) completions
+        //}
+        Vec::new()
+    }
+}
+
+pub(crate) struct CmdCompletion {
+    /// TODO
+    ii: i32,
+}
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
@@ -93,6 +145,7 @@ impl Completer for IonFileCompleter {
             }
         }
 
+        eprintln!("start={}", start);
         filename_completion(&start, |x| self.inner.completions(x)).collect()
     }
 }

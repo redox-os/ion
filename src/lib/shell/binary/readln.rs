@@ -1,4 +1,5 @@
 use super::super::{completer::*, Binary, DirectoryStack, Shell, Variables};
+use fnv::FnvHashMap;
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use smallstring::SmallString;
 use std::{
@@ -11,6 +12,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
     {
         let vars_ptr = &shell.variables as *const Variables;
         let dirs_ptr = &shell.directory_stack as *const DirectoryStack;
+        let completions = &shell.completions as *const FnvHashMap<String, CmdCompletion>;
 
         // Collects the current list of values from history for completion.
         let history = &shell.context.as_ref().unwrap().history.buffers.iter()
@@ -50,8 +52,13 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                         if filename {
                             if let Ok(current_dir) = env::current_dir() {
                                 if let Some(url) = current_dir.to_str() {
+                                    // drawback: does not handle situations where cursor is
+                                    // in the middle of the command
+                                    let buffer = editor.current_buffer();
+                                    let cmd_so_far = buffer.range(0, buffer.num_chars());
+                                    eprintln!("cmd so far={:?}|pos={:?}", cmd_so_far, pos);
                                     let completer =
-                                        IonFileCompleter::new(Some(url), dirs_ptr, vars_ptr);
+                                        IonCmdCompleter::new(completions, cmd_so_far, pos, dirs_ptr, vars_ptr);
                                     mem::replace(
                                         &mut editor.context().completer,
                                         Some(Box::new(completer)),

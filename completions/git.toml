@@ -1,0 +1,68 @@
+[main]
+name = git
+aliases = [ ]
+
+# TODO: positionals
+# TODO "trailing parameters"
+
+[params.short]
+p = flag
+C = path
+c = keyvalue
+
+[params.long]
+version = flag
+help = flag
+html-path = flag
+man-path = flag
+info-path = flag
+paginate = flag
+no-pager = flag
+no-replace-objects = flag
+bare = flag
+exec-path = optional path
+git-dir = path
+work-tree = path
+namespace = string
+
+
+[[command]]
+name = add
+end-of-params = '--'
+after-params = array path
+
+[params.short]
+v = flag
+n = flag
+f = flag
+i = flag
+p = flag
+e = flag
+u = flag
+N = flag
+
+[params.long]
+verbose = flag
+dry-run = flag
+force = flag
+interactive = flag
+patch = flag
+edit = flag
+all = flag
+no-all = flag
+ignore-removal = flag
+no-ignore-removal = flag
+update = flag
+intent-to-add = flag
+refresh = flag
+ignore-errors = flag
+ignore-missing = flag
+renormalize = flag
+chmod = 'special (+|-)x'
+
+
+[[command]]
+name = clone
+
+[[command]]
+name = commit

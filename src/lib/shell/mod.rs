@@ -20,7 +20,7 @@ pub use self::{
     binary::Binary, fork::{Capture, Fork, IonResult},
 };
 pub(crate) use self::{
-    flow::FlowLogic, history::{IgnoreSetting, ShellHistory}, job::{Job, JobKind},
+    completer::CmdCompletion, flow::FlowLogic, history::{IgnoreSetting, ShellHistory}, job::{Job, JobKind},
     pipe_exec::{foreground, job_control},
 };
 
@@ -97,6 +97,10 @@ pub struct Shell {
     /// Stores the patterns used to determine whether a command should be saved in the history
     /// or not
     ignore_setting: IgnoreSetting,
+    /// TODO
+    /// provides no protection against collision attacks, where a malicious user can craft specific
+    /// keys designed to slow a hasher down.
+    completions: FnvHashMap<String, CmdCompletion>,
 }
 
 pub struct ShellBuilder;
@@ -410,6 +414,7 @@ impl<'a> Shell {
             break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new()),
             ignore_setting: IgnoreSetting::default(),
+            completions: FnvHashMap::default(),
         }
     }
 }
