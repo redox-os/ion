@@ -72,7 +72,8 @@ impl PipeItem {
 
 impl Pipeline {
     pub(crate) fn requires_piping(&self) -> bool {
-        self.items.len() > 1 || self.items.iter().any(|it| it.outputs.len() > 0)
+        self.items.len() > 1
+            || self.items.iter().any(|it| it.outputs.len() > 0)
             || self.items.iter().any(|it| it.inputs.len() > 0)
             || self.items.last().unwrap().job.kind == JobKind::Background
             || self.items.last().unwrap().job.kind == JobKind::Disown
@@ -122,8 +123,6 @@ impl fmt::Display for Pipeline {
             }
             match kind {
                 JobKind::Last => (),
-                JobKind::And => tokens.push("&&".into()),
-                JobKind::Or => tokens.push("||".into()),
                 JobKind::Background => tokens.push("&".into()),
                 JobKind::Disown => tokens.push("&!".into()),
                 JobKind::Pipe(RedirectFrom::Stdout) => tokens.push("|".into()),

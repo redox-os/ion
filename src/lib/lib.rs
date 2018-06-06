@@ -3,6 +3,7 @@
 #![feature(integer_atomics)]
 #![feature(pointer_methods)]
 #![feature(getpid)]
+#![feature(nll)]
 
 #[macro_use]
 extern crate bitflags;
@@ -32,11 +33,11 @@ extern crate xdg;
 
 #[cfg(target_os = "redox")]
 #[path = "sys/redox/mod.rs"]
-mod sys;
+pub mod sys;
 
 #[cfg(unix)]
 #[path = "sys/unix/mod.rs"]
-mod sys;
+pub mod sys;
 
 #[macro_use]
 mod types;

@@ -3,9 +3,7 @@
 // - Validate syntax in methods
 
 use std::{
-    cmp::max,
-    fmt::{self, Display, Formatter},
-    u16,
+    fmt::{self, Display, Formatter}, u16,
 };
 
 bitflags! {
@@ -20,6 +18,8 @@ bitflags! {
         /// Set while parsing through an inline arithmetic expression, e.g. $((foo * bar / baz))
         const MATHEXPR = 128;
         const POST_MATHEXPR = 256;
+        const AND = 512;
+        const OR = 1024;
     }
 }
 
@@ -66,22 +66,31 @@ impl Display for StatementError {
 
 /// Returns true if the byte matches [^A-Za-z0-9_]
 fn is_invalid(byte: u8) -> bool {
-    byte <= 47 || (byte >= 58 && byte <= 64) || (byte >= 91 && byte <= 94) || byte == 96
+    byte <= 47
+        || (byte >= 58 && byte <= 64)
+        || (byte >= 91 && byte <= 94)
+        || byte == 96
         || (byte >= 123 && byte <= 127)
 }
 
-pub(crate) struct StatementSplitter {
-    data:             String,
+#[derive(Debug, PartialEq)]
+pub(crate) enum StatementVariant<'a> {
+    And(&'a str),
+    Or(&'a str),
+    Default(&'a str),
+}
+
+pub(crate) struct StatementSplitter<'a> {
+    data:             &'a str,
     read:             usize,
+    start:            usize,
     flags:            Flags,
-    a_level:          u8,
-    ap_level:         u8,
-    p_level:          u8,
+    paren_level:      u8,
     brace_level:      u8,
     math_paren_level: i8,
 }
 
-impl<'a> StatementSplitter {
+impl<'a> StatementSplitter<'a> {
     fn single_quote<B: Iterator<Item = u8>>(&mut self, bytes: &mut B) -> usize {
         let mut read = 0;
         while let Some(character) = bytes.next() {
@@ -96,31 +105,55 @@ impl<'a> StatementSplitter {
         read
     }
 
-    pub(crate) fn new(data: String) -> StatementSplitter {
+    pub(crate) fn new(data: &'a str) -> Self {
         StatementSplitter {
             data,
-            read:             0,
-            flags:            Flags::empty(),
-            a_level:          0,
-            ap_level:         0,
-            p_level:          0,
-            brace_level:      0,
+            read: 0,
+            start: 0,
+            flags: Flags::empty(),
+            paren_level: 0,
+            brace_level: 0,
             math_paren_level: 0,
+        }
+    }
+
+    fn get_statement(&mut self, new_flag: Flags) -> StatementVariant<'a> {
+        if self.flags.contains(Flags::AND) {
+            self.flags = (self.flags - Flags::AND) | new_flag;
+            StatementVariant::And(&self.data[self.start + 1..self.read - 1].trim())
+        } else if self.flags.contains(Flags::OR) {
+            self.flags = (self.flags - Flags::OR) | new_flag;
+            StatementVariant::Or(&self.data[self.start + 1..self.read - 1].trim())
+        } else {
+            self.flags |= new_flag;
+            let statement = &self.data[self.start..self.read - 1].trim();
+            StatementVariant::Default(statement)
+        }
+    }
+
+    fn get_statement_from(&mut self, input: &'a str) -> StatementVariant<'a> {
+        if self.flags.contains(Flags::AND) {
+            self.flags -= Flags::AND;
+            StatementVariant::And(input)
+        } else if self.flags.contains(Flags::OR) {
+            self.flags -= Flags::OR;
+            StatementVariant::Or(input)
+        } else {
+            StatementVariant::Default(input)
         }
     }
 }
 
-impl Iterator for StatementSplitter {
-    type Item = Result<String, StatementError>;
+impl<'a> Iterator for StatementSplitter<'a> {
+    type Item = Result<StatementVariant<'a>, StatementError>;
 
-    fn next(&mut self) -> Option<Result<String, StatementError>> {
-        let start = self.read;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.start = self.read;
         let mut first_arg_found = false;
         let mut else_found = false;
         let mut else_pos = 0;
         let mut error = None;
-        let c = self.data.clone();
-        let mut bytes = c.bytes().skip(self.read);
+        let mut bytes = self.data.bytes().skip(self.read).peekable();
         while let Some(character) = bytes.next() {
             self.read += 1;
             match character {
@@ -176,7 +209,8 @@ impl Iterator for StatementSplitter {
                 b'(' if self.flags.contains(Flags::MATHEXPR) => {
                     self.math_paren_level += 1;
                 }
-                b'(' if !self.flags
+                b'(' if !self
+                    .flags
                     .intersects(Flags::COMM_1 | Flags::VARIAB | Flags::ARRAY) =>
                 {
                     if error.is_none() && !self.flags.contains(Flags::DQUOTE) {
@@ -193,11 +227,11 @@ impl Iterator for StatementSplitter {
                         // The next character will always be a left paren in this branch;
                         self.math_paren_level = -1;
                     } else {
-                        self.p_level += 1;
+                        self.paren_level += 1;
                     }
                 }
                 b'(' if self.flags.contains(Flags::COMM_2) => {
-                    self.ap_level += 1;
+                    self.paren_level += 1;
                 }
                 b'(' if self.flags.intersects(Flags::VARIAB | Flags::ARRAY) => {
                     self.flags = (self.flags - (Flags::VARIAB | Flags::ARRAY)) | Flags::METHOD;
@@ -219,10 +253,10 @@ impl Iterator for StatementSplitter {
                 } else {
                     self.math_paren_level -= 1;
                 },
-                b')' if self.flags.contains(Flags::METHOD) && self.p_level == 0 => {
+                b')' if self.flags.contains(Flags::METHOD) && self.paren_level == 0 => {
                     self.flags ^= Flags::METHOD;
                 }
-                b')' if self.p_level + self.ap_level == 0 => {
+                b')' if self.paren_level == 0 => {
                     if error.is_none() && !self.flags.contains(Flags::DQUOTE) {
                         error = Some(StatementError::InvalidCharacter(
                             character as char,
@@ -230,75 +264,49 @@ impl Iterator for StatementSplitter {
                         ))
                     }
                 }
-                b')' if self.p_level != 0 => self.p_level -= 1,
-                b')' => self.ap_level -= 1,
-                b';' if !self.flags.contains(Flags::DQUOTE) && self.p_level == 0
-                    && self.ap_level == 0 =>
+                b')' => self.paren_level -= 1,
+                b';' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 =>
                 {
+                    let statement = self.get_statement(Flags::empty());
                     return match error {
                         Some(error) => Some(Err(error)),
-                        None => Some(Ok(String::from(self.data[start..self.read - 1].trim()))),
+                        None => Some(Ok(statement)),
                     }
                 }
-                b'&' if !self.flags.contains(Flags::DQUOTE) && self.p_level == 0
-                    && self.ap_level == 0 =>
+                b'&' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 =>
                 {
-                    if self.data.len() > self.read {
-                        match self.data.as_bytes()[self.read] {
-                            b'&' => {
-                                // insert and into data
-                                let c = self.data.clone();
-                                let (statement, rest) = c.split_at(self.read);
-                                self.data = String::from("and ");
-                                self.data.push_str(&rest[1..]);
-                                self.read = 0;
-                                return match error {
-                                    Some(error) => Some(Err(error)),
-                                    None => Some(Ok(String::from(
-                                        statement[..max(statement.len() - 2, 0)].trim(),
-                                    ))),
-                                };
-                            }
-                            _ => (),
-                        }
+                    if bytes.peek() == Some(&b'&') { // Detecting if there is a 2nd `&` character
+                        let statement = self.get_statement(Flags::AND);
+                        self.read += 1; // Have `read` skip the 2nd `&` character after reading
+                        return match error {
+                            Some(error) => Some(Err(error)),
+                            None => Some(Ok(statement)),
+                        };
                     }
                 }
-                b'|' if !self.flags.contains(Flags::DQUOTE) && self.p_level == 0
-                    && self.ap_level == 0 =>
+                b'|' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 =>
                 {
-                    if self.data.len() > self.read {
-                        match self.data.as_bytes()[self.read] {
-                            b'|' => {
-                                // insert and into data
-                                let c = self.data.clone();
-                                let (statement, rest) = c.split_at(self.read);
-                                self.data = String::from("or ");
-                                self.data.push_str(&rest[1..]);
-                                self.read = 0;
-                                return match error {
-                                    Some(error) => Some(Err(error)),
-                                    None => Some(Ok(String::from(
-                                        statement[..max(statement.len() - 2, 0)].trim(),
-                                    ))),
-                                };
-                            }
-                            _ => (),
-                        }
+                    if bytes.peek() == Some(&b'|') { // Detecting if there is a 2nd `|` character
+                        let statement = self.get_statement(Flags::OR);
+                        self.read += 1; // Have `read` skip the 2nd `|` character after reading
+                        return match error {
+                            Some(error) => Some(Err(error)),
+                            None => Some(Ok(statement)),
+                        };
                     }
                 }
 
-                b'#' if self.read == 1
-                    || (!self.flags.contains(Flags::DQUOTE) && self.p_level + self.ap_level == 0
+                b'#' if self.read == 1 || (!self.flags.contains(Flags::DQUOTE) && self.paren_level == 0
                         && match self.data.as_bytes()[self.read - 2] {
                             b' ' | b'\t' => true,
                             _ => false,
                         }) =>
                 {
-                    let output = self.data[start..self.read - 1].trim();
+                    let statement = self.get_statement(Flags::empty());
                     self.read = self.data.len();
                     return match error {
                         Some(error) => Some(Err(error)),
-                        None => Some(Ok(String::from(output))),
+                        None => Some(Ok(statement)),
                     };
                 }
                 b' ' if else_found => {
@@ -306,13 +314,14 @@ impl Iterator for StatementSplitter {
                     if !output.is_empty() {
                         if "if" != *output {
                             self.read = else_pos;
-                            return Some(Ok(String::from("else")));
+                            self.flags.remove(Flags::AND | Flags::OR);
+                            return Some(Ok(StatementVariant::Default("else")));
                         }
                     }
                     else_found = false;
                 }
                 b' ' if !first_arg_found => {
-                    let output = &self.data[start..self.read - 1].trim();
+                    let output = &self.data[self.start..self.read - 1].trim();
                     if !output.is_empty() {
                         match *output {
                             "else" => {
@@ -335,13 +344,13 @@ impl Iterator for StatementSplitter {
             self.flags -= Flags::COMM_1 | Flags::COMM_2;
         }
 
-        if start == self.read {
+        if self.start == self.read {
             None
         } else {
             self.read = self.data.len();
             match error {
                 Some(error) => Some(Err(error)),
-                None if self.p_level != 0 || self.ap_level != 0 || self.a_level != 0 => {
+                None if self.paren_level != 0 => {
                     Some(Err(StatementError::UnterminatedSubshell))
                 }
                 None if self.flags.contains(Flags::METHOD) => {
@@ -355,9 +364,9 @@ impl Iterator for StatementSplitter {
                     Some(Err(StatementError::UnterminatedArithmetic))
                 }
                 None => {
-                    let output = self.data[start..].trim();
+                    let output = self.data[self.start..].trim();
                     if output.is_empty() {
-                        return Some(Ok(String::from(output)));
+                        return Some(Ok(self.get_statement_from(output)));
                     }
                     match output.as_bytes()[0] {
                         b'>' | b'<' | b'^' => {
@@ -368,7 +377,7 @@ impl Iterator for StatementSplitter {
                         b'*' | b'%' | b'?' | b'{' | b'}' => Some(Err(
                             StatementError::IllegalCommandName(String::from(output)),
                         )),
-                        _ => Some(Ok(String::from(output))),
+                        _ => Some(Ok(self.get_statement_from(output))),
                     }
                 }
             }
@@ -379,8 +388,8 @@ impl Iterator for StatementSplitter {
 #[test]
 fn syntax_errors() {
     let command = "echo (echo one); echo $( (echo one); echo ) two; echo $(echo one";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command)
+        .collect::<Vec<_>>();
     assert_eq!(results[0], Err(StatementError::InvalidCharacter('(', 6)));
     assert_eq!(results[1], Err(StatementError::InvalidCharacter('(', 26)));
     assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 43)));
@@ -388,8 +397,7 @@ fn syntax_errors() {
     assert_eq!(results.len(), 4);
 
     let command = ">echo";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(
         results[0],
         Err(StatementError::ExpectedCommandButFound("redirection"))
@@ -397,7 +405,7 @@ fn syntax_errors() {
     assert_eq!(results.len(), 1);
 
     let command = "echo $((foo bar baz)";
-    let results = StatementSplitter::new(String::from(command)).collect::<Vec<_>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results[0], Err(StatementError::UnterminatedArithmetic));
     assert_eq!(results.len(), 1);
 }
@@ -405,94 +413,96 @@ fn syntax_errors() {
 #[test]
 fn methods() {
     let command = "echo $join(array, ', '); echo @join(var, ', ')";
-    let statements = StatementSplitter::new(String::from(command)).collect::<Vec<_>>();
-    assert_eq!(statements[0], Ok(String::from("echo $join(array, ', ')")));
-    assert_eq!(statements[1], Ok(String::from("echo @join(var, ', ')")));
+    let statements = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(statements[0], Ok(StatementVariant::Default("echo $join(array, ', ')")));
+    assert_eq!(statements[1], Ok(StatementVariant::Default("echo @join(var, ', ')")));
     assert_eq!(statements.len(), 2);
 }
 
 #[test]
 fn processes() {
     let command = "echo $(seq 1 10); echo $(seq 1 10)";
-    for statement in StatementSplitter::new(String::from(command)) {
-        assert_eq!(statement, Ok(String::from("echo $(seq 1 10)")));
+    for statement in StatementSplitter::new(command) {
+        assert_eq!(statement, Ok(StatementVariant::Default("echo $(seq 1 10)")));
     }
 }
 
 #[test]
 fn array_processes() {
     let command = "echo @(echo one; sleep 1); echo @(echo one; sleep 1)";
-    for statement in StatementSplitter::new(String::from(command)) {
-        assert_eq!(statement, Ok(String::from("echo @(echo one; sleep 1)")));
+    for statement in StatementSplitter::new(command) {
+        assert_eq!(statement, Ok(StatementVariant::Default("echo @(echo one; sleep 1)")));
     }
 }
 
 #[test]
 fn process_with_statements() {
     let command = "echo $(seq 1 10; seq 1 10)";
-    for statement in StatementSplitter::new(String::from(command)) {
-        assert_eq!(statement, Ok(String::from(command)));
+    for statement in StatementSplitter::new(command) {
+        assert_eq!(statement, Ok(StatementVariant::Default(command)));
     }
 }
 
 #[test]
 fn quotes() {
     let command = "echo \"This ;'is a test\"; echo 'This ;\" is also a test'";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0], Ok(String::from("echo \"This ;'is a test\"")));
-    assert_eq!(
-        results[1],
-        Ok(String::from("echo 'This ;\" is also a test'"))
-    );
+    assert_eq!(results[0], Ok(StatementVariant::Default("echo \"This ;'is a test\"")));
+    assert_eq!(results[1], Ok(StatementVariant::Default("echo 'This ;\" is also a test'")));
 }
 
 #[test]
 fn comments() {
     let command = "echo $(echo one # two); echo three # four";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0], Ok(String::from("echo $(echo one # two)")));
-    assert_eq!(results[1], Ok(String::from("echo three")));
+    assert_eq!(results[0], Ok(StatementVariant::Default("echo $(echo one # two)")));
+    assert_eq!(results[1], Ok(StatementVariant::Default("echo three")));
 }
 
 #[test]
 fn nested_process() {
     let command = "echo $(echo one $(echo two) three)";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0], Ok(String::from(command)));
+    assert_eq!(results[0], Ok(StatementVariant::Default(command)));
 
     let command = "echo $(echo $(echo one; echo two); echo two)";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0], Ok(String::from(command)));
+    assert_eq!(results[0], Ok(StatementVariant::Default(command)));
 }
 
 #[test]
 fn nested_array_process() {
     let command = "echo @(echo one @(echo two) three)";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0], Ok(String::from(command)));
+    assert_eq!(results[0], Ok(StatementVariant::Default(command)));
 
     let command = "echo @(echo @(echo one; echo two); echo two)";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0], Ok(String::from(command)));
+    assert_eq!(results[0], Ok(StatementVariant::Default(command)));
 }
 
 #[test]
 fn braced_variables() {
     let command = "echo ${foo}bar ${bar}baz ${baz}quux @{zardoz}wibble";
-    let results = StatementSplitter::new(String::from(command))
-        .collect::<Vec<Result<String, StatementError>>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 1);
-    assert_eq!(results, vec![Ok(String::from(command))]);
+    assert_eq!(results[0], Ok(StatementVariant::Default(command)));
+}
+
+#[test]
+fn variants() {
+    let command = r#"echo "Hello!"; echo "How are you doing?" && echo "I'm just an ordinary test." || echo "Helping by making sure your code works right."; echo "Have a good day!""#;
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
+    assert_eq!(results.len(), 5);
+    assert_eq!(results[0], Ok(StatementVariant::Default(r#"echo "Hello!""#)));
+    assert_eq!(results[1], Ok(StatementVariant::Default(r#"echo "How are you doing?""#)));
+    assert_eq!(results[2], Ok(StatementVariant::And(r#"echo "I'm just an ordinary test.""#)));
+    assert_eq!(results[3], Ok(StatementVariant::Or(r#"echo "Helping by making sure your code works right.""#)));
+    assert_eq!(results[4], Ok(StatementVariant::Default(r#"echo "Have a good day!""#)));
 }

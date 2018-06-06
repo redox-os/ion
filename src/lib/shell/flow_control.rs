@@ -167,7 +167,7 @@ impl Display for FunctionError {
 }
 
 impl Function {
-    pub(crate) fn execute(self, shell: &mut Shell, args: &[&str]) -> Result<(), FunctionError> {
+    pub(crate) fn execute<S: AsRef<str>>(self, shell: &mut Shell, args: &[S]) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
             return Err(FunctionError::InvalidArgumentCount);
         }
@@ -179,12 +179,12 @@ impl Function {
             FnvHashMap::with_capacity_and_hasher(64, Default::default());
 
         for (type_, value) in self.args.iter().zip(args.iter().skip(1)) {
-            let value = match value_check(shell, value, type_.kind) {
+            let value = match value_check(shell, value.as_ref(), type_.kind) {
                 Ok(value) => value,
                 Err(_) => {
                     return Err(FunctionError::InvalidArgumentType(
                         type_.kind,
-                        (*value).into(),
+                        value.as_ref().into(),
                     ))
                 }
             };

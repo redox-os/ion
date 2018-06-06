@@ -36,7 +36,13 @@ pub(crate) fn parse_case<'a>(
                 binding = Some(splitter.next().ok_or(CaseError::NoBindVariable)?);
                 match splitter.next() {
                     Some("if") => {
-                        let string = splitter.collect::<Vec<_>>().join(" ");
+                        // Joining by folding is more efficient than collecting into Vec and then joining
+                        let mut string = splitter.fold(String::with_capacity(5), |mut state, element| {
+                            state.push_str(element);
+                            state.push(' ');
+                            state
+                        });
+                        string.pop(); // Pop out the unneeded ' ' character
                         if string.is_empty() {
                             return Err(CaseError::NoConditional);
                         }
@@ -47,7 +53,13 @@ pub(crate) fn parse_case<'a>(
                 }
             }
             Some("if") => {
-                let string = splitter.collect::<Vec<_>>().join(" ");
+                // Joining by folding is more efficient than collecting into Vec and then joining
+                let mut string = splitter.fold(String::with_capacity(5), |mut state, element| {
+                    state.push_str(element);
+                    state.push(' ');
+                    state
+                });
+                string.pop(); // Pop out the unneeded ' ' character
                 if string.is_empty() {
                     return Err(CaseError::NoConditional);
                 }

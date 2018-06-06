@@ -1,6 +1,5 @@
 use std::{
-    error::Error,
-    io::{stdout, Write},
+    error::Error, io::{stdout, Write},
 };
 
 pub(crate) fn print_man(man_page: &'static str) {
@@ -15,9 +14,9 @@ pub(crate) fn print_man(man_page: &'static str) {
     }
 }
 
-pub(crate) fn check_help(args: &[&str], man_page: &'static str) -> bool {
+pub(crate) fn check_help(args: &[String], man_page: &'static str) -> bool {
     for arg in args {
-        if *arg == "-h" || *arg == "--help" {
+        if &**arg == "-h" || &**arg == "--help" {
             print_man(man_page);
             return true;
         }
@@ -196,6 +195,20 @@ OPTIONS
 
     -   Following arguments will be set as positional arguments in the shell.
         If no arguments are suppled, arguments will not be unset.
+"#;
+
+pub(crate) const MAN_EQ: &'static str = r#"NAME
+    eq - Checks if two arguments are the same
+
+SYNOPSIS
+    eq [ -h | --help ] [not]
+
+DESCRIPTION
+    Returns 0 if the two arguments are equal
+
+OPTIONS
+    not
+        returns 0 if the two arguments are not equal.
 "#;
 
 pub(crate) const MAN_EVAL: &'static str = r#"NAME

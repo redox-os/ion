@@ -1,5 +1,8 @@
 use super::{directory_stack::DirectoryStack, variables::Variables};
+use glob::glob;
 use liner::{Completer, FilenameCompleter};
+use smallvec::SmallVec;
+use std::{iter, str};
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
@@ -20,7 +23,7 @@ impl IonFileCompleter {
         vars: *const Variables,
     ) -> IonFileCompleter {
         IonFileCompleter {
-            inner:     FilenameCompleter::new(path),
+            inner: FilenameCompleter::new(path),
             dir_stack,
             vars,
         }
@@ -47,8 +50,7 @@ impl Completer for IonFileCompleter {
             if let Some(expanded) = unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) }
             {
                 // Now we obtain completions for the `expanded` form of the `start` value.
-                let completions = self.inner.completions(&expanded);
-                let mut iterator = completions.iter();
+                let mut iterator = filename_completion(&expanded, |x| self.inner.completions(x));
 
                 // And then we will need to take those completions and remove the expanded form
                 // of the tilde pattern and replace it with that pattern yet again.
@@ -77,7 +79,7 @@ impl Completer for IonFileCompleter {
                     // search pattern begins, and re-use that index to slice the completions so
                     // that we may re-add the tilde character with the completion that follows.
                     if let Some(completion) = iterator.next() {
-                        if let Some(e_index) = completion.rfind(search) {
+                        if let Some(e_index) = expanded.rfind(search) {
                             completions.push(escape(&[tilde, &completion[e_index..]].concat()));
                             for completion in iterator {
                                 let expanded = &completion[e_index..];
@@ -91,12 +93,60 @@ impl Completer for IonFileCompleter {
             }
         }
 
-        self.inner
-            .completions(&unescape(start))
-            .iter()
-            .map(|x| escape(x.as_str()))
-            .collect()
+        filename_completion(&start, |x| self.inner.completions(x)).collect()
     }
+}
+
+fn filename_completion<'a, LC>(start: &'a str, liner_complete: LC) -> impl Iterator<Item = String> + 'a
+where
+    LC: Fn(&str) -> Vec<String> + 'a
+{
+    let unescaped_start = unescape(start);
+
+    let split_start = unescaped_start.split("/");
+    let mut string: SmallVec<[u8; 128]> = SmallVec::with_capacity(128);
+
+    // When 'start' is an absolute path, "/..." gets split to ["", "..."]
+    // So we skip the first element and add "/" to the start of the string
+    let skip = if unescaped_start.starts_with("/") {
+        string.push(b'/');
+        1
+    } else {
+        0
+    };
+
+    for element in split_start.skip(skip) {
+        string.extend_from_slice(element.as_bytes());
+        string.extend_from_slice(b"*/");
+    }
+
+    string.pop(); // pop out the last '/' character
+    let string = unsafe { &str::from_utf8_unchecked(&string) };
+
+    let globs = glob(string).ok().and_then(|completions| {
+        let mut completions = completions
+            .filter_map(Result::ok)
+            .map(|x| x.to_string_lossy().into_owned());
+
+        if let Some(first) = completions.next() {
+            Some(iter::once(first).chain(completions))
+        } else {
+            None
+        }
+    });
+
+    let iter_inner_glob: Box<Iterator<Item = String>> = match globs {
+        Some(iter) => Box::new(iter),
+        None => Box::new(iter::once(escape(start)))
+    };
+
+    // Use Liner::Completer as well, to preserve the previous behaviour
+    // around single-directory completions
+    iter_inner_glob.flat_map(move |path| {
+        liner_complete(&path)
+            .into_iter()
+            .map(|x| escape(x.as_str()))
+    })
 }
 
 /// Escapes filenames from the completer so that special characters will be properly escaped.
@@ -163,5 +213,34 @@ where
             completions.extend_from_slice(&x.completions(start));
         }
         completions
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn filename_completion() {
+        let current_dir = env::current_dir().expect("Unable to get current directory");
+
+        let completer = IonFileCompleter::new(
+            current_dir.to_str(),
+            &DirectoryStack::new(),
+            &Variables::default(),
+        );
+        assert_eq!(completer.completions("testing"), vec!["testing/"]);
+        assert_eq!(
+            completer.completions("testing/file"),
+            vec!["testing/file_with_text"]
+        );
+
+        assert_eq!(completer.completions("~"), vec!["~/"]);
+
+        assert_eq!(
+            completer.completions("tes/fil"),
+            vec!["testing/file_with_text"]
+        );
     }
 }

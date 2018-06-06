@@ -25,7 +25,7 @@ impl<'a> ArgumentSplitter<'a> {
     pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
         ArgumentSplitter {
             data,
-            read:     0,
+            read: 0,
             bitflags: ArgumentFlags::empty(),
         }
     }
@@ -95,7 +95,8 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b'(' => {
                     // Disable VARIAB + ARRAY and enable METHOD.
                     // if variab or array are set
-                    if self.bitflags
+                    if self
+                        .bitflags
                         .intersects(ArgumentFlags::VARIAB | ArgumentFlags::ARRAY)
                     {
                         self.bitflags
@@ -126,7 +127,8 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 // ) && level + alevel == 0) => break,
                 // Break from the loop once a root-level space is found.
                 b' ' => {
-                    if !self.bitflags
+                    if !self
+                        .bitflags
                         .intersects(ArgumentFlags::DOUBLE | ArgumentFlags::METHOD)
                         && level == 0 && alevel == 0 && blevel == 0
                     {

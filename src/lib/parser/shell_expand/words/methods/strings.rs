@@ -1,7 +1,6 @@
 use super::{
     super::{
-        super::{expand_string, is_expression, slice, Expander},
-        Select,
+        super::{expand_string, is_expression, slice, Expander}, Select,
     },
     MethodArgs,
 };
@@ -68,7 +67,9 @@ fn escape(input: &str) -> Result<String, &'static str> {
             13 => output.push_str("\\r"),
             27 => output.push_str("\\e"),
             n if n != 59 && n != 95
-                && ((n >= 33 && n < 48) || (n >= 58 && n < 65) || (n >= 91 && n < 97)
+                && ((n >= 33 && n < 48)
+                    || (n >= 58 && n < 65)
+                    || (n >= 91 && n < 97)
                     || (n >= 123 && n < 127)) =>
             {
                 output.push('\\');

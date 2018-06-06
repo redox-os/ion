@@ -3,7 +3,7 @@ use self::rand::Rng;
 use std::io::{self, Write};
 
 #[allow(unused_must_use)]
-fn rand_list(args: &[&str]) -> Result<(), String> {
+fn rand_list(args: &[String]) -> Result<(), String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     let mut output = Vec::new();
@@ -13,7 +13,7 @@ fn rand_list(args: &[&str]) -> Result<(), String> {
     };
     while output.len() < arg1 {
         let rand_num = rand::thread_rng().gen_range(1, args.len());
-        output.push(args[rand_num]);
+        output.push(&*args[rand_num]);
         output.dedup();
     }
     for out in output {
@@ -23,7 +23,7 @@ fn rand_list(args: &[&str]) -> Result<(), String> {
     Ok(())
 }
 #[allow(unused_must_use)]
-pub(crate) fn random(args: &[&str]) -> Result<(), String> {
+pub(crate) fn random(args: &[String]) -> Result<(), String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     match args.len() {

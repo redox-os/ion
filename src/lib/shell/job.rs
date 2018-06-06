@@ -1,17 +1,16 @@
 use super::Shell;
 use builtins::{BuiltinFunction, BUILTINS};
 use parser::{expand_string, pipelines::RedirectFrom};
+use shell::pipe_exec::PipelineExecution;
 use smallstring::SmallString;
 use std::{fmt, fs::File, str};
 use types::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) enum JobKind {
-    And,
     Background,
     Disown,
     Last,
-    Or,
     Pipe(RedirectFrom),
 }
 
@@ -128,8 +127,7 @@ impl TeeItem {
     /// never be `RedirectFrom`::Both`
     pub(crate) fn write_to_all(&mut self, extra: Option<RedirectFrom>) -> ::std::io::Result<()> {
         use std::{
-            io::{self, Read, Write},
-            os::unix::io::*,
+            io::{self, Read, Write}, os::unix::io::*,
         };
         fn write_out<R>(source: &mut R, sinks: &mut [File]) -> io::Result<()>
         where
@@ -216,6 +214,39 @@ impl RefinedJob {
             // TODO: Print for real
             RefinedJob::Cat { .. } => "multi-input".into(),
             RefinedJob::Tee { .. } => "multi-output".into(),
+        }
+    }
+
+    pub(crate) fn exec<S: PipelineExecution>(&self, shell: &mut S) -> i32 {
+        match *self {
+            RefinedJob::External {
+                ref name,
+                ref args,
+                ref stdin,
+                ref stdout,
+                ref stderr,
+            } => {
+                shell.exec_external(&name, &args[1..], stdin, stdout, stderr)
+            }
+            RefinedJob::Builtin {
+                main,
+                ref args,
+                ref stdin,
+                ref stdout,
+                ref stderr,
+            } => {
+                shell.exec_builtin(main, args, stdout, stderr, stdin)
+            }
+            RefinedJob::Function {
+                ref name,
+                ref args,
+                ref stdin,
+                ref stdout,
+                ref stderr,
+            } => {
+                shell.exec_function(name, args, stdout, stderr, stdin)
+            }
+            _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
         }
     }
 

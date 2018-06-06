@@ -1,0 +1,7 @@
+echo [{ }]
+
+echo [{a b c}]
+
+echo [a{b c} d]
+
+echo [a{b,c d} e]

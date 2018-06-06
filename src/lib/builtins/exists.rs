@@ -10,14 +10,14 @@ use shell;
 use shell::flow_control::{Function, Statement};
 use shell::Shell;
 
-pub(crate) fn exists(args: &[&str], shell: &Shell) -> Result<bool, String> {
+pub(crate) fn exists(args: &[String], shell: &Shell) -> Result<bool, String> {
     let arguments = &args[1..];
     evaluate_arguments(arguments, shell)
 }
 
-fn evaluate_arguments(arguments: &[&str], shell: &Shell) -> Result<bool, String> {
+fn evaluate_arguments(arguments: &[String], shell: &Shell) -> Result<bool, String> {
     match arguments.first() {
-        Some(&s) if s.starts_with("--") => {
+        Some(ref s) if s.starts_with("--") => {
             let (_, option) = s.split_at(2);
             // If no argument was given, return `SUCCESS`, as this means a string starting
             // with a dash was given
@@ -27,7 +27,7 @@ fn evaluate_arguments(arguments: &[&str], shell: &Shell) -> Result<bool, String>
                 Ok(match_option_argument(option, arg, shell))
             })
         }
-        Some(&s) if s.starts_with("-") => {
+        Some(ref s) if s.starts_with("-") => {
             // Access the second character in the flag string: this will be type of the
             // flag. If no flag was given, return `SUCCESS`, as this means a
             // string with value "-" was checked.
@@ -155,42 +155,42 @@ fn test_evaluate_arguments() {
     assert_eq!(evaluate_arguments(&[], &shell), Ok(false));
     // multiple arguments
     // ignores all but the first argument
-    assert_eq!(evaluate_arguments(&["foo", "bar"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["foo".to_owned(), "bar".to_owned()], &shell), Ok(true));
 
     // check `exists STRING`
-    assert_eq!(evaluate_arguments(&[""], &shell), Ok(false));
-    assert_eq!(evaluate_arguments(&["string"], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["string with space"], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-startswithdash"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["".to_owned()], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["string".to_owned()], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["string with space".to_owned()], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-startswithdash".to_owned()], &shell), Ok(true));
 
     // check `exists -a`
     // no argument means we treat it as a string
-    assert_eq!(evaluate_arguments(&["-a"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-a".to_owned()], &shell), Ok(true));
     shell
         .variables
         .set_array("emptyarray", SmallVec::from_vec(Vec::new()));
-    assert_eq!(evaluate_arguments(&["-a", "emptyarray"], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-a".to_owned(), "emptyarray".to_owned()], &shell), Ok(false));
     let mut vec = Vec::new();
     vec.push("element".to_owned());
     shell.variables.set_array("array", SmallVec::from_vec(vec));
-    assert_eq!(evaluate_arguments(&["-a", "array"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-a".to_owned(), "array".to_owned()], &shell), Ok(true));
     shell.variables.unset_array("array");
-    assert_eq!(evaluate_arguments(&["-a", "array"], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-a".to_owned(), "array".to_owned()], &shell), Ok(false));
 
     // check `exists -b`
     // TODO: see test_binary_is_in_path()
     // no argument means we treat it as a string
-    assert_eq!(evaluate_arguments(&["-b"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-b".to_owned()], &shell), Ok(true));
     let oldpath = shell.get_var("PATH").unwrap_or("/usr/bin".to_owned());
     shell.set_var("PATH", "testing/");
 
     assert_eq!(
-        evaluate_arguments(&["-b", "executable_file"], &shell),
+        evaluate_arguments(&["-b".to_owned(), "executable_file".to_owned()], &shell),
         Ok(true)
     );
-    assert_eq!(evaluate_arguments(&["-b", "empty_file"], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-b".to_owned(), "empty_file".to_owned()], &shell), Ok(false));
     assert_eq!(
-        evaluate_arguments(&["-b", "file_does_not_exist"], &shell),
+        evaluate_arguments(&["-b".to_owned(), "file_does_not_exist".to_owned()], &shell),
         Ok(false)
     );
 
@@ -200,45 +200,45 @@ fn test_evaluate_arguments() {
 
     // check `exists -d`
     // no argument means we treat it as a string
-    assert_eq!(evaluate_arguments(&["-d"], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-d", "testing/"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-d".to_owned()], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-d".to_owned(), "testing/".to_owned()], &shell), Ok(true));
     assert_eq!(
-        evaluate_arguments(&["-d", "testing/empty_file"], &shell),
+        evaluate_arguments(&["-d".to_owned(), "testing/empty_file".to_owned()], &shell),
         Ok(false)
     );
     assert_eq!(
-        evaluate_arguments(&["-d", "does/not/exist/"], &shell),
+        evaluate_arguments(&["-d".to_owned(), "does/not/exist/".to_owned()], &shell),
         Ok(false)
     );
 
     // check `exists -f`
     // no argument means we treat it as a string
-    assert_eq!(evaluate_arguments(&["-f"], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-f", "testing/"], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-f".to_owned()], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-f".to_owned(), "testing/".to_owned()], &shell), Ok(false));
     assert_eq!(
-        evaluate_arguments(&["-f", "testing/empty_file"], &shell),
+        evaluate_arguments(&["-f".to_owned(), "testing/empty_file".to_owned()], &shell),
         Ok(true)
     );
     assert_eq!(
-        evaluate_arguments(&["-f", "does-not-exist"], &shell),
+        evaluate_arguments(&["-f".to_owned(), "does-not-exist".to_owned()], &shell),
         Ok(false)
     );
 
     // check `exists -s`
     // no argument means we treat it as a string
-    assert_eq!(evaluate_arguments(&["-s"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-s".to_owned()], &shell), Ok(true));
     shell.set_var("emptyvar", "");
-    assert_eq!(evaluate_arguments(&["-s", "emptyvar"], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-s".to_owned(), "emptyvar".to_owned()], &shell), Ok(false));
     shell.set_var("testvar", "foobar");
-    assert_eq!(evaluate_arguments(&["-s", "testvar"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-s".to_owned(), "testvar".to_owned()], &shell), Ok(true));
     shell.variables.unset_var("testvar");
-    assert_eq!(evaluate_arguments(&["-s", "testvar"], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-s".to_owned(), "testvar".to_owned()], &shell), Ok(false));
     // also check that it doesn't trigger on arrays
     let mut vec = Vec::new();
     vec.push("element".to_owned());
     shell.variables.unset_var("array");
     shell.variables.set_array("array", SmallVec::from_vec(vec));
-    assert_eq!(evaluate_arguments(&["-s", "array"], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-s".to_owned(), "array".to_owned()], &shell), Ok(false));
 
     // check `exists --fn`
     let name_str = "test_function";
@@ -257,14 +257,14 @@ fn test_evaluate_arguments() {
         Function::new(Some(description), name, args, statements),
     );
 
-    assert_eq!(evaluate_arguments(&["--fn", name_str], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["--fn".to_owned(), name_str.to_owned()], &shell), Ok(true));
     shell.functions.remove(name_str);
-    assert_eq!(evaluate_arguments(&["--fn", name_str], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["--fn".to_owned(), name_str.to_owned()], &shell), Ok(false));
 
     // check invalid flags / parameters (should all be treated as strings and
     // therefore succeed)
-    assert_eq!(evaluate_arguments(&["--foo"], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-x"], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["--foo".to_owned()], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-x".to_owned()], &shell), Ok(true));
 }
 
 #[test]
