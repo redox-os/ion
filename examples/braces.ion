@@ -3,6 +3,7 @@ echo 1{A{1,2},B{1,2}}
 
 # permutating braces
 echo {0,1}abc{2,3,4}def{5,6,7}{g,h,i}
+echo It{{em,alic}iz,erat}e{d,}
 
 # inclusive ranges
 echo {-1...1}
