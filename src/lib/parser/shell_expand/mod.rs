@@ -198,12 +198,22 @@ pub(crate) fn expand_string<E: Expander>(
 ) -> Array {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
+    let mut word_iterator = WordIterator::new(original, expand_func);
 
-    for word in WordIterator::new(original, expand_func) {
-        if let WordToken::Brace(_) = word {
-            contains_brace = true;
+    loop {
+        match word_iterator.next() {
+            Some(word) => {
+                if let WordToken::Brace(_) = word {
+                    contains_brace = true;
+                }
+                token_buffer.push(word);
+            }
+            None if original.is_empty() => {
+                token_buffer.push(WordToken::Normal("", true, false));
+                break;
+            }
+            None => break,
         }
-        token_buffer.push(word);
     }
 
     expand_tokens(&token_buffer, expand_func, reverse_quoting, contains_brace)
