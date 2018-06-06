@@ -700,6 +700,20 @@ mod test {
     }
 
     #[test]
+    fn expand_braces_v2() {
+        let line = "It{{em,alic}iz,erat}e{d,}";
+        let expected = "Itemized Itemize Italicized Italicize Iterated Iterate";
+        let expanded = expand_string(line, &VariableExpander, false);
+        assert_eq!(
+            expected
+                .split_whitespace()
+                .map(|x| x.to_owned())
+                .collect::<Array>(),
+            expanded
+        );
+    }
+
+    #[test]
     fn expand_variables_with_colons() {
         let expanded = expand_string("$FOO:$BAR", &VariableExpander, false);
         assert_eq!(array!["FOO:BAR"], expanded);
