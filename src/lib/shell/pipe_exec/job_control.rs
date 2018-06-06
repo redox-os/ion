@@ -182,14 +182,15 @@ impl JobControl for Shell {
     }
 
     fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32 {
-        // Resume the background task, if needed.
-        if cont {
-            signals::resume(pid);
-        }
         // Pass the TTY to the background job
         set_foreground_as(pid);
         // Signal the background thread that is waiting on this process to stop waiting.
         self.foreground_signals.signal_to_grab(pid);
+        // Resume the background task, if needed.
+        if cont {
+            signals::resume(pid);
+        }
+
         let status = loop {
             // When the background thread that is monitoring the task receives an exit/stop
             // signal, the status of that process will be communicated back. To
