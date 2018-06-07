@@ -2,8 +2,10 @@ use super::{directory_stack::DirectoryStack, variables::Variables};
 use fnv::FnvHashMap;
 use glob::glob;
 use liner::{Completer, CursorPosition, FilenameCompleter};
+//use serde_derive::Deserialize;
 use smallvec::SmallVec;
-use std::{iter, str};
+use toml;
+use std::{iter, str, fs::File, io::{BufReader, prelude::*}};
 
 pub(crate) struct IonCmdCompleter {
     ///
@@ -51,9 +53,117 @@ impl Completer for IonCmdCompleter {
     }
 }
 
+pub(crate) enum CmdParameter {
+    FLAG,
+    PATH(bool),
+    FILE,
+    FILE_EXT(Vec<String>),
+    DIRECTORY,
+    KEYVALUE(Option<Vec<String>>),
+    STRING
+}
+
 pub(crate) struct CmdCompletion {
     /// TODO
-    ii: i32,
+    name: String,
+    params_short: FnvHashMap<String, CmdParameter>,
+    params_long: FnvHashMap<String, CmdParameter>,
+    subcommands: FnvHashMap<String, CmdCompletion>
+}
+
+impl CmdCompletion {
+    pub(crate) fn from_config(configfile: String) -> Option<CmdCompletion> {
+        let toml_str = if let Ok(file) = File::open(configfile) {
+            let mut buf_reader = BufReader::new(file);
+            let mut contents = String::new();
+            if let Ok(_) = buf_reader.read_to_string(&mut contents){
+                contents
+            } else {
+                "".to_owned()
+            }
+        } else {
+            "".to_owned()
+        };
+
+        let decoded: Result<InternalCmdCompletion, _> = toml::from_str(&toml_str);
+        if let Ok(decoded) = decoded {
+            println!("{:#?}", decoded);
+            Some(CmdCompletion::from_internal(decoded))
+        } else {
+            None
+        }
+    }
+
+    fn from_internal(from: InternalCmdCompletion) -> CmdCompletion {
+        let name = from.name;
+        let (params_short, params_long) = if let Some(params) = from.params {
+            let params_short = if let Some(params_short) = params.short {
+                CmdCompletion::parse_InternalCmdCompletionParamSet(params_short)
+            } else {
+                FnvHashMap::default()
+            };
+
+            let params_long = if let Some(params_long) = params.long {
+                CmdCompletion::parse_InternalCmdCompletionParamSet(params_long)
+            } else {
+                FnvHashMap::default()
+            };
+
+            (params_short, params_long)
+        } else {
+            (FnvHashMap::default(), FnvHashMap::default())
+        };
+
+        let mut subcommands: FnvHashMap<String, CmdCompletion> = FnvHashMap::default();
+        if let Some(subcommands) = from.commands {
+            for subcommand in subcommands {
+                let subcmd = CmdCompletion::from_internal(subcommand);
+                let subname = subcmd.name;
+                // TODO: this does not work because FnvHashMap.insert() can only take a usize as key
+                // Therefore, we need to use a std HashMap.
+                //subcommands.insert(subname.as_bytes(), subcmd);
+            }
+        }
+
+        CmdCompletion {
+            name: name,
+            params_short: params_short,
+            params_long: params_long,
+            subcommands: subcommands,
+        }
+    }
+
+    fn parse_InternalCmdCompletionParamSet(from: InternalCmdCompletionParamSet) ->
+    FnvHashMap<String, CmdParameter> {
+
+        FnvHashMap::default()
+    }
+}
+
+/// used to parse the config files, will then be translated to a CmdCompletion-struct
+#[derive(Debug, Deserialize)]
+struct InternalCmdCompletion {
+    name: String,
+    aliases: Option<Vec<String>>,
+    end_of_params: Option<String>,
+    after_params: Option<Vec<String>>,
+    params: Option<InternalCmdCompletionParams>,
+    commands: Option<Vec<InternalCmdCompletion>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct InternalCmdCompletionParams {
+    short: Option<InternalCmdCompletionParamSet>,
+    long: Option<InternalCmdCompletionParamSet>,
+}
+
+#[derive(Debug, Deserialize)]
+struct InternalCmdCompletionParamSet {
+    flag: Option<Vec<String>>,
+    path: Option<Vec<String>>,
+    path_optional: Option<Vec<String>>,
+    string: Option<Vec<String>>,
+    keyvalue: Option<Vec<String>>,
 }
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases

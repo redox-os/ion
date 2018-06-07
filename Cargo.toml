@@ -36,8 +36,11 @@ liner = "0.4"
 permutate = "0.3"
 rand = "0.4"
 regex = "1.0"
+serde = "1.0"
+serde_derive = "1.0"
 smallstring = "0.1"
 smallvec = "0.6"
+toml = "0.4"
 unicode-segmentation = "1.2"
 xdg = { git = "https://github.com/whitequark/rust-xdg" }
 

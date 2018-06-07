@@ -22,10 +22,13 @@ extern crate libc;
 extern crate libloading;
 extern crate liner;
 extern crate regex;
+#[macro_use]
+extern crate serde_derive;
 extern crate smallstring;
 extern crate smallvec;
 #[cfg(target_os = "redox")]
 extern crate syscall;
+extern crate toml;
 extern crate unicode_segmentation;
 #[cfg(all(unix, not(target_os = "redox")))]
 extern crate users as users_unix;

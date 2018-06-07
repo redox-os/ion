@@ -8,7 +8,7 @@ use self::{
     prompt::{prompt, prompt_fn}, readln::readln,
     terminate::{terminate_quotes, terminate_script_quotes},
 };
-use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
+use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory, completer};
 use liner::{Buffer, Context};
 use std::{env, fs::File, io::ErrorKind, iter, path::Path, process};
 
@@ -56,6 +56,8 @@ pub trait Binary {
     fn save_command(&mut self, command: &str);
     // Resets the flow control fields to their default values.
     fn reset_flow(&mut self);
+    /// (re)load command completion
+    fn load_cmd_completion(&mut self, config: String) -> bool;
 }
 
 impl Binary for Shell {
@@ -129,6 +131,8 @@ impl Binary for Shell {
         self.variables
             .set_array("args", iter::once(env::args().next().unwrap()).collect());
 
+        self.load_cmd_completion("./completions/git.toml".to_owned());
+
         loop {
             if let Some(command) = self.readln() {
                 if !command.is_empty() {
@@ -184,6 +188,13 @@ impl Binary for Shell {
     fn prompt_fn(&mut self) -> Option<String> { prompt_fn(self) }
 
     fn prompt(&mut self) -> String { prompt(self) }
+
+    fn load_cmd_completion(&mut self, config: String) -> bool {
+        let completion = completer::CmdCompletion::from_config(config);
+        //let name = completion.get_name();
+
+        false
+    }
 }
 
 struct WordDivide<I>

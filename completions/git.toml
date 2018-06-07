@@ -1,68 +1,60 @@
-[main]
-name = git
-aliases = [ ]
-
-# TODO: positionals
-# TODO "trailing parameters"
+name = "git"
 
 [params.short]
-p = flag
-C = path
-c = keyvalue
+flag = [ "p" ]
+path = [ "C" ]
+keyvalue = [ "c" ]
 
 [params.long]
-version = flag
-help = flag
-html-path = flag
-man-path = flag
-info-path = flag
-paginate = flag
-no-pager = flag
-no-replace-objects = flag
-bare = flag
-exec-path = optional path
-git-dir = path
-work-tree = path
-namespace = string
+flag = [
+    "version",
+    "help",
+    "html-path",
+    "man-path",
+    "info-path",
+    "paginate",
+    "no-pager",
+    "no-replace-object",
+    "bare",
+]
+path = [
+    "git-dir",
+    "work-tree",
+]
+path_optional = [
+    "exec-path",
+]
+string = [
+    "namespace",
+]
 
+[[commands]]
+name = "add"
+end_of_params = "--"
+after_params = [ "array", "path" ]
 
-[[command]]
-name = add
-end-of-params = '--'
-after-params = array path
+    [commands.params.short]
+    flag = [ "v", "n", "f", "i", "p", "e", "u", "N", ]
 
-[params.short]
-v = flag
-n = flag
-f = flag
-i = flag
-p = flag
-e = flag
-u = flag
-N = flag
+    [commands.params.long]
+    flag = [
+        "verbose",
+        "dry-run",
+        "force",
+        "interactive",
+        "patch",
+        "edit",
+        "all",
+        "no-all",
+        "ignore-removal",
+        "no-ignore-removal",
+        "update",
+        "intent-to-add",
+        "refresh",
+        "ignore-errors",
+        "ignore-missing",
+        "renormalize",
+    ]
 
-[params.long]
-verbose = flag
-dry-run = flag
-force = flag
-interactive = flag
-patch = flag
-edit = flag
-all = flag
-no-all = flag
-ignore-removal = flag
-no-ignore-removal = flag
-update = flag
-intent-to-add = flag
-refresh = flag
-ignore-errors = flag
-ignore-missing = flag
-renormalize = flag
-chmod = 'special (+|-)x'
-
-
-[[command]]
-name = clone
-
-[[command]]
-name = commit
+[[commands]]
+name = "commit"
