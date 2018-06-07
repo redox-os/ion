@@ -198,12 +198,22 @@ pub(crate) fn expand_string<E: Expander>(
 ) -> Array {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
+    let mut word_iterator = WordIterator::new(original, expand_func);
 
-    for word in WordIterator::new(original, expand_func) {
-        if let WordToken::Brace(_) = word {
-            contains_brace = true;
+    loop {
+        match word_iterator.next() {
+            Some(word) => {
+                if let WordToken::Brace(_) = word {
+                    contains_brace = true;
+                }
+                token_buffer.push(word);
+            }
+            None if original.is_empty() => {
+                token_buffer.push(WordToken::Normal("", true, false));
+                break;
+            }
+            None => break,
         }
-        token_buffer.push(word);
     }
 
     expand_tokens(&token_buffer, expand_func, reverse_quoting, contains_brace)
@@ -679,6 +689,20 @@ mod test {
         let line = "pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
         let expected = "prodigal programmer processed prototype procedures proficiently proving \
                         prospective projections";
+        let expanded = expand_string(line, &VariableExpander, false);
+        assert_eq!(
+            expected
+                .split_whitespace()
+                .map(|x| x.to_owned())
+                .collect::<Array>(),
+            expanded
+        );
+    }
+
+    #[test]
+    fn expand_braces_v2() {
+        let line = "It{{em,alic}iz,erat}e{d,}";
+        let expected = "Itemized Itemize Italicized Italicize Iterated Iterate";
         let expanded = expand_string(line, &VariableExpander, false);
         assert_eq!(
             expected
