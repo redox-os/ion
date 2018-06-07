@@ -21,7 +21,7 @@ name = "ion"
 path = "src/main.rs"
 
 [build-dependencies]
-ansi_term = "0.10"
+ansi_term = "0.11"
 version_check = "0.1.3"
 
 [dependencies]
@@ -35,7 +35,7 @@ itoa = "0.4"
 lazy_static = "1.0"
 liner = { git = "https://github.com/redox-os/liner" }
 permutate = "0.3"
-rand = "0.4"
+rand = "0.5"
 regex = "1.0"
 smallstring = "0.1"
 smallvec = "0.6"
@@ -52,7 +52,7 @@ panic = "abort"
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 libc = "0.2"
 libloading = "0.5"
-users = "0.6"
+users = "0.7"
 
 [target."cfg(target_os = \"redox\")".dependencies]
 redox_syscall = "0.1"
