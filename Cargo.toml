@@ -1,4 +1,5 @@
 [package]
+
 authors = [
     "Michael Aaron Murphy <mmstickman@gmail.com>",
     "Hunter Goldstein <hunter.d.goldstein@gmail.com>",
@@ -32,7 +33,7 @@ fnv = "1.0"
 glob = "0.2"
 itoa = "0.4"
 lazy_static = "1.0"
-liner = "0.4"
+liner = { git = "https://github.com/redox-os/liner" }
 permutate = "0.3"
 rand = "0.4"
 regex = "1.0"
@@ -47,9 +48,14 @@ path = "src/lib/lib.rs"
 [profile.release]
 lto = true
 panic = "abort"
+
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 libc = "0.2"
 libloading = "0.5"
 users = "0.6"
+
 [target."cfg(target_os = \"redox\")".dependencies]
 redox_syscall = "0.1"
+
+[patch.crates-io]
+liner = { git = "https://github.com/redox-os/liner" }
