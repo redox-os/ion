@@ -4,3 +4,4 @@ echo foo | grep foo && echo found foo
 echo foo | grep bar || echo did not find bar
 echo test | grep test && echo found test | cat
 
+echo $(im_not_a_command | echo 1)

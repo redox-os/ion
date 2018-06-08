@@ -889,6 +889,8 @@ pub(crate) fn pipe(
                         }
                     }
 
+                    set_process_group(&mut pgid, current_pid);
+
                     previous_status = shell.wait(pgid, remember);
                     let _ = io::stdout().flush();
                     let _ = io::stderr().flush();
