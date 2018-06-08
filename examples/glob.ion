@@ -16,3 +16,7 @@ echo *[wh]*
 echo [t]*
 cd ..
 rm glob_test -R
+echo *{lock,toml}
+echo {L,R}*
+echo *{l,t}o??
+echo {L*,R*}E
