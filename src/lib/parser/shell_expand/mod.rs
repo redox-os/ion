@@ -300,7 +300,10 @@ fn expand_braces<E: Expander>(
 
                 slice(&mut output, expanded, index.clone());
             }
-            WordToken::Normal(text, do_glob, tilde) => {
+            WordToken::Normal(text, mut do_glob, tilde) => {
+                if text.ends_with('*') && do_glob {
+                    do_glob = false;
+                }
                 expand(
                     &mut output,
                     &mut expanded_words,
@@ -330,7 +333,25 @@ fn expand_braces<E: Expander>(
         }
     }
 
-    expanded_words
+    expanded_words.into_iter().fold(Array::new(), |mut array, word| {
+        if let Some(_) = word.find('*') {
+            if let Ok(paths) = glob(&word) {
+                for path in paths {
+                    if let Ok(path_buf) = path {
+                        array.push(path_buf.to_string_lossy().to_string());
+                    } else {
+                        array.push(String::new());
+                    }
+                }
+            } else {
+                array.push(word);
+            }
+            array
+        } else {
+            array.push(word);
+            array
+        }
+    })
 }
 
 fn expand_single_array_token<E: Expander>(token: &WordToken, expand_func: &E) -> Option<Array> {
