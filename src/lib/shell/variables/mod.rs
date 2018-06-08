@@ -179,7 +179,7 @@ impl Variables {
     }
 
     pub(crate) fn is_valid_variable_character(c: char) -> bool {
-        c.is_alphanumeric() || c == '_' || c == '?'
+        c.is_alphanumeric() || c == '_' || c == '?' || c == '.'
     }
 
     pub fn strings<'a>(&'a self) -> impl Iterator<Item = Identifier> + 'a {
@@ -356,7 +356,7 @@ impl Variables {
         if sys::isatty(sys::STDIN_FILENO) {
             let mut con = Context::new();
             for arg in args.into_iter().skip(1) {
-                match con.read_line(format!("{}=", arg.as_ref().trim()), &mut |_| {}) {
+                match con.read_line(format!("{}=", arg.as_ref().trim()), None, &mut |_| {}) {
                     Ok(buffer) => self.set_var(arg.as_ref(), buffer.trim()),
                     Err(_) => return FAILURE,
                 }

@@ -27,6 +27,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
 
             let line = shell.context.as_mut().unwrap().read_line(
                 prompt,
+                None,
                 &mut move |Event { editor, kind }| {
                     if let EventKind::BeforeComplete = kind {
                         let (words, pos) = editor.get_words_and_cursor_position();
