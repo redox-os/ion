@@ -1,6 +1,6 @@
-struct StaticMap {
-    keys:   &'static [&'static str],
-    values: &'static [&'static str],
+pub(crate) struct StaticMap {
+    pub(crate) keys:   &'static [&'static str],
+    pub(crate) values: &'static [&'static str],
 }
 
 impl StaticMap {
@@ -30,7 +30,7 @@ const ATTRIBUTES: StaticMap = map!(
     "underlined" => "4"
 );
 
-const COLORS: StaticMap = map!(
+pub(crate) const COLORS: StaticMap = map!(
     "black" => "30",
     "blue" => "34",
     "cyan" => "36",
