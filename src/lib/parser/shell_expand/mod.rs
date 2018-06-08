@@ -300,16 +300,13 @@ fn expand_braces<E: Expander>(
 
                 slice(&mut output, expanded, index.clone());
             }
-            WordToken::Normal(text, mut do_glob, tilde) => {
-                if text.ends_with('*') && do_glob {
-                    do_glob = false;
-                }
+            WordToken::Normal(text, _, tilde) => {
                 expand(
                     &mut output,
                     &mut expanded_words,
                     expand_func,
                     text,
-                    do_glob,
+                    false,
                     tilde,
                 );
             }
