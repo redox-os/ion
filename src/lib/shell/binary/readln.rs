@@ -55,7 +55,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                                     // in the middle of the command
                                     let buffer = editor.current_buffer();
                                     let cmd_so_far = buffer.range(0, buffer.num_chars());
-                                    eprintln!("cmd so far={:?}|pos={:?}", cmd_so_far, pos);
+                                    //eprintln!("cmd so far={:?}|pos={:?}", cmd_so_far, pos);
                                     let completer =
                                         IonCmdCompleter::new(completions, cmd_so_far, pos, dirs_ptr, vars_ptr);
                                     mem::replace(

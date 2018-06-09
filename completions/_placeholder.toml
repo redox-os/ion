@@ -1,0 +1,41 @@
+name = "_placeholder"
+
+[params.short]
+flag = [ "" ]
+file = [ [ "" ] ]
+keyvalue = [ [ "" ] ]
+path = [ "" ]
+path_optional = [ "" ]
+string = [ "" ]
+
+[params.long]
+flag = [ "" ]
+file = [ [ "" ] ]
+keyvalue = [ [ "" ] ]
+path = [ "" ]
+path_optional = [ "" ]
+string = [ "" ]
+
+[[commands]]
+name = "add"
+
+[[commands]]
+name = "XXX"
+end_of_params = "--"
+after_params = [ "array", "path" ]
+
+    [commands.params.short]
+    flag = [ "" ]
+    file = [ [ "" ] ]
+    keyvalue = [ [ "" ] ]
+    path = [ "" ]
+    path_optional = [ "" ]
+    string = [ "" ]
+
+    [commands.params.long]
+    flag = [ "" ]
+    file = [ [ "" ] ]
+    keyvalue = [ [ "" ] ]
+    path = [ "" ]
+    path_optional = [ "" ]
+    string = [ "" ]

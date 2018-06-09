@@ -54,7 +54,7 @@ impl Completer for IonCmdCompleter {
     /// When the tab key is pressed, **Liner** will use this method to perform completions of
     /// command parameters.
     fn completions(&self, start: &str) -> Vec<String> {
-        eprintln!("[cmd={}|start={}|pos={:?}]", self.cmd_so_far, start, self.pos);
+        //eprintln!("[cmd={}|start={}|pos={:?}]", self.cmd_so_far, start, self.pos);
 
         let file_completer = if let Ok(current_dir) = env::current_dir() {
             if let Some(url) = current_dir.to_str() {
@@ -140,23 +140,26 @@ impl CmdCompletion {
             CursorPosition::InSpace(_, _) => (1, false)
         };
 
-        self.get_completions_int(cmd, idx, inword, file_completer)
+        let completions = self.get_completions_int(cmd, idx, inword, file_completer);
+        //println!("->completions: {:?}", completions);
+        completions
     }
 
     fn get_completions_int(&self, cmd: Vec<&str>, idx: usize, inword: bool, file_completer: IonFileCompleter) -> Vec<String> {
-        println!("search in {} for {:?} with idx {}", self.name, cmd, idx);
+        //println!("search in {} for {:?} with idx {} and inword: {}", self.name, cmd, idx, inword);
         if self.name != cmd[0] {
             return Vec::new()
         }
 
         let mut in_parameter = false;
         let mut parameter_type: Option<&CmdParameter> = None;
-        println!("idx: {}, len: {}", idx, cmd.len());
         let end = cmp::min(idx+1, cmd.len());
 
+        //println!("idx: {}, len: {}, end: {}", idx, cmd.len(), end);
         for ii in 1..end {
             let item = cmd[ii];
-            println!("item: {}", item);
+            //println!("item({}): {}", ii, item);
+            //println!("in_param: {}", in_parameter);
 
             if !in_parameter {
                 // if we're in a submodule, pass the remaining parameters down
@@ -184,17 +187,14 @@ impl CmdCompletion {
                         parameter_type = param_type;
                     }
                 }
-            } else if ii != end - 1 {
-                println!("going false again");
+            // we have finished a parameter value only if:
+            // - it is not at the end of the list
+            // - it is the last item and we are not at the edge (but in a space behind)
+            } else if ii != end - 1 || !inword {
                 in_parameter = false;
                 parameter_type = None;
             }
         }
-
-        // we are not yet in the parameter, if we just completed the parameter-name without
-        // writing a space after it
-        // TODO: this breaks autocompletion of filenames, etc..
-        in_parameter = in_parameter && !inword;
 
         // At this point we know the type of the element we're typing right now:
         // - submodule name or parameter name
@@ -204,6 +204,7 @@ impl CmdCompletion {
         } else {
             ""
         };
+        //println!("item_in_progress after loop: {} (inparam: {}) inword: {}", item_in_progress, in_parameter, inword);
 
         if !in_parameter {
             // submodule name or parameter name
@@ -211,7 +212,7 @@ impl CmdCompletion {
                 .chain(self.params_short.keys())
                 .chain(self.params_long.keys())
                 .filter(|xx| xx.starts_with(item_in_progress))
-                .map(|xx| (*xx).clone())
+                .map(|xx| (*xx).clone() + " ")
                 .collect();
 
             return if candidates.len() == 1 && candidates[0] == item_in_progress {
@@ -220,7 +221,8 @@ impl CmdCompletion {
                     // if not, autocomplete with a space
                     vec!(item_in_progress.to_owned() + " ")
                 } else {
-                    // otherwise just add a space
+                    // otherwise just add a space (this should never happen but we must return
+                    // something so that the compiler is happy :P)
                     vec!(" ".to_owned())
                 }
             } else {
@@ -231,7 +233,6 @@ impl CmdCompletion {
             if let Some(param_type) = parameter_type {
                 match param_type {
                     CmdParameter::FILE(extensions) => {
-                        // TODO filter for extensions
                         let files = file_completer.completions(item_in_progress);
                         if let Some(extensions) = extensions {
                             let mut matching_files = Vec::new();
@@ -239,7 +240,7 @@ impl CmdCompletion {
                                 matching_files = matching_files
                                     .iter()
                                     .chain(files.iter().filter(|xx| xx.ends_with(extension)))
-                                    .map(|xx| (*xx).clone())
+                                    .map(|xx| (*xx).clone() + " ")
                                     .collect();
                             }
 
@@ -248,9 +249,22 @@ impl CmdCompletion {
                             return files;
                         }
                     },
+                    CmdParameter::KEYVALUE(keys) => {
+                        if let Some(keys) = keys {
+                            return keys.iter()
+                                .filter(|xx| xx.starts_with(item_in_progress))
+                                .map(|xx| (*xx).clone() + "=")
+                                .collect();
+                        }
+                    },
                     CmdParameter::PATH(optional) => {
+                        // TODO: implement optional stuff
                         return file_completer.completions(item_in_progress);
-                    }
+                    },
+                    CmdParameter::STRING => {
+                        // no completions for that type available
+                        return vec!();
+                    },
                     _ => {
                         return vec!("NOT_YET_IMPLEMENTED".to_owned());
                     }
@@ -338,6 +352,18 @@ impl CmdCompletion {
             }
         }
 
+        if let Some(keyvalues) = from.keyvalue {
+            for keyvalue in &keyvalues {
+                let keyvalue_param = &keyvalue[0];
+                let keyvalue_keys = if keyvalue.len() > 1 {
+                    Some(keyvalue[1..keyvalue.len()].to_vec())
+                } else {
+                    None
+                };
+                to.insert(prefix.to_owned() + keyvalue_param, CmdParameter::KEYVALUE(keyvalue_keys));
+            }
+        }
+
         to
     }
 }
@@ -366,7 +392,7 @@ struct InternalCmdCompletionParamSet {
     path: Option<Vec<String>>,
     path_optional: Option<Vec<String>>,
     string: Option<Vec<String>>,
-    keyvalue: Option<Vec<String>>,
+    keyvalue: Option<Vec<Vec<String>>>,
 }
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
@@ -458,7 +484,6 @@ impl Completer for IonFileCompleter {
             }
         }
 
-        eprintln!("start={}", start);
         filename_completion(&start, |x| self.inner.completions(x)).collect()
     }
 }
