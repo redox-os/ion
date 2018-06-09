@@ -3,7 +3,7 @@ use glob::glob;
 use liner::{Completer, CursorPosition, FilenameCompleter};
 use smallvec::SmallVec;
 use toml;
-use std::{collections::HashMap, env, iter, fs::File, io::{BufReader, prelude::*}, str};
+use std::{cmp, collections::HashMap, env, iter, fs::File, io::{BufReader, prelude::*}, str};
 
 pub(crate) struct IonCmdCompleter {
     ///
@@ -55,16 +55,31 @@ impl Completer for IonCmdCompleter {
     /// command parameters.
     fn completions(&self, start: &str) -> Vec<String> {
         eprintln!("[cmd={}|start={}|pos={:?}]", self.cmd_so_far, start, self.pos);
+
+        let file_completer = if let Ok(current_dir) = env::current_dir() {
+            if let Some(url) = current_dir.to_str() {
+                IonFileCompleter::new(Some(url), self.dir_stack, self.vars)
+            } else {
+                return Vec::new();
+            }
+        } else {
+            return Vec::new();
+        };
+
         // TODO: Should we respect IFS?
         let cmd = self.cmd_so_far.split_whitespace().collect::<Vec<&str>>();
         match unsafe { (*self.completions).get(cmd[0]) } {
             Some(completion) => {
                 // get completions for application
-                completion.get_completions(cmd, self.pos)
+                completion.get_completions(
+                    cmd,
+                    self.pos,
+                    file_completer,
+                )
             }
             None => {
                 // return default (file) completions
-                self.file_completions(start)
+                file_completer.completions(start)
             }
         }
     }
@@ -72,10 +87,11 @@ impl Completer for IonCmdCompleter {
 
 pub(crate) enum CmdParameter {
     FLAG,
+    // bool tells us whether the parameter value is OPTIONAL
     PATH(bool),
-    FILE,
-    FILE_EXT(Vec<String>),
-    DIRECTORY,
+    // if present, the vector gives a list of file extensions to match
+    FILE(Option<Vec<String>>),
+    // if present, the vector gives a list of possible key values
     KEYVALUE(Option<Vec<String>>),
     STRING
 }
@@ -115,33 +131,38 @@ impl CmdCompletion {
         self.name.clone()
     }
 
-    fn get_completions(&self, cmd: Vec<&str>, pos: CursorPosition) -> Vec<String> {
-        let idx = match pos {
-            CursorPosition::InWord(idx) => idx,
-            CursorPosition::OnWordRightEdge(idx) => idx,
-            CursorPosition::OnWordLeftEdge(idx) => idx - 1,
-            CursorPosition::InSpace(_, Some(idx)) => idx,
-            CursorPosition::InSpace(_, None) => 0
+    fn get_completions(&self, cmd: Vec<&str>, pos: CursorPosition, file_completer: IonFileCompleter) -> Vec<String> {
+        let (idx, inword) = match pos {
+            CursorPosition::InWord(idx) => (idx, true),
+            CursorPosition::OnWordRightEdge(idx) => (idx, true),
+            CursorPosition::OnWordLeftEdge(idx) => (idx-1, true),
+            CursorPosition::InSpace(Some(idx), _) => (idx+1, false),
+            CursorPosition::InSpace(_, _) => (1, false)
         };
 
-        self.get_completions_int(cmd, idx)
+        self.get_completions_int(cmd, idx, inword, file_completer)
     }
 
-    fn get_completions_int(&self, cmd: Vec<&str>, idx: usize) -> Vec<String> {
+    fn get_completions_int(&self, cmd: Vec<&str>, idx: usize, inword: bool, file_completer: IonFileCompleter) -> Vec<String> {
+        println!("search in {} for {:?} with idx {}", self.name, cmd, idx);
         if self.name != cmd[0] {
             return Vec::new()
         }
 
         let mut in_parameter = false;
         let mut parameter_type: Option<&CmdParameter> = None;
-        for ii in 1..idx {
+        println!("idx: {}, len: {}", idx, cmd.len());
+        let end = cmp::min(idx+1, cmd.len());
+
+        for ii in 1..end {
             let item = cmd[ii];
+            println!("item: {}", item);
 
             if !in_parameter {
                 // if we're in a submodule, pass the remaining parameters down
                 if let Some(subcommand) = self.subcommands.get(item) {
                     let tmp = cmd[ii..cmd.len()].to_vec();
-                    return subcommand.get_completions_int(tmp, idx-ii);
+                    return subcommand.get_completions_int(tmp, idx-ii, inword, file_completer);
                 }
 
                 let lookuptable = if item.starts_with("--") {
@@ -155,7 +176,7 @@ impl CmdCompletion {
                 if let Some(lookuptable) = lookuptable {
                     if let Some(param) = lookuptable.get(item) {
                         let (in_param, param_type) = match param {
-                            CmdParameter::FLAG | CmdParameter::PATH(false) => (false, None),
+                            CmdParameter::FLAG => (false, None),
                             param @ _ => (true, Some(param)),
                         };
 
@@ -163,41 +184,94 @@ impl CmdCompletion {
                         parameter_type = param_type;
                     }
                 }
-            } else {
+            } else if ii != end - 1 {
+                println!("going false again");
                 in_parameter = false;
                 parameter_type = None;
             }
         }
 
+        // we are not yet in the parameter, if we just completed the parameter-name without
+        // writing a space after it
+        // TODO: this breaks autocompletion of filenames, etc..
+        in_parameter = in_parameter && !inword;
+
         // At this point we know the type of the element we're typing right now:
         // - submodule name or parameter name
         // - parameter value (and which type it must be)
-        let item = cmd[idx];
+        let item_in_progress = if idx > 0 && idx < cmd.len() {
+            cmd[idx]
+        } else {
+            ""
+        };
+
         if !in_parameter {
             // submodule name or parameter name
-            let list: Vec<&String> = if item.starts_with("--") {
-                self.params_long.keys().filter(|xx| xx.starts_with(item)).collect()
-            } else if item.starts_with('-') {
-                self.params_short.keys().filter(|xx| xx.starts_with(item)).collect()
+            let candidates: Vec<String> = self.subcommands.keys()
+                .chain(self.params_short.keys())
+                .chain(self.params_long.keys())
+                .filter(|xx| xx.starts_with(item_in_progress))
+                .map(|xx| (*xx).clone())
+                .collect();
+
+            return if candidates.len() == 1 && candidates[0] == item_in_progress {
+                // if only the element we just typed matches, check whether we already completed it
+                if inword {
+                    // if not, autocomplete with a space
+                    vec!(item_in_progress.to_owned() + " ")
+                } else {
+                    // otherwise just add a space
+                    vec!(" ".to_owned())
+                }
             } else {
-                self.subcommands.keys().filter(|xx| xx.starts_with(item)).collect()
-            };
+                candidates
+            }
+        } else {
+            // we are completing a parameter value
+            if let Some(param_type) = parameter_type {
+                match param_type {
+                    CmdParameter::FILE(extensions) => {
+                        // TODO filter for extensions
+                        let files = file_completer.completions(item_in_progress);
+                        if let Some(extensions) = extensions {
+                            let mut matching_files = Vec::new();
+                            for extension in extensions {
+                                matching_files = matching_files
+                                    .iter()
+                                    .chain(files.iter().filter(|xx| xx.ends_with(extension)))
+                                    .map(|xx| (*xx).clone())
+                                    .collect();
+                            }
+
+                            return matching_files;
+                        } else {
+                            return files;
+                        }
+                    },
+                    CmdParameter::PATH(optional) => {
+                        return file_completer.completions(item_in_progress);
+                    }
+                    _ => {
+                        return vec!("NOT_YET_IMPLEMENTED".to_owned());
+                    }
+                }
+            }
         }
 
-        Vec::new()
+        vec!(item_in_progress.to_owned() + " ")
     }
 
     fn from_internal(from: InternalCmdCompletion) -> CmdCompletion {
         let name = from.name;
         let (params_short, params_long) = if let Some(params) = from.params {
             let params_short = if let Some(params_short) = params.short {
-                CmdCompletion::parse_InternalCmdCompletionParamSet(params_short)
+                CmdCompletion::parse_internal_cmd_completion_param_set(params_short, "-")
             } else {
                 HashMap::new()
             };
 
             let params_long = if let Some(params_long) = params.long {
-                CmdCompletion::parse_InternalCmdCompletionParamSet(params_long)
+                CmdCompletion::parse_internal_cmd_completion_param_set(params_long, "--")
             } else {
                 HashMap::new()
             };
@@ -224,10 +298,47 @@ impl CmdCompletion {
         }
     }
 
-    fn parse_InternalCmdCompletionParamSet(from: InternalCmdCompletionParamSet) ->
+    fn parse_internal_cmd_completion_param_set(from: InternalCmdCompletionParamSet, prefix: &str) ->
     HashMap<String, CmdParameter> {
+        let mut to = HashMap::new();
 
-        HashMap::new()
+        if let Some(flags) = from.flag {
+            for flag in &flags {
+                to.insert(prefix.to_owned() + flag, CmdParameter::FLAG);
+            }
+        }
+
+        if let Some(files) = from.file {
+            for file in &files {
+                let file_param = &file[0];
+                let file_extensions = if file.len() > 1 {
+                    Some(file[1..file.len()].to_vec())
+                } else {
+                    None
+                };
+                to.insert(prefix.to_owned() + file_param, CmdParameter::FILE(file_extensions));
+            }
+        }
+
+        if let Some(paths) = from.path {
+            for path in &paths {
+                to.insert(prefix.to_owned() + path, CmdParameter::PATH(false));
+            }
+        }
+
+        if let Some(paths) = from.path_optional {
+            for path in &paths {
+                to.insert(prefix.to_owned() + path, CmdParameter::PATH(true));
+            }
+        }
+
+        if let Some(strings) = from.string {
+            for string in &strings {
+                to.insert(prefix.to_owned() + string, CmdParameter::STRING);
+            }
+        }
+
+        to
     }
 }
 
@@ -251,6 +362,7 @@ struct InternalCmdCompletionParams {
 #[derive(Debug, Deserialize)]
 struct InternalCmdCompletionParamSet {
     flag: Option<Vec<String>>,
+    file: Option<Vec<Vec<String>>>,
     path: Option<Vec<String>>,
     path_optional: Option<Vec<String>>,
     string: Option<Vec<String>>,

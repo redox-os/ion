@@ -6,6 +6,10 @@ path = [ "C" ]
 keyvalue = [ "c" ]
 
 [params.long]
+path = [
+    "git-dir",
+    "work-tree",
+]
 flag = [
     "version",
     "help",
@@ -17,15 +21,14 @@ flag = [
     "no-replace-object",
     "bare",
 ]
-path = [
-    "git-dir",
-    "work-tree",
-]
 path_optional = [
     "exec-path",
 ]
 string = [
     "namespace",
+]
+file = [
+    [ "test", ".txt", ".md" ],
 ]
 
 [[commands]]
@@ -58,3 +61,6 @@ after_params = [ "array", "path" ]
 
 [[commands]]
 name = "commit"
+
+[[commands]]
+name = "checkout"
