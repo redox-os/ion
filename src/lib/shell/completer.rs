@@ -1,15 +1,13 @@
 use super::{directory_stack::DirectoryStack, variables::Variables};
-use fnv::FnvHashMap;
 use glob::glob;
 use liner::{Completer, CursorPosition, FilenameCompleter};
-//use serde_derive::Deserialize;
 use smallvec::SmallVec;
 use toml;
-use std::{iter, str, fs::File, io::{BufReader, prelude::*}};
+use std::{collections::HashMap, env, iter, fs::File, io::{BufReader, prelude::*}, str};
 
 pub(crate) struct IonCmdCompleter {
     ///
-    completions: *const FnvHashMap<String, CmdCompletion>,
+    completions: *const HashMap<String, CmdCompletion>,
     /// The entered command so far
     cmd_so_far: String,
     /// Where in the command we are
@@ -22,7 +20,7 @@ pub(crate) struct IonCmdCompleter {
 
 impl IonCmdCompleter {
     pub(crate) fn new(
-        completions: *const FnvHashMap<String, CmdCompletion>,
+        completions: *const HashMap<String, CmdCompletion>,
         cmd_so_far: String,
         pos: CursorPosition,
         dir_stack: *const DirectoryStack,
@@ -36,6 +34,20 @@ impl IonCmdCompleter {
             vars: vars,
         }
     }
+
+    fn file_completions(&self, start: &str) -> Vec<String> {
+        let mut completions = Vec::new();
+        //let file_completer = IonFileCompleter::new(start, self.dir_stack, self.vars);
+        if let Ok(current_dir) = env::current_dir() {
+            if let Some(url) = current_dir.to_str() {
+                let completer =
+                    IonFileCompleter::new(Some(url), self.dir_stack, self.vars);
+                completions = completer.completions(start);
+            }
+        }
+
+        completions
+    }
 }
 
 impl Completer for IonCmdCompleter {
@@ -43,13 +55,18 @@ impl Completer for IonCmdCompleter {
     /// command parameters.
     fn completions(&self, start: &str) -> Vec<String> {
         eprintln!("[cmd={}|start={}|pos={:?}]", self.cmd_so_far, start, self.pos);
-        // TODO: Split at the right edge of the first word
-        // let application = self.cmd_so_far.split
-        //match self.completions.get(application) {
-        //    Some(cmdCompletion) => // get completions for application
-        //    None => // return default (file) completions
-        //}
-        Vec::new()
+        // TODO: Should we respect IFS?
+        let cmd = self.cmd_so_far.split_whitespace().collect::<Vec<&str>>();
+        match unsafe { (*self.completions).get(cmd[0]) } {
+            Some(completion) => {
+                // get completions for application
+                completion.get_completions(cmd, self.pos)
+            }
+            None => {
+                // return default (file) completions
+                self.file_completions(start)
+            }
+        }
     }
 }
 
@@ -66,9 +83,9 @@ pub(crate) enum CmdParameter {
 pub(crate) struct CmdCompletion {
     /// TODO
     name: String,
-    params_short: FnvHashMap<String, CmdParameter>,
-    params_long: FnvHashMap<String, CmdParameter>,
-    subcommands: FnvHashMap<String, CmdCompletion>
+    params_short: HashMap<String, CmdParameter>,
+    params_long: HashMap<String, CmdParameter>,
+    subcommands: HashMap<String, CmdCompletion>
 }
 
 impl CmdCompletion {
@@ -94,34 +111,108 @@ impl CmdCompletion {
         }
     }
 
+    pub(crate) fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn get_completions(&self, cmd: Vec<&str>, pos: CursorPosition) -> Vec<String> {
+        let idx = match pos {
+            CursorPosition::InWord(idx) => idx,
+            CursorPosition::OnWordRightEdge(idx) => idx,
+            CursorPosition::OnWordLeftEdge(idx) => idx - 1,
+            CursorPosition::InSpace(_, Some(idx)) => idx,
+            CursorPosition::InSpace(_, None) => 0
+        };
+
+        self.get_completions_int(cmd, idx)
+    }
+
+    fn get_completions_int(&self, cmd: Vec<&str>, idx: usize) -> Vec<String> {
+        if self.name != cmd[0] {
+            return Vec::new()
+        }
+
+        let mut in_parameter = false;
+        let mut parameter_type: Option<&CmdParameter> = None;
+        for ii in 1..idx {
+            let item = cmd[ii];
+
+            if !in_parameter {
+                // if we're in a submodule, pass the remaining parameters down
+                if let Some(subcommand) = self.subcommands.get(item) {
+                    let tmp = cmd[ii..cmd.len()].to_vec();
+                    return subcommand.get_completions_int(tmp, idx-ii);
+                }
+
+                let lookuptable = if item.starts_with("--") {
+                    Some(&self.params_long)
+                } else if item.starts_with('-') {
+                    Some(&self.params_short)
+                } else {
+                    None
+                };
+
+                if let Some(lookuptable) = lookuptable {
+                    if let Some(param) = lookuptable.get(item) {
+                        let (in_param, param_type) = match param {
+                            CmdParameter::FLAG | CmdParameter::PATH(false) => (false, None),
+                            param @ _ => (true, Some(param)),
+                        };
+
+                        in_parameter = in_param;
+                        parameter_type = param_type;
+                    }
+                }
+            } else {
+                in_parameter = false;
+                parameter_type = None;
+            }
+        }
+
+        // At this point we know the type of the element we're typing right now:
+        // - submodule name or parameter name
+        // - parameter value (and which type it must be)
+        let item = cmd[idx];
+        if !in_parameter {
+            // submodule name or parameter name
+            let list: Vec<&String> = if item.starts_with("--") {
+                self.params_long.keys().filter(|xx| xx.starts_with(item)).collect()
+            } else if item.starts_with('-') {
+                self.params_short.keys().filter(|xx| xx.starts_with(item)).collect()
+            } else {
+                self.subcommands.keys().filter(|xx| xx.starts_with(item)).collect()
+            };
+        }
+
+        Vec::new()
+    }
+
     fn from_internal(from: InternalCmdCompletion) -> CmdCompletion {
         let name = from.name;
         let (params_short, params_long) = if let Some(params) = from.params {
             let params_short = if let Some(params_short) = params.short {
                 CmdCompletion::parse_InternalCmdCompletionParamSet(params_short)
             } else {
-                FnvHashMap::default()
+                HashMap::new()
             };
 
             let params_long = if let Some(params_long) = params.long {
                 CmdCompletion::parse_InternalCmdCompletionParamSet(params_long)
             } else {
-                FnvHashMap::default()
+                HashMap::new()
             };
 
             (params_short, params_long)
         } else {
-            (FnvHashMap::default(), FnvHashMap::default())
+            (HashMap::new(), HashMap::new())
         };
 
-        let mut subcommands: FnvHashMap<String, CmdCompletion> = FnvHashMap::default();
-        if let Some(subcommands) = from.commands {
-            for subcommand in subcommands {
-                let subcmd = CmdCompletion::from_internal(subcommand);
-                let subname = subcmd.name;
-                // TODO: this does not work because FnvHashMap.insert() can only take a usize as key
-                // Therefore, we need to use a std HashMap.
-                //subcommands.insert(subname.as_bytes(), subcmd);
+        let mut subcommands: HashMap<String, CmdCompletion> = HashMap::new();
+        if let Some(commands) = from.commands {
+            for command in commands {
+                let subcmd = CmdCompletion::from_internal(command);
+                let subname = subcmd.get_name();
+                subcommands.insert(subname, subcmd);
             }
         }
 
@@ -134,9 +225,9 @@ impl CmdCompletion {
     }
 
     fn parse_InternalCmdCompletionParamSet(from: InternalCmdCompletionParamSet) ->
-    FnvHashMap<String, CmdParameter> {
+    HashMap<String, CmdParameter> {
 
-        FnvHashMap::default()
+        HashMap::new()
     }
 }
 

@@ -190,10 +190,14 @@ impl Binary for Shell {
     fn prompt(&mut self) -> String { prompt(self) }
 
     fn load_cmd_completion(&mut self, config: String) -> bool {
-        let completion = completer::CmdCompletion::from_config(config);
-        //let name = completion.get_name();
+        if let Some(completion) = completer::CmdCompletion::from_config(config) {
+            let name = completion.get_name();
+            self.completions.insert(name, completion);
 
-        false
+            true
+        } else {
+            false
+        }
     }
 }
 

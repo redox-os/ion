@@ -1,9 +1,8 @@
 use super::super::{completer::*, Binary, DirectoryStack, Shell, Variables};
-use fnv::FnvHashMap;
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use smallstring::SmallString;
 use std::{
-    env, io::{self, ErrorKind, Write}, mem, path::PathBuf,
+    collections::HashMap, env, io::{self, ErrorKind, Write}, mem, path::PathBuf,
 };
 use sys;
 use types::*;
@@ -12,7 +11,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
     {
         let vars_ptr = &shell.variables as *const Variables;
         let dirs_ptr = &shell.directory_stack as *const DirectoryStack;
-        let completions = &shell.completions as *const FnvHashMap<String, CmdCompletion>;
+        let completions = &shell.completions as *const HashMap<String, CmdCompletion>;
 
         // Collects the current list of values from history for completion.
         let history = &shell.context.as_ref().unwrap().history.buffers.iter()

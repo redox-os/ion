@@ -36,7 +36,7 @@ use liner::Context;
 use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
 use smallvec::SmallVec;
 use std::{
-    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
+    collections::HashMap, fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
     sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
@@ -100,7 +100,7 @@ pub struct Shell {
     /// TODO
     /// provides no protection against collision attacks, where a malicious user can craft specific
     /// keys designed to slow a hasher down.
-    completions: FnvHashMap<String, CmdCompletion>,
+    completions: HashMap<String, CmdCompletion>,
 }
 
 pub struct ShellBuilder;
@@ -414,7 +414,7 @@ impl<'a> Shell {
             break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new()),
             ignore_setting: IgnoreSetting::default(),
-            completions: FnvHashMap::default(),
+            completions: HashMap::new(),
         }
     }
 }
