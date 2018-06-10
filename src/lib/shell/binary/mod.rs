@@ -24,7 +24,7 @@ DESCRIPTION
 
 OPTIONS
     -c
-        evaulates given commands instead of reading from the commandline.
+        evaluates given commands instead of reading from the commandline.
 
     -n or --no-execute
         do not execute any commands, just do syntax checking.
