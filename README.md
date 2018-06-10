@@ -62,7 +62,7 @@ integration tests.
 
 ## Issue Board
 
-Please visit the [issue board](https://github.com/redox-os/ion/issues) for a list of curated
+Please visit the [issue board](https://gitlab.redox-os.org/redox-os/shell/ion/issues) for a list of curated
 issues that need to be worked on. If an issue has the **WIP** tag, then that issue is currently
 being worked on. Otherwise, the issue is free game. Issues are also labeled to guide contributors
 into finding problems to tackle at a given skill level. Not to worry though, because most issues
@@ -125,13 +125,13 @@ Then, it's just a matter of performing one of the following methods:
 ## Install Direct From Git
 
 ```sh
-cargo install --git https://github.com/redox-os/ion/
+cargo install --git https://gitlab.redox-os.org/redox-os/shell/ion/
 ```
 
 ## Build Locally
 
 ```sh
-git clone https://github.com/redox-os/ion/
+git clone https://gitlab.redox-os.org/redox-os/shell/ion/
 cd ion && cargo build --release
 ```
 
@@ -153,7 +153,7 @@ echo Current Branch: ${git::branch}${git::modified_count}${git::untracked_count}
 
 # Vim/NeoVim Syntax Highlighting Plugin
 
-We do have an [officially-supported syntax highlighting plugin](https://github.com/vmchale/ion-vim) for all the
+We do have an [officially-supported syntax highlighting plugin](https://gitlab.redox-os.org/redox-os/shell/ion-vim) for all the
 vim/nvim users out there.
 
 ```vimscript
