@@ -47,12 +47,11 @@ fn string_method() {
 
 #[test]
 fn escape_with_backslash() {
-    let input = "\\$FOO\\$BAR \\$FOO";
+    let input = r#"\$FOO\$BAR \$FOO"#;
     let expected = vec![
-        WordToken::Normal("$FOO", false, false),
-        WordToken::Normal("$BAR", false, false),
+        WordToken::Normal("$FOO$BAR".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Normal("$FOO", false, false),
+        WordToken::Normal("$FOO".into(), false, false),
     ];
     compare(input, expected);
 }
@@ -99,7 +98,7 @@ fn array_process_within_string_process() {
     compare(
         "echo $(let free=[@(free -h)]; echo @free[6]@free[8]/@free[7])",
         vec![
-            WordToken::Normal("echo", false, false),
+            WordToken::Normal("echo".into(), false, false),
             WordToken::Whitespace(" "),
             WordToken::Process(
                 "let free=[@(free -h)]; echo @free[6]@free[8]/@free[7]",
@@ -152,7 +151,7 @@ fn string_keys() {
 fn nested_processes() {
     let input = "echo $(echo $(echo one)) $(echo one $(echo two) three)";
     let expected = vec![
-        WordToken::Normal("echo", false, false),
+        WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
         WordToken::Process("echo $(echo one)", false, Select::All),
         WordToken::Whitespace(" "),
@@ -165,7 +164,7 @@ fn nested_processes() {
 fn words_process_with_quotes() {
     let input = "echo $(git branch | rg '[*]' | awk '{print $2}')";
     let expected = vec![
-        WordToken::Normal("echo", false, false),
+        WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
         WordToken::Process(
             "git branch | rg '[*]' | awk '{print $2}'",
@@ -177,7 +176,7 @@ fn words_process_with_quotes() {
 
     let input = "echo $(git branch | rg \"[*]\" | awk '{print $2}')";
     let expected = vec![
-        WordToken::Normal("echo", false, false),
+        WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
         WordToken::Process(
             "git branch | rg \"[*]\" | awk '{print $2}'",
@@ -192,16 +191,16 @@ fn words_process_with_quotes() {
 fn test_words() {
     let input = "echo $ABC \"${ABC}\" one{$ABC,$ABC} ~ $(echo foo) \"$(seq 1 100)\"";
     let expected = vec![
-        WordToken::Normal("echo", false, false),
+        WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
         WordToken::Variable("ABC", false, Select::All),
         WordToken::Whitespace(" "),
         WordToken::Variable("ABC", true, Select::All),
         WordToken::Whitespace(" "),
-        WordToken::Normal("one", false, false),
+        WordToken::Normal("one".into(), false, false),
         WordToken::Brace(vec!["$ABC", "$ABC"]),
         WordToken::Whitespace(" "),
-        WordToken::Normal("~", false, true),
+        WordToken::Normal("~".into(), false, true),
         WordToken::Whitespace(" "),
         WordToken::Process("echo foo", false, Select::All),
         WordToken::Whitespace(" "),
@@ -214,13 +213,9 @@ fn test_words() {
 fn test_multiple_escapes() {
     let input = "foo\\(\\) bar\\(\\)";
     let expected = vec![
-        WordToken::Normal("foo", false, false),
-        WordToken::Normal("(", false, false),
-        WordToken::Normal(")", false, false),
+        WordToken::Normal("foo()".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Normal("bar", false, false),
-        WordToken::Normal("(", false, false),
-        WordToken::Normal(")", false, false),
+        WordToken::Normal("bar()".into(), false, false),
     ];
     compare(input, expected);
 }
@@ -229,7 +224,7 @@ fn test_multiple_escapes() {
 fn test_arithmetic() {
     let input = "echo $((foo bar baz bing 3 * 2))";
     let expected = vec![
-        WordToken::Normal("echo", false, false),
+        WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
         WordToken::Arithmetic("foo bar baz bing 3 * 2"),
     ];
@@ -240,9 +235,9 @@ fn test_arithmetic() {
 fn test_globbing() {
     let input = "barbaz* bingcrosb*";
     let expected = vec![
-        WordToken::Normal("barbaz*", true, false),
+        WordToken::Normal("barbaz*".into(), true, false),
         WordToken::Whitespace(" "),
-        WordToken::Normal("bingcrosb*", true, false),
+        WordToken::Normal("bingcrosb*".into(), true, false),
     ];
     compare(input, expected);
 }
@@ -251,15 +246,15 @@ fn test_globbing() {
 fn test_empty_strings() {
     let input = "rename '' 0 a \"\"";
     let expected = vec![
-        WordToken::Normal("rename", false, false),
+        WordToken::Normal("rename".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Normal("", false, false),
+        WordToken::Normal("".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Normal("0", false, false),
+        WordToken::Normal("0".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Normal("a", false, false),
+        WordToken::Normal("a".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Normal("", false, false),
+        WordToken::Normal("".into(), false, false),
     ];
     compare(input, expected);
 }

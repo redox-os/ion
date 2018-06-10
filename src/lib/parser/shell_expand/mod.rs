@@ -203,13 +203,16 @@ pub(crate) fn expand_string<E: Expander>(
     loop {
         match word_iterator.next() {
             Some(word) => {
-                if let WordToken::Brace(_) = word {
-                    contains_brace = true;
+                match word {
+                    WordToken::Brace(_) => {
+                        contains_brace = true;
+                    }
+                    _ => (),
                 }
                 token_buffer.push(word);
             }
             None if original.is_empty() => {
-                token_buffer.push(WordToken::Normal("", true, false));
+                token_buffer.push(WordToken::Normal("".into(), true, false));
                 break;
             }
             None => break,
@@ -300,12 +303,12 @@ fn expand_braces<E: Expander>(
 
                 slice(&mut output, expanded, index.clone());
             }
-            WordToken::Normal(text, do_glob, tilde) => {
+            WordToken::Normal(ref text, do_glob, tilde) => {
                 expand(
                     &mut output,
                     &mut expanded_words,
                     expand_func,
-                    text,
+                    text.as_ref(),
                     do_glob,
                     tilde,
                 );
@@ -407,12 +410,12 @@ fn expand_single_string_token<E: Expander>(
 
     match *token {
         WordToken::StringMethod(ref method) => method.handle(&mut output, expand_func),
-        WordToken::Normal(text, do_glob, tilde) => {
+        WordToken::Normal(ref text, do_glob, tilde) => {
             expand(
                 &mut output,
                 &mut expanded_words,
                 expand_func,
-                text,
+                text.as_ref(),
                 do_glob,
                 tilde,
             );
@@ -552,12 +555,12 @@ pub(crate) fn expand_tokens<E: Expander>(
                     method.handle(&mut output, expand_func);
                 }
                 WordToken::Brace(_) => unreachable!(),
-                WordToken::Normal(text, do_glob, tilde) => {
+                WordToken::Normal(ref text, do_glob, tilde) => {
                     expand(
                         &mut output,
                         &mut expanded_words,
                         expand_func,
-                        text,
+                        text.as_ref(),
                         do_glob,
                         tilde,
                     );
