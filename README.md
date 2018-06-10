@@ -72,13 +72,13 @@ Then, it's just a matter of performing one of the following methods:
 ## Install Direct From Git
 
 ```sh
-cargo +nightly install --git https://gitlab.redox-os.org/redox-os/shell/ion/
+cargo +nightly install --git https://gitlab.redox-os.org/redox-os/ion/
 ```
 
 ## Build Locally
 
 ```sh
-git clone https://gitlab.redox-os.org/redox-os/shell/ion/
+git clone https://gitlab.redox-os.org/redox-os/ion/
 cd ion && cargo +nightly build --release
 ```
 
@@ -100,7 +100,7 @@ echo Current Branch: ${git::branch}${git::modified_count}${git::untracked_count}
 
 # Vim/NeoVim Syntax Highlighting Plugin
 
-We do have an [officially-supported syntax highlighting plugin](https://gitlab.redox-os.org/redox-os/shell/ion-vim) for all the
+We do have an [officially-supported syntax highlighting plugin](https://gitlab.redox-os.org/redox-os/ion-vim) for all the
 vim/nvim users out there.
 
 ```vimscript

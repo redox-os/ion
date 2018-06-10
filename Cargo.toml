@@ -33,7 +33,7 @@ fnv = "1.0"
 glob = "0.2"
 itoa = "0.4"
 lazy_static = "1.0"
-liner = { git = "https://gitlab.redox-os.org/redox-os/shell/liner" }
+liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }
 permutate = "0.3"
 rand = "0.5"
 regex = "1.0"
@@ -58,4 +58,4 @@ users = "0.7"
 redox_syscall = "0.1"
 
 [patch.crates-io]
-liner = { git = "https://gitlab.redox-os.org/redox-os/shell/liner" }
+liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }

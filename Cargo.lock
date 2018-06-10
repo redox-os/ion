@@ -63,7 +63,7 @@ dependencies = [
  "atty 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.31.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "decimal 2.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "liner 0.4.5 (git+https://gitlab.redox-os.org/redox-os/shell/liner)",
+ "liner 0.4.5 (git+https://gitlab.redox-os.org/redox-os/liner)",
 ]
 
 [[package]]
@@ -169,7 +169,7 @@ dependencies = [
  "lazy_static 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "libloading 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "liner 0.4.5 (git+https://gitlab.redox-os.org/redox-os/shell/liner)",
+ "liner 0.4.5 (git+https://gitlab.redox-os.org/redox-os/liner)",
  "permutate 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -209,7 +209,7 @@ dependencies = [
 [[package]]
 name = "liner"
 version = "0.4.5"
-source = "git+https://gitlab.redox-os.org/redox-os/shell/liner#5bbd4ae94bc01a1897e97f4951600cfd37cc63c1"
+source = "git+https://gitlab.redox-os.org/redox-os/liner#5bbd4ae94bc01a1897e97f4951600cfd37cc63c1"
 dependencies = [
  "bytecount 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "termion 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -485,7 +485,7 @@ source = "git+https://github.com/whitequark/rust-xdg#090afef2509d746e48d6bfa9b2e
 "checksum lazy_static 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e6412c5e2ad9584b0b8e979393122026cdd6d2a80b933f890dcd694ddbe73739"
 "checksum libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)" = "b685088df2b950fccadf07a7187c8ef846a959c142338a48f9dc0b94517eb5f1"
 "checksum libloading 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9c3ad660d7cb8c5822cd83d10897b0f1f1526792737a179e73896152f85b88c2"
-"checksum liner 0.4.5 (git+https://gitlab.redox-os.org/redox-os/shell/liner)" = "<none>"
+"checksum liner 0.4.5 (git+https://gitlab.redox-os.org/redox-os/liner)" = "<none>"
 "checksum memchr 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "796fba70e76612589ed2ce7f45282f5af869e0fdd7cc6199fa1aa1f1d591ba9d"
 "checksum ord_subset 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc65e6e24476e1a5baed530f60b918ff7925539aaae1d59ab51113c991321c40"
 "checksum permutate 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "53b7d5b19a715ffab38693a9dd44b067fdfa2b18eef65bd93562dfe507022fae"
