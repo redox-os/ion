@@ -252,13 +252,13 @@ fn test_evaluate_arguments() {
     statements.push(Statement::End);
     let description = "description".to_owned();
 
-    shell.functions.insert(
+    shell.variables.insert_function(
         name.clone(),
         Function::new(Some(description), name, args, statements),
     );
 
     assert_eq!(evaluate_arguments(&["--fn".to_owned(), name_str.to_owned()], &shell), Ok(true));
-    shell.functions.remove(name_str);
+    shell.variables.remove_function(name_str);
     assert_eq!(evaluate_arguments(&["--fn".to_owned(), name_str.to_owned()], &shell), Ok(false));
 
     // check invalid flags / parameters (should all be treated as strings and
@@ -408,7 +408,7 @@ fn test_string_var_is_not_empty() {
 #[test]
 fn test_function_is_defined() {
     use parser::assignments::{KeyBuf, Primitive};
-    let mut shell = shell::ShellBuilder::new().as_library();
+    let shell = shell::ShellBuilder::new().as_library();
 
     // create a simple dummy function
     let name_str = "test_function";
@@ -422,12 +422,12 @@ fn test_function_is_defined() {
     statements.push(Statement::End);
     let description = "description".to_owned();
 
-    shell.functions.insert(
+    shell.variables.insert_function(
         name.clone(),
         Function::new(Some(description), name, args, statements),
     );
 
     assert_eq!(function_is_defined(name_str, &shell), true);
-    shell.functions.remove(name_str);
+    shell.variables.remove_function(name_str);
     assert_eq!(function_is_defined(name_str, &shell), false);
 }

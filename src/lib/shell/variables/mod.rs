@@ -280,7 +280,7 @@ impl<'a> Variables<'a> {
                     None => break
                 }
             }
-            None
+            env::var(name).ok()
         }
     }
     pub fn insert_alias(&self, name: SmallString, value: Value) -> Option<Value> {
@@ -348,6 +348,19 @@ impl<'a> Variables<'a> {
         loop {
             if let Some(var) = me.functions.borrow().get(name) {
                 return Some(var.clone());
+            }
+            match me.parent {
+                Some(parent) => me = parent,
+                None => break
+            }
+        }
+        None
+    }
+    pub fn remove_function(&self, name: &str) -> Option<Function> {
+        let mut me = self;
+        loop {
+            if let Some(var) = me.functions.borrow_mut().remove(name) {
+                return Some(var);
             }
             match me.parent {
                 Some(parent) => me = parent,
@@ -505,7 +518,7 @@ mod tests {
     use super::*;
     use parser::{expand_string, Expander};
 
-    struct VariableExpander(pub Variables);
+    struct VariableExpander(pub Variables<'static>);
 
     impl Expander for VariableExpander {
         fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
@@ -520,7 +533,7 @@ mod tests {
 
     #[test]
     fn set_var_and_expand_a_variable() {
-        let mut variables = Variables::default();
+        let variables = Variables::default();
         variables.set_var("FOO", "BAR");
         let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
         assert_eq!("BAR", &expanded);
@@ -538,7 +551,7 @@ mod tests {
 
     #[test]
     fn minimal_directory_var_should_compact_path() {
-        let mut variables = Variables::default();
+        let variables = Variables::default();
         variables.set_var("PWD", "/var/log/nix");
         assert_eq!(
             "v/l/nix",
@@ -548,7 +561,7 @@ mod tests {
 
     #[test]
     fn minimal_directory_var_shouldnt_compact_path() {
-        let mut variables = Variables::default();
+        let variables = Variables::default();
         variables.set_var("PWD", "/var/log");
         assert_eq!(
             "/var/log",
