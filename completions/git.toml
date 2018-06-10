@@ -69,65 +69,6 @@ after_params = [ "array", "path" ]
         "renormalize",
     ]
 
-[[commands]]
-name = "am"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "archive"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "bisect"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
 
 [[commands]]
 name = "branch"
@@ -138,7 +79,7 @@ name = "branch"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -146,27 +87,7 @@ name = "branch"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "bundle"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -178,7 +99,7 @@ name = "checkout"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -186,67 +107,7 @@ name = "checkout"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "cherry-pick"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "citool"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "clean"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -258,7 +119,7 @@ name = "clone"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -266,7 +127,7 @@ name = "clone"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -278,7 +139,7 @@ name = "commit"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -286,47 +147,7 @@ name = "commit"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "describe"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "diff"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -338,7 +159,7 @@ name = "fetch"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -346,87 +167,7 @@ name = "fetch"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "format-patch"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "gc"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "grep"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "gui"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -438,7 +179,7 @@ name = "init"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -446,27 +187,7 @@ name = "init"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "log"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -478,7 +199,7 @@ name = "merge"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -486,47 +207,7 @@ name = "merge"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "mv"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "notes"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -538,7 +219,7 @@ name = "pull"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -546,7 +227,7 @@ name = "pull"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -558,7 +239,7 @@ name = "push"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -566,7 +247,7 @@ name = "push"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -578,7 +259,7 @@ name = "rebase"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -586,7 +267,7 @@ name = "rebase"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -598,7 +279,7 @@ name = "reset"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -606,67 +287,7 @@ name = "reset"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "revert"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "rm"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "shortlog"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -678,7 +299,7 @@ name = "show"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -686,7 +307,7 @@ name = "show"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -698,7 +319,7 @@ name = "stash"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -706,7 +327,7 @@ name = "stash"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -718,7 +339,7 @@ name = "status"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -726,7 +347,7 @@ name = "status"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -738,7 +359,7 @@ name = "submodule"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -746,47 +367,7 @@ name = "submodule"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "tag"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "worktree"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -798,7 +379,7 @@ name = "config"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -806,147 +387,7 @@ name = "config"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "fast-export"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "fast-import"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "filter-branch"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "mergetool"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "pack-refs"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "prune"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "reflog"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -958,7 +399,7 @@ name = "remote"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -966,187 +407,7 @@ name = "remote"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "repack"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "replace"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "annotate"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "blame"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "cherry"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "count-objects"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "difftool"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "fsck"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "get-tar-commit-id"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
 
 [[commands]]
@@ -1158,7 +419,7 @@ name = "help"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
     flag = [ "" ]
@@ -1166,244 +427,4 @@ name = "help"
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "instaweb"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "merge-tree"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "rerere"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "rev-parse"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "show-branch"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "verify-commit"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "verify-tag"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "what-changed"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "archimport"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "cvsexportcommit"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "XXX"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-
-[[commands]]
-name = "cvsimport"
-
-    [commands.params.short]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
-
-    [commands.params.long]
-    flag = [ "" ]
-    file = [ [ "" ] ]
-    keyvalue = [ [ "" ] ]
-    path = [ "" ]
-    path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]

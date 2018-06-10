@@ -131,7 +131,9 @@ impl Binary for Shell {
         self.variables
             .set_array("args", iter::once(env::args().next().unwrap()).collect());
 
+        // TODO: load all files from specific directory
         self.load_cmd_completion("./completions/git.toml".to_owned());
+        self.load_cmd_completion("./completions/cargo.toml".to_owned());
 
         loop {
             if let Some(command) = self.readln() {

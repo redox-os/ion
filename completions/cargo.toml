@@ -1,0 +1,72 @@
+name = "cargo"
+
+[params.short]
+flag = [ "V", "v", "vv", "q", "h" ]
+string = [ ["Z"] ]
+
+[params.long]
+flag = [
+    "frozen",
+    "help",
+    "list",
+    "locked",
+    "verbose",
+    "version",
+    "quiet",
+]
+string = [
+    [ "explain" ],
+    [ "color", "auto", "always", "never" ],
+]
+
+[[commands]]
+name = "build"
+
+    [commands.params.short]
+    flag = [ "h", "q", "v" ]
+    int = [ "j" ]
+    string = [
+        [ "p" ],
+        [ "Z" ],
+    ]
+
+    [commands.params.long]
+    flag = [
+        "all",
+        "all-features",
+        "all-targets",
+        "benches",
+        "bins",
+        "build-plan",
+        "examples",
+        "frozen",
+        "help",
+        "lib",
+        "locked",
+        "no-default-features",
+        "release",
+        "tests",
+        "quiet",
+        "verbose",
+    ]
+    int = [ "jobs" ]
+    path = [
+        "manifest-path",
+        "out-dir",
+        "target-dir",
+    ]
+    string = [
+        # no support for custom items yet
+        [ "bench" ],
+        [ "bin" ],
+        [ "color", "auto", "always", "never" ],
+        [ "example" ],
+        [ "exclude" ],
+        [ "message-format", "human", "json" ],
+        [ "package" ],
+        [ "target" ],
+        [ "test" ],
+    ]
+    array_string = [
+        "features",
+    ]

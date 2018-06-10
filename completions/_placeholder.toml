@@ -1,41 +1,62 @@
+# name of the command to complete
 name = "_placeholder"
 
+# short params are prefixed with one dash ("-")
 [params.short]
-flag = [ "" ]
+# file: parameters that take a file name as a patameter
+# the first element of each array is the parameter-name, the remaining elements
+# define a list of file extensions to match
+# e.g. to define a parameter "--file" which matches only files ending with ".rs"
+# and ".ion", do the following:
+# file = [ [ "file", ".ion", ".rs" ] ]
 file = [ [ "" ] ]
+# flags are toggles; they don't take a value
+flag = [ "" ]
+# For parameters that take a number. Currently only integers are supported.
+number = [ "" ]
+# A list of parameters that take key=value pairs as values
+# Format is the same as with "file". Do NOT write the '='
 keyvalue = [ [ "" ] ]
+# For parameters taking a path. If you want to match files with specific file
+# extensions, use "file".
 path = [ "" ]
+# Same as above, however the parameter value is optional. NOT YET IMPLEMENTED.
 path_optional = [ "" ]
-string = [ "" ]
+# Parameters that take a string as a value. Can be used for parameters that take
+# custom types. Same format as for "file" and "keyvalue", where additional
+# elements are a list of options
+string = [ [ "", ""] ]
 
+# short params are prefixed with two dashes ("--")
 [params.long]
-flag = [ "" ]
 file = [ [ "" ] ]
+flag = [ "" ]
+int = [ "" ]
 keyvalue = [ [ "" ] ]
 path = [ "" ]
 path_optional = [ "" ]
-string = [ "" ]
+string = [ [ "", ""] ]
 
+# Many applications have subcommands (e.g. for cargo: "build", "run", "clean")
+# You can define their parameters here. You can have as many commands as you want.
+# IMPORTANT: use double-brackets ("tables" in TOML)
 [[commands]]
-name = "add"
-
-[[commands]]
-name = "XXX"
-end_of_params = "--"
-after_params = [ "array", "path" ]
+name = ""
 
     [commands.params.short]
-    flag = [ "" ]
     file = [ [ "" ] ]
+    flag = [ "" ]
+    int = [ "" ]
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]
 
     [commands.params.long]
-    flag = [ "" ]
     file = [ [ "" ] ]
+    flag = [ "" ]
+    int = [ "" ]
     keyvalue = [ [ "" ] ]
     path = [ "" ]
     path_optional = [ "" ]
-    string = [ "" ]
+    string = [ [ "", ""] ]

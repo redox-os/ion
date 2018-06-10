@@ -87,13 +87,15 @@ impl Completer for IonCmdCompleter {
 
 pub(crate) enum CmdParameter {
     FLAG,
-    // bool tells us whether the parameter value is OPTIONAL
-    PATH(bool),
     // if present, the vector gives a list of file extensions to match
     FILE(Option<Vec<String>>),
+    INT,
     // if present, the vector gives a list of possible key values
     KEYVALUE(Option<Vec<String>>),
-    STRING
+    // bool tells us whether the parameter value is OPTIONAL
+    PATH(bool),
+    // if present, contains a list of possible (allowed) values
+    STRING(Option<Vec<String>>),
 }
 
 pub(crate) struct CmdCompletion {
@@ -120,7 +122,7 @@ impl CmdCompletion {
 
         let decoded: Result<InternalCmdCompletion, _> = toml::from_str(&toml_str);
         if let Ok(decoded) = decoded {
-            println!("{:#?}", decoded);
+            //println!("{:#?}", decoded);
             Some(CmdCompletion::from_internal(decoded))
         } else {
             None
@@ -215,6 +217,8 @@ impl CmdCompletion {
                 .map(|xx| (*xx).clone() + " ")
                 .collect();
 
+            //println!("candidates: {:?}", candidates);
+
             return if candidates.len() == 1 && candidates[0] == item_in_progress {
                 // if only the element we just typed matches, check whether we already completed it
                 if inword {
@@ -249,6 +253,13 @@ impl CmdCompletion {
                             return files;
                         }
                     },
+                    CmdParameter::INT => {
+                        // TODO we might want to support floating point numbers, allowed
+                        // numbers/ranges, etc.
+                        return vec!["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].iter()
+                            .map(|xx| item_in_progress.to_owned() + xx)
+                            .collect();
+                    },
                     CmdParameter::KEYVALUE(keys) => {
                         if let Some(keys) = keys {
                             return keys.iter()
@@ -261,9 +272,15 @@ impl CmdCompletion {
                         // TODO: implement optional stuff
                         return file_completer.completions(item_in_progress);
                     },
-                    CmdParameter::STRING => {
-                        // no completions for that type available
-                        return vec!();
+                    CmdParameter::STRING(options) => {
+                        return if let Some(options) = options {
+                            options.iter()
+                                .filter(|xx| xx.starts_with(item_in_progress))
+                                .map(|xx| (*xx).clone() + " ")
+                                .collect()
+                        } else {
+                            vec!()
+                        }
                     },
                     _ => {
                         return vec!("NOT_YET_IMPLEMENTED".to_owned());
@@ -325,6 +342,11 @@ impl CmdCompletion {
         if let Some(files) = from.file {
             for file in &files {
                 let file_param = &file[0];
+                // filter empty parameter-names as they would break tab completion and are always
+                // invalid
+                if file_param.trim().len() < 1 {
+                    continue;
+                }
                 let file_extensions = if file.len() > 1 {
                     Some(file[1..file.len()].to_vec())
                 } else {
@@ -334,27 +356,59 @@ impl CmdCompletion {
             }
         }
 
+        if let Some(ints) = from.int {
+            for int in &ints {
+                to.insert(prefix.to_owned() + int, CmdParameter::INT);
+            }
+        }
+
         if let Some(paths) = from.path {
             for path in &paths {
+                // filter empty parameter-names as they would break tab completion and are always
+                // invalid
+                if path.trim().len() < 1 {
+                    continue;
+                }
                 to.insert(prefix.to_owned() + path, CmdParameter::PATH(false));
             }
         }
 
         if let Some(paths) = from.path_optional {
             for path in &paths {
+                // filter empty parameter-names as they would break tab completion and are always
+                // invalid
+                if path.trim().len() < 1 {
+                    continue;
+                }
                 to.insert(prefix.to_owned() + path, CmdParameter::PATH(true));
             }
         }
 
         if let Some(strings) = from.string {
             for string in &strings {
-                to.insert(prefix.to_owned() + string, CmdParameter::STRING);
+                let string_param = &string[0];
+                // filter empty parameter-names as they would break tab completion and are always
+                // invalid
+                if string_param.trim().len() < 1 {
+                    continue;
+                }
+                let string_options = if string.len() > 1 {
+                    Some(string[1..string.len()].to_vec())
+                } else {
+                    None
+                };
+                to.insert(prefix.to_owned() + string_param, CmdParameter::STRING(string_options));
             }
         }
 
         if let Some(keyvalues) = from.keyvalue {
             for keyvalue in &keyvalues {
                 let keyvalue_param = &keyvalue[0];
+                // filter empty parameter-names as they would break tab completion and are always
+                // invalid
+                if keyvalue_param.trim().len() < 1 {
+                    continue;
+                }
                 let keyvalue_keys = if keyvalue.len() > 1 {
                     Some(keyvalue[1..keyvalue.len()].to_vec())
                 } else {
@@ -387,12 +441,13 @@ struct InternalCmdCompletionParams {
 
 #[derive(Debug, Deserialize)]
 struct InternalCmdCompletionParamSet {
-    flag: Option<Vec<String>>,
     file: Option<Vec<Vec<String>>>,
+    flag: Option<Vec<String>>,
+    int: Option<Vec<String>>,
+    keyvalue: Option<Vec<Vec<String>>>,
     path: Option<Vec<String>>,
     path_optional: Option<Vec<String>>,
-    string: Option<Vec<String>>,
-    keyvalue: Option<Vec<Vec<String>>>,
+    string: Option<Vec<Vec<String>>>,
 }
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
