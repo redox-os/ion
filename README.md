@@ -29,73 +29,6 @@ We are providing our manual for Ion in the form of a markdown-based book, which 
 > request. If you have any questions regarding certain implementation details, feel free to
 > ask in whichever venue you are most comfortable with.
 
-# Contributors
-
-## Guidelines
-
-### Code Formatting
-
-When submitting a pull request, be sure to run `rustfmt`:
-
-```
-rustup component add rustfmt-preview
-cargo +nightly fmt
-```
-
-### On Unit & Integration Tests
-
-If you see an area that deserves a test, feel free to add extra tests in your pull requests.
-When submitting new functionality, especially complex functionality, try to write as many
-tests as you can think of to cover all possible code paths that your function(s) might take.
-Integration tests are located in the **examples** directory, and are the most important place
-to create tests -- unit tests come second after the integration tests.
-
-Integration tests are much more useful in general, as they cover real world use cases and
-stress larger portions of the code base at once. Yet unit tests still have their place, as
-they are able to test bits of functionality which may not necessarily be covered by existing
-integration tests.
-
-> In order to create unit tests for otherwise untestable code that depends on greater runtime
-> specifics, you should likely write your functions to accept generic inputs, where unit
-> tests can pass dummy types and environments into your functions for the purpose of testing
-> the function, whereas in practice the function is hooked up to it's appropriate types.
-
-## Issue Board
-
-Please visit the [issue board](https://gitlab.redox-os.org/redox-os/shell/ion/issues) for a list of curated
-issues that need to be worked on. If an issue has the **WIP** tag, then that issue is currently
-being worked on. Otherwise, the issue is free game. Issues are also labeled to guide contributors
-into finding problems to tackle at a given skill level. Not to worry though, because most issues
-within Ion are relatively simple **C-Class** issues. The most difficult issues are marked as
-**A-Class**.
-
-## Chatroom
-
-Send an email to [info@redox-os.org](mailto:info@redox-os.org) to request invitation for joining
-the developer chatroom for Ion. Experience with Rust is not required for contributing to Ion. There
-are ways to contribute to Ion at all levels of experience, from writing scripts in Ion and reporting
-issues, to seeking mentorship on how to implement solutions for specific issues on the issue board.
-
-## Discussion
-
-In addition to the chatroom, there's a [thread in the Redox forums](https://discourse.redox-os.org/t/ion-shell-development-discussion/682)
-that can be used for discussions relating to Ion and Ion shell development. These are mostly served
-by the GitHub issue board, but general discussions can take place there instead.
-
-## Why Not Windows Support?
-
-Windows is not, and may never be supported due to certain limitations in the NT kernel. Namely,
-where in all non-Windows operating systems, the kernel takes an array of strings that defines
-the command to execute, and all of that command's arguments; Windows instead takes a single
-string that contains both the command and all of its arguments. This pushes the job of parsing
-arguments from the system shell onto the individual program, and may account for why the command-line
-in Windows is so funky.
-
-In addition, Windows does not support forking, a concept by which a new sub-process is spawned with
-the same state as the parent, for the purpose of continuing execution down a different path from the
-parent. This enables for subshells to be spawned, as commonly seen by process expansions (**$()**),
-among piping builtins and functions.
-
 # Goals
 
 Syntax and feature decisions for Ion are made based upon three measurements: is the feature useful,
@@ -114,6 +47,20 @@ class variables with their own unique **@** sigil. Strings are also treated as f
 variables with their own unique **$** sigil. Both support being sliced with **[range]**, and they
 each have their own supply of methods.
 
+# Why Not Windows Support?
+
+Windows is not, and may never be supported due to certain limitations in the NT kernel. Namely,
+where in all non-Windows operating systems, the kernel takes an array of strings that defines
+the command to execute, and all of that command's arguments; Windows instead takes a single
+string that contains both the command and all of its arguments. This pushes the job of parsing
+arguments from the system shell onto the individual program, and may account for why the command-line
+in Windows is so funky.
+
+In addition, Windows does not support forking, a concept by which a new sub-process is spawned with
+the same state as the parent, for the purpose of continuing execution down a different path from the
+parent. This enables for subshells to be spawned, as commonly seen by process expansions (**$()**),
+among piping builtins and functions.
+
 # Compile / Install Instructions
 
 Rust nightly is required for compiling Ion. Simplest way to obtain Rust/Cargo is by
@@ -125,14 +72,14 @@ Then, it's just a matter of performing one of the following methods:
 ## Install Direct From Git
 
 ```sh
-cargo install --git https://gitlab.redox-os.org/redox-os/shell/ion/
+cargo +nightly install --git https://gitlab.redox-os.org/redox-os/shell/ion/
 ```
 
 ## Build Locally
 
 ```sh
 git clone https://gitlab.redox-os.org/redox-os/shell/ion/
-cd ion && cargo build --release
+cd ion && cargo +nightly build --release
 ```
 
 # Git Plugin
