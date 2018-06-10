@@ -1,5 +1,6 @@
 use super::{flow::FlowLogic, Shell, Variables};
 use parser::{assignments::*, pipelines::Pipeline};
+use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
 use std::mem;
 use types::Identifier;
@@ -174,6 +175,22 @@ impl Function {
 
         let name = self.name.clone();
 
+        let mut values: SmallVec<[_; 8]> = SmallVec::new();
+
+        for (type_, value) in self.args.iter().zip(args.iter().skip(1)) {
+            let value = match value_check(shell, value.as_ref(), type_.kind) {
+                Ok(value) => value,
+                Err(_) => {
+                    return Err(FunctionError::InvalidArgumentType(
+                        type_.kind,
+                        value.as_ref().into(),
+                    ))
+                }
+            };
+
+            values.push((type_.clone(), value));
+        }
+
         shell.with_vars(|mut vars| {
             while !vars.functions.borrow().contains_key(&name) {
                 vars = vars.parent.expect("execute called on function that's not in scope");
@@ -188,17 +205,7 @@ impl Function {
             let vars: Variables<'static> = unsafe { mem::transmute(vars) };
             vars
         }, move |shell| {
-            for (type_, value) in self.args.into_iter().zip(args.iter().skip(1)) {
-                let value = match value_check(shell, value.as_ref(), type_.kind) {
-                    Ok(value) => value,
-                    Err(_) => {
-                        return Err(FunctionError::InvalidArgumentType(
-                            type_.kind,
-                            value.as_ref().into(),
-                        ))
-                    }
-                };
-
+            for (type_, value) in values {
                 match value {
                     ReturnValue::Vector(vector) => {
                         shell.variables.arrays.borrow_mut().insert(type_.name.into(), vector);
