@@ -415,11 +415,47 @@ impl<'a> Variables<'a> {
             .replace(&self.get_var("HOME").unwrap(), "~")
     }
 
-    pub fn unset_array(&self, name: &str) -> Option<Array> { self.arrays.borrow_mut().remove(name) }
+    pub fn unset_array(&self, name: &str) -> Option<Array> {
+        let mut me = self;
+        loop {
+            if let Some(var) = me.arrays.borrow_mut().remove(name) {
+                return Some(var);
+            }
+            match me.parent {
+                Some(parent) => me = parent,
+                None => break
+            }
+        }
+        None
+    }
 
-    pub fn get_array(&self, name: &str) -> Option<Array> { self.arrays.borrow().get(name).cloned() }
+    pub fn get_array(&self, name: &str) -> Option<Array> {
+        let mut me = self;
+        loop {
+            if let Some(var) = me.arrays.borrow().get(name) {
+                return Some(var.clone());
+            }
+            match me.parent {
+                Some(parent) => me = parent,
+                None => break
+            }
+        }
+        None
+    }
 
-    pub fn get_map(&self, name: &str) -> Option<HashMap> { self.hashmaps.borrow().get(name).cloned() }
+    pub fn get_map(&self, name: &str) -> Option<HashMap> {
+        let mut me = self;
+        loop {
+            if let Some(var) = me.hashmaps.borrow().get(name) {
+                return Some(var.clone());
+            }
+            match me.parent {
+                Some(parent) => me = parent,
+                None => break
+            }
+        }
+        None
+    }
 
     #[allow(dead_code)]
     pub(crate) fn set_hashmap_value(&self, name: &str, key: &str, value: &str) {
