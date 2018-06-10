@@ -203,23 +203,12 @@ pub(crate) fn expand_string<E: Expander>(
     loop {
         match word_iterator.next() {
             Some(word) => {
-                let word = match word {
-                    WordToken::Brace(value) => {
+                match word {
+                    WordToken::Brace(_) => {
                         contains_brace = true;
-                        WordToken::Brace(value)
                     }
-                    WordToken::Normal(mut output, glob, tilde) => {
-                        if let Some(found) = output.find("\\") {
-                            if output.len() > found {
-                                let mut string = output.to_owned();
-                                string.to_mut().remove(found);
-                                output = string;
-                            }
-                        }
-                        WordToken::Normal(output, glob, tilde)
-                    }
-                    word_token => word_token,
-                };
+                    _ => (),
+                }
                 token_buffer.push(word);
             }
             None if original.is_empty() => {
