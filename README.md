@@ -9,7 +9,7 @@ is developed alongside, and primarily for, RedoxOS, it is a fully capable on oth
 
 [![Build Status](https://travis-ci.org/redox-os/ion.svg)](https://travis-ci.org/redox-os/ion)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![crates.io](http://meritbadge.herokuapp.com/ion-shell)](https://crates.io/crates/ion-shell)
+[![crates.io](https://meritbadge.herokuapp.com/ion-shell)](https://crates.io/crates/ion-shell)
 ![LOC](https://tokei.rs/b1/github/redox-os/ion)
 
 > Ion is still a WIP, and both its syntax and rules are subject to change over time. It is
@@ -107,4 +107,4 @@ vim/nvim users out there.
 Plugin 'vmchale/ion-vim'
 ```
 
-![Screenshot of Syntax Highlighting](http://i.imgur.com/JzZp7WT.png)
+![Screenshot of Syntax Highlighting](https://i.imgur.com/JzZp7WT.png)
