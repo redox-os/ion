@@ -2,6 +2,7 @@ before_script:
   - apt-get update -qq
   - apt-get install -qq build-essential curl git
   - curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
+  - source "$HOME/.cargo/env"
 
 build:
   script:
@@ -9,6 +10,5 @@ build:
 
 test:
   script:
-  - source "$HOME/.cargo/env"
   - cargo test --lib
   - bash examples/run_examples.sh
