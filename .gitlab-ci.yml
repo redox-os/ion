@@ -4,11 +4,8 @@ before_script:
   - curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
   - source "$HOME/.cargo/env"
 
-build:
+nightly:
   script:
     - cargo build
-
-test:
-  script:
-  - cargo test --lib
-  - bash examples/run_examples.sh
+    - cargo test --lib
+    - bash examples/run_examples.sh
