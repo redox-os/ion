@@ -9,5 +9,6 @@ build:
 
 test:
   script:
+  - source "$HOME/.cargo/env"
   - cargo test --lib
   - bash examples/run_examples.sh
