@@ -12,6 +12,8 @@ pub(crate) use self::{
     select::{Select, SelectWithSize},
 };
 use super::{super::ArgumentSplitter, expand_string, Expander};
+use shell::escape::unescape;
+use std::borrow::Cow;
 
 // Bit Twiddling Guide:
 // var & FLAG != 0 checks if FLAG is enabled
@@ -32,7 +34,7 @@ bitflags! {
 pub(crate) enum WordToken<'a> {
     /// Represents a normal string who may contain a globbing character
     /// (the second element) or a tilde expression (the third element)
-    Normal(&'a str, bool, bool),
+    Normal(Cow<'a, str>, bool, bool),
     Whitespace(&'a str),
     // Tilde(&'a str),
     Brace(Vec<&'a str>),
@@ -642,7 +644,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
             return None;
         }
 
-        let mut iterator = self.data.bytes().skip(self.read);
+        let mut iterator = self.data.bytes().skip(self.read).peekable();
         let mut start = self.read;
         let mut glob = false;
         let mut tilde = false;
@@ -710,7 +712,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                         Some(b' ') | None => {
                             self.read += 1;
                             let output = &self.data[start..self.read];
-                            return Some(WordToken::Normal(output, glob, tilde));
+                            return Some(WordToken::Normal(output.into(), glob, tilde));
                         }
                         _ => {
                             self.read += 1;
@@ -737,7 +739,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                             Some(b' ') | None => {
                                 self.read += 1;
                                 let output = &self.data[start..self.read];
-                                return Some(WordToken::Normal(output, glob, tilde));
+                                return Some(WordToken::Normal(output.into(), glob, tilde));
                             }
                             _ => {
                                 self.read += 1;
@@ -763,48 +765,61 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
             match character {
                 _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
                 b'\\' if !self.flags.contains(Flags::SQUOTE) => {
-                    self.flags ^= Flags::BACKSL;
+                    pub(crate) fn maybe_unescape(input: &str, contains_escapeable: bool) -> Cow<str> {
+                        if !contains_escapeable {
+                            input.into()
+                        } else {
+                            let mut output = Vec::with_capacity(input.len());
+                            let mut bytes = input.bytes();
+                            while let Some(b) = bytes.next() {
+                                match b {
+                                    b'\\' => if let Some(next) = bytes.next() {
+                                        output.push(next);
+                                    } else {
+                                        output.push(b'\\')
+                                    },
+                                    _ => output.push(b),
+                                }
+                            }
+                            unsafe { String::from_utf8_unchecked(output) }.into()
+                        }
+                    }
 
-                    let include_backsl = self.flags.contains(Flags::DQUOTE)
-                        && iterator.clone().next().map_or(false, |nextch| {
-                            nextch != b'$' && nextch != b'\\' && nextch != b'"'
-                        });
-
-                    let end = if include_backsl {
-                        self.read + 1
-                    } else {
-                        self.read
-                    };
-                    let output = &self.data[start..end];
+                    let _ = iterator.next();
                     self.read += 1;
-                    return Some(WordToken::Normal(output, glob, tilde));
+
+                    if self.flags.contains(Flags::DQUOTE) {
+                        let next = iterator.next();
+                        self.read += 1;
+                        return Some(WordToken::Normal(maybe_unescape(&self.data[start..(self.read)], next.map_or(false, |c| c == b'$' || c == b'@' || c == b'\\' || c == b'"')), glob, tilde));
+                    }
                 }
                 b'\'' if !self.flags.contains(Flags::DQUOTE) => {
                     self.flags ^= Flags::SQUOTE;
                     let output = &self.data[start..self.read];
                     self.read += 1;
-                    return Some(WordToken::Normal(output, glob, tilde));
+                    return Some(WordToken::Normal(output.into(), glob, tilde));
                 }
                 b'"' if !self.flags.contains(Flags::SQUOTE) => {
                     self.flags ^= Flags::DQUOTE;
                     let output = &self.data[start..self.read];
                     self.read += 1;
-                    return Some(WordToken::Normal(output, glob, tilde));
+                    return Some(WordToken::Normal(output.into(), glob, tilde));
                 }
                 b' ' | b'{' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
-                    return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde))
+                    return Some(WordToken::Normal(unescape(&self.data[start..self.read]).into(), glob, tilde))
                 }
                 b'$' | b'@' if !self.flags.contains(Flags::SQUOTE) => {
                     if let Some(&character) = self.data.as_bytes().get(self.read) {
                         if character == b' ' {
                             self.read += 1;
                             let output = &self.data[start..self.read];
-                            return Some(WordToken::Normal(output, glob, tilde));
+                            return Some(WordToken::Normal(output.into(), glob, tilde));
                         }
                     }
                     let output = &self.data[start..self.read];
                     if output != "" {
-                        return Some(WordToken::Normal(output, glob, tilde));
+                        return Some(WordToken::Normal(output.into(), glob, tilde));
                     } else {
                         return self.next();
                     };
@@ -813,7 +828,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     if self.glob_check(&mut iterator) {
                         glob = true;
                     } else {
-                        return Some(WordToken::Normal(&self.data[start..self.read], glob, tilde));
+                        return Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde));
                     }
                 }
                 b'*' | b'?' if !self.flags.contains(Flags::SQUOTE) => {
@@ -827,7 +842,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
         if start == self.read {
             None
         } else {
-            Some(WordToken::Normal(&self.data[start..], glob, tilde))
+            Some(WordToken::Normal(unescape(&self.data[start..]).into(), glob, tilde))
         }
     }
 }

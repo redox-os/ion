@@ -3,6 +3,7 @@ pub(crate) mod binary;
 pub(crate) mod colors;
 mod completer;
 pub(crate) mod directory_stack;
+pub(crate) mod escape;
 pub mod flags;
 mod flow;
 pub(crate) mod flow_control;
