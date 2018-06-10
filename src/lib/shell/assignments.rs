@@ -32,7 +32,7 @@ fn list_vars(shell: &Shell) {
 
     // Write all the string variables to the buffer.
     let _ = buffer.write(b"# String Variables\n");
-    shell.variables.variables.iter().for_each(|(key, val)| {
+    shell.variables.variables.borrow().iter().for_each(|(key, val)| {
         let _ = buffer.write([key, " = ", val.as_str(), "\n"].concat().as_bytes());
     });
 
@@ -41,8 +41,9 @@ fn list_vars(shell: &Shell) {
     shell
         .variables
         .arrays
+        .borrow()
         .iter()
-        .for_each(|(key, val)| print_array(&mut buffer, &key, &val));
+        .for_each(|(key, val)| print_array(&mut buffer, &key, &val))
 }
 
 /// Represents: A variable store capable of setting local variables or
@@ -102,10 +103,8 @@ impl VariableStore for Shell {
                             let key_name: &str = &key.name;
                             let lhs = self
                                 .variables
-                                .variables
-                                .get(key_name)
-                                .map(|x| x.as_str())
-                                .unwrap_or("0");
+                                .get_var(key_name)
+                                .unwrap_or_else(|| String::from("0"));
 
                             let result = math(&lhs, key.kind, operator, &value, |value| {
                                 env::set_var(key_name, &OsStr::from_bytes(value))
@@ -178,10 +177,9 @@ impl VariableStore for Shell {
                             let key_name: &str = &key.name;
                             let lhs = self
                                 .variables
-                                .variables
-                                .get(key_name)
-                                .map(|x| x.as_str())
-                                .unwrap_or("0") as *const str;
+                                .get_var(key_name)
+                                .unwrap_or_else(|| String::from("0"));
+                            let lhs = &*lhs as *const str;
 
                             let result =
                                 math(unsafe { &*lhs }, key.kind, operator, &value, |value| {

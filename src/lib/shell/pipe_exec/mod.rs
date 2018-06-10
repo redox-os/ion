@@ -584,7 +584,7 @@ impl PipelineExecution for Shell {
             redir(file.as_raw_fd(), sys::STDERR_FILENO);
         }
 
-        let function = self.functions.get(name).cloned().unwrap();
+        let function = self.variables.get_function(name).unwrap();
         match function.execute(self, args) {
             Ok(()) => SUCCESS,
             Err(FunctionError::InvalidArgumentCount) => {
@@ -671,7 +671,7 @@ impl PipelineExecution for Shell {
                         builtins::builtin_cd,
                         iter::once("cd".into()).chain(job.args.drain()).collect(),
                     )
-                } else if self.functions.contains_key(job.args[0].as_str()) {
+                } else if self.variables.get_function(job.args[0].as_str()).is_some() {
                     RefinedJob::function(job.args[0].clone().into(), job.args.drain().collect())
                 } else if let Some(builtin) = job.builtin {
                     RefinedJob::builtin(builtin, job.args.drain().collect())

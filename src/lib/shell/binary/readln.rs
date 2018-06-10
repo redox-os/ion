@@ -21,7 +21,6 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
 
         loop {
             let prompt = handle_prompt(shell.prompt()).unwrap();
-            let funcs = &shell.functions;
             let vars = &shell.variables;
             let builtins = &shell.builtins;
 
@@ -69,13 +68,13 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                                 // Add the history list to the completer's definitions.
                                 .chain(history.iter().cloned())
                                 // Add the aliases to the completer's definitions.
-                                .chain(vars.aliases.keys().cloned())
+                                .chain(vars.aliases.borrow().keys().cloned())
                                 // Add the list of available functions to the completer's definitions.
-                                .chain(funcs.keys().cloned())
+                                .chain(vars.functions.borrow().keys().cloned())
                                 // Add the list of available variables to the completer's definitions.
                                 // TODO: We should make it free to do String->SmallString
                                 //       and mostly free to go back (free if allocated)
-                                .chain(vars.strings().map(|s| ["$", &s].concat().into()))
+                                .chain(vars.strings().iter().map(|s| ["$", &s].concat().into()))
                                 .collect();
 
                             // Initialize a new completer from the definitions collected.

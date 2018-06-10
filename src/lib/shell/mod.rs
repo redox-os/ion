@@ -32,12 +32,11 @@ use self::{
     variables::Variables,
 };
 use builtins::{BuiltinMap, BUILTINS};
-use fnv::FnvHashMap;
 use liner::Context;
 use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
 use smallvec::SmallVec;
 use std::{
-    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
+    fs::File, io::{self, Read, Write}, iter::FromIterator, mem, ops::Deref, path::Path, ptr, process,
     sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
@@ -68,13 +67,11 @@ pub struct Shell {
     /// Note that the context is only available in an interactive session.
     pub(crate) context: Option<Context>,
     /// Contains the aliases, strings, and array variable maps.
-    pub variables: Variables,
+    pub variables: Variables<'static>,
     /// Contains the current state of flow control parameters.
     flow_control: FlowControl,
     /// Contains the directory stack parameters.
     pub(crate) directory_stack: DirectoryStack,
-    /// Contains all of the user-defined functions that have been created.
-    pub(crate) functions: FnvHashMap<Identifier, Function>,
     /// When a command is executed, the final result of that command is stored
     /// here.
     pub previous_status: i32,
@@ -171,13 +168,29 @@ impl<'a> Shell {
         Fork::new(self, capture).exec(child_func)
     }
 
+    /// A method for temporarily using a separate set of variables for this shell.
+    /// Calls the inner callback and then swaps back.
+    pub fn with_vars<VF, F, T>(&mut self, variables: VF, callback: F) -> T
+        where VF: FnOnce(&Variables) -> Variables<'static>,
+               F: FnOnce(&mut Self) -> T
+    {
+        // TODO: It's undefined behavior if variables() callback panics.
+        // This could be solved with the take-mut crate.
+        let old = mem::replace(&mut self.variables, unsafe { mem::uninitialized() });
+        let new = variables(&old);
+        unsafe { ptr::write(&mut self.variables, new); }
+
+        let value = callback(self);
+        mem::replace(&mut self.variables, old);
+        value
+    }
+
     /// A method for executing a function with the given `name`, using `args` as the input.
     /// If the function does not exist, an `IonError::DoesNotExist` is returned.
     pub fn execute_function<S: AsRef<str>>(&mut self, name: &str, args: &[S]) -> Result<i32, IonError> {
-        self.functions
-            .get_mut(name.into())
+        self.variables
+            .get_function(name)
             .ok_or(IonError::DoesNotExist)
-            .map(|func| func.clone())
             .and_then(|function| {
                 function
                     .execute(self, args)
@@ -221,8 +234,8 @@ impl<'a> Shell {
     }
 
     /// Gets an array variable, if it exists within the shell's array map.
-    pub fn get_array(&self, name: &str) -> Option<&[String]> {
-        self.variables.get_array(name).map(SmallVec::as_ref)
+    pub fn get_array(&self, name: &str) -> Option<SmallVec<[String; 4]>> {
+        self.variables.get_array(name)
     }
 
     /// Obtains a variable, returning an empty string if it does not exist.
@@ -252,11 +265,11 @@ impl<'a> Shell {
                     }
                     last_command.clear();
                     last_command.push_str(key);
-                    self.variables.aliases.get(key)
+                    self.variables.get_alias(key)
                 };
 
                 if let Some(alias) = possible_alias {
-                    let new_args = ArgumentSplitter::new(alias)
+                    let new_args = ArgumentSplitter::new(&alias)
                         .map(String::from)
                         .chain(item.job.args.drain().skip(1))
                         .collect::<Array>();
@@ -288,7 +301,7 @@ impl<'a> Shell {
                 Some(self.execute_pipeline(pipeline))
             }
         // Branch else if -> input == shell function and set the exit_status
-        } else if let Some(function) = self.functions.get(&pipeline.items[0].job.command).cloned() {
+        } else if let Some(function) = self.variables.get_function(&pipeline.items[0].job.command) {
             if !pipeline.requires_piping() {
                 let args: &[String] = pipeline.items[0].job.args.deref();
                 match function.execute(self, args) {
@@ -401,7 +414,6 @@ impl<'a> Shell {
             variables: Variables::default(),
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new(),
-            functions: FnvHashMap::default(),
             previous_job: !0,
             previous_status: 0,
             flags: 0,

@@ -139,7 +139,7 @@ fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
 
 /// Returns true if a function with the given name is defined
 fn function_is_defined(function: &str, shell: &Shell) -> bool {
-    match shell.functions.get(function) {
+    match shell.variables.get_function(function) {
         Some(_) => true,
         None => false,
     }

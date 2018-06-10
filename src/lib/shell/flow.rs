@@ -8,6 +8,7 @@ use parser::{
     ForExpression, StatementSplitter,
 };
 use shell::assignments::VariableStore;
+use shell::variables::Variables;
 use std::{
     io::{stdout, Write}, iter, mem,
 };
@@ -185,7 +186,7 @@ impl FlowLogic for Shell {
 
                 if self.flow_control.level == 0 {
                     // All blocks were read, thus we can add it to the list
-                    self.functions.insert(
+                    self.variables.insert_function(
                         name.clone(),
                         Function::new(description, name, args, statements),
                     );
@@ -491,7 +492,7 @@ impl FlowLogic for Shell {
             } => {
                 self.flow_control.level += 1;
                 collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
-                self.functions.insert(
+                self.variables.insert_function(
                     name.clone(),
                     Function::new(description, name, args, statements),
                 );
@@ -607,14 +608,26 @@ impl FlowLogic for Shell {
     }
 
     fn execute_statements(&mut self, mut statements: Vec<Statement>) -> Condition {
-        let mut iterator = statements.drain(..);
-        while let Some(statement) = iterator.next() {
-            match self.execute_statement(&mut iterator, statement) {
-                Condition::NoOp => {}
-                cond => return cond,
+        self.with_vars(|old: &Variables| {
+            let new = old.new_scope();
+            // TODO: THIS IS SUPER UNSAFE!!!!!11111
+            // I'm bypassing the borrow checker here because I'm too gosh darn lazy
+            // to make Shell take a lifetime pararmeter.
+            // THIS. IS. WRONG.
+            // This should be fixed. Some day. Ugh.
+            // Don't do this at home, kids!
+            let new: Variables<'static> = unsafe { mem::transmute(new) };
+            new
+        }, |shell| {
+            let mut iterator = statements.drain(..);
+            while let Some(statement) = iterator.next() {
+                match shell.execute_statement(&mut iterator, statement) {
+                    Condition::NoOp => {}
+                    cond => return cond,
+                }
             }
-        }
-        Condition::NoOp
+            Condition::NoOp
+        })
     }
 
     fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition {
@@ -859,7 +872,7 @@ impl FlowLogic for Shell {
                             statements,
                             description,
                         } => {
-                            shell.functions.insert(
+                            shell.variables.insert_function(
                                 name.clone(),
                                 Function::new(description, name, args, statements),
                             );

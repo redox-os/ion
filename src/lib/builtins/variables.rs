@@ -118,9 +118,9 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
             return FAILURE;
         }
         Binding::KeyValue(key, value) => {
-            vars.aliases.insert(key, value);
+            vars.insert_alias(key, value);
         }
-        Binding::ListEntries => print_list(&vars.aliases),
+        Binding::ListEntries => print_list(&vars.aliases.borrow()),
         Binding::KeyOnly(key) => {
             eprintln!("ion: please provide value for alias '{}'", key);
             return FAILURE;
@@ -140,7 +140,7 @@ pub(crate) fn drop_alias<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32
         return FAILURE;
     }
     for alias in args.iter().skip(1) {
-        if vars.aliases.remove(alias.as_ref()).is_none() {
+        if vars.remove_alias(alias.as_ref()).is_none() {
             eprintln!("ion: undefined alias: {}", alias.as_ref());
             return FAILURE;
         }
