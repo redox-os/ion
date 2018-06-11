@@ -238,7 +238,7 @@ pub(crate) fn expand_string_no_glob<E: Expander>(
                 token_buffer.push(word);
             }
             None if original.is_empty() => {
-                token_buffer.push(WordToken::Normal("", true, false));
+                token_buffer.push(WordToken::Normal("".into(), true, false));
                 break;
             }
             None => break,
