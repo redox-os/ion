@@ -807,7 +807,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     }
                     let output = &self.data[start..self.read];
                     if output != "" {
-                        return Some(WordToken::Normal(output.into(), glob, tilde));
+                        return Some(WordToken::Normal(unescape(output).into(), glob, tilde));
                     } else {
                         return self.next();
                     };
