@@ -4,6 +4,8 @@ mod range;
 mod select;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod benchmarks;
 
 #[cfg(test)]
 pub(crate) use self::methods::Key;
@@ -27,7 +29,6 @@ bitflags! {
         const BACKSL = 1;
         const SQUOTE = 2;
         const DQUOTE = 4;
-        const NOGLOB = 8;
     }
 }
 
@@ -37,7 +38,6 @@ pub(crate) enum WordToken<'a> {
     /// (the second element) or a tilde expression (the third element)
     Normal(Cow<'a, str>, bool, bool),
     Whitespace(&'a str),
-    // Tilde(&'a str),
     Brace(Vec<&'a str>),
     Array(Vec<&'a str>, Select),
     Variable(&'a str, bool, Select),
@@ -46,7 +46,7 @@ pub(crate) enum WordToken<'a> {
     Process(&'a str, bool, Select),
     StringMethod(StringMethod<'a>),
     ArrayMethod(ArrayMethod<'a>),
-    Arithmetic(&'a str), // Glob(&'a str)
+    Arithmetic(&'a str),
 }
 
 pub(crate) struct WordIterator<'a, E: Expander + 'a> {
@@ -54,6 +54,7 @@ pub(crate) struct WordIterator<'a, E: Expander + 'a> {
     read:      usize,
     flags:     Flags,
     expanders: &'a E,
+    do_glob: bool,
 }
 
 impl<'a, E: Expander + 'a> WordIterator<'a, E> {
@@ -633,14 +634,16 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             read: 0,
             flags: Flags::empty(),
             expanders,
+            do_glob: true,
         }
     }
     pub(crate) fn new_no_glob(data: &'a str, expanders: &'a E) -> WordIterator<'a, E> {
         WordIterator {
             data,
             read: 0,
-            flags: Flags::NOGLOB,
+            flags: Flags::empty(),
             expanders,
+            do_glob: false,
         }
     }
 }
@@ -704,7 +707,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     }
                     b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                         if self.glob_check(&mut iterator) {
-                            glob = true && !self.flags.contains(Flags::NOGLOB);
+                            glob = self.do_glob;
                         } else {
                             return Some(self.array(&mut iterator));
                         }
@@ -758,7 +761,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     }
                     b'*' | b'?' => {
                         self.read += 1;
-                        glob = true && !self.flags.contains(Flags::NOGLOB);
+                        glob = self.do_glob;
                         break;
                     }
                     _ => {
@@ -823,13 +826,13 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                 }
                 b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                     if self.glob_check(&mut iterator) {
-                        glob = true && !self.flags.contains(Flags::NOGLOB);
+                        glob = self.do_glob;
                     } else {
                         return Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde));
                     }
                 }
                 b'*' | b'?' if !self.flags.contains(Flags::SQUOTE) => {
-                    glob = true && !self.flags.contains(Flags::NOGLOB);
+                    glob = self.do_glob;
                 }
                 _ => (),
             }

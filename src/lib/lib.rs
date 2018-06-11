@@ -4,6 +4,7 @@
 #![feature(pointer_methods)]
 #![feature(getpid)]
 #![feature(nll)]
+#![feature(test)]
 
 #[macro_use]
 extern crate bitflags;
