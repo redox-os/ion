@@ -9,10 +9,11 @@ pub(crate) fn command_not_found(shell: &mut Shell, command: &str) -> bool {
 /// High-level function for executing a function programmatically.
 /// NOTE: Always add "ion" as a first argument in `args`.
 pub fn fork_function<S: AsRef<str>>(shell: &mut Shell, fn_name: &str, args: &[S]) -> bool {
-    let function = match shell.functions.get(fn_name) {
-        Some(func) => func as *const Function,
+    let function = match shell.variables.get_function(fn_name) {
+        Some(func) => func,
         None => return false,
     };
+    let function = &function as *const Function;
 
     if let Err(err) = shell.fork(Capture::None, |child| {
         let result = unsafe { function.read() }.execute(child, args);

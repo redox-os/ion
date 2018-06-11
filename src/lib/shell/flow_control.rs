@@ -1,8 +1,9 @@
-use super::{flow::FlowLogic, Shell};
-use fnv::*;
+use super::{flow::FlowLogic, Shell, Variables};
 use parser::{assignments::*, pipelines::Pipeline};
+use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
-use types::{Identifier, *};
+use std::mem;
+use types::Identifier;
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ElseIf {
@@ -142,7 +143,7 @@ impl Default for FlowControl {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Function {
     description: Option<String>,
     name:        Identifier,
@@ -172,11 +173,9 @@ impl Function {
             return Err(FunctionError::InvalidArgumentCount);
         }
 
-        let mut variables_backup: FnvHashMap<&str, Option<Value>> =
-            FnvHashMap::with_capacity_and_hasher(64, Default::default());
+        let name = self.name.clone();
 
-        let mut arrays_backup: FnvHashMap<&str, Option<Array>> =
-            FnvHashMap::with_capacity_and_hasher(64, Default::default());
+        let mut values: SmallVec<[_; 8]> = SmallVec::new();
 
         for (type_, value) in self.args.iter().zip(args.iter().skip(1)) {
             let value = match value_check(shell, value.as_ref(), type_.kind) {
@@ -189,40 +188,37 @@ impl Function {
                 }
             };
 
-            match value {
-                ReturnValue::Vector(vector) => {
-                    let array = shell.variables.get_array(&type_.name).cloned();
-                    arrays_backup.insert(&type_.name, array);
-                    shell.variables.set_array(&type_.name, vector);
-                }
-                ReturnValue::Str(string) => {
-                    variables_backup.insert(&type_.name, shell.get_var(&type_.name));
-                    shell.set_var(&type_.name, &string);
-                }
-            }
+            values.push((type_.clone(), value));
         }
 
-        shell.execute_statements(self.statements);
-
-        for (name, value_option) in &variables_backup {
-            match *value_option {
-                Some(ref value) => shell.set_var(name, value),
-                None => {
-                    shell.variables.unset_var(name);
+        shell.with_vars(|mut vars| {
+            while !vars.functions.borrow().contains_key(&name) {
+                vars = vars.parent.expect("execute called on function that's not in scope");
+            }
+            let vars = vars.new_scope();
+            // TODO: THIS IS SUPER UNSAFE!!!!!11111
+            // I'm bypassing the borrow checker here because I'm too gosh darn lazy
+            // to make Shell take a lifetime pararmeter.
+            // THIS. IS. WRONG.
+            // This should be fixed. Some day. Ugh.
+            // Don't do this at home, kids!
+            let vars: Variables<'static> = unsafe { mem::transmute(vars) };
+            vars
+        }, move |shell| {
+            for (type_, value) in values {
+                match value {
+                    ReturnValue::Vector(vector) => {
+                        shell.variables.arrays.borrow_mut().insert(type_.name.into(), vector);
+                    }
+                    ReturnValue::Str(string) => {
+                        shell.variables.variables.borrow_mut().insert(type_.name.into(), string);
+                    }
                 }
             }
-        }
 
-        for (name, value_option) in arrays_backup {
-            match value_option {
-                Some(value) => shell.variables.set_array(name, value),
-                None => {
-                    shell.variables.unset_array(name);
-                }
-            }
-        }
-
-        Ok(())
+            shell.execute_statements(self.statements);
+            Ok(())
+        })
     }
 
     pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> { self.description.as_ref() }

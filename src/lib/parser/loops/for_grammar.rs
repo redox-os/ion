@@ -67,7 +67,7 @@ mod tests {
     use super::*;
     use shell::variables::Variables;
 
-    struct VariableExpander(pub Variables);
+    struct VariableExpander(pub Variables<'static>);
 
     impl Expander for VariableExpander {
         fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn for_variable() {
-        let mut variables = Variables::default();
+        let variables = Variables::default();
         variables.set_var("A", "1 2 3 4 5");
         assert_eq!(
             ForExpression::new(&["$A".to_owned()], &VariableExpander(variables)),

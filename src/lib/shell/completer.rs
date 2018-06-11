@@ -7,21 +7,21 @@ use std::{iter, str};
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
 /// when a special character is contained within an expanded filename.
-pub(crate) struct IonFileCompleter {
+pub(crate) struct IonFileCompleter<'a> {
     /// The completer that this completer is  handling.
     inner: FilenameCompleter,
     /// A pointer to the directory stack in the shell.
     dir_stack: *const DirectoryStack,
     /// A pointer to the variables map in the shell.
-    vars: *const Variables,
+    vars: *const Variables<'a>,
 }
 
-impl IonFileCompleter {
+impl<'a> IonFileCompleter<'a> {
     pub(crate) fn new(
         path: Option<&str>,
         dir_stack: *const DirectoryStack,
-        vars: *const Variables,
-    ) -> IonFileCompleter {
+        vars: *const Variables<'a>,
+    ) -> IonFileCompleter<'a> {
         IonFileCompleter {
             inner: FilenameCompleter::new(path),
             dir_stack,
@@ -30,7 +30,7 @@ impl IonFileCompleter {
     }
 }
 
-impl Completer for IonFileCompleter {
+impl<'a> Completer for IonFileCompleter<'a> {
     /// When the tab key is pressed, **Liner** will use this method to perform completions of
     /// filenames. As our `IonFileCompleter` is a wrapper around **Liner**'s
     /// `FilenameCompleter`,

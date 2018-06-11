@@ -209,7 +209,7 @@ dependencies = [
 [[package]]
 name = "liner"
 version = "0.4.5"
-source = "git+https://gitlab.redox-os.org/redox-os/liner#5bbd4ae94bc01a1897e97f4951600cfd37cc63c1"
+source = "git+https://gitlab.redox-os.org/redox-os/liner#98f723d1501701a659ab998226d7f5b32098ffc2"
 dependencies = [
  "bytecount 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "termion 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)",

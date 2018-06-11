@@ -19,7 +19,7 @@ pub(crate) fn which(args: &[String], shell: &mut Shell) -> Result<i32, ()> {
         if let Ok(c_type) = get_command_info(&**command, shell) {
             match c_type.as_ref() {
                 "alias" => {
-                    let alias = shell.variables.aliases.get(&**command).unwrap();
+                    let alias = shell.variables.get_alias(&**command).unwrap();
                     println!("{}: alias to {}", command, alias);
                 }
                 "function" => println!("{}: function", command),
@@ -45,7 +45,7 @@ pub(crate) fn find_type(args: &[String], shell: &mut Shell) -> Result<i32, ()> {
         if let Ok(c_type) = get_command_info(&**command, shell) {
             match c_type.as_ref() {
                 "alias" => {
-                    let alias = shell.variables.aliases.get(&**command).unwrap();
+                    let alias = shell.variables.get_alias(&**command).unwrap();
                     println!("{} is aliased to `{}`", command, alias);
                 }
                 // TODO Make it print the function.
@@ -62,9 +62,9 @@ pub(crate) fn find_type(args: &[String], shell: &mut Shell) -> Result<i32, ()> {
 }
 
 pub(crate) fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<Cow<'a, str>, ()> {
-    if shell.variables.aliases.get(command).is_some() {
+    if shell.variables.get_alias(command).is_some() {
         return Ok("alias".into());
-    } else if shell.functions.contains_key(command) {
+    } else if shell.variables.get_function(command).is_some() {
         return Ok("function".into());
     } else if shell.builtins.contains_key(command) {
         return Ok("builtin".into());

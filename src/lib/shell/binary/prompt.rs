@@ -15,12 +15,13 @@ pub(crate) fn prompt(shell: &mut Shell) -> String {
 }
 
 pub(crate) fn prompt_fn(shell: &mut Shell) -> Option<String> {
-    let function = shell.functions.get("PROMPT")? as *const Function;
+    let function = shell.variables.get_function("PROMPT")?;
+    let function = &function as *const Function;
 
     let mut output = None;
 
-    match shell.fork(Capture::StdoutThenIgnoreStderr, |child| unsafe {
-        let _ = function.read().execute(child, &["ion"]);
+    match shell.fork(Capture::StdoutThenIgnoreStderr, |child| {
+        let _ = unsafe { function.read() }.execute(child, &["ion"]);
     }) {
         Ok(result) => {
             let mut string = String::with_capacity(1024);
