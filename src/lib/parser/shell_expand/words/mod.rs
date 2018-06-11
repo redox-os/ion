@@ -27,6 +27,7 @@ bitflags! {
         const BACKSL = 1;
         const SQUOTE = 2;
         const DQUOTE = 4;
+        const NOGLOB = 8;
     }
 }
 
@@ -634,6 +635,14 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             expanders,
         }
     }
+    pub(crate) fn new_no_glob(data: &'a str, expanders: &'a E) -> WordIterator<'a, E> {
+        WordIterator {
+            data,
+            read: 0,
+            flags: Flags::NOGLOB,
+            expanders,
+        }
+    }
 }
 
 impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
@@ -695,7 +704,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     }
                     b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                         if self.glob_check(&mut iterator) {
-                            glob = true;
+                            glob = true && !self.flags.contains(Flags::NOGLOB);
                         } else {
                             return Some(self.array(&mut iterator));
                         }
@@ -749,7 +758,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     }
                     b'*' | b'?' => {
                         self.read += 1;
-                        glob = true;
+                        glob = true && !self.flags.contains(Flags::NOGLOB);
                         break;
                     }
                     _ => {
@@ -814,13 +823,13 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                 }
                 b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                     if self.glob_check(&mut iterator) {
-                        glob = true;
+                        glob = true && !self.flags.contains(Flags::NOGLOB);
                     } else {
                         return Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde));
                     }
                 }
                 b'*' | b'?' if !self.flags.contains(Flags::SQUOTE) => {
-                    glob = true;
+                    glob = true && !self.flags.contains(Flags::NOGLOB);
                 }
                 _ => (),
             }

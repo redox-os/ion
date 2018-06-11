@@ -97,7 +97,7 @@ fn expand_brace<E: Expander>(
     let mut temp = Vec::new();
     for word in nodes
         .into_iter()
-        .flat_map(|node| expand_string(node, expand_func, reverse_quoting))
+        .flat_map(|node| expand_string_no_glob(node, expand_func, reverse_quoting))
     {
         match parse_range(&word) {
             Some(elements) => for word in elements {
@@ -106,7 +106,6 @@ fn expand_brace<E: Expander>(
             None => temp.push(word.into()),
         }
     }
-
     if !temp.is_empty() {
         if !current.is_empty() {
             tokens.push(BraceToken::Normal(current.clone()));
@@ -218,10 +217,35 @@ pub(crate) fn expand_string<E: Expander>(
             None => break,
         }
     }
-
     expand_tokens(&token_buffer, expand_func, reverse_quoting, contains_brace)
 }
 
+pub(crate) fn expand_string_no_glob<E: Expander>(
+    original: &str,
+    expand_func: &E,
+    reverse_quoting: bool,
+) -> Array {
+    let mut token_buffer = Vec::new();
+    let mut contains_brace = false;
+    let mut word_iterator = WordIterator::new_no_glob(original, expand_func);
+
+    loop {
+        match word_iterator.next() {
+            Some(word) => {
+                if let WordToken::Brace(_) = word {
+                    contains_brace = true;
+                }
+                token_buffer.push(word);
+            }
+            None if original.is_empty() => {
+                token_buffer.push(WordToken::Normal("", true, false));
+                break;
+            }
+            None => break,
+        }
+    }
+    expand_tokens(&token_buffer, expand_func, reverse_quoting, contains_brace)
+}
 fn expand_braces<E: Expander>(
     word_tokens: &[WordToken],
     expand_func: &E,
@@ -316,7 +340,6 @@ fn expand_braces<E: Expander>(
             WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
         }
     }
-
     if expanders.is_empty() {
         expanded_words.push(output.into());
     } else {
@@ -335,7 +358,15 @@ fn expand_braces<E: Expander>(
 
     expanded_words.into_iter().fold(Array::new(), |mut array, word| {
         if let Some(_) = word.find('*') {
-            if let Ok(paths) = glob(&word) {
+            if let Ok(mut paths) = glob(&word) {
+                match paths.next() {
+                    Some(path) => if let Ok(path_buf) = path {
+                        array.push(path_buf.to_string_lossy().to_string());
+                    } else {
+                        array.push(String::new());
+                    },
+                    None => array.push(word),
+                }
                 for path in paths {
                     if let Ok(path_buf) = path {
                         array.push(path_buf.to_string_lossy().to_string());
@@ -519,7 +550,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                 None => expand_single_string_token(token, expand_func, reverse_quoting),
             };
         }
-
+    
         let mut output = String::new();
         let mut expanded_words = Array::new();
 
