@@ -10,7 +10,7 @@ use self::{
 };
 use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
 use liner::{Buffer, Context};
-use std::{env, fs::File, io::ErrorKind, iter, path::Path, process};
+use std::{env, fs::File, io::ErrorKind, iter, path::Path, process, sync::Mutex};
 
 pub const MAN_ION: &'static str = r#"NAME
     ion - ion shell
@@ -121,7 +121,7 @@ impl Binary for Shell {
                     }
                 }
             }
-            context
+            Mutex::new(context)
         });
 
         self.evaluate_init_file();
