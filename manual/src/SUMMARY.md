@@ -19,6 +19,7 @@
     - [Array Variables](ch04-02-arrays.md)
     - [Arithmetic Variables](ch04-03-arithmetic.md)
     - [Exporting Variables](ch04-04-exporting.md)
+    - [Scopes](ch04-05-scopes.md)
 
 - [Expansions](ch05-00-expansions.md)
 
