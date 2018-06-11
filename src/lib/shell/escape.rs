@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 /// Escapes filenames from the completer so that special characters will be properly escaped.
 ///
 /// NOTE: Perhaps we should submit a PR to Liner to add a &'static [u8] field to
@@ -16,18 +18,14 @@ pub(crate) fn escape(input: &str) -> String {
 }
 
 /// Unescapes filenames to be passed into the completer
-pub(crate) fn unescape(input: &str) -> String {
-    let mut output = Vec::with_capacity(input.len());
-    let mut bytes = input.bytes();
-    while let Some(b) = bytes.next() {
-        match b {
-            b'\\' => if let Some(next) = bytes.next() {
-                output.push(next);
-            } else {
-                output.push(b'\\')
-            },
-            _ => output.push(b),
+pub(crate) fn unescape(input: &str) -> Cow<str> {
+    let mut input: Cow<str> = input.into();
+    while let Some(found) = input.find('\\') {
+        if input.as_ref().chars().skip(found + 1).next().is_some() {
+            input.to_mut().remove(found);
+        } else {
+            break;
         }
     }
-    unsafe { String::from_utf8_unchecked(output) }
+    input
 }

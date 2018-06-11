@@ -769,7 +769,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                         if !contains_escapeable {
                             input.into()
                         } else {
-                            unescape(input).into()
+                            unescape(input)
                         }
                     }
 
@@ -795,7 +795,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     return Some(WordToken::Normal(output.into(), glob, tilde));
                 }
                 b' ' | b'{' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
-                    return Some(WordToken::Normal(unescape(&self.data[start..self.read]).into(), glob, tilde))
+                    return Some(WordToken::Normal(unescape(&self.data[start..self.read]), glob, tilde))
                 }
                 b'$' | b'@' if !self.flags.contains(Flags::SQUOTE) => {
                     if let Some(&character) = self.data.as_bytes().get(self.read) {
@@ -807,7 +807,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     }
                     let output = &self.data[start..self.read];
                     if output != "" {
-                        return Some(WordToken::Normal(unescape(output).into(), glob, tilde));
+                        return Some(WordToken::Normal(unescape(output), glob, tilde));
                     } else {
                         return self.next();
                     };
@@ -830,7 +830,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
         if start == self.read {
             None
         } else {
-            Some(WordToken::Normal(unescape(&self.data[start..]).into(), glob, tilde))
+            Some(WordToken::Normal(unescape(&self.data[start..]), glob, tilde))
         }
     }
 }
