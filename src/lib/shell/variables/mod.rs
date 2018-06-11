@@ -97,6 +97,54 @@ impl<'a> Default for Variables<'a> {
 
 const PLUGIN: u8 = 1;
 
+macro_rules! descend_scopes {
+    (clone $var:ident) => {
+        Some($var.clone())
+    };
+    (no_clone $var:ident) => {
+        Some($var)
+    };
+    (ref $name:expr) => {
+        &$name
+    };
+    (val $name:expr) => {
+        $name
+    };
+    (lookup, $self:ident.$map:ident.$borrow:ident().$lookup:ident($name:expr) else $fallback:block, $clone:tt) => {
+        {
+            let mut me = $self;
+            loop {
+                if let Some(var) = me.$map.$borrow().$lookup($name) {
+                    break descend_scopes!($clone var);
+                }
+                match me.parent {
+                    Some(parent) => me = parent,
+                    None => break $fallback
+                }
+            }
+        }
+    };
+    (insert, $self:ident.$map:ident, $borrow:tt $name:expr, $value:expr) => {
+        {
+            let mut me = $self;
+            loop {
+                let mut map = me.$map.borrow_mut();
+                if map.contains_key(descend_scopes!($borrow $name)) {
+                    break map.insert($name.into(), $value.into());
+                }
+                match me.parent {
+                    Some(parent) => me = parent,
+                    None => {
+                        // It wasn't found, insert new at current scope
+                        drop(map);
+                        break $self.$map.borrow_mut().insert($name.into(), $value.into());
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl<'a> Variables<'a> {
     pub(crate) fn new_scope<'b>(&'b self) -> Variables<'b> {
         Variables {
@@ -270,104 +318,26 @@ impl<'a> Variables<'a> {
         } else {
             // Otherwise, it's just a simple variable name.
             // Travel down the scopes and look for it.
-            let mut me = self;
-            loop {
-                if let Some(var) = me.variables.borrow().get(name) {
-                    return Some(var.clone());
-                }
-                match me.parent {
-                    Some(parent) => me = parent,
-                    None => break
-                }
-            }
-            env::var(name).ok()
+            descend_scopes!(lookup, self.variables.borrow().get(name) else { env::var(name).ok() }, clone)
         }
     }
     pub fn insert_alias(&self, name: SmallString, value: Value) -> Option<Value> {
-        let mut me = self;
-        loop {
-            let mut aliases = me.aliases.borrow_mut();
-            if aliases.contains_key(&name) {
-                break aliases.insert(name.into(), value.into());
-            }
-            match me.parent {
-                Some(parent) => me = parent,
-                None => {
-                    // It wasn't found, insert new at current scope
-                    drop(aliases);
-                    break self.aliases.borrow_mut().insert(name.into(), value.into())
-                }
-            }
-        }
+        descend_scopes!(insert, self.aliases, ref name, value)
     }
     pub fn get_alias(&self, name: &str) -> Option<Value> {
-        let mut me = self;
-        loop {
-            if let Some(var) = me.aliases.borrow().get(name) {
-                return Some(var.clone());
-            }
-            match me.parent {
-                Some(parent) => me = parent,
-                None => break
-            }
-        }
-        None
+        descend_scopes!(lookup, self.aliases.borrow().get(name) else { None }, clone)
     }
     pub fn remove_alias(&self, name: &str) -> Option<Value> {
-        let mut me = self;
-        loop {
-            if let Some(var) = me.aliases.borrow_mut().remove(name) {
-                return Some(var);
-            }
-            match me.parent {
-                Some(parent) => me = parent,
-                None => break
-            }
-        }
-        None
+        descend_scopes!(lookup, self.aliases.borrow_mut().remove(name) else { None }, no_clone)
     }
     pub fn insert_function(&self, name: SmallString, value: Function) -> Option<Function> {
-        let mut me = self;
-        loop {
-            let mut functions = me.functions.borrow_mut();
-            if functions.contains_key(&name) {
-                break functions.insert(name.into(), value.into());
-            }
-            match me.parent {
-                Some(parent) => me = parent,
-                None => {
-                    // It wasn't found, insert new at current scope
-                    drop(functions);
-                    break self.functions.borrow_mut().insert(name.into(), value.into())
-                }
-            }
-        }
+        descend_scopes!(insert, self.functions, ref name, value)
     }
     pub fn get_function(&self, name: &str) -> Option<Function> {
-        let mut me = self;
-        loop {
-            if let Some(var) = me.functions.borrow().get(name) {
-                return Some(var.clone());
-            }
-            match me.parent {
-                Some(parent) => me = parent,
-                None => break
-            }
-        }
-        None
+        descend_scopes!(lookup, self.functions.borrow().get(name) else { None }, clone)
     }
     pub fn remove_function(&self, name: &str) -> Option<Function> {
-        let mut me = self;
-        loop {
-            if let Some(var) = me.functions.borrow_mut().remove(name) {
-                return Some(var);
-            }
-            match me.parent {
-                Some(parent) => me = parent,
-                None => break
-            }
-        }
-        None
+        descend_scopes!(lookup, self.functions.borrow_mut().remove(name) else { None }, no_clone)
     }
 
     /// Obtains the value for the **MWD** variable.
@@ -430,53 +400,39 @@ impl<'a> Variables<'a> {
     }
 
     pub fn get_array(&self, name: &str) -> Option<Array> {
-        let mut me = self;
-        loop {
-            if let Some(var) = me.arrays.borrow().get(name) {
-                return Some(var.clone());
-            }
-            match me.parent {
-                Some(parent) => me = parent,
-                None => break
-            }
-        }
-        None
+        descend_scopes!(lookup, self.arrays.borrow().get(name) else { None }, clone)
     }
 
     pub fn get_map(&self, name: &str) -> Option<HashMap> {
-        let mut me = self;
-        loop {
-            if let Some(var) = me.hashmaps.borrow().get(name) {
-                return Some(var.clone());
-            }
-            match me.parent {
-                Some(parent) => me = parent,
-                None => break
-            }
-        }
-        None
+        descend_scopes!(lookup, self.hashmaps.borrow().get(name) else { None }, clone)
     }
 
     #[allow(dead_code)]
     pub(crate) fn set_hashmap_value(&self, name: &str, key: &str, value: &str) {
-        if !name.is_empty() {
-            if let Some(map) = self.hashmaps.borrow_mut().get_mut(name) {
+        let mut me = self;
+        loop {
+            if let Some(map) = me.hashmaps.borrow_mut().get_mut(name) {
                 map.insert(key.into(), value.into());
-                return;
+                break;
             }
-
-            let mut map = HashMap::with_capacity_and_hasher(4, Default::default());
-            map.insert(key.into(), value.into());
-            self.hashmaps.borrow_mut().insert(name.into(), map);
+            match me.parent {
+                Some(parent) => me = parent,
+                None => {
+                    let mut map = HashMap::with_capacity_and_hasher(4, Default::default());
+                    map.insert(key.into(), value.into());
+                    self.hashmaps.borrow_mut().insert(name.into(), map);
+                    break;
+                }
+            }
         }
     }
 
     pub fn set_array(&self, name: &str, value: Array) {
         if !name.is_empty() {
             if value.is_empty() {
-                self.arrays.borrow_mut().remove(name);
+                descend_scopes!(lookup, self.arrays.borrow_mut().remove(name) else { None }, no_clone);
             } else {
-                self.arrays.borrow_mut().insert(name.into(), value);
+                descend_scopes!(insert, self.arrays, val name, value);
             }
         }
     }
@@ -496,23 +452,7 @@ impl<'a> Variables<'a> {
                     }
                     return;
                 }
-                let mut me = self;
-                loop {
-                    let mut variables = me.variables.borrow_mut();
-                    if variables.contains_key(name) {
-                        variables.insert(name.into(), value.into());
-                        break;
-                    }
-                    match me.parent {
-                        Some(parent) => me = parent,
-                        None => {
-                            // It wasn't found, insert new at current scope
-                            drop(variables);
-                            self.variables.borrow_mut().insert(name.into(), value.into());
-                            break;
-                        }
-                    }
-                }
+                descend_scopes!(insert, self.variables, val name, value);
             }
         }
     }
