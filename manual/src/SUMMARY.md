@@ -11,7 +11,8 @@
     - [Quoting Rules](ch03-03-quotation.md)
     - [Multi-line Arguments](ch03-04-multiargs.md)
     - [Multi-line Comments](ch03-05-multicomments.md)
-    - [General Tips](ch03-06-general.md)
+    - [Prompt Function](ch03-06-prompt_fn.md)
+    - [General Tips](ch03-07-general.md)
 
 - [Variable Assignments](ch04-00-variables.md)
 
