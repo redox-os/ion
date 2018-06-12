@@ -13,7 +13,7 @@ description = "The Ion Shell"
 license-file = "LICENSE"
 name = "ion-shell"
 readme = "README.md"
-repository = "https://github.com/redox-os/ion"
+repository = "https://gitlab.redox-os.org/redox-os/ion"
 version = "1.0.0-alpha"
 
 [[bin]]
