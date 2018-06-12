@@ -83,6 +83,10 @@ impl<'a> Default for Variables<'a> {
             || env::set_var("HOME", "?"),
             |path| env::set_var("HOME", path.to_str().unwrap_or("?")),
         );
+
+        // Initialize the HOST variable
+        env::set_var("HOST", &self_sys::get_host_name().unwrap_or("?".to_owned()));
+
         Variables {
             parent:    None,
             hashmaps:  RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),

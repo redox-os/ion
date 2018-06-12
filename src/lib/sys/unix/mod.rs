@@ -360,11 +360,24 @@ fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
 
 pub mod variables {
     use users_unix::{get_user_by_name, os::unix::UserExt};
+    use super::libc::{self, c_char};
 
     pub(crate) fn get_user_home(username: &str) -> Option<String> {
         match get_user_by_name(username) {
             Some(user) => Some(user.home_dir().to_string_lossy().into_owned()),
             None => None,
+        }
+    }
+
+    pub(crate) fn get_host_name() -> Option<String> {
+        let mut host_name = [0u8; 512];
+
+        if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) } == 0 {
+            let len = host_name.iter().position(|i| *i == 0).unwrap_or(host_name.len());
+
+            Some(unsafe {String::from_utf8_unchecked(host_name[..len].to_owned())})
+        } else {
+            None
         }
     }
 }

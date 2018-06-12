@@ -254,8 +254,22 @@ pub mod signals {
 }
 
 pub mod variables {
+    use super::libc::{self, c_char};
+    
     pub(crate) fn get_user_home(_username: &str) -> Option<String> {
         // TODO
         None
+    }
+
+    pub(crate) fn get_host_name() -> Option<String> {
+        let mut host_name = [0u8; 512];
+
+        if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) } == 0 {
+            let len = host_name.iter().position(|i| *i == 0).unwrap_or(host_name.len());
+
+            Some(unsafe {String::from_utf8_unchecked(host_name[..len].to_owned())})
+        } else {
+            None
+        }
     }
 }
