@@ -65,7 +65,7 @@ pub struct Shell {
     pub(crate) builtins: &'static BuiltinMap,
     /// Contains the history, completions, and manages writes to the history file.
     /// Note that the context is only available in an interactive session.
-    pub(crate) context: Option<Context>,
+    pub(crate) context: Option<Mutex<Context>>,
     /// Contains the aliases, strings, and array variable maps.
     pub variables: Variables<'static>,
     /// Contains the current state of flow control parameters.
@@ -338,7 +338,7 @@ impl<'a> Shell {
                         elapsed_time.as_secs(),
                         elapsed_time.subsec_nanos()
                     );
-                    context.history.push(summary.into()).unwrap_or_else(|err| {
+                    context.lock().unwrap().history.push(summary.into()).unwrap_or_else(|err| {
                         eprintln!("ion: history append: {}", err);
                     });
                 }
@@ -392,7 +392,7 @@ impl<'a> Shell {
                 self.resume_stopped();
                 self.background_send(sys::SIGHUP);
             }
-            let context = self.context.as_mut().unwrap();
+            let mut context = self.context.as_ref().unwrap().lock().unwrap();
             context.history.commit_history();
         }
     }

@@ -79,25 +79,27 @@ impl<'a> Iterator for DesignatorSearcher<'a> {
 }
 
 pub(crate) fn expand_designators<'a>(shell: &Shell, cmd: &'a str) -> Cow<'a, str> {
-    let context = shell.context.as_ref().unwrap();
-    if let Some(buffer) = context.history.buffers.iter().last() {
-        let buffer = buffer.as_bytes();
-        let buffer = unsafe { str::from_utf8_unchecked(&buffer) };
-        let mut output = String::with_capacity(cmd.len());
-        for token in DesignatorSearcher::new(cmd.as_bytes()) {
-            match token {
-                Token::Text(text) => output.push_str(text),
-                Token::Designator(text) => match text {
-                    "!!" => output.push_str(buffer),
-                    "!$" => output.push_str(last_arg(buffer)),
-                    "!0" => output.push_str(command(buffer)),
-                    "!^" => output.push_str(first_arg(buffer)),
-                    "!*" => output.push_str(&args(buffer)),
-                    _ => output.push_str(text),
-                },
+    if let Some(ref context) = shell.context {
+        let context = context.lock().unwrap();
+        if let Some(buffer) = context.history.buffers.iter().last() {
+            let buffer = buffer.as_bytes();
+            let buffer = unsafe { str::from_utf8_unchecked(&buffer) };
+            let mut output = String::with_capacity(cmd.len());
+            for token in DesignatorSearcher::new(cmd.as_bytes()) {
+                match token {
+                    Token::Text(text) => output.push_str(text),
+                    Token::Designator(text) => match text {
+                        "!!" => output.push_str(buffer),
+                        "!$" => output.push_str(last_arg(buffer)),
+                        "!0" => output.push_str(command(buffer)),
+                        "!^" => output.push_str(first_arg(buffer)),
+                        "!*" => output.push_str(&args(buffer)),
+                        _ => output.push_str(text),
+                    },
+                }
             }
+            return Cow::Owned(output);
         }
-        return Cow::Owned(output);
     }
 
     Cow::Borrowed(cmd)

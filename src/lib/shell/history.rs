@@ -15,6 +15,8 @@ bitflags! {
         const NO_SUCH_COMMAND    = (0b1 << 2);
         /// used if regexes are defined.
         const BASED_ON_REGEX     = (0b1 << 3);
+        /// ignore commands that are duplicates
+        const DUPLICATES         = (0b1 << 4);
     }
 }
 
@@ -51,11 +53,11 @@ pub(crate) trait ShellHistory {
     /// updated correctly after a command is entered that alters them and just before loading
     /// the
     /// history file so that it will be loaded correctly.
-    fn set_context_history_from_vars(&mut self);
+    fn set_context_history_from_vars(&self);
 
     /// Saves a command in the history, depending on @HISTORY_IGNORE. Should be called
     /// immediately after `on_command()`
-    fn save_command_in_history(&mut self, command: &str);
+    fn save_command_in_history(&self, command: &str);
 
     /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
     /// is changed.
@@ -79,6 +81,7 @@ impl ShellHistory for Shell {
                 "all" => flags |= IgnoreFlags::ALL,
                 "no_such_command" => flags |= IgnoreFlags::NO_SUCH_COMMAND,
                 "whitespace" => flags |= IgnoreFlags::WHITESPACE,
+                "duplicates" => flags |= IgnoreFlags::DUPLICATES,
                 // The length check is there to just ignore empty regex definitions
                 _ if pattern.starts_with(regex_prefix) && pattern.len() > regex_prefix.len() => {
                     flags |= IgnoreFlags::BASED_ON_REGEX;
@@ -100,18 +103,18 @@ impl ShellHistory for Shell {
         }
     }
 
-    fn save_command_in_history(&mut self, command: &str) {
+    fn save_command_in_history(&self, command: &str) {
         if self.should_save_command(command) {
             // Mark the command in the context history
             self.set_context_history_from_vars();
-            if let Err(err) = self.context.as_mut().unwrap().history.push(command.into()) {
+            if let Err(err) = self.context.as_ref().unwrap().lock().unwrap().history.push(command.into()) {
                 eprintln!("ion: {}", err);
             }
         }
     }
 
-    fn set_context_history_from_vars(&mut self) {
-        let context = self.context.as_mut().unwrap();
+    fn set_context_history_from_vars(&self) {
+        let mut context = self.context.as_ref().unwrap().lock().unwrap();
         let variables = &self.variables;
         let max_history_size = variables
             .get_var_or_empty("HISTORY_SIZE")
@@ -137,7 +140,7 @@ impl ShellHistory for Shell {
     fn print_history(&self, _arguments: &[String]) -> i32 {
         if let Some(context) = self.context.as_ref() {
             let mut buffer = Vec::with_capacity(8 * 1024);
-            for command in &context.history.buffers {
+            for command in &context.lock().unwrap().history.buffers {
                 let _ = writeln!(buffer, "{}", command);
             }
             let stdout = io::stdout();
@@ -173,6 +176,26 @@ impl ShellHistoryPrivate for Shell {
         if ignore.contains(IgnoreFlags::NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND
         {
             return false;
+        }
+
+        if ignore.contains(IgnoreFlags::DUPLICATES) {
+            if let Some(ref context) = self.context {
+                let mut context = context.lock().unwrap();
+                let buffers = &mut context.history.buffers;
+                *buffers = buffers.into_iter().filter_map(|buffer| {
+                    let hist_command = buffer.lines().concat();
+                    if &hist_command != command {
+                        Some((*buffer).clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+                return true;
+            } else {
+                return false;
+            }
+
         }
 
         if let Some(ref regexes) = *regexes {
