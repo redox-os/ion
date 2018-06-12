@@ -38,14 +38,14 @@
     - [Loops](ch07-02-loops.md)
     - [Matches](ch07-03-matches.md)
 
-- [Script Executions](ch08-00-scripts.md)
+- [Functions](ch08-00-functions)
 
-- [Signal Handling](ch09-00-signals.md)
+- [Script Executions](ch09-00-scripts.md)
 
-- [Job Control](ch10-00-jobs.md)
+- [Signal Handling](ch10-00-signals.md)
 
-- [Builtin Commands](ch11-00-builtins.md)
+- [Job Control](ch11-00-jobs.md)
 
-- [Ion by Example](ch12-00-examples.md)
+- [Builtin Commands](ch12-00-builtins.md)
 
 - [Command History](ch13-00-history.md)
