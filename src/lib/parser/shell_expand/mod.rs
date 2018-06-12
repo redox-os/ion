@@ -197,7 +197,7 @@ pub(crate) fn expand_string<E: Expander>(
 ) -> Array {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
-    let mut word_iterator = WordIterator::new(original, expand_func);
+    let mut word_iterator = WordIterator::new(original, expand_func, true);
 
     loop {
         match word_iterator.next() {
@@ -220,20 +220,23 @@ pub(crate) fn expand_string<E: Expander>(
     expand_tokens(&token_buffer, expand_func, reverse_quoting, contains_brace)
 }
 
-pub(crate) fn expand_string_no_glob<E: Expander>(
+fn expand_string_no_glob<E: Expander>(
     original: &str,
     expand_func: &E,
     reverse_quoting: bool,
 ) -> Array {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
-    let mut word_iterator = WordIterator::new_no_glob(original, expand_func);
+    let mut word_iterator = WordIterator::new(original, expand_func, false);
 
     loop {
         match word_iterator.next() {
             Some(word) => {
-                if let WordToken::Brace(_) = word {
-                    contains_brace = true;
+                match word {
+                    WordToken::Brace(_) => {
+                        contains_brace = true;
+                    }
+                    _ => (),
                 }
                 token_buffer.push(word);
             }
@@ -246,6 +249,7 @@ pub(crate) fn expand_string_no_glob<E: Expander>(
     }
     expand_tokens(&token_buffer, expand_func, reverse_quoting, contains_brace)
 }
+
 fn expand_braces<E: Expander>(
     word_tokens: &[WordToken],
     expand_func: &E,

@@ -628,22 +628,13 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         WordToken::Whitespace(&self.data[start..self.read])
     }
 
-    pub(crate) fn new(data: &'a str, expanders: &'a E) -> WordIterator<'a, E> {
+    pub(crate) fn new(data: &'a str, expanders: &'a E, do_glob: bool) -> WordIterator<'a, E> {
         WordIterator {
             data,
             read: 0,
             flags: Flags::empty(),
             expanders,
-            do_glob: true,
-        }
-    }
-    pub(crate) fn new_no_glob(data: &'a str, expanders: &'a E) -> WordIterator<'a, E> {
-        WordIterator {
-            data,
-            read: 0,
-            flags: Flags::empty(),
-            expanders,
-            do_glob: false,
+            do_glob: do_glob,
         }
     }
 }

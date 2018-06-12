@@ -17,6 +17,8 @@ extern crate glob;
 extern crate itoa;
 #[macro_use]
 extern crate lazy_static;
+#[cfg(test)]
+extern crate test;
 #[cfg(all(unix, not(target_os = "redox")))]
 extern crate libc;
 #[cfg(all(unix, not(target_os = "redox")))]
