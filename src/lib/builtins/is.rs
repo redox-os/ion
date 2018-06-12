@@ -1,4 +1,3 @@
-use builtins::man_pages::{check_help, MAN_IS};
 use shell::Shell;
 
 pub(crate) fn is(args: &[String], shell: &mut Shell) -> Result<(), String> {
