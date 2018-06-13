@@ -4,6 +4,7 @@ use super::{
 use itoa;
 use parser::assignments::*;
 use shell::history::ShellHistory;
+use types::Array;
 use std::{
     collections::HashMap,
     env, ffi::OsStr, fmt::{self, Display}, io::{self, BufWriter, Write}, mem,
@@ -219,12 +220,14 @@ impl VariableStore for Shell {
         for action in actions_step2 {
             match action {
                 Ok(Action::UpdateArray(key, _, _)) => {
-                    if let ReturnValue::Vector(ref values) = collected[key.name] {
-                        self.variables.set_array(key.name, (*values).clone());
+                    if let Some(ReturnValue::Vector(ref mut values)) = collected.get_mut(key.name) {
+                        let mut unborrow = Array::new();
+                        ::std::mem::swap(values, &mut unborrow);
+                        self.variables.set_array(key.name, unborrow);
                     }
                 }
                 Ok(Action::UpdateString(key, _, _)) => {
-                    if let ReturnValue::Str(ref value) = collected[key.name] {
+                    if let Some(ReturnValue::Str(ref value)) = collected.get(key.name) {
                         self.set_var(key.name, value);
                     }
                 }
