@@ -31,12 +31,13 @@ Ideally, this value should be the same as `HISTFILE_SIZE`
 Specifies which commands should **NOT** be saved in the history.
 This is an array and defaults to an **empty array**, meaning that all commands will be saved.
 Each element of the array can take one of the following options:
-- **all** -> All commands are ignored, nothing will be saved in the history
+- **all** -> All commands are ignored, nothing will be saved in the history.
 - **no_such_command** -> Commands which return `NO_SUCH_COMMAND` will not be saved in the history.
 - **whitespace** -> Commands which start with a [whitespace character](https://doc.rust-lang.org/stable/reference/whitespace.html) will not be saved in the
 history.
 - **regex:xxx** -> Where xxx is treated as a [regular expression](https://doc.rust-lang.org/regex/regex/index.html).
 Commands which match this regular expression will not be saved in the history.
+- **duplicates** -> All preceding duplicate commands are removed/ignored from the history after a matching command is entered.
 
 **Notes**
 - You can specify as many elements as you want.

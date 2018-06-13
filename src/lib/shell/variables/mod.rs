@@ -38,11 +38,11 @@ pub struct Variables<'a> {
 
 impl<'a> Default for Variables<'a> {
     fn default() -> Self {
-        let mut map = FnvHashMap::with_capacity_and_hasher(64, Default::default());
-        map.insert("DIRECTORY_STACK_SIZE".into(), "1000".into());
-        map.insert("HISTORY_SIZE".into(), "1000".into());
-        map.insert("HISTFILE_SIZE".into(), "100000".into());
-        map.insert(
+        let mut map_vars = FnvHashMap::with_capacity_and_hasher(64, Default::default());
+        map_vars.insert("DIRECTORY_STACK_SIZE".into(), "1000".into());
+        map_vars.insert("HISTORY_SIZE".into(), "1000".into());
+        map_vars.insert("HISTFILE_SIZE".into(), "100000".into());
+        map_vars.insert(
             "PROMPT".into(),
             "${x::1B}]0;${USER}: \
              ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# \
@@ -51,15 +51,15 @@ impl<'a> Default for Variables<'a> {
         );
 
         // Set the PID, UID, and EUID variables.
-        map.insert(
+        map_vars.insert(
             "PID".into(),
             getpid().ok().map_or("?".into(), |id| id.to_string()),
         );
-        map.insert(
+        map_vars.insert(
             "UID".into(),
             getuid().ok().map_or("?".into(), |id| id.to_string()),
         );
-        map.insert(
+        map_vars.insert(
             "EUID".into(),
             geteuid().ok().map_or("?".into(), |id| id.to_string()),
         );
@@ -67,10 +67,13 @@ impl<'a> Default for Variables<'a> {
         // Initialize the HISTFILE variable
         if let Ok(base_dirs) = BaseDirectories::with_prefix("ion") {
             if let Ok(path) = base_dirs.place_data_file("history") {
-                map.insert("HISTFILE".into(), path.to_str().unwrap_or("?").into());
-                map.insert("HISTFILE_ENABLED".into(), "1".into());
+                map_vars.insert("HISTFILE".into(), path.to_str().unwrap_or("?").into());
+                map_vars.insert("HISTFILE_ENABLED".into(), "1".into());
             }
         }
+
+        let mut map_arrays = FnvHashMap::with_capacity_and_hasher(64, Default::default());
+        map_arrays.insert("HISTORY_IGNORE".into(), array!["no_such_command", "whitespace", "duplicates"]);
 
         // Initialize the PWD (Present Working Directory) variable
         env::current_dir().ok().map_or_else(
@@ -90,8 +93,8 @@ impl<'a> Default for Variables<'a> {
         Variables {
             parent:    None,
             hashmaps:  RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
-            arrays:    RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
-            variables: RefCell::new(map),
+            arrays:    RefCell::new(map_arrays),
+            variables: RefCell::new(map_vars),
             aliases:   RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
             functions: RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
             flags:     Cell::new(0),
