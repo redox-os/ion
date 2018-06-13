@@ -179,7 +179,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 b',' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) && level == 0 => {
                     elements.push(&self.data[start..self.read]);
                     start = self.read + 1;
-                }
+                },
                 b'{' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => level += 1,
                 b'}' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => if level == 0 {
                     elements.push(&self.data[start..self.read]);
@@ -188,6 +188,8 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 } else {
                     level -= 1;
                 },
+                b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => level += 1,
+                b']' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => level -= 1,
                 _ => (),
             }
             self.read += 1;
