@@ -1,3 +1,4 @@
+extern crate libc;
 extern crate syscall;
 
 use std::{
