@@ -5,6 +5,7 @@ use itoa;
 use parser::assignments::*;
 use shell::history::ShellHistory;
 use std::{
+    collections::HashMap,
     env, ffi::OsStr, fmt::{self, Display}, io::{self, BufWriter, Write}, mem,
     os::unix::ffi::OsStrExt, str,
 };
@@ -144,14 +145,15 @@ impl VariableStore for Shell {
     }
 
     fn local(&mut self, action: LocalAction) -> i32 {
-        let actions = match action {
+        let mut collected: HashMap<&str, ReturnValue> = HashMap::new();
+        let (actions_step1, actions_step2) = match action {
             LocalAction::List => {
                 list_vars(&self);
                 return SUCCESS;
             }
-            LocalAction::Assign(ref keys, op, ref vals) => AssignmentActions::new(keys, op, vals),
+            LocalAction::Assign(ref keys, op, ref vals) => (AssignmentActions::new(keys, op.clone(), vals), AssignmentActions::new(keys, op, vals)),
         };
-        for action in actions {
+        for action in actions_step1 {
             match action {
                 Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
                     match value_check(self, &expression, key.kind) {
@@ -162,7 +164,7 @@ impl VariableStore for Shell {
                             if key.name == "HISTORY_IGNORE" {
                                 self.update_ignore_patterns(&values);
                             }
-                            self.variables.set_array(key.name, values)
+                            collected.insert(key.name, ReturnValue::Vector(values));
                         }
                         Err(why) => {
                             eprintln!("ion: assignment error: {}: {}", key.name, why);
@@ -178,25 +180,21 @@ impl VariableStore for Shell {
                     return FAILURE;
                 }
                 Ok(Action::UpdateString(key, operator, expression)) => {
-                    if ["HOME", "PWD", "MWD", "SWD", "?"].contains(&key.name) {
+                    if ["HOME", "HOST", "PWD", "MWD", "SWD", "?"].contains(&key.name) {
                         eprintln!("ion: not allowed to set {}", key.name);
                         return FAILURE;
                     }
 
                     match value_check(self, &expression, key.kind) {
                         Ok(ReturnValue::Str(value)) => {
-                            let key_name: &str = &key.name;
                             let lhs = self
                                 .variables
-                                .get_var(key_name)
+                                .get_var(key.name)
                                 .unwrap_or_else(|| String::from("0"));
-                            let lhs = &*lhs as *const str;
 
                             let result =
-                                math(unsafe { &*lhs }, key.kind, operator, &value, |value| {
-                                    self.set_var(key_name, unsafe {
-                                        str::from_utf8_unchecked(value)
-                                    })
+                                math(&lhs, key.kind, operator, &value, |value| {
+                                    collected.insert(key.name, ReturnValue::Str(unsafe { str::from_utf8_unchecked(value) }.to_owned()));
                                 });
 
                             if let Err(why) = result {
@@ -215,6 +213,22 @@ impl VariableStore for Shell {
                     eprintln!("ion: assignment error: {}", why);
                     return FAILURE;
                 }
+            }
+        }
+
+        for action in actions_step2 {
+            match action {
+                Ok(Action::UpdateArray(key, _, _)) => {
+                    if let ReturnValue::Vector(ref values) = collected[key.name] {
+                        self.variables.set_array(key.name, (*values).clone());
+                    }
+                }
+                Ok(Action::UpdateString(key, _, _)) => {
+                    if let ReturnValue::Str(ref value) = collected[key.name] {
+                        self.set_var(key.name, value);
+                    }
+                }
+                _ => unreachable!(),
             }
         }
 
