@@ -205,10 +205,32 @@ pub(crate) fn expand_string<E: Expander>(
                 match word {
                     WordToken::Brace(_) => {
                         contains_brace = true;
+                        token_buffer.push(word);
                     }
-                    _ => (),
+                    WordToken::ArrayVariable(data, contains_quote, selection) => {
+                        if let Select::Key(key) = selection {
+                            if key.key.contains(' ') {
+                                for index in key.key.split(' ') {
+                                    let select = index.parse::<Select>().unwrap_or(Select::None);
+                                    token_buffer.push(
+                                        WordToken::ArrayVariable(
+                                            data,
+                                            contains_quote,
+                                            select,
+                                        )
+                                    );
+                                    token_buffer.push(WordToken::Whitespace(" "));
+                                }
+                                token_buffer.pop(); // Pop out the last unneeded whitespace token
+                            } else {
+                                token_buffer.push(WordToken::ArrayVariable(data, contains_quote, Select::Key(key)));
+                            }
+                        } else {
+                            token_buffer.push(WordToken::ArrayVariable(data, contains_quote, selection));
+                        }
+                    }
+                    _ => token_buffer.push(word),
                 }
-                token_buffer.push(word);
             }
             None if original.is_empty() => {
                 token_buffer.push(WordToken::Normal("".into(), true, false));
