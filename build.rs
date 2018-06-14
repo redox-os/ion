@@ -2,7 +2,7 @@ extern crate ansi_term;
 extern crate version_check;
 
 use ansi_term::Color::{Blue, Red, White};
-use version_check::is_nightly;
+use version_check::supports_features;
 
 // Specifies the minimum version needed to compile Ion.
 // NOTE: 1.19 is required due to the usage of `break` with values for
@@ -14,20 +14,20 @@ use std::{
 };
 
 fn main() {
-    match is_nightly() {
+    match supports_features() {
         Some(true) => (), // Success!
         Some(false) => {
             eprintln!(
                 "{} {}",
                 Red.bold().paint("Error:"),
-                White.paint("Ion requires nightly to build.")
+                White.paint("Ion requires nightly/dev to build.")
             );
             // print_version_err(&*version_string);
             eprintln!(
                 "{}{}{}",
                 Blue.paint("Use `"),
                 White.paint("rustup update"),
-                Blue.paint("` to update to the latest stable compiler.")
+                Blue.paint("` to update to the latest nightly compiler.")
             );
             panic!("Aborting compilation due to incompatible compiler.")
         }
