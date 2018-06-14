@@ -33,6 +33,14 @@ echo $a $b $c
 let a b c -= 2 2 4
 echo $a $b $c
 
+let x y z = 1 2 3
+let x y z = $z $x $y
+echo $x $y $z
+
+let x y z = 1 2 3
+let z x y = $y $z $x
+echo $x $y $z
+
 let a = [
     one # a comment
     two # another comment

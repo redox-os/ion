@@ -219,13 +219,13 @@ impl VariableStore for Shell {
         for action in actions_step2 {
             match action {
                 Ok(Action::UpdateArray(key, _, _)) => {
-                    if let Some(ReturnValue::Vector(ref values)) = collected.get_mut(key.name) {
-                        self.variables.set_array(key.name, (*values).clone());
+                    if let Some(ReturnValue::Vector(values)) = collected.remove(key.name) {
+                        self.variables.set_array(key.name, values);
                     }
                 }
                 Ok(Action::UpdateString(key, _, _)) => {
-                    if let Some(ReturnValue::Str(ref value)) = collected.get(key.name) {
-                        self.set_var(key.name, value);
+                    if let Some(ReturnValue::Str(value)) = collected.remove(key.name) {
+                        self.set_var(key.name, &value);
                     }
                 }
                 _ => unreachable!(),
