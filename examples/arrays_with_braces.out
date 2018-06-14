@@ -2,4 +2,6 @@
 a b c
 ab c d
 ab ac d e
+,
 a,b
+[a,b]c d e

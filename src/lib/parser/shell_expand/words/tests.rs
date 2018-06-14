@@ -259,6 +259,17 @@ fn test_empty_strings() {
     compare(input, expected);
 }
 
+#[test]
+fn test_braces() {
+    let input = "echo {c[a,b],d}";
+    let expected = vec![
+        WordToken::Normal("echo".into(), false, false),
+        WordToken::Whitespace(" "),
+        WordToken::Brace(vec!["c[a,b]", "d"]),
+    ];
+    compare(input, expected);
+}
+
 struct WithVars;
 
 impl Expander for WithVars {
