@@ -608,17 +608,7 @@ impl FlowLogic for Shell {
     }
 
     fn execute_statements(&mut self, mut statements: Vec<Statement>) -> Condition {
-        self.with_vars(|old: &Variables| {
-            let new = old.new_scope();
-            // TODO: THIS IS SUPER UNSAFE!!!!!11111
-            // I'm bypassing the borrow checker here because I'm too gosh darn lazy
-            // to make Shell take a lifetime pararmeter.
-            // THIS. IS. WRONG.
-            // This should be fixed. Some day. Ugh.
-            // Don't do this at home, kids!
-            let new: Variables<'static> = unsafe { mem::transmute(new) };
-            new
-        }, |shell| {
+        self.with_vars(|old: &Variables| old.new_scope(), |shell| {
             let mut iterator = statements.drain(..);
             while let Some(statement) = iterator.next() {
                 match shell.execute_statement(&mut iterator, statement) {

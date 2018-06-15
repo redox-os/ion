@@ -1,8 +1,7 @@
-use super::{flow::FlowLogic, Shell, Variables};
+use super::{flow::FlowLogic, Shell};
 use parser::{assignments::*, pipelines::Pipeline};
 use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
-use std::mem;
 use types::Identifier;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -195,15 +194,7 @@ impl Function {
             while !vars.functions.borrow().contains_key(&name) {
                 vars = vars.parent.expect("execute called on function that's not in scope");
             }
-            let vars = vars.new_scope();
-            // TODO: THIS IS SUPER UNSAFE!!!!!11111
-            // I'm bypassing the borrow checker here because I'm too gosh darn lazy
-            // to make Shell take a lifetime pararmeter.
-            // THIS. IS. WRONG.
-            // This should be fixed. Some day. Ugh.
-            // Don't do this at home, kids!
-            let vars: Variables<'static> = unsafe { mem::transmute(vars) };
-            vars
+            vars.new_scope()
         }, move |shell| {
             for (type_, value) in values {
                 match value {

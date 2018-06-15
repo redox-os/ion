@@ -36,10 +36,11 @@ use liner::Context;
 use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
 use smallvec::SmallVec;
 use std::{
-    fs::File, io::{self, Read, Write}, iter::FromIterator, mem, ops::Deref, path::Path, ptr, process,
+    fs::File, io::{self, Read, Write}, iter::FromIterator, mem, ops::Deref, path::Path, process,
     sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
+use take_mut;
 use types::*;
 use xdg::BaseDirectories;
 
@@ -171,17 +172,25 @@ impl<'a> Shell {
     /// A method for temporarily using a separate set of variables for this shell.
     /// Calls the inner callback and then swaps back.
     pub fn with_vars<VF, F, T>(&mut self, variables: VF, callback: F) -> T
-        where VF: FnOnce(&Variables) -> Variables<'static>,
+        where VF: for <'b> FnOnce(&'b Variables) -> Variables<'b>,
                F: FnOnce(&mut Self) -> T
     {
-        // TODO: It's undefined behavior if variables() callback panics.
-        // This could be solved with the take-mut crate.
-        let old = mem::replace(&mut self.variables, unsafe { mem::uninitialized() });
-        let new = variables(&old);
-        unsafe { ptr::write(&mut self.variables, new); }
+        let mut old = None;
+        take_mut::take(&mut self.variables, |old2| {
+            old = Some(old2);
+            let new = variables(old.as_ref().unwrap());
 
+            // TODO: THIS IS SUPER UNSAFE!!!!!11111
+            // I'm bypassing the borrow checker here because I'm too gosh darn lazy
+            // to make Shell take a lifetime pararmeter.
+            // THIS. IS. WRONG.
+            // This should be fixed. Some day. Ugh.
+            // Don't do this at home, kids!
+            let new: Variables<'static> = unsafe { mem::transmute(new) };
+            new
+        });
         let value = callback(self);
-        mem::replace(&mut self.variables, old);
+        mem::replace(&mut self.variables, old.unwrap());
         value
     }
 
