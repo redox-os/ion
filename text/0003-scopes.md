@@ -6,13 +6,27 @@ the same "body" they are defined in. For example, a variable defined in an if-st
 be visible outside of it. Because ion does not have a separate syntax for defining/updating a
 variable it assumes first assignment is the declaration.
 
+```ion
+let x = 5 # defines x
+
+# This will always execute.
+# Only reason for this check is to show how
+# variables defined inside it are destroyed.
+if test 1 == 1
+  let x = 2 # updates existing x
+  let y = 3 # defines y
+
+  # end of scope, y is deleted since it's owned by it
+end
+
+echo $x # prints 2
+echo $y # prints nothing, y is deleted already
+```
+
 ## Scopes and functions
 [scopes-and-functions]: #scopes-and-functions
 
 Functions will be called from the scope they were defined in, meaning definitions in another scope
 won't be visible from within the function, even if the function is called from within said scope.
-Currently ion does however allow you to access a variable defined between the function and the
-function call from within said function, as long as it is not in a new scope. This does not match
-most other languages, but is similar to the way python does it. This may be subject to change as
-it's due to how variables are implemented rather than a design decision. More specifically, ion
-keeps a hashmap of variables, and hashmaps do not have ordering.
+They will also keep track of in which order they were defined so they cannot access values defined
+after the function itself. Once again, this matches the behavior of most other languages.
