@@ -190,14 +190,8 @@ impl Function {
             values.push((type_.clone(), value));
         }
 
-        let mut index = None;
-        for (i, scope) in shell.variables.scopes.iter().enumerate().rev() {
-            if scope.contains_key(&name) {
-                index = Some(i);
-                break;
-            }
-        }
-        let index = index.expect("execute called with invalid function");
+        let index = shell.variables.index_scope_for_var(&name)
+            .expect("execute called with invalid function");
 
         // Pop off all scopes since function temporarily
         let temporary: Vec<_> = shell.variables.pop_scopes(index).collect();

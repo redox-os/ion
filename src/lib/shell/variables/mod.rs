@@ -36,7 +36,7 @@ pub enum VariableType {
 #[derive(Clone, Debug)]
 pub struct Variables {
     flags:   u8,
-    pub scopes: Vec<FnvHashMap<Identifier, VariableType>>,
+    scopes:  Vec<FnvHashMap<Identifier, VariableType>>,
     current: usize,
 }
 
@@ -133,6 +133,42 @@ impl Variables {
         let amount = self.scopes.len() - self.current - 1;
         self.scopes.iter_mut().rev().skip(amount)
     }
+    pub fn index_scope_for_var(&self, name: &str) -> Option<usize> {
+        let amount = self.scopes.len() - self.current - 1;
+        for (i, scope) in self.scopes.iter().enumerate().rev().skip(amount) {
+            if scope.contains_key(name) {
+                return Some(i);
+            }
+        }
+        None
+    }
+    pub fn shadow(&mut self, name: SmallString, value: VariableType) -> Option<VariableType> {
+        self.scopes.get_mut(self.current).unwrap().insert(name, value)
+    }
+    pub fn lookup_any(&self, name: &str) -> Option<&VariableType> {
+        for scope in self.scopes() {
+            if let val @ Some(_) = scope.get(name) {
+                return val;
+            }
+        }
+        None
+    }
+    pub fn lookup_any_mut(&mut self, name: &str) -> Option<&mut VariableType> {
+        for scope in self.scopes_mut() {
+            if let val @ Some(_) = scope.get_mut(name) {
+                return val;
+            }
+        }
+        None
+    }
+    pub fn remove_any(&mut self, name: &str) -> Option<VariableType> {
+        for scope in self.scopes_mut() {
+            if let val @ Some(_) = scope.remove(name) {
+                return val;
+            }
+        }
+        None
+    }
 
     #[allow(dead_code)]
     pub(crate) fn is_hashmap_reference(key: &str) -> Option<(Identifier, Key)> {
@@ -226,34 +262,6 @@ impl Variables {
 
     pub(crate) fn is_valid_variable_character(c: char) -> bool {
         c.is_alphanumeric() || c == '_' || c == '?' || c == '.'
-    }
-
-    pub fn shadow(&mut self, name: SmallString, value: VariableType) -> Option<VariableType> {
-        self.scopes.get_mut(self.current).unwrap().insert(name, value)
-    }
-    pub fn lookup_any(&self, name: &str) -> Option<&VariableType> {
-        for scope in self.scopes() {
-            if let val @ Some(_) = scope.get(name) {
-                return val;
-            }
-        }
-        None
-    }
-    pub fn lookup_any_mut(&mut self, name: &str) -> Option<&mut VariableType> {
-        for scope in self.scopes_mut() {
-            if let val @ Some(_) = scope.get_mut(name) {
-                return val;
-            }
-        }
-        None
-    }
-    pub fn remove_any(&mut self, name: &str) -> Option<VariableType> {
-        for scope in self.scopes_mut() {
-            if let val @ Some(_) = scope.remove(name) {
-                return val;
-            }
-        }
-        None
     }
 
     pub fn variables(&self) -> impl Iterator<Item = (&SmallString, &Value)> {
