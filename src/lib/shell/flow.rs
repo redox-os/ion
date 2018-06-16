@@ -614,7 +614,7 @@ impl FlowLogic for Shell {
         while let Some(statement) = iterator.next() {
             match self.execute_statement(&mut iterator, statement) {
                 Condition::NoOp => {}
-                cond => condition = Some(cond),
+                cond => { condition = Some(cond); break; },
             }
         }
 

@@ -39,8 +39,8 @@ let array = [@split_at(a, $pos)]
 echo $join(array, "\n")
 
 let a = [1 2 3 4 5]
-let a = "1 2 3 4 5"
-echo $join(@split(a, " "), $join(a, " "))
+let b = "1 2 3 4 5"
+echo $join(@split(b, " "), $join(a, " "))
 
 echo $regex_replace("one two onemy anemy town", "\ o|\ a" "\ e")
 

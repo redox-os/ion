@@ -408,7 +408,7 @@ fn test_string_var_is_not_empty() {
 #[test]
 fn test_function_is_defined() {
     use parser::assignments::{KeyBuf, Primitive};
-    let shell = shell::ShellBuilder::new().as_library();
+    let mut shell = shell::ShellBuilder::new().as_library();
 
     // create a simple dummy function
     let name_str = "test_function";

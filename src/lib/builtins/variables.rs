@@ -192,7 +192,7 @@ mod test {
     use parser::{expand_string, Expander};
     use shell::status::{FAILURE, SUCCESS};
 
-    struct VariableExpander(pub Variables<'static>);
+    struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
         fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }

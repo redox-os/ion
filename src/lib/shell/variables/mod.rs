@@ -276,10 +276,6 @@ impl Variables {
             })
             .flatten()
     }
-    pub fn strings(&self) -> Vec<SmallString> {
-        let vars = self.scopes.last().unwrap();
-        vars.keys().cloned().chain(env::vars().map(|(k, _)| k.into())).collect()
-    }
     pub fn unset_var(&mut self, name: &str) -> Option<Value> {
         match self.remove_any(name) {
             Some(VariableType::Variable(val)) => Some(val),
@@ -589,7 +585,7 @@ mod tests {
 
     #[test]
     fn set_var_and_expand_a_variable() {
-        let variables = Variables::default();
+        let mut variables = Variables::default();
         variables.set_var("FOO", "BAR");
         let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
         assert_eq!("BAR", &expanded);
@@ -607,7 +603,7 @@ mod tests {
 
     #[test]
     fn minimal_directory_var_should_compact_path() {
-        let variables = Variables::default();
+        let mut variables = Variables::default();
         variables.set_var("PWD", "/var/log/nix");
         assert_eq!(
             "v/l/nix",
@@ -617,7 +613,7 @@ mod tests {
 
     #[test]
     fn minimal_directory_var_shouldnt_compact_path() {
-        let variables = Variables::default();
+        let mut variables = Variables::default();
         variables.set_var("PWD", "/var/log");
         assert_eq!(
             "/var/log",
