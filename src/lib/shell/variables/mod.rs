@@ -35,8 +35,9 @@ pub enum VariableType {
 
 #[derive(Clone, Debug)]
 pub struct Variables {
+    flags:   u8,
     pub scopes: Vec<FnvHashMap<Identifier, VariableType>>,
-    flags:      u8,
+    current: usize,
 }
 
 impl Default for Variables {
@@ -96,7 +97,8 @@ impl Default for Variables {
 
         Variables {
             flags: 0,
-            scopes: vec![map]
+            scopes: vec![map],
+            current: 0
         }
     }
 }
@@ -104,12 +106,32 @@ impl Default for Variables {
 const PLUGIN: u8 = 1;
 
 impl Variables {
-    pub(crate) fn new_scope(&mut self) {
-        self.scopes.push(FnvHashMap::with_capacity_and_hasher(64, Default::default()));
+    pub fn new_scope(&mut self) {
+        self.current += 1;
+        if self.current >= self.scopes.len() {
+            self.scopes.push(FnvHashMap::with_capacity_and_hasher(64, Default::default()));
+        }
     }
-    pub(crate) fn pop_scope(&mut self) {
-        // TODO use counter and re-use hashmap
-        self.scopes.pop();
+    pub fn pop_scope(&mut self) {
+        self.scopes.get_mut(self.current).unwrap().clear();
+        self.current -= 1;
+    }
+    pub fn pop_scopes<'a>(&'a mut self, index: usize) -> impl Iterator<Item = FnvHashMap<Identifier, VariableType>> + 'a {
+        self.current = index;
+        self.scopes.drain(index+1..)
+    }
+    pub fn append_scopes(&mut self, scopes: Vec<FnvHashMap<Identifier, VariableType>>) {
+        self.scopes.drain(self.current+1..);
+        self.current += scopes.len();
+        self.scopes.extend(scopes);
+    }
+    pub fn scopes(&self) -> impl Iterator<Item = &FnvHashMap<Identifier, VariableType>> {
+        let amount = self.scopes.len() - self.current - 1;
+        self.scopes.iter().rev().skip(amount)
+    }
+    pub fn scopes_mut(&mut self) -> impl Iterator<Item = &mut FnvHashMap<Identifier, VariableType>> {
+        let amount = self.scopes.len() - self.current - 1;
+        self.scopes.iter_mut().rev().skip(amount)
     }
 
     #[allow(dead_code)]
@@ -207,10 +229,10 @@ impl Variables {
     }
 
     pub fn shadow(&mut self, name: SmallString, value: VariableType) -> Option<VariableType> {
-        self.scopes.last_mut().unwrap().insert(name, value)
+        self.scopes.get_mut(self.current).unwrap().insert(name, value)
     }
     pub fn lookup_any(&self, name: &str) -> Option<&VariableType> {
-        for scope in self.scopes.iter().rev() {
+        for scope in self.scopes() {
             if let val @ Some(_) = scope.get(name) {
                 return val;
             }
@@ -218,7 +240,7 @@ impl Variables {
         None
     }
     pub fn lookup_any_mut(&mut self, name: &str) -> Option<&mut VariableType> {
-        for scope in self.scopes.iter_mut().rev() {
+        for scope in self.scopes_mut() {
             if let val @ Some(_) = scope.get_mut(name) {
                 return val;
             }
@@ -226,7 +248,7 @@ impl Variables {
         None
     }
     pub fn remove_any(&mut self, name: &str) -> Option<VariableType> {
-        for scope in self.scopes.iter_mut().rev() {
+        for scope in self.scopes_mut() {
             if let val @ Some(_) = scope.remove(name) {
                 return val;
             }
@@ -235,7 +257,7 @@ impl Variables {
     }
 
     pub fn variables(&self) -> impl Iterator<Item = (&SmallString, &Value)> {
-        self.scopes.iter().rev()
+        self.scopes()
             .map(|map| {
                 map.iter()
                     .filter_map(|(key, val)| if let VariableType::Variable(val) = val {

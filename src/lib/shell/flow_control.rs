@@ -200,8 +200,7 @@ impl Function {
         let index = index.expect("execute called with invalid function");
 
         // Pop off all scopes since function temporarily
-        let temporary: Vec<_> = shell.variables.scopes.drain(index+1..).collect();
-        shell.variables.new_scope();
+        let temporary: Vec<_> = shell.variables.pop_scopes(index).collect();
 
         for (type_, value) in values {
             match value {
@@ -216,8 +215,7 @@ impl Function {
 
         shell.execute_statements(self.statements);
 
-        shell.variables.pop_scope();
-        shell.variables.scopes.extend(temporary);
+        shell.variables.append_scopes(temporary);
         Ok(())
     }
 
