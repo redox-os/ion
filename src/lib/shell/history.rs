@@ -8,9 +8,9 @@ bitflags! {
     struct IgnoreFlags: u8 {
         // Macro definition fails if last flag has a comment at the end of the line.
         /// ignore all commands ("all")
-        const ALL                = (0b1 << 0);
+        const ALL                = (0b1);
         /// ignore commands with leading whitespace ("whitespace")
-        const WHITESPACE         = (0x1 << 1);
+        const WHITESPACE         = (0b1 << 1);
         /// ignore commands with status code 127 ("no_such_command")
         const NO_SUCH_COMMAND    = (0b1 << 2);
         /// used if regexes are defined.
@@ -97,7 +97,7 @@ impl ShellHistory for Shell {
         }
 
         self.ignore_setting.flags = flags;
-        self.ignore_setting.regexes = if regexes.len() > 0 {
+        self.ignore_setting.regexes = if !regexes.is_empty() {
             Some(regexes)
         } else {
             None
@@ -126,7 +126,7 @@ impl ShellHistory for Shell {
 
         if &*variables.get_var_or_empty("HISTFILE_ENABLED") == "1" {
             let file_name = variables.get_var("HISTFILE");
-            context.history.set_file_name(file_name.map(|f| f.into()));
+            context.history.set_file_name(file_name);
 
             let max_histfile_size = variables
                 .get_var_or_empty("HISTFILE_SIZE")
@@ -168,14 +168,11 @@ impl ShellHistoryPrivate for Shell {
 
         // Here we allow to also ignore the setting of the local variable because we
         // assume the user entered the leading whitespace on purpose.
-        if ignore.contains(IgnoreFlags::WHITESPACE) {
-            if command.chars().next().map_or(false, |b| b.is_whitespace()) {
-                return false;
-            }
+        if ignore.contains(IgnoreFlags::WHITESPACE) && command.chars().next().map_or(false, |b| b.is_whitespace()) {
+            return false;
         }
 
-        if ignore.contains(IgnoreFlags::NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND
-        {
+        if ignore.contains(IgnoreFlags::NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND {
             return false;
         }
 
@@ -185,7 +182,7 @@ impl ShellHistoryPrivate for Shell {
                 let buffers = &mut context.history.buffers;
                 *buffers = buffers.into_iter().filter_map(|buffer| {
                     let hist_command = buffer.lines().concat();
-                    if &hist_command != command {
+                    if hist_command != command {
                         Some((*buffer).clone())
                     } else {
                         None

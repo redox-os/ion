@@ -247,15 +247,12 @@ impl FlowLogic for Shell {
             }
             Statement::And(box_statement) => {
                 if self.flow_control.level == 0 {
-                    match self.previous_status {
-                        SUCCESS => {
-                            if let Err(why) = self.execute_toplevel(iterator, *box_statement) {
-                                eprintln!("{}", why);
-                                self.flow_control.level = 0;
-                                self.flow_control.current_if_mode = 0;
-                            }
+                    if let SUCCESS = self.previous_status {
+                        if let Err(why) = self.execute_toplevel(iterator, *box_statement) {
+                            eprintln!("{}", why);
+                            self.flow_control.level = 0;
+                            self.flow_control.current_if_mode = 0;
                         }
-                        _ => (),
                     }
                 } else {
                     // A statement wasn't executed , which means that current_statement has been
@@ -266,15 +263,12 @@ impl FlowLogic for Shell {
             }
             Statement::Or(box_statement) => {
                 if self.flow_control.level == 0 {
-                    match self.previous_status {
-                        FAILURE => {
-                            if let Err(why) = self.execute_toplevel(iterator, *box_statement) {
-                                eprintln!("{}", why);
-                                self.flow_control.level = 0;
-                                self.flow_control.current_if_mode = 0;
-                            }
+                    if let FAILURE = self.previous_status {
+                        if let Err(why) = self.execute_toplevel(iterator, *box_statement) {
+                            eprintln!("{}", why);
+                            self.flow_control.level = 0;
+                            self.flow_control.current_if_mode = 0;
                         }
-                        _ => (),
                     }
                 } else {
                     // A statement wasn't executed , which means that current_statement has been
@@ -371,7 +365,7 @@ impl FlowLogic for Shell {
                     _ => (),
                 }
             },
-            ForExpression::Multiple(values) => for value in values.iter() {
+            ForExpression::Multiple(values) => for value in &values {
                 self.set_var(variable, &value);
                 match self.execute_statements(statements.clone()) {
                     Condition::Break => break,
@@ -759,19 +753,19 @@ impl FlowLogic for Shell {
                 level: &mut usize,
                 current_if_mode: &mut u8,
             ) {
-                match current_statement {
-                    &mut Statement::While {
+                match *current_statement {
+                    Statement::While {
                         ref mut statements, ..
                     }
-                    | &mut Statement::For {
+                    | Statement::For {
                         ref mut statements, ..
                     }
-                    | &mut Statement::Function {
+                    | Statement::Function {
                         ref mut statements, ..
                     } => {
                         collect_loops(&mut iterator, statements, level);
                     }
-                    &mut Statement::If {
+                    Statement::If {
                         ref mut success,
                         ref mut else_if,
                         ref mut failure,
@@ -792,21 +786,21 @@ impl FlowLogic for Shell {
                             }
                         };
                     }
-                    &mut Statement::Match { ref mut cases, .. } => {
+                    Statement::Match { ref mut cases, .. } => {
                         if let Err(why) = collect_cases(&mut iterator, cases, level) {
                             eprintln!("{}", why);
                         }
                     }
-                    &mut Statement::Time(ref mut box_stmt) => {
+                    Statement::Time(ref mut box_stmt) => {
                         append_new_commands(iterator, box_stmt.as_mut(), level, current_if_mode);
                     }
-                    &mut Statement::And(ref mut box_stmt) => {
+                    Statement::And(ref mut box_stmt) => {
                         append_new_commands(iterator, box_stmt.as_mut(), level, current_if_mode);
                     }
-                    &mut Statement::Or(ref mut box_stmt) => {
+                    Statement::Or(ref mut box_stmt) => {
                         append_new_commands(iterator, box_stmt.as_mut(), level, current_if_mode);
                     }
-                    &mut Statement::Not(ref mut box_stmt) => {
+                    Statement::Not(ref mut box_stmt) => {
                         append_new_commands(iterator, box_stmt.as_mut(), level, current_if_mode);
                     }
                     _ => (),
@@ -912,18 +906,12 @@ impl FlowLogic for Shell {
                             };
                             return condition;
                         }
-                        Statement::And(box_stmt) => match shell.previous_status {
-                            SUCCESS => {
-                                execute_final(shell, *box_stmt);
-                            }
-                            _ => (),
-                        },
-                        Statement::Or(box_stmt) => match shell.previous_status {
-                            FAILURE => {
-                                execute_final(shell, *box_stmt);
-                            }
-                            _ => (),
-                        },
+                        Statement::And(box_stmt) => if let SUCCESS = shell.previous_status {
+                            execute_final(shell, *box_stmt);
+                        }
+                        Statement::Or(box_stmt) => if let FAILURE = shell.previous_status {
+                            execute_final(shell, *box_stmt);
+                        }
                         Statement::Not(box_stmt) => {
                             execute_final(shell, *box_stmt);
                             match shell.previous_status {

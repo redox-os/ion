@@ -1,10 +1,8 @@
 /// Given an valid assignment expression, this will split it into `keys`,
 /// `operator`, `values`.
-pub(crate) fn split_assignment<'a>(
-    statement: &'a str,
-) -> (Option<&'a str>, Option<&'a str>, Option<&'a str>) {
+pub(crate) fn split_assignment(statement: &str) -> (Option<&str>, Option<&str>, Option<&str>) {
     let statement = statement.trim();
-    if statement.len() == 0 {
+    if statement.is_empty() {
         return (None, None, None);
     }
 
@@ -14,7 +12,7 @@ pub(crate) fn split_assignment<'a>(
 
     while let Some(byte) = bytes.next() {
         if b'=' == byte {
-            if let None = statement.as_bytes().get(read + 1) {
+            if statement.as_bytes().get(read + 1).is_none() {
                 return (Some(&statement[..read].trim()), Some("="), None);
             }
             start = read;

@@ -172,11 +172,9 @@ impl Colors {
                 },
                 _ => (),
             }
-        } else {
-            if let Ok(value) = variable.parse::<u8>() {
-                *field = Some(Mode::Range256(value));
-                return true;
-            }
+        } else if let Ok(value) = variable.parse::<u8>() {
+            *field = Some(Mode::Range256(value));
+            return true;
         }
 
         false
@@ -207,7 +205,7 @@ impl Colors {
             background: None,
             attributes: None,
         };
-        for variable in input.split(",") {
+        for variable in input.split(',') {
             if variable == "reset" {
                 return Colors {
                     foreground: None,

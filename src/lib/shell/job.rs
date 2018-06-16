@@ -198,7 +198,7 @@ impl RefinedJob {
         match *self {
             RefinedJob::External { ref args, .. }
             | RefinedJob::Builtin { ref args, .. }
-            | RefinedJob::Function { ref args, .. } => format!("{}", args.join(" ")),
+            | RefinedJob::Function { ref args, .. } => args.join(" ").to_owned(),
             // TODO: Figure out real printing
             RefinedJob::Cat { .. } | RefinedJob::Tee { .. } => "".into(),
         }
@@ -256,7 +256,7 @@ impl RefinedJob {
     }
 
     pub(crate) fn stdout(&mut self, file: File) {
-        if let &mut RefinedJob::Cat { ref mut stdout, .. } = self {
+        if let RefinedJob::Cat { ref mut stdout, .. } = *self {
             *stdout = Some(file);
         } else {
             set_field!(self, stdout, file);

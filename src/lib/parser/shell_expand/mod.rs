@@ -101,9 +101,9 @@ fn expand_brace<E: Expander>(
     {
         match parse_range(&word) {
             Some(elements) => for word in elements {
-                temp.push(word.into())
+                temp.push(word)
             },
-            None => temp.push(word.into()),
+            None => temp.push(word),
         }
     }
     if !temp.is_empty() {
@@ -254,11 +254,8 @@ fn expand_string_no_glob<E: Expander>(
     loop {
         match word_iterator.next() {
             Some(word) => {
-                match word {
-                    WordToken::Brace(_) => {
-                        contains_brace = true;
-                    }
-                    _ => (),
+                if let WordToken::Brace(_) = word {
+                    contains_brace = true;
                 }
                 token_buffer.push(word);
             }
@@ -367,7 +364,7 @@ fn expand_braces<E: Expander>(
         }
     }
     if expanders.is_empty() {
-        expanded_words.push(output.into());
+        expanded_words.push(output);
     } else {
         if !output.is_empty() {
             tokens.push(BraceToken::Normal(output));
@@ -383,7 +380,7 @@ fn expand_braces<E: Expander>(
     }
 
     expanded_words.into_iter().fold(Array::new(), |mut array, word| {
-        if let Some(_) = word.find('*') {
+        if word.find('*').is_some() {
             if let Ok(mut paths) = glob(&word) {
                 match paths.next() {
                     Some(path) => if let Ok(path_buf) = path {
@@ -506,7 +503,7 @@ fn expand_single_string_token<E: Expander>(
                 Some(var) => var,
                 None => {
                     if output != "" {
-                        expanded_words.push(output.into());
+                        expanded_words.push(output);
                     }
                     return expanded_words;
                 }
@@ -661,7 +658,7 @@ pub(crate) fn expand_tokens<E: Expander>(
         }
         // I'm not entirely sure if empty strings are valid in any case- maarten
         if output != "" {
-            expanded_words.push(output.into());
+            expanded_words.push(output);
         }
         expanded_words
     } else {

@@ -16,10 +16,7 @@ pub(crate) fn status(args: &[String], shell: &mut Shell) -> Result<(), String> {
     let mut flags = Flags::empty();
     let shell_args: Vec<_> = env::args().collect();
 
-    let mut is_login = false;
-    if shell_args[0].chars().nth(0).unwrap() == '-' {
-        is_login = true;
-    }
+    let is_login = shell_args[0].chars().nth(0).unwrap() == '-';
 
     let args_len = args.len();
     if args_len == 1 {
@@ -54,10 +51,8 @@ pub(crate) fn status(args: &[String], shell: &mut Shell) -> Result<(), String> {
             return Err(err);
         }
 
-        if flags.contains(Flags::INTERACTIVE) {
-            if shell.is_background_shell || shell.is_library {
-                return Err(err);
-            }
+        if flags.contains(Flags::INTERACTIVE) && shell.is_background_shell || shell.is_library {
+            return Err(err);
         }
 
         if flags.contains(Flags::FILENAME) {

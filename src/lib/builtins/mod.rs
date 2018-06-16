@@ -61,7 +61,7 @@ macro_rules! map {
 /// }
 
 /// Builtins are in A-Z order.
-pub const BUILTINS: &'static BuiltinMap = &map!(
+pub const BUILTINS: &BuiltinMap = &map!(
     "alias" => builtin_alias : "View, set or unset aliases",
     "bg" => builtin_bg : "Resumes a stopped background process",
     "bool" => builtin_bool : "If the value is '1' or 'true', return 0 exit status",

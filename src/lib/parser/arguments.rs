@@ -1,15 +1,15 @@
 bitflags! {
     struct ArgumentFlags: u8 {
         /// Double quotes
-        const DOUBLE = 0b00000001;
+        const DOUBLE = 0b0000_0001;
         /// Command flags
-        const COMM_1 = 0b00000010; // found $
-        const COMM_2 = 0b00000100; // found ( after $
+        const COMM_1 = 0b0000_0010; // found $
+        const COMM_2 = 0b0000_0100; // found ( after $
         /// String variable
-        const VARIAB = 0b00001000;
+        const VARIAB = 0b0000_1000;
         /// Array variable
-        const ARRAY  = 0b00010000;
-        const METHOD = 0b00100000;
+        const ARRAY  = 0b0001_0000;
+        const METHOD = 0b0010_0000;
     }
 }
 

@@ -290,7 +290,7 @@ impl<'a> StringMethod<'a> {
                     Err(msg) => eprintln!("{}", &msg),
                 };
             }
-            method @ _ => {
+            method => {
                 if sys::is_root() {
                     eprintln!("ion: root is not allowed to execute plugins");
                     return;

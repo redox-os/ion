@@ -12,7 +12,7 @@ use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
 use liner::{Buffer, Context};
 use std::{env, fs::File, io::ErrorKind, iter, path::Path, process, sync::Mutex};
 
-pub const MAN_ION: &'static str = r#"NAME
+pub const MAN_ION: &str = r#"NAME
     ion - ion shell
 
 SYNOPSIS
@@ -242,7 +242,7 @@ where
     }
 }
 
-fn word_divide<'a>(buf: &'a Buffer) -> Vec<(usize, usize)> {
+fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
     // -> impl Iterator<Item = (usize, usize)> + 'a
     WordDivide {
         iter:       buf.chars().cloned().enumerate(),

@@ -126,12 +126,12 @@ impl<'a> KeyIterator<'a> {
 
         match &self.data[start..] {
             "]" => {
-                return Ok(Key {
+                Ok(Key {
                     name,
                     kind: Primitive::AnyArray,
                 })
             }
-            data @ _ => return Err(TypeError::Invalid(data)),
+            data @ _ => Err(TypeError::Invalid(data)),
         }
     }
 

@@ -47,16 +47,14 @@ impl PipeItem {
     pub(crate) fn expand(&mut self, shell: &Shell) {
         self.job.expand(shell);
 
-        for input in self.inputs.iter_mut() {
+        for input in &mut self.inputs {
             *input = match input {
-                &mut Input::File(ref s) => Input::File(expand_string(s, shell, false).join(" ")),
-                &mut Input::HereString(ref s) => {
-                    Input::HereString(expand_string(s, shell, true).join(" "))
-                }
+                Input::File(ref s) => Input::File(expand_string(s, shell, false).join(" ")),
+                Input::HereString(ref s) => Input::HereString(expand_string(s, shell, true).join(" ")),
             };
         }
 
-        for output in self.outputs.iter_mut() {
+        for output in &mut self.outputs {
             output.file = expand_string(output.file.as_str(), shell, false).join(" ");
         }
     }
@@ -73,8 +71,8 @@ impl PipeItem {
 impl Pipeline {
     pub(crate) fn requires_piping(&self) -> bool {
         self.items.len() > 1
-            || self.items.iter().any(|it| it.outputs.len() > 0)
-            || self.items.iter().any(|it| it.inputs.len() > 0)
+            || self.items.iter().any(|it| !it.outputs.is_empty())
+            || self.items.iter().any(|it| !it.inputs.is_empty())
             || self.items.last().unwrap().job.kind == JobKind::Background
             || self.items.last().unwrap().job.kind == JobKind::Disown
     }
@@ -97,11 +95,11 @@ impl fmt::Display for Pipeline {
             tokens.extend(item.job.args.clone().into_iter());
             for input in inputs {
                 match input {
-                    &Input::File(ref file) => {
+                    Input::File(ref file) => {
                         tokens.push("<".into());
                         tokens.push(file.clone());
                     }
-                    &Input::HereString(ref string) => {
+                    Input::HereString(ref string) => {
                         tokens.push("<<<".into());
                         tokens.push(string.clone());
                     }

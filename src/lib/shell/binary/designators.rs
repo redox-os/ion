@@ -106,7 +106,7 @@ pub(crate) fn expand_designators<'a>(shell: &Shell, cmd: &'a str) -> Cow<'a, str
     Cow::Borrowed(cmd)
 }
 
-fn command<'a>(text: &'a str) -> &'a str { ArgumentSplitter::new(text).next().unwrap_or(text) }
+fn command(text: &str) -> &str { ArgumentSplitter::new(text).next().unwrap_or(text) }
 
 fn args(text: &str) -> &str {
     let bytes = text.as_bytes();
@@ -123,6 +123,6 @@ fn args(text: &str) -> &str {
         .unwrap_or(text)
 }
 
-fn first_arg<'a>(text: &'a str) -> &'a str { ArgumentSplitter::new(text).nth(1).unwrap_or(text) }
+fn first_arg(text: &str) -> &str { ArgumentSplitter::new(text).nth(1).unwrap_or(text) }
 
-fn last_arg<'a>(text: &'a str) -> &'a str { ArgumentSplitter::new(text).last().unwrap_or(text) }
+fn last_arg(text: &str) -> &str { ArgumentSplitter::new(text).last().unwrap_or(text) }

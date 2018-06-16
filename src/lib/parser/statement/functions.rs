@@ -5,7 +5,7 @@ use super::{
 /// The arguments expression given to a function declaration goes into here, which will be
 /// converted into a tuple consisting of a `KeyIterator` iterator, which will collect type
 /// information, and an optional description of the function.
-pub(crate) fn parse_function<'a>(arg: &'a str) -> (KeyIterator<'a>, Option<&'a str>) {
+pub(crate) fn parse_function(arg: &str) -> (KeyIterator, Option<&str>) {
     let (args, description) = split_pattern(arg, "--");
     (KeyIterator::new(args), description)
 }

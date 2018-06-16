@@ -115,8 +115,8 @@ impl StringMethodPlugins {
     ) -> Result<Option<String>, StringError> {
         let func = self
             .symbols
-            .get(function.into())
-            .ok_or(StringError::FunctionMissing(function.into()))?;
+            .get(function)
+            .ok_or_else(|| StringError::FunctionMissing(function.into()))?;
         unsafe {
             let data = (*func)(RawMethodArguments::from(arguments));
             if data.is_null() {

@@ -30,7 +30,7 @@ impl StringNamespace {
         let func = self
             .symbols
             .get(&function)
-            .ok_or(StringError::FunctionMissing(function.clone()))?;
+            .ok_or_else(|| StringError::FunctionMissing(function.clone()))?;
         unsafe {
             let data = (*func)();
             if data.is_null() {

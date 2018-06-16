@@ -137,7 +137,7 @@ impl VariableStore for Shell {
                 list_vars(&self);
                 return SUCCESS;
             }
-            LocalAction::Assign(ref keys, op, ref vals) => (AssignmentActions::new(keys, op.clone(), vals), AssignmentActions::new(keys, op, vals)),
+            LocalAction::Assign(ref keys, op, ref vals) => (AssignmentActions::new(keys, op, vals), AssignmentActions::new(keys, op, vals)),
         };
         for action in actions_step1 {
             match action {

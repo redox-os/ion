@@ -7,7 +7,7 @@ fn stepped_range_numeric<'a>(
     step: isize,
     nb_digits: usize,
 ) -> Option<Box<Iterator<Item = String> + 'a>> {
-    return if step == 0 {
+    if step == 0 {
         None
     } else if start < end && step < 0 {
         None
@@ -31,7 +31,7 @@ fn stepped_range_numeric<'a>(
         });
 
         Some(Box::new(iter))
-    };
+    }
 }
 
 fn stepped_range_chars<'a>(

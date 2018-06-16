@@ -637,7 +637,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             read: 0,
             flags: Flags::empty(),
             expanders,
-            do_glob: do_glob,
+            do_glob,
         }
     }
 }

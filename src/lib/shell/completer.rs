@@ -74,17 +74,15 @@ impl Completer for IonFileCompleter {
                     for completion in iterator {
                         completions.push([start, &completion[expanded.len()..]].concat());
                     }
-                } else {
                     // To save processing time, we should get obtain the index position where our
                     // search pattern begins, and re-use that index to slice the completions so
                     // that we may re-add the tilde character with the completion that follows.
-                    if let Some(completion) = iterator.next() {
-                        if let Some(e_index) = expanded.rfind(search) {
-                            completions.push(escape(&[tilde, &completion[e_index..]].concat()));
-                            for completion in iterator {
-                                let expanded = &completion[e_index..];
-                                completions.push(escape(&[tilde, expanded].concat()));
-                            }
+                } else if let Some(completion) = iterator.next() {
+                    if let Some(e_index) = expanded.rfind(search) {
+                        completions.push(escape(&[tilde, &completion[e_index..]].concat()));
+                        for completion in iterator {
+                            let expanded = &completion[e_index..];
+                            completions.push(escape(&[tilde, expanded].concat()));
                         }
                     }
                 }
@@ -103,12 +101,12 @@ where
 {
     let unescaped_start = unescape(start);
 
-    let split_start = unescaped_start.split("/");
+    let split_start = unescaped_start.split('/');
     let mut string: SmallVec<[u8; 128]> = SmallVec::with_capacity(128);
 
     // When 'start' is an absolute path, "/..." gets split to ["", "..."]
     // So we skip the first element and add "/" to the start of the string
-    let skip = if unescaped_start.starts_with("/") {
+    let skip = if unescaped_start.starts_with('/') {
         string.push(b'/');
         1
     } else {

@@ -11,7 +11,7 @@ pub(crate) fn test(args: &[String]) -> Result<bool, String> {
 
 fn evaluate_arguments(arguments: &[String]) -> Result<bool, String> {
     match arguments.first() {
-        Some(ref s) if s.starts_with("-") && s[1..].starts_with(char::is_alphabetic) => {
+        Some(ref s) if s.starts_with('-') && s[1..].starts_with(char::is_alphabetic) => {
             // Access the second character in the flag string: this will be type of the
             // flag. If no flag was given, return `SUCCESS`
             s.chars().nth(1).map_or(Ok(true), |flag| {
@@ -112,7 +112,7 @@ fn parse_integers(left: &str, right: &str) -> Result<(Option<isize>, Option<isiz
             .parse::<isize>()
             .map_err(|_| format!("test: integer expression expected: {:?}", input))
         {
-            Err(why) => Err(String::from(why)),
+            Err(why) => Err(why),
             Ok(res) => Ok(Some(res)),
         }
     };
@@ -163,8 +163,8 @@ fn file_size_is_greater_than_zero(filepath: &str) -> bool {
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective read bits.
 fn file_has_read_permission(filepath: &str) -> bool {
-    const USER: u32 = 0b100000000;
-    const GROUP: u32 = 0b100000;
+    const USER: u32 = 0b1_0000_0000;
+    const GROUP: u32 = 0b10_0000;
     const GUEST: u32 = 0b100;
 
     // Collect the mode of permissions for the file

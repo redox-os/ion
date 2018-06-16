@@ -238,7 +238,7 @@ impl Shell {
         let command_start_time = SystemTime::now();
 
         // Expand any aliases found
-        for item in pipeline.items.iter_mut() {
+        for item in &mut pipeline.items {
             let mut last_command = String::with_capacity(32);
             loop {
                 let possible_alias = {
@@ -443,7 +443,7 @@ impl<'a> Expander for Shell {
             self.get_var(variable)
         } else {
             self.get_var(variable)
-                .map(|x| x.ascii_replace('\n', ' ').into())
+                .map(|x| x.ascii_replace('\n', ' '))
         }
     }
 

@@ -13,7 +13,7 @@ pub(crate) struct Collector<'a> {
 
 lazy_static! {
     /// The set of bytes that will always indicate an end of an arg
-    static ref FOLLOW_ARGS: HashSet<u8> = b"&|<> \t".into_iter().map(|b| *b).collect();
+    static ref FOLLOW_ARGS: HashSet<u8> = b"&|<> \t".into_iter().cloned().collect();
 }
 
 impl<'a> Collector<'a> {
@@ -36,7 +36,7 @@ impl<'a> Collector<'a> {
         /// Attempt to add a redirection
         macro_rules! try_redir_out {
             ($from:expr) => {{
-                if let None = outputs {
+                if outputs.is_none() {
                     outputs = Some(Vec::new());
                 }
                 let append = if let Some(&(_, b'>')) = bytes.peek() {
@@ -131,7 +131,7 @@ impl<'a> Collector<'a> {
                     try_redir_out!(RedirectFrom::Stdout);
                 }
                 b'<' => {
-                    if let None = inputs {
+                    if inputs.is_none() {
                         inputs = Some(Vec::new());
                     }
                     bytes.next();
@@ -142,9 +142,8 @@ impl<'a> Collector<'a> {
                             bytes.next();
                             bytes.next();
                             if let Some(cmd) = self.arg(&mut bytes)? {
-                                inputs
-                                    .as_mut()
-                                    .map(|x| x.push(Input::HereString(cmd.into())));
+                                if let Some(x) = inputs.as_mut()
+                                    { x.push(Input::HereString(cmd.into())) };
                             } else {
                                 return Err("expected string argument after '<<<'");
                             }
@@ -165,12 +164,12 @@ impl<'a> Collector<'a> {
                             if heredoc.len() > 1 {
                                 let herestring =
                                     Input::HereString(heredoc[..heredoc.len() - 1].join("\n"));
-                                inputs.as_mut().map(|x| x.push(herestring.clone()));
+                                if let Some(x) = inputs.as_mut() { x.push(herestring.clone()) };
                             }
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
                         // Otherwise interpret it as stdin redirection
-                        inputs.as_mut().map(|x| x.push(Input::File(file.into())));
+                        if let Some(x) = inputs.as_mut() { x.push(Input::File(file.into())) };
                     } else {
                         return Err("expected file argument after redirection for input");
                     }
@@ -351,13 +350,10 @@ impl<'a> Collector<'a> {
         I: Iterator<Item = (usize, u8)>,
     {
         while let Some(&(i, b)) = bytes.peek() {
-            match b {
                 // We return an inclusive range to keep the quote type intact
-                b'\'' => {
-                    bytes.next();
-                    return Ok(&self.data[start..i + 1]);
-                }
-                _ => (),
+            if let b'\'' = b {
+                bytes.next();
+                return Ok(&self.data[start..i + 1]);
             }
             bytes.next();
         }

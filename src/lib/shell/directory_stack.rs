@@ -34,7 +34,7 @@ impl DirectoryStack {
             };
         }
 
-        return new_dir;
+        new_dir
     }
 
     // pushd -<num>
@@ -57,7 +57,7 @@ impl DirectoryStack {
         index: usize,
         caller: &str,
     ) -> Result<(), Cow<'static, str>> {
-        let dir = self.dirs.iter().nth(index).ok_or_else(|| {
+        let dir = self.dirs.get(index).ok_or_else(|| {
             Cow::Owned(format!(
                 "ion: {}: {}: directory stack out of range\n",
                 caller, index
@@ -136,9 +136,10 @@ impl DirectoryStack {
                 None => return FAILURE,
             };
         } else {
-            let folder: fn(String, Cow<str>) -> String = match dirs_args & MULTILINE > 0 {
-                true => |x, y| x + "\n" + &y,
-                false => |x, y| x + " " + &y,
+            let folder: fn(String, Cow<str>) -> String = if dirs_args & MULTILINE > 0 {
+                |x, y| x + "\n" + &y
+            } else {
+                |x, y| x + " " + &y
             };
 
             let first = match iter.next() {
@@ -370,9 +371,7 @@ impl DirectoryStack {
             num
         } else {
             (len - 1).checked_sub(num).ok_or_else(|| {
-                Cow::Owned(format!(
-                    "ion: popd: negative directory stack index out of range\n"
-                ))
+                Cow::Owned("ion: popd: negative directory stack index out of range\n".to_owned())
             })?
         };
 

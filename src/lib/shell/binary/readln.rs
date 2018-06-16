@@ -40,7 +40,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                                 match (words.into_iter().nth(index), env::current_dir()) {
                                     (Some((start, end)), Ok(file)) => {
                                         let filename = editor.current_buffer().range(start, end);
-                                        complete_as_file(file, filename, index)
+                                        complete_as_file(&file, &filename, index)
                                     }
                                     _ => false,
                                 }
@@ -136,17 +136,17 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
 }
 
 /// Infer if the given filename is actually a partial filename
-fn complete_as_file(current_dir: PathBuf, filename: String, index: usize) -> bool {
+fn complete_as_file(current_dir: &PathBuf, filename: &str, index: usize) -> bool {
     let filename = filename.trim();
     let mut file = current_dir.clone();
     file.push(&filename);
     // If the user explicitly requests a file through this syntax then complete as
     // a file
-    if filename.starts_with(".") {
+    if filename.starts_with('.') {
         return true;
     }
     // If the file starts with a dollar sign, it's a variable, not a file
-    if filename.starts_with("$") {
+    if filename.starts_with('$') {
         return false;
     }
     // Once we are beyond the first string, assume its a file

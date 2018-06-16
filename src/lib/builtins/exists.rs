@@ -27,7 +27,7 @@ fn evaluate_arguments(arguments: &[String], shell: &Shell) -> Result<bool, Strin
                 Ok(match_option_argument(option, arg, shell))
             })
         }
-        Some(ref s) if s.starts_with("-") => {
+        Some(ref s) if s.starts_with('-') => {
             // Access the second character in the flag string: this will be type of the
             // flag. If no flag was given, return `SUCCESS`, as this means a
             // string with value "-" was checked.
@@ -88,7 +88,7 @@ fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
     // *might* be possible TODO: that `exists` reports a binary to be in the
     // path, while the shell cannot find it or TODO: vice-versa
     if let Some(path) = shell.get_var("PATH") {
-        for dir in path.split(":") {
+        for dir in path.split(':') {
             let fname = format!("{}/{}", dir, binaryname);
             if let Ok(metadata) = fs::metadata(&fname) {
                 if metadata.is_file() && file_has_execute_permission(&fname) {
@@ -108,7 +108,7 @@ fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
 /// Note: This function is 1:1 the same as src/builtins/test.rs:file_has_execute_permission
 /// If you change the following function, please also update the one in src/builtins/test.rs
 fn file_has_execute_permission(filepath: &str) -> bool {
-    const USER: u32 = 0b1000000;
+    const USER: u32 = 0b100_0000;
     const GROUP: u32 = 0b1000;
     const GUEST: u32 = 0b1;
 

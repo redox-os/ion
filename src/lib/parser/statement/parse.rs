@@ -15,7 +15,7 @@ where
         Ok(pipeline) => statement(pipeline),
         Err(err) => {
             eprintln!("ion: syntax error: {}", err);
-            return Statement::Default;
+            Statement::Default
         }
     }
 }
@@ -111,7 +111,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         "else" => return Statement::Else,
         _ if cmd.starts_with("else") => {
             let cmd = cmd[4..].trim_left();
-            if cmd.len() == 0 {
+            if cmd.is_empty() {
                 return Statement::Else;
             } else if cmd.starts_with("if ") {
                 return collect(cmd[3..].trim_left(), |pipeline| {
@@ -157,7 +157,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         _ if cmd.starts_with("case ") => {
             let (value, binding, conditional) = match cmd[5..].trim_left() {
                 "_" => (None, None, None),
-                value @ _ => {
+                value => {
                     let (value, binding, conditional) = match case::parse_case(value) {
                         Ok(values) => values,
                         Err(why) => {
@@ -189,7 +189,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         _ if cmd.starts_with("fn ") => {
             let cmd = cmd[3..].trim_left();
-            let pos = cmd.find(char::is_whitespace).unwrap_or(cmd.len());
+            let pos = cmd.find(char::is_whitespace).unwrap_or_else(|| cmd.len());
             let name = &cmd[..pos];
             if !is_valid_name(name) {
                 eprintln!(

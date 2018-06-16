@@ -13,7 +13,7 @@ pub(crate) enum Operator {
 }
 
 impl Operator {
-    pub(crate) fn parse<'a>(data: &'a str) -> Result<Operator, AssignmentError<'a>> {
+    pub(crate) fn parse(data: &str) -> Result<Operator, AssignmentError> {
         match data {
             "=" => Ok(Operator::Equal),
             "+=" => Ok(Operator::Add),

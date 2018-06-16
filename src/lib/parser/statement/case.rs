@@ -22,9 +22,7 @@ impl<'a> Display for CaseError<'a> {
     }
 }
 
-pub(crate) fn parse_case<'a>(
-    data: &'a str,
-) -> Result<(Option<&'a str>, Option<&'a str>, Option<String>), CaseError<'a>> {
+pub(crate) fn parse_case(data: &str,) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError> {
     let mut splitter = ArgumentSplitter::new(data);
     // let argument = splitter.next().ok_or(CaseError::Empty)?;
     let mut argument = None;

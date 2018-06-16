@@ -1,4 +1,4 @@
-use std::{mem::transmute, ops::DerefMut};
+use std::ops::DerefMut;
 
 // TODO: These could be generalised to work on non-ASCII characters (and even
 //       strings!) as long as the byte size of the needle and haystack match.
@@ -34,7 +34,7 @@ impl AsciiReplaceInPlace for str {
         let (needle, haystack) = (needle as u8, haystack as u8);
 
         // This is safe because we verify that we don't modify non-ascii bytes
-        let mut_bytes: &mut [u8] = unsafe { transmute(self) };
+        let mut_bytes: &mut [u8] = unsafe { &mut *(self as *mut str as *mut [u8]) };
         // NOTE: When str_mut_extras is stable, use this line instead
         // let mut_bytes = unsafe { self.as_bytes_mut() };
         for chr in mut_bytes.iter_mut() {

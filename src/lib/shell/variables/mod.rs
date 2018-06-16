@@ -113,7 +113,7 @@ impl Variables {
         }
     }
     pub fn pop_scope(&mut self) {
-        self.scopes.get_mut(self.current).unwrap().clear();
+        self.scopes[self.current].clear();
         self.current -= 1;
     }
     pub fn pop_scopes<'a>(&'a mut self, index: usize) -> impl Iterator<Item = FnvHashMap<Identifier, VariableType>> + 'a {
@@ -143,7 +143,7 @@ impl Variables {
         None
     }
     pub fn shadow(&mut self, name: SmallString, value: VariableType) -> Option<VariableType> {
-        self.scopes.get_mut(self.current).unwrap().insert(name, value)
+        self.scopes[self.current].insert(name, value)
     }
     pub fn lookup_any(&self, name: &str) -> Option<&VariableType> {
         for scope in self.scopes() {
@@ -319,7 +319,7 @@ impl Variables {
 
                     // Attempt to obtain the given namespace from our lazily-generated map of
                     // namespaces.
-                    if let Some(namespace) = STRING_NAMESPACES.get(name.into()) {
+                    if let Some(namespace) = STRING_NAMESPACES.get(name) {
                         // Attempt to execute the given function from that namespace, and map it's
                         // results.
                         match namespace.execute(variable.into()) {
@@ -441,7 +441,7 @@ impl Variables {
             // variant of the directory path. If that is not possible, we will cancel the
             // borrow and return `swd` itself as the minified path.
             let elements = swd
-                .split("/")
+                .split('/')
                 .filter(|s| !s.is_empty())
                 .collect::<Vec<&str>>();
             if elements.len() > 2 {
@@ -515,7 +515,7 @@ impl Variables {
             } else {
                 match self.lookup_any_mut(name) {
                     Some(VariableType::Array(val)) => *val = value,
-                    _ => { self.shadow(name.into(), VariableType::Array(value.into())); }
+                    _ => { self.shadow(name.into(), VariableType::Array(value)); }
                 }
             }
         }

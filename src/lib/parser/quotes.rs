@@ -143,21 +143,19 @@ impl Terminator {
                     });
                 }
                 false
+            } else if let Some(b'\\') = self.buffer.bytes().last() {
+                let _ = self.buffer.pop();
+                self.read -= 1;
+                self.flags |= Flags::TRIM;
+                false
             } else {
-                if let Some(b'\\') = self.buffer.bytes().last() {
-                    let _ = self.buffer.pop();
-                    self.read -= 1;
-                    self.flags |= Flags::TRIM;
-                    false
+                // If the last two bytes are either '&&' or '||', we aren't terminated yet.
+                let bytes = self.buffer.as_bytes();
+                if bytes.len() >= 2 {
+                    let bytes = &bytes[bytes.len() - 2..];
+                    bytes != [b'&', b'&'] && bytes != [b'|', b'|']
                 } else {
-                    // If the last two bytes are either '&&' or '||', we aren't terminated yet.
-                    let bytes = self.buffer.as_bytes();
-                    if bytes.len() >= 2 {
-                        let bytes = &bytes[bytes.len() - 2..];
-                        bytes != &[b'&', b'&'] && bytes != &[b'|', b'|']
-                    } else {
-                        true
-                    }
+                    true
                 }
             }
         };

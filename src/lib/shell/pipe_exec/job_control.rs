@@ -196,7 +196,7 @@ impl JobControl for Shell {
             // signal, the status of that process will be communicated back. To
             // avoid consuming CPU cycles, we wait 25 ms between polls.
             match self.foreground_signals.was_processed() {
-                Some(BackgroundResult::Status(stat)) => break stat as i32,
+                Some(BackgroundResult::Status(stat)) => break i32::from(stat),
                 Some(BackgroundResult::Errored) => break TERMINATED,
                 None => sleep(Duration::from_millis(25)),
             }

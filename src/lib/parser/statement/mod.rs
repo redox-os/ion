@@ -10,7 +10,7 @@ use shell::flow_control::Statement;
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
-pub(crate) fn parse_and_validate<'a>(statement: Result<StatementVariant, StatementError>) -> Statement {
+pub(crate) fn parse_and_validate(statement: Result<StatementVariant, StatementError>) -> Statement {
     match statement {
         Ok(StatementVariant::And(statement)) => Statement::And(Box::new(parse(statement))),
         Ok(StatementVariant::Or(statement)) => Statement::Or(Box::new(parse(statement))),

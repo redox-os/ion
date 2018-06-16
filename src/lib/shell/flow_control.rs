@@ -299,7 +299,7 @@ where
             }
         }
     }
-    return Ok(());
+    Ok(())
 }
 
 pub(crate) fn collect_loops<I: Iterator<Item = Statement>>(
@@ -315,56 +315,56 @@ pub(crate) fn collect_loops<I: Iterator<Item = Statement>>(
             | Statement::If { .. }
             | Statement::Function { .. }
             | Statement::Match { .. } => *level += 1,
-            Statement::Time(ref box_stmt) => match box_stmt.as_ref() {
-                &Statement::While { .. }
-                | &Statement::For { .. }
-                | &Statement::If { .. }
-                | &Statement::Function { .. }
-                | &Statement::Match { .. } => *level += 1,
-                &Statement::End if *level == 1 => {
+            Statement::Time(ref box_stmt) => match *box_stmt.as_ref() {
+                Statement::While { .. }
+                | Statement::For { .. }
+                | Statement::If { .. }
+                | Statement::Function { .. }
+                | Statement::Match { .. } => *level += 1,
+                Statement::End if *level == 1 => {
                     *level = 0;
                     break;
                 }
-                &Statement::End => *level -= 1,
+                Statement::End => *level -= 1,
                 _ => (),
             },
-            Statement::And(ref box_stmt) => match box_stmt.as_ref() {
-                &Statement::While { .. }
-                | &Statement::For { .. }
-                | &Statement::If { .. }
-                | &Statement::Function { .. }
-                | &Statement::Match { .. } => *level += 1,
-                &Statement::End if *level == 1 => {
+            Statement::And(ref box_stmt) => match *box_stmt.as_ref() {
+                Statement::While { .. }
+                | Statement::For { .. }
+                | Statement::If { .. }
+                | Statement::Function { .. }
+                | Statement::Match { .. } => *level += 1,
+                Statement::End if *level == 1 => {
                     *level = 0;
                     break;
                 }
-                &Statement::End => *level -= 1,
+                Statement::End => *level -= 1,
                 _ => (),
             },
-            Statement::Or(ref box_stmt) => match box_stmt.as_ref() {
-                &Statement::While { .. }
-                | &Statement::For { .. }
-                | &Statement::If { .. }
-                | &Statement::Function { .. }
-                | &Statement::Match { .. } => *level += 1,
-                &Statement::End if *level == 1 => {
+            Statement::Or(ref box_stmt) => match *box_stmt.as_ref() {
+                Statement::While { .. }
+                | Statement::For { .. }
+                | Statement::If { .. }
+                | Statement::Function { .. }
+                | Statement::Match { .. } => *level += 1,
+                Statement::End if *level == 1 => {
                     *level = 0;
                     break;
                 }
-                &Statement::End => *level -= 1,
+                Statement::End => *level -= 1,
                 _ => (),
             },
-            Statement::Not(ref box_stmt) => match box_stmt.as_ref() {
-                &Statement::While { .. }
-                | &Statement::For { .. }
-                | &Statement::If { .. }
-                | &Statement::Function { .. }
-                | &Statement::Match { .. } => *level += 1,
-                &Statement::End if *level == 1 => {
+            Statement::Not(ref box_stmt) => match *box_stmt.as_ref() {
+                Statement::While { .. }
+                | Statement::For { .. }
+                | Statement::If { .. }
+                | Statement::Function { .. }
+                | Statement::Match { .. } => *level += 1,
+                Statement::End if *level == 1 => {
                     *level = 0;
                     break;
                 }
-                &Statement::End => *level -= 1,
+                Statement::End => *level -= 1,
                 _ => (),
             },
             Statement::End if *level == 1 => {

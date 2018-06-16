@@ -495,19 +495,19 @@ impl PipelineExecution for Shell {
         if let Some(ref file) = *stderr {
             redir(file.as_raw_fd(), sys::STDERR_FILENO);
         }
-        let res = match items {
-            &mut (None, None) => panic!("There must be at least one TeeItem, this is a bug"),
-            &mut (Some(ref mut tee_out), None) => match kind {
+        let res = match *items {
+            (None, None) => panic!("There must be at least one TeeItem, this is a bug"),
+            (Some(ref mut tee_out), None) => match kind {
                 JobKind::Pipe(RedirectFrom::Stderr) => tee_out.write_to_all(None),
                 JobKind::Pipe(_) => tee_out.write_to_all(Some(RedirectFrom::Stdout)),
                 _ => tee_out.write_to_all(None),
             },
-            &mut (None, Some(ref mut tee_err)) => match kind {
+            (None, Some(ref mut tee_err)) => match kind {
                 JobKind::Pipe(RedirectFrom::Stdout) => tee_err.write_to_all(None),
                 JobKind::Pipe(_) => tee_err.write_to_all(Some(RedirectFrom::Stderr)),
                 _ => tee_err.write_to_all(None),
             },
-            &mut (Some(ref mut tee_out), Some(ref mut tee_err)) => {
+            (Some(ref mut tee_out), Some(ref mut tee_err)) => {
                 // TODO Make it work with pipes
                 if let Err(e) = tee_out.write_to_all(None) {
                     Err(e)
@@ -1077,7 +1077,7 @@ fn spawn_proc(
 
 // TODO: Don't require this.
 fn close(file: &Option<File>) {
-    if let &Some(ref file) = file {
+    if let Some(ref file) = *file {
         if let Err(e) = sys::close(file.as_raw_fd()) {
             eprintln!("ion: failed to close file '{:?}': {}", file, e);
         }

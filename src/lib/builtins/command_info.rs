@@ -70,7 +70,7 @@ pub(crate) fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<C
         return Ok("builtin".into());
     } else {
         for path in env::var("PATH")
-            .unwrap_or("/bin".to_string())
+            .unwrap_or_else(|_| String::from("/bin"))
             .split(sys::PATH_SEPARATOR)
         {
             let executable = Path::new(path).join(command);

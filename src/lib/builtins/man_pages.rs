@@ -24,7 +24,7 @@ pub(crate) fn check_help(args: &[String], man_page: &'static str) -> bool {
     false
 }
 
-pub(crate) const MAN_STATUS: &'static str = r#"NAME
+pub(crate) const MAN_STATUS: &str = r#"NAME
     status - Evaluates the current runtime status
 
 SYNOPSIS
@@ -42,7 +42,7 @@ OPTIONS
         prints the filename of the currently running script or else stdio. Also --current-filename.
 "#;
 
-pub(crate) const MAN_CD: &'static str = r#"NAME
+pub(crate) const MAN_CD: &str = r#"NAME
     cd - Change directory.
 
 SYNOPSIS
@@ -55,7 +55,7 @@ DESCRIPTION
 
 "#;
 
-pub(crate) const MAN_BOOL: &'static str = r#"NAME
+pub(crate) const MAN_BOOL: &str = r#"NAME
     bool - Returns true if the value given to it is equal to '1' or 'true'.
 
 SYNOPSIS
@@ -65,7 +65,7 @@ DESCRIPTION
     Returns true if the value given to it is equal to '1' or 'true'.
 "#;
 
-pub(crate) const MAN_IS: &'static str = r#"NAME
+pub(crate) const MAN_IS: &str = r#"NAME
     is - Checks if two arguments are the same
 
 SYNOPSIS
@@ -79,7 +79,7 @@ OPTIONS
         returns 0 if the two arguments are not equal.
 "#;
 
-pub(crate) const MAN_ISATTY: &'static str = r#"
+pub(crate) const MAN_ISATTY: &str = r#"
     isatty - Checks if argument is a file descriptor
 
 SYNOPSIS
@@ -89,7 +89,7 @@ DESCRIPTION
     Returns 0 exit status if the supplied file descriptor is a tty.
 "#;
 
-pub(crate) const MAN_DIRS: &'static str = r#"NAME
+pub(crate) const MAN_DIRS: &str = r#"NAME
     dirs - prints the directory stack
 
 SYNOPSIS
@@ -99,7 +99,7 @@ DESCRIPTION
     dirs prints the current directory stack.
 "#;
 
-pub(crate) const MAN_PUSHD: &'static str = r#"NAME
+pub(crate) const MAN_PUSHD: &str = r#"NAME
     pushd - push a directory to the directory stack
 
 SYNOPSIS
@@ -109,7 +109,7 @@ DESCRIPTION
     pushd pushes a directory to the directory stack.
 "#;
 
-pub(crate) const MAN_POPD: &'static str = r#"NAME
+pub(crate) const MAN_POPD: &str = r#"NAME
     popd - shift through the directory stack
 
 SYNOPSIS
@@ -120,7 +120,7 @@ DESCRIPTION
     pushd adds directories to the stack.
 "#;
 
-// pub(crate) const MAN_FN: &'static str = r#"NAME
+// pub(crate) const MAN_FN: &str = r#"NAME
 // fn - print a list of all functions or create a function
 //
 // SYNOPSIS
@@ -148,7 +148,7 @@ DESCRIPTION
 // example 1
 // "#;
 
-pub(crate) const MAN_READ: &'static str = r#"NAME
+pub(crate) const MAN_READ: &str = r#"NAME
     read - read a line of input into some variables
 
 SYNOPSIS
@@ -158,7 +158,7 @@ DESCRIPTION
     For each variable reads from standard input and stores the results in the variable.
 "#;
 
-pub(crate) const MAN_DROP: &'static str = r#"NAME
+pub(crate) const MAN_DROP: &str = r#"NAME
     drop - delete some variables or arrays
 
 SYNOPSIS
@@ -173,7 +173,7 @@ OPTIONS
         Instead of deleting variables deletes arrays.
 "#;
 
-pub(crate) const MAN_SET: &'static str = r#"NAME
+pub(crate) const MAN_SET: &str = r#"NAME
     set - Set or unset values of shell options and positional parameters.
 
 SYNOPSIS
@@ -197,7 +197,7 @@ OPTIONS
         If no arguments are suppled, arguments will not be unset.
 "#;
 
-pub(crate) const MAN_EQ: &'static str = r#"NAME
+pub(crate) const MAN_EQ: &str = r#"NAME
     eq - Checks if two arguments are the same
 
 SYNOPSIS
@@ -211,7 +211,7 @@ OPTIONS
         returns 0 if the two arguments are not equal.
 "#;
 
-pub(crate) const MAN_EVAL: &'static str = r#"NAME
+pub(crate) const MAN_EVAL: &str = r#"NAME
     eval - evaluates the specified commands
 
 SYNOPSIS
@@ -222,7 +222,7 @@ DESCRIPTION
     all arguments are joined using a space as a separator.
 "#;
 
-pub(crate) const MAN_EXEC: &'static str = r#"NAME
+pub(crate) const MAN_EXEC: &str = r#"NAME
     exec - Replace the shell with the given command.
 
 SYNOPSIS
@@ -237,7 +237,7 @@ OPTIONS
     -c  Execute command with an empty environment.
 "#;
 
-pub(crate) const MAN_HISTORY: &'static str = r#"NAME
+pub(crate) const MAN_HISTORY: &str = r#"NAME
     history - print command history
 
 SYNOPSIS
@@ -247,7 +247,7 @@ DESCRIPTION
     Prints the command history.
 "#;
 
-pub(crate) const MAN_SOURCE: &'static str = r#"NAME
+pub(crate) const MAN_SOURCE: &str = r#"NAME
     source - evaluates given file
 
 SYNOPSIS
@@ -258,7 +258,7 @@ DESCRIPTION
     variables will affect the current shell because of this.
 "#;
 
-pub(crate) const MAN_ECHO: &'static str = r#"NAME
+pub(crate) const MAN_ECHO: &str = r#"NAME
     echo - display a line of text
 
 SYNOPSIS
@@ -289,7 +289,7 @@ OPTIONS
         \v  vertical tab (VT)
 "#;
 
-pub(crate) const MAN_TEST: &'static str = r#"NAME
+pub(crate) const MAN_TEST: &str = r#"NAME
     test - perform tests on files and text
 
 SYNOPSIS
@@ -394,7 +394,7 @@ AUTHOR
     Written by Michael Murphy.
 "#;
 
-pub(crate) const MAN_RANDOM: &'static str = r#"NAME
+pub(crate) const MAN_RANDOM: &str = r#"NAME
     random - generate a random number
 
 SYNOPSIS
@@ -407,7 +407,7 @@ DESCRIPTION
     If two arguments are given the range is [START, END].
 "#;
 
-pub(crate) const MAN_TRUE: &'static str = r#"NAME
+pub(crate) const MAN_TRUE: &str = r#"NAME
     true - does nothing successfully
 
 SYNOPSIS
@@ -417,7 +417,7 @@ DESCRIPTION
     Sets the exit status to 0.
 "#;
 
-pub(crate) const MAN_FALSE: &'static str = r#"NAME
+pub(crate) const MAN_FALSE: &str = r#"NAME
     false - does nothing unsuccessfully
 
 SYNOPSIS
@@ -427,7 +427,7 @@ DESCRIPTION
     Sets the exit status to 1.
 "#;
 
-pub(crate) const MAN_JOBS: &'static str = r#"NAME
+pub(crate) const MAN_JOBS: &str = r#"NAME
     jobs - list all jobs running in the background
 
 SYNOPSIS
@@ -437,7 +437,7 @@ DESCRIPTION
     Prints a list of all jobs running in the background.
 "#;
 
-pub(crate) const MAN_BG: &'static str = r#"NAME
+pub(crate) const MAN_BG: &str = r#"NAME
     bg - sends jobs to background
 
 SYNOPSIS
@@ -447,7 +447,7 @@ DESCRIPTION
     bg sends the job to the background resuming it if it has stopped.
 "#;
 
-pub(crate) const MAN_FG: &'static str = r#"NAME
+pub(crate) const MAN_FG: &str = r#"NAME
     fg - bring job to foreground
 
 SYNOPSIS
@@ -457,7 +457,7 @@ DESCRIPTION
     fg brings the specified job to foreground resuming it if it has stopped.
 "#;
 
-pub(crate) const MAN_SUSPEND: &'static str = r#"NAME
+pub(crate) const MAN_SUSPEND: &str = r#"NAME
     suspend - suspend the current shell
 
 SYNOPSIS
@@ -468,7 +468,7 @@ DESCRIPTION
     returning to the parent process. It can be resumed by sending it SIGCONT.
 "#;
 
-pub(crate) const MAN_DISOWN: &'static str = r#"NAME
+pub(crate) const MAN_DISOWN: &str = r#"NAME
     disown - Disown processes
 
 SYNOPSIS
@@ -483,7 +483,7 @@ OPTIONS
     -a  If no job IDs were supplied, remove all jobs from the background process list.
 "#;
 
-pub(crate) const MAN_EXIT: &'static str = r#"NAME
+pub(crate) const MAN_EXIT: &str = r#"NAME
     exit - exit the shell
 
 SYNOPSIS
@@ -493,7 +493,7 @@ DESCRIPTION
     Makes ion exit. The exit status will be that of the last command executed.
 "#;
 
-pub(crate) const MAN_MATCHES: &'static str = r#"NAME
+pub(crate) const MAN_MATCHES: &str = r#"NAME
     matches - checks if the second argument contains any portion of the first.
 
 SYNOPSIS
@@ -510,7 +510,7 @@ EXAMPLES
         matches x xs
 "#;
 
-pub(crate) const MAN_EXISTS: &'static str = r#"NAME
+pub(crate) const MAN_EXISTS: &str = r#"NAME
     exists - check whether items exist
 
 SYNOPSIS
@@ -567,7 +567,7 @@ AUTHOR
     Heavily based on implementation of the test builtin, which was written by Michael Murph.
 "#;
 
-pub(crate) const MAN_WHICH: &'static str = r#"NAME
+pub(crate) const MAN_WHICH: &str = r#"NAME
     which - locate a program file in the current user's path
 
 SYNOPSIS
