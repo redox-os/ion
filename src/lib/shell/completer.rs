@@ -150,7 +150,7 @@ where
 }
 
 /// A completer that combines suggestions from multiple completers.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct MultiCompleter<A, B>
 where
     A: Completer,

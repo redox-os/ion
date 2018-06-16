@@ -49,6 +49,7 @@ pub(crate) enum WordToken<'a> {
     Arithmetic(&'a str),
 }
 
+#[derive(Debug)]
 pub(crate) struct WordIterator<'a, E: Expander + 'a> {
     data:      &'a str,
     read:      usize,

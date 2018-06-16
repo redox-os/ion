@@ -25,6 +25,7 @@ impl<'a> Display for AssignmentError<'a> {
 ///
 /// Each request will tell the shell whether the assignment is asking to update an array or a
 /// string, and will contain the key/value pair to assign.
+#[derive(Debug)]
 pub(crate) struct AssignmentActions<'a> {
     keys:     KeyIterator<'a>,
     operator: Operator,

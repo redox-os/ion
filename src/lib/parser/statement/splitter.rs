@@ -80,6 +80,7 @@ pub(crate) enum StatementVariant<'a> {
     Default(&'a str),
 }
 
+#[derive(Debug)]
 pub(crate) struct StatementSplitter<'a> {
     data:             &'a str,
     read:             usize,

@@ -2,6 +2,7 @@
 
 use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
 
+#[derive(Debug)]
 pub(crate) enum BackgroundResult {
     Errored,
     Status(u8),
@@ -10,6 +11,7 @@ pub(crate) enum BackgroundResult {
 const REPLIED: u8 = 1;
 const ERRORED: u8 = 2;
 
+#[derive(Debug)]
 /// An atomic structure that can safely be shared across threads, which serves to provide
 /// communication between the shell and background threads. The `fg` command uses this
 /// structure to notify a background thread that it needs to wait for and return

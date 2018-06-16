@@ -186,6 +186,7 @@ impl Binary for Shell {
     fn prompt(&mut self) -> String { prompt(self) }
 }
 
+#[derive(Debug)]
 struct WordDivide<I>
 where
     I: Iterator<Item = (usize, char)>,

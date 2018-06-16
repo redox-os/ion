@@ -6,6 +6,7 @@ use std::{
     path::PathBuf,
 };
 
+#[derive(Debug)]
 pub struct DirectoryStack {
     dirs: VecDeque<PathBuf>, // The top is always the current directory
 }

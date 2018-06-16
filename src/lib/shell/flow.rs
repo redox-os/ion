@@ -13,6 +13,7 @@ use std::{
 };
 use types::Array;
 
+#[derive(Debug)]
 pub(crate) enum Condition {
     Continue,
     Break,

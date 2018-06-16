@@ -126,6 +126,7 @@ impl Statement {
     }
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct FlowControl {
     pub level:             usize,
     pub current_statement: Statement,

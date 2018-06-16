@@ -6,6 +6,7 @@ use super::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use shell::{Job, JobKind};
 use types::*;
 
+#[derive(Debug)]
 pub(crate) struct Collector<'a> {
     data: &'a str,
 }

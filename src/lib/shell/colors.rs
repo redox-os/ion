@@ -1,3 +1,4 @@
+#[derive(Debug)]
 struct StaticMap {
     keys:   &'static [&'static str],
     values: &'static [&'static str],

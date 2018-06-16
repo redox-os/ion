@@ -14,6 +14,7 @@ bitflags! {
 }
 
 /// An efficient `Iterator` structure for splitting arguments
+#[derive(Debug)]
 pub struct ArgumentSplitter<'a> {
     data: &'a str,
     /// Number of bytes read

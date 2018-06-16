@@ -16,6 +16,7 @@ enum Token<'a> {
     Text(&'a str),
 }
 
+#[derive(Debug)]
 struct DesignatorSearcher<'a> {
     data:  &'a [u8],
     flags: Flags,

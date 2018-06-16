@@ -18,6 +18,7 @@ bitflags! {
 ///
 /// This example comes from the shell's REPL, which ensures that the user's input
 /// will only be submitted for execution once a terminated command is supplied.
+#[derive(Debug)]
 pub struct Terminator {
     buffer:     String,
     eof:        Option<String>,

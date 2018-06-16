@@ -24,6 +24,7 @@ impl Key {
     pub(crate) fn new<K: Into<::types::Key>>(key: K) -> Key { Key { key: key.into() } }
 }
 
+#[derive(Debug)]
 pub(crate) struct MethodArgs<'a, 'b, E: 'b + Expander> {
     args:   &'a str,
     expand: &'b E,

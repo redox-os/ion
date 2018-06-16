@@ -222,6 +222,7 @@ impl VariableStore for Shell {
     }
 }
 
+#[derive(Debug)]
 enum MathError {
     RHS,
     LHS,

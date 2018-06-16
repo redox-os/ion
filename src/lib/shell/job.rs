@@ -112,6 +112,7 @@ pub(crate) enum RefinedJob {
     },
 }
 
+#[derive(Debug)]
 pub struct TeeItem {
     /// Where to read from for this tee. Generally only necessary if we need to tee both
     /// stdout and stderr.

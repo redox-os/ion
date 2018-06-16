@@ -20,6 +20,7 @@ bitflags! {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct IgnoreSetting {
     flags: IgnoreFlags,
     // Yes, a bad heap-based Vec, however unfortunately its not possible to store Regex'es in Array

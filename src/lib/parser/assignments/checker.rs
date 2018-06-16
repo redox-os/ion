@@ -4,7 +4,7 @@ use super::{
 
 use std::iter::Iterator;
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 enum IsArrayHelper {
     Valid(usize),
     RootBracketClosed,
