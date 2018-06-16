@@ -36,11 +36,10 @@ use liner::Context;
 use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
 use smallvec::SmallVec;
 use std::{
-    fs::File, io::{self, Read, Write}, iter::FromIterator, mem, ops::Deref, path::Path, process,
+    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
     sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
-use take_mut;
 use types::*;
 use xdg::BaseDirectories;
 
@@ -68,7 +67,7 @@ pub struct Shell {
     /// Note that the context is only available in an interactive session.
     pub(crate) context: Option<Mutex<Context>>,
     /// Contains the aliases, strings, and array variable maps.
-    pub variables: Variables<'static>,
+    pub variables: Variables,
     /// Contains the current state of flow control parameters.
     flow_control: FlowControl,
     /// Contains the directory stack parameters.
@@ -153,7 +152,7 @@ impl ShellBuilder {
     pub fn new() -> ShellBuilder { ShellBuilder }
 }
 
-impl<'a> Shell {
+impl Shell {
     /// A method for capturing the output of the shell, and performing actions without modifying
     /// the state of the original shell. This performs a fork, taking a closure that controls
     /// the shell in the child of the fork.
@@ -167,31 +166,6 @@ impl<'a> Shell {
         child_func: F,
     ) -> Result<IonResult, IonError> {
         Fork::new(self, capture).exec(child_func)
-    }
-
-    /// A method for temporarily using a separate set of variables for this shell.
-    /// Calls the inner callback and then swaps back.
-    pub fn with_vars<VF, F, T>(&mut self, variables: VF, callback: F) -> T
-        where VF: for <'b> FnOnce(&'b Variables) -> Variables<'b>,
-               F: FnOnce(&mut Self) -> T
-    {
-        let mut old = None;
-        take_mut::take(&mut self.variables, |old2| {
-            old = Some(old2);
-            let new = variables(old.as_ref().unwrap());
-
-            // TODO: THIS IS SUPER UNSAFE!!!!!11111
-            // I'm bypassing the borrow checker here because I'm too gosh darn lazy
-            // to make Shell take a lifetime pararmeter.
-            // THIS. IS. WRONG.
-            // This should be fixed. Some day. Ugh.
-            // Don't do this at home, kids!
-            let new: Variables<'static> = unsafe { mem::transmute(new) };
-            new
-        });
-        let value = callback(self);
-        mem::replace(&mut self.variables, old.unwrap());
-        value
     }
 
     /// A method for executing a function with the given `name`, using `args` as the input.

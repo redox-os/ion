@@ -33,28 +33,14 @@ fn list_vars(shell: &Shell) {
 
     // Write all the string variables to the buffer.
     let _ = buffer.write(b"# String Variables\n");
-    let mut me = &shell.variables;
-    loop {
-        me.variables.borrow().iter().for_each(|(key, val)| {
-            let _ = buffer.write([key, " = ", val.as_str(), "\n"].concat().as_bytes());
-        });
-        match me.parent {
-            Some(parent) => me = parent,
-            None => break
-        }
+    for (key, val) in shell.variables.variables() {
+        let _ = buffer.write([key, " = ", val.as_str(), "\n"].concat().as_bytes());
     }
 
     // Then immediately follow that with a list of array variables.
     let _ = buffer.write(b"\n# Array Variables\n");
-    let mut me = &shell.variables;
-    loop {
-        me.arrays.borrow().iter().for_each(|(key, val)| {
-            print_array(&mut buffer, &key, &val)
-        });
-        match me.parent {
-            Some(parent) => me = parent,
-            None => break
-        }
+    for (key, val) in shell.variables.arrays() {
+        print_array(&mut buffer, &key, &val)
     }
 }
 

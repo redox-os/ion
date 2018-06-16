@@ -68,9 +68,9 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                                 // Add the history list to the completer's definitions.
                                 .chain(history.iter().cloned())
                                 // Add the aliases to the completer's definitions.
-                                .chain(vars.aliases.borrow().keys().cloned())
+                                .chain(vars.aliases().map(|(key, _)| key.clone()))
                                 // Add the list of available functions to the completer's definitions.
-                                .chain(vars.functions.borrow().keys().cloned())
+                                .chain(vars.functions().map(|(key, _)| key.clone()))
                                 // Add the list of available variables to the completer's definitions.
                                 // TODO: We should make it free to do String->SmallString
                                 //       and mostly free to go back (free if allocated)

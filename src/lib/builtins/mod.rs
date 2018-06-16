@@ -272,7 +272,7 @@ fn builtin_unalias(args: &[String], shell: &mut Shell) -> i32 {
 
 // TODO There is a man page for fn however the -h and --help flags are not
 // checked for.
-fn builtin_fn(_: &[String], shell: &mut Shell) -> i32 { fn_(&mut shell.variables.functions.borrow_mut()) }
+fn builtin_fn(_: &[String], shell: &mut Shell) -> i32 { fn_(&mut shell.variables) }
 
 fn builtin_read(args: &[String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_READ) {

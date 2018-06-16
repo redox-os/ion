@@ -1,15 +1,13 @@
-use fnv::FnvHashMap;
-use shell::{flow_control::Function, status::*};
+use shell::{status::*, variables::Variables};
 use std::io::{self, Write};
-use types::Identifier;
 
-fn print_functions(functions: &FnvHashMap<Identifier, Function>) {
+fn print_functions(vars: &Variables) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
     let _ = writeln!(stdout, "# Functions");
-    for fn_name in functions.keys() {
-        let description = &functions.get(fn_name).unwrap().get_description();
-        if let Some(ref description) = *description {
+    for (fn_name, function) in vars.functions() {
+        let description = function.get_description();
+        if let Some(ref description) = description {
             let _ = writeln!(stdout, "    {} -- {}", fn_name, description);
         } else {
             let _ = writeln!(stdout, "    {}", fn_name);
@@ -17,7 +15,7 @@ fn print_functions(functions: &FnvHashMap<Identifier, Function>) {
     }
 }
 
-pub(crate) fn fn_(functions: &mut FnvHashMap<Identifier, Function>) -> i32 {
-    print_functions(functions);
+pub(crate) fn fn_(vars: &mut Variables) -> i32 {
+    print_functions(vars);
     SUCCESS
 }

@@ -8,7 +8,6 @@ use parser::{
     ForExpression, StatementSplitter,
 };
 use shell::assignments::VariableStore;
-use shell::variables::Variables;
 use std::{
     io::{stdout, Write}, iter, mem,
 };
@@ -608,16 +607,20 @@ impl FlowLogic for Shell {
     }
 
     fn execute_statements(&mut self, mut statements: Vec<Statement>) -> Condition {
-        self.with_vars(|old: &Variables| old.new_scope(), |shell| {
-            let mut iterator = statements.drain(..);
-            while let Some(statement) = iterator.next() {
-                match shell.execute_statement(&mut iterator, statement) {
-                    Condition::NoOp => {}
-                    cond => return cond,
-                }
+        self.variables.new_scope();
+
+        let mut iterator = statements.drain(..);
+        let mut condition = None;
+        while let Some(statement) = iterator.next() {
+            match self.execute_statement(&mut iterator, statement) {
+                Condition::NoOp => {}
+                cond => condition = Some(cond),
             }
-            Condition::NoOp
-        })
+        }
+
+        self.variables.pop_scope();
+
+        condition.unwrap_or(Condition::NoOp)
     }
 
     fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition {

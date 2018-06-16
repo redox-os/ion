@@ -10,13 +10,12 @@ use liner::Context;
 use smallstring::SmallString;
 use std::{
     env,
-    cell::{Cell, RefCell},
     io::{self, BufRead},
+    mem
 };
 use sys::{self, geteuid, getpid, getuid, is_root, variables as self_sys};
 use types::{
-    Array, ArrayVariableContext, HashMap, HashMapVariableContext, Identifier, Key, Value,
-    VariableContext,
+    Array, HashMap, Identifier, Key, Value,
 };
 use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
@@ -26,54 +25,59 @@ lazy_static! {
 }
 
 #[derive(Clone, Debug)]
-pub struct Variables<'a> {
-    pub parent:    Option<&'a Variables<'a>>,
-    pub hashmaps:  RefCell<HashMapVariableContext>,
-    pub arrays:    RefCell<ArrayVariableContext>,
-    pub variables: RefCell<VariableContext>,
-    pub aliases:   RefCell<VariableContext>,
-    pub functions: RefCell<FnvHashMap<Identifier, Function>>,
-    flags:         Cell<u8>,
+pub enum VariableType {
+    Alias(Value),
+    Array(Array),
+    Function(Function),
+    HashMap(HashMap),
+    Variable(Value)
 }
 
-impl<'a> Default for Variables<'a> {
+#[derive(Clone, Debug)]
+pub struct Variables {
+    pub scopes: Vec<FnvHashMap<Identifier, VariableType>>,
+    flags:      u8,
+}
+
+impl Default for Variables {
     fn default() -> Self {
-        let mut map_vars = FnvHashMap::with_capacity_and_hasher(64, Default::default());
-        map_vars.insert("DIRECTORY_STACK_SIZE".into(), "1000".into());
-        map_vars.insert("HISTORY_SIZE".into(), "1000".into());
-        map_vars.insert("HISTFILE_SIZE".into(), "100000".into());
-        map_vars.insert(
+        let mut map: FnvHashMap<Identifier, VariableType> = FnvHashMap::with_capacity_and_hasher(64, Default::default());
+        map.insert("DIRECTORY_STACK_SIZE".into(), VariableType::Variable("1000".into()));
+        map.insert("HISTORY_SIZE".into(), VariableType::Variable("1000".into()));
+        map.insert("HISTFILE_SIZE".into(), VariableType::Variable("100000".into()));
+        map.insert(
             "PROMPT".into(),
-            "${x::1B}]0;${USER}: \
-             ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# \
-             ${c::reset}"
-                .into(),
+            VariableType::Variable(
+                "${x::1B}]0;${USER}: \
+                 ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# \
+                 ${c::reset}"
+                    .into()
+            ),
         );
 
         // Set the PID, UID, and EUID variables.
-        map_vars.insert(
+        map.insert(
             "PID".into(),
-            getpid().ok().map_or("?".into(), |id| id.to_string()),
+            VariableType::Variable(getpid().ok().map_or("?".into(), |id| id.to_string())),
         );
-        map_vars.insert(
+        map.insert(
             "UID".into(),
-            getuid().ok().map_or("?".into(), |id| id.to_string()),
+            VariableType::Variable(getuid().ok().map_or("?".into(), |id| id.to_string())),
         );
-        map_vars.insert(
+        map.insert(
             "EUID".into(),
-            geteuid().ok().map_or("?".into(), |id| id.to_string()),
+            VariableType::Variable(geteuid().ok().map_or("?".into(), |id| id.to_string())),
         );
 
         // Initialize the HISTFILE variable
         if let Ok(base_dirs) = BaseDirectories::with_prefix("ion") {
             if let Ok(path) = base_dirs.place_data_file("history") {
-                map_vars.insert("HISTFILE".into(), path.to_str().unwrap_or("?").into());
-                map_vars.insert("HISTFILE_ENABLED".into(), "1".into());
+                map.insert("HISTFILE".into(), VariableType::Variable(path.to_str().unwrap_or("?").into()));
+                map.insert("HISTFILE_ENABLED".into(), VariableType::Variable("1".into()));
             }
         }
 
-        let mut map_arrays = FnvHashMap::with_capacity_and_hasher(64, Default::default());
-        map_arrays.insert("HISTORY_IGNORE".into(), array!["no_such_command", "whitespace", "duplicates"]);
+        map.insert("HISTORY_IGNORE".into(), VariableType::Array(array!["no_such_command", "whitespace", "duplicates"]));
 
         // Initialize the PWD (Present Working Directory) variable
         env::current_dir().ok().map_or_else(
@@ -91,78 +95,21 @@ impl<'a> Default for Variables<'a> {
         env::set_var("HOST", &self_sys::get_host_name().unwrap_or("?".to_owned()));
 
         Variables {
-            parent:    None,
-            hashmaps:  RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
-            arrays:    RefCell::new(map_arrays),
-            variables: RefCell::new(map_vars),
-            aliases:   RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
-            functions: RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
-            flags:     Cell::new(0),
+            flags: 0,
+            scopes: vec![map]
         }
     }
 }
 
 const PLUGIN: u8 = 1;
 
-macro_rules! descend_scopes {
-    (clone $var:ident) => {
-        Some($var.clone())
-    };
-    (no_clone $var:ident) => {
-        Some($var)
-    };
-    (ref $name:expr) => {
-        &$name
-    };
-    (val $name:expr) => {
-        $name
-    };
-    (lookup, $self:ident.$map:ident.$borrow:ident().$lookup:ident($name:expr) else $fallback:block, $clone:tt) => {
-        {
-            let mut me = $self;
-            loop {
-                if let Some(var) = me.$map.$borrow().$lookup($name) {
-                    break descend_scopes!($clone var);
-                }
-                match me.parent {
-                    Some(parent) => me = parent,
-                    None => break $fallback
-                }
-            }
-        }
-    };
-    (insert, $self:ident.$map:ident, $borrow:tt $name:expr, $value:expr) => {
-        {
-            let mut me = $self;
-            loop {
-                let mut map = me.$map.borrow_mut();
-                if map.contains_key(descend_scopes!($borrow $name)) {
-                    break map.insert($name.into(), $value.into());
-                }
-                match me.parent {
-                    Some(parent) => me = parent,
-                    None => {
-                        // It wasn't found, insert new at current scope
-                        drop(map);
-                        break $self.$map.borrow_mut().insert($name.into(), $value.into());
-                    }
-                }
-            }
-        }
+impl Variables {
+    pub(crate) fn new_scope(&mut self) {
+        self.scopes.push(FnvHashMap::with_capacity_and_hasher(64, Default::default()));
     }
-}
-
-impl<'a> Variables<'a> {
-    pub(crate) fn new_scope<'b>(&'b self) -> Variables<'b> {
-        Variables {
-            flags:     self.flags.clone(),
-            parent:    Some(self),
-            hashmaps:  RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
-            arrays:    RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
-            variables: RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
-            aliases:   RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
-            functions: RefCell::new(FnvHashMap::with_capacity_and_hasher(64, Default::default())),
-        }
+    pub(crate) fn pop_scope(&mut self) {
+        // TODO use counter and re-use hashmap
+        self.scopes.pop();
     }
 
     #[allow(dead_code)]
@@ -259,17 +206,57 @@ impl<'a> Variables<'a> {
         c.is_alphanumeric() || c == '_' || c == '?' || c == '.'
     }
 
+    pub fn shadow(&mut self, name: SmallString, value: VariableType) -> Option<VariableType> {
+        self.scopes.last_mut().unwrap().insert(name, value)
+    }
+    pub fn lookup_any(&self, name: &str) -> Option<&VariableType> {
+        for scope in self.scopes.iter().rev() {
+            if let val @ Some(_) = scope.get(name) {
+                return val;
+            }
+        }
+        None
+    }
+    pub fn lookup_any_mut(&mut self, name: &str) -> Option<&mut VariableType> {
+        for scope in self.scopes.iter_mut().rev() {
+            if let val @ Some(_) = scope.get_mut(name) {
+                return val;
+            }
+        }
+        None
+    }
+    pub fn remove_any(&mut self, name: &str) -> Option<VariableType> {
+        for scope in self.scopes.iter_mut().rev() {
+            if let val @ Some(_) = scope.remove(name) {
+                return val;
+            }
+        }
+        None
+    }
+
+    pub fn variables(&self) -> impl Iterator<Item = (&SmallString, &Value)> {
+        self.scopes.iter().rev()
+            .map(|map| {
+                map.iter()
+                    .filter_map(|(key, val)| if let VariableType::Variable(val) = val {
+                        Some((key, val))
+                    } else {
+                        None
+                    })
+            })
+            .flatten()
+    }
     pub fn strings(&self) -> Vec<SmallString> {
-        let vars = self.variables.borrow_mut();
+        let vars = self.scopes.last().unwrap();
         vars.keys().cloned().chain(env::vars().map(|(k, _)| k.into())).collect()
     }
-
-    pub fn unset_var(&self, name: &str) -> Option<Value> {
-        self.variables.borrow_mut().remove(name)
+    pub fn unset_var(&mut self, name: &str) -> Option<Value> {
+        match self.remove_any(name) {
+            Some(VariableType::Variable(val)) => Some(val),
+            _ => None
+        }
     }
-
     pub fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
-
     pub fn get_var(&self, name: &str) -> Option<Value> {
         match name {
             "MWD" => return Some(self.get_minimal_directory()),
@@ -324,27 +311,95 @@ impl<'a> Variables<'a> {
             }
         } else {
             // Otherwise, it's just a simple variable name.
-            // Travel down the scopes and look for it.
-            descend_scopes!(lookup, self.variables.borrow().get(name) else { env::var(name).ok() }, clone)
+            match self.lookup_any(name) {
+                Some(VariableType::Variable(val)) => Some(val.clone()),
+                _ => env::var(name).ok()
+            }
         }
     }
-    pub fn insert_alias(&self, name: SmallString, value: Value) -> Option<Value> {
-        descend_scopes!(insert, self.aliases, ref name, value)
+    pub fn set_var(&mut self, name: &str, value: &str) {
+        if !name.is_empty() {
+            if value.is_empty() {
+                self.unset_var(name);
+            } else {
+                if name == "NS_PLUGINS" {
+                    match value {
+                        "0" => self.disable_plugins(),
+                        "1" => self.enable_plugins(),
+                        _ => eprintln!(
+                            "ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1."
+                        ),
+                    }
+                    return;
+                }
+                match self.lookup_any_mut(name) {
+                    Some(VariableType::Variable(val)) => *val = value.into(),
+                    _ => { self.shadow(name.into(), VariableType::Variable(value.into())); }
+                }
+            }
+        }
+    }
+
+    pub fn insert_alias(&mut self, name: SmallString, value: Value) -> Option<Value> {
+        match self.lookup_any_mut(&name) {
+            Some(VariableType::Alias(val)) => Some(mem::replace(val, value)),
+            _ => { self.shadow(name, VariableType::Alias(value)); None }
+        }
     }
     pub fn get_alias(&self, name: &str) -> Option<Value> {
-        descend_scopes!(lookup, self.aliases.borrow().get(name) else { None }, clone)
+        match self.lookup_any(name) {
+            Some(VariableType::Alias(val)) => Some(val.clone()),
+            _ => None
+        }
     }
-    pub fn remove_alias(&self, name: &str) -> Option<Value> {
-        descend_scopes!(lookup, self.aliases.borrow_mut().remove(name) else { None }, no_clone)
+    pub fn remove_alias(&mut self, name: &str) -> Option<Value> {
+        match self.remove_any(name) {
+            Some(VariableType::Alias(val)) => Some(val),
+            _ => None
+        }
     }
-    pub fn insert_function(&self, name: SmallString, value: Function) -> Option<Function> {
-        descend_scopes!(insert, self.functions, ref name, value)
+    pub fn aliases(&self) -> impl Iterator<Item = (&SmallString, &Value)> {
+        self.scopes.iter().rev()
+            .map(|map| {
+                map.iter()
+                    .filter_map(|(key, val)| if let VariableType::Alias(val) = val {
+                        Some((key, val))
+                    } else {
+                        None
+                    })
+            })
+            .flatten()
+    }
+
+    pub fn insert_function(&mut self, name: SmallString, value: Function) -> Option<Function> {
+        match self.lookup_any_mut(&name) {
+            Some(VariableType::Function(val)) => Some(mem::replace(val, value)),
+            _ => { self.shadow(name, VariableType::Function(value)); None }
+        }
     }
     pub fn get_function(&self, name: &str) -> Option<Function> {
-        descend_scopes!(lookup, self.functions.borrow().get(name) else { None }, clone)
+        match self.lookup_any(name) {
+            Some(VariableType::Function(val)) => Some(val.clone()),
+            _ => None
+        }
     }
-    pub fn remove_function(&self, name: &str) -> Option<Function> {
-        descend_scopes!(lookup, self.functions.borrow_mut().remove(name) else { None }, no_clone)
+    pub fn remove_function(&mut self, name: &str) -> Option<Function> {
+        match self.remove_any(name) {
+            Some(VariableType::Function(val)) => Some(val),
+            _ => None
+        }
+    }
+    pub fn functions(&self) -> impl Iterator<Item = (&SmallString, &Function)> {
+        self.scopes.iter().rev()
+            .map(|map| {
+                map.iter()
+                    .filter_map(|(key, val)| if let VariableType::Function(val) = val {
+                        Some((key, val))
+                    } else {
+                        None
+                    })
+            })
+            .flatten()
     }
 
     /// Obtains the value for the **MWD** variable.
@@ -392,79 +447,67 @@ impl<'a> Variables<'a> {
             .replace(&self.get_var("HOME").unwrap(), "~")
     }
 
-    pub fn unset_array(&self, name: &str) -> Option<Array> {
-        let mut me = self;
-        loop {
-            if let Some(var) = me.arrays.borrow_mut().remove(name) {
-                return Some(var);
-            }
-            match me.parent {
-                Some(parent) => me = parent,
-                None => break
-            }
+    pub fn unset_array(&mut self, name: &str) -> Option<Array> {
+        match self.remove_any(name) {
+            Some(VariableType::Array(val)) => Some(val),
+            _ => None
         }
-        None
     }
 
     pub fn get_array(&self, name: &str) -> Option<Array> {
-        descend_scopes!(lookup, self.arrays.borrow().get(name) else { None }, clone)
+        match self.lookup_any(name) {
+            Some(VariableType::Array(val)) => Some(val.clone()),
+            _ => None
+        }
     }
 
     pub fn get_map(&self, name: &str) -> Option<HashMap> {
-        descend_scopes!(lookup, self.hashmaps.borrow().get(name) else { None }, clone)
+        match self.lookup_any(name) {
+            Some(VariableType::HashMap(val)) => Some(val.clone()),
+            _ => None
+        }
     }
 
     #[allow(dead_code)]
-    pub(crate) fn set_hashmap_value(&self, name: &str, key: &str, value: &str) {
-        let mut me = self;
-        loop {
-            if let Some(map) = me.hashmaps.borrow_mut().get_mut(name) {
+    pub(crate) fn set_hashmap_value(&mut self, name: &str, key: &str, value: &str) {
+        match self.lookup_any_mut(name) {
+            Some(VariableType::HashMap(map)) => {
                 map.insert(key.into(), value.into());
-                break;
+            },
+            _ => {
+                let mut map = HashMap::with_capacity_and_hasher(4, Default::default());
+                map.insert(key.into(), value.into());
+                self.shadow(name.into(), VariableType::HashMap(map));
             }
-            match me.parent {
-                Some(parent) => me = parent,
-                None => {
-                    let mut map = HashMap::with_capacity_and_hasher(4, Default::default());
-                    map.insert(key.into(), value.into());
-                    self.hashmaps.borrow_mut().insert(name.into(), map);
-                    break;
+        }
+    }
+
+    pub fn set_array(&mut self, name: &str, value: Array) {
+        if !name.is_empty() {
+            if value.is_empty() {
+                self.remove_any(name);
+            } else {
+                match self.lookup_any_mut(name) {
+                    Some(VariableType::Array(val)) => *val = value,
+                    _ => { self.shadow(name.into(), VariableType::Array(value.into())); }
                 }
             }
         }
     }
-
-    pub fn set_array(&self, name: &str, value: Array) {
-        if !name.is_empty() {
-            if value.is_empty() {
-                descend_scopes!(lookup, self.arrays.borrow_mut().remove(name) else { None }, no_clone);
-            } else {
-                descend_scopes!(insert, self.arrays, val name, value);
-            }
-        }
+    pub fn arrays(&self) -> impl Iterator<Item = (&SmallString, &Array)> {
+        self.scopes.iter().rev()
+            .map(|map| {
+                map.iter()
+                    .filter_map(|(key, val)| if let VariableType::Array(val) = val {
+                        Some((key, val))
+                    } else {
+                        None
+                    })
+            })
+            .flatten()
     }
 
-    pub fn set_var(&self, name: &str, value: &str) {
-        if !name.is_empty() {
-            if value.is_empty() {
-                self.unset_var(name);
-            } else {
-                if name == "NS_PLUGINS" {
-                    match value {
-                        "0" => self.disable_plugins(),
-                        "1" => self.enable_plugins(),
-                        _ => eprintln!(
-                            "ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1."
-                        ),
-                    }
-                    return;
-                }
-                descend_scopes!(insert, self.variables, val name, value);
-            }
-        }
-    }
-
-    pub(crate) fn read<I: IntoIterator>(&self, args: I) -> i32
+    pub(crate) fn read<I: IntoIterator>(&mut self, args: I) -> i32
     where
         I::Item: AsRef<str>,
     {
@@ -489,11 +532,11 @@ impl<'a> Variables<'a> {
         SUCCESS
     }
 
-    pub(crate) fn disable_plugins(&self) { self.flags.set(self.flags.get() & 255 ^ PLUGIN); }
+    pub(crate) fn disable_plugins(&mut self) { self.flags &= !PLUGIN; }
 
-    pub(crate) fn enable_plugins(&self) { self.flags.set(self.flags.get() | PLUGIN) }
+    pub(crate) fn enable_plugins(&mut self) { self.flags |= PLUGIN; }
 
-    pub(crate) fn has_plugin_support(&self) -> bool { self.flags.get() & PLUGIN != 0 }
+    pub(crate) fn has_plugin_support(&self) -> bool { self.flags & PLUGIN == PLUGIN }
 }
 
 #[cfg(test)]
@@ -501,7 +544,7 @@ mod tests {
     use super::*;
     use parser::{expand_string, Expander};
 
-    struct VariableExpander(pub Variables<'static>);
+    struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
         fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }

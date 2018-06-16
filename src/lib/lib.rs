@@ -1,9 +1,10 @@
 #![allow(unknown_lints)]
 #![allow(while_let_on_iterator)]
-#![feature(integer_atomics)]
-#![feature(pointer_methods)]
 #![feature(getpid)]
+#![feature(integer_atomics)]
+#![feature(iterator_flatten)]
 #![feature(nll)]
+#![feature(pointer_methods)]
 #![feature(test)]
 
 #[macro_use]
@@ -17,7 +18,6 @@ extern crate glob;
 extern crate itoa;
 #[macro_use]
 extern crate lazy_static;
-extern crate take_mut;
 #[cfg(test)]
 extern crate test;
 #[cfg(all(unix, not(target_os = "redox")))]

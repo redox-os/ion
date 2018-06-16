@@ -42,7 +42,6 @@ smallstring = "0.1"
 smallvec = "0.6"
 unicode-segmentation = "1.2"
 xdg = { git = "https://github.com/whitequark/rust-xdg" }
-take_mut = "0.2.2"
 
 [lib]
 path = "src/lib/lib.rs"

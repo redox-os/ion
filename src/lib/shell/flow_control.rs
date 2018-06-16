@@ -1,4 +1,4 @@
-use super::{flow::FlowLogic, Shell};
+use super::{flow::FlowLogic, Shell, variables::VariableType};
 use parser::{assignments::*, pipelines::Pipeline};
 use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
@@ -190,26 +190,35 @@ impl Function {
             values.push((type_.clone(), value));
         }
 
-        shell.with_vars(|mut vars| {
-            while !vars.functions.borrow().contains_key(&name) {
-                vars = vars.parent.expect("execute called on function that's not in scope");
+        let mut index = None;
+        for (i, scope) in shell.variables.scopes.iter().enumerate().rev() {
+            if scope.contains_key(&name) {
+                index = Some(i);
+                break;
             }
-            vars.new_scope()
-        }, move |shell| {
-            for (type_, value) in values {
-                match value {
-                    ReturnValue::Vector(vector) => {
-                        shell.variables.arrays.borrow_mut().insert(type_.name.into(), vector);
-                    }
-                    ReturnValue::Str(string) => {
-                        shell.variables.variables.borrow_mut().insert(type_.name.into(), string);
-                    }
+        }
+        let index = index.expect("execute called with invalid function");
+
+        // Pop off all scopes since function temporarily
+        let temporary: Vec<_> = shell.variables.scopes.drain(index+1..).collect();
+        shell.variables.new_scope();
+
+        for (type_, value) in values {
+            match value {
+                ReturnValue::Vector(vector) => {
+                    shell.variables.shadow(type_.name.into(), VariableType::Array(vector));
+                }
+                ReturnValue::Str(string) => {
+                    shell.variables.shadow(type_.name.into(), VariableType::Variable(string));
                 }
             }
+        }
 
-            shell.execute_statements(self.statements);
-            Ok(())
-        })
+        shell.execute_statements(self.statements);
+
+        shell.variables.pop_scope();
+        shell.variables.scopes.extend(temporary);
+        Ok(())
     }
 
     pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> { self.description.as_ref() }

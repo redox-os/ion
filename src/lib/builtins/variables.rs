@@ -5,11 +5,11 @@ use std::io::{self, Write};
 use shell::{status::*, variables::Variables};
 use types::*;
 
-fn print_list(list: &VariableContext) {
+fn print_list(vars: &Variables) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 
-    for (key, value) in list {
+    for (key, value) in vars.aliases() {
         let _ = stdout
             .write(key.as_bytes())
             .and_then(|_| stdout.write_all(b" = "))
@@ -120,7 +120,7 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
         Binding::KeyValue(key, value) => {
             vars.insert_alias(key, value);
         }
-        Binding::ListEntries => print_list(&vars.aliases.borrow()),
+        Binding::ListEntries => print_list(&vars),
         Binding::KeyOnly(key) => {
             eprintln!("ion: please provide value for alias '{}'", key);
             return FAILURE;
