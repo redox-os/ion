@@ -433,9 +433,11 @@ impl FlowLogic for Shell {
             Statement::Error(number) => self.previous_status = number,
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
+                self.variables.set_var("?", &self.previous_status.to_string());
             }
             Statement::Export(action) => {
                 self.previous_status = self.export(action);
+                self.variables.set_var("?", &self.previous_status.to_string());
             }
             Statement::While {
                 expression,
@@ -839,9 +841,11 @@ impl FlowLogic for Shell {
                         Statement::Error(number) => shell.previous_status = number,
                         Statement::Let(action) => {
                             shell.previous_status = shell.local(action);
+                            shell.variables.set_var("?", &shell.previous_status.to_string());
                         }
                         Statement::Export(action) => {
                             shell.previous_status = shell.export(action);
+                            shell.variables.set_var("?", &shell.previous_status.to_string());
                         }
                         Statement::While {
                             expression,
