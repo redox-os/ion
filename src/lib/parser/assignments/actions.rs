@@ -6,6 +6,8 @@ pub(crate) enum AssignmentError<'a> {
     InvalidOperator(&'a str),
     InvalidValue(Primitive, Primitive),
     TypeError(TypeError<'a>),
+    ExtraValues(&'a str, &'a str),
+    ExtraKeys(&'a str, &'a str),
 }
 
 impl<'a> Display for AssignmentError<'a> {
@@ -16,6 +18,10 @@ impl<'a> Display for AssignmentError<'a> {
                 write!(f, "expected {}, but received {}", expected, actual)
             }
             AssignmentError::TypeError(ref type_err) => write!(f, "{}", type_err),
+            AssignmentError::ExtraValues(ref prevkey, ref prevval) => write!(f, "extra values were supplied, and thus ignored. \
+                                                                                 Previous assignment: '{}' = '{}'", prevkey, prevval),
+            AssignmentError::ExtraKeys(ref prevkey, ref prevval) => write!(f, "extra keys were supplied, and thus ignored. \
+                                                                               Previous assignment: '{}' = '{}'", prevkey, prevval),
         }
     }
 }
@@ -50,27 +56,26 @@ impl<'a> Iterator for AssignmentActions<'a> {
     type Item = Result<Action<'a>, AssignmentError<'a>>;
 
     fn next(&mut self) -> Option<Result<Action<'a>, AssignmentError<'a>>> {
-        if let Some(key) = self.keys.next() {
-            match key {
-                Ok(key) => match self.values.next() {
-                    Some(value) => {
+        let next_key = self.keys.next();
+        let next_value = self.values.next();
+        match (next_key, next_value) {
+            (Some(key), Some(value)) => {
+                match key {
+                    Ok(key) => {
                         self.prevkey = key.name;
                         self.prevval = value;
                         Some(Action::new(key, self.operator, value))
                     }
-                    None => None,
-                },
-                Err(why) => Some(Err(AssignmentError::TypeError(why))),
+                    Err(why) => Some(Err(AssignmentError::TypeError(why))),
+                }
             }
-        } else {
-            if let Some(_) = self.values.next() {
-                eprintln!(
-                    "ion: extra values were supplied, and thus ignored. Previous assignment: '{}' \
-                     = '{}'",
-                    self.prevkey, self.prevval
-                );
+            (None, Some(_)) => {
+                Some(Err(AssignmentError::ExtraValues(self.prevkey, self.prevval)))
             }
-            None
+            (Some(_), None) => {
+                Some(Err(AssignmentError::ExtraKeys(self.prevkey, self.prevval)))
+            }
+            _ => None,
         }
     }
 }

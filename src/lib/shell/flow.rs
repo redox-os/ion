@@ -85,9 +85,11 @@ impl FlowLogic for Shell {
             // Execute a Let Statement
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
+                self.variables.set_var("?", &self.previous_status.to_string());
             }
             Statement::Export(action) => {
                 self.previous_status = self.export(action);
+                self.variables.set_var("?", &self.previous_status.to_string());
             }
             // Collect the statements for the while loop, and if the loop is complete,
             // execute the while loop with the provided expression.
