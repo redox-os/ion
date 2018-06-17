@@ -3,24 +3,26 @@
 
 Ion, like most other languages, has a concept of scopes. Any variables defined should belong to
 the same "body" they are defined in. For example, a variable defined in an if-statement should not
-be visible outside of it. Because ion does not have a separate syntax for defining/updating a
-variable it assumes first assignment is the declaration.
+be visible outside of it. Definitions in ion are done using `let`, which can also be used for
+shadowing a variable. Updating an existing variable is done using `assign`. Therefore, the
+technical difference is that `assign` works with scopes and fails if the variable doesn't exist.
 
 ```ion
 let x = 5 # defines x
+let y = 3 # defines y
 
 # This will always execute.
 # Only reason for this check is to show how
 # variables defined inside it are destroyed.
 if test 1 == 1
-  let x = 2 # updates existing x
-  let y = 3 # defines y
+  assign x = 4 # updates existing x
+  let y = 2 # defines (shadows) y
 
   # end of scope, y is deleted since it's owned by it
 end
 
-echo $x # prints 2
-echo $y # prints nothing, y is deleted already
+echo $x # prints 4
+echo $y # prints 3
 ```
 
 ## Scopes and functions
