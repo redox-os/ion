@@ -149,6 +149,72 @@ let A:int = 5
 let B:int[] = [5 2 3 1]
 ```
 
+## Assignment Operators
+[operators]: #operators
+
+The `=` operator is not the only supported assignment operation: various other arithmetic
+operators are supported as well. The action performed depends on the type of the variable
+defined on the left hand side of the statement.
+
+```
+$ let A:int = 5
+$ let A += 2
+$ echo $A
+7
+```
+
+### String Operators
+[string-operations]: #string-operations
+
+Arithmetic operations are supported, so long as the variable being assigned to, and the value
+to assign, are numbers.
+
+- **Add**: `+=`
+- **Subtract**: `-=`
+- **Divide**: `/=`
+- **Integer Divide**: `//=`
+- **Multiply**: `*=`
+- **Exponent**: `**=`
+
+### Array Operators
+[array-operations]: #array-operations
+
+Arithmetic may also be performed on arrays. These operations can be SIMD-accelerated.
+
+- **Add**: `+=`
+- **Subtract**: `-=`
+- **Divide**: `/=`
+- **Integer Divide**: `//=`
+- **Multiply**: `*=`
+- **Exponent**: `**=`
+
+There are also some array-specific operations:
+
+- **Append** (`++`): Append values to the array
+```
+$ let ARRAY = [ 1 2 3 ]
+$ let ARRAY ++ 4
+$ let ARRAY ++ [5 6 7]
+$ echo @ARRAY
+1 2 3 4 5 6 7
+```
+
+- **Append-Head** (`::`): Insert values at the beginning of the array
+```
+$ let ARRAY = [ 4 5 6 ]
+$ let ARRAY :: [ 1 2 3 ]
+$ echo @ARRAY
+1 2 3 4 5 6
+```
+
+- **Difference** (`\\`): Retain values which are different from the array on the right
+```
+$ let ARRAY = [ 1 2 3 4 5 6 ]
+$ let ARRAY \\ [1 3 5]
+$ echo @ARRAY
+2 4 6
+```
+
 ## Error Handling
 [errors]: #errors
 
@@ -216,4 +282,4 @@ POSIX syntax was briefly considered, but quickly dismissed due to the shortcomin
 # Unresolved questions
 [unresolved]: #unresolved-questions
 
-There are no unresolved questions remaining.
+1. What should the complete set of assignment operations be?
