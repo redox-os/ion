@@ -177,6 +177,10 @@ impl VariableStore for Shell {
 
                     match value_check(self, &expression, key.kind) {
                         Ok(ReturnValue::Str(value)) => {
+                            if operator == Operator::Equal {
+                                collected.insert(key.name, ReturnValue::Str(value));
+                                continue;
+                            }
                             match self.variables.lookup_any(key.name) {
                                 Some(VariableType::Variable(lhs)) => {
                                     let result = math(&lhs, key.kind, operator, &value, |value| {
@@ -192,6 +196,7 @@ impl VariableStore for Shell {
                                 },
                                 Some(VariableType::Array(array)) => {
                                     let mut output = SmallVec::with_capacity(array.len());
+
                                     let value = match value.parse::<f64>() {
                                         Ok(n) => n,
                                         Err(_) => {
@@ -199,6 +204,7 @@ impl VariableStore for Shell {
                                             return FAILURE;
                                         }
                                     };
+
                                     for part in array.chunks(8) {
                                         let mut vec = simd::f64x8::splat(0.0);
 
@@ -217,9 +223,8 @@ impl VariableStore for Shell {
                                             Operator::Divide => vec /= value,
                                             Operator::Subtract => vec -= value,
                                             Operator::Multiply => vec *= value,
-                                            Operator::Equal => vec = simd::f64x8::splat(value),
                                             _ => {
-                                                eprintln!("ion: assignment error: operator does not yet work on arrays");
+                                                eprintln!("ion: assignment error: operator does not work on arrays");
                                                 return FAILURE;
                                             }
                                         }
@@ -232,12 +237,8 @@ impl VariableStore for Shell {
                                     collected.insert(key.name, ReturnValue::Vector(output));
                                 },
                                 _ => {
-                                    if operator == Operator::Equal {
-                                        collected.insert(key.name, ReturnValue::Str(value));
-                                    } else {
-                                        eprintln!("ion: assignment error: type does not support this operator");
-                                        return FAILURE;
-                                    }
+                                    eprintln!("ion: assignment error: type does not support this operator");
+                                    return FAILURE;
                                 }
                             }
                         }
