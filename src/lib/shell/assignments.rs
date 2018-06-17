@@ -3,11 +3,15 @@ use super::{
 };
 use itoa;
 use parser::assignments::*;
-use shell::history::ShellHistory;
+use smallvec::SmallVec;
+use shell::{
+    history::ShellHistory,
+    variables::VariableType
+};
 use std::{
     collections::HashMap,
     env, ffi::OsStr, fmt::{self, Display}, io::{self, BufWriter, Write}, mem,
-    os::unix::ffi::OsStrExt, str,
+    os::unix::ffi::OsStrExt, str, simd,
 };
 
 fn list_vars(shell: &Shell) {
@@ -173,19 +177,68 @@ impl VariableStore for Shell {
 
                     match value_check(self, &expression, key.kind) {
                         Ok(ReturnValue::Str(value)) => {
-                            let lhs = self
-                                .variables
-                                .get_var(key.name)
-                                .unwrap_or_else(|| String::from("0"));
+                            match self.variables.lookup_any(key.name) {
+                                Some(VariableType::Variable(lhs)) => {
+                                    let result = math(&lhs, key.kind, operator, &value, |value| {
+                                        collected.insert(key.name, ReturnValue::Str(unsafe {
+                                            str::from_utf8_unchecked(value)
+                                        }.to_owned()));
+                                    });
 
-                            let result =
-                                math(&lhs, key.kind, operator, &value, |value| {
-                                    collected.insert(key.name, ReturnValue::Str(unsafe { str::from_utf8_unchecked(value) }.to_owned()));
-                                });
+                                    if let Err(why) = result {
+                                        eprintln!("ion: assignment error: {}", why);
+                                        return FAILURE;
+                                    }
+                                },
+                                Some(VariableType::Array(array)) => {
+                                    let mut output = SmallVec::with_capacity(array.len());
+                                    let value = match value.parse::<f64>() {
+                                        Ok(n) => n,
+                                        Err(_) => {
+                                            eprintln!("ion: assignment error: value is not a float");
+                                            return FAILURE;
+                                        }
+                                    };
+                                    for part in array.chunks(8) {
+                                        let mut vec = simd::f64x8::splat(0.0);
 
-                            if let Err(why) = result {
-                                eprintln!("ion: assignment error: {}", why);
-                                return FAILURE;
+                                        for (i, value) in part.iter().enumerate() {
+                                            vec = vec.replace(i, match value.parse::<f64>() {
+                                                Ok(n) => n,
+                                                Err(_) => {
+                                                    eprintln!("ion: assignment error: array item is not a float");
+                                                    return FAILURE;
+                                                }
+                                            });
+                                        }
+
+                                        match operator {
+                                            Operator::Add => vec += value,
+                                            Operator::Divide => vec /= value,
+                                            Operator::Subtract => vec -= value,
+                                            Operator::Multiply => vec *= value,
+                                            Operator::Equal => vec = simd::f64x8::splat(value),
+                                            _ => {
+                                                eprintln!("ion: assignment error: operator does not yet work on arrays");
+                                                return FAILURE;
+                                            }
+                                        }
+
+                                        for i in 0..part.len() {
+                                            output.push(vec.extract(i).to_string());
+                                        }
+                                    }
+
+                                    collected.insert(key.name, ReturnValue::Vector(output));
+                                },
+                                _ => {
+                                    if operator == Operator::Equal {
+                                        collected.insert(key.name, ReturnValue::Str(value));
+                                    } else {
+                                        eprintln!("ion: assignment error: type does not support this operator");
+                                        return FAILURE;
+                                    }
+                                }
                             }
                         }
                         Err(why) => {
@@ -210,8 +263,10 @@ impl VariableStore for Shell {
                     }
                 }
                 Ok(Action::UpdateString(key, _, _)) => {
-                    if let Some(ReturnValue::Str(value)) = collected.remove(key.name) {
-                        self.set_var(key.name, &value);
+                    match collected.remove(key.name) {
+                        Some(ReturnValue::Str(value)) => self.set_var(key.name, &value),
+                        Some(ReturnValue::Vector(values)) => self.variables.set_array(key.name, values),
+                        _ => ()
                     }
                 }
                 _ => unreachable!(),

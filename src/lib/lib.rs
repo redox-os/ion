@@ -5,6 +5,7 @@
 #![feature(iterator_flatten)]
 #![feature(nll)]
 #![feature(pointer_methods)]
+#![feature(stdsimd)]
 #![feature(test)]
 
 #[macro_use]
