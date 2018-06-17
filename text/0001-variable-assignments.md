@@ -1,7 +1,7 @@
 - Feature Name: variable_assignment
 - Start Date: 2018-06-12
 - RFC PR: N/A
-- Ion Issue: N/A
+- Ion Issues: #777
 
 # Summary
 [summary]: #summary
@@ -9,7 +9,7 @@
 Variables are assigned using the `let` keyword. A `let` statement will consist of any number of
 variable keys on the left side of the statement, an assignment operator, and a collection of
 associated values on the right side of the statement. Variables may be optionally-typed, which
-will ensure that values fit the expected critea for the variables.
+will ensure that values fit the expected criteria for the variables.
 
 # Motivation
 [motivation]: #motivation
@@ -62,15 +62,33 @@ $ echo @FOO
 FOO BAR BAZ
 ```
 
-Individual values within an array may also be updated, using an array syntax.
+### Array Index Assignment
+[array-index-assignment]: #array-index-assignment
+
+When assigning directly to an index in an array, if one value is supplied, that value will
+be assigned to that index. If an array of values is supplied, the array will be inserted
+at that location.
 
 ```
-$ let FOO = [1 2 3]
-$ let FOO[0] = 4
+$ let FOO = [4 5 6]
+$ let FOO[0] = [1 2 3]
 $ echo @FOO
-4 2 3
+1 2 3 4 5 6
 ```
 
+### Array Index Range Assignment
+[array-index-range-assignment]: #array-index-range-assignment
+
+It is also possible to assign an array to replace a range of values. The array being assigned to
+that region may be smaller or larger than the region it is replacing.
+
+```
+$ let FOO = [1 2 3 4]
+$ let FOO[..1] = [4 5 6]
+$ let FOO[2..3] = [7]
+$ echo @FOO
+4 5 6 7
+```
 
 ## Copying Values
 [copy]: #copy
