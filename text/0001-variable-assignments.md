@@ -1,7 +1,7 @@
 - Feature Name: variable_assignment
 - Start Date: 2018-06-12
 - RFC PR: N/A
-- Ion Issues: #777
+- Ion Issues: #777, #778, #779
 
 # Summary
 [summary]: #summary
@@ -149,6 +149,21 @@ let A:int = 5
 let B:int[] = [5 2 3 1]
 ```
 
+### Supported Types
+[supported-types]: #supported-types
+
+- **[]** / **T[]**: an array of like-values
+- **bool**: either `1` or `0`
+- **float**: a generic decimal of any size
+- **int**: a generic integer of any size, which may be negative
+- **i32**: 32-bit int
+- **i64**: 64-bit int
+- **i128**: 128-bit int
+- **uint**: a generic integer of any size, which may not be negative
+- **u32**: 32-bit uint
+- **u64**: 64-bit uint
+- **u128**: 128-bit uint
+
 ## Assignment Operators
 [operators]: #operators
 
@@ -283,3 +298,4 @@ POSIX syntax was briefly considered, but quickly dismissed due to the shortcomin
 [unresolved]: #unresolved-questions
 
 1. What should the complete set of assignment operations be?
+2. What types should we support for type-checking?
