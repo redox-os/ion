@@ -1,11 +1,11 @@
 ## Scopes
 [scopes]: #scopes
 
-Ion, like most other languages, has a concept of scopes. Any variables defined should belong to
-the same "body" they are defined in. For example, a variable defined in an if-statement should not
-be visible outside of it. Definitions in ion are done using `let`, which can also be used for
-shadowing a variable. Updating an existing variable is done using `assign`. Therefore, the
-technical difference is that `assign` works with scopes and fails if the variable doesn't exist.
+Ion, like most other languages, has a concept of scopes. Any variables defined should belong to the
+same "body" they are defined in. For example, a variable defined in an if-statement should not be
+visible outside of it. Definitions in ion are done using `let`, which can also be used for shadowing
+a variable. Updating an existing variable is done using `assign`. Therefore, the technical
+difference is that `assign` works with scopes and fails if the variable doesn't exist.
 
 ```ion
 let x = 5 # defines x
