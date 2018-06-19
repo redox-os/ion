@@ -201,6 +201,8 @@ impl<'a> Collector<'a> {
         let mut brace_level = 0;
         let mut start = None;
         let mut end = None;
+        // Array increments * 2 + 1; brace * 2
+        let mut array_brace_counter = 0;
 
         macro_rules! is_toplevel {
             () => {
@@ -233,19 +235,27 @@ impl<'a> Collector<'a> {
                 }
                 b'[' => {
                     array_level += 1;
+                    array_brace_counter = array_brace_counter * 2 + 1;
                     bytes.next();
                 }
-                b']' => {
+                b']' => if array_brace_counter % 2 == 1 {
                     array_level -= 1;
+                    array_brace_counter = (array_brace_counter - 1) / 2;
                     bytes.next();
+                } else {
+                    break;
                 }
                 b'{' => {
                     brace_level += 1;
+                    array_brace_counter *= 2;
                     bytes.next();
                 }
-                b'}' => {
+                b'}' => if array_brace_counter % 2 == 0 {
                     brace_level -= 1;
+                    array_brace_counter /= 2;
                     bytes.next();
+                } else {
+                    break;
                 }
                 // This is a tricky one: we only end the argment if `^` is followed by a
                 // redirection character
@@ -969,6 +979,17 @@ mod tests {
             }],
         };
         assert_eq!(parse(input), Statement::Pipeline(expected));
+    }
+
+    #[test]
+    fn arrays_braces_out_of_order() {
+        let unmatched = Err("ion: syntax error: unmatched left bracket");
+
+        let pipe1 = super::Collector::new("echo {[}]");
+        assert_eq!(pipe1.parse(), unmatched);
+
+        let pipe2 = super::Collector::new("echo [{]}");
+        assert_eq!(pipe2.parse(), unmatched);
     }
 
 }
