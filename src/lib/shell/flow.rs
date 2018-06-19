@@ -606,7 +606,7 @@ impl FlowLogic for Shell {
     }
 
     fn execute_statements(&mut self, mut statements: Vec<Statement>) -> Condition {
-        self.variables.new_scope();
+        self.variables.new_scope(false);
 
         let mut iterator = statements.drain(..);
         let mut condition = None;

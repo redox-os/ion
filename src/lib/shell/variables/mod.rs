@@ -11,7 +11,8 @@ use smallstring::SmallString;
 use std::{
     env,
     io::{self, BufRead},
-    mem
+    mem,
+    ops::{Deref, DerefMut}
 };
 use sys::{self, geteuid, getpid, getuid, is_root, variables as self_sys};
 use types::{
@@ -34,9 +35,28 @@ pub enum VariableType {
 }
 
 #[derive(Clone, Debug)]
+pub struct Scope {
+    vars: FnvHashMap<Identifier, VariableType>,
+    /// This scope is on a namespace boundary.
+    /// Any previous scopes need to be accessed through `super::`.
+    namespace: bool
+}
+impl Deref for Scope {
+    type Target = FnvHashMap<Identifier, VariableType>;
+    fn deref(&self) -> &Self::Target {
+        &self.vars
+    }
+}
+impl DerefMut for Scope {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.vars
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Variables {
     flags:   u8,
-    scopes:  Vec<FnvHashMap<Identifier, VariableType>>,
+    scopes:  Vec<Scope>,
     current: usize,
 }
 
@@ -97,7 +117,10 @@ impl Default for Variables {
 
         Variables {
             flags: 0,
-            scopes: vec![map],
+            scopes: vec![Scope {
+                vars: map,
+                namespace: false
+            }],
             current: 0
         }
     }
@@ -106,30 +129,35 @@ impl Default for Variables {
 const PLUGIN: u8 = 1;
 
 impl Variables {
-    pub fn new_scope(&mut self) {
+    pub fn new_scope(&mut self, namespace: bool) {
         self.current += 1;
         if self.current >= self.scopes.len() {
-            self.scopes.push(FnvHashMap::with_capacity_and_hasher(64, Default::default()));
+            self.scopes.push(Scope {
+                vars: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+                namespace: namespace
+            });
+        } else {
+            self.scopes[self.current].namespace = namespace;
         }
     }
     pub fn pop_scope(&mut self) {
         self.scopes[self.current].clear();
         self.current -= 1;
     }
-    pub fn pop_scopes<'a>(&'a mut self, index: usize) -> impl Iterator<Item = FnvHashMap<Identifier, VariableType>> + 'a {
+    pub fn pop_scopes<'a>(&'a mut self, index: usize) -> impl Iterator<Item = Scope> + 'a {
         self.current = index;
         self.scopes.drain(index+1..)
     }
-    pub fn append_scopes(&mut self, scopes: Vec<FnvHashMap<Identifier, VariableType>>) {
+    pub fn append_scopes(&mut self, scopes: Vec<Scope>) {
         self.scopes.drain(self.current+1..);
         self.current += scopes.len();
         self.scopes.extend(scopes);
     }
-    pub fn scopes(&self) -> impl Iterator<Item = &FnvHashMap<Identifier, VariableType>> {
+    pub fn scopes(&self) -> impl Iterator<Item = &Scope> {
         let amount = self.scopes.len() - self.current - 1;
         self.scopes.iter().rev().skip(amount)
     }
-    pub fn scopes_mut(&mut self) -> impl Iterator<Item = &mut FnvHashMap<Identifier, VariableType>> {
+    pub fn scopes_mut(&mut self) -> impl Iterator<Item = &mut Scope> {
         let amount = self.scopes.len() - self.current - 1;
         self.scopes.iter_mut().rev().skip(amount)
     }
@@ -145,18 +173,55 @@ impl Variables {
     pub fn shadow(&mut self, name: SmallString, value: VariableType) -> Option<VariableType> {
         self.scopes[self.current].insert(name, value)
     }
-    pub fn lookup_any(&self, name: &str) -> Option<&VariableType> {
+    pub fn lookup_any(&self, mut name: &str) -> Option<&VariableType> {
+        let mut up_namespace: usize = 0;
+        if name.starts_with("global::") {
+            name = &name["global::".len()..];
+            // Go up as many namespaces as possible
+            up_namespace = self.scopes()
+                .filter(|scope| scope.namespace)
+                .count();
+        } else {
+            while name.starts_with("super::") {
+                name = &name["super::".len()..];
+                up_namespace += 1;
+            }
+        }
         for scope in self.scopes() {
+            let mut exit = false;
+            if scope.namespace {
+                if let Some(new) = up_namespace.checked_sub(1) {
+                    up_namespace = new;
+                } else {
+                    // We hit a new namespace but we didn't request to go down to a new namespace
+                    exit = true;
+                }
+            }
+            if up_namespace > 0 {
+                continue;
+            }
+
             if let val @ Some(_) = scope.get(name) {
                 return val;
+            }
+            if exit {
+                break;
             }
         }
         None
     }
     pub fn lookup_any_mut(&mut self, name: &str) -> Option<&mut VariableType> {
+        if name.starts_with("super::") || name.starts_with("global::") {
+            // Cannot mutate outer namespace
+            return None;
+        }
         for scope in self.scopes_mut() {
+            let exit = scope.namespace;
             if let val @ Some(_) = scope.get_mut(name) {
                 return val;
+            }
+            if exit {
+                break;
             }
         }
         None
@@ -289,57 +354,55 @@ impl Variables {
             "SWD" => return Some(self.get_simplified_directory()),
             _ => (),
         }
-        if let Some((name, variable)) = name.find("::").map(|pos| (&name[..pos], &name[pos + 2..]))
-        {
-            // If the parsed name contains the '::' pattern, then a namespace was
-            // designated. Find it.
-            match name {
-                "c" | "color" => Colors::collect(variable).into_string(),
-                "x" | "hex" => match u8::from_str_radix(variable, 16) {
-                    Ok(c) => Some((c as char).to_string()),
-                    Err(why) => {
-                        eprintln!("ion: hex parse error: {}: {}", variable, why);
-                        None
-                    }
-                },
-                "env" => env::var(variable).map(Into::into).ok(),
-                _ => {
-                    if is_root() {
-                        eprintln!("ion: root is not allowed to execute plugins");
-                        return None;
-                    }
-
-                    if !self.has_plugin_support() {
-                        eprintln!(
-                            "ion: plugins are disabled. Considering enabling them with `let \
-                             NS_PLUGINS = 1`"
-                        );
-                        return None;
-                    }
-
-                    // Attempt to obtain the given namespace from our lazily-generated map of
-                    // namespaces.
-                    if let Some(namespace) = STRING_NAMESPACES.get(name) {
-                        // Attempt to execute the given function from that namespace, and map it's
-                        // results.
-                        match namespace.execute(variable.into()) {
-                            Ok(value) => value.map(Into::into),
-                            Err(why) => {
-                                eprintln!("ion: string namespace error: {}: {}", name, why);
-                                None
-                            }
-                        }
-                    } else {
-                        eprintln!("ion: unsupported namespace: '{}'", name);
-                        None
-                    }
+        // If the parsed name contains the '::' pattern, then a namespace was
+        // designated. Find it.
+        match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
+            Some(("c", variable)) | Some(("color", variable)) => Colors::collect(variable).into_string(),
+            Some(("x", variable)) | Some(("hex", variable)) => match u8::from_str_radix(variable, 16) {
+                Ok(c) => Some((c as char).to_string()),
+                Err(why) => {
+                    eprintln!("ion: hex parse error: {}: {}", variable, why);
+                    None
                 }
-            }
-        } else {
-            // Otherwise, it's just a simple variable name.
-            match self.lookup_any(name) {
-                Some(VariableType::Variable(val)) => Some(val.clone()),
-                _ => env::var(name).ok()
+            },
+            Some(("env", variable)) => env::var(variable).map(Into::into).ok(),
+            Some(("super", _)) | Some(("global", _)) | None => {
+                // Otherwise, it's just a simple variable name.
+                match self.lookup_any(name) {
+                    Some(VariableType::Variable(val)) => Some(val.clone()),
+                    _ => env::var(name).ok()
+                }
+            },
+            Some((_, variable)) => {
+                if is_root() {
+                    eprintln!("ion: root is not allowed to execute plugins");
+                    return None;
+                }
+
+                if !self.has_plugin_support() {
+                    eprintln!(
+                        "ion: plugins are disabled. Considering enabling them with `let \
+                         NS_PLUGINS = 1`"
+                    );
+                    return None;
+                }
+
+                // Attempt to obtain the given namespace from our lazily-generated map of
+                // namespaces.
+                if let Some(namespace) = STRING_NAMESPACES.get(name) {
+                    // Attempt to execute the given function from that namespace, and map it's
+                    // results.
+                    match namespace.execute(variable.into()) {
+                        Ok(value) => value.map(Into::into),
+                        Err(why) => {
+                            eprintln!("ion: string namespace error: {}: {}", name, why);
+                            None
+                        }
+                    }
+                } else {
+                    eprintln!("ion: unsupported namespace: '{}'", name);
+                    None
+                }
             }
         }
     }

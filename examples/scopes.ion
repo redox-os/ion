@@ -14,8 +14,8 @@ if test 1 == 1
   let x = 1
 
   fn print
-    echo $x
-    echo $y
+    echo ${super::x}
+    echo ${super::y}
   end
 
   if test 1 == 1

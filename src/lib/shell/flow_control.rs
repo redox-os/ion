@@ -197,6 +197,8 @@ impl Function {
         // Pop off all scopes since function temporarily
         let temporary: Vec<_> = shell.variables.pop_scopes(index).collect();
 
+        shell.variables.new_scope(true);
+
         for (type_, value) in values {
             match value {
                 ReturnValue::Vector(vector) => {
@@ -210,6 +212,7 @@ impl Function {
 
         shell.execute_statements(self.statements);
 
+        shell.variables.pop_scope();
         shell.variables.append_scopes(temporary);
         Ok(())
     }
