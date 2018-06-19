@@ -28,8 +28,12 @@ echo $y # prints 3
 ## Scopes and functions
 [scopes-and-functions]: #scopes-and-functions
 
-Functions can use functions and variables from higher-level scopes than the one they were defined
-in. They can not access data from the scope they were called from, nor can they access variables
-defined after they were defined, meaning ion would keep some sort of ordering of what is defined
-when. Other functions would be excluded from this order as it's important for functions to be able
-to call each other. Once again, this matches the behavior of most other languages.
+Functions cannot access any variables or functions from outside of it, unless you specify
+"namespace". The `super::` namespace lets you access variables directly outside of where the
+function was defined. This namespace may be repeated any amount of times to access a variable higher
+up. For example, `super::super::a` accesses `a` from two nested functions up. The `global::`
+namespace accesses the top-level scopes before the first nested function, and is technically just
+`super::` automatically repeated X amount of times, where X is the number of nested functions.
+Variables defined after the function should never be accessible, meaning there needs to be some sort
+of ordering to insertions. Note that together these restrictions make sure it doesn't matter where
+the function is called from, only where it's defined.
