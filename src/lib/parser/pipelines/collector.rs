@@ -202,7 +202,8 @@ impl<'a> Collector<'a> {
         let mut start = None;
         let mut end = None;
         // Array increments * 2 + 1; brace * 2
-        let mut array_brace_counter = 0;
+        // Supports up to 31 nested arrays
+        let mut array_brace_counter: u32 = 0;
 
         macro_rules! is_toplevel {
             () => {
@@ -235,7 +236,7 @@ impl<'a> Collector<'a> {
                 }
                 b'[' => {
                     array_level += 1;
-                    array_brace_counter = array_brace_counter * 2 + 1;
+                    array_brace_counter = array_brace_counter.wrapping_mul(2) + 1;
                     bytes.next();
                 }
                 b']' => if array_brace_counter % 2 == 1 {
@@ -247,7 +248,7 @@ impl<'a> Collector<'a> {
                 }
                 b'{' => {
                     brace_level += 1;
-                    array_brace_counter *= 2;
+                    array_brace_counter = array_brace_counter.wrapping_mul(2);
                     bytes.next();
                 }
                 b'}' => if array_brace_counter % 2 == 0 {
