@@ -174,13 +174,13 @@ impl Variables {
         self.scopes[self.current].insert(name, value)
     }
     pub fn lookup_any(&self, mut name: &str) -> Option<&VariableType> {
-        let mut up_namespace: usize = 0;
+        let mut up_namespace: isize = 0;
         if name.starts_with("global::") {
             name = &name["global::".len()..];
             // Go up as many namespaces as possible
             up_namespace = self.scopes()
                 .filter(|scope| scope.namespace)
-                .count();
+                .count() as isize;
         } else {
             while name.starts_with("super::") {
                 name = &name["super::".len()..];
@@ -188,24 +188,13 @@ impl Variables {
             }
         }
         for scope in self.scopes() {
-            let mut exit = false;
+            match scope.get(name) {
+                val @ Some(VariableType::Function(_)) => return val,
+                val @ Some(_) if up_namespace == 0 => return val,
+                _ => ()
+            }
             if scope.namespace {
-                if let Some(new) = up_namespace.checked_sub(1) {
-                    up_namespace = new;
-                } else {
-                    // We hit a new namespace but we didn't request to go down to a new namespace
-                    exit = true;
-                }
-            }
-            if up_namespace > 0 {
-                continue;
-            }
-
-            if let val @ Some(_) = scope.get(name) {
-                return val;
-            }
-            if exit {
-                break;
+                up_namespace -= 1;
             }
         }
         None
