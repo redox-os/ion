@@ -28,12 +28,12 @@ echo $y # prints 3
 ## Scopes and functions
 [scopes-and-functions]: #scopes-and-functions
 
-Functions cannot access any variables or functions from outside of it, unless you specify
-"namespace". The `super::` namespace lets you access variables directly outside of where the
-function was defined. This namespace may be repeated any amount of times to access a variable higher
-up. For example, `super::super::a` accesses `a` from two nested functions up. The `global::`
-namespace accesses the top-level scopes before the first nested function, and is technically just
-`super::` automatically repeated X amount of times, where X is the number of nested functions.
-Variables defined after the function should never be accessible, meaning there needs to be some sort
-of ordering to insertions. Note that together these restrictions make sure it doesn't matter where
-the function is called from, only where it's defined.
+Functions cannot access any variables (note, functions can still be accessed) from outside of it,
+unless you specify "namespace". The `super::` namespace lets you access variables directly outside
+of where the function was defined.  This namespace may be repeated any amount of times to access a
+variable higher up. For example, `super::super::a` accesses `a` from two nested functions up. The
+`global::` namespace accesses the top-level scopes before the first nested function, and is
+technically just `super::` automatically repeated X amount of times, where X is the number of nested
+functions.  Variables defined after the function should never be accessible, meaning there needs to
+be some sort of ordering to insertions.  Note that together these restrictions make sure it doesn't
+matter where the function is called from, only where it's defined.
