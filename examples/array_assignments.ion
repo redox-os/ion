@@ -1,0 +1,24 @@
+let array = [1 2 3]
+let array[0] = 4
+echo @array
+let value = 1
+let array[$value] = 5
+echo @array
+let array[2]:int = 6
+echo @array
+
+let FOO = [4 5 6]
+let FOO[0] = [1 2 3]
+echo @FOO
+
+let FOO = [4 5 6]
+let FOO[1] = [1 2 3]
+echo @FOO
+
+let FOO = [4 5 6]
+let FOO[2] = [1 2 3]
+echo @FOO
+
+let FOO = [4 5 6]
+let FOO[3] = [1 2 3]
+echo @FOO

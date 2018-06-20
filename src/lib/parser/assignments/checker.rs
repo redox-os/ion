@@ -153,51 +153,54 @@ fn get_array<E: Expander>(shell: &E, value: &str) -> ReturnValue {
 pub(crate) fn value_check<'a, E: Expander>(
     shell: &E,
     value: &'a str,
-    expected: Primitive,
+    expected: &Primitive,
 ) -> Result<ReturnValue, TypeError<'a>> {
-    macro_rules! string {
+    macro_rules! get_string {
         () => {
             get_string(shell, value)
         };
     }
-    macro_rules! array {
+    macro_rules! get_array {
         () => {
             get_array(shell, value)
         };
     }
     let is_array = is_array(value);
     match expected {
-        Primitive::Any if is_array => Ok(array!()),
-        Primitive::Any => Ok(string!()),
-        Primitive::AnyArray if is_array => Ok(array!()),
-        Primitive::Str if !is_array => Ok(string!()),
-        Primitive::StrArray if is_array => Ok(array!()),
+        Primitive::Any if is_array => Ok(get_array!()),
+        Primitive::Any => Ok(get_string!()),
+        Primitive::AnyArray if is_array => Ok(get_array!()),
+        Primitive::Str if !is_array => Ok(get_string!()),
+        Primitive::StrArray if is_array => Ok(get_array!()),
         Primitive::Boolean if !is_array => {
-            let value = string!();
-            let value = is_boolean_string(&value).map_err(|_| TypeError::BadValue(expected))?;
+            let value = get_string!();
+            let value = is_boolean_string(&value).map_err(|_| TypeError::BadValue(expected.clone()))?;
             Ok(ReturnValue::Str(value.to_owned()))
         }
         Primitive::BooleanArray if is_array => {
-            let mut values = array!();
+            let mut values = get_array!();
             if is_boolean_array(&mut values) {
                 Ok(values)
             } else {
-                Err(TypeError::BadValue(expected))
+                Err(TypeError::BadValue(expected.clone()))
             }
         }
         Primitive::Integer if !is_array => {
-            is_integer_string(string!()).map_err(|_| TypeError::BadValue(expected))
+            is_integer_string(get_string!()).map_err(|_| TypeError::BadValue(expected.clone()))
         }
         Primitive::IntegerArray if is_array => {
-            is_integer_array(array!()).map_err(|_| TypeError::BadValue(expected))
+            is_integer_array(get_array!()).map_err(|_| TypeError::BadValue(expected.clone()))
         }
         Primitive::Float if !is_array => {
-            is_float_string(string!()).map_err(|_| TypeError::BadValue(expected))
+            is_float_string(get_string!()).map_err(|_| TypeError::BadValue(expected.clone()))
         }
         Primitive::FloatArray if is_array => {
-            is_float_array(array!()).map_err(|_| TypeError::BadValue(expected))
+            is_float_array(get_array!()).map_err(|_| TypeError::BadValue(expected.clone()))
         }
-        _ => Err(TypeError::BadValue(expected)),
+        Primitive::Indexed(_, kind) => {
+            value_check(shell, value, &*kind)
+        }
+        _ => Err(TypeError::BadValue(expected.clone())),
     }
 }
 

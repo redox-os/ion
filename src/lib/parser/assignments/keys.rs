@@ -26,7 +26,7 @@ impl<'a> Display for TypeError<'a> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
             TypeError::Invalid(parm) => write!(f, "invalid type supplied: {}", parm),
-            TypeError::BadValue(expected) => write!(f, "expected {}", expected),
+            TypeError::BadValue(ref expected) => write!(f, "expected {}", expected),
         }
     }
 }
@@ -50,7 +50,7 @@ impl<'a> From<Key<'a>> for KeyBuf {
 }
 
 /// A primitive defines the type that a requested value should satisfy.
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Primitive {
     Any,
     AnyArray,
@@ -62,6 +62,7 @@ pub enum Primitive {
     IntegerArray,
     Float,
     FloatArray,
+    Indexed(String, Box<Primitive>),
 }
 
 impl Primitive {
@@ -94,6 +95,7 @@ impl Display for Primitive {
             Primitive::Integer => write!(f, "int"),
             Primitive::IntegerArray => write!(f, "int[]"),
             Primitive::StrArray => write!(f, "str[]"),
+            Primitive::Indexed(_, ref kind) => write!(f, "{}", kind),
         }
     }
 }
@@ -108,30 +110,42 @@ pub(crate) struct KeyIterator<'a> {
 impl<'a> KeyIterator<'a> {
     // Executes when a semicolon was not found, but an array character was.
     fn parse_array(&mut self, name: &'a str) -> Result<Key<'a>, TypeError<'a>> {
-        let start = self.read;
-        for byte in self.data.bytes().skip(self.read) {
-            if byte == b' ' {
-                match &self.data[start..self.read] {
-                    "]" => {
-                        return Ok(Key {
-                            name,
-                            kind: Primitive::AnyArray,
-                        })
-                    }
-                    data @ _ => return Err(TypeError::Invalid(data)),
-                }
-            }
-            self.read += 1;
-        }
+        let index_ident_start = self.read;
+        loop {
+            let mut eol = self.read + 1 >= self.data.len();
 
-        match &self.data[start..] {
-            "]" => {
-                Ok(Key {
-                    name,
-                    kind: Primitive::AnyArray,
-                })
+            if self.data.as_bytes()[self.read] == b']' && (eol || self.data.as_bytes()[self.read + 1] == b' ') {
+                let kind = match &self.data[index_ident_start..self.read] {
+                    "" => Primitive::AnyArray,
+                    s => Primitive::Indexed(s.to_owned(), Box::new(Primitive::Any)),
+                };
+                self.read += 1;
+
+                break Ok(Key { name, kind });
+            } else if self.data.as_bytes()[self.read] == b']' && self.data.as_bytes()[self.read + 1] == b':' {
+                let index_ident_end = self.read;
+
+                self.read += 2;
+
+                while !eol && self.data.as_bytes()[self.read] != b' ' {
+                    self.read += 1;
+                    eol = self.read >= self.data.len();
+                }
+
+                let kind = match &self.data[index_ident_start..index_ident_end] {
+                    "" => Primitive::AnyArray,
+                    s => match Primitive::parse(&self.data[index_ident_end + 2..self.read]) {
+                        Some(kind) => Primitive::Indexed(s.to_owned(), Box::new(kind)),
+                        None => break Err(TypeError::Invalid(&self.data[index_ident_end + 1..self.read])),
+                    }
+                };
+
+                break Ok(Key { name, kind });
+            } else if !eol {
+                self.read += 1;
+            } else {
+                break Err(TypeError::Invalid(&self.data[self.read..]));
             }
-            data @ _ => Err(TypeError::Invalid(data)),
         }
     }
 
@@ -173,14 +187,10 @@ impl<'a> Iterator for KeyIterator<'a> {
                     }))
                 }
                 b':' => {
-                    // NOTE: Borrowck issue?
-                    let read = self.read;
-                    return Some(self.parse_parameter(&self.data[start..read - 1].trim()));
+                    return Some(self.parse_parameter(&self.data[start..self.read - 1].trim()));
                 }
                 b'[' => {
-                    // NOTE: Borrowck issue?
-                    let read = self.read;
-                    return Some(self.parse_array(&self.data[start..read - 1].trim()));
+                    return Some(self.parse_array(&self.data[start..self.read - 1].trim()));
                 }
                 _ => (),
             }
@@ -202,7 +212,7 @@ mod tests {
 
     #[test]
     fn key_parsing() {
-        let mut parser = KeyIterator::new("a:int b[] c:bool d e:int[] d:a");
+        let mut parser = KeyIterator::new("a:int b[] c:bool d e:int[] f[0] g[$index] h[1]:int d:a");
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key {
@@ -236,6 +246,27 @@ mod tests {
             Ok(Key {
                 name: "e",
                 kind: Primitive::IntegerArray,
+            },)
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "f",
+                kind: Primitive::Indexed(String::from("0"), Box::new(Primitive::Any)),
+            },)
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "g",
+                kind: Primitive::Indexed(String::from("$index"), Box::new(Primitive::Any)),
+            },)
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "h",
+                kind: Primitive::Indexed(String::from("1"), Box::new(Primitive::Integer)),
             },)
         );
         assert_eq!(parser.next().unwrap(), Err(TypeError::Invalid("a")));

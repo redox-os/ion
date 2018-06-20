@@ -84,7 +84,7 @@ impl VariableStore for Shell {
         for action in actions {
             match action {
                 Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
-                    match value_check(self, &expression, key.kind) {
+                    match value_check(self, &expression, &key.kind) {
                         Ok(ReturnValue::Vector(values)) => env::set_var(key.name, values.join(" ")),
                         Err(why) => {
                             eprintln!("ion: assignment error: {}: {}", key.name, why);
@@ -100,7 +100,7 @@ impl VariableStore for Shell {
                     return FAILURE;
                 }
                 Ok(Action::UpdateString(key, operator, expression)) => {
-                    match value_check(self, &expression, key.kind) {
+                    match value_check(self, &expression, &key.kind) {
                         Ok(ReturnValue::Str(value)) => {
                             let key_name: &str = &key.name;
                             let lhs = self
@@ -108,7 +108,7 @@ impl VariableStore for Shell {
                                 .get_var(key_name)
                                 .unwrap_or_else(|| String::from("0"));
 
-                            let result = math(&lhs, key.kind, operator, &value, |value| {
+                            let result = math(&lhs, &key.kind, operator, &value, |value| {
                                 env::set_var(key_name, &OsStr::from_bytes(value))
                             });
 
@@ -146,7 +146,7 @@ impl VariableStore for Shell {
         for action in actions_step1 {
             match action {
                 Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
-                    match value_check(self, &expression, key.kind) {
+                    match value_check(self, &expression, &key.kind) {
                         Ok(ReturnValue::Vector(values)) => {
                             // When we changed the HISTORY_IGNORE variable, update the
                             // ignore patterns. This happens first because `set_array`
@@ -156,11 +156,13 @@ impl VariableStore for Shell {
                             }
                             collected.insert(key.name, ReturnValue::Vector(values));
                         }
+                        Ok(ReturnValue::Str(value)) => {
+                            collected.insert(key.name, ReturnValue::Str(value));
+                        }
                         Err(why) => {
                             eprintln!("ion: assignment error: {}: {}", key.name, why);
                             return FAILURE;
                         }
-                        _ => unreachable!(),
                     }
                 }
                 Ok(Action::UpdateArray(..)) => {
@@ -175,7 +177,7 @@ impl VariableStore for Shell {
                         return FAILURE;
                     }
 
-                    match value_check(self, &expression, key.kind) {
+                    match value_check(self, &expression, &key.kind) {
                         Ok(ReturnValue::Str(value)) => {
                             if operator == Operator::Equal {
                                 collected.insert(key.name, ReturnValue::Str(value));
@@ -183,7 +185,7 @@ impl VariableStore for Shell {
                             }
                             match self.variables.lookup_any(key.name) {
                                 Some(VariableType::Variable(lhs)) => {
-                                    let result = math(&lhs, key.kind, operator, &value, |value| {
+                                    let result = math(&lhs, &key.kind, operator, &value, |value| {
                                         collected.insert(key.name, ReturnValue::Str(unsafe {
                                             str::from_utf8_unchecked(value)
                                         }.to_owned()));
@@ -259,8 +261,39 @@ impl VariableStore for Shell {
         for action in actions_step2 {
             match action {
                 Ok(Action::UpdateArray(key, _, _)) => {
-                    if let Some(ReturnValue::Vector(values)) = collected.remove(key.name) {
-                        self.variables.set_array(key.name, values);
+                    match collected.remove(key.name) {
+                        Some(ReturnValue::Vector(values)) => {
+                            if let Primitive::Indexed(ref index, _) = key.kind {
+                                match parse_index(index, &self) {
+                                    Ok(index_num) => {
+                                        if let Some(mut array) = self.variables.get_array(key.name) {
+                                            for (i, value) in values.into_iter().enumerate() {
+                                                array.insert(index_num + i, value);
+                                            }
+                                            self.variables.set_array(key.name, array);
+                                        }
+                                    }
+                                    Err(why) => {
+                                        eprintln!("{}", why);
+                                        return FAILURE;
+                                    }
+                                };
+                            } else {
+                                self.variables.set_array(key.name, values);
+                            }
+                        }
+                        Some(ReturnValue::Str(value)) => {
+                            if let Primitive::Indexed(ref index, _) = key.kind {
+                                match parse_index(index, &self) {
+                                    Ok(index_num) => self.variables.set_at_array_index(key.name, index_num, &value),
+                                    Err(why) => {
+                                        eprintln!("{}", why);
+                                        return FAILURE;
+                                    }
+                                };
+                            }
+                        }
+                        _ => ()
                     }
                 }
                 Ok(Action::UpdateString(key, _, _)) => {
@@ -275,6 +308,24 @@ impl VariableStore for Shell {
         }
 
         SUCCESS
+    }
+}
+
+fn parse_index(index: &str, shell: &Shell) -> Result<usize, String> {
+    if index.chars().all(char::is_numeric) {
+        Ok(index.parse::<usize>().unwrap()) // It's okay to unwrap since all chars are numeric
+    } else if index.starts_with("$") && index.chars().nth(1).map(char::is_alphabetic).unwrap_or(false) {
+        match shell.variables.get_var(&index[1..]) {
+            Some(value) => {
+                match value.parse::<usize>() {
+                    Ok(index) => Ok(index),
+                    Err(_) => Err(format!("ion: index variable does not contain a numeric value: {}", index)),
+                }
+            }
+            None => Err(format!("ion: index variable does not exist: {}", index)),
+        }
+    } else {
+        Err(format!("ion: invalid array index: {}", index))
     }
 }
 
@@ -323,13 +374,13 @@ fn write_integer<F: FnMut(&[u8])>(integer: i64, mut func: F) {
 
 fn math<'a, F: FnMut(&[u8])>(
     lhs: &str,
-    key: Primitive,
+    key: &Primitive,
     operator: Operator,
     value: &'a str,
     mut writefn: F,
 ) -> Result<(), MathError> {
     match operator {
-        Operator::Add => if Primitive::Any == key || Primitive::Float == key {
+        Operator::Add => if Primitive::Any == *key || Primitive::Float == *key {
             writefn(
                 parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?
                     .to_string()
@@ -341,7 +392,7 @@ fn math<'a, F: FnMut(&[u8])>(
             return Err(MathError::Unsupported);
         },
         Operator::Divide => {
-            if Primitive::Any == key || Primitive::Float == key || Primitive::Integer == key {
+            if Primitive::Any == *key || Primitive::Float == *key || Primitive::Integer == *key {
                 writefn(
                     parse_f64(lhs, value, |lhs, rhs| lhs / rhs)?
                         .to_string()
@@ -351,12 +402,12 @@ fn math<'a, F: FnMut(&[u8])>(
                 return Err(MathError::Unsupported);
             }
         }
-        Operator::IntegerDivide => if Primitive::Any == key || Primitive::Float == key {
+        Operator::IntegerDivide => if Primitive::Any == *key || Primitive::Float == *key {
             write_integer(parse_i64(lhs, value, |lhs, rhs| lhs / rhs)?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
-        Operator::Subtract => if Primitive::Any == key || Primitive::Float == key {
+        Operator::Subtract => if Primitive::Any == *key || Primitive::Float == *key {
             writefn(
                 parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?
                     .to_string()
@@ -367,7 +418,7 @@ fn math<'a, F: FnMut(&[u8])>(
         } else {
             return Err(MathError::Unsupported);
         },
-        Operator::Multiply => if Primitive::Any == key || Primitive::Float == key {
+        Operator::Multiply => if Primitive::Any == *key || Primitive::Float == *key {
             writefn(
                 parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?
                     .to_string()
@@ -378,7 +429,7 @@ fn math<'a, F: FnMut(&[u8])>(
         } else {
             return Err(MathError::Unsupported);
         },
-        Operator::Exponent => if Primitive::Any == key || Primitive::Float == key {
+        Operator::Exponent => if Primitive::Any == *key || Primitive::Float == *key {
             writefn(
                 parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?
                     .to_string()

@@ -14,7 +14,7 @@ impl<'a> Display for AssignmentError<'a> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
             AssignmentError::InvalidOperator(op) => write!(f, "invalid operator supplied: {}", op),
-            AssignmentError::InvalidValue(expected, actual) => {
+            AssignmentError::InvalidValue(ref expected, ref actual) => {
                 write!(f, "expected {}, but received {}", expected, actual)
             }
             AssignmentError::TypeError(ref type_err) => write!(f, "{}", type_err),
@@ -105,7 +105,8 @@ impl<'a> Action<'a> {
                 Ok(Action::UpdateArray(var, operator, value))
             } else {
                 Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))
-            },
+            }
+            Primitive::Indexed(_, _) => Ok(Action::UpdateArray(var, operator, value)),
             Primitive::Any if is_array(value) => Ok(Action::UpdateArray(var, operator, value)),
             Primitive::Any => Ok(Action::UpdateString(var, operator, value)),
             _ if is_array(value) => {

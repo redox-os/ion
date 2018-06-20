@@ -162,7 +162,7 @@ impl Display for FunctionError {
         use self::FunctionError::*;
         match *self {
             InvalidArgumentCount => write!(fmt, "invalid number of arguments"),
-            InvalidArgumentType(t, ref value) => write!(fmt, "{} is not of type {}", value, t),
+            InvalidArgumentType(ref t, ref value) => write!(fmt, "{} is not of type {}", value, t),
         }
     }
 }
@@ -178,11 +178,11 @@ impl Function {
         let mut values: SmallVec<[_; 8]> = SmallVec::new();
 
         for (type_, value) in self.args.iter().zip(args.iter().skip(1)) {
-            let value = match value_check(shell, value.as_ref(), type_.kind) {
+            let value = match value_check(shell, value.as_ref(), &type_.kind) {
                 Ok(value) => value,
                 Err(_) => {
                     return Err(FunctionError::InvalidArgumentType(
-                        type_.kind,
+                        type_.kind.clone(),
                         value.as_ref().into(),
                     ))
                 }

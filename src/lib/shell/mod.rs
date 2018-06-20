@@ -221,6 +221,10 @@ impl Shell {
         self.variables.get_array(name)
     }
 
+    pub fn set_at_array_index(&mut self, name: &str, index: usize, value: &str) -> i32 {
+        self.variables.set_at_array_index(name, index, value)
+    }
+
     /// Obtains a variable, returning an empty string if it does not exist.
     pub(crate) fn get_var_or_empty(&self, name: &str) -> String {
         self.variables.get_var_or_empty(name)

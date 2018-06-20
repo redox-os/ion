@@ -546,6 +546,21 @@ impl Variables {
         }
     }
 
+    pub fn set_at_array_index(&mut self, name: &str, index: usize, value: &str) -> i32 {
+        match self.lookup_any_mut(name) {
+            Some(VariableType::Array(ref mut array)) => {
+                if let Some(ref mut get) = array.get_mut(index) {
+                    get.clear();
+                    get.push_str(value);
+                    SUCCESS
+                } else {
+                    FAILURE
+                }
+            }
+            _ => FAILURE,
+        }
+    }
+
     #[allow(dead_code)]
     pub(crate) fn set_hashmap_value(&mut self, name: &str, key: &str, value: &str) {
         match self.lookup_any_mut(name) {
