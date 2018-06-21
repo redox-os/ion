@@ -227,6 +227,7 @@ where
         match self.iter.next() {
             Some((i, '\\')) => {
                 if let Some((_, cnext)) = self.iter.next() {
+                    self.count += 1;
                     // We use `i` in order to include the backslash as part of the word
                     self.check_boundary(cnext, i, true)
                 } else {
