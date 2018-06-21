@@ -1,13 +1,14 @@
 use super::{
-    super::{signals, status::*, Shell}, foreground::BackgroundResult,
+    super::{signals, status::*, Shell},
+    foreground::{BackgroundResult, ForegroundSignals},
 };
 use std::{
-    fmt, process, sync::{Arc, Mutex}, thread::{sleep, spawn}, time::Duration,
+    fmt, process,
+    sync::{Arc, Mutex},
+    thread::{sleep, spawn},
+    time::Duration,
 };
 use sys;
-
-use sys::job_control as self_sys;
-pub(crate) use sys::job_control::watch_background;
 
 /// When given a process ID, that process's group will be assigned as the
 /// foreground process group.
@@ -155,7 +156,56 @@ impl JobControl for Shell {
     }
 
     fn watch_foreground(&mut self, pid: i32, command: &str) -> i32 {
-        self_sys::watch_foreground(self, pid, command)
+        let mut signaled = 0;
+        let mut exit_status = 0;
+        let mut status;
+
+        loop {
+            status = 0;
+            match waitpid(pid, &mut status, WUNTRACED) {
+                Err(errno) => match errno {
+                    ECHILD if signaled == 0 => break exit_status,
+                    ECHILD => break signaled,
+                    errno => {
+                        eprintln!("ion: waitpid error: {}", strerror(errno));
+                        break FAILURE;
+                    }
+                },
+                Ok(0) => (),
+                Ok(_) if wifexited(status) => exit_status = wexitstatus(status),
+                Ok(pid) if wifsignaled(status) => {
+                    let signal = wtermsig(status);
+                    if signal == SIGPIPE {
+                        continue;
+                    } else if wcoredump(status) {
+                        eprintln!("ion: process ({}) had a core dump", pid);
+                        continue;
+                    }
+
+                    eprintln!("ion: process ({}) ended by signal {}", pid, signal);
+                    match signal {
+                        SIGINT => {
+                            let _ = kill(pid as u32, signal as i32);
+                            self.break_flow = true;
+                        }
+                        _ => {
+                            self.handle_signal(signal);
+                        }
+                    }
+                    signaled = 128 + signal as i32;
+                }
+                Ok(pid) if wifstopped(status) => {
+                    self.send_to_background(
+                        pid.abs() as u32,
+                        ProcessState::Stopped,
+                        command.into(),
+                    );
+                    self.break_flow = true;
+                    break 128 + wstopsig(status);
+                }
+                Ok(_) => (),
+            }
+        }
     }
 
     /// Waits until all running background tasks have completed, and listens for signals in the
@@ -204,5 +254,86 @@ impl JobControl for Shell {
         // Have the shell reclaim the TTY
         set_foreground_as(process::id());
         status
+    }
+}
+
+use sys::{
+    kill, strerror, waitpid, wcoredump, wexitstatus, wifcontinued, wifexited, wifsignaled,
+    wifstopped, wstopsig, wtermsig, ECHILD, SIGINT, SIGPIPE, WCONTINUED, WNOHANG, WUNTRACED,
+};
+
+const OPTS: i32 = WUNTRACED | WCONTINUED | WNOHANG;
+
+pub(crate) fn watch_background(
+    fg: Arc<ForegroundSignals>,
+    processes: Arc<Mutex<Vec<BackgroundProcess>>>,
+    pgid: u32,
+    njob: usize,
+) {
+    let (mut fg_was_grabbed, mut status);
+    let mut exit_status = 0;
+
+    macro_rules! get_process {
+        (| $ident:ident | $func:expr) => {
+            let mut processes = processes.lock().unwrap();
+            let $ident = &mut processes.iter_mut().nth(njob).unwrap();
+            $func
+        };
+    }
+
+    loop {
+        fg_was_grabbed = fg.was_grabbed(pgid);
+        status = 0;
+        match waitpid(-(pgid as i32), &mut status, OPTS) {
+            Err(errno) if errno == ECHILD => {
+                if !fg_was_grabbed {
+                    eprintln!("ion: ([{}] {}) exited with {}", njob, pgid, status);
+                }
+
+                get_process!(|process| {
+                    process.state = ProcessState::Empty;
+                    if fg_was_grabbed {
+                        fg.reply_with(exit_status as i8);
+                    }
+                });
+
+                break;
+            }
+            Err(errno) => {
+                eprintln!("ion: ([{}] {}) errored: {}", njob, pgid, errno);
+
+                get_process!(|process| {
+                    process.state = ProcessState::Empty;
+                    if fg_was_grabbed {
+                        fg.errored();
+                    }
+                });
+
+                break;
+            }
+            Ok(0) => (),
+            Ok(_) if wifexited(status) => exit_status = wexitstatus(status),
+            Ok(_) if wifstopped(status) => {
+                if !fg_was_grabbed {
+                    eprintln!("ion: ([{}] {}) Stopped", njob, pgid);
+                }
+
+                get_process!(|process| {
+                    if fg_was_grabbed {
+                        fg.reply_with(TERMINATED as i8);
+                    }
+                    process.state = ProcessState::Stopped;
+                });
+            }
+            Ok(_) if wifcontinued(status) => {
+                if !fg_was_grabbed {
+                    eprintln!("ion: ([{}] {}) Running", njob, pgid);
+                }
+
+                get_process!(|process| process.state = ProcessState::Running);
+            }
+            Ok(_) => (),
+        }
+        sleep(Duration::from_millis(100));
     }
 }

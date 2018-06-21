@@ -1,13 +1,20 @@
 extern crate libc;
 
-pub mod job_control;
 pub mod signals;
 
 use libc::{
-    c_char, c_int, pid_t, sighandler_t, strerror, waitpid, ECHILD, EINTR, WEXITSTATUS, WUNTRACED,
+    c_char, c_int, pid_t, sighandler_t, waitpid as waitpid_, WCOREDUMP, WEXITSTATUS, WIFCONTINUED,
+    WIFEXITED, WIFSIGNALED, WIFSTOPPED, WSTOPSIG, WTERMSIG,
 };
+
+pub use libc::{ECHILD, EINTR, WCONTINUED, WNOHANG, WUNTRACED};
+
 use std::{
-    env, ffi::{CStr, CString}, io::{self, Write}, os::unix::io::RawFd, ptr,
+    env,
+    ffi::{CStr, CString},
+    io,
+    os::unix::io::RawFd,
+    ptr,
 };
 
 pub(crate) const PATH_SEPARATOR: &str = ":";
@@ -40,13 +47,34 @@ fn errno() -> i32 { unsafe { *libc::__error() } }
 #[cfg(target_os = "dragonfly")]
 fn errno() -> i32 { unsafe { *libc::__dfly_error() } }
 
-fn write_errno(msg: &str, errno: i32) {
-    let stderr = io::stderr();
-    let mut stderr = stderr.lock();
-    let _ = stderr.write(msg.as_bytes());
-    let _ = stderr.write(unsafe { CStr::from_ptr(strerror(errno)) }.to_bytes());
-    let _ = stderr.write_all(b"\n");
+pub fn strerror(errno: i32) -> &'static str {
+    unsafe {
+        let ptr = libc::strerror(errno);
+        if ptr.is_null() {
+            return "Unknown Error";
+        }
+        
+        CStr::from_ptr(ptr)
+            .to_str()
+            .unwrap_or("Unknown Error")
+    }
 }
+
+pub fn waitpid(pid: i32, status: &mut i32, options: i32) -> Result<i32, i32> {
+    match unsafe { waitpid_(pid, status, options) } {
+        -1 => Err(errno()),
+        pid => Ok(pid),
+    }
+}
+
+pub fn wexitstatus(status: i32) -> i32 { unsafe { WEXITSTATUS(status) } }
+pub fn wifexited(status: i32) -> bool { unsafe { WIFEXITED(status) } }
+pub fn wifstopped(status: i32) -> bool { unsafe { WIFSTOPPED(status) } }
+pub fn wifcontinued(status: i32) -> bool { unsafe { WIFCONTINUED(status) } }
+pub fn wifsignaled(status: i32) -> bool { unsafe { WIFSIGNALED(status) } }
+pub fn wcoredump(status: i32) -> bool { unsafe { WCOREDUMP(status) } }
+pub fn wtermsig(status: i32) -> i32 { unsafe { WTERMSIG(status) } }
+pub fn wstopsig(status: i32) -> i32 { unsafe { WSTOPSIG(status) } }
 
 pub(crate) fn geteuid() -> io::Result<u32> { Ok(unsafe { libc::geteuid() } as u32) }
 
@@ -55,36 +83,6 @@ pub(crate) fn getuid() -> io::Result<u32> { Ok(unsafe { libc::getuid() } as u32)
 pub(crate) fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
 
 pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
-
-pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
-    let mut status;
-
-    loop {
-        status = 0;
-        match unsafe { waitpid(pid as i32, &mut status, WUNTRACED) } {
-            -1 if errno() == EINTR => continue,
-            -1 => break Err(io::Error::from_raw_os_error(errno())),
-            _ => break Ok(()),
-        }
-    }
-}
-
-pub fn wait_for_child(pid: u32) -> io::Result<u8> {
-    let mut status;
-    let mut result;
-
-    loop {
-        status = 0;
-        result = unsafe { waitpid(pid as i32, &mut status, WUNTRACED) };
-        if result == -1 {
-            break if errno() == ECHILD {
-                Ok(unsafe { WEXITSTATUS(status) as u8 })
-            } else {
-                Err(io::Error::from_raw_os_error(errno()))
-            };
-        }
-    }
-}
 
 pub fn fork_exit(exit_status: i32) -> ! { unsafe { libc::_exit(exit_status) } }
 
@@ -359,8 +357,8 @@ fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
 }
 
 pub mod variables {
-    use users_unix::{get_user_by_name, os::unix::UserExt};
     use super::libc::{self, c_char};
+    use users_unix::{get_user_by_name, os::unix::UserExt};
 
     pub(crate) fn get_user_home(username: &str) -> Option<String> {
         match get_user_by_name(username) {
@@ -372,10 +370,15 @@ pub mod variables {
     pub(crate) fn get_host_name() -> Option<String> {
         let mut host_name = [0u8; 512];
 
-        if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) } == 0 {
-            let len = host_name.iter().position(|i| *i == 0).unwrap_or_else(|| host_name.len());
+        if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) }
+            == 0
+        {
+            let len = host_name
+                .iter()
+                .position(|i| *i == 0)
+                .unwrap_or_else(|| host_name.len());
 
-            Some(unsafe {String::from_utf8_unchecked(host_name[..len].to_owned())})
+            Some(unsafe { String::from_utf8_unchecked(host_name[..len].to_owned()) })
         } else {
             None
         }

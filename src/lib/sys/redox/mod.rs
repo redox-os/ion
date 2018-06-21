@@ -2,12 +2,18 @@ extern crate libc;
 extern crate syscall;
 
 use std::{
-    env, io, mem, os::unix::{ffi::OsStrExt, io::RawFd, process::ExitStatusExt}, path::PathBuf,
-    process::{exit, ExitStatus}, slice,
+    env, io, mem,
+    os::unix::{ffi::OsStrExt, io::RawFd},
+    path::PathBuf,
+    process::exit,
+    slice,
 };
-use syscall::{waitpid, SigAction, EINTR, WUNTRACED};
-
-pub mod job_control;
+use syscall::{waitpid as waitpid_, SigAction};
+pub use syscall::{
+    wcoredump as wcoredump_, wexitstatus as wexitstatus_, wifcontinued as wifcontinued_,
+    wifexited as wifexited_, wifsignaled as wifsignaled_, wifstopped as wifstopped_,
+    wstopsig as wstopsig_, wtermsig as wtermsig_, ECHILD, EINTR,
+};
 
 pub(crate) const PATH_SEPARATOR: &str = ";";
 pub(crate) const NULL_PATH: &str = "null:";
@@ -20,6 +26,9 @@ pub(crate) const SIGCONT: i32 = syscall::SIGCONT as i32;
 pub(crate) const SIGSTOP: i32 = syscall::SIGSTOP as i32;
 pub(crate) const SIGTSTP: i32 = syscall::SIGTSTP as i32;
 pub(crate) const SIGPIPE: i32 = syscall::SIGPIPE as i32;
+pub(crate) const WUNTRACED: i32 = syscall::WUNTRACED as i32;
+pub(crate) const WNOHANG: i32 = syscall::WNOHANG as i32;
+pub(crate) const WCONTINUED: i32 = syscall::WCONTINUED as i32;
 
 pub const STDIN_FILENO: RawFd = 0;
 pub(crate) const STDOUT_FILENO: RawFd = 1;
@@ -35,33 +44,30 @@ pub unsafe fn fork() -> io::Result<u32> { cvt(syscall::clone(0)).map(|pid| pid a
 
 pub fn fork_exit(status: i32) -> ! { exit(status) }
 
-pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
-    let mut status = 0;
+pub fn wexitstatus(status: i32) -> i32 { wexitstatus_(status as usize) as i32 }
+pub fn wtermsig(status: i32) -> i32 { wtermsig_(status as usize) as i32 }
+pub fn wstopsig(status: i32) -> i32 { wstopsig_(status as usize) as i32 }
+pub fn wifcontinued(status: i32) -> bool { wifcontinued_(status as usize) }
+pub fn wifsignaled(status: i32) -> bool { wifsignaled_(status as usize) }
+pub fn wifstopped(status: i32) -> bool { wifstopped_(status as usize) }
+pub fn wcoredump(status: i32) -> bool { wcoredump_(status as usize) }
+pub fn wifexited(status: i32) -> bool { wifexited_(status as usize) }
 
-    loop {
-        match waitpid(pid as usize, &mut status, WUNTRACED) {
-            Err(ref error) if error.errno == EINTR => continue,
-            Err(ref error) => break Err(io::Error::from_raw_os_error(error.errno)),
-            Ok(_) => break Ok(()),
-        }
-    }
+pub fn waitpid(pid: i32, status: &mut i32, options: i32) -> Result<i32, i32> {
+    let mut stat = 0;
+    let result = match waitpid_(pid as usize, &mut stat, options as usize) {
+        Err(ref error) => Err(error.errno),
+        Ok(pid) => Ok(pid as i32),
+    };
+
+    *status = stat as i32;
+    result
 }
 
-pub fn wait_for_child(pid: u32) -> io::Result<u8> {
-    let mut status;
-    use syscall::{waitpid, ECHILD};
-
-    loop {
-        status = 0;
-        match waitpid(pid as usize, &mut status, WUNTRACED) {
-            Err(ref error) if error.errno == ECHILD => break,
-            Err(error) => return Err(io::Error::from_raw_os_error(error.errno)),
-            _ => (),
-        }
-    }
-
-    let status = ExitStatus::from_raw(status as i32);
-    Ok(status.code().unwrap_or(0) as u8)
+pub fn strerror(errno: i32) -> &'static str {
+    syscall::error::STR_ERROR.get(errno as usize)
+        .map(|err| *err)
+        .unwrap_or("Unknown Error")
 }
 
 pub(crate) fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
@@ -256,7 +262,7 @@ pub mod signals {
 
 pub mod variables {
     use super::libc::{self, c_char};
-    
+
     pub(crate) fn get_user_home(_username: &str) -> Option<String> {
         // TODO
         None
@@ -265,10 +271,15 @@ pub mod variables {
     pub(crate) fn get_host_name() -> Option<String> {
         let mut host_name = [0u8; 512];
 
-        if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) } == 0 {
-            let len = host_name.iter().position(|i| *i == 0).unwrap_or(host_name.len());
+        if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) }
+            == 0
+        {
+            let len = host_name
+                .iter()
+                .position(|i| *i == 0)
+                .unwrap_or(host_name.len());
 
-            Some(unsafe {String::from_utf8_unchecked(host_name[..len].to_owned())})
+            Some(unsafe { String::from_utf8_unchecked(host_name[..len].to_owned()) })
         } else {
             None
         }

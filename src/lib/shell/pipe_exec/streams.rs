@@ -1,5 +1,7 @@
 use std::{
-    fs::File, io, os::unix::io::{AsRawFd, FromRawFd, RawFd},
+    fs::File,
+    io,
+    os::unix::io::{AsRawFd, FromRawFd, RawFd},
 };
 use sys;
 
@@ -15,7 +17,9 @@ pub(crate) fn redir(old: RawFd, new: RawFd) {
 /// when dropped.
 pub(crate) fn duplicate_streams() -> io::Result<(Option<File>, File, File)> {
     // STDIN may have been closed for a background shell, so it is ok if it cannot be duplicated.
-    let stdin = sys::dup(sys::STDIN_FILENO).ok().map(|fd| unsafe { File::from_raw_fd(fd) });
+    let stdin = sys::dup(sys::STDIN_FILENO)
+        .ok()
+        .map(|fd| unsafe { File::from_raw_fd(fd) });
 
     sys::dup(sys::STDOUT_FILENO)
         .map(|fd| unsafe { File::from_raw_fd(fd) })

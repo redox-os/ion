@@ -11,19 +11,29 @@ pub mod job_control;
 pub mod streams;
 
 use self::{
-    fork::fork_pipe, job_control::{JobControl, ProcessState},
+    fork::fork_pipe,
+    job_control::{JobControl, ProcessState},
     streams::{duplicate_streams, redir, redirect_streams},
 };
 use super::{
-    flags::*, flow_control::FunctionError, fork_function::command_not_found,
-    job::{RefinedJob, TeeItem}, signals::{self, SignalHandler}, status::*, JobKind, Shell,
+    flags::*,
+    flow_control::FunctionError,
+    fork_function::command_not_found,
+    job::{RefinedJob, TeeItem},
+    signals::{self, SignalHandler},
+    status::*,
+    JobKind, Shell,
 };
 use builtins::{self, BuiltinFunction};
 use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use smallvec::SmallVec;
 use std::{
-    fs::{File, OpenOptions}, io::{self, Error, Write}, iter,
-    os::unix::io::{AsRawFd, FromRawFd, RawFd}, path::Path, process::{self, exit},
+    fs::{File, OpenOptions},
+    io::{self, Error, Write},
+    iter,
+    os::unix::io::{AsRawFd, FromRawFd, RawFd},
+    path::Path,
+    process::{self, exit},
 };
 use sys;
 
@@ -460,7 +470,7 @@ impl PipelineExecution for Shell {
             Ok(pid) => {
                 let _ = sys::setpgid(pid, pid);
                 let _ = sys::tcsetpgrp(0, pid);
-                let _ = sys::wait_for_interrupt(pid);
+                let _ = wait_for_interrupt(pid);
                 let _ = sys::kill(pid, sys::SIGCONT);
                 self.watch_foreground(-(pid as i32), "")
             }
@@ -484,8 +494,7 @@ impl PipelineExecution for Shell {
         stderr: &Option<File>,
         stdin: &Option<File>,
         kind: JobKind,
-    ) -> i32
-    {
+    ) -> i32 {
         if let Some(ref file) = *stdin {
             redir(file.as_raw_fd(), sys::STDIN_FILENO);
         }
@@ -529,8 +538,7 @@ impl PipelineExecution for Shell {
         sources: &mut [File],
         stdout: &Option<File>,
         stdin: &mut Option<File>,
-    ) -> i32
-    {
+    ) -> i32 {
         if let Some(ref file) = *stdin {
             redir(file.as_raw_fd(), sys::STDIN_FILENO)
         }
@@ -976,56 +984,52 @@ fn spawn_proc(
             ref stdout,
             ref stderr,
             ref stdin,
-        } => {
-            match unsafe { sys::fork() } {
-                Ok(0) => {
-                    prepare_child(block_child, pgid);
-                    let ret = shell.exec_builtin(main, &args, stdout, stderr, stdin);
-                    close(stdout);
-                    close(stderr);
-                    close(stdin);
-                    exit(ret)
-                }
-                Ok(pid) => {
-                    close(stdin);
-                    close(stdout);
-                    close(stderr);
-                    *last_pid = *current_pid;
-                    *current_pid = pid;
-                }
-                Err(e) => {
-                    eprintln!("ion: failed to fork {}: {}", short, e);
-                }
+        } => match unsafe { sys::fork() } {
+            Ok(0) => {
+                prepare_child(block_child, pgid);
+                let ret = shell.exec_builtin(main, &args, stdout, stderr, stdin);
+                close(stdout);
+                close(stderr);
+                close(stdin);
+                exit(ret)
             }
-        }
+            Ok(pid) => {
+                close(stdin);
+                close(stdout);
+                close(stderr);
+                *last_pid = *current_pid;
+                *current_pid = pid;
+            }
+            Err(e) => {
+                eprintln!("ion: failed to fork {}: {}", short, e);
+            }
+        },
         RefinedJob::Function {
             ref name,
             ref args,
             ref stdout,
             ref stderr,
             ref stdin,
-        } => {
-            match unsafe { sys::fork() } {
-                Ok(0) => {
-                    prepare_child(block_child, pgid);
-                    let ret = shell.exec_function(name, &args, stdout, stderr, stdin);
-                    close(stdout);
-                    close(stderr);
-                    close(stdin);
-                    exit(ret)
-                }
-                Ok(pid) => {
-                    close(stdin);
-                    close(stdout);
-                    close(stderr);
-                    *last_pid = *current_pid;
-                    *current_pid = pid;
-                }
-                Err(e) => {
-                    eprintln!("ion: failed to fork {}: {}", short, e);
-                }
+        } => match unsafe { sys::fork() } {
+            Ok(0) => {
+                prepare_child(block_child, pgid);
+                let ret = shell.exec_function(name, &args, stdout, stderr, stdin);
+                close(stdout);
+                close(stderr);
+                close(stdin);
+                exit(ret)
             }
-        }
+            Ok(pid) => {
+                close(stdin);
+                close(stdout);
+                close(stderr);
+                *last_pid = *current_pid;
+                *current_pid = pid;
+            }
+            Err(e) => {
+                eprintln!("ion: failed to fork {}: {}", short, e);
+            }
+        },
         RefinedJob::Cat {
             ref mut sources,
             ref stdout,
@@ -1100,7 +1104,7 @@ fn prepare_child(block_child: bool, pgid: u32) {
 fn resume_prior_process(last_pid: &mut u32, current_pid: u32) {
     if *last_pid != 0 {
         // Ensure that the process is stopped before continuing.
-        if let Err(why) = sys::wait_for_interrupt(*last_pid) {
+        if let Err(why) = wait_for_interrupt(*last_pid) {
             eprintln!("ion: error waiting for sigstop: {}", why);
         }
         let _ = sys::kill(*last_pid, sys::SIGCONT);
@@ -1116,4 +1120,17 @@ fn set_process_group(pgid: &mut u32, pid: u32) -> bool {
     }
     let _ = sys::setpgid(pid, *pgid);
     pgid_set
+}
+
+pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
+    let mut status;
+
+    loop {
+        status = 0;
+        match sys::waitpid(pid as i32, &mut status, sys::WUNTRACED) {
+            Ok(_) => break Ok(()),
+            Err(errno) if errno == sys::EINTR => continue,
+            Err(errno) => break Err(io::Error::from_raw_os_error(errno)),
+        }
+    }
 }

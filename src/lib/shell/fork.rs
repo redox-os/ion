@@ -1,8 +1,25 @@
 use super::{IonError, Shell};
 use std::{
-    fs::File, os::unix::io::{AsRawFd, FromRawFd},
+    fs::File,
+    io,
+    os::unix::io::{AsRawFd, FromRawFd},
 };
 use sys;
+
+pub fn wait_for_child(pid: u32) -> io::Result<u8> {
+    let mut status;
+
+    loop {
+        status = 0;
+        if let Err(errno) = sys::waitpid(pid as i32, &mut status, sys::WUNTRACED) {
+            break if errno == sys::ECHILD {
+                Ok(sys::wexitstatus(status) as u8)
+            } else {
+                Err(io::Error::from_raw_os_error(errno))
+            };
+        }
+    }
+}
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
@@ -58,18 +75,22 @@ impl<'a> Fork<'a> {
 
         // If we are to capture stdout, create a pipe for capturing outputs.
         let mut outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
-            Some(sys::pipe2(sys::O_CLOEXEC)
-                .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
-                .map_err(|why| IonError::Fork { why })?)
+            Some(
+                sys::pipe2(sys::O_CLOEXEC)
+                    .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
+                    .map_err(|why| IonError::Fork { why })?,
+            )
         } else {
             None
         };
 
         // And if we are to capture stderr, create a pipe for that as well.
         let mut errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
-            Some(sys::pipe2(sys::O_CLOEXEC)
-                .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
-                .map_err(|why| IonError::Fork { why })?)
+            Some(
+                sys::pipe2(sys::O_CLOEXEC)
+                    .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
+                    .map_err(|why| IonError::Fork { why })?,
+            )
         } else {
             None
         };
@@ -128,7 +149,7 @@ impl<'a> Fork<'a> {
                         read
                     }),
                     // `waitpid()` is required to reap the child.
-                    status: sys::wait_for_child(pid).map_err(|why| IonError::Fork { why })?,
+                    status: wait_for_child(pid).map_err(|why| IonError::Fork { why })?,
                 })
             }
             Err(why) => Err(IonError::Fork { why }),
