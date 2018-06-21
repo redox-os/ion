@@ -263,21 +263,9 @@ impl VariableStore for Shell {
                 Ok(Action::UpdateArray(key, _, _)) => {
                     match collected.remove(key.name) {
                         Some(ReturnValue::Vector(values)) => {
-                            if let Primitive::Indexed(ref index, _) = key.kind {
-                                match parse_index(index, &self) {
-                                    Ok(index_num) => {
-                                        if let Some(mut array) = self.variables.get_array(key.name) {
-                                            for (i, value) in values.into_iter().enumerate() {
-                                                array.insert(index_num + i, value);
-                                            }
-                                            self.variables.set_array(key.name, array);
-                                        }
-                                    }
-                                    Err(why) => {
-                                        eprintln!("{}", why);
-                                        return FAILURE;
-                                    }
-                                };
+                            if let Primitive::Indexed(_, _) = key.kind {
+                                eprintln!("ion: multi-dimensional arrays are not yet supported");
+                                return FAILURE;
                             } else {
                                 self.variables.set_array(key.name, values);
                             }
