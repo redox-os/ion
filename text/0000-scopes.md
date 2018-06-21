@@ -6,7 +6,14 @@
 # Summary
 [summary]: #summary
 
-One para explanation of the feature.
+In order to prevent unexpected behavior when defining and calling functions,
+they should have a separate set of variables. Each "body" (the part that is
+usually indented) will own its own map of variables, its scope. Each variable
+owned by it is deleted when the body ends. To access a variable in a different
+scope you can use `assign` to make the intention of modifying the existing
+variable obvious. Functions disallow you from accessing outer variables by
+default, but this can be overriden with namespaces to specify where you want
+the variable from.
 
 # Motivation
 [motivation]: #motivation
@@ -30,13 +37,13 @@ programming languages. A scope is a block of statements that are executed togeth
 same body, such as a branch within an `if` statement, the body of a `for` or `while` loop, or
 the body of a function. Scopes may even be nested within other scopes.
 
-TODO: Add image here
+![example image](https://gitlab.redox-os.org/redox-os/ion/raw/rfcs/images/blocks.svg)
 
 Variables may be accessed from scopes that exist on a higher level than the scope currently in
 execution. However, variables created at lower scopes will be lost once that scope has exited.
 For example, a variable defined in an if-statement should not be visible outside of it.
 
-TODO: Add image here
+![example image](https://gitlab.redox-os.org/redox-os/ion/raw/rfcs/images/scopes.svg)
 
 Variables are created within a scope using the `let` keyword. If the `let` keyword is used to
 create a variable which already exists in a higher scope, then the new variable will be assigned
@@ -82,7 +89,19 @@ defined. This namespace may be repeated any amount of times to access a variable
 scope stack. For example, `${super::super::a}` accesses `$a` from two scopes up.
 
 ```
-TODO EXAMPLE
+fn parent
+  let a = 2
+
+  fn child
+    let a = 4        # shadows a
+    echo $a          # prints 4
+    echo ${super::a} # prints 2
+  end
+
+  child
+end
+
+parent
 ```
 
 ### Global Namespace
@@ -93,28 +112,46 @@ The `global` namespace accesses variables from any higher scope. It is equivalen
 variable.
 
 ```
-TODO EXAMPLE
+let a = 1
+
+fn parent
+  fn child
+    echo ${global::a} # prints 1
+  end
+end
+
+parent
 ```
 
 ### Restriction
 [function-scope-restrictions]: #function-scope-restrictions
 
 Variables defined after the function should never be accessible, meaning there needs to
-be some sort of ordering to insertions.  Note that together these restrictions make sure it doesn't
+be some sort of ordering to insertions. Note that together these restrictions make sure it doesn't
 matter where the function is called from, only where it's defined.
-
 
 # Drawbacks
 [drawbacks]: #drawbacks
 
-Why should we *not* do this?
+Functions can no longer mutate outer environment, which might make things more
+complicated. It also adds complexity to the language and code, and shells
+usually have very simple syntax. However, this would improve the overall
+quality of scripts written in ion so it's probably worth it anyway. Namespaces,
+ordering and even `assign` are features we could live without, but a basic
+scoping mechanism would improve things a lot.
 
 # Alternatives
 [alternatives]: #alternatives
 
-What other designs have been considered? What is the impact of not doing this?
+We could let local variables have their own `local` keyword, which wouldn't be
+the default. However, then everybody would just be pushed to use that and the
+old `let` syntax would be wasted. Alternatively we could keep this RFC but also
+add a `global` keyword for bypassing scopes. However global variables are
+usually harder to find that way rather than letting each global variable be
+defined in the global scope where you can easily see all of them.
 
 # Unresolved questions
 [unresolved]: #unresolved-questions
 
-What parts of the design are still TBD?
+How in the world are you supposed to mutate variables outside of a function???
+Ion doesn't have references yet so right now return values are the only option.
