@@ -22,27 +22,15 @@ extern crate lazy_static;
 #[cfg(test)]
 extern crate test;
 #[cfg(all(unix, not(target_os = "redox")))]
-extern crate libc;
-#[cfg(all(unix, not(target_os = "redox")))]
 extern crate libloading;
 extern crate liner;
 extern crate regex;
 extern crate smallstring;
 extern crate smallvec;
-#[cfg(target_os = "redox")]
-extern crate syscall;
 extern crate unicode_segmentation;
-#[cfg(all(unix, not(target_os = "redox")))]
-extern crate users as users_unix;
 extern crate xdg;
 
-#[cfg(target_os = "redox")]
-#[path = "sys/redox/mod.rs"]
-pub mod sys;
-
-#[cfg(unix)]
-#[path = "sys/unix/mod.rs"]
-pub mod sys;
+pub extern crate ion_sys as sys;
 
 #[macro_use]
 mod types;

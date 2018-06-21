@@ -17,20 +17,20 @@ use std::{
     ptr,
 };
 
-pub(crate) const PATH_SEPARATOR: &str = ":";
-pub(crate) const NULL_PATH: &str = "/dev/null";
+pub const PATH_SEPARATOR: &str = ":";
+pub const NULL_PATH: &str = "/dev/null";
 
-pub(crate) const O_CLOEXEC: usize = libc::O_CLOEXEC as usize;
-pub(crate) const SIGHUP: i32 = libc::SIGHUP;
-pub(crate) const SIGINT: i32 = libc::SIGINT;
-pub(crate) const SIGTERM: i32 = libc::SIGTERM;
-pub(crate) const SIGCONT: i32 = libc::SIGCONT;
-pub(crate) const SIGSTOP: i32 = libc::SIGSTOP;
-pub(crate) const SIGTSTP: i32 = libc::SIGTSTP;
-pub(crate) const SIGPIPE: i32 = libc::SIGPIPE;
+pub const O_CLOEXEC: usize = libc::O_CLOEXEC as usize;
+pub const SIGHUP: i32 = libc::SIGHUP;
+pub const SIGINT: i32 = libc::SIGINT;
+pub const SIGTERM: i32 = libc::SIGTERM;
+pub const SIGCONT: i32 = libc::SIGCONT;
+pub const SIGSTOP: i32 = libc::SIGSTOP;
+pub const SIGTSTP: i32 = libc::SIGTSTP;
+pub const SIGPIPE: i32 = libc::SIGPIPE;
 
-pub(crate) const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
-pub(crate) const STDERR_FILENO: i32 = libc::STDERR_FILENO;
+pub const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
+pub const STDERR_FILENO: i32 = libc::STDERR_FILENO;
 pub const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 
 // Why each platform wants to be unique in this regard is anyone's guess.
@@ -76,27 +76,27 @@ pub fn wcoredump(status: i32) -> bool { unsafe { WCOREDUMP(status) } }
 pub fn wtermsig(status: i32) -> i32 { unsafe { WTERMSIG(status) } }
 pub fn wstopsig(status: i32) -> i32 { unsafe { WSTOPSIG(status) } }
 
-pub(crate) fn geteuid() -> io::Result<u32> { Ok(unsafe { libc::geteuid() } as u32) }
+pub fn geteuid() -> io::Result<u32> { Ok(unsafe { libc::geteuid() } as u32) }
 
-pub(crate) fn getuid() -> io::Result<u32> { Ok(unsafe { libc::getuid() } as u32) }
+pub fn getuid() -> io::Result<u32> { Ok(unsafe { libc::getuid() } as u32) }
 
-pub(crate) fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
+pub fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
 
 pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
 
 pub fn fork_exit(exit_status: i32) -> ! { unsafe { libc::_exit(exit_status) } }
 
-pub(crate) fn getpid() -> io::Result<u32> { cvt(unsafe { libc::getpid() }).map(|pid| pid as u32) }
+pub fn getpid() -> io::Result<u32> { cvt(unsafe { libc::getpid() }).map(|pid| pid as u32) }
 
-pub(crate) fn kill(pid: u32, signal: i32) -> io::Result<()> {
+pub fn kill(pid: u32, signal: i32) -> io::Result<()> {
     cvt(unsafe { libc::kill(pid as pid_t, signal as c_int) }).and(Ok(()))
 }
 
-pub(crate) fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
+pub fn killpg(pgid: u32, signal: i32) -> io::Result<()> {
     cvt(unsafe { libc::kill(-(pgid as pid_t), signal as c_int) }).and(Ok(()))
 }
 
-pub(crate) fn fork_and_exec<F: Fn(), S: AsRef<str>>(
+pub fn fork_and_exec<F: Fn(), S: AsRef<str>>(
     prog: &str,
     args: &[S],
     stdin: Option<RawFd>,
@@ -214,7 +214,7 @@ pub(crate) fn fork_and_exec<F: Fn(), S: AsRef<str>>(
     }
 }
 
-pub(crate) fn execve<'a, S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Error {
+pub fn execve<'a, S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Error {
     let prog_str = match CString::new(prog) {
         Ok(prog) => prog,
         Err(_) => {
@@ -287,7 +287,7 @@ pub(crate) fn execve<'a, S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool)
     }
 }
 
-pub(crate) fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
+pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     let mut fds = [0; 2];
 
     #[cfg(not(target_os = "macos"))]
@@ -299,12 +299,12 @@ pub(crate) fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     Ok((fds[0], fds[1]))
 }
 
-pub(crate) fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
+pub fn setpgid(pid: u32, pgid: u32) -> io::Result<()> {
     cvt(unsafe { libc::setpgid(pid as pid_t, pgid as pid_t) }).and(Ok(()))
 }
 
 #[allow(dead_code)]
-pub(crate) fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
+pub fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()> {
     if unsafe { libc::signal(signal as c_int, handler as sighandler_t) } == libc::SIG_ERR {
         Err(io::Error::last_os_error())
     } else {
@@ -312,7 +312,7 @@ pub(crate) fn signal(signal: i32, handler: extern "C" fn(i32)) -> io::Result<()>
     }
 }
 
-pub(crate) fn reset_signal(signal: i32) -> io::Result<()> {
+pub fn reset_signal(signal: i32) -> io::Result<()> {
     if unsafe { libc::signal(signal as c_int, libc::SIG_DFL) } == libc::SIG_ERR {
         Err(io::Error::last_os_error())
     } else {
@@ -320,17 +320,17 @@ pub(crate) fn reset_signal(signal: i32) -> io::Result<()> {
     }
 }
 
-pub(crate) fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
+pub fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
     cvt(unsafe { libc::tcsetpgrp(fd as c_int, pgrp as pid_t) }).and(Ok(()))
 }
 
-pub(crate) fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup(fd) }) }
+pub fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup(fd) }) }
 
-pub(crate) fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
+pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
     cvt(unsafe { libc::dup2(old, new) })
 }
 
-pub(crate) fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
+pub fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
 
 pub fn isatty(fd: RawFd) -> bool { unsafe { libc::isatty(fd) == 1 } }
 
@@ -360,14 +360,14 @@ pub mod variables {
     use super::libc::{self, c_char};
     use users_unix::{get_user_by_name, os::unix::UserExt};
 
-    pub(crate) fn get_user_home(username: &str) -> Option<String> {
+    pub fn get_user_home(username: &str) -> Option<String> {
         match get_user_by_name(username) {
             Some(user) => Some(user.home_dir().to_string_lossy().into_owned()),
             None => None,
         }
     }
 
-    pub(crate) fn get_host_name() -> Option<String> {
+    pub fn get_host_name() -> Option<String> {
         let mut host_name = [0u8; 512];
 
         if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) }

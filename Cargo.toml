@@ -16,6 +16,9 @@ readme = "README.md"
 repository = "https://gitlab.redox-os.org/redox-os/ion"
 version = "1.0.0-alpha"
 
+[workspace]
+members = ["ion_sys"]
+
 [[bin]]
 name = "ion"
 path = "src/main.rs"
@@ -33,7 +36,6 @@ fnv = "1.0"
 glob = "0.2"
 itoa = "0.4"
 lazy_static = "1.0"
-libc = "0.2"
 liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }
 permutate = "0.3"
 rand = "0.5"
@@ -42,6 +44,7 @@ smallstring = "0.1"
 smallvec = "0.6"
 unicode-segmentation = "1.2"
 xdg = { git = "https://github.com/whitequark/rust-xdg" }
+ion_sys = { path = "ion_sys" }
 
 [lib]
 path = "src/lib/lib.rs"
@@ -52,10 +55,6 @@ panic = "abort"
 
 [target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
 libloading = "0.5"
-users = "0.7"
-
-[target."cfg(target_os = \"redox\")".dependencies]
-redox_syscall = "0.1"
 
 [patch.crates-io]
 liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }
