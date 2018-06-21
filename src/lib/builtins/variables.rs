@@ -23,15 +23,6 @@ enum Binding {
     ListEntries,
     KeyOnly(Identifier),
     KeyValue(Identifier, Value),
-    Math(Identifier, Operator, f32),
-    MathInvalid(Value),
-}
-
-enum Operator {
-    Plus,
-    Minus,
-    Divide,
-    Multiply,
 }
 
 /// Parses alias as a `(key, value)` tuple.
@@ -42,7 +33,6 @@ fn parse_alias(args: &str) -> Binding {
     // Find the key and advance the iterator until the equals operator is found.
     let mut key = "".to_owned();
     let mut found_key = false;
-    let mut operator = None;
 
     // Scans through characters until the key is found, then continues to scan until
     // the equals operator is found.
@@ -50,34 +40,6 @@ fn parse_alias(args: &str) -> Binding {
         match character {
             ' ' if key.is_empty() => (),
             ' ' => found_key = true,
-            '+' => {
-                if char_iter.next() == Some('=') {
-                    operator = Some(Operator::Plus);
-                    found_key = true;
-                }
-                break;
-            }
-            '-' => {
-                if char_iter.next() == Some('=') {
-                    operator = Some(Operator::Minus);
-                    found_key = true;
-                }
-                break;
-            }
-            '*' => {
-                if char_iter.next() == Some('=') {
-                    operator = Some(Operator::Multiply);
-                    found_key = true;
-                }
-                break;
-            }
-            '/' => {
-                if char_iter.next() == Some('=') {
-                    operator = Some(Operator::Divide);
-                    found_key = true;
-                }
-                break;
-            }
             '=' => {
                 found_key = true;
                 break;
@@ -98,13 +60,7 @@ fn parse_alias(args: &str) -> Binding {
         } else if !Variables::is_valid_variable_name(&key) {
             Binding::InvalidKey(key)
         } else {
-            match operator {
-                Some(operator) => match value.parse::<f32>() {
-                    Ok(value) => Binding::Math(key, operator, value),
-                    Err(_) => Binding::MathInvalid(value),
-                },
-                None => Binding::KeyValue(key, value),
-            }
+            Binding::KeyValue(key, value)
         }
     }
 }
@@ -123,10 +79,6 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
         Binding::ListEntries => print_list(&vars),
         Binding::KeyOnly(key) => {
             eprintln!("ion: please provide value for alias '{}'", key);
-            return FAILURE;
-        }
-        _ => {
-            eprintln!("ion: invalid alias syntax");
             return FAILURE;
         }
     }

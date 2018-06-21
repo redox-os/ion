@@ -315,7 +315,7 @@ impl Variables {
     }
 
     pub(crate) fn is_valid_variable_character(c: char) -> bool {
-        c.is_alphanumeric() || c == '_' || c == '?' || c == '.'
+        c.is_alphanumeric() || c == '_' || c == '?' || c == '.' || c == '-' || c == '+'
     }
 
     pub fn variables(&self) -> impl Iterator<Item = (&SmallString, &Value)> {
