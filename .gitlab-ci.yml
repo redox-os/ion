@@ -7,8 +7,4 @@ before_script:
 nightly:
   script:
     - cargo build
-    - cargo test --lib
-    - cargo test --manifest-path members/braces/Cargo.toml
-    - cargo test --manifest-path members/builtins/Cargo.toml
-    - cargo test --manifest-path members/ranges/Cargo.toml
-    - bash examples/run_examples.sh
+    - make tests

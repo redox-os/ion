@@ -167,6 +167,7 @@ dependencies = [
  "glob 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "ion_braces 0.1.0",
  "ion_builtins 0.1.0",
+ "ion_lexers 0.1.0",
  "ion_ranges 0.1.0",
  "ion_sys 0.1.0",
  "itoa 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -199,6 +200,13 @@ dependencies = [
  "rand 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "smallstring 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "smallvec 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ion_lexers"
+version = "0.1.0"
+dependencies = [
+ "bitflags 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

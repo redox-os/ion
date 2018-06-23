@@ -2,9 +2,10 @@ mod arrays;
 mod strings;
 
 pub(crate) use self::{arrays::ArrayMethod, strings::StringMethod};
-
 use self::strings::unescape;
-use super::{super::super::ArgumentSplitter, expand_string, Expander};
+
+use lexers::ArgumentSplitter;
+use super::{expand_string, Expander};
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Pattern<'a> {

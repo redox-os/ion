@@ -1,7 +1,6 @@
+use lexers::ArgumentSplitter;
 use super::{
-    super::{
-        assignments::{split_assignment, Operator}, pipelines::{self, Pipeline}, ArgumentSplitter,
-    },
+    super::{assignments::{split_assignment, Operator}, pipelines::{self, Pipeline}},
     case, functions::{collect_arguments, parse_function},
 };
 use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};

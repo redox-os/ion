@@ -6,7 +6,8 @@ mod benchmarks;
 
 pub(crate) use self::methods::{ArrayMethod, Pattern, StringMethod};
 pub use ranges::{Select, SelectWithSize};
-use super::{super::ArgumentSplitter, expand_string, Expander};
+use lexers::ArgumentSplitter;
+use super::{expand_string, Expander};
 use shell::escape::unescape;
 use std::borrow::Cow;
 

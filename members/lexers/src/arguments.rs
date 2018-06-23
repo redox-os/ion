@@ -123,9 +123,6 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                     self.read += 2;
                     continue;
                 }
-                // b' ' if (!self.bitflags.contains(
-                //     ArgumentFlags::DOUBLE | ArgumentFlags::METHOD
-                // ) && level + alevel == 0) => break,
                 // Break from the loop once a root-level space is found.
                 b' ' => {
                     if !self

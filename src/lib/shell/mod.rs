@@ -32,8 +32,9 @@ use self::{
     variables::Variables,
 };
 use builtins::{BuiltinMap, BUILTINS};
+use lexers::ArgumentSplitter;
 use liner::Context;
-use parser::{pipelines::Pipeline, ArgumentSplitter, Expander, Select, Terminator};
+use parser::{pipelines::Pipeline, Expander, Select, Terminator};
 use smallvec::SmallVec;
 use std::{
     fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,

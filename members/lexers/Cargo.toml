@@ -1,0 +1,7 @@
+[package]
+name = "ion_lexers"
+version = "0.1.0"
+authors = ["Michael Murphy <mmstickman@gmail.com>"]
+
+[dependencies]
+bitflags = "1.0"

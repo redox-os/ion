@@ -1,4 +1,5 @@
-use super::{super::ArgumentSplitter, checker::*, *};
+use lexers::ArgumentSplitter;
+use super::{checker::*, *};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]

@@ -1,83 +1,6 @@
-use parser::ArgumentSplitter;
+use lexers::{ArgumentSplitter, DesignatorLexer, DesignatorToken};
 use shell::Shell;
 use std::{borrow::Cow, str};
-
-bitflags! {
-    struct Flags: u8 {
-        const DQUOTE = 1;
-        const SQUOTE = 2;
-        const DESIGN = 4;
-    }
-}
-
-#[derive(Debug)]
-enum Token<'a> {
-    Designator(&'a str),
-    Text(&'a str),
-}
-
-#[derive(Debug)]
-struct DesignatorSearcher<'a> {
-    data:  &'a [u8],
-    flags: Flags,
-}
-
-impl<'a> DesignatorSearcher<'a> {
-    fn grab_and_shorten(&mut self, id: usize) -> &'a str {
-        let output = unsafe { str::from_utf8_unchecked(&self.data[..id]) };
-        self.data = &self.data[id..];
-        output
-    }
-
-    fn new(data: &'a [u8]) -> DesignatorSearcher {
-        DesignatorSearcher {
-            data,
-            flags: Flags::empty(),
-        }
-    }
-}
-
-impl<'a> Iterator for DesignatorSearcher<'a> {
-    type Item = Token<'a>;
-
-    fn next(&mut self) -> Option<Token<'a>> {
-        let mut iter = self.data.iter().enumerate();
-        while let Some((id, byte)) = iter.next() {
-            match *byte {
-                b'\\' => {
-                    let _ = iter.next();
-                }
-                b'"' if !self.flags.contains(Flags::SQUOTE) => self.flags ^= Flags::DQUOTE,
-                b'\'' if !self.flags.contains(Flags::DQUOTE) => self.flags ^= Flags::SQUOTE,
-                b'!' if !self.flags.intersects(Flags::DQUOTE | Flags::DESIGN) => {
-                    self.flags |= Flags::DESIGN;
-                    if id != 0 {
-                        return Some(Token::Text(self.grab_and_shorten(id)));
-                    }
-                }
-                b' ' | b'\t' | b'\'' | b'"' | b'a'...b'z' | b'A'...b'Z'
-                    if self.flags.contains(Flags::DESIGN) =>
-                {
-                    self.flags ^= Flags::DESIGN;
-                    return Some(Token::Designator(self.grab_and_shorten(id)));
-                }
-                _ => (),
-            }
-        }
-
-        if self.data.is_empty() {
-            None
-        } else {
-            let output = unsafe { str::from_utf8_unchecked(&self.data) };
-            self.data = b"";
-            Some(if self.flags.contains(Flags::DESIGN) {
-                Token::Designator(output)
-            } else {
-                Token::Text(output)
-            })
-        }
-    }
-}
 
 pub(crate) fn expand_designators<'a>(shell: &Shell, cmd: &'a str) -> Cow<'a, str> {
     if let Some(ref context) = shell.context {
@@ -86,10 +9,10 @@ pub(crate) fn expand_designators<'a>(shell: &Shell, cmd: &'a str) -> Cow<'a, str
             let buffer = buffer.as_bytes();
             let buffer = unsafe { str::from_utf8_unchecked(&buffer) };
             let mut output = String::with_capacity(cmd.len());
-            for token in DesignatorSearcher::new(cmd.as_bytes()) {
+            for token in DesignatorLexer::new(cmd.as_bytes()) {
                 match token {
-                    Token::Text(text) => output.push_str(text),
-                    Token::Designator(text) => match text {
+                    DesignatorToken::Text(text) => output.push_str(text),
+                    DesignatorToken::Designator(text) => match text {
                         "!!" => output.push_str(buffer),
                         "!$" => output.push_str(last_arg(buffer)),
                         "!0" => output.push_str(command(buffer)),

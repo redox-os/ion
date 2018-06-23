@@ -30,9 +30,10 @@ extern crate smallvec;
 extern crate unicode_segmentation;
 extern crate xdg;
 
-pub extern crate ion_sys as sys;
+extern crate ion_sys as sys;
 extern crate ion_braces as braces;
 extern crate ion_builtins;
+extern crate ion_lexers as lexers;
 extern crate ion_ranges as ranges;
 
 #[macro_use]
