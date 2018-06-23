@@ -1,5 +1,4 @@
-extern crate rand;
-use self::rand::Rng;
+use rand::{thread_rng, Rng};
 use std::io::{self, Write};
 
 #[allow(unused_must_use)]
@@ -12,7 +11,7 @@ fn rand_list(args: &[String]) -> Result<(), String> {
         Err(_) => return Err(String::from("Invalid argument for random")),
     };
     while output.len() < arg1 {
-        let rand_num = rand::thread_rng().gen_range(1, args.len());
+        let rand_num = thread_rng().gen_range(1, args.len());
         output.push(&*args[rand_num]);
         output.dedup();
     }
@@ -23,12 +22,12 @@ fn rand_list(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 #[allow(unused_must_use)]
-pub(crate) fn random(args: &[String]) -> Result<(), String> {
+pub fn random(args: &[String]) -> Result<(), String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     match args.len() {
         0 => {
-            let rand_num = rand::thread_rng().gen_range(0, 32767);
+            let rand_num = thread_rng().gen_range(0, 32767);
             writeln!(stdout, "{}", rand_num);
         }
         1 => {
@@ -49,7 +48,7 @@ pub(crate) fn random(args: &[String]) -> Result<(), String> {
             if arg2 <= arg1 {
                 return Err(String::from("END must be greater than START"));
             }
-            let rand_num = rand::thread_rng().gen_range(arg1, arg2);
+            let rand_num = thread_rng().gen_range(arg1, arg2);
             writeln!(stdout, "{}", rand_num);
         }
         3 => {
@@ -70,7 +69,7 @@ pub(crate) fn random(args: &[String]) -> Result<(), String> {
                     if arg1 / arg2 >= end {
                         end += 1;
                     }
-                    let rand_num = rand::thread_rng().gen_range(arg1 / arg2, end);
+                    let rand_num = thread_rng().gen_range(arg1 / arg2, end);
                     writeln!(stdout, "{}", rand_num * arg2);
                 }
                 Err(_) => return rand_list(args),

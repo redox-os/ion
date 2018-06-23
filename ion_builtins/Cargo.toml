@@ -1,0 +1,12 @@
+[package]
+name = "ion_builtins"
+version = "0.1.0"
+authors = ["Michael Murphy <mmstickman@gmail.com>"]
+publish = false
+
+[dependencies]
+bitflags = "1.0"
+calculate = "0.5"
+rand = "0.5"
+smallstring = "0.1"
+smallvec = "0.6"

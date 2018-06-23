@@ -1,25 +1,21 @@
-pub mod calc;
 pub mod functions;
-pub mod random;
 pub mod source;
 pub mod variables;
 
 mod command_info;
-mod conditionals;
-mod echo;
 mod exec;
 mod exists;
-mod ion;
 mod is;
 mod job_control;
 mod man_pages;
 mod set;
 mod status;
-mod test;
+
+use ion_builtins::{calc, conditionals, echo, random, test};
 
 use self::{
-    command_info::*, conditionals::{contains, ends_with, starts_with}, echo::echo, exec::exec,
-    exists::exists, functions::fn_, ion::ion_docs, is::is, man_pages::*, source::source,
+    command_info::*, echo::echo, exec::exec,
+    exists::exists, functions::fn_, is::is, man_pages::*, source::source,
     status::status, test::test, variables::{alias, drop_alias, drop_array, drop_variable},
 };
 
@@ -83,7 +79,6 @@ pub const BUILTINS: &BuiltinMap = &map!(
     "fn" => builtin_fn : "Print list of functions",
     "help" => builtin_help : HELP_DESC,
     "history" => builtin_history : "Display a log of all commands previously executed",
-    "ion-docs" => ion_docs : "Opens the Ion manual",
     "is" => builtin_is : "Simple alternative to == and !=",
     "isatty" => builtin_isatty : "Returns 0 exit status if the supplied FD is a tty",
     "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
@@ -135,6 +130,10 @@ impl BuiltinMap {
         })
     }
 }
+
+fn starts_with(args: &[String], _: &mut Shell) -> i32 { conditionals::starts_with(args) }
+fn ends_with(args: &[String], _: &mut Shell) -> i32 { conditionals::ends_with(args) }
+fn contains(args: &[String], _: &mut Shell) -> i32 { conditionals::contains(args) }
 
 // Definitions of simple builtins go here
 fn builtin_status(args: &[String], shell: &mut Shell) -> i32 {
@@ -199,8 +198,8 @@ fn builtin_bool(args: &[String], shell: &mut Shell) -> i32 {
         _ => match &*args[1] {
             "1" => (),
             "true" => (),
-            "--help" => print_man(MAN_BOOL),
-            "-h" => print_man(MAN_BOOL),
+            "--help" => println!("{}", MAN_BOOL),
+            "-h" => println!("{}", MAN_BOOL),
             _ => return FAILURE,
         },
     }
@@ -453,7 +452,7 @@ fn builtin_suspend(args: &[String], _: &mut Shell) -> i32 {
 fn builtin_disown(args: &[String], shell: &mut Shell) -> i32 {
     for arg in args {
         if *arg == "--help" {
-            print_man(MAN_DISOWN);
+            println!("{}", MAN_DISOWN);
             return SUCCESS;
         }
     }

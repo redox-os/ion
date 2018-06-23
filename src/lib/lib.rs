@@ -31,6 +31,7 @@ extern crate unicode_segmentation;
 extern crate xdg;
 
 pub extern crate ion_sys as sys;
+extern crate ion_builtins;
 
 #[macro_use]
 mod types;

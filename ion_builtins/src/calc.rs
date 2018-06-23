@@ -1,4 +1,4 @@
-use calc::{eval, eval_polish, CalcError, Value};
+use calculate::{eval, eval_polish, CalcError, Value};
 use std::io::{self, Write};
 
 fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
@@ -8,7 +8,7 @@ fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
     }
 }
 
-pub(crate) fn calc(args: &[String]) -> Result<(), String> {
+pub fn calc(args: &[String]) -> Result<(), String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     if !args.is_empty() {

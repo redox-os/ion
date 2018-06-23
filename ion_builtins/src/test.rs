@@ -1,10 +1,114 @@
-use super::man_pages::{print_man, MAN_TEST};
 use smallstring::SmallString;
 use std::{
     fs, os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt}, path::Path, time::SystemTime,
 };
 
-pub(crate) fn test(args: &[String]) -> Result<bool, String> {
+pub const MAN_TEST: &str = r#"NAME
+    test - perform tests on files and text
+
+SYNOPSIS
+    test [EXPRESSION]
+
+DESCRIPTION
+    Tests the expressions given and returns an exit status of 0 if true, else 1.
+
+OPTIONS
+    -n STRING
+        the length of STRING is nonzero
+
+    STRING
+        equivalent to -n STRING
+
+    -z STRING
+        the length of STRING is zero
+
+    STRING = STRING
+        the strings are equivalent
+
+    STRING != STRING
+        the strings are not equal
+
+    INTEGER -eq INTEGER
+        the integers are equal
+
+    INTEGER -ge INTEGER
+        the first INTEGER is greater than or equal to the first INTEGER
+
+    INTEGER -gt INTEGER
+        the first INTEGER is greater than the first INTEGER
+
+    INTEGER -le INTEGER
+        the first INTEGER is less than or equal to the first INTEGER
+
+    INTEGER -lt INTEGER
+        the first INTEGER is less than the first INTEGER
+
+    INTEGER -ne INTEGER
+        the first INTEGER is not equal to the first INTEGER
+
+    FILE -ef FILE
+        both files have the same device and inode numbers
+
+    FILE -nt FILE
+        the first FILE is newer than the second FILE
+
+    FILE -ot FILE
+        the first file is older than the second FILE
+
+    -b FILE
+        FILE exists and is a block device
+
+    -c FILE
+        FILE exists and is a character device
+
+    -d FILE
+        FILE exists and is a directory
+
+    -e FILE
+        FILE exists
+
+    -f FILE
+        FILE exists and is a regular file
+
+    -h FILE
+        FILE exists and is a symbolic link (same as -L)
+
+    -L FILE
+        FILE exists and is a symbolic link (same as -h)
+
+    -r FILE
+        FILE exists and read permission is granted
+
+    -s FILE
+        FILE exists and has a file size greater than zero
+
+    -S FILE
+        FILE exists and is a socket
+
+    -w FILE
+        FILE exists and write permission is granted
+
+    -x FILE
+        FILE exists and execute (or search) permission is granted
+
+EXAMPLES
+    Test if the file exists:
+        test -e FILE && echo "The FILE exists" || echo "The FILE does not exist"
+
+    Test if the file exists and is a regular file, and if so, write to it:
+        test -f FILE && echo "Hello, FILE" >> FILE || echo "Cannot write to a directory"
+
+    Test if 10 is greater than 5:
+        test 10 -gt 5 && echo "10 is greater than 5" || echo "10 is not greater than 5"
+
+    Test if the user is running a 64-bit OS (POSIX environment only):
+        test $(getconf LONG_BIT) = 64 && echo "64-bit OS" || echo "32-bit OS"
+
+AUTHOR
+    Written by Michael Murphy.
+"#;
+
+pub fn test(args: &[String]) -> Result<bool, String> {
     let arguments = &args[1..];
     evaluate_arguments(arguments)
 }
@@ -26,7 +130,7 @@ fn evaluate_arguments(arguments: &[String]) -> Result<bool, String> {
         Some(ref s) if *s == "--help" => {
             // "--help" only makes sense if it is the first option. Only look for it
             // in the first position.
-            print_man(MAN_TEST);
+            println!("{}", MAN_TEST);
             Ok(true)
         }
         Some(arg) => {

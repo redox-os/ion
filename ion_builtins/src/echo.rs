@@ -9,7 +9,7 @@ bitflags! {
     }
 }
 
-pub(crate) fn echo(args: &[String]) -> Result<(), io::Error> {
+pub fn echo(args: &[String]) -> Result<(), io::Error> {
     let mut flags = Flags::empty();
     let mut data: SmallVec<[&str; 16]> = SmallVec::with_capacity(16);
 
