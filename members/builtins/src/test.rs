@@ -423,39 +423,39 @@ fn test_integers_arguments() {
 
 #[test]
 fn test_file_exists() {
-    assert_eq!(file_exists("../testing/empty_file"), true);
+    assert_eq!(file_exists("../../testing/empty_file"), true);
     assert_eq!(file_exists("this-does-not-exist"), false);
 }
 
 #[test]
 fn test_file_is_regular() {
-    assert_eq!(file_is_regular("../testing/empty_file"), true);
-    assert_eq!(file_is_regular("../testing"), false);
+    assert_eq!(file_is_regular("../../testing/empty_file"), true);
+    assert_eq!(file_is_regular("../../testing"), false);
 }
 
 #[test]
 fn test_file_is_directory() {
-    assert_eq!(file_is_directory("../testing"), true);
-    assert_eq!(file_is_directory("../testing/empty_file"), false);
+    assert_eq!(file_is_directory("../../testing"), true);
+    assert_eq!(file_is_directory("../../testing/empty_file"), false);
 }
 
 #[test]
 fn test_file_is_symlink() {
-    assert_eq!(file_is_symlink("../testing/symlink"), true);
-    assert_eq!(file_is_symlink("../testing/empty_file"), false);
+    assert_eq!(file_is_symlink("../../testing/symlink"), true);
+    assert_eq!(file_is_symlink("../../testing/empty_file"), false);
 }
 
 #[test]
 fn test_file_has_execute_permission() {
-    assert_eq!(file_has_execute_permission("../testing/executable_file"), true);
-    assert_eq!(file_has_execute_permission("../testing/empty_file"), false);
+    assert_eq!(file_has_execute_permission("../../testing/executable_file"), true);
+    assert_eq!(file_has_execute_permission("../../testing/empty_file"), false);
 }
 
 #[test]
 fn test_file_size_is_greater_than_zero() {
     assert_eq!(
-        file_size_is_greater_than_zero("../testing/file_with_text"),
+        file_size_is_greater_than_zero("../../testing/file_with_text"),
         true
     );
-    assert_eq!(file_size_is_greater_than_zero("../testing/empty_file"), false);
+    assert_eq!(file_size_is_greater_than_zero("../../testing/empty_file"), false);
 }

@@ -17,7 +17,9 @@ repository = "https://gitlab.redox-os.org/redox-os/ion"
 version = "1.0.0-alpha"
 
 [workspace]
-members = [ "ion_braces", "ion_builtins", "ion_sys", "ion_ranges" ]
+members = [
+    "members/braces", "members/builtins", "members/sys", "members/ranges"
+]
 
 [[bin]]
 name = "ion"
@@ -43,10 +45,10 @@ smallstring = "0.1"
 smallvec = "0.6"
 unicode-segmentation = "1.2"
 xdg = { git = "https://github.com/whitequark/rust-xdg" }
-ion_braces = { path = "ion_braces" }
-ion_builtins = { path = "ion_builtins" }
-ion_sys = { path = "ion_sys" }
-ion_ranges = { path = "ion_ranges" }
+ion_braces = { path = "members/braces" }
+ion_builtins = { path = "members/builtins" }
+ion_sys = { path = "members/sys" }
+ion_ranges = { path = "members/ranges" }
 
 [lib]
 path = "src/lib/lib.rs"
