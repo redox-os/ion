@@ -1,0 +1,8 @@
+[package]
+name = "ion_braces"
+version = "0.1.0"
+authors = ["Michael Murphy <mmstickman@gmail.com>"]
+
+[dependencies]
+permutate = "0.3"
+smallvec = "0.6"

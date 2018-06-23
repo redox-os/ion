@@ -1,9 +1,10 @@
 use super::{
     super::{
-        super::{expand_string, is_expression, Expander}, Index, Select, SelectWithSize,
+        super::{expand_string, is_expression, Expander}, Select, SelectWithSize,
     },
     strings::unescape, Pattern,
 };
+use ranges::Index;
 use smallstring::SmallString;
 use std::char;
 use types::Array;
@@ -211,9 +212,8 @@ impl<'a> ArrayMethod<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::{
-        super::{super::Range, Key}, *,
-    };
+    use super::*;
+    use ranges::Range;
     use types::Value;
 
     struct VariableExpander;
@@ -360,7 +360,7 @@ mod test {
             method:    "split",
             variable:  "$SPACEDFOO",
             pattern:   Pattern::Whitespace,
-            selection: Select::Key(Key::new("1")),
+            selection: Select::Key("1".into()),
         };
         method.handle(&mut output, &VariableExpander);
         assert_eq!(output, "");

@@ -1,5 +1,6 @@
 use super::*;
 use types::{Array, Value};
+use ranges::{Index, Range};
 
 struct Empty;
 
@@ -12,16 +13,6 @@ fn compare(input: &str, expected: Vec<WordToken>) {
         correct += 1;
     }
     assert_eq!(expected.len(), correct);
-}
-
-#[test]
-fn ranges() {
-    let range1 = Range::exclusive(Index::new(1), Index::new(5));
-    assert_eq!(Some((1, 4)), range1.bounds(42));
-    assert_eq!(Some((1, 4)), range1.bounds(7));
-    let range2 = Range::inclusive(Index::new(2), Index::new(-4));
-    assert_eq!(Some((2, 5)), range2.bounds(10));
-    assert_eq!(None, range2.bounds(3));
 }
 
 #[test]
@@ -125,7 +116,7 @@ fn indexes() {
             Select::Range(Range::inclusive(Index::new(0), Index::new(3))),
         ),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable("array", false, Select::Key(Key::new("abc"))),
+        WordToken::ArrayVariable("array", false, Select::Key("abc".into())),
         WordToken::Whitespace(" "),
         WordToken::ArrayVariable("array", false, Select::Range(Range::to(Index::new(3)))),
         WordToken::Whitespace(" "),
@@ -138,11 +129,11 @@ fn indexes() {
 fn string_keys() {
     let input = "@array['key'] @array[key] @array[]";
     let expected = vec![
-        WordToken::ArrayVariable("array", false, Select::Key(Key::new("key"))),
+        WordToken::ArrayVariable("array", false, Select::Key("key".into())),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable("array", false, Select::Key(Key::new("key"))),
+        WordToken::ArrayVariable("array", false, Select::Key("key".into())),
         WordToken::Whitespace(" "),
-        WordToken::ArrayVariable("array", false, Select::Key(Key::new(""))),
+        WordToken::ArrayVariable("array", false, Select::Key("".into())),
     ];
     compare(input, expected);
 }

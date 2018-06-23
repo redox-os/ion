@@ -1,18 +1,11 @@
-mod index;
 mod methods;
-mod range;
-mod select;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod benchmarks;
 
-#[cfg(test)]
-pub(crate) use self::methods::Key;
-pub(crate) use self::{
-    index::Index, methods::{ArrayMethod, Pattern, StringMethod}, range::Range,
-    select::{Select, SelectWithSize},
-};
+pub(crate) use self::methods::{ArrayMethod, Pattern, StringMethod};
+pub use ranges::{Select, SelectWithSize};
 use super::{super::ArgumentSplitter, expand_string, Expander};
 use shell::escape::unescape;
 use std::borrow::Cow;

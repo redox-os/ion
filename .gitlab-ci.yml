@@ -8,4 +8,7 @@ nightly:
   script:
     - cargo build
     - cargo test --lib
+    - cargo test --manifest-path ion_braces/Cargo.toml
+    - cargo test --manifest-path ion_builtins/Cargo.toml
+    - cargo test --manifest-path ion_ranges/Cargo.toml
     - bash examples/run_examples.sh

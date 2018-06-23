@@ -53,7 +53,7 @@ pub fn strerror(errno: i32) -> &'static str {
         if ptr.is_null() {
             return "Unknown Error";
         }
-        
+
         CStr::from_ptr(ptr)
             .to_str()
             .unwrap_or("Unknown Error")
@@ -214,7 +214,7 @@ pub fn fork_and_exec<F: Fn(), S: AsRef<str>>(
     }
 }
 
-pub fn execve<'a, S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Error {
+pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Error {
     let prog_str = match CString::new(prog) {
         Ok(prog) => prog,
         Err(_) => {

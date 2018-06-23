@@ -1,0 +1,7 @@
+[package]
+name = "ion_ranges"
+version = "0.1.0"
+authors = ["Michael Murphy <mmstickman@gmail.com>"]
+
+[dependencies]
+smallstring = "0.1"

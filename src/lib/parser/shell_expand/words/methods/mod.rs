@@ -12,18 +12,6 @@ pub(crate) enum Pattern<'a> {
     Whitespace,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Key {
-    pub(crate) key: ::types::Key,
-}
-
-impl Key {
-    pub(crate) fn get(&self) -> &::types::Key { &self.key }
-
-    #[cfg(test)]
-    pub(crate) fn new<K: Into<::types::Key>>(key: K) -> Key { Key { key: key.into() } }
-}
-
 #[derive(Debug)]
 pub(crate) struct MethodArgs<'a, 'b, E: 'b + Expander> {
     args:   &'a str,

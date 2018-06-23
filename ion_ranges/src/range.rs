@@ -2,7 +2,7 @@ use super::Index;
 
 /// A range of values in a vector-like object
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub(crate) struct Range {
+pub struct Range {
     /// Starting index
     start: Index,
     /// Ending index
@@ -24,7 +24,7 @@ impl Range {
     /// let selection = vec.iter().skip(start).take(size).collect::<Vec<_>>();
     /// assert_eq!(expected, selection);
     /// ```
-    pub(crate) fn bounds(&self, vector_length: usize) -> Option<(usize, usize)> {
+    pub fn bounds(&self, vector_length: usize) -> Option<(usize, usize)> {
         if let Some(start) = self.start.resolve(vector_length) {
             if let Some(end) = self.end.resolve(vector_length) {
                 if end < start {
@@ -42,7 +42,7 @@ impl Range {
         }
     }
 
-    pub(crate) fn exclusive(start: Index, end: Index) -> Range {
+    pub fn exclusive(start: Index, end: Index) -> Range {
         Range {
             start,
             end,
@@ -50,7 +50,7 @@ impl Range {
         }
     }
 
-    pub(crate) fn inclusive(start: Index, end: Index) -> Range {
+    pub fn inclusive(start: Index, end: Index) -> Range {
         Range {
             start,
             end,
@@ -58,7 +58,7 @@ impl Range {
         }
     }
 
-    pub(crate) fn from(start: Index) -> Range {
+    pub fn from(start: Index) -> Range {
         Range {
             start,
             end: Index::new(-1),
@@ -66,7 +66,7 @@ impl Range {
         }
     }
 
-    pub(crate) fn to(end: Index) -> Range {
+    pub fn to(end: Index) -> Range {
         Range {
             start: Index::new(0),
             end,

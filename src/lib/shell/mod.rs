@@ -490,7 +490,7 @@ impl<'a> Expander for Shell {
                             .collect::<Array>(),
                     ),
                     Select::Key(ref key) => {
-                        Some(array![map.get(key.get()).unwrap_or(&"".into()).clone()])
+                        Some(array![map.get(key).unwrap_or(&"".into()).clone()])
                     }
                     _ => None,
                 },

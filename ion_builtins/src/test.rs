@@ -282,7 +282,7 @@ fn file_has_read_permission(filepath: &str) -> bool {
 /// To extract the permissions from the mode, the bitwise AND operator will be used and compared
 /// with the respective write bits.
 fn file_has_write_permission(filepath: &str) -> bool {
-    const USER: u32 = 0b10000000;
+    const USER: u32 = 0b1000_0000;
     const GROUP: u32 = 0b10000;
     const GUEST: u32 = 0b10;
 
@@ -299,7 +299,7 @@ fn file_has_write_permission(filepath: &str) -> bool {
 /// Note: This function is 1:1 the same as src/builtins/exists.rs:file_has_execute_permission
 /// If you change the following function, please also update the one in src/builtins/exists.rs
 fn file_has_execute_permission(filepath: &str) -> bool {
-    const USER: u32 = 0b1000000;
+    const USER: u32 = 0b100_0000;
     const GROUP: u32 = 0b1000;
     const GUEST: u32 = 0b1;
 
@@ -423,39 +423,39 @@ fn test_integers_arguments() {
 
 #[test]
 fn test_file_exists() {
-    assert_eq!(file_exists("testing/empty_file"), true);
+    assert_eq!(file_exists("../testing/empty_file"), true);
     assert_eq!(file_exists("this-does-not-exist"), false);
 }
 
 #[test]
 fn test_file_is_regular() {
-    assert_eq!(file_is_regular("testing/empty_file"), true);
-    assert_eq!(file_is_regular("testing"), false);
+    assert_eq!(file_is_regular("../testing/empty_file"), true);
+    assert_eq!(file_is_regular("../testing"), false);
 }
 
 #[test]
 fn test_file_is_directory() {
-    assert_eq!(file_is_directory("testing"), true);
-    assert_eq!(file_is_directory("testing/empty_file"), false);
+    assert_eq!(file_is_directory("../testing"), true);
+    assert_eq!(file_is_directory("../testing/empty_file"), false);
 }
 
 #[test]
 fn test_file_is_symlink() {
-    assert_eq!(file_is_symlink("testing/symlink"), true);
-    assert_eq!(file_is_symlink("testing/empty_file"), false);
+    assert_eq!(file_is_symlink("../testing/symlink"), true);
+    assert_eq!(file_is_symlink("../testing/empty_file"), false);
 }
 
 #[test]
 fn test_file_has_execute_permission() {
-    assert_eq!(file_has_execute_permission("testing/executable_file"), true);
-    assert_eq!(file_has_execute_permission("testing/empty_file"), false);
+    assert_eq!(file_has_execute_permission("../testing/executable_file"), true);
+    assert_eq!(file_has_execute_permission("../testing/empty_file"), false);
 }
 
 #[test]
 fn test_file_size_is_greater_than_zero() {
     assert_eq!(
-        file_size_is_greater_than_zero("testing/file_with_text"),
+        file_size_is_greater_than_zero("../testing/file_with_text"),
         true
     );
-    assert_eq!(file_size_is_greater_than_zero("testing/empty_file"), false);
+    assert_eq!(file_size_is_greater_than_zero("../testing/empty_file"), false);
 }

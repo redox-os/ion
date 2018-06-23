@@ -1,11 +1,12 @@
-use super::{super::ranges::parse_index_range, methods::Key, Index, Range};
+use smallstring::SmallString;
 use std::{
     iter::{empty, FromIterator}, str::FromStr,
 };
+use super::{parse_index_range, Index, Range};
 
 /// Represents a filter on a vector-like object
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Select {
+pub enum Select {
     /// Select no elements
     None,
     /// Select all elements
@@ -15,10 +16,10 @@ pub(crate) enum Select {
     /// Select a range of elements
     Range(Range),
     /// Select an element by mapped key
-    Key(Key),
+    Key(SmallString),
 }
 
-pub(crate) trait SelectWithSize {
+pub trait SelectWithSize {
     type Item;
     fn select<O>(&mut self, Select, usize) -> O
     where
@@ -69,6 +70,6 @@ impl FromStr for Select {
             return Ok(Select::Range(range));
         }
 
-        Ok(Select::Key(Key { key: data.into() }))
+        Ok(Select::Key(data.into()))
     }
 }

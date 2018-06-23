@@ -1,13 +1,11 @@
 // TODO: Handle Runtime Errors
 extern crate calc;
-extern crate permutate;
 
-mod braces;
-mod ranges;
 mod words;
 
-pub(crate) use self::words::{Index, Range, Select, WordIterator, WordToken};
-use self::{braces::BraceToken, ranges::parse_range};
+pub(crate) use self::words::{Select, WordIterator, WordToken};
+use braces::{self, BraceToken};
+use ranges::{parse_range, Index, Range};
 use glob::glob;
 use std::{ptr, str};
 use types::*;
@@ -209,8 +207,8 @@ pub(crate) fn expand_string<E: Expander>(
                     }
                     WordToken::ArrayVariable(data, contains_quote, selection) => {
                         if let Select::Key(key) = selection {
-                            if key.key.contains(' ') {
-                                for index in key.key.split(' ') {
+                            if key.contains(' ') {
+                                for index in key.split(' ') {
                                     let select = index.parse::<Select>().unwrap_or(Select::None);
                                     token_buffer.push(
                                         WordToken::ArrayVariable(
@@ -374,7 +372,7 @@ fn expand_braces<E: Expander>(
             .map(|list| list.iter().map(AsRef::as_ref).collect::<Vec<&str>>())
             .collect();
         let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
-        for word in braces::expand_braces(&tokens, &*vector_of_arrays) {
+        for word in braces::expand(&tokens, &*vector_of_arrays) {
             expanded_words.push(word.into());
         }
     }
@@ -573,7 +571,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                 None => expand_single_string_token(token, expand_func, reverse_quoting),
             };
         }
-    
+
         let mut output = String::new();
         let mut expanded_words = Array::new();
 
