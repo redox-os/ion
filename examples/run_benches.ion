@@ -1,0 +1,17 @@
+
+# Function for timing each individual script
+fn check_timing script
+	# set var utime to time of executing script
+	let utime = $(time $script > /dev/null)
+	echo $script $utime
+end
+
+cargo build --release
+
+for file in ./*.ion
+	check_timing $file >> temp.out
+end
+
+
+cat temp.out | column -t
+
