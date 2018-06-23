@@ -158,13 +158,13 @@ pub fn builtin_cd(args: &[String], shell: &mut Shell) -> i32 {
         Ok(()) => {
             match env::current_dir() {
                 Ok(cwd) => {
-                    let pwd = shell.get_var_or_empty("PWD");
+                    let pwd = env::var("PWD").ok().unwrap_or_else(String::default);
                     let pwd = &pwd;
                     let current_dir = cwd.to_str().unwrap_or("?");
 
                     if pwd != current_dir {
                         shell.set_var("OLDPWD", pwd);
-                        shell.set_var("PWD", current_dir);
+                        env::set_var("PWD", current_dir);
                     }
                     fork_function(shell, "CD_CHANGE", &["ion"]);
                 }

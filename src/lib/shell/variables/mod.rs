@@ -266,11 +266,10 @@ impl Variables {
             "" => if let Some(home) = env::home_dir() {
                 return Some(home.to_string_lossy().to_string() + remainder);
             },
-            "+" => if let Some(pwd) = self.get_var("PWD") {
-                return Some(pwd.to_string() + remainder);
-            } else if let Ok(pwd) = env::current_dir() {
-                return Some(pwd.to_string_lossy().to_string() + remainder);
-            },
+            "+" => return Some(match env::var("PWD") {
+                Ok(var) => var + remainder,
+                _ => ["?", remainder].concat()
+            }),
             "-" => if let Some(oldpwd) = self.get_var("OLDPWD") {
                 return Some(oldpwd.to_string() + remainder);
             },
@@ -520,7 +519,7 @@ impl Variables {
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
     fn get_simplified_directory(&self) -> Value {
-        self.get_var("PWD")
+        env::var("PWD")
             .unwrap()
             .replace(&self.get_var("HOME").unwrap(), "~")
     }
@@ -670,8 +669,8 @@ mod tests {
 
     #[test]
     fn minimal_directory_var_should_compact_path() {
-        let mut variables = Variables::default();
-        variables.set_var("PWD", "/var/log/nix");
+        let variables = Variables::default();
+        env::set_var("PWD", "/var/log/nix");
         assert_eq!(
             "v/l/nix",
             variables.get_var("MWD").expect("no value returned")
@@ -680,8 +679,8 @@ mod tests {
 
     #[test]
     fn minimal_directory_var_shouldnt_compact_path() {
-        let mut variables = Variables::default();
-        variables.set_var("PWD", "/var/log");
+        let variables = Variables::default();
+        env::set_var("PWD", "/var/log");
         assert_eq!(
             "/var/log",
             variables.get_var("MWD").expect("no value returned")

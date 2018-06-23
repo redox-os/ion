@@ -3,6 +3,7 @@ use super::{
 };
 use std::{
     borrow::Cow, collections::VecDeque, env::{current_dir, home_dir, set_current_dir},
+    env,
     path::PathBuf,
 };
 
@@ -234,8 +235,8 @@ impl DirectoryStack {
 
         // Update $PWD
         match current_dir() {
-            Ok(current_dir) => variables.set_var("PWD", current_dir.to_str().unwrap_or("?")),
-            Err(_) => variables.set_var("PWD", "?"),
+            Ok(current_dir) => env::set_var("PWD", current_dir.to_str().unwrap_or("?")),
+            Err(_) => env::set_var("PWD", "?"),
         }
     }
 
