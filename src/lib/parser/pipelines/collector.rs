@@ -239,12 +239,14 @@ impl<'a> Collector<'a> {
                     array_brace_counter = array_brace_counter.wrapping_mul(2) + 1;
                     bytes.next();
                 }
-                b']' => if array_brace_counter % 2 == 1 {
+                b']' => {
                     array_level -= 1;
-                    array_brace_counter = (array_brace_counter - 1) / 2;
-                    bytes.next();
-                } else {
-                    break;
+                    if array_brace_counter % 2 == 1 {
+                        array_brace_counter = (array_brace_counter - 1) / 2;
+                        bytes.next();
+                    } else {
+                        break;
+                    }
                 }
                 b'{' => {
                     brace_level += 1;
@@ -319,6 +321,9 @@ impl<'a> Collector<'a> {
         }
         if array_level < 0 {
             return Err("ion: syntax error: extra right bracket(s)");
+        }
+        if brace_level < 0 {
+            return Err("ion: syntax error: extra right brace(s)");
         }
         match (start, end) {
             (Some(i), Some(j)) if i < j => Ok(Some(&self.data[i..j])),
@@ -982,15 +987,21 @@ mod tests {
         assert_eq!(parse(input), Statement::Pipeline(expected));
     }
 
+    fn assert_parse_error(s: &str) {
+        assert!(super::Collector::new(s).parse().is_err());
+    }
+
     #[test]
     fn arrays_braces_out_of_order() {
-        let unmatched = Err("ion: syntax error: unmatched left bracket");
+        assert_parse_error("echo {[}]");
+        assert_parse_error("echo [{]}");
+    }
 
-        let pipe1 = super::Collector::new("echo {[}]");
-        assert_eq!(pipe1.parse(), unmatched);
-
-        let pipe2 = super::Collector::new("echo [{]}");
-        assert_eq!(pipe2.parse(), unmatched);
+    #[test]
+    fn unmatched_right_brackets() {
+        assert_parse_error("]");
+        assert_parse_error("}");
+        assert_parse_error(")");
     }
 
 }
