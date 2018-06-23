@@ -6,8 +6,16 @@ macro_rules! string_function {
                     eprintln!("ion: {}: two arguments must be supplied", args[0]);
                     return 2;
                 }
-                3 => if args[1].$method(&args[2]) { 0 } else { 1 },
-                _ => if args[2..].iter().any(|arg| args[1].$method(arg)) { 0 } else { 1 }
+                3 => if args[1].$method(&args[2]) {
+                    0
+                } else {
+                    1
+                },
+                _ => if args[2..].iter().any(|arg| args[1].$method(arg)) {
+                    0
+                } else {
+                    1
+                },
             }
         }
     };

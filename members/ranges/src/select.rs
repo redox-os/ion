@@ -1,8 +1,9 @@
+use super::{parse_index_range, Index, Range};
 use smallstring::SmallString;
 use std::{
-    iter::{empty, FromIterator}, str::FromStr,
+    iter::{empty, FromIterator},
+    str::FromStr,
 };
-use super::{parse_index_range, Index, Range};
 
 /// Represents a filter on a vector-like object
 #[derive(Debug, PartialEq, Clone)]

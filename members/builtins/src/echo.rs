@@ -1,5 +1,5 @@
-use std::io::{self, BufWriter, Write};
 use smallvec::SmallVec;
+use std::io::{self, BufWriter, Write};
 
 bitflags! {
     struct Flags : u8 {

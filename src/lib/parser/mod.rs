@@ -7,6 +7,6 @@ mod statement;
 
 pub use self::{assignments::Primitive, quotes::Terminator};
 pub(crate) use self::{
-    loops::for_grammar::ForExpression, shell_expand::{expand_string, Expander, Select},
+    loops::ForExpression, shell_expand::{expand_string, Expander, Select},
     statement::{parse_and_validate, StatementSplitter},
 };

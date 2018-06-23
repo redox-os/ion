@@ -5,10 +5,7 @@ mod parse;
 mod range;
 mod select;
 
-pub use self::index::*;
-pub use self::parse::*;
-pub use self::range::*;
-pub use self::select::*;
+pub use self::{index::*, parse::*, range::*, select::*};
 
 #[cfg(test)]
 mod tests {

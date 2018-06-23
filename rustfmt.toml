@@ -12,5 +12,4 @@ reorder_impl_items = true
 struct_field_align_threshold = 30
 use_field_init_shorthand = true
 wrap_comments = true
-write_mode = "overwrite"
 merge_imports = true

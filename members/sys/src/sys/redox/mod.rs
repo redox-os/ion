@@ -65,7 +65,8 @@ pub fn waitpid(pid: i32, status: &mut i32, options: i32) -> Result<i32, i32> {
 }
 
 pub fn strerror(errno: i32) -> &'static str {
-    syscall::error::STR_ERROR.get(errno as usize)
+    syscall::error::STR_ERROR
+        .get(errno as usize)
         .map(|err| *err)
         .unwrap_or("Unknown Error")
 }
@@ -230,9 +231,7 @@ pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
 
 pub fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(syscall::dup(fd, &[])) }
 
-pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
-    cvt(syscall::dup2(old, new, &[]))
-}
+pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(syscall::dup2(old, new, &[])) }
 
 pub fn close(fd: RawFd) -> io::Result<()> { cvt(syscall::close(fd)).and(Ok(())) }
 

@@ -54,9 +54,7 @@ pub fn strerror(errno: i32) -> &'static str {
             return "Unknown Error";
         }
 
-        CStr::from_ptr(ptr)
-            .to_str()
-            .unwrap_or("Unknown Error")
+        CStr::from_ptr(ptr).to_str().unwrap_or("Unknown Error")
     }
 }
 
@@ -326,9 +324,7 @@ pub fn tcsetpgrp(fd: RawFd, pgrp: u32) -> io::Result<()> {
 
 pub fn dup(fd: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup(fd) }) }
 
-pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> {
-    cvt(unsafe { libc::dup2(old, new) })
-}
+pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::dup2(old, new) }) }
 
 pub fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
 

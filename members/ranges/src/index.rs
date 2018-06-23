@@ -25,7 +25,7 @@ impl Index {
     /// - A positive value `n` represents `Forward(n)`
     /// - A negative value `-n` reprents `Backwards(n - 1)` such that:
     /// ```ignore,rust
-    /// assert_eq!(Index::new(-1), Index::Backward(0))
+    /// assert_eq!(Index::new(-1), Index::Backward(0)) 
     /// ```
     pub fn new(input: isize) -> Index {
         if input < 0 {

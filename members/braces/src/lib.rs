@@ -20,7 +20,7 @@ pub fn expand<'a>(
         Box::new(multiple_brace_expand)
     } else if expanders.len() == 1 {
         let single_brace_expand = SingleBraceExpand {
-            elements:   expanders[0].iter().map(|element| *element),
+            elements: expanders[0].iter().map(|element| *element),
             tokens,
             loop_count: 0,
         };
@@ -53,18 +53,18 @@ fn escape_string(output: &mut SmallVec<[u8; 64]>, input: &str) {
 pub struct MultipleBraceExpand<'a> {
     permutator: Permutator<'a, str>,
     tokens:     &'a [BraceToken],
-    buffer:     Vec<&'a str>
+    buffer:     Vec<&'a str>,
 }
 
 impl<'a> MultipleBraceExpand<'a> {
     pub fn new(
         tokens: &'a [BraceToken],
-        expanders: &'a [&'a [&'a str]]
+        expanders: &'a [&'a [&'a str]],
     ) -> MultipleBraceExpand<'a> {
         MultipleBraceExpand {
             permutator: Permutator::new(expanders),
             tokens,
-            buffer: vec![""; expanders.len()]
+            buffer: vec![""; expanders.len()],
         }
     }
 }
@@ -170,7 +170,7 @@ mod tests {
             BraceToken::Normal("GH".to_owned()),
         ];
         assert_eq!(
-            MultipleBraceExpand ::new(tokens, expanders).collect::<Vec<String>>(),
+            MultipleBraceExpand::new(tokens, expanders).collect::<Vec<String>>(),
             vec![
                 "AB1CD3EF5GH".to_owned(),
                 "AB1CD3EF6GH".to_owned(),
@@ -190,7 +190,7 @@ mod tests {
         let tokens: &[BraceToken] = &[BraceToken::Normal("A=".to_owned()), BraceToken::Expander];
         assert_eq!(
             SingleBraceExpand {
-                elements:   elements.iter().map(|element| *element),
+                elements: elements.iter().map(|element| *element),
                 tokens,
                 loop_count: 0,
             }.collect::<Vec<String>>(),

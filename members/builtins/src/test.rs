@@ -1,6 +1,9 @@
 use smallstring::SmallString;
 use std::{
-    fs, os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt}, path::Path, time::SystemTime,
+    fs,
+    os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt},
+    path::Path,
+    time::SystemTime,
 };
 
 pub const MAN_TEST: &str = r#"NAME
@@ -372,53 +375,142 @@ fn test_strings() {
 fn test_empty_str() {
     let eval = |args: Vec<String>| evaluate_arguments(&args);
     assert_eq!(eval(vec!["".to_owned()]), Ok(false));
-    assert_eq!(eval(vec!["c".to_owned(), "=".to_owned(), "".to_owned()]), Ok(false));
+    assert_eq!(
+        eval(vec!["c".to_owned(), "=".to_owned(), "".to_owned()]),
+        Ok(false)
+    );
 }
 
 #[test]
 fn test_integers_arguments() {
     fn vec_string(args: &[&str]) -> Vec<String> {
-        args.iter().map(|s| (*s).to_owned()).collect::<Vec<String>>()
+        args.iter()
+            .map(|s| (*s).to_owned())
+            .collect::<Vec<String>>()
     }
     // Equal To
-    assert_eq!(evaluate_arguments(&vec_string(&["10", "-eq", "10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["10", "-eq", "5"])), Ok(false));
-    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-eq", "-10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-eq", "10"])), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["10", "-eq", "10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["10", "-eq", "5"])),
+        Ok(false)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-10", "-eq", "-10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-10", "-eq", "10"])),
+        Ok(false)
+    );
 
     // Greater Than or Equal To
-    assert_eq!(evaluate_arguments(&vec_string(&["10", "-ge", "10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["10", "-ge", "5"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["5", "-ge", "10"])), Ok(false));
-    assert_eq!(evaluate_arguments(&vec_string(&["-9", "-ge", "-10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-ge", "-10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-ge", "10"])), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["10", "-ge", "10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["10", "-ge", "5"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["5", "-ge", "10"])),
+        Ok(false)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-9", "-ge", "-10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-10", "-ge", "-10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-10", "-ge", "10"])),
+        Ok(false)
+    );
 
     // Less Than or Equal To
-    assert_eq!(evaluate_arguments(&vec_string(&["5", "-le", "5"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["5", "-le", "10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["10", "-le", "5"])), Ok(false));
-    assert_eq!(evaluate_arguments(&vec_string(&["-11", "-le", "-10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-le", "-10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["10", "-le", "-10"])), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["5", "-le", "5"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["5", "-le", "10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["10", "-le", "5"])),
+        Ok(false)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-11", "-le", "-10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-10", "-le", "-10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["10", "-le", "-10"])),
+        Ok(false)
+    );
 
     // Less Than
-    assert_eq!(evaluate_arguments(&vec_string(&["5", "-lt", "10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["10", "-lt", "5"])), Ok(false));
-    assert_eq!(evaluate_arguments(&vec_string(&["-11", "-lt", "-10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["10", "-lt", "-10"])), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["5", "-lt", "10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["10", "-lt", "5"])),
+        Ok(false)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-11", "-lt", "-10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["10", "-lt", "-10"])),
+        Ok(false)
+    );
 
     // Greater Than
-    assert_eq!(evaluate_arguments(&vec_string(&["10", "-gt", "5"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["5", "-gt", "10"])), Ok(false));
-    assert_eq!(evaluate_arguments(&vec_string(&["-9", "-gt", "-10"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-gt", "10"])), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["10", "-gt", "5"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["5", "-gt", "10"])),
+        Ok(false)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-9", "-gt", "-10"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-10", "-gt", "10"])),
+        Ok(false)
+    );
 
     // Not Equal To
-    assert_eq!(evaluate_arguments(&vec_string(&["10", "-ne", "5"])), Ok(true));
-    assert_eq!(evaluate_arguments(&vec_string(&["5", "-ne", "5"])), Ok(false));
-    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-ne", "-10"])), Ok(false));
-    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-ne", "10"])), Ok(true));
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["10", "-ne", "5"])),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["5", "-ne", "5"])),
+        Ok(false)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-10", "-ne", "-10"])),
+        Ok(false)
+    );
+    assert_eq!(
+        evaluate_arguments(&vec_string(&["-10", "-ne", "10"])),
+        Ok(true)
+    );
 }
 
 #[test]
@@ -447,8 +539,14 @@ fn test_file_is_symlink() {
 
 #[test]
 fn test_file_has_execute_permission() {
-    assert_eq!(file_has_execute_permission("../../testing/executable_file"), true);
-    assert_eq!(file_has_execute_permission("../../testing/empty_file"), false);
+    assert_eq!(
+        file_has_execute_permission("../../testing/executable_file"),
+        true
+    );
+    assert_eq!(
+        file_has_execute_permission("../../testing/empty_file"),
+        false
+    );
 }
 
 #[test]
@@ -457,5 +555,8 @@ fn test_file_size_is_greater_than_zero() {
         file_size_is_greater_than_zero("../../testing/file_with_text"),
         true
     );
-    assert_eq!(file_size_is_greater_than_zero("../../testing/empty_file"), false);
+    assert_eq!(
+        file_size_is_greater_than_zero("../../testing/empty_file"),
+        false
+    );
 }
