@@ -1,29 +1,46 @@
-#  /usr/bin/env ion
+#!/usr/bin/env ion
 
-# function for timing each individual script
-fn check_timing script
+let PROJECT_DIR = $parent(@split($(cargo locate-project), '"')[3])
+let CARGO = $PROJECT_DIR/target/release/ion
+
+fn check_timing script:str chars:int
 	let utime:float = 0.0
-	# loop 10 times
 	for _ in 0..10
-		# set to actual number part of time output, has "s" as end
-		let utime_arrval = @(time $script >/dev/null)[1]
-		# make it a string var
-		let utime_str:str = $utime_arrval
-		# remove s at end and add to total
-		let utime:float += $utime_str[..11]
+		let temp = @(time ${global::CARGO} $script >/dev/null)[1]
+		let utime:float += $temp[..-1]
 	end
+
 	let utime /= 10
-	echo $script $utime[..11]
+	let utime = $utime[..11]
+
+	let script = $filename(script)
+	let script_len utime_len = $len(script) $len(utime)
+
+	echo $repeat(' ', $(( chars - script_len )))$script \
+		$utime$repeat('0', $(( 11 - utime_len )))
 end
 
-#cargo build --release
-
-for file in ./*.ion
-	check_timing $file >> temp.out
+fn script_width scripts[]
+	let max_chars:int = 0
+	for script in @scripts
+		let chars:int = $len($filename(script))
+		if test $max_chars -lt $chars
+			let max_chars:int = $chars
+		end
+	end
+	echo $max_chars
 end
 
-cat temp.out | column -t > bench_results.txt
+fn bench_values scripts[]
+	let max_chars = $(script_width [@scripts])
+	for file in @scripts
+		check_timing $file $max_chars
+	end
+end
 
-cat bench_results.txt
-
-rm temp.out
+cd $PROJECT_DIR/examples
+if test $len(@args) -eq 1
+	bench_values [ ./*.ion ]
+else
+    bench_values [ @args[1..] ]
+end
