@@ -1,6 +1,5 @@
 #  /usr/bin/env ion
 
-
 # function for timing each individual script
 fn check_timing script
 	let utime:float = 0.0
