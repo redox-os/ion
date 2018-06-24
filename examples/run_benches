@@ -1,0 +1,46 @@
+#!/usr/bin/env ion
+
+let PROJECT_DIR = $parent(@split($(cargo locate-project), '"')[3])
+let CARGO = $PROJECT_DIR/target/release/ion
+
+fn check_timing script:str chars:int
+	let utime:float = 0.0
+	for _ in 0..10
+		let temp = @(time ${global::CARGO} $script >/dev/null)[1]
+		let utime:float += $temp[..-1]
+	end
+
+	let utime /= 10
+	let utime = $utime[..11]
+
+	let script = $filename(script)
+	let script_len utime_len = $len(script) $len(utime)
+
+	echo $repeat(' ', $(( chars - script_len )))$script \
+		$utime$repeat('0', $(( 11 - utime_len )))
+end
+
+fn script_width scripts[]
+	let max_chars:int = 0
+	for script in @scripts
+		let chars:int = $len($filename(script))
+		if test $max_chars -lt $chars
+			let max_chars:int = $chars
+		end
+	end
+	echo $max_chars
+end
+
+fn bench_values scripts[]
+	let max_chars = $(script_width [@scripts])
+	for file in @scripts
+		check_timing $file $max_chars
+	end
+end
+
+cd $PROJECT_DIR/examples
+if test $len(@args) -eq 1
+	bench_values [ ./*.ion ]
+else
+    bench_values [ @args[1..] ]
+end
