@@ -8,7 +8,7 @@ fn check_timing script
 	for n in 0..10
 		let utime = @(time $script >/dev/null)[1]
 	end
-	let utime /= 10
+	#let utime /= 10
 	echo $script $utime
 end
 
