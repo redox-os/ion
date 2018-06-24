@@ -65,15 +65,22 @@ FOO BAR BAZ
 ### Array Index Assignment
 [array-index-assignment]: #array-index-assignment
 
-When assigning directly to an index in an array, if one value is supplied, that value will
-be assigned to that index. If an array of values is supplied, the array will be inserted
-at that location.
+It is possible to assign a value directly to a specific position within an array.
 
 ```
 $ let FOO = [4 5 6]
-$ let FOO[0] = [1 2 3]
+$ let FOO[0] = 1
 $ echo @FOO
-1 2 3 4 5 6
+1 5 6
+```
+
+Multidimensional arrays may also be assigned to in the same manner.
+
+```
+$ let FOO = [[1 2 3] [4 5 6]]
+$ let FOO[0] = [7 8 9]
+$ echo @FOO
+7 8 9 4 5 6
 ```
 
 ### Array Index Range Assignment
@@ -156,13 +163,13 @@ let B:int[] = [5 2 3 1]
 - **bool**: either `1` or `0`
 - **float**: a generic decimal of any size
 - **int**: a generic integer of any size, which may be negative
-- **i32**: 32-bit int
-- **i64**: 64-bit int
-- **i128**: 128-bit int
+  - **i32**: 32-bit int
+  - **i64**: 64-bit int
+  - **i128**: 128-bit int
 - **uint**: a generic integer of any size, which may not be negative
-- **u32**: 32-bit uint
-- **u64**: 64-bit uint
-- **u128**: 128-bit uint
+  - **u32**: 32-bit uint
+  - **u64**: 64-bit uint
+  - **u128**: 128-bit uint
 
 ## Assignment Operators
 [operators]: #operators
