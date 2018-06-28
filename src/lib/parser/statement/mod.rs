@@ -1,6 +1,9 @@
 mod case;
 mod functions;
+#[cfg(not(fuzzing))]
 mod parse;
+#[cfg(fuzzing)]
+pub mod parse;
 mod splitter;
 
 pub(crate) use self::{

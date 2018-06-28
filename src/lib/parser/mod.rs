@@ -10,3 +10,12 @@ pub(crate) use self::{
     loops::ForExpression, shell_expand::{expand_string, Expander, Select},
     statement::{parse_and_validate, StatementSplitter},
 };
+
+#[cfg(fuzzing)]
+pub mod fuzzing {
+    use super::*;
+
+    pub fn statement_parse(data: &str) {
+        statement::parse::parse(data);
+    }
+}

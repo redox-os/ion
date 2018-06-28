@@ -1,0 +1,3 @@
+cargo install cargo-fuzz
+
+cargo fuzz run parser -- -timeout=2 -only_ascii=1 -print_coverage=1 -prefer_small=1
