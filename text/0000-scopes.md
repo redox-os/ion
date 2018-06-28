@@ -10,7 +10,7 @@ In order to prevent unexpected behavior when defining and calling functions,
 they should have a separate set of variables. Each "body" (the part that is
 usually indented) will own its own map of variables, its scope. Each variable
 owned by it is deleted when the body ends. To access a variable in a different
-scope you can use `assign` to make the intention of modifying the existing
+scope you can use `amend` to make the intention of modifying the existing
 variable obvious. Functions disallow you from accessing outer variables by
 default, but this can be overriden with namespaces to specify where you want
 the variable from.
@@ -53,7 +53,7 @@ as it exists.
 
 ![example image](https://gitlab.redox-os.org/redox-os/ion/raw/rfcs/images/scopes.svg)
 
-To update an existing variable in a higher scope, rather than shadowing it, the `assign` keyword
+To update an existing variable in a higher scope, rather than shadowing it, the `amend` keyword
 should be used instead. This keyword cannot create new variables, but it may update them.
 
 ```ion
@@ -64,7 +64,7 @@ let y = 3 # defines y
 # Only reason for this check is to show how
 # variables defined inside it are destroyed.
 if test 1 == 1
-  assign x = 4 # updates existing x
+  amend x = 4 # updates existing x
   let y = 2 # defines (shadows) y
 
   # end of scope, y is deleted since it's owned by it
@@ -77,9 +77,21 @@ echo $y # prints 3
 ## Scopes and Functions
 [scopes-and-functions]: #scopes-and-functions
 
-Functions may not access variables that are outside of the function by default. In order to access
-variables that were declared outside of the function, the variable must be invoked through either
-the `global` or `super` namespace.
+Functions may not access variables that are outside of the function by default.
+In order to access variables that were declared outside of the function, the
+variable must be invoked through either the `global` or `super` namespace. The
+`amend` command can mutate variables from other namespaces as well.
+
+```
+let greeted = 0
+
+fn greet_once
+  if test greeted == 0
+    echo "Hello!"
+    amend global::greeted = 1
+  end
+end
+```
 
 ### Super Namespace
 [super-namespace]: #super-namespace
@@ -123,20 +135,6 @@ end
 parent
 ```
 
-Global variales sometimes need to be mutated to maintain a global state. You
-can do this using the `--global` flag to `assign`.
-
-```
-let greeted = 0
-
-fn greet_once
-  if test greeted == 0
-    echo "Hello!"
-    assign --global greeted = 1
-  end
-end
-```
-
 ### Restriction
 [function-scope-restrictions]: #function-scope-restrictions
 
@@ -151,7 +149,7 @@ Functions can no longer mutate outer environment, which might make things more
 complicated. It also adds complexity to the language and code, and shells
 usually have very simple syntax. However, this would improve the overall
 quality of scripts written in ion so it's probably worth it anyway. Namespaces,
-ordering and even `assign` are features we could live without, but a basic
+ordering and even `amend` are features we could live without, but a basic
 scoping mechanism would improve things a lot.
 
 # Alternatives
@@ -163,9 +161,3 @@ old `let` syntax would be wasted. Alternatively we could keep this RFC but also
 add a `global` keyword for bypassing scopes. However global variables are
 usually harder to find that way rather than letting each global variable be
 defined in the global scope where you can easily see all of them.
-
-# Unresolved questions
-[unresolved]: #unresolved-questions
-
-How in the world are you supposed to mutate variables outside of a function???
-Ion doesn't have references yet so right now return values are the only option.
