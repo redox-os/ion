@@ -51,7 +51,7 @@ in the current scope, **shadowing** the variable which already exists. Shadowing
 means that the original variable will exist, but the new variable will override it for as long
 as it exists.
 
-TODO: Add image here
+![example image](https://gitlab.redox-os.org/redox-os/ion/raw/rfcs/images/scopes.svg)
 
 To update an existing variable in a higher scope, rather than shadowing it, the `assign` keyword
 should be used instead. This keyword cannot create new variables, but it may update them.
@@ -121,6 +121,20 @@ fn parent
 end
 
 parent
+```
+
+Global variales sometimes need to be mutated to maintain a global state. You
+can do this using the `--global` flag to `assign`.
+
+```
+let greeted = 0
+
+fn greet_once
+  if test greeted == 0
+    echo "Hello!"
+    assign --global greeted = 1
+  end
+end
 ```
 
 ### Restriction
