@@ -25,7 +25,7 @@ use std::{
 
 use parser::Terminator;
 use shell::{
-    self, fork_function::fork_function, job_control::{JobControl, ProcessState}, status::*, variables::VariableType,
+    self, fork_function::fork_function, job_control::{JobControl, ProcessState}, status::*,
     FlowLogic, Shell, ShellHistory,
 };
 use sys;
@@ -163,8 +163,8 @@ pub fn builtin_cd(args: &[String], shell: &mut Shell) -> i32 {
                     let current_dir = cwd.to_str().unwrap_or("?");
 
                     if pwd != current_dir {
-                        shell.set_variable("OLDPWD", VariableType::Str(pwd.clone()));
-                        shell.set_variable("PWD", VariableType::Str(current_dir.into()));
+                        env::set_var("OLDPWD", pwd);
+                        env::set_var("PWD", current_dir);
                     }
                     fork_function(shell, "CD_CHANGE", &["ion"]);
                 }
@@ -250,7 +250,7 @@ fn builtin_popd(args: &[String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_POPD) {
         return SUCCESS;
     }
-    match shell.directory_stack.popd(args, &mut shell.variables) {
+    match shell.directory_stack.popd(args) {
         Ok(()) => SUCCESS,
         Err(why) => {
             let stderr = io::stderr();

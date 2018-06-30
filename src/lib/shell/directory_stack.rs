@@ -1,9 +1,9 @@
 use super::{
-    status::{FAILURE, SUCCESS}, variables::{Variables, VariableType},
+    status::{FAILURE, SUCCESS},
+    variables::Variables,
 };
 use std::{
-    borrow::Cow, collections::VecDeque, env::{current_dir, home_dir, set_current_dir},
-    env,
+    borrow::Cow, collections::VecDeque, env::{self, current_dir, home_dir, set_current_dir},
     path::PathBuf,
 };
 
@@ -186,12 +186,14 @@ impl DirectoryStack {
         }
     }
 
-    fn get_previous_dir(&self, variables: &Variables) -> Option<String> {
-        let previous_pwd = variables.get_str_or_empty("OLDPWD");
-        if previous_pwd == "?" || previous_pwd == "" {
-            None
-        } else {
-            Some(previous_pwd)
+    fn get_previous_dir(&self) -> Option<String> {
+        match env::var("OLDPWD") {
+            Ok(previous_pwd) => if previous_pwd == "?" || previous_pwd == "" {
+                None
+            } else {
+                Some(previous_pwd)
+            },
+            Err(_) => None,
         }
     }
 
@@ -199,10 +201,9 @@ impl DirectoryStack {
         &mut self,
         variables: &Variables,
     ) -> Result<(), Cow<'static, str>> {
-        match self.get_previous_dir(variables) {
+        match self.get_previous_dir() {
             Some(prev) => {
                 self.dirs.remove(0);
-                let prev = prev.to_string();
                 println!("{}", prev);
                 self.change_and_push_dir(&prev, variables)
             }
@@ -224,13 +225,14 @@ impl DirectoryStack {
         )
     }
 
-    fn update_env_variables(&mut self, variables: &mut Variables) {
+    fn update_env_variables(&mut self) {
         // Update $OLDPWD
-        let old_pwd = variables.get_str_or_empty("PWD");
-        if old_pwd.is_empty() {
-            variables.set_variable("OLDPWD", VariableType::Str("?".into()));
-        } else {
-            variables.set_variable("OLDPWD", VariableType::Str(old_pwd));
+        if let Ok(old_pwd) = env::var("PWD") {
+            if old_pwd.is_empty() {
+                env::set_var("OLDPWD", "?");
+            } else {
+                env::set_var("OLDPWD", &old_pwd);
+            }
         }
 
         // Update $PWD
@@ -324,18 +326,14 @@ impl DirectoryStack {
             }
         };
 
-        self.update_env_variables(variables);
+        self.update_env_variables();
         self.print_dirs();
         Ok(())
     }
 
     /// Attempts to set the current directory to the directory stack's previous directory,
     /// and then removes the front directory from the stack.
-    pub(crate) fn popd<I: IntoIterator>(
-        &mut self,
-        args: I,
-        variables: &mut Variables,
-    ) -> Result<(), Cow<'static, str>>
+    pub(crate) fn popd<I: IntoIterator>(&mut self, args: I) -> Result<(), Cow<'static, str>>
     where
         I::Item: AsRef<str>,
     {
@@ -394,7 +392,7 @@ impl DirectoryStack {
             )));
         }
 
-        self.update_env_variables(variables);
+        self.update_env_variables();
         self.print_dirs();
         Ok(())
     }
