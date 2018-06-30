@@ -198,12 +198,6 @@ impl Default for Variables {
 
         map.insert("HISTORY_IGNORE".into(), VariableType::Array(array!["no_such_command", "whitespace", "duplicates"]));
 
-        // Initialize the PWD (Present Working Directory) variable
-        env::current_dir().ok().map_or_else(
-            || env::set_var("PWD", "?"),
-            |path| env::set_var("PWD", path.to_str().unwrap_or("?")),
-        );
-
         // Initialize the HOME variable
         env::home_dir().map_or_else(
             || env::set_var("HOME", "?"),

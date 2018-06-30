@@ -3,9 +3,24 @@ use super::{
     variables::Variables,
 };
 use std::{
-    borrow::Cow, collections::VecDeque, env::{self, current_dir, home_dir, set_current_dir},
-    path::PathBuf,
+    borrow::Cow, collections::VecDeque, env::{self, home_dir, set_current_dir},
+    path::{Component, Path, PathBuf},
 };
+
+fn set_current_dir_ion(dir: &Path) -> Result<(), Cow<'static, str>> {
+    set_current_dir(dir)
+        .map_err(|why| Cow::Owned(format!("{}", why)))?;
+
+    env::set_var(
+        "OLDPWD",
+        env::var("PWD").ok()
+            .and_then(|pwd| if pwd.is_empty() { None } else { Some(pwd) })
+            .unwrap_or_else(|| "?".into())
+    );
+
+    env::set_var("PWD", dir.to_str().unwrap_or_else(|| "?".into()));
+    Ok(())
+}
 
 #[derive(Debug)]
 pub struct DirectoryStack {
@@ -14,7 +29,6 @@ pub struct DirectoryStack {
 
 impl DirectoryStack {
     fn normalize_path(&mut self, dir: &str) -> PathBuf {
-        use std::path::{Component, Path};
         // Create a clone of the current directory.
         let mut new_dir = match self.dirs.front() {
             Some(cur_dir) => cur_dir.clone(),
@@ -60,13 +74,12 @@ impl DirectoryStack {
     ) -> Result<(), Cow<'static, str>> {
         let dir = self.dirs.get(index).ok_or_else(|| {
             Cow::Owned(format!(
-                "ion: {}: {}: directory stack out of range\n",
+                "ion: {}: {}: directory stack out of range",
                 caller, index
             ))
         })?;
 
-        set_current_dir(dir)
-            .map_err(|_| Cow::Owned(format!("ion: {}: Failed setting current dir\n", caller)))
+        set_current_dir_ion(dir)
     }
 
     fn print_dirs(&self) {
@@ -170,16 +183,13 @@ impl DirectoryStack {
         variables: &Variables,
     ) -> Result<(), Cow<'static, str>> {
         let new_dir = self.normalize_path(dir);
-
-        // Try to change into the new directory
-        match set_current_dir(&new_dir) {
+        match set_current_dir_ion(&new_dir) {
             Ok(()) => {
-                // Push the new current directory onto the directory stack.
                 self.push_dir(new_dir, variables);
                 Ok(())
             }
             Err(err) => Err(Cow::Owned(format!(
-                "ion: failed to set current dir to {}: {}\n",
+                "ion: failed to set current dir to {}: {}",
                 new_dir.to_string_lossy(),
                 err
             ))),
@@ -187,14 +197,9 @@ impl DirectoryStack {
     }
 
     fn get_previous_dir(&self) -> Option<String> {
-        match env::var("OLDPWD") {
-            Ok(previous_pwd) => if previous_pwd == "?" || previous_pwd == "" {
-                None
-            } else {
-                Some(previous_pwd)
-            },
-            Err(_) => None,
-        }
+        env::var("OLDPWD").ok().and_then(|pwd|
+            if pwd.is_empty() || pwd == "?" { None } else { Some(pwd) }
+        )
     }
 
     fn switch_to_previous_directory(
@@ -223,23 +228,6 @@ impl DirectoryStack {
                 )
             },
         )
-    }
-
-    fn update_env_variables(&mut self) {
-        // Update $OLDPWD
-        if let Ok(old_pwd) = env::var("PWD") {
-            if old_pwd.is_empty() {
-                env::set_var("OLDPWD", "?");
-            } else {
-                env::set_var("OLDPWD", &old_pwd);
-            }
-        }
-
-        // Update $PWD
-        match current_dir() {
-            Ok(current_dir) => env::set_var("PWD", current_dir.to_str().unwrap_or("?")),
-            Err(_) => env::set_var("PWD", "?"),
-        }
     }
 
     pub(crate) fn cd<I: IntoIterator>(
@@ -295,7 +283,7 @@ impl DirectoryStack {
                     None => Action::Push(PathBuf::from(arg)), // no numeric arg => `dir`-parameter
                 };
             } else {
-                return Err(Cow::Borrowed("ion: pushd: too many arguments\n"));
+                return Err(Cow::Borrowed("ion: pushd: too many arguments"));
             }
         }
 
@@ -303,7 +291,7 @@ impl DirectoryStack {
         match action {
             Action::Switch => {
                 if len < 2 {
-                    return Err(Cow::Borrowed("ion: pushd: no other directory\n"));
+                    return Err(Cow::Borrowed("ion: pushd: no other directory"));
                 }
                 if !keep_front {
                     self.set_current_dir_by_index(1, "pushd")?;
@@ -326,7 +314,6 @@ impl DirectoryStack {
             }
         };
 
-        self.update_env_variables();
         self.print_dirs();
         Ok(())
     }
@@ -353,7 +340,7 @@ impl DirectoryStack {
                     }
                     None => {
                         return Err(Cow::Owned(format!(
-                            "ion: popd: {}: invalid argument\n",
+                            "ion: popd: {}: invalid argument",
                             arg
                         )))
                     }
@@ -363,14 +350,14 @@ impl DirectoryStack {
 
         let len: usize = self.dirs.len();
         if len <= 1 {
-            return Err(Cow::Borrowed("ion: popd: directory stack empty\n"));
+            return Err(Cow::Borrowed("ion: popd: directory stack empty"));
         }
 
         let mut index: usize = if count_from_front {
             num
         } else {
             (len - 1).checked_sub(num).ok_or_else(|| {
-                Cow::Owned("ion: popd: negative directory stack index out of range\n".to_owned())
+                Cow::Owned("ion: popd: negative directory stack index out of range".to_owned())
             })?
         };
 
@@ -387,12 +374,11 @@ impl DirectoryStack {
         // pop element
         if self.dirs.remove(index).is_none() {
             return Err(Cow::Owned(format!(
-                "ion: popd: {}: directory stack index out of range\n",
+                "ion: popd: {}: directory stack index out of range",
                 index
             )));
         }
 
-        self.update_env_variables();
         self.print_dirs();
         Ok(())
     }
@@ -413,13 +399,15 @@ impl DirectoryStack {
     /// if available.
     pub(crate) fn new() -> DirectoryStack {
         let mut dirs: VecDeque<PathBuf> = VecDeque::new();
-        match current_dir() {
+        match env::current_dir() {
             Ok(curr_dir) => {
+                env::set_var("PWD", curr_dir.to_str().unwrap_or_else(|| "?"));
                 dirs.push_front(curr_dir);
                 DirectoryStack { dirs }
             }
             Err(_) => {
                 eprintln!("ion: failed to get current directory when building directory stack");
+                env::set_var("PWD", "?");
                 DirectoryStack { dirs }
             }
         }

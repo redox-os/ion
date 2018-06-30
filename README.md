@@ -46,7 +46,7 @@ cargo +nightly install --git https://gitlab.redox-os.org/redox-os/ion/
 
 ```sh
 git clone https://gitlab.redox-os.org/redox-os/ion/
-cd ion && cargo +nightly build --release
+cd ion && make && sudo make install prefix=/usr
 ```
 
 # Vim/NeoVim Syntax Highlighting Plugin

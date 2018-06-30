@@ -19,9 +19,7 @@ use self::{
     status::status, test::test, variables::{alias, drop_alias, drop_array, drop_variable},
 };
 
-use std::{
-    env, error::Error, io::{self, Write},
-};
+use std::{error::Error, io::{self, Write}};
 
 use parser::Terminator;
 use shell::{
@@ -156,20 +154,7 @@ pub fn builtin_cd(args: &[String], shell: &mut Shell) -> i32 {
 
     match shell.directory_stack.cd(args, &shell.variables) {
         Ok(()) => {
-            match env::current_dir() {
-                Ok(cwd) => {
-                    let pwd = env::var("PWD").ok().unwrap_or_else(String::default);
-                    let pwd = &pwd;
-                    let current_dir = cwd.to_str().unwrap_or("?");
-
-                    if pwd != current_dir {
-                        env::set_var("OLDPWD", pwd);
-                        env::set_var("PWD", current_dir);
-                    }
-                    fork_function(shell, "CD_CHANGE", &["ion"]);
-                }
-                Err(_) => env::set_var("PWD", "?"),
-            };
+            fork_function(shell, "CD_CHANGE", &["ion"]);
             SUCCESS
         }
         Err(why) => {
