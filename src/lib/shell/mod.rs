@@ -236,8 +236,8 @@ impl Shell {
     }
 
     /// Sets a variable of `name` with the given `value` in the shell's variable map.
-    pub fn set_variable(&mut self, name: &str, value: VariableType) {
-        self.variables.set_variable(name, value);
+    pub fn set<T: Into<VariableType>>(&mut self, name: &str, value: T) {
+        self.variables.set(name, value);
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
@@ -337,7 +337,7 @@ impl Shell {
 
         // Retrieve the exit_status and set the $? variable and history.previous_status
         if let Some(code) = exit_status {
-            self.set_variable("?", VariableType::Str(code.to_string()));
+            self.set("?", code.to_string());
             self.previous_status = code;
         }
 

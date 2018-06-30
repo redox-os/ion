@@ -65,7 +65,7 @@ impl ForExpression {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shell::variables::{Variables, VariableType};
+    use shell::variables::Variables;
 
     struct VariableExpander(pub Variables);
 
@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn for_variable() {
         let mut variables = Variables::default();
-        variables.set_variable("A", VariableType::Str("1 2 3 4 5".into()));
+        variables.set("A", "1 2 3 4 5".to_string());
         assert_eq!(
             ForExpression::new(&["$A".to_owned()], &VariableExpander(variables)),
             ForExpression::Normal("1 2 3 4 5".to_owned())

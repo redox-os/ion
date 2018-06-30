@@ -82,6 +82,36 @@ impl From<VariableType> for Function {
     }
 }
 
+impl From<String> for VariableType {
+    fn from(string: String) -> Self {
+        VariableType::Str(string)
+    }
+}
+
+impl From<Alias> for VariableType {
+    fn from(alias: Alias) -> Self {
+        VariableType::Alias(alias)
+    }
+}
+
+impl From<Array> for VariableType {
+    fn from(array: Array) -> Self {
+        VariableType::Array(array)
+    }
+}
+
+impl From<HashMap> for VariableType {
+    fn from(hash_map: HashMap) -> Self {
+        VariableType::HashMap(hash_map)
+    }
+}
+
+impl From<Function> for VariableType {
+    fn from(function: Function) -> Self {
+         VariableType::Function(function)
+    }
+}
+
 impl fmt::Display for VariableType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -488,7 +518,8 @@ impl Variables {
         }
     }
 
-    pub fn set_variable(&mut self, name: &str, var: VariableType) {
+    pub fn set<T: Into<VariableType>>(&mut self, name: &str, var: T) {
+        let var = var.into();
         match self.lookup_any_mut(&name) {
             Some(VariableType::Str(ref mut str_)) => {
                 if !name.is_empty() {
@@ -658,7 +689,7 @@ impl Variables {
             for arg in args.into_iter().skip(1) {
                 match con.read_line(format!("{}=", arg.as_ref().trim()), None, &mut |_| {}) {
                     Ok(buffer) => {
-                        self.set_variable(arg.as_ref(), VariableType::Str(buffer.trim().into()));
+                        self.set(arg.as_ref(), buffer.trim().to_string());
                     }
                     Err(_) => return FAILURE,
                 }
@@ -669,7 +700,7 @@ impl Variables {
             let mut lines = handle.lines();
             for arg in args.into_iter().skip(1) {
                 if let Some(Ok(line)) = lines.next() {
-                    self.set_variable(arg.as_ref(), VariableType::Str(line.trim().into()));
+                    self.set(arg.as_ref(), line.trim().to_string());
                 }
             }
         }
@@ -706,7 +737,7 @@ mod tests {
     #[test]
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
-        variables.set_variable("FOO", VariableType::Str("BAR".into()));
+        variables.set("FOO", "BAR".to_string());
         let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
         assert_eq!("BAR", &expanded);
     }

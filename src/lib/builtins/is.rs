@@ -1,6 +1,3 @@
-#[cfg(test)]
-use shell::variables::VariableType;
-
 use shell::Shell;
 use types;
 
@@ -47,8 +44,8 @@ fn test_is() {
     }
     use shell::ShellBuilder;
     let mut shell = ShellBuilder::new().as_library();
-    shell.set_variable("x", VariableType::Str("value".into()));
-    shell.set_variable("y", VariableType::Str("0".into()));
+    shell.set("x", "value".to_string());
+    shell.set("y", "0".to_string());
 
     // Four arguments
     assert_eq!(

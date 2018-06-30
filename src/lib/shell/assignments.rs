@@ -269,7 +269,7 @@ impl VariableStore for Shell {
                     match collected.remove(key.name) {
                         map @ Some(VariableType::HashMap(_)) => {
                             if let Primitive::HashMap(_) = key.kind {
-                                self.variables.set_variable(key.name, map.unwrap());
+                                self.variables.set(key.name, map.unwrap());
                             } else if let Primitive::Indexed(_, _) = key.kind {
                                 eprintln!("ion: cannot insert hash map into index");
                                 return FAILURE;
@@ -280,7 +280,7 @@ impl VariableStore for Shell {
                                 eprintln!("ion: multi-dimensional arrays are not yet supported");
                                 return FAILURE;
                             } else {
-                                self.variables.set_variable(key.name, array.unwrap());
+                                self.variables.set(key.name, array.unwrap());
                             }
                         }
                         Some(VariableType::Str(value)) => {
@@ -329,8 +329,8 @@ impl VariableStore for Shell {
                 }
                 Ok(Action::UpdateString(key, _, _)) => {
                     match collected.remove(key.name) {
-                        str_ @ Some(VariableType::Str(_)) => { self.variables.set_variable(key.name, str_.unwrap()); }
-                        array @ Some(VariableType::Array(_)) => { self.variables.set_variable(key.name, array.unwrap()); }
+                        str_ @ Some(VariableType::Str(_)) => { self.variables.set(key.name, str_.unwrap()); }
+                        array @ Some(VariableType::Array(_)) => { self.variables.set(key.name, array.unwrap()); }
                         _ => ()
                     }
                 }

@@ -8,7 +8,7 @@ use self::{
     prompt::{prompt, prompt_fn}, readln::readln,
     terminate::{terminate_quotes, terminate_script_quotes},
 };
-use super::{flow_control::Statement, status::*, variables::VariableType, FlowLogic, Shell, ShellHistory};
+use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
 use types;
 use liner::{Buffer, Context};
 use std::{env, fs::File, io::ErrorKind, iter, path::Path, process, sync::Mutex};
@@ -128,7 +128,7 @@ impl Binary for Shell {
         self.evaluate_init_file();
 
         self.variables
-            .set_variable("args", VariableType::Array(iter::once(env::args().next().unwrap()).collect()));
+            .set("args", iter::once(env::args().next().unwrap()).collect::<types::Array>());
 
         loop {
             if let Some(command) = self.readln() {

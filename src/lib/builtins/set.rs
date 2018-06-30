@@ -1,5 +1,5 @@
 use liner::KeyBindings;
-use shell::{flags::*, variables::VariableType, Shell};
+use shell::{flags::*, Shell};
 use types;
 use std::iter;
 
@@ -79,13 +79,13 @@ pub(crate) fn set(args: &[String], shell: &mut Shell) -> i32 {
             // This used to take a `&[String]` but cloned them all, so although
             // this is non-ideal and could probably be better done with `Rc`, it
             // hasn't got any slower.
-            let arguments = iter::once(command)
+            let arguments: types::Array = iter::once(command)
                 .chain(args_iter.map(|i| i.to_string()))
                 .collect();
             match kind {
-                UnsetIfNone => { shell.variables.set_variable("args", VariableType::Array(arguments)); }
+                UnsetIfNone => { shell.variables.set("args", arguments); }
                 RetainIfNone => if arguments.len() != 1 {
-                    shell.variables.set_variable("args", VariableType::Array(arguments));
+                    shell.variables.set("args", arguments);
                 },
             }
         }

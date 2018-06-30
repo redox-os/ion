@@ -2,7 +2,7 @@
 
 use std::io::{self, Write};
 
-use shell::{status::*, variables::{Variables, VariableType}};
+use shell::{status::*, variables::Variables};
 use types::*;
 
 fn print_list(vars: &Variables) {
@@ -74,7 +74,7 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
             return FAILURE;
         }
         Binding::KeyValue(key, value) => {
-            vars.set_variable(&key, VariableType::Alias(Alias(value)));
+            vars.set(&key, Alias(value));
         }
         Binding::ListEntries => print_list(&vars),
         Binding::KeyOnly(key) => {
@@ -177,7 +177,7 @@ mod test {
     #[test]
     fn drop_deletes_variable() {
         let mut variables = Variables::default();
-        variables.set_variable("FOO", VariableType::Str("BAR".into()));
+        variables.set("FOO", "BAR".to_string());
         let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
         let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
@@ -201,7 +201,7 @@ mod test {
     #[test]
     fn drop_deletes_array() {
         let mut variables = Variables::default();
-        variables.set_variable("FOO", VariableType::Array(array!["BAR"]));
+        variables.set("FOO", array!["BAR"]);
         let return_status = drop_array(&mut variables, &["drop", "-a", "FOO"]);
         assert_eq!(SUCCESS, return_status);
         let expanded = expand_string("@FOO", &VariableExpander(variables), false).join("");
