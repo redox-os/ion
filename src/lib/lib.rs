@@ -37,7 +37,7 @@ extern crate ion_lexers as lexers;
 extern crate ion_ranges as ranges;
 
 #[macro_use]
-mod types;
+pub mod types;
 #[macro_use]
 pub mod parser;
 mod ascii_helpers;
