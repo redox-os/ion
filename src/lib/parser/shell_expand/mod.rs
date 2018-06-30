@@ -29,7 +29,7 @@ pub(crate) trait Expander {
     /// Expand an array variable with some selection
     fn array(&self, &str, Select) -> Option<Array> { None }
     /// Expand a string variable given if its quoted / unquoted
-    fn variable(&self, &str, bool) -> Option<Value> { None }
+    fn string(&self, &str, bool) -> Option<Value> { None }
     /// Expand a subshell expression
     fn command(&self, &str) -> Option<Value> { None }
 }
@@ -341,7 +341,7 @@ fn expand_braces<E: Expander>(
             }
             WordToken::Variable(text, quoted, ref index) => {
                 let quoted = if reverse_quoting { !quoted } else { quoted };
-                let expanded = match expand_func.variable(text, quoted) {
+                let expanded = match expand_func.string(text, quoted) {
                     Some(var) => var,
                     None => continue,
                 };
@@ -497,7 +497,7 @@ fn expand_single_string_token<E: Expander>(
         }
         WordToken::Variable(text, quoted, ref index) => {
             let quoted = if reverse_quoting { !quoted } else { quoted };
-            let expanded = match expand_func.variable(text, quoted) {
+            let expanded = match expand_func.string(text, quoted) {
                 Some(var) => var,
                 None => {
                     if output != "" {
@@ -644,7 +644,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                 }
                 WordToken::Variable(text, quoted, ref index) => {
                     let quoted = if reverse_quoting { !quoted } else { quoted };
-                    let expanded = match expand_func.variable(text, quoted) {
+                    let expanded = match expand_func.string(text, quoted) {
                         Some(var) => var,
                         None => continue,
                     };
@@ -676,7 +676,7 @@ fn expand_arithmetic<E: Expander>(output: &mut String, input: &str, expander: &E
         if !var.is_empty() {
             // We have reached the end of a potential variable, so we expand it and push
             // it onto the result
-            let res = expander.variable(&var, false);
+            let res = expander.string(&var, false);
             match res {
                 Some(v) => out.push_str(&v),
                 None => out.push_str(&var),
@@ -714,7 +714,7 @@ mod test {
     struct VariableExpander;
 
     impl Expander for VariableExpander {
-        fn variable(&self, variable: &str, _: bool) -> Option<Value> {
+        fn string(&self, variable: &str, _: bool) -> Option<Value> {
             match variable {
                 "A" => Some("1".to_owned()),
                 "B" => Some("test".to_owned()),

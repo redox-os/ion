@@ -14,7 +14,7 @@ pub(crate) fn parse_function(arg: &str) -> (KeyIterator, Option<&str>) {
 /// type error is detected, then that error will be returned instead. This is required because
 /// of lifetime restrictions on `KeyIterator`, which will not live for the remainder of the
 /// declared function's lifetime.
-pub(crate) fn collect_arguments<'a>(args: KeyIterator<'a>) -> Result<Vec<KeyBuf>, TypeError<'a>> {
+pub(crate) fn collect_arguments(args: KeyIterator) -> Result<Vec<KeyBuf>, TypeError> {
     args.map(|a| a.map(Into::into)).collect()
 }
 

@@ -2,7 +2,7 @@ extern crate ion_shell;
 extern crate ion_sys as sys;
 extern crate smallvec;
 
-use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};
+use ion_shell::{flags::NO_EXEC, shell::variables::VariableType, Binary, JobControl, ShellBuilder, MAN_ION};
 use smallvec::SmallVec;
 use std::{
     env, error::Error, io::{stdout, stdin, Write, BufRead, BufReader}, iter::FromIterator,
@@ -45,7 +45,7 @@ fn main() {
                 for arg in args {
                     array.push(arg.into());
                 }
-                shell.variables.set_array("args", array);
+                shell.variables.set_variable("args", VariableType::Array(array));
                 if let Err(err) = shell.execute_script(&path) {
                     eprintln!("ion: {}", err);
                 }

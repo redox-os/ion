@@ -9,14 +9,16 @@ use fnv::FnvHashMap;
 use liner::Context;
 use smallstring::SmallString;
 use std::{
+    any::TypeId,
     env,
+    fmt,
     io::{self, BufRead},
     mem,
     ops::{Deref, DerefMut}
 };
 use sys::{self, geteuid, getpid, getuid, is_root, variables as self_sys};
 use types::{
-    Array, HashMap, Identifier, Key, Value,
+    self, Alias, Array, HashMap, Identifier, Key, Value,
 };
 use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
@@ -25,13 +27,79 @@ lazy_static! {
     static ref STRING_NAMESPACES: FnvHashMap<Identifier, StringNamespace> = namespaces::collect();
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum VariableType {
-    Alias(Value),
+    Str(Value),
+    Alias(Alias),
     Array(Array),
-    Function(Function),
     HashMap(HashMap),
-    Variable(Value)
+    Function(Function),
+    None,
+}
+
+impl From<VariableType> for String {
+    fn from(var: VariableType) -> Self {
+        match var {
+            VariableType::Str(string) => string,
+            _ => String::with_capacity(0),
+        }
+    }
+}
+
+impl From<VariableType> for Alias {
+    fn from(var: VariableType) -> Self {
+        match var {
+            VariableType::Alias(alias) => alias,
+            _ => Alias::empty(),
+        }
+    }
+}
+
+impl From<VariableType> for Array {
+    fn from(var: VariableType) -> Self {
+        match var {
+            VariableType::Array(array) => array,
+            _ => Array::with_capacity(0),
+        }
+    }
+}
+
+impl From<VariableType> for HashMap {
+    fn from(var: VariableType) -> Self {
+        match var {
+            VariableType::HashMap(hash_map) => hash_map,
+            _ => HashMap::with_capacity_and_hasher(0, Default::default()),
+        }
+    }
+}
+
+impl From<VariableType> for Function {
+    fn from(var: VariableType) -> Self {
+        match var {
+            VariableType::Function(function) => function,
+            _ => Function::new(Default::default(), Default::default(), Default::default(), Default::default()),
+        }
+    }
+}
+
+impl fmt::Display for VariableType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            VariableType::Str(ref str_) => write!(f, "{}", str_),
+            VariableType::Alias(ref alias) => write!(f, "{}", **alias),
+            VariableType::Array(ref array) => write!(f, "{}", array.join(" ")),
+            VariableType::HashMap(ref map) => {
+                let mut format = map.into_iter().fold(String::new(), |mut format, (_, var_type)| {
+                    format.push_str(&format!("{}", var_type));
+                    format.push(' ');
+                    format
+                });
+                format.pop();
+                write!(f, "{}", format)
+            }
+            _ => write!(f, "")
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -63,12 +131,12 @@ pub struct Variables {
 impl Default for Variables {
     fn default() -> Self {
         let mut map: FnvHashMap<Identifier, VariableType> = FnvHashMap::with_capacity_and_hasher(64, Default::default());
-        map.insert("DIRECTORY_STACK_SIZE".into(), VariableType::Variable("1000".into()));
-        map.insert("HISTORY_SIZE".into(), VariableType::Variable("1000".into()));
-        map.insert("HISTFILE_SIZE".into(), VariableType::Variable("100000".into()));
+        map.insert("DIRECTORY_STACK_SIZE".into(), VariableType::Str("1000".into()));
+        map.insert("HISTORY_SIZE".into(), VariableType::Str("1000".into()));
+        map.insert("HISTFILE_SIZE".into(), VariableType::Str("100000".into()));
         map.insert(
             "PROMPT".into(),
-            VariableType::Variable(
+            VariableType::Str(
                 "${x::1B}]0;${USER}: \
                  ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# \
                  ${c::reset}"
@@ -79,22 +147,22 @@ impl Default for Variables {
         // Set the PID, UID, and EUID variables.
         map.insert(
             "PID".into(),
-            VariableType::Variable(getpid().ok().map_or("?".into(), |id| id.to_string())),
+            VariableType::Str(getpid().ok().map_or("?".into(), |id| id.to_string())),
         );
         map.insert(
             "UID".into(),
-            VariableType::Variable(getuid().ok().map_or("?".into(), |id| id.to_string())),
+            VariableType::Str(getuid().ok().map_or("?".into(), |id| id.to_string())),
         );
         map.insert(
             "EUID".into(),
-            VariableType::Variable(geteuid().ok().map_or("?".into(), |id| id.to_string())),
+            VariableType::Str(geteuid().ok().map_or("?".into(), |id| id.to_string())),
         );
 
         // Initialize the HISTFILE variable
         if let Ok(base_dirs) = BaseDirectories::with_prefix("ion") {
             if let Ok(path) = base_dirs.place_data_file("history") {
-                map.insert("HISTFILE".into(), VariableType::Variable(path.to_str().unwrap_or("?").into()));
-                map.insert("HISTFILE_ENABLED".into(), VariableType::Variable("1".into()));
+                map.insert("HISTFILE".into(), VariableType::Str(path.to_str().unwrap_or("?").into()));
+                map.insert("HISTFILE_ENABLED".into(), VariableType::Str("1".into()));
             }
         }
 
@@ -215,7 +283,8 @@ impl Variables {
         }
         None
     }
-    pub fn remove_any(&mut self, name: &str) -> Option<VariableType> {
+
+    pub fn remove_variable(&mut self, name: &str) -> Option<VariableType> {
         for scope in self.scopes_mut() {
             if let val @ Some(_) = scope.remove(name) {
                 return val;
@@ -270,8 +339,8 @@ impl Variables {
                 Ok(var) => var + remainder,
                 _ => ["?", remainder].concat()
             }),
-            "-" => if let Some(oldpwd) = self.get_var("OLDPWD") {
-                return Some(oldpwd.to_string() + remainder);
+            "-" => if let Some(oldpwd) = self.get::<Value>("OLDPWD") {
+                return Some(oldpwd.clone() + remainder);
             },
             _ => {
                 let neg;
@@ -317,11 +386,11 @@ impl Variables {
         c.is_alphanumeric() || c == '_' || c == '?' || c == '.' || c == '-' || c == '+'
     }
 
-    pub fn variables(&self) -> impl Iterator<Item = (&SmallString, &Value)> {
+    pub fn string_vars(&self) -> impl Iterator<Item = (&SmallString, &Value)> {
         self.scopes()
             .map(|map| {
                 map.iter()
-                    .filter_map(|(key, val)| if let VariableType::Variable(val) = val {
+                    .filter_map(|(key, val)| if let VariableType::Str(val) = val {
                         Some((key, val))
                     } else {
                         None
@@ -329,118 +398,175 @@ impl Variables {
             })
             .flatten()
     }
-    pub fn unset_var(&mut self, name: &str) -> Option<Value> {
-        match self.remove_any(name) {
-            Some(VariableType::Variable(val)) => Some(val),
-            _ => None
-        }
+
+    pub fn get_str_or_empty(&self, name: &str) -> String {
+        self.get::<String>(name).unwrap_or_default()
     }
-    pub fn get_var_or_empty(&self, name: &str) -> Value { self.get_var(name).unwrap_or_default() }
-    pub fn get_var(&self, name: &str) -> Option<Value> {
-        match name {
-            "MWD" => return Some(self.get_minimal_directory()),
-            "SWD" => return Some(self.get_simplified_directory()),
-            _ => (),
-        }
-        // If the parsed name contains the '::' pattern, then a namespace was
-        // designated. Find it.
-        match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
-            Some(("c", variable)) | Some(("color", variable)) => Colors::collect(variable).into_string(),
-            Some(("x", variable)) | Some(("hex", variable)) => match u8::from_str_radix(variable, 16) {
-                Ok(c) => Some((c as char).to_string()),
-                Err(why) => {
-                    eprintln!("ion: hex parse error: {}: {}", variable, why);
-                    None
-                }
-            },
-            Some(("env", variable)) => env::var(variable).map(Into::into).ok(),
-            Some(("super", _)) | Some(("global", _)) | None => {
-                // Otherwise, it's just a simple variable name.
-                match self.lookup_any(name) {
-                    Some(VariableType::Variable(val)) => Some(val.clone()),
-                    _ => env::var(name).ok()
-                }
-            },
-            Some((_, variable)) => {
-                if is_root() {
-                    eprintln!("ion: root is not allowed to execute plugins");
-                    return None;
-                }
 
-                if !self.has_plugin_support() {
-                    eprintln!(
-                        "ion: plugins are disabled. Considering enabling them with `let \
-                         NS_PLUGINS = 1`"
-                    );
-                    return None;
-                }
+    pub fn get<T: Clone + From<VariableType> + 'static>(&self, name: &str) -> Option<T> {
+        let specified_type = TypeId::of::<T>();
 
-                // Attempt to obtain the given namespace from our lazily-generated map of
-                // namespaces.
-                if let Some(namespace) = STRING_NAMESPACES.get(name) {
-                    // Attempt to execute the given function from that namespace, and map it's
-                    // results.
-                    match namespace.execute(variable.into()) {
-                        Ok(value) => value.map(Into::into),
-                        Err(why) => {
-                            eprintln!("ion: string namespace error: {}: {}", name, why);
-                            None
+        if specified_type == TypeId::of::<types::Value>() {
+            match name {
+                "MWD" => return Some(T::from(VariableType::Str(self.get_minimal_directory()))),
+                "SWD" => return Some(T::from(VariableType::Str(self.get_simplified_directory()))),
+                _ => (),
+            }
+            // If the parsed name contains the '::' pattern, then a namespace was
+            // designated. Find it.
+            match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
+                Some(("c", variable)) | Some(("color", variable)) => Colors::collect(variable).into_string().map(|s| T::from(VariableType::Str(s))),
+                Some(("x", variable)) | Some(("hex", variable)) => match u8::from_str_radix(variable, 16) {
+                    Ok(c) => Some(T::from(VariableType::Str((c as char).to_string()))),
+                    Err(why) => {
+                        eprintln!("ion: hex parse error: {}: {}", variable, why);
+                        None
+                    }
+                },
+                Some(("env", variable)) => env::var(variable).map(Into::into).ok().map(|s| T::from(VariableType::Str(s))),
+                Some(("super", _)) | Some(("global", _)) | None => {
+                    // Otherwise, it's just a simple variable name.
+                    match self.lookup_any(name) {
+                        Some(VariableType::Str(val)) => Some(T::from(VariableType::Str(val.clone()))),
+                        _ => env::var(name).ok().map(|s| T::from(VariableType::Str(s))),
+                    }
+                },
+                Some((_, variable)) => {
+                    if is_root() {
+                        eprintln!("ion: root is not allowed to execute plugins");
+                        return None;
+                    }
+
+                    if !self.has_plugin_support() {
+                        eprintln!(
+                            "ion: plugins are disabled. Considering enabling them with `let \
+                            NS_PLUGINS = 1`"
+                        );
+                        return None;
+                    }
+
+                    // Attempt to obtain the given namespace from our lazily-generated map of
+                    // namespaces.
+                    if let Some(namespace) = STRING_NAMESPACES.get(name) {
+                        // Attempt to execute the given function from that namespace, and map it's
+                        // results.
+                        match namespace.execute(variable.into()) {
+                            Ok(value) => value.map(|s| T::from(VariableType::Str(s))),
+                            Err(why) => {
+                                eprintln!("ion: string namespace error: {}: {}", name, why);
+                                None
+                            }
                         }
+                    } else {
+                        eprintln!("ion: unsupported namespace: '{}'", name);
+                        None
                     }
-                } else {
-                    eprintln!("ion: unsupported namespace: '{}'", name);
-                    None
                 }
             }
-        }
-    }
-    pub fn set_var(&mut self, name: &str, value: &str) {
-        if !name.is_empty() {
-            if value.is_empty() {
-                self.unset_var(name);
-            } else {
-                if name == "NS_PLUGINS" {
-                    match value {
-                        "0" => self.disable_plugins(),
-                        "1" => self.enable_plugins(),
-                        _ => eprintln!(
-                            "ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1."
-                        ),
-                    }
-                    return;
-                }
-                match self.lookup_any_mut(name) {
-                    Some(VariableType::Variable(val)) => *val = value.into(),
-                    _ => { self.shadow(name.into(), VariableType::Variable(value.into())); }
-                }
+        } else if specified_type == TypeId::of::<types::Alias>() {
+            match self.lookup_any(name) {
+                Some(VariableType::Alias(alias)) => Some(T::from(VariableType::Alias((*alias).clone()))),
+                _ => None
             }
+        } else if specified_type == TypeId::of::<types::Array>() {
+            match self.lookup_any(name) {
+                Some(VariableType::Array(array)) => Some(T::from(VariableType::Array(array.clone()))),
+                _ => None
+            }
+        } else if specified_type == TypeId::of::<types::HashMap>() {
+            match self.lookup_any(name) {
+                Some(VariableType::HashMap(hash_map)) => Some(T::from(VariableType::HashMap(hash_map.clone()))),
+                _ => None
+            }
+        } else if specified_type == TypeId::of::<Function>() {
+            match self.lookup_any(name) {
+                Some(VariableType::Function(func)) => Some(T::from(VariableType::Function(func.clone()))),
+                _ => None
+            }
+        } else {
+            None
         }
     }
 
-    pub fn insert_alias(&mut self, name: SmallString, value: Value) -> Option<Value> {
+    pub fn set_variable(&mut self, name: &str, var: VariableType) {
         match self.lookup_any_mut(&name) {
-            Some(VariableType::Alias(val)) => Some(mem::replace(val, value)),
-            _ => { self.shadow(name, VariableType::Alias(value)); None }
+            Some(VariableType::Str(ref mut str_)) => {
+                if !name.is_empty() {
+                    if let VariableType::Str(var_str) = var {
+                        if var_str.is_empty() {
+                            self.remove_variable(name);
+                        } else {
+                            if name == "NS_PLUGINS" {
+                                match &*var_str {
+                                    "0" => self.disable_plugins(),
+                                    "1" => self.enable_plugins(),
+                                    _ => eprintln!(
+                                        "ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1."
+                                    ),
+                                }
+                                return;
+                            }
+                            mem::replace(str_, var_str);
+                        }
+                    } else {
+                        self.shadow(name.into(), var);
+                    }
+                }
+            }
+            Some(VariableType::Alias(ref mut alias)) => {
+                if !name.is_empty() {
+                    if let VariableType::Alias(var_alias) = var {
+                        mem::replace(alias, var_alias);
+                    } else {
+                        self.shadow(name.into(), var);
+                    }
+                }
+            }
+            Some(VariableType::Array(ref mut array)) => {
+                if !name.is_empty() {
+                    if let VariableType::Array(var_array) = var {
+                        if var_array.is_empty() {
+                            self.remove_variable(name);
+                        } else {
+                            mem::replace(array, var_array);
+                        }
+                    } else {
+                        self.shadow(name.into(), var);
+                    }
+                }
+            }
+            Some(VariableType::HashMap(ref mut map)) => {
+                if !name.is_empty() {
+                    if let VariableType::HashMap(var_map) = var {
+                        if var_map.is_empty() {
+                            self.remove_variable(name);
+                        } else {
+                            mem::replace(map, var_map);
+                        }
+                    } else {
+                        self.shadow(name.into(), var);
+                    }
+                }
+            }
+            Some(VariableType::Function(ref mut func)) => {
+                if !name.is_empty() {
+                    if let VariableType::Function(var_func) = var {
+                        mem::replace(func, var_func);
+                    } else {
+                        self.shadow(name.into(), var);
+                    }
+                }
+            }
+            _ => { self.shadow(name.into(), var); }
         }
     }
-    pub fn get_alias(&self, name: &str) -> Option<Value> {
-        match self.lookup_any(name) {
-            Some(VariableType::Alias(val)) => Some(val.clone()),
-            _ => None
-        }
-    }
-    pub fn remove_alias(&mut self, name: &str) -> Option<Value> {
-        match self.remove_any(name) {
-            Some(VariableType::Alias(val)) => Some(val),
-            _ => None
-        }
-    }
+
     pub fn aliases(&self) -> impl Iterator<Item = (&SmallString, &Value)> {
         self.scopes.iter().rev()
             .map(|map| {
                 map.iter()
-                    .filter_map(|(key, val)| if let VariableType::Alias(val) = val {
-                        Some((key, val))
+                    .filter_map(|(key, possible_alias)| if let VariableType::Alias(alias) = possible_alias {
+                        Some((key, &**alias))
                     } else {
                         None
                     })
@@ -448,24 +574,6 @@ impl Variables {
             .flatten()
     }
 
-    pub fn insert_function(&mut self, name: SmallString, value: Function) -> Option<Function> {
-        match self.lookup_any_mut(&name) {
-            Some(VariableType::Function(val)) => Some(mem::replace(val, value)),
-            _ => { self.shadow(name, VariableType::Function(value)); None }
-        }
-    }
-    pub fn get_function(&self, name: &str) -> Option<Function> {
-        match self.lookup_any(name) {
-            Some(VariableType::Function(val)) => Some(val.clone()),
-            _ => None
-        }
-    }
-    pub fn remove_function(&mut self, name: &str) -> Option<Function> {
-        match self.remove_any(name) {
-            Some(VariableType::Function(val)) => Some(val),
-            _ => None
-        }
-    }
     pub fn functions(&self) -> impl Iterator<Item = (&SmallString, &Function)> {
         self.scopes.iter().rev()
             .map(|map| {
@@ -519,73 +627,15 @@ impl Variables {
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
     fn get_simplified_directory(&self) -> Value {
+        let home = match self.get::<Value>("HOME") {
+            Some(string) => string,
+            None => String::from("?"),
+        };
         env::var("PWD")
             .unwrap()
-            .replace(&self.get_var("HOME").unwrap(), "~")
+            .replace(&home, "~")
     }
 
-    pub fn unset_array(&mut self, name: &str) -> Option<Array> {
-        match self.remove_any(name) {
-            Some(VariableType::Array(val)) => Some(val),
-            _ => None
-        }
-    }
-
-    pub fn get_array(&self, name: &str) -> Option<Array> {
-        match self.lookup_any(name) {
-            Some(VariableType::Array(val)) => Some(val.clone()),
-            _ => None
-        }
-    }
-
-    pub fn get_map(&self, name: &str) -> Option<HashMap> {
-        match self.lookup_any(name) {
-            Some(VariableType::HashMap(val)) => Some(val.clone()),
-            _ => None
-        }
-    }
-
-    pub fn set_at_array_index(&mut self, name: &str, index: usize, value: &str) -> i32 {
-        match self.lookup_any_mut(name) {
-            Some(VariableType::Array(ref mut array)) => {
-                if let Some(ref mut get) = array.get_mut(index) {
-                    get.clear();
-                    get.push_str(value);
-                    SUCCESS
-                } else {
-                    FAILURE
-                }
-            }
-            _ => FAILURE,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn set_hashmap_value(&mut self, name: &str, key: &str, value: &str) {
-        match self.lookup_any_mut(name) {
-            Some(VariableType::HashMap(map)) => {
-                map.insert(key.into(), value.into());
-            },
-            _ => {
-                let mut map = HashMap::with_capacity_and_hasher(4, Default::default());
-                map.insert(key.into(), value.into());
-                self.shadow(name.into(), VariableType::HashMap(map));
-            }
-        }
-    }
-
-    pub fn set_array(&mut self, name: &str, value: Array) {
-        if !name.is_empty() {
-            if value.is_empty() {
-                self.remove_any(name);
-            } else {
-                match self.lookup_any_mut(name) {
-                    Some(VariableType::Array(val)) => *val = value,
-                    _ => { self.shadow(name.into(), VariableType::Array(value)); }
-                }
-            }
-        }
-    }
     pub fn arrays(&self) -> impl Iterator<Item = (&SmallString, &Array)> {
         self.scopes.iter().rev()
             .map(|map| {
@@ -607,7 +657,9 @@ impl Variables {
             let mut con = Context::new();
             for arg in args.into_iter().skip(1) {
                 match con.read_line(format!("{}=", arg.as_ref().trim()), None, &mut |_| {}) {
-                    Ok(buffer) => self.set_var(arg.as_ref(), buffer.trim()),
+                    Ok(buffer) => {
+                        self.set_variable(arg.as_ref(), VariableType::Str(buffer.trim().into()));
+                    }
                     Err(_) => return FAILURE,
                 }
             }
@@ -617,7 +669,7 @@ impl Variables {
             let mut lines = handle.lines();
             for arg in args.into_iter().skip(1) {
                 if let Some(Ok(line)) = lines.next() {
-                    self.set_var(arg.as_ref(), line.trim());
+                    self.set_variable(arg.as_ref(), VariableType::Str(line.trim().into()));
                 }
             }
         }
@@ -639,7 +691,9 @@ mod tests {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn variable(&self, var: &str, _: bool) -> Option<Value> { self.0.get_var(var) }
+        fn string(&self, var: &str, _: bool) -> Option<Value> {
+            self.0.get::<Value>(var)
+        }
     }
 
     #[test]
@@ -652,7 +706,7 @@ mod tests {
     #[test]
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
-        variables.set_var("FOO", "BAR");
+        variables.set_variable("FOO", VariableType::Str("BAR".into()));
         let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
         assert_eq!("BAR", &expanded);
     }
@@ -673,7 +727,10 @@ mod tests {
         env::set_var("PWD", "/var/log/nix");
         assert_eq!(
             "v/l/nix",
-            variables.get_var("MWD").expect("no value returned")
+            match variables.get::<Value>("MWD") {
+                Some(string) => string,
+                None => panic!("no value returned")
+            }
         );
     }
 
@@ -683,7 +740,10 @@ mod tests {
         env::set_var("PWD", "/var/log");
         assert_eq!(
             "/var/log",
-            variables.get_var("MWD").expect("no value returned")
+            match variables.get::<Value>("MWD") {
+                Some(string) => string,
+                None => panic!("no value returned")
+            }
         );
     }
 }

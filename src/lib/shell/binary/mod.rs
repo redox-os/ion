@@ -8,7 +8,8 @@ use self::{
     prompt::{prompt, prompt_fn}, readln::readln,
     terminate::{terminate_quotes, terminate_script_quotes},
 };
-use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
+use super::{flow_control::Statement, status::*, variables::VariableType, FlowLogic, Shell, ShellHistory};
+use types;
 use liner::{Buffer, Context};
 use std::{env, fs::File, io::ErrorKind, iter, path::Path, process, sync::Mutex};
 
@@ -96,8 +97,8 @@ impl Binary for Shell {
         self.context = Some({
             let mut context = Context::new();
             context.word_divider_fn = Box::new(word_divide);
-            if "1" == self.get_var_or_empty("HISTFILE_ENABLED") {
-                let path = self.get_var("HISTFILE").expect("shell didn't set HISTFILE");
+            if "1" == self.get_str_or_empty("HISTFILE_ENABLED") {
+                let path = self.get::<types::Value>("HISTFILE").expect("shell didn't set HISTFILE");
                 context.history.set_file_name(Some(path.clone()));
                 if !Path::new(path.as_str()).exists() {
                     eprintln!("ion: creating history file at \"{}\"", path);
@@ -110,7 +111,7 @@ impl Binary for Shell {
                         // pass
                     }
                     Err(ref err) if err.kind() == ErrorKind::NotFound => {
-                        let history_filename = self.get_var_or_empty("HISTFILE");
+                        let history_filename = self.get_str_or_empty("HISTFILE");
                         eprintln!(
                             "ion: failed to find history file {}: {}",
                             history_filename, err
@@ -127,7 +128,7 @@ impl Binary for Shell {
         self.evaluate_init_file();
 
         self.variables
-            .set_array("args", iter::once(env::args().next().unwrap()).collect());
+            .set_variable("args", VariableType::Array(iter::once(env::args().next().unwrap()).collect()));
 
         loop {
             if let Some(command) = self.readln() {

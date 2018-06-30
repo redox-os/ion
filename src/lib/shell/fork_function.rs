@@ -1,4 +1,4 @@
-use super::{Capture, Function, Shell};
+use shell::{Capture, Function, Shell};
 use std::process;
 use sys;
 
@@ -9,7 +9,7 @@ pub(crate) fn command_not_found(shell: &mut Shell, command: &str) -> bool {
 /// High-level function for executing a function programmatically.
 /// NOTE: Always add "ion" as a first argument in `args`.
 pub fn fork_function<S: AsRef<str>>(shell: &mut Shell, fn_name: &str, args: &[S]) -> bool {
-    let function = match shell.variables.get_function(fn_name) {
+    let function: Function = match shell.variables.get::<Function>(fn_name) {
         Some(func) => func,
         None => return false,
     };

@@ -42,7 +42,7 @@ mod types;
 pub mod parser;
 mod ascii_helpers;
 mod builtins;
-mod shell;
+pub mod shell;
 
 pub use shell::{
     binary::MAN_ION, flags, pipe_exec::job_control::JobControl, status, Binary, Capture, Fork,

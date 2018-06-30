@@ -264,7 +264,7 @@ fn test_braces() {
 struct WithVars;
 
 impl Expander for WithVars {
-    fn variable(&self, var: &str, _: bool) -> Option<Value> {
+    fn string(&self, var: &str, _: bool) -> Option<Value> {
         match var {
             "pkmn1" => "Pokémon".to_owned().into(),
             "pkmn2" => "Poke\u{0301}mon".to_owned().into(),

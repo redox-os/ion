@@ -17,25 +17,25 @@ pub(crate) struct KeyBuf {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum TypeError<'a> {
-    Invalid(&'a str),
+pub(crate) enum TypeError {
+    Invalid(String),
     BadValue(Primitive),
 }
 
-impl<'a> Display for TypeError<'a> {
+impl<'a> Display for TypeError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
-            TypeError::Invalid(parm) => write!(f, "invalid type supplied: {}", parm),
+            TypeError::Invalid(ref parm) => write!(f, "invalid type supplied: {}", parm),
             TypeError::BadValue(ref expected) => write!(f, "expected {}", expected),
         }
     }
 }
 
 impl<'a> Key<'a> {
-    fn new(name: &'a str, data: &'a str) -> Result<Key<'a>, TypeError<'a>> {
+    fn new(name: &'a str, data: &'a str) -> Result<Key<'a>, TypeError> {
         match Primitive::parse(data) {
             Some(data) => Ok(Key { kind: data, name }),
-            None => Err(TypeError::Invalid(data)),
+            None => Err(TypeError::Invalid(data.into())),
         }
     }
 }
@@ -62,6 +62,8 @@ pub enum Primitive {
     IntegerArray,
     Float,
     FloatArray,
+    HashMap(Box<Primitive>),
+    BTreeMap(Box<Primitive>),
     Indexed(String, Box<Primitive>),
 }
 
@@ -77,7 +79,36 @@ impl Primitive {
             "int[]" => Primitive::IntegerArray,
             "float" => Primitive::Float,
             "float[]" => Primitive::FloatArray,
-            _ => return None,
+            kind => {
+                fn parse_inner_hash_map(inner: &str) -> Option<Primitive> {
+                    match inner {
+                        "" => Some(Primitive::HashMap(Box::new(Primitive::Any))),
+                        _  => Primitive::parse(inner).map(|p| Primitive::HashMap(Box::new(p)))
+                    }
+                }
+                fn parse_inner_btree_map(inner: &str) -> Option<Primitive> {
+                    match inner {
+                        "" => Some(Primitive::BTreeMap(Box::new(Primitive::Any))),
+                        _  => Primitive::parse(inner).map(|p| Primitive::BTreeMap(Box::new(p)))
+                    }
+                }
+
+                let res = if kind.starts_with("hmap[") {
+                    let kind = &kind[5..];
+                    kind.rfind(']').map(|found| &kind[..found]).and_then(parse_inner_hash_map)
+                } else if kind.starts_with("bmap[") {
+                    let kind = &kind[5..];
+                    kind.rfind(']').map(|found| &kind[..found]).and_then(parse_inner_btree_map)
+                } else {
+                    None
+                };
+
+                if let Some(data) = res {
+                    data
+                } else {
+                    return None;
+                }
+            }
         };
         Some(data)
     }
@@ -95,6 +126,18 @@ impl Display for Primitive {
             Primitive::Integer => write!(f, "int"),
             Primitive::IntegerArray => write!(f, "int[]"),
             Primitive::StrArray => write!(f, "str[]"),
+            Primitive::HashMap(ref kind) => {
+                match **kind {
+                    Primitive::Any | Primitive::Str => write!(f, "hmap[]"),
+                    ref kind => write!(f, "hmap[{}]", kind),
+                }
+            }
+            Primitive::BTreeMap(ref kind) => {
+                match **kind {
+                    Primitive::Any | Primitive::Str => write!(f, "bmap[]"),
+                    ref kind => write!(f, "bmap[{}]", kind),
+                }
+            }
             Primitive::Indexed(_, ref kind) => write!(f, "{}", kind),
         }
     }
@@ -109,7 +152,7 @@ pub(crate) struct KeyIterator<'a> {
 
 impl<'a> KeyIterator<'a> {
     // Executes when a semicolon was not found, but an array character was.
-    fn parse_array(&mut self, name: &'a str) -> Result<Key<'a>, TypeError<'a>> {
+    fn parse_array(&mut self, name: &'a str) -> Result<Key<'a>, TypeError> {
         let index_ident_start = self.read;
         loop {
             let mut eol = self.read + 1 >= self.data.len();
@@ -136,7 +179,7 @@ impl<'a> KeyIterator<'a> {
                     "" => Primitive::AnyArray,
                     s => match Primitive::parse(&self.data[index_ident_end + 2..self.read]) {
                         Some(kind) => Primitive::Indexed(s.to_owned(), Box::new(kind)),
-                        None => break Err(TypeError::Invalid(&self.data[index_ident_end + 1..self.read])),
+                        None => break Err(TypeError::Invalid(self.data[index_ident_end + 1..self.read].into())),
                     }
                 };
 
@@ -144,13 +187,13 @@ impl<'a> KeyIterator<'a> {
             } else if !eol {
                 self.read += 1;
             } else {
-                break Err(TypeError::Invalid(&self.data[self.read..]));
+                break Err(TypeError::Invalid(self.data[self.read..].into()));
             }
         }
     }
 
     // Parameters are values that follow the semicolon (':').
-    fn parse_parameter(&mut self, name: &'a str) -> Result<Key<'a>, TypeError<'a>> {
+    fn parse_parameter(&mut self, name: &'a str) -> Result<Key<'a>, TypeError> {
         let mut start = self.read;
         for byte in self.data.bytes().skip(self.read) {
             self.read += 1;
@@ -162,7 +205,7 @@ impl<'a> KeyIterator<'a> {
         }
 
         if start == self.read {
-            Err(TypeError::Invalid(""))
+            Err(TypeError::Invalid(String::new()))
         } else {
             Key::new(name, &self.data[start..self.read].trim())
         }
@@ -172,9 +215,9 @@ impl<'a> KeyIterator<'a> {
 }
 
 impl<'a> Iterator for KeyIterator<'a> {
-    type Item = Result<Key<'a>, TypeError<'a>>;
+    type Item = Result<Key<'a>, TypeError>;
 
-    fn next(&mut self) -> Option<Result<Key<'a>, TypeError<'a>>> {
+    fn next(&mut self) -> Option<Result<Key<'a>, TypeError>> {
         let mut start = self.read;
         for byte in self.data.bytes().skip(self.read) {
             self.read += 1;
@@ -212,7 +255,10 @@ mod tests {
 
     #[test]
     fn key_parsing() {
-        let mut parser = KeyIterator::new("a:int b[] c:bool d e:int[] f[0] g[$index] h[1]:int d:a");
+        let mut parser = KeyIterator::new("a:int b[] c:bool d e:int[] \
+                                           f[0] g[$index] h[1]:int \
+                                           i:hmap[] j:hmap[float] k:hmap[int[]] l:hmap[hmap[bool[]]] \
+                                           d:a");
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key {
@@ -252,23 +298,51 @@ mod tests {
             parser.next().unwrap(),
             Ok(Key {
                 name: "f",
-                kind: Primitive::Indexed(String::from("0"), Box::new(Primitive::Any)),
+                kind: Primitive::Indexed("0".into(), Box::new(Primitive::Any)),
             },)
         );
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key {
                 name: "g",
-                kind: Primitive::Indexed(String::from("$index"), Box::new(Primitive::Any)),
+                kind: Primitive::Indexed("$index".into(), Box::new(Primitive::Any)),
             },)
         );
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key {
                 name: "h",
-                kind: Primitive::Indexed(String::from("1"), Box::new(Primitive::Integer)),
+                kind: Primitive::Indexed("1".into(), Box::new(Primitive::Integer)),
             },)
         );
-        assert_eq!(parser.next().unwrap(), Err(TypeError::Invalid("a")));
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "i",
+                kind: Primitive::HashMap(Box::new(Primitive::Any)),
+            },)
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "j",
+                kind: Primitive::HashMap(Box::new(Primitive::Float)),
+            },)
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "k",
+                kind: Primitive::HashMap(Box::new(Primitive::IntegerArray)),
+            },)
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "l",
+                kind: Primitive::HashMap(Box::new(Primitive::HashMap(Box::new(Primitive::BooleanArray)))),
+            },)
+        );
+        assert_eq!(parser.next().unwrap(), Err(TypeError::Invalid("a".into())));
     }
 }

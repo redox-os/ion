@@ -29,15 +29,23 @@ use self::{
     directory_stack::DirectoryStack, flags::*,
     flow_control::{FlowControl, Function, FunctionError}, foreground::ForegroundSignals,
     job_control::{BackgroundProcess, JobControl}, pipe_exec::PipelineExecution, status::*,
-    variables::Variables,
+    variables::{
+        Variables,
+        VariableType,
+    }
 };
+use types;
 use builtins::{BuiltinMap, BUILTINS};
 use lexers::ArgumentSplitter;
 use liner::Context;
 use parser::{pipelines::Pipeline, Expander, Select, Terminator};
-use smallvec::SmallVec;
 use std::{
-    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
+    fs::File,
+    io::{self, Read, Write},
+    iter::FromIterator,
+    ops::Deref,
+    path::Path,
+    process,
     sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
@@ -173,7 +181,7 @@ impl Shell {
     /// If the function does not exist, an `IonError::DoesNotExist` is returned.
     pub fn execute_function<S: AsRef<str>>(&mut self, name: &str, args: &[S]) -> Result<i32, IonError> {
         self.variables
-            .get_function(name)
+            .get::<Function>(name)
             .ok_or(IonError::DoesNotExist)
             .and_then(|function| {
                 function
@@ -217,26 +225,20 @@ impl Shell {
         }
     }
 
-    /// Gets an array variable, if it exists within the shell's array map.
-    pub fn get_array(&self, name: &str) -> Option<SmallVec<[String; 4]>> {
-        self.variables.get_array(name)
-    }
-
-    pub fn set_at_array_index(&mut self, name: &str, index: usize, value: &str) -> i32 {
-        self.variables.set_at_array_index(name, index, value)
-    }
-
     /// Obtains a variable, returning an empty string if it does not exist.
-    pub(crate) fn get_var_or_empty(&self, name: &str) -> String {
-        self.variables.get_var_or_empty(name)
+    pub(crate) fn get_str_or_empty(&self, name: &str) -> String {
+        self.variables.get_str_or_empty(name)
     }
 
-    /// Gets a string variable, if it exists within the shell's variable map.
-    pub fn get_var(&self, name: &str) -> Option<String> { self.variables.get_var(name) }
+    /// Gets any variable, if it exists within the shell's variable map.
+    pub fn get<T: Clone + From<VariableType> + 'static>(&self, name: &str) -> Option<T> {
+        self.variables.get::<T>(name)
+    }
 
-    /// Sets a variable of `name` with the given `value` in the shell's
-    /// variable map.
-    pub fn set_var(&mut self, name: &str, value: &str) { self.variables.set_var(name, value); }
+    /// Sets a variable of `name` with the given `value` in the shell's variable map.
+    pub fn set_variable(&mut self, name: &str, value: VariableType) {
+        self.variables.set_variable(name, value);
+    }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
     pub(crate) fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
@@ -253,7 +255,7 @@ impl Shell {
                     }
                     last_command.clear();
                     last_command.push_str(key);
-                    self.variables.get_alias(key)
+                    self.variables.get::<types::Alias>(key)
                 };
 
                 if let Some(alias) = possible_alias {
@@ -289,7 +291,7 @@ impl Shell {
                 Some(self.execute_pipeline(pipeline))
             }
         // Branch else if -> input == shell function and set the exit_status
-        } else if let Some(function) = self.variables.get_function(&pipeline.items[0].job.command) {
+        } else if let Some(function) = self.variables.get::<Function>(&pipeline.items[0].job.command) {
             if !pipeline.requires_piping() {
                 let args: &[String] = pipeline.items[0].job.args.deref();
                 match function.execute(self, args) {
@@ -319,7 +321,7 @@ impl Shell {
         // pipline just executed to the the file and context histories. At the
         // moment, this means record how long it took.
         if let Some(context) = self.context.as_mut() {
-            if "1" == self.variables.get_var_or_empty("RECORD_SUMMARY") {
+            if "1" == self.variables.get_str_or_empty("RECORD_SUMMARY") {
                 if let Ok(elapsed_time) = command_start_time.elapsed() {
                     let summary = format!(
                         "#summary# elapsed real time: {}.{:09} seconds",
@@ -335,7 +337,7 @@ impl Shell {
 
         // Retrieve the exit_status and set the $? variable and history.previous_status
         if let Some(code) = exit_status {
-            self.set_var("?", &code.to_string());
+            self.set_variable("?", VariableType::Str(code.to_string()));
             self.previous_status = code;
         }
 
@@ -442,19 +444,18 @@ impl<'a> Expander for Shell {
     }
 
     /// Expand a string variable given if its quoted / unquoted
-    fn variable(&self, variable: &str, quoted: bool) -> Option<Value> {
+    fn string(&self, name: &str, quoted: bool) -> Option<Value> {
         use ascii_helpers::AsciiReplace;
         if quoted {
-            self.get_var(variable)
+            self.get::<Value>(name)
         } else {
-            self.get_var(variable)
-                .map(|x| x.ascii_replace('\n', ' '))
+            self.get::<Value>(name).map(|x| x.ascii_replace('\n', ' '))
         }
     }
 
     /// Expand an array variable with some selection
-    fn array(&self, array: &str, selection: Select) -> Option<Array> {
-        let mut found = match self.variables.get_array(array) {
+    fn array(&self, name: &str, selection: Select) -> Option<Array> {
+        let mut found = match self.variables.get::<Array>(name) {
             Some(array) => match selection {
                 Select::None => None,
                 Select::All => Some(array.clone()),
@@ -483,15 +484,26 @@ impl<'a> Expander for Shell {
             None => None,
         };
         if found.is_none() {
-            found = match self.variables.get_map(array) {
+            found = match self.variables.get::<HashMap>(name) {
                 Some(map) => match selection {
-                    Select::All => Some(
-                        map.iter()
-                            .map(|(_, value)| value.clone())
-                            .collect::<Array>(),
-                    ),
+                    Select::All => {
+                        let mut array = Array::new();
+                        for (_, value) in map.iter() {
+                            let f = format!("{}", value);
+                            match *value {
+                                VariableType::Str(_) => array.push(f),
+                                VariableType::Array(_) | VariableType::HashMap(_) => {
+                                    for split in f.split_whitespace() {
+                                        array.push(split.to_owned());
+                                    }
+                                }
+                                _ => (),
+                            }
+                        }
+                        Some(array)
+                    }
                     Select::Key(ref key) => {
-                        Some(array![map.get(key).unwrap_or(&"".into()).clone()])
+                        Some(array![format!("{}", map.get(key).unwrap_or(&VariableType::Str("".into())))])
                     }
                     _ => None,
                 },

@@ -1,4 +1,8 @@
+#[cfg(test)]
+use shell::variables::VariableType;
+
 use shell::Shell;
+use types;
 
 pub(crate) fn is(args: &[String], shell: &mut Shell) -> Result<(), String> {
     match args.len() {
@@ -27,16 +31,13 @@ fn eval_arg(arg: &str, shell: &mut Shell) -> String {
 // On error returns an empty String.
 fn get_var_string(name: &str, shell: &mut Shell) -> String {
     if name.chars().nth(0).unwrap() != '$' {
-        return "".to_string();
+        return String::new();
     }
 
-    let var = shell.variables.get_var(&name[1..]);
-    let sh_var: &str = match var.as_ref() {
+    match shell.variables.get::<types::Value>(&name[1..]) {
         Some(s) => s,
-        None => "",
-    };
-
-    sh_var.to_string()
+        None => String::new(),
+    }
 }
 
 #[test]
@@ -46,8 +47,8 @@ fn test_is() {
     }
     use shell::ShellBuilder;
     let mut shell = ShellBuilder::new().as_library();
-    shell.set_var("x", "value");
-    shell.set_var("y", "0");
+    shell.set_variable("x", VariableType::Str("value".into()));
+    shell.set_variable("y", VariableType::Str("0".into()));
 
     // Four arguments
     assert_eq!(

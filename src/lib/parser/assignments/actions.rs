@@ -6,7 +6,7 @@ use std::fmt::{self, Display, Formatter};
 pub(crate) enum AssignmentError<'a> {
     InvalidOperator(&'a str),
     InvalidValue(Primitive, Primitive),
-    TypeError(TypeError<'a>),
+    TypeError(TypeError),
     ExtraValues(&'a str, &'a str),
     ExtraKeys(&'a str, &'a str),
 }
@@ -102,7 +102,8 @@ impl<'a> Action<'a> {
             | Primitive::BooleanArray
             | Primitive::FloatArray
             | Primitive::IntegerArray
-            | Primitive::StrArray => if is_array(value) {
+            | Primitive::StrArray
+            | Primitive::HashMap(_) => if is_array(value) {
                 Ok(Action::UpdateArray(var, operator, value))
             } else {
                 Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))

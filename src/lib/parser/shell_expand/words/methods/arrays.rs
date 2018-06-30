@@ -171,7 +171,7 @@ impl<'a> ArrayMethod<'a> {
 
     #[inline]
     fn resolve_var<E: Expander>(&self, expand_func: &E) -> String {
-        if let Some(variable) = expand_func.variable(self.variable, false) {
+        if let Some(variable) = expand_func.string(self.variable, false) {
             variable
         } else if is_expression(self.variable) {
             expand_string(self.variable, expand_func, false).join(" ")
@@ -226,7 +226,7 @@ mod test {
             }
         }
 
-        fn variable(&self, variable: &str, _: bool) -> Option<Value> {
+        fn string(&self, variable: &str, _: bool) -> Option<Value> {
             match variable {
                 "FOO" => Some("FOOBAR".to_owned()),
                 "SPACEDFOO" => Some("FOO BAR".to_owned()),

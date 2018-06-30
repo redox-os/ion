@@ -1,8 +1,8 @@
-use super::{status::*, Shell};
+use shell::{status::*, Shell};
 
 use regex::Regex;
 use std::io::{self, Write};
-use types::Array;
+use types;
 
 bitflags! {
     struct IgnoreFlags: u8 {
@@ -62,7 +62,7 @@ pub(crate) trait ShellHistory {
 
     /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
     /// is changed.
-    fn update_ignore_patterns(&mut self, patterns: &Array);
+    fn update_ignore_patterns(&mut self, patterns: &types::Array);
 }
 
 trait ShellHistoryPrivate {
@@ -72,7 +72,7 @@ trait ShellHistoryPrivate {
 }
 
 impl ShellHistory for Shell {
-    fn update_ignore_patterns(&mut self, patterns: &Array) {
+    fn update_ignore_patterns(&mut self, patterns: &types::Array) {
         let mut flags = IgnoreFlags::empty();
         let mut regexes = Vec::new();
         // for convenience and to avoid typos
@@ -118,18 +118,17 @@ impl ShellHistory for Shell {
         let mut context = self.context.as_ref().unwrap().lock().unwrap();
         let variables = &self.variables;
         let max_history_size = variables
-            .get_var_or_empty("HISTORY_SIZE")
+            .get_str_or_empty("HISTORY_SIZE")
             .parse()
             .unwrap_or(1000);
 
         context.history.set_max_size(max_history_size);
 
-        if &*variables.get_var_or_empty("HISTFILE_ENABLED") == "1" {
-            let file_name = variables.get_var("HISTFILE");
-            context.history.set_file_name(file_name);
+        if &*variables.get_str_or_empty("HISTFILE_ENABLED") == "1" {
+            context.history.set_file_name(variables.get::<types::Value>("HISTFILE"));
 
             let max_histfile_size = variables
-                .get_var_or_empty("HISTFILE_SIZE")
+                .get_str_or_empty("HISTFILE_SIZE")
                 .parse()
                 .unwrap_or(1000);
             context.history.set_max_file_size(max_histfile_size);

@@ -1,4 +1,4 @@
-use super::super::{Capture, Function, Shell};
+use shell::{Capture, Function, Shell};
 use parser::shell_expand::expand_string;
 use std::{io::Read, process};
 use sys;
@@ -7,7 +7,7 @@ pub(crate) fn prompt(shell: &mut Shell) -> String {
     if shell.flow_control.level == 0 {
         match prompt_fn(shell) {
             Some(prompt) => prompt,
-            None => expand_string(&shell.get_var_or_empty("PROMPT"), shell, false).join(" "),
+            None => expand_string(&shell.get_str_or_empty("PROMPT"), shell, false).join(" "),
         }
     } else {
         "    ".repeat(shell.flow_control.level as usize)
@@ -15,7 +15,7 @@ pub(crate) fn prompt(shell: &mut Shell) -> String {
 }
 
 pub(crate) fn prompt_fn(shell: &mut Shell) -> Option<String> {
-    let function = shell.variables.get_function("PROMPT")?;
+    let function = shell.variables.get::<Function>("PROMPT")?;
     let function = &function as *const Function;
 
     let mut output = None;

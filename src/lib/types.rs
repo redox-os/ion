@@ -1,12 +1,43 @@
 use fnv::FnvHashMap;
 use smallstring::SmallString;
 use smallvec::SmallVec;
+use shell::variables::VariableType;
+use std::ops::{Deref, DerefMut};
 
 pub type Array = SmallVec<[Value; 4]>;
-pub type HashMap = FnvHashMap<Key, Value>;
+pub type HashMap = FnvHashMap<Key, VariableType>;
 pub type Identifier = SmallString;
 pub type Key = SmallString;
 pub type Value = String;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Alias(pub String);
+
+impl Alias {
+    pub fn empty() -> Self {
+        Alias(String::with_capacity(0))
+    }
+}
+
+impl Deref for Alias {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Alias {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Into<String> for Alias {
+    fn into(self) -> String {
+        self.0
+    }
+}
 
 /// Construct a new Array containing the given arguments
 ///

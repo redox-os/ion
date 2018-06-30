@@ -1,6 +1,7 @@
 use builtins::man_pages::*;
-use shell::{status::*, Shell};
+use shell::{status::*, flow_control::Function, Shell};
 use sys;
+use types;
 
 use std::{borrow::Cow, env, path::Path};
 
@@ -18,9 +19,8 @@ pub(crate) fn which(args: &[String], shell: &mut Shell) -> Result<i32, ()> {
     for command in &args[1..] {
         if let Ok(c_type) = get_command_info(&**command, shell) {
             match c_type.as_ref() {
-                "alias" => {
-                    let alias = shell.variables.get_alias(&**command).unwrap();
-                    println!("{}: alias to {}", command, alias);
+                "alias" => if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
+                    println!("{}: alias to {}", command, &*alias);
                 }
                 "function" => println!("{}: function", command),
                 "builtin" => println!("{}: built-in shell command", command),
@@ -44,9 +44,8 @@ pub(crate) fn find_type(args: &[String], shell: &mut Shell) -> Result<i32, ()> {
     for command in &args[1..] {
         if let Ok(c_type) = get_command_info(&**command, shell) {
             match c_type.as_ref() {
-                "alias" => {
-                    let alias = shell.variables.get_alias(&**command).unwrap();
-                    println!("{} is aliased to `{}`", command, alias);
+                "alias" => if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
+                    println!("{} is aliased to `{}`", command, &*alias);
                 }
                 // TODO Make it print the function.
                 "function" => println!("{} is a function", command),
@@ -62,9 +61,9 @@ pub(crate) fn find_type(args: &[String], shell: &mut Shell) -> Result<i32, ()> {
 }
 
 pub(crate) fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<Cow<'a, str>, ()> {
-    if shell.variables.get_alias(command).is_some() {
+    if shell.variables.get::<types::Alias>(command).is_some() {
         return Ok("alias".into());
-    } else if shell.variables.get_function(command).is_some() {
+    } else if shell.variables.get::<Function>(command).is_some() {
         return Ok("function".into());
     } else if shell.builtins.contains_key(command) {
         return Ok("builtin".into());

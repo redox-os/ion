@@ -4,14 +4,18 @@ use super::{
     job_control::JobControl, status::*, Shell,
 };
 use parser::{
-    assignments::{is_array, ReturnValue}, expand_string, parse_and_validate, pipelines::Pipeline,
+    assignments::is_array, expand_string, parse_and_validate, pipelines::Pipeline,
     ForExpression, StatementSplitter,
 };
-use shell::assignments::VariableStore;
+use shell::{
+    assignments::VariableStore,
+    variables::VariableType,
+};
+
 use std::{
     io::{stdout, Write}, iter, mem,
 };
-use types::Array;
+use types;
 
 #[derive(Debug)]
 pub(crate) enum Condition {
@@ -85,11 +89,11 @@ impl FlowLogic for Shell {
             // Execute a Let Statement
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
-                self.variables.set_var("?", &self.previous_status.to_string());
+                self.variables.set_variable("?", VariableType::Str(self.previous_status.to_string()));
             }
             Statement::Export(action) => {
                 self.previous_status = self.export(action);
-                self.variables.set_var("?", &self.previous_status.to_string());
+                self.variables.set_variable("?", VariableType::Str(self.previous_status.to_string()));
             }
             // Collect the statements for the while loop, and if the loop is complete,
             // execute the while loop with the provided expression.
@@ -188,9 +192,9 @@ impl FlowLogic for Shell {
 
                 if self.flow_control.level == 0 {
                     // All blocks were read, thus we can add it to the list
-                    self.variables.insert_function(
-                        name.clone(),
-                        Function::new(description, name, args, statements),
+                    self.variables.set_variable(
+                        &name,
+                        VariableType::Function(Function::new(description, name.clone(), args, statements)),
                     );
                 } else {
                     // Store the partial function declaration in memory.
@@ -290,7 +294,7 @@ impl FlowLogic for Shell {
                         _ => (),
                     }
                     let status = self.previous_status.to_string();
-                    self.set_var("?", &status);
+                    self.set_variable("?", VariableType::Str(status));
                 } else {
                     // A statement wasn't executed , which means that current_statement has been
                     // set to the inner statement. We fix this here.
@@ -366,7 +370,7 @@ impl FlowLogic for Shell {
                 }
             },
             ForExpression::Multiple(values) => for value in &values {
-                self.set_var(variable, &value);
+                self.set_variable(variable, VariableType::Str(value.clone()));
                 match self.execute_statements(statements.clone()) {
                     Condition::Break => break,
                     Condition::SigInt => return Condition::SigInt,
@@ -381,7 +385,7 @@ impl FlowLogic for Shell {
                 }
             },
             ForExpression::Normal(values) => for value in values.lines() {
-                self.set_var(variable, &value);
+                self.set_variable(variable, VariableType::Str(value.into()));
                 match self.execute_statements(statements.clone()) {
                     Condition::Break => break,
                     Condition::SigInt => return Condition::SigInt,
@@ -396,7 +400,7 @@ impl FlowLogic for Shell {
                 }
             },
             ForExpression::Range(start, end) => for value in (start..end).map(|x| x.to_string()) {
-                self.set_var(variable, &value);
+                self.set_variable(variable, VariableType::Str(value.clone()));
                 match self.execute_statements(statements.clone()) {
                     Condition::Break => break,
                     Condition::SigInt => return Condition::SigInt,
@@ -427,11 +431,11 @@ impl FlowLogic for Shell {
             Statement::Error(number) => self.previous_status = number,
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
-                self.variables.set_var("?", &self.previous_status.to_string());
+                self.variables.set_variable("?", VariableType::Str(self.previous_status.to_string()));
             }
             Statement::Export(action) => {
                 self.previous_status = self.export(action);
-                self.variables.set_var("?", &self.previous_status.to_string());
+                self.variables.set_variable("?", VariableType::Str(self.previous_status.to_string()));
             }
             Statement::While {
                 expression,
@@ -490,9 +494,9 @@ impl FlowLogic for Shell {
             } => {
                 self.flow_control.level += 1;
                 collect_loops(&mut iterator, &mut statements, &mut self.flow_control.level);
-                self.variables.insert_function(
-                    name.clone(),
-                    Function::new(description, name, args, statements),
+                self.variables.set_variable(
+                    &name,
+                    VariableType::Function(Function::new(description, name.clone(), args, statements)),
                 );
             }
             Statement::Pipeline(mut pipeline) => {
@@ -566,7 +570,7 @@ impl FlowLogic for Shell {
                     _ => (),
                 }
                 let status = self.previous_status.to_string();
-                self.set_var("?", &status);
+                self.set_variable("?", VariableType::Str(status));
             }
             Statement::Break => return Condition::Break,
             Statement::Continue => return Condition::Continue,
@@ -630,7 +634,7 @@ impl FlowLogic for Shell {
         // ```ignore
         // matches("foo", "bar")
         // ```
-        fn matches(lhs: &Array, rhs: &Array) -> bool {
+        fn matches(lhs: &types::Array, rhs: &types::Array) -> bool {
             for v in lhs {
                 if rhs.contains(&v) {
                     return true;
@@ -652,12 +656,15 @@ impl FlowLogic for Shell {
                         if is_array {
                             previous_bind = self
                                 .variables
-                                .get_array(bind)
-                                .map(|x| ReturnValue::Vector(x.clone()));
-                            self.variables.set_array(&bind, value.clone());
+                                .get::<types::Array>(bind)
+                                .map(|x| VariableType::Array(x));
+                            self.variables.set_variable(&bind, VariableType::Array(value.clone()));
                         } else {
-                            previous_bind = self.get_var(bind).map(|x| ReturnValue::Str(x));
-                            self.set_var(&bind, &value.join(" "));
+                            previous_bind = self
+                                .variables
+                                .get::<types::Value>(bind)
+                                .map(|x| VariableType::Str(x));
+                            self.set_variable(&bind, VariableType::Str(value.join(" ").into()));
                         }
                     }
 
@@ -673,10 +680,10 @@ impl FlowLogic for Shell {
                     if let Some(ref bind) = case.binding {
                         if let Some(value) = previous_bind {
                             match value {
-                                ReturnValue::Str(value) => self.set_var(bind, &value),
-                                ReturnValue::Vector(values) => {
-                                    self.variables.set_array(bind, values)
-                                }
+                                str_ @ VariableType::Str(_) => { self.set_variable(bind, str_); }
+                                array @ VariableType::Array(_) => { self.variables.set_variable(bind, array); }
+                                map @ VariableType::HashMap(_) => { self.variables.set_variable(bind, map); }
+                                _ => (),
                             }
                         }
                     }
@@ -689,12 +696,15 @@ impl FlowLogic for Shell {
                         if is_array {
                             previous_bind = self
                                 .variables
-                                .get_array(bind)
-                                .map(|x| ReturnValue::Vector(x.clone()));
-                            self.variables.set_array(&bind, value.clone());
+                                .get::<types::Array>(bind)
+                                .map(|x| VariableType::Array(x));
+                            self.variables.set_variable(&bind, VariableType::Array(value.clone()));
                         } else {
-                            previous_bind = self.get_var(bind).map(|x| ReturnValue::Str(x));
-                            self.set_var(&bind, &value.join(" "));
+                            previous_bind = self
+                                .variables
+                                .get::<types::Value>(bind)
+                                .map(|x| VariableType::Str(x));
+                            self.set_variable(&bind, VariableType::Str(value.join(" ").into()));
                         }
                     }
 
@@ -710,10 +720,10 @@ impl FlowLogic for Shell {
                     if let Some(ref bind) = case.binding {
                         if let Some(value) = previous_bind {
                             match value {
-                                ReturnValue::Str(value) => self.set_var(bind, &value),
-                                ReturnValue::Vector(values) => {
-                                    self.variables.set_array(bind, values)
-                                }
+                                str_ @ VariableType::Str(_) => { self.set_variable(bind, str_); }
+                                array @ VariableType::Array(_) => { self.set_variable(bind, array); }
+                                map @ VariableType::HashMap(_) => { self.set_variable(bind, map); }
+                                _ => (),
                             }
                         }
                     }
@@ -835,11 +845,11 @@ impl FlowLogic for Shell {
                         Statement::Error(number) => shell.previous_status = number,
                         Statement::Let(action) => {
                             shell.previous_status = shell.local(action);
-                            shell.variables.set_var("?", &shell.previous_status.to_string());
+                            shell.variables.set_variable("?", VariableType::Str(shell.previous_status.to_string()));
                         }
                         Statement::Export(action) => {
                             shell.previous_status = shell.export(action);
-                            shell.variables.set_var("?", &shell.previous_status.to_string());
+                            shell.variables.set_variable("?", VariableType::Str(shell.previous_status.to_string()));
                         }
                         Statement::While {
                             expression,
@@ -866,9 +876,9 @@ impl FlowLogic for Shell {
                             statements,
                             description,
                         } => {
-                            shell.variables.insert_function(
-                                name.clone(),
-                                Function::new(description, name, args, statements),
+                            shell.variables.set_variable(
+                                &name,
+                                VariableType::Function(Function::new(description, name.clone(), args, statements)),
                             );
                         }
                         Statement::If {
@@ -921,7 +931,7 @@ impl FlowLogic for Shell {
                             }
                             shell
                                 .variables
-                                .set_var("?", &shell.previous_status.to_string());
+                                .set_variable("?", VariableType::Str(shell.previous_status.to_string()));
                         }
                         _ => (),
                     }

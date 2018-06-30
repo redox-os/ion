@@ -17,7 +17,7 @@ use self::{
 };
 use super::{
     flags::*,
-    flow_control::FunctionError,
+    flow_control::{Function, FunctionError},
     fork_function::command_not_found,
     job::{RefinedJob, TeeItem},
     signals::{self, SignalHandler},
@@ -592,7 +592,7 @@ impl PipelineExecution for Shell {
             redir(file.as_raw_fd(), sys::STDERR_FILENO);
         }
 
-        let function = self.variables.get_function(name).unwrap();
+        let function = self.variables.get::<Function>(name).unwrap();
         match function.execute(self, args) {
             Ok(()) => SUCCESS,
             Err(FunctionError::InvalidArgumentCount) => {
@@ -679,7 +679,7 @@ impl PipelineExecution for Shell {
                         builtins::builtin_cd,
                         iter::once("cd".into()).chain(job.args.drain()).collect(),
                     )
-                } else if self.variables.get_function(job.args[0].as_str()).is_some() {
+                } else if self.variables.get::<Function>(job.args[0].as_str()).is_some() {
                     RefinedJob::function(job.args[0].clone().into(), job.args.drain().collect())
                 } else if let Some(builtin) = job.builtin {
                     RefinedJob::builtin(builtin, job.args.drain().collect())

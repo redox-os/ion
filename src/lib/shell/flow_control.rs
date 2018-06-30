@@ -1,4 +1,4 @@
-use super::{flow::FlowLogic, Shell, variables::VariableType};
+use shell::{flow::FlowLogic, Shell};
 use parser::{assignments::*, pipelines::Pipeline};
 use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
@@ -143,7 +143,7 @@ impl Default for FlowControl {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Function {
     description: Option<String>,
     name:        Identifier,
@@ -200,14 +200,7 @@ impl Function {
         shell.variables.new_scope(true);
 
         for (type_, value) in values {
-            match value {
-                ReturnValue::Vector(vector) => {
-                    shell.variables.shadow(type_.name.into(), VariableType::Array(vector));
-                }
-                ReturnValue::Str(string) => {
-                    shell.variables.shadow(type_.name.into(), VariableType::Variable(string));
-                }
-            }
+            shell.variables.shadow(type_.name.into(), value);
         }
 
         shell.execute_statements(self.statements);

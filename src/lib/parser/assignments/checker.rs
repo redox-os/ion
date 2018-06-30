@@ -1,7 +1,9 @@
 use super::{
-    super::{expand_string, Expander}, Primitive, ReturnValue, TypeError,
+    super::{expand_string, Expander}, Primitive, TypeError,
 };
 
+use shell::variables::VariableType;
+use types::*;
 use std::iter::Iterator;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -61,16 +63,16 @@ pub(crate) fn is_boolean(value: &str) -> Result<&str, ()> {
     }
 }
 
-fn is_boolean_string(value: &ReturnValue) -> Result<&str, ()> {
-    if let ReturnValue::Str(ref value) = *value {
+fn is_boolean_string(value: &VariableType) -> Result<&str, ()> {
+    if let VariableType::Str(ref value) = *value {
         is_boolean(&value.as_str())
     } else {
         unreachable!()
     }
 }
 
-fn is_integer_string(value: ReturnValue) -> Result<ReturnValue, ()> {
-    let is_ok = if let ReturnValue::Str(ref num) = value {
+fn is_integer_string(value: VariableType) -> Result<VariableType, ()> {
+    let is_ok = if let VariableType::Str(ref num) = value {
         num.parse::<i64>().is_ok()
     } else {
         unreachable!()
@@ -83,8 +85,8 @@ fn is_integer_string(value: ReturnValue) -> Result<ReturnValue, ()> {
     }
 }
 
-fn is_float_string(value: ReturnValue) -> Result<ReturnValue, ()> {
-    let is_ok = if let ReturnValue::Str(ref num) = value {
+fn is_float_string(value: VariableType) -> Result<VariableType, ()> {
+    let is_ok = if let VariableType::Str(ref num) = value {
         num.parse::<f64>().is_ok()
     } else {
         unreachable!()
@@ -97,8 +99,8 @@ fn is_float_string(value: ReturnValue) -> Result<ReturnValue, ()> {
     }
 }
 
-fn is_boolean_array(values: &mut ReturnValue) -> bool {
-    if let ReturnValue::Vector(ref mut values) = *values {
+fn is_boolean_array(values: &mut VariableType) -> bool {
+    if let VariableType::Array(ref mut values) = *values {
         for element in values.iter_mut() {
             let boolean = {
                 match is_boolean(&element) {
@@ -114,8 +116,8 @@ fn is_boolean_array(values: &mut ReturnValue) -> bool {
     }
 }
 
-fn is_integer_array(value: ReturnValue) -> Result<ReturnValue, ()> {
-    let is_ok = if let ReturnValue::Vector(ref nums) = value {
+fn is_integer_array(value: VariableType) -> Result<VariableType, ()> {
+    let is_ok = if let VariableType::Array(ref nums) = value {
         nums.iter().all(|num| num.parse::<i64>().is_ok())
     } else {
         unreachable!()
@@ -128,8 +130,8 @@ fn is_integer_array(value: ReturnValue) -> Result<ReturnValue, ()> {
     }
 }
 
-fn is_float_array(value: ReturnValue) -> Result<ReturnValue, ()> {
-    let is_ok = if let ReturnValue::Vector(ref nums) = value {
+fn is_float_array(value: VariableType) -> Result<VariableType, ()> {
+    let is_ok = if let VariableType::Array(ref nums) = value {
         nums.iter().all(|num| num.parse::<f64>().is_ok())
     } else {
         unreachable!()
@@ -142,19 +144,49 @@ fn is_float_array(value: ReturnValue) -> Result<ReturnValue, ()> {
     }
 }
 
-fn get_string<E: Expander>(shell: &E, value: &str) -> ReturnValue {
-    ReturnValue::Str(expand_string(value, shell, false).join(" "))
+fn get_string<E: Expander>(shell: &E, value: &str) -> VariableType {
+    VariableType::Str(expand_string(value, shell, false).join(" "))
 }
 
-fn get_array<E: Expander>(shell: &E, value: &str) -> ReturnValue {
-    ReturnValue::Vector(expand_string(value, shell, false))
+fn get_array<E: Expander>(shell: &E, value: &str) -> VariableType {
+    VariableType::Array(expand_string(value, shell, false))
 }
 
-pub(crate) fn value_check<'a, E: Expander>(
+fn get_hash_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive) -> Result<VariableType, TypeError> {
+    let array = expand_string(expression, shell, false);
+    let mut hash_map: HashMap = HashMap::with_capacity_and_hasher(array.len(), Default::default());
+
+    for string in array {
+        if let Some(found) = string.find('=') {
+            let key = &string[..found];
+            let value = &string[found + 1..];
+            match value_check(shell, value, inner_kind) {
+                Ok(VariableType::Str(str_)) => {
+                    hash_map.insert(key.into(), VariableType::Str(str_));
+                }
+                Ok(VariableType::Array(array)) => {
+                    hash_map.insert(key.into(), VariableType::Array(array));
+                }
+                Ok(VariableType::HashMap(map)) => {
+                    hash_map.insert(key.into(), VariableType::HashMap(map));
+                }
+                Err(type_error) => return Err(type_error),
+                _ => (),
+            }
+
+        } else {
+            return Err(TypeError::BadValue(inner_kind.clone()))
+        }
+    }
+
+    Ok(VariableType::HashMap(hash_map))
+}
+
+pub(crate) fn value_check<E: Expander>(
     shell: &E,
-    value: &'a str,
+    value: &str,
     expected: &Primitive,
-) -> Result<ReturnValue, TypeError<'a>> {
+) -> Result<VariableType, TypeError> {
     macro_rules! get_string {
         () => {
             get_string(shell, value)
@@ -175,7 +207,7 @@ pub(crate) fn value_check<'a, E: Expander>(
         Primitive::Boolean if !is_array => {
             let value = get_string!();
             let value = is_boolean_string(&value).map_err(|_| TypeError::BadValue(expected.clone()))?;
-            Ok(ReturnValue::Str(value.to_owned()))
+            Ok(VariableType::Str(value.to_owned()))
         }
         Primitive::BooleanArray if is_array => {
             let mut values = get_array!();
@@ -197,16 +229,16 @@ pub(crate) fn value_check<'a, E: Expander>(
         Primitive::FloatArray if is_array => {
             is_float_array(get_array!()).map_err(|_| TypeError::BadValue(expected.clone()))
         }
-        Primitive::Indexed(_, kind) => {
-            value_check(shell, value, &*kind)
-        }
+        Primitive::HashMap(ref kind) if is_array => get_hash_map(shell, value, kind),
+        Primitive::BTreeMap(_) if is_array => Err(TypeError::BadValue(expected.clone())),
+        Primitive::Indexed(_, kind) => value_check(shell, value, &*kind),
         _ => Err(TypeError::BadValue(expected.clone())),
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{super::*, *};
+    use super::*;
 
     #[test]
     fn is_array_() {
@@ -229,13 +261,13 @@ mod test {
 
     #[test]
     fn is_integer_array_() {
-        let expected = Ok(ReturnValue::Vector(array!["1", "2", "3"]));
+        let expected = Ok(VariableType::Array(array!["1", "2", "3"]));
         assert_eq!(
-            is_integer_array(ReturnValue::Vector(array!["1", "2", "3"])),
+            is_integer_array(VariableType::Array(array!["1", "2", "3"])),
             expected
         );
         assert_eq!(
-            is_integer_array(ReturnValue::Vector(array!["1", "2", "three"])),
+            is_integer_array(VariableType::Array(array!["1", "2", "three"])),
             Err(())
         );
     }

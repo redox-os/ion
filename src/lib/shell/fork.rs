@@ -1,4 +1,4 @@
-use super::{IonError, Shell};
+use super::{variables::VariableType, IonError, Shell};
 use std::{
     fs::File,
     io,
@@ -130,7 +130,7 @@ impl<'a> Fork<'a> {
 
                 // Obtain ownership of the child's copy of the shell, and then configure it.
                 let mut shell: Shell = unsafe { (self.shell as *const Shell).read() };
-                shell.set_var("PID", &sys::getpid().unwrap_or(0).to_string());
+                shell.set_variable("PID", VariableType::Str(sys::getpid().unwrap_or(0).to_string()));
                 let _ = shell.context.take();
 
                 // Execute the given closure within the child's shell.

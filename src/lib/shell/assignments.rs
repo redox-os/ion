@@ -8,6 +8,7 @@ use shell::{
     history::ShellHistory,
     variables::VariableType
 };
+use types;
 use std::{
     collections::HashMap,
     env, ffi::OsStr, fmt::{self, Display}, io::{self, BufWriter, Write}, mem,
@@ -37,7 +38,7 @@ fn list_vars(shell: &Shell) {
 
     // Write all the string variables to the buffer.
     let _ = buffer.write(b"# String Variables\n");
-    for (key, val) in shell.variables.variables() {
+    for (key, val) in shell.variables.string_vars() {
         let _ = buffer.write([key, " = ", val.as_str(), "\n"].concat().as_bytes());
     }
 
@@ -61,7 +62,7 @@ impl VariableStore for Shell {
     fn export(&mut self, action: ExportAction) -> i32 {
         let actions = match action {
             ExportAction::Assign(ref keys, op, ref vals) => AssignmentActions::new(keys, op, vals),
-            ExportAction::LocalExport(ref key) => match self.get_var(key) {
+            ExportAction::LocalExport(ref key) => match self.get::<types::Value>(key) {
                 Some(var) => {
                     env::set_var(key, &var);
                     return SUCCESS;
@@ -85,7 +86,7 @@ impl VariableStore for Shell {
             match action {
                 Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
                     match value_check(self, &expression, &key.kind) {
-                        Ok(ReturnValue::Vector(values)) => env::set_var(key.name, values.join(" ")),
+                        Ok(VariableType::Array(values)) => env::set_var(key.name, values.join(" ")),
                         Err(why) => {
                             eprintln!("ion: assignment error: {}: {}", key.name, why);
                             return FAILURE;
@@ -101,11 +102,11 @@ impl VariableStore for Shell {
                 }
                 Ok(Action::UpdateString(key, operator, expression)) => {
                     match value_check(self, &expression, &key.kind) {
-                        Ok(ReturnValue::Str(value)) => {
+                        Ok(VariableType::Str(value)) => {
                             let key_name: &str = &key.name;
-                            let lhs = self
+                            let lhs: String = self
                                 .variables
-                                .get_var(key_name)
+                                .get::<types::Value>(key_name)
                                 .unwrap_or_else(|| String::from("0"));
 
                             let result = math(&lhs, &key.kind, operator, &value, |value| {
@@ -135,7 +136,7 @@ impl VariableStore for Shell {
     }
 
     fn local(&mut self, action: LocalAction) -> i32 {
-        let mut collected: HashMap<&str, ReturnValue> = HashMap::new();
+        let mut collected: HashMap<&str, VariableType> = HashMap::new();
         let (actions_step1, actions_step2) = match action {
             LocalAction::List => {
                 list_vars(&self);
@@ -147,22 +148,26 @@ impl VariableStore for Shell {
             match action {
                 Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
                     match value_check(self, &expression, &key.kind) {
-                        Ok(ReturnValue::Vector(values)) => {
+                        Ok(VariableType::Array(values)) => {
                             // When we changed the HISTORY_IGNORE variable, update the
                             // ignore patterns. This happens first because `set_array`
                             // consumes 'values'
                             if key.name == "HISTORY_IGNORE" {
                                 self.update_ignore_patterns(&values);
                             }
-                            collected.insert(key.name, ReturnValue::Vector(values));
+                            collected.insert(key.name, VariableType::Array(values));
                         }
-                        Ok(ReturnValue::Str(value)) => {
-                            collected.insert(key.name, ReturnValue::Str(value));
+                        Ok(VariableType::Str(value)) => {
+                            collected.insert(key.name, VariableType::Str(value));
+                        }
+                        Ok(VariableType::HashMap(map)) => {
+                            collected.insert(key.name, VariableType::HashMap(map));
                         }
                         Err(why) => {
                             eprintln!("ion: assignment error: {}: {}", key.name, why);
                             return FAILURE;
                         }
+                        _ => (),
                     }
                 }
                 Ok(Action::UpdateArray(..)) => {
@@ -178,15 +183,15 @@ impl VariableStore for Shell {
                     }
 
                     match value_check(self, &expression, &key.kind) {
-                        Ok(ReturnValue::Str(value)) => {
+                        Ok(VariableType::Str(value)) => {
                             if operator == Operator::Equal {
-                                collected.insert(key.name, ReturnValue::Str(value));
+                                collected.insert(key.name, VariableType::Str(value));
                                 continue;
                             }
                             match self.variables.lookup_any(key.name) {
-                                Some(VariableType::Variable(lhs)) => {
+                                Some(VariableType::Str(lhs)) => {
                                     let result = math(&lhs, &key.kind, operator, &value, |value| {
-                                        collected.insert(key.name, ReturnValue::Str(unsafe {
+                                        collected.insert(key.name, VariableType::Str(unsafe {
                                             str::from_utf8_unchecked(value)
                                         }.to_owned()));
                                     });
@@ -236,7 +241,7 @@ impl VariableStore for Shell {
                                         }
                                     }
 
-                                    collected.insert(key.name, ReturnValue::Vector(output));
+                                    collected.insert(key.name, VariableType::Array(output));
                                 },
                                 _ => {
                                     eprintln!("ion: assignment error: type does not support this operator");
@@ -262,23 +267,61 @@ impl VariableStore for Shell {
             match action {
                 Ok(Action::UpdateArray(key, _, _)) => {
                     match collected.remove(key.name) {
-                        Some(ReturnValue::Vector(values)) => {
+                        map @ Some(VariableType::HashMap(_)) => {
+                            if let Primitive::HashMap(_) = key.kind {
+                                self.variables.set_variable(key.name, map.unwrap());
+                            } else if let Primitive::Indexed(_, _) = key.kind {
+                                eprintln!("ion: cannot insert hash map into index");
+                                return FAILURE;
+                            }
+                        }
+                        array @ Some(VariableType::Array(_)) => {
                             if let Primitive::Indexed(_, _) = key.kind {
                                 eprintln!("ion: multi-dimensional arrays are not yet supported");
                                 return FAILURE;
                             } else {
-                                self.variables.set_array(key.name, values);
+                                self.variables.set_variable(key.name, array.unwrap());
                             }
                         }
-                        Some(ReturnValue::Str(value)) => {
-                            if let Primitive::Indexed(ref index, _) = key.kind {
-                                match parse_index(index, &self) {
-                                    Ok(index_num) => self.variables.set_at_array_index(key.name, index_num, &value),
-                                    Err(why) => {
-                                        eprintln!("{}", why);
+                        Some(VariableType::Str(value)) => {
+                            if let Primitive::Indexed(ref index_value, ref index_kind) = key.kind {
+                                match value_check(self, index_value, index_kind) {
+                                    Ok(VariableType::Str(ref index)) => {
+                                        match self.variables.lookup_any_mut(key.name) {
+                                            Some(VariableType::HashMap(map)) => {
+                                                if let Some(VariableType::Str(val)) = map.get_mut(&**index) {
+                                                    *val = value;
+                                                }
+                                            }
+                                            Some(VariableType::Array(array)) => {
+                                                let index_num = match index.parse::<usize>() {
+                                                    Ok(num) => num,
+                                                    Err(_) => {
+                                                        eprintln!("ion: index variable does not contain a numeric value: {}", index);
+                                                        return FAILURE;
+                                                    }
+                                                };
+                                                if let Some(val) = array.get_mut(index_num) {
+                                                    *val = value;
+                                                }
+                                            }
+                                            _ => (),
+                                        }
+                                    }
+                                    Ok(VariableType::Array(_)) => {
+                                        eprintln!("ion: index variable cannot be an array");
                                         return FAILURE;
                                     }
-                                };
+                                    Ok(VariableType::HashMap(_)) => {
+                                        eprintln!("ion: index variable cannot be a hash map");
+                                        return FAILURE;
+                                    }
+                                    Err(why) => {
+                                        eprintln!("ion: assignment error: {}: {}", key.name, why);
+                                        return FAILURE;
+                                    }
+                                    _ => (),
+                                }
                             }
                         }
                         _ => ()
@@ -286,8 +329,8 @@ impl VariableStore for Shell {
                 }
                 Ok(Action::UpdateString(key, _, _)) => {
                     match collected.remove(key.name) {
-                        Some(ReturnValue::Str(value)) => self.set_var(key.name, &value),
-                        Some(ReturnValue::Vector(values)) => self.variables.set_array(key.name, values),
+                        str_ @ Some(VariableType::Str(_)) => { self.variables.set_variable(key.name, str_.unwrap()); }
+                        array @ Some(VariableType::Array(_)) => { self.variables.set_variable(key.name, array.unwrap()); }
                         _ => ()
                     }
                 }
@@ -296,24 +339,6 @@ impl VariableStore for Shell {
         }
 
         SUCCESS
-    }
-}
-
-fn parse_index(index: &str, shell: &Shell) -> Result<usize, String> {
-    if index.chars().all(char::is_numeric) {
-        Ok(index.parse::<usize>().unwrap()) // It's okay to unwrap since all chars are numeric
-    } else if index.starts_with("$") && index.chars().nth(1).map(char::is_alphabetic).unwrap_or(false) {
-        match shell.variables.get_var(&index[1..]) {
-            Some(value) => {
-                match value.parse::<usize>() {
-                    Ok(index) => Ok(index),
-                    Err(_) => Err(format!("ion: index variable does not contain a numeric value: {}", index)),
-                }
-            }
-            None => Err(format!("ion: index variable does not exist: {}", index)),
-        }
-    } else {
-        Err(format!("ion: invalid array index: {}", index))
     }
 }
 

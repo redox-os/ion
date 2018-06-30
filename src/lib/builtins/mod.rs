@@ -25,10 +25,11 @@ use std::{
 
 use parser::Terminator;
 use shell::{
-    self, fork_function::fork_function, job_control::{JobControl, ProcessState}, status::*,
+    self, fork_function::fork_function, job_control::{JobControl, ProcessState}, status::*, variables::VariableType,
     FlowLogic, Shell, ShellHistory,
 };
 use sys;
+use types;
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
                          none specified\n    help <command>";
@@ -162,8 +163,8 @@ pub fn builtin_cd(args: &[String], shell: &mut Shell) -> i32 {
                     let current_dir = cwd.to_str().unwrap_or("?");
 
                     if pwd != current_dir {
-                        shell.set_var("OLDPWD", pwd);
-                        env::set_var("PWD", current_dir);
+                        shell.set_variable("OLDPWD", VariableType::Str(pwd.clone()));
+                        shell.set_variable("PWD", VariableType::Str(current_dir.into()));
                     }
                     fork_function(shell, "CD_CHANGE", &["ion"]);
                 }
@@ -186,7 +187,7 @@ fn builtin_bool(args: &[String], shell: &mut Shell) -> i32 {
         return FAILURE;
     }
 
-    let opt = shell.variables.get_var(&args[1][1..]);
+    let opt = shell.variables.get::<types::Value>(&args[1][1..]);
     let sh_var: &str = match opt.as_ref() {
         Some(s) => s,
         None => "",

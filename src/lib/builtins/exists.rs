@@ -1,14 +1,18 @@
 #[cfg(test)]
 use smallstring::SmallString;
-#[cfg(test)]
-use smallvec::SmallVec;
 use std::{fs, os::unix::fs::PermissionsExt};
 
 #[cfg(test)]
-use shell;
-#[cfg(test)]
-use shell::flow_control::{Function, Statement};
-use shell::Shell;
+use shell::{
+    self,
+    variables::VariableType,
+    flow_control::Statement,
+};
+use shell::{
+    flow_control::Function,
+    Shell,
+};
+use types;
 
 pub(crate) fn exists(args: &[String], shell: &Shell) -> Result<bool, String> {
     let arguments = &args[1..];
@@ -87,7 +91,7 @@ fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
     // TODO: Right now they use an entirely different logic which means that it
     // *might* be possible TODO: that `exists` reports a binary to be in the
     // path, while the shell cannot find it or TODO: vice-versa
-    if let Some(path) = shell.get_var("PATH") {
+    if let Some(path) = shell.get::<types::Value>("PATH") {
         for dir in path.split(':') {
             let fname = format!("{}/{}", dir, binaryname);
             if let Ok(metadata) = fs::metadata(&fname) {
@@ -123,7 +127,7 @@ fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
 
 /// Returns true if the variable is an array and the array is not empty
 fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
-    match shell.variables.get_array(arrayvar) {
+    match shell.variables.get::<types::Array>(arrayvar) {
         Some(array) => !array.is_empty(),
         None => false,
     }
@@ -131,7 +135,7 @@ fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
 
 /// Returns true if the variable is a string and the string is not empty
 fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
-    match shell.get_var(stringvar) {
+    match shell.variables.get::<types::Value>(stringvar) {
         Some(string) => !string.is_empty(),
         None => false,
     }
@@ -139,7 +143,7 @@ fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
 
 /// Returns true if a function with the given name is defined
 fn function_is_defined(function: &str, shell: &Shell) -> bool {
-    match shell.variables.get_function(function) {
+    match shell.variables.get::<Function>(function) {
         Some(_) => true,
         None => false,
     }
@@ -168,21 +172,21 @@ fn test_evaluate_arguments() {
     assert_eq!(evaluate_arguments(&["-a".to_owned()], &shell), Ok(true));
     shell
         .variables
-        .set_array("emptyarray", SmallVec::from_vec(Vec::new()));
+        .set_variable("emptyarray", VariableType::Array(Vec::new().into()));
     assert_eq!(evaluate_arguments(&["-a".to_owned(), "emptyarray".to_owned()], &shell), Ok(false));
     let mut vec = Vec::new();
     vec.push("element".to_owned());
-    shell.variables.set_array("array", SmallVec::from_vec(vec));
+    shell.variables.set_variable("array", VariableType::Array(vec.into()));
     assert_eq!(evaluate_arguments(&["-a".to_owned(), "array".to_owned()], &shell), Ok(true));
-    shell.variables.unset_array("array");
+    shell.variables.remove_variable("array");
     assert_eq!(evaluate_arguments(&["-a".to_owned(), "array".to_owned()], &shell), Ok(false));
 
     // check `exists -b`
     // TODO: see test_binary_is_in_path()
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-b".to_owned()], &shell), Ok(true));
-    let oldpath = shell.get_var("PATH").unwrap_or("/usr/bin".to_owned());
-    shell.set_var("PATH", "testing/");
+    let oldpath = shell.get::<types::Value>("PATH").unwrap_or("/usr/bin".to_owned());
+    shell.set_variable("PATH", VariableType::Str("testing/".into()));
 
     assert_eq!(
         evaluate_arguments(&["-b".to_owned(), "executable_file".to_owned()], &shell),
@@ -196,7 +200,7 @@ fn test_evaluate_arguments() {
 
     // restore original PATH. Not necessary for the currently defined test cases
     // but this might change in the future? Better safe than sorry!
-    shell.set_var("PATH", &oldpath);
+    shell.set_variable("PATH", VariableType::Str(oldpath));
 
     // check `exists -d`
     // no argument means we treat it as a string
@@ -227,17 +231,17 @@ fn test_evaluate_arguments() {
     // check `exists -s`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-s".to_owned()], &shell), Ok(true));
-    shell.set_var("emptyvar", "");
+    shell.set_variable("emptyvar", VariableType::Str("".into()));
     assert_eq!(evaluate_arguments(&["-s".to_owned(), "emptyvar".to_owned()], &shell), Ok(false));
-    shell.set_var("testvar", "foobar");
+    shell.set_variable("testvar", VariableType::Str("foobar".into()));
     assert_eq!(evaluate_arguments(&["-s".to_owned(), "testvar".to_owned()], &shell), Ok(true));
-    shell.variables.unset_var("testvar");
+    shell.variables.remove_variable("testvar");
     assert_eq!(evaluate_arguments(&["-s".to_owned(), "testvar".to_owned()], &shell), Ok(false));
     // also check that it doesn't trigger on arrays
     let mut vec = Vec::new();
     vec.push("element".to_owned());
-    shell.variables.unset_var("array");
-    shell.variables.set_array("array", SmallVec::from_vec(vec));
+    shell.variables.remove_variable("array");
+    shell.variables.set_variable("array", VariableType::Array(vec.into()));
     assert_eq!(evaluate_arguments(&["-s".to_owned(), "array".to_owned()], &shell), Ok(false));
 
     // check `exists --fn`
@@ -252,13 +256,13 @@ fn test_evaluate_arguments() {
     statements.push(Statement::End);
     let description = "description".to_owned();
 
-    shell.variables.insert_function(
-        name.clone(),
-        Function::new(Some(description), name, args, statements),
+    shell.variables.set_variable(
+        &name,
+        VariableType::Function(Function::new(Some(description), name.clone(), args, statements)),
     );
 
     assert_eq!(evaluate_arguments(&["--fn".to_owned(), name_str.to_owned()], &shell), Ok(true));
-    shell.variables.remove_function(name_str);
+    shell.variables.remove_variable(name_str);
     assert_eq!(evaluate_arguments(&["--fn".to_owned(), name_str.to_owned()], &shell), Ok(false));
 
     // check invalid flags / parameters (should all be treated as strings and
@@ -335,7 +339,7 @@ fn test_binary_is_in_path() {
     // TODO: PATH containing directories without read permission (for user)
     // TODO: PATH containing directories without execute ("enter") permission (for
     // user) TODO: empty PATH?
-    shell.set_var("PATH", "testing/");
+    shell.set_variable("PATH", VariableType::Str("testing/".into()));
 
     assert_eq!(binary_is_in_path("executable_file", &shell), true);
     assert_eq!(binary_is_in_path("empty_file", &shell), false);
@@ -360,25 +364,21 @@ fn test_string_is_nonzero() {
 fn test_array_var_is_not_empty() {
     let mut shell = shell::ShellBuilder::new().as_library();
 
-    shell
-        .variables
-        .set_array("EMPTY_ARRAY", SmallVec::from_vec(Vec::new()));
+    shell.variables.set_variable("EMPTY_ARRAY", VariableType::Array(Vec::new().into()));
     assert_eq!(array_var_is_not_empty("EMPTY_ARRAY", &shell), false);
 
     let mut not_empty_vec = Vec::new();
     not_empty_vec.push("array not empty".to_owned());
-    shell
-        .variables
-        .set_array("NOT_EMPTY_ARRAY", SmallVec::from_vec(not_empty_vec));
+    shell.variables.set_variable("NOT_EMPTY_ARRAY", VariableType::Array(not_empty_vec.into()));
     assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), true);
 
     // test for array which does not even exist
-    shell.variables.unset_array("NOT_EMPTY_ARRAY");
+    shell.variables.remove_variable("NOT_EMPTY_ARRAY");
     assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), false);
 
     // array_var_is_not_empty should NOT match for non-array variables with the
     // same name
-    shell.set_var("VARIABLE", "notempty-variable");
+    shell.set_variable("VARIABLE", VariableType::Str("notempty-variable".into()));
     assert_eq!(array_var_is_not_empty("VARIABLE", &shell), false);
 }
 
@@ -386,22 +386,20 @@ fn test_array_var_is_not_empty() {
 fn test_string_var_is_not_empty() {
     let mut shell = shell::ShellBuilder::new().as_library();
 
-    shell.set_var("EMPTY", "");
+    shell.set_variable("EMPTY", VariableType::Str("".into()));
     assert_eq!(string_var_is_not_empty("EMPTY", &shell), false);
 
-    shell.set_var("NOT_EMPTY", "notempty");
+    shell.set_variable("NOT_EMPTY", VariableType::Str("notempty".into()));
     assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), true);
 
     // string_var_is_not_empty should NOT match for arrays with the same name
     let mut vec = Vec::new();
     vec.push("not-empty".to_owned());
-    shell
-        .variables
-        .set_array("ARRAY_NOT_EMPTY", SmallVec::from_vec(vec));
+    shell.variables.set_variable("ARRAY_NOT_EMPTY", VariableType::Array(vec.into()));
     assert_eq!(string_var_is_not_empty("ARRAY_NOT_EMPTY", &shell), false);
 
     // test for a variable which does not even exist
-    shell.variables.unset_var("NOT_EMPTY");
+    shell.variables.remove_variable("NOT_EMPTY");
     assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), false);
 }
 
@@ -422,12 +420,12 @@ fn test_function_is_defined() {
     statements.push(Statement::End);
     let description = "description".to_owned();
 
-    shell.variables.insert_function(
-        name.clone(),
-        Function::new(Some(description), name, args, statements),
+    shell.variables.set_variable(
+        &name,
+        VariableType::Function(Function::new(Some(description), name.clone(), args, statements)),
     );
 
     assert_eq!(function_is_defined(name_str, &shell), true);
-    shell.variables.remove_function(name_str);
+    shell.variables.remove_variable(name_str);
     assert_eq!(function_is_defined(name_str, &shell), false);
 }

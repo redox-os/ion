@@ -104,7 +104,7 @@ impl<'a> StringMethod<'a> {
         macro_rules! string_eval {
             ($variable:ident $method:tt) => {{
                 let pattern = pattern.join(" ");
-                let is_true = if let Some(value) = expand.variable($variable, false) {
+                let is_true = if let Some(value) = expand.string($variable, false) {
                     value.$method(&pattern)
                 } else if is_expression($variable) {
                     expand_string($variable, expand, false)
@@ -119,7 +119,7 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! path_eval {
             ($method:tt) => {{
-                if let Some(value) = expand.variable(variable, false) {
+                if let Some(value) = expand.string(variable, false) {
                     output.push_str(
                         Path::new(&value)
                             .$method()
@@ -140,7 +140,7 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! string_case {
             ($method:tt) => {{
-                if let Some(value) = expand.variable(variable, false) {
+                if let Some(value) = expand.string(variable, false) {
                     output.push_str(value.$method().as_str());
                 } else if is_expression(variable) {
                     let word = expand_string(variable, expand, false).join(" ");
@@ -151,7 +151,7 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! get_var {
             () => {{
-                if let Some(value) = expand.variable(variable, false) {
+                if let Some(value) = expand.string(variable, false) {
                     value
                 } else {
                     expand_string(variable, expand, false).join(" ")
@@ -230,7 +230,7 @@ impl<'a> StringMethod<'a> {
             "len" => if variable.starts_with('@') || is_array(variable) {
                 let expanded = expand_string(variable, expand, false);
                 output.push_str(&expanded.len().to_string());
-            } else if let Some(value) = expand.variable(variable, false) {
+            } else if let Some(value) = expand.string(variable, false) {
                 let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
                 output.push_str(&count.to_string());
             } else if is_expression(variable) {
@@ -238,13 +238,13 @@ impl<'a> StringMethod<'a> {
                 let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
                 output.push_str(&count.to_string());
             },
-            "len_bytes" => if let Some(value) = expand.variable(variable, false) {
+            "len_bytes" => if let Some(value) = expand.string(variable, false) {
                 output.push_str(&value.as_bytes().len().to_string());
             } else if is_expression(variable) {
                 let word = expand_string(variable, expand, false).join(" ");
                 output.push_str(&word.as_bytes().len().to_string());
             },
-            "reverse" => if let Some(value) = expand.variable(variable, false) {
+            "reverse" => if let Some(value) = expand.string(variable, false) {
                 let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
                 output.push_str(rev_graphs.collect::<String>().as_str());
             } else if is_expression(variable) {
@@ -253,7 +253,7 @@ impl<'a> StringMethod<'a> {
                 output.push_str(rev_graphs.collect::<String>().as_str());
             },
             "find" => {
-                let out = if let Some(value) = expand.variable(variable, false) {
+                let out = if let Some(value) = expand.string(variable, false) {
                     value.find(&pattern.join(" "))
                 } else if is_expression(variable) {
                     expand_string(variable, expand, false)
@@ -265,7 +265,7 @@ impl<'a> StringMethod<'a> {
                 output.push_str(&out.map(|i| i as isize).unwrap_or(-1).to_string());
             }
             "unescape" => {
-                let out = if let Some(value) = expand.variable(variable, false) {
+                let out = if let Some(value) = expand.string(variable, false) {
                     value
                 } else if is_expression(variable) {
                     expand_string(variable, expand, false).join(" ")
@@ -278,7 +278,7 @@ impl<'a> StringMethod<'a> {
                 };
             }
             "escape" => {
-                let word = if let Some(value) = expand.variable(variable, false) {
+                let word = if let Some(value) = expand.string(variable, false) {
                     value
                 } else if is_expression(variable) {
                     expand_string(variable, expand, false).join(" ")
@@ -302,7 +302,7 @@ impl<'a> StringMethod<'a> {
                         expand_string(variable, expand, false).into_vec(),
                         pattern,
                     )
-                } else if let Some(value) = expand.variable(variable, false) {
+                } else if let Some(value) = expand.string(variable, false) {
                     MethodArguments::StringArg(value, pattern)
                 } else if is_expression(variable) {
                     let expanded = expand_string(variable, expand, false);
@@ -333,7 +333,7 @@ mod test {
     struct VariableExpander;
 
     impl Expander for VariableExpander {
-        fn variable(&self, variable: &str, _: bool) -> Option<Value> {
+        fn string(&self, variable: &str, _: bool) -> Option<Value> {
             match variable {
                 "FOO" => Some("FOOBAR".to_owned()),
                 _ => None,

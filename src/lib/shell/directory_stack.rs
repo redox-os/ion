@@ -1,5 +1,5 @@
 use super::{
-    status::{FAILURE, SUCCESS}, variables::Variables,
+    status::{FAILURE, SUCCESS}, variables::{Variables, VariableType},
 };
 use std::{
     borrow::Cow, collections::VecDeque, env::{current_dir, home_dir, set_current_dir},
@@ -187,7 +187,7 @@ impl DirectoryStack {
     }
 
     fn get_previous_dir(&self, variables: &Variables) -> Option<String> {
-        let previous_pwd = variables.get_var_or_empty("OLDPWD");
+        let previous_pwd = variables.get_str_or_empty("OLDPWD");
         if previous_pwd == "?" || previous_pwd == "" {
             None
         } else {
@@ -226,11 +226,11 @@ impl DirectoryStack {
 
     fn update_env_variables(&mut self, variables: &mut Variables) {
         // Update $OLDPWD
-        let old_pwd = variables.get_var_or_empty("PWD");
+        let old_pwd = variables.get_str_or_empty("PWD");
         if old_pwd.is_empty() {
-            variables.set_var("OLDPWD", "?");
+            variables.set_variable("OLDPWD", VariableType::Str("?".into()));
         } else {
-            variables.set_var("OLDPWD", &old_pwd);
+            variables.set_variable("OLDPWD", VariableType::Str(old_pwd));
         }
 
         // Update $PWD
@@ -406,7 +406,7 @@ impl DirectoryStack {
     /// else it will return a default value of 1000.
     fn get_size(variables: &Variables) -> usize {
         variables
-            .get_var_or_empty("DIRECTORY_STACK_SIZE")
+            .get_str_or_empty("DIRECTORY_STACK_SIZE")
             .parse::<usize>()
             .unwrap_or(1000)
     }
