@@ -2,6 +2,7 @@ use super::{
     flow_control::{ExportAction, LocalAction}, status::*, Shell,
 };
 use itoa;
+use lexers::assignments::{Operator, Primitive};
 use parser::assignments::*;
 use smallvec::SmallVec;
 use shell::{
@@ -457,6 +458,7 @@ fn math<'a, F: FnMut(&[u8])>(
             return Err(MathError::Unsupported);
         },
         Operator::Equal => writefn(value.as_bytes()),
+        _ => return Err(MathError::Unsupported)
     };
 
     Ok(())

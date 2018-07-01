@@ -1,10 +1,9 @@
-use lexers::ArgumentSplitter;
-use super::{checker::*, *};
+use lexers::{ArgumentSplitter, assignments::{Key, KeyIterator, Operator, Primitive, TypeError}};
+use super::checker::*;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum AssignmentError<'a> {
-    InvalidOperator(&'a str),
     InvalidValue(Primitive, Primitive),
     TypeError(TypeError),
     ExtraValues(&'a str, &'a str),
@@ -14,7 +13,6 @@ pub(crate) enum AssignmentError<'a> {
 impl<'a> Display for AssignmentError<'a> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match *self {
-            AssignmentError::InvalidOperator(op) => write!(f, "invalid operator supplied: {}", op),
             AssignmentError::InvalidValue(ref expected, ref actual) => {
                 write!(f, "expected {}, but received {}", expected, actual)
             }
@@ -124,10 +122,10 @@ mod tests {
     use super::*;
 
     fn split(input: &str) -> (String, Operator, String) {
-        let (keys, op, vals) = split_assignment(input);
+        let (keys, op, vals) = assignment_lexer(input);
         (
             keys.unwrap().into(),
-            Operator::parse(op.unwrap()).unwrap(),
+            op.unwrap(),
             vals.unwrap().into(),
         )
     }

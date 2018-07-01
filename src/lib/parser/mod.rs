@@ -5,7 +5,7 @@ mod quotes;
 pub(crate) mod shell_expand;
 mod statement;
 
-pub use self::{assignments::Primitive, quotes::Terminator};
+pub use self::quotes::Terminator;
 pub(crate) use self::{
     loops::ForExpression, shell_expand::{expand_string, Expander, Select},
     statement::{parse_and_validate, StatementSplitter},

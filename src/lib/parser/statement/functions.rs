@@ -1,6 +1,5 @@
-use super::{
-    super::assignments::{KeyBuf, KeyIterator, TypeError}, split_pattern,
-};
+use super::split_pattern;
+use lexers::assignments::{KeyBuf, KeyIterator, TypeError};
 
 /// The arguments expression given to a function declaration goes into here, which will be
 /// converted into a tuple consisting of a `KeyIterator` iterator, which will collect type

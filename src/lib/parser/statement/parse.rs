@@ -1,6 +1,6 @@
-use lexers::ArgumentSplitter;
+use lexers::{assignment_lexer, ArgumentSplitter};
 use super::{
-    super::{assignments::{split_assignment, Operator}, pipelines::{self, Pipeline}},
+    super::pipelines::{self, Pipeline},
     case, functions::{collect_arguments, parse_function},
 };
 use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};
@@ -36,7 +36,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         _ if cmd.starts_with("let ") => {
             // Split the let expression and ensure that the statement is valid.
-            let (keys, op, vals) = split_assignment(cmd[4..].trim_left());
+            let (keys, op, vals) = assignment_lexer(cmd[4..].trim_left());
             let (keys, op, values) = match vals {
                 Some(vals) => {
                     // If the values exist, then the keys and operator also exists.
@@ -52,24 +52,14 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             };
 
-            // After also ensuring the the operator is a valid operator, create the let
-            // statement.
-            match Operator::parse(op) {
-                Ok(operator) => {
-                    return Statement::Let(LocalAction::Assign(keys, operator, values));
-                }
-                Err(why) => {
-                    eprintln!("ion: assignment error: {}", why);
-                    return Statement::Default;
-                }
-            }
+            return Statement::Let(LocalAction::Assign(keys, op, values));
         }
         "export" => {
             return Statement::Export(ExportAction::List);
         }
         _ if cmd.starts_with("export ") => {
             // Split the let expression and ensure that the statement is valid.
-            let (keys, op, vals) = split_assignment(cmd[7..].trim_left());
+            let (keys, op, vals) = assignment_lexer(cmd[7..].trim_left());
             let (keys, op, values) = match vals {
                 Some(vals) => {
                     // If the values exist, then the keys and operator also exists.
@@ -87,17 +77,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             };
 
-            // After also ensuring the the operator is a valid operator, create the let
-            // statement.
-            match Operator::parse(op) {
-                Ok(operator) => {
-                    return Statement::Export(ExportAction::Assign(keys, operator, values));
-                }
-                Err(why) => {
-                    eprintln!("ion: assignment error: {}", why);
-                    return Statement::Default;
-                }
-            }
+            return Statement::Export(ExportAction::Assign(keys, op, values));
         }
         _ if cmd.starts_with("if ") => {
             return collect(cmd[3..].trim_left(), |pipeline| Statement::If {

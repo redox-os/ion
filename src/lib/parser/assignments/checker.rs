@@ -1,7 +1,5 @@
-use super::{
-    super::{expand_string, Expander}, Primitive, TypeError,
-};
-
+use super::super::{expand_string, Expander};
+use lexers::assignments::{Primitive, TypeError};
 use shell::variables::VariableType;
 use types::*;
 use std::iter::Iterator;

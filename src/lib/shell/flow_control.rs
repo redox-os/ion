@@ -3,6 +3,7 @@ use parser::{assignments::*, pipelines::Pipeline};
 use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
 use types::Identifier;
+use lexers::assignments::{KeyBuf, Operator, Primitive};
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ElseIf {
