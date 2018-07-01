@@ -1,8 +1,6 @@
 mod methods;
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod benchmarks;
 
 pub(crate) use self::methods::{ArrayMethod, Pattern, StringMethod};
 pub use ranges::{Select, SelectWithSize};

@@ -140,7 +140,7 @@ impl ShellBuilder {
                 _ => unreachable!(),
             };
 
-            signals::PENDING.store(signal, Ordering::SeqCst);
+            signals::PENDING.store(signal as usize, Ordering::SeqCst);
         }
 
         let _ = sys::signal(sys::SIGHUP, handler);
@@ -388,7 +388,7 @@ impl Shell {
     }
 
     pub(crate) fn next_signal(&self) -> Option<i32> {
-        match signals::PENDING.swap(0, Ordering::SeqCst) {
+        match signals::PENDING.swap(0, Ordering::SeqCst) as u8 {
             0 => None,
             signals::SIGINT => Some(sys::SIGINT),
             signals::SIGHUP => Some(sys::SIGHUP),

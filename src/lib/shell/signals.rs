@@ -3,13 +3,14 @@
 //! startup, and unblock signals for each of the forked
 //! children of the shell.
 
-use std::sync::atomic::{ATOMIC_U8_INIT, AtomicU8};
+// use std::sync::atomic::{ATOMIC_U8_INIT, AtomicU8};
+use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize};
 
 use sys;
 
 pub(crate) use sys::signals::{block, unblock};
 
-pub static PENDING: AtomicU8 = ATOMIC_U8_INIT;
+pub static PENDING: AtomicUsize = ATOMIC_USIZE_INIT;
 pub const SIGINT: u8 = 1;
 pub const SIGHUP: u8 = 2;
 pub const SIGTERM: u8 = 4;

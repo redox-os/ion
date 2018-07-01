@@ -420,7 +420,7 @@ impl Variables {
                         None
                     })
             })
-            .flatten()
+            .flat_map(|f| f)
     }
 
     pub fn get_str_or_empty(&self, name: &str) -> String {
@@ -596,7 +596,7 @@ impl Variables {
                         None
                     })
             })
-            .flatten()
+            .flat_map(|f| f)
     }
 
     pub fn functions(&self) -> impl Iterator<Item = (&SmallString, &Function)> {
@@ -609,7 +609,7 @@ impl Variables {
                         None
                     })
             })
-            .flatten()
+            .flat_map(|f| f)
     }
 
     /// Obtains the value for the **MWD** variable.
@@ -671,7 +671,7 @@ impl Variables {
                         None
                     })
             })
-            .flatten()
+            .flat_map(|f| f)
     }
 
     pub(crate) fn read<I: IntoIterator>(&mut self, args: I) -> i32

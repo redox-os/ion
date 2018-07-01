@@ -1,12 +1,7 @@
 #![allow(unknown_lints)]
 #![allow(while_let_on_iterator)]
-#![feature(getpid)]
-#![feature(integer_atomics)]
-#![feature(iterator_flatten)]
 #![feature(nll)]
-#![feature(pointer_methods)]
 #![feature(stdsimd)]
-#![feature(test)]
 
 #[macro_use]
 extern crate bitflags;
@@ -19,8 +14,6 @@ extern crate glob;
 extern crate itoa;
 #[macro_use]
 extern crate lazy_static;
-#[cfg(test)]
-extern crate test;
 #[cfg(all(unix, not(target_os = "redox")))]
 extern crate libloading;
 extern crate liner;
