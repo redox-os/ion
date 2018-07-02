@@ -4,6 +4,7 @@ use super::{
 use itoa;
 use lexers::assignments::{Operator, Primitive};
 use parser::assignments::*;
+use smallstring::SmallString;
 use smallvec::SmallVec;
 use shell::{
     history::ShellHistory,
@@ -290,9 +291,7 @@ impl VariableStore for Shell {
                                     Ok(VariableType::Str(ref index)) => {
                                         match self.variables.lookup_any_mut(key.name) {
                                             Some(VariableType::HashMap(map)) => {
-                                                if let Some(VariableType::Str(val)) = map.get_mut(&**index) {
-                                                    *val = value;
-                                                }
+                                                map.entry(SmallString::from_str(index)).or_insert(VariableType::Str(value));
                                             }
                                             Some(VariableType::Array(array)) => {
                                                 let index_num = match index.parse::<usize>() {
