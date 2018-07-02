@@ -223,7 +223,7 @@ pub(crate) fn parse(code: &str) -> Statement {
 mod tests {
     use self::pipelines::PipeItem;
     use super::*;
-    use parser::assignments::{KeyBuf, Primitive};
+    use lexers::assignments::{KeyBuf, Primitive};
     use shell::{flow_control::Statement, Job, JobKind};
 
     #[test]

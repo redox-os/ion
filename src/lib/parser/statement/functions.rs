@@ -19,9 +19,8 @@ pub(crate) fn collect_arguments(args: KeyIterator) -> Result<Vec<KeyBuf>, TypeEr
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        super::super::assignments::{KeyBuf, Primitive}, *,
-    };
+    use lexers::assignments::{KeyBuf, Primitive};
+    use parser::statement::functions::{collect_arguments, parse_function}; 
 
     #[test]
     fn function_parsing() {

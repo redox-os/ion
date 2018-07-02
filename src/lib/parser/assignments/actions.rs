@@ -120,6 +120,7 @@ impl<'a> Action<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lexers::assignments::*;
 
     fn split(input: &str) -> (String, Operator, String) {
         let (keys, op, vals) = assignment_lexer(input);
@@ -244,6 +245,48 @@ mod tests {
                 },
                 Operator::Equal,
                 "[four five]",
+            ))
+        );
+        let (keys, op, values) = split("array ++= [one two three four five]");
+        let actions = AssignmentActions::new(&keys, op, &values).collect::<Vec<_>>();
+        assert_eq!(actions.len(), 1);
+        assert_eq!(
+            actions[0],
+            Ok(Action::UpdateArray(
+                Key {
+                    name: "array",
+                    kind: Primitive::Any,
+                },
+                Operator::Concatenate,
+                "[one two three four five]",
+            ))
+        );
+        let (keys, op, values) = split("array ::= [1 2 3 4 5]");
+        let actions = AssignmentActions::new(&keys, op, &values).collect::<Vec<_>>();
+        assert_eq!(actions.len(), 1);
+        assert_eq!(
+            actions[0],
+            Ok(Action::UpdateArray(
+                Key {
+                    name: "array",
+                    kind: Primitive::Any,
+                },
+                Operator::ConcatenateHead,
+                "[1 2 3 4 5]",
+            ))
+        );
+        let (keys, op, values) = split(r"array \\= [foo bar baz]");
+        let actions = AssignmentActions::new(&keys, op, &values).collect::<Vec<_>>();
+        assert_eq!(actions.len(), 1);
+        assert_eq!(
+            actions[0],
+            Ok(Action::UpdateArray(
+                Key {
+                    name: "array",
+                    kind: Primitive::Any,
+                },
+                Operator::Filter,
+                "[foo bar baz]",
             ))
         );
     }

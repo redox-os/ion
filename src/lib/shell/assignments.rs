@@ -148,35 +148,95 @@ impl VariableStore for Shell {
         };
         for action in actions_step1 {
             match action {
-                Ok(Action::UpdateArray(key, Operator::Equal, expression)) => {
-                    match value_check(self, &expression, &key.kind) {
-                        Ok(VariableType::Array(values)) => {
-                            // When we changed the HISTORY_IGNORE variable, update the
-                            // ignore patterns. This happens first because `set_array`
-                            // consumes 'values'
-                            if key.name == "HISTORY_IGNORE" {
-                                self.update_ignore_patterns(&values);
+                Ok(Action::UpdateArray(key, operator, expression)) => {
+                    match operator {
+                        Operator::Equal => match value_check(self, &expression, &key.kind) {
+                            Ok(VariableType::Array(values)) => {
+                                // When we changed the HISTORY_IGNORE variable, update the
+                                // ignore patterns. This happens first because `set_array`
+                                // consumes 'values'
+                                if key.name == "HISTORY_IGNORE" {
+                                    self.update_ignore_patterns(&values);
+                                }
+                                collected.insert(key.name, VariableType::Array(values));
                             }
-                            collected.insert(key.name, VariableType::Array(values));
+                            Ok(VariableType::Str(value)) => {
+                                collected.insert(key.name, VariableType::Str(value));
+                            }
+                            Ok(VariableType::HashMap(map)) => {
+                                collected.insert(key.name, VariableType::HashMap(map));
+                            }
+                            Err(why) => {
+                                eprintln!("ion: assignment error: {}: {}", key.name, why);
+                                return FAILURE;
+                            }
+                            _ => (),
                         }
-                        Ok(VariableType::Str(value)) => {
-                            collected.insert(key.name, VariableType::Str(value));
+                        Operator::Concatenate => match value_check(self, &expression, &key.kind) {
+                            Ok(VariableType::Array(values)) => {
+                                match self.variables.get_mut(key.name) {
+                                    Some(VariableType::Array(ref mut array)) => {
+                                        array.extend(values);
+                                    }
+                                    None => {
+                                        eprintln!("ion: assignment error: {}: cannot concatenate non-array variable", key.name);
+                                        return FAILURE;
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            Err(why) => {
+                                eprintln!("ion: assignment error: {}: {}", key.name, why);
+                                return FAILURE;
+                            }
+                            _ => (),
                         }
-                        Ok(VariableType::HashMap(map)) => {
-                            collected.insert(key.name, VariableType::HashMap(map));
+                        Operator::ConcatenateHead => match value_check(self, &expression, &key.kind) {
+                            Ok(VariableType::Array(values)) => {
+                                match self.variables.get_mut(key.name) {
+                                    Some(VariableType::Array(ref mut array)) => {
+                                        for (index, value) in values.into_iter().enumerate() {
+                                            array.insert(index, value);
+                                        }
+                                    }
+                                    None => {
+                                        eprintln!("ion: assignment error: {}: cannot head concatenate non-array variable", key.name);
+                                        return FAILURE;
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            Err(why) => {
+                                eprintln!("ion: assignment error: {}: {}", key.name, why);
+                                return FAILURE;
+                            }
+                            _ => (),
                         }
-                        Err(why) => {
-                            eprintln!("ion: assignment error: {}: {}", key.name, why);
-                            return FAILURE;
+                        Operator::Filter => match value_check(self, &expression, &key.kind) {
+                            Ok(VariableType::Array(values)) => {
+                                match self.variables.get_mut(key.name) {
+                                    Some(VariableType::Array(ref mut array)) => {
+                                        let mut iterator: Box<Iterator<Item=&String>> = Box::new(array.iter());
+                                        for value in &values {
+                                            iterator = Box::new(iterator.filter(move |item| *item != value));
+                                        }
+                                        *array = iterator.cloned().collect();
+                                    }
+                                    None => {
+                                        eprintln!("ion: assignment error: {}: cannot head concatenate non-array variable", key.name);
+                                        return FAILURE;
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            Err(why) => {
+                                eprintln!("ion: assignment error: {}: {}", key.name, why);
+                                return FAILURE;
+                            }
+                            _ => (),
                         }
                         _ => (),
                     }
-                }
-                Ok(Action::UpdateArray(..)) => {
-                    eprintln!(
-                        "ion: arithmetic operators on array expressions aren't supported yet."
-                    );
-                    return FAILURE;
                 }
                 Ok(Action::UpdateString(key, operator, expression)) => {
                     if ["HOME", "HOST", "PWD", "MWD", "SWD", "?"].contains(&key.name) {
@@ -186,11 +246,53 @@ impl VariableStore for Shell {
 
                     match value_check(self, &expression, &key.kind) {
                         Ok(VariableType::Str(value)) => {
-                            if operator == Operator::Equal {
-                                collected.insert(key.name, VariableType::Str(value));
-                                continue;
+                            match operator {
+                                Operator::Equal => {
+                                    collected.insert(key.name, VariableType::Str(value));
+                                    continue;
+                                }
+                                Operator::Concatenate => {
+                                    match self.variables.get_mut(key.name) {
+                                        Some(VariableType::Array(ref mut array)) => {
+                                            array.push(value);
+                                        }
+                                        None => {
+                                            eprintln!("ion: assignment error: {}: cannot concatenate non-array variable", key.name);
+                                            return FAILURE;
+                                        }
+                                        _ => (),
+                                    }
+                                    continue;
+                                }
+                                Operator::ConcatenateHead => {
+                                    match self.variables.get_mut(key.name) {
+                                        Some(VariableType::Array(ref mut array)) => {
+                                            array.insert(0, value);
+                                        }
+                                        None => {
+                                            eprintln!("ion: assignment error: {}: cannot head concatenate non-array variable", key.name);
+                                            return FAILURE;
+                                        }
+                                        _ => (),
+                                    }
+                                    continue;
+                                }
+                                Operator::Filter => {
+                                    match self.variables.get_mut(key.name) {
+                                        Some(VariableType::Array(ref mut array)) => {
+                                            *array = array.iter().filter(move |item| **item != value).cloned().collect();
+                                        }
+                                        None => {
+                                            eprintln!("ion: assignment error: {}: cannot head concatenate non-array variable", key.name);
+                                            return FAILURE;
+                                        }
+                                        _ => (),
+                                    }
+                                    continue;
+                                }
+                                _ => (),
                             }
-                            match self.variables.lookup_any(key.name) {
+                            match self.variables.get_ref(key.name) {
                                 Some(VariableType::Str(lhs)) => {
                                     let result = math(&lhs, &key.kind, operator, &value, |value| {
                                         collected.insert(key.name, VariableType::Str(unsafe {
@@ -289,7 +391,7 @@ impl VariableStore for Shell {
                             if let Primitive::Indexed(ref index_value, ref index_kind) = key.kind {
                                 match value_check(self, index_value, index_kind) {
                                     Ok(VariableType::Str(ref index)) => {
-                                        match self.variables.lookup_any_mut(key.name) {
+                                        match self.variables.get_mut(key.name) {
                                             Some(VariableType::HashMap(map)) => {
                                                 map.entry(SmallString::from_str(index)).or_insert(VariableType::Str(value));
                                             }

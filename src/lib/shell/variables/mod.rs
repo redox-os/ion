@@ -232,27 +232,33 @@ impl Variables {
             self.scopes[self.current].namespace = namespace;
         }
     }
+
     pub fn pop_scope(&mut self) {
         self.scopes[self.current].clear();
         self.current -= 1;
     }
+
     pub fn pop_scopes<'a>(&'a mut self, index: usize) -> impl Iterator<Item = Scope> + 'a {
         self.current = index;
         self.scopes.drain(index+1..)
     }
+
     pub fn append_scopes(&mut self, scopes: Vec<Scope>) {
         self.scopes.drain(self.current+1..);
         self.current += scopes.len();
         self.scopes.extend(scopes);
     }
+
     pub fn scopes(&self) -> impl Iterator<Item = &Scope> {
         let amount = self.scopes.len() - self.current - 1;
         self.scopes.iter().rev().skip(amount)
     }
+
     pub fn scopes_mut(&mut self) -> impl Iterator<Item = &mut Scope> {
         let amount = self.scopes.len() - self.current - 1;
         self.scopes.iter_mut().rev().skip(amount)
     }
+
     pub fn index_scope_for_var(&self, name: &str) -> Option<usize> {
         let amount = self.scopes.len() - self.current - 1;
         for (i, scope) in self.scopes.iter().enumerate().rev().skip(amount) {
@@ -262,10 +268,12 @@ impl Variables {
         }
         None
     }
+
     pub fn shadow(&mut self, name: SmallString, value: VariableType) -> Option<VariableType> {
         self.scopes[self.current].insert(name, value)
     }
-    pub fn lookup_any(&self, mut name: &str) -> Option<&VariableType> {
+
+    pub fn get_ref(&self, mut name: &str) -> Option<&VariableType> {
         let mut up_namespace: isize = 0;
         if name.starts_with("global::") {
             name = &name["global::".len()..];
@@ -291,7 +299,8 @@ impl Variables {
         }
         None
     }
-    pub fn lookup_any_mut(&mut self, name: &str) -> Option<&mut VariableType> {
+
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut VariableType> {
         if name.starts_with("super::") || name.starts_with("global::") {
             // Cannot mutate outer namespace
             return None;
@@ -450,7 +459,7 @@ impl Variables {
                 Some(("env", variable)) => env::var(variable).map(Into::into).ok().map(|s| T::from(VariableType::Str(s))),
                 Some(("super", _)) | Some(("global", _)) | None => {
                     // Otherwise, it's just a simple variable name.
-                    match self.lookup_any(name) {
+                    match self.get_ref(name) {
                         Some(VariableType::Str(val)) => Some(T::from(VariableType::Str(val.clone()))),
                         _ => env::var(name).ok().map(|s| T::from(VariableType::Str(s))),
                     }
@@ -488,22 +497,22 @@ impl Variables {
                 }
             }
         } else if specified_type == TypeId::of::<types::Alias>() {
-            match self.lookup_any(name) {
+            match self.get_ref(name) {
                 Some(VariableType::Alias(alias)) => Some(T::from(VariableType::Alias((*alias).clone()))),
                 _ => None
             }
         } else if specified_type == TypeId::of::<types::Array>() {
-            match self.lookup_any(name) {
+            match self.get_ref(name) {
                 Some(VariableType::Array(array)) => Some(T::from(VariableType::Array(array.clone()))),
                 _ => None
             }
         } else if specified_type == TypeId::of::<types::HashMap>() {
-            match self.lookup_any(name) {
+            match self.get_ref(name) {
                 Some(VariableType::HashMap(hash_map)) => Some(T::from(VariableType::HashMap(hash_map.clone()))),
                 _ => None
             }
         } else if specified_type == TypeId::of::<Function>() {
-            match self.lookup_any(name) {
+            match self.get_ref(name) {
                 Some(VariableType::Function(func)) => Some(T::from(VariableType::Function(func.clone()))),
                 _ => None
             }
@@ -514,7 +523,7 @@ impl Variables {
 
     pub fn set<T: Into<VariableType>>(&mut self, name: &str, var: T) {
         let var = var.into();
-        match self.lookup_any_mut(&name) {
+        match self.get_mut(&name) {
             Some(VariableType::Str(ref mut str_)) => {
                 if !name.is_empty() {
                     if let VariableType::Str(var_str) = var {

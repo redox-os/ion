@@ -150,7 +150,7 @@ fn function_is_defined(function: &str, shell: &Shell) -> bool {
 
 #[test]
 fn test_evaluate_arguments() {
-    use parser::assignments::{KeyBuf, Primitive};
+    use lexers::assignments::{KeyBuf, Primitive};
     let mut shell = shell::ShellBuilder::new().as_library();
 
     // assert_eq!(evaluate_arguments(&[], &mut sink, &shell), Ok(false));
@@ -404,7 +404,7 @@ fn test_string_var_is_not_empty() {
 
 #[test]
 fn test_function_is_defined() {
-    use parser::assignments::{KeyBuf, Primitive};
+    use lexers::assignments::{KeyBuf, Primitive};
     let mut shell = shell::ShellBuilder::new().as_library();
 
     // create a simple dummy function
