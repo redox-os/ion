@@ -2,10 +2,11 @@ use fnv::FnvHashMap;
 use smallstring::SmallString;
 use smallvec::SmallVec;
 use shell::variables::VariableType;
-use std::ops::{Deref, DerefMut};
+use std::{collections::BTreeMap as StdBTreeMap, ops::{Deref, DerefMut}};
 
 pub type Array = SmallVec<[Value; 4]>;
 pub type HashMap = FnvHashMap<Key, VariableType>;
+pub type BTreeMap = StdBTreeMap<String, VariableType>;
 pub type Identifier = SmallString;
 pub type Key = SmallString;
 pub type Value = String;

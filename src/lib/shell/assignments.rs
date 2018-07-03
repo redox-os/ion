@@ -163,8 +163,11 @@ impl VariableStore for Shell {
                             Ok(VariableType::Str(value)) => {
                                 collected.insert(key.name, VariableType::Str(value));
                             }
-                            Ok(VariableType::HashMap(map)) => {
-                                collected.insert(key.name, VariableType::HashMap(map));
+                            Ok(VariableType::HashMap(hmap)) => {
+                                collected.insert(key.name, VariableType::HashMap(hmap));
+                            }
+                            Ok(VariableType::BTreeMap(bmap)) => {
+                                collected.insert(key.name, VariableType::BTreeMap(bmap));
                             }
                             Err(why) => {
                                 eprintln!("ion: assignment error: {}: {}", key.name, why);
@@ -371,11 +374,19 @@ impl VariableStore for Shell {
             match action {
                 Ok(Action::UpdateArray(key, _, _)) => {
                     match collected.remove(key.name) {
-                        map @ Some(VariableType::HashMap(_)) => {
+                        hmap @ Some(VariableType::HashMap(_)) => {
                             if let Primitive::HashMap(_) = key.kind {
-                                self.variables.set(key.name, map.unwrap());
+                                self.variables.set(key.name, hmap.unwrap());
                             } else if let Primitive::Indexed(_, _) = key.kind {
-                                eprintln!("ion: cannot insert hash map into index");
+                                eprintln!("ion: cannot insert hmap into index");
+                                return FAILURE;
+                            }
+                        }
+                        bmap @ Some(VariableType::BTreeMap(_)) => {
+                            if let Primitive::BTreeMap(_) = key.kind {
+                                self.variables.set(key.name, bmap.unwrap());
+                            } else if let Primitive::Indexed(_, _) = key.kind {
+                                eprintln!("ion: cannot insert bmap into index");
                                 return FAILURE;
                             }
                         }
@@ -392,8 +403,11 @@ impl VariableStore for Shell {
                                 match value_check(self, index_value, index_kind) {
                                     Ok(VariableType::Str(ref index)) => {
                                         match self.variables.get_mut(key.name) {
-                                            Some(VariableType::HashMap(map)) => {
-                                                map.entry(SmallString::from_str(index)).or_insert(VariableType::Str(value));
+                                            Some(VariableType::HashMap(hmap)) => {
+                                                hmap.entry(SmallString::from_str(index)).or_insert(VariableType::Str(value));
+                                            }
+                                            Some(VariableType::BTreeMap(bmap)) => {
+                                                bmap.entry(index.clone()).or_insert(VariableType::Str(value));
                                             }
                                             Some(VariableType::Array(array)) => {
                                                 let index_num = match index.parse::<usize>() {
@@ -415,7 +429,11 @@ impl VariableStore for Shell {
                                         return FAILURE;
                                     }
                                     Ok(VariableType::HashMap(_)) => {
-                                        eprintln!("ion: index variable cannot be a hash map");
+                                        eprintln!("ion: index variable cannot be a hmap");
+                                        return FAILURE;
+                                    }
+                                    Ok(VariableType::BTreeMap(_)) => {
+                                        eprintln!("ion: index variable cannot be a bmap");
                                         return FAILURE;
                                     }
                                     Err(why) => {

@@ -101,7 +101,8 @@ impl<'a> Action<'a> {
             | Primitive::FloatArray
             | Primitive::IntegerArray
             | Primitive::StrArray
-            | Primitive::HashMap(_) => if is_array(value) {
+            | Primitive::HashMap(_)
+            | Primitive::BTreeMap(_) => if is_array(value) {
                 Ok(Action::UpdateArray(var, operator, value))
             } else {
                 Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))

@@ -18,7 +18,7 @@ use std::{
 };
 use sys::{self, geteuid, getpid, getuid, is_root, variables as self_sys};
 use types::{
-    self, Alias, Array, HashMap, Identifier, Key, Value,
+    self, Alias, Array, BTreeMap, HashMap, Identifier, Key, Value,
 };
 use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
@@ -33,6 +33,7 @@ pub enum VariableType {
     Alias(Alias),
     Array(Array),
     HashMap(HashMap),
+    BTreeMap(BTreeMap),
     Function(Function),
     None,
 }
@@ -73,6 +74,15 @@ impl From<VariableType> for HashMap {
     }
 }
 
+impl From<VariableType> for BTreeMap {
+    fn from(var: VariableType) -> Self {
+        match var {
+            VariableType::BTreeMap(btree_map) => btree_map,
+            _ => BTreeMap::new(),
+        }
+    }
+}
+
 impl From<VariableType> for Function {
     fn from(var: VariableType) -> Self {
         match var {
@@ -106,6 +116,12 @@ impl From<HashMap> for VariableType {
     }
 }
 
+impl From<BTreeMap> for VariableType {
+    fn from(btree_map: BTreeMap) -> Self {
+        VariableType::BTreeMap(btree_map)
+    }
+}
+
 impl From<Function> for VariableType {
     fn from(function: Function) -> Self {
          VariableType::Function(function)
@@ -127,6 +143,15 @@ impl fmt::Display for VariableType {
                 format.pop();
                 write!(f, "{}", format)
             }
+            VariableType::BTreeMap(ref map) => {
+                let mut format = map.into_iter().fold(String::new(), |mut format, (_, var_type)| {
+                    format.push_str(&format!("{}", var_type));
+                    format.push(' ');
+                    format
+                });
+                format.pop();
+                write!(f, "{}", format)
+            }
             _ => write!(f, "")
         }
     }
@@ -139,12 +164,14 @@ pub struct Scope {
     /// Any previous scopes need to be accessed through `super::`.
     namespace: bool
 }
+
 impl Deref for Scope {
     type Target = FnvHashMap<Identifier, VariableType>;
     fn deref(&self) -> &Self::Target {
         &self.vars
     }
 }
+
 impl DerefMut for Scope {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.vars
@@ -508,7 +535,12 @@ impl Variables {
             }
         } else if specified_type == TypeId::of::<types::HashMap>() {
             match self.get_ref(name) {
-                Some(VariableType::HashMap(hash_map)) => Some(T::from(VariableType::HashMap(hash_map.clone()))),
+                Some(VariableType::HashMap(hmap)) => Some(T::from(VariableType::HashMap(hmap.clone()))),
+                _ => None
+            }
+        } else if specified_type == TypeId::of::<types::BTreeMap>() {
+            match self.get_ref(name) {
+                Some(VariableType::BTreeMap(bmap)) => Some(T::from(VariableType::BTreeMap(bmap.clone()))),
                 _ => None
             }
         } else if specified_type == TypeId::of::<Function>() {

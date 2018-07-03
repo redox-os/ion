@@ -152,7 +152,7 @@ fn get_array<E: Expander>(shell: &E, value: &str) -> VariableType {
 
 fn get_hash_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive) -> Result<VariableType, TypeError> {
     let array = expand_string(expression, shell, false);
-    let mut hash_map: HashMap = HashMap::with_capacity_and_hasher(array.len(), Default::default());
+    let mut hmap: HashMap = HashMap::with_capacity_and_hasher(array.len(), Default::default());
 
     for string in array {
         if let Some(found) = string.find('=') {
@@ -160,13 +160,16 @@ fn get_hash_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive
             let value = &string[found + 1..];
             match value_check(shell, value, inner_kind) {
                 Ok(VariableType::Str(str_)) => {
-                    hash_map.insert(key.into(), VariableType::Str(str_));
+                    hmap.insert(key.into(), VariableType::Str(str_));
                 }
                 Ok(VariableType::Array(array)) => {
-                    hash_map.insert(key.into(), VariableType::Array(array));
+                    hmap.insert(key.into(), VariableType::Array(array));
                 }
                 Ok(VariableType::HashMap(map)) => {
-                    hash_map.insert(key.into(), VariableType::HashMap(map));
+                    hmap.insert(key.into(), VariableType::HashMap(map));
+                }
+                Ok(VariableType::BTreeMap(map)) => {
+                    hmap.insert(key.into(), VariableType::BTreeMap(map));
                 }
                 Err(type_error) => return Err(type_error),
                 _ => (),
@@ -177,7 +180,40 @@ fn get_hash_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive
         }
     }
 
-    Ok(VariableType::HashMap(hash_map))
+    Ok(VariableType::HashMap(hmap))
+}
+
+fn get_btree_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive) -> Result<VariableType, TypeError> {
+    let array = expand_string(expression, shell, false);
+    let mut bmap: BTreeMap = BTreeMap::new();
+
+    for string in array {
+        if let Some(found) = string.find('=') {
+            let key = &string[..found];
+            let value = &string[found + 1..];
+            match value_check(shell, value, inner_kind) {
+                Ok(VariableType::Str(str_)) => {
+                    bmap.insert(key.into(), VariableType::Str(str_));
+                }
+                Ok(VariableType::Array(array)) => {
+                    bmap.insert(key.into(), VariableType::Array(array));
+                }
+                Ok(VariableType::HashMap(map)) => {
+                    bmap.insert(key.into(), VariableType::HashMap(map));
+                }
+                Ok(VariableType::BTreeMap(map)) => {
+                    bmap.insert(key.into(), VariableType::BTreeMap(map));
+                }
+                Err(type_error) => return Err(type_error),
+                _ => (),
+            }
+
+        } else {
+            return Err(TypeError::BadValue(inner_kind.clone()))
+        }
+    }
+
+    Ok(VariableType::BTreeMap(bmap))
 }
 
 pub(crate) fn value_check<E: Expander>(
@@ -228,8 +264,8 @@ pub(crate) fn value_check<E: Expander>(
             is_float_array(get_array!()).map_err(|_| TypeError::BadValue(expected.clone()))
         }
         Primitive::HashMap(ref kind) if is_array => get_hash_map(shell, value, kind),
-        Primitive::BTreeMap(_) if is_array => Err(TypeError::BadValue(expected.clone())),
-        Primitive::Indexed(_, kind) => value_check(shell, value, &*kind),
+        Primitive::BTreeMap(ref kind) if is_array => get_btree_map(shell, value, kind),
+        Primitive::Indexed(_, ref kind) => value_check(shell, value, kind),
         _ => Err(TypeError::BadValue(expected.clone())),
     }
 }

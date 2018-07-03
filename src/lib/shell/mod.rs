@@ -455,19 +455,16 @@ impl<'a> Expander for Shell {
 
     /// Expand an array variable with some selection
     fn array(&self, name: &str, selection: Select) -> Option<Array> {
-        let mut found = match self.variables.get::<Array>(name) {
-            Some(array) => match selection {
-                Select::None => None,
-                Select::All => Some(array.clone()),
-                Select::Index(id) => id
+        if let Some(array) = self.variables.get::<Array>(name) {
+            match selection {
+                Select::All => return Some(array.clone()),
+                Select::Index(id) => return id
                     .resolve(array.len())
                     .and_then(|n| array.get(n))
                     .map(|x| Array::from_iter(Some(x.to_owned()))),
                 Select::Range(range) => if let Some((start, length)) = range.bounds(array.len()) {
-                    if array.len() <= start {
-                        None
-                    } else {
-                        Some(
+                    if array.len() > start {
+                        return Some(
                             array
                                 .iter()
                                 .skip(start)
@@ -476,41 +473,57 @@ impl<'a> Expander for Shell {
                                 .collect::<Array>(),
                         )
                     }
-                } else {
-                    None
-                },
-                Select::Key(_) => None,
-            },
-            None => None,
-        };
-        if found.is_none() {
-            found = match self.variables.get::<HashMap>(name) {
-                Some(map) => match selection {
-                    Select::All => {
-                        let mut array = Array::new();
-                        for (_, value) in map.iter() {
-                            let f = format!("{}", value);
-                            match *value {
-                                VariableType::Str(_) => array.push(f),
-                                VariableType::Array(_) | VariableType::HashMap(_) => {
-                                    for split in f.split_whitespace() {
-                                        array.push(split.to_owned());
-                                    }
+                }
+                _ => (),
+            }
+        } else if let Some(hmap) = self.variables.get::<HashMap>(name) {
+            match selection {
+                Select::All => {
+                    let mut array = Array::new();
+                    for (_, value) in hmap.iter() {
+                        let f = format!("{}", value);
+                        match *value {
+                            VariableType::Str(_) => array.push(f),
+                            VariableType::Array(_) | VariableType::HashMap(_) | VariableType::BTreeMap(_) => {
+                                for split in f.split_whitespace() {
+                                    array.push(split.to_owned());
                                 }
-                                _ => (),
                             }
+                            _ => (),
                         }
-                        Some(array)
                     }
-                    Select::Key(ref key) => {
-                        Some(array![format!("{}", map.get(key).unwrap_or(&VariableType::Str("".into())))])
+                    return Some(array)
+                }
+                Select::Key(ref key) => {
+                    return Some(array![format!("{}", hmap.get(key).unwrap_or(&VariableType::Str("".into())))])
+                }
+                _ => (),
+            }
+        } else if let Some(bmap) = self.variables.get::<BTreeMap>(name) {
+            match selection {
+                Select::All => {
+                    let mut array = Array::new();
+                    for (_, value) in bmap.iter() {
+                        let f = format!("{}", value);
+                        match *value {
+                            VariableType::Str(_) => array.push(f),
+                            VariableType::Array(_) | VariableType::HashMap(_) | VariableType::BTreeMap(_) => {
+                                for split in f.split_whitespace() {
+                                    array.push(split.to_owned());
+                                }
+                            }
+                            _ => (),
+                        }
                     }
-                    _ => None,
-                },
-                None => None,
+                    return Some(array)
+                }
+                Select::Key(ref key) => {
+                    return Some(array![format!("{}", bmap.get(&(&*key).to_string()).unwrap_or(&VariableType::Str("".into())))])
+                }
+                _ => (),
             }
         }
-        found
+        None
     }
 
     fn tilde(&self, input: &str) -> Option<String> {

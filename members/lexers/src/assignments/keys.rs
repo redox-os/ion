@@ -165,6 +165,7 @@ mod tests {
         let mut parser = KeyIterator::new("a:int b[] c:bool d e:int[] \
                                            f[0] g[$index] h[1]:int \
                                            i:hmap[] j:hmap[float] k:hmap[int[]] l:hmap[hmap[bool[]]] \
+                                           m:bmap[] n:bmap[int] o:bmap[float[]] p:bmap[hmap[bool]] \
                                            d:a");
         assert_eq!(
             parser.next().unwrap(),
@@ -248,6 +249,34 @@ mod tests {
             Ok(Key {
                 name: "l",
                 kind: Primitive::HashMap(Box::new(Primitive::HashMap(Box::new(Primitive::BooleanArray)))),
+            },)
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "m",
+                kind: Primitive::BTreeMap(Box::new(Primitive::Any)),
+            },)
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "n",
+                kind: Primitive::BTreeMap(Box::new(Primitive::Integer)),
+            },)
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "o",
+                kind: Primitive::BTreeMap(Box::new(Primitive::FloatArray)),
+            },)
+        );
+        assert_eq!(
+            parser.next().unwrap(),
+            Ok(Key {
+                name: "p",
+                kind: Primitive::BTreeMap(Box::new(Primitive::HashMap(Box::new(Primitive::Boolean)))),
             },)
         );
         assert_eq!(parser.next().unwrap(), Err(TypeError::Invalid("a".into())));
