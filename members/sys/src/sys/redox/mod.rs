@@ -2,7 +2,9 @@ extern crate libc;
 extern crate syscall;
 
 use std::{
-    env, io, mem,
+    env::{split_paths, remove_var, var, vars},
+    io,
+    mem,
     os::unix::{ffi::OsStrExt, io::RawFd},
     path::PathBuf,
     process::exit,
@@ -292,6 +294,6 @@ pub mod env {
     };
 
     pub fn home_dir() -> Option<PathBuf> {
-        env::var_os("HOME").map(PathBuf::from);
+        env::var_os("HOME").map(PathBuf::from)
     }
 }
