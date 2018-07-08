@@ -16,6 +16,9 @@ DESCRIPTION
     Tests the expressions given and returns an exit status of 0 if true, else 1.
 
 OPTIONS
+    --help
+        prints this help text
+
     -n STRING
         the length of STRING is nonzero
 
@@ -111,6 +114,10 @@ AUTHOR
     Written by Michael Murphy.
 "#;
 
+const QUICK_GUIDE: &'static str =
+r#"Usage: test [EXPRESSION]
+Try 'test --help' for more information."#;
+
 pub fn test(args: &[String]) -> Result<bool, String> {
     let arguments = &args[1..];
     evaluate_arguments(arguments)
@@ -148,7 +155,10 @@ fn evaluate_arguments(arguments: &[String]) -> Result<bool, String> {
                     evaluate_expression(arg, operator, right_arg)
                 })
         }
-        None => Ok(false),
+        None => {
+            println!("{}", QUICK_GUIDE);
+            Ok(false)
+        }
     }
 }
 
