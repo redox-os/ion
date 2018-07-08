@@ -160,12 +160,12 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
         // This is a fully specified scheme or path to an
         // executable.
         Some(PathBuf::from(prog))
-    } else if let Ok(paths) = env::var("PATH") {
+    } else if let Ok(paths) = var("PATH") {
         // This is not a fully specified scheme or path.
         // Iterate through the possible paths in the
         // env var PATH that this executable may be found
         // in and return the first one found.
-        env::split_paths(&paths)
+        split_paths(&paths)
             .filter_map(|mut path| {
                 path.push(prog);
                 if path.exists() {
@@ -181,8 +181,8 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
 
     // If clear_env set, clear the env.
     if clear_env {
-        for (key, _) in env::vars() {
-            env::remove_var(key);
+        for (key, _) in vars() {
+            remove_var(key);
         }
     }
 
