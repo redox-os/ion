@@ -16,7 +16,7 @@ use std::{
     mem,
     ops::{Deref, DerefMut}
 };
-use sys::{self, geteuid, getpid, getuid, is_root, variables as self_sys};
+use sys::{self, geteuid, getpid, getuid, is_root, variables as self_sys, env as sys_env};
 use types::{
     self, Alias, Array, BTreeMap, HashMap, Identifier, Key, Value,
 };
@@ -226,7 +226,7 @@ impl Default for Variables {
         map.insert("HISTORY_IGNORE".into(), VariableType::Array(array!["no_such_command", "whitespace", "duplicates"]));
 
         // Initialize the HOME variable
-        env::home_dir().map_or_else(
+        sys_env::home_dir().map_or_else(
             || env::set_var("HOME", "?"),
             |path| env::set_var("HOME", path.to_str().unwrap_or("?")),
         );
@@ -392,7 +392,7 @@ impl Variables {
         }
 
         match tilde_prefix {
-            "" => if let Some(home) = env::home_dir() {
+            "" => if let Some(home) = sys_env::home_dir() {
                 return Some(home.to_string_lossy().to_string() + remainder);
             },
             "+" => return Some(match env::var("PWD") {

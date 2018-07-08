@@ -2,8 +2,9 @@ use super::{
     status::{FAILURE, SUCCESS},
     variables::Variables,
 };
+use sys::env as sys_env;
 use std::{
-    borrow::Cow, collections::VecDeque, env::{self, home_dir, set_current_dir},
+    borrow::Cow, collections::VecDeque, env::{self, set_current_dir},
     path::{Component, Path, PathBuf},
 };
 
@@ -217,7 +218,7 @@ impl DirectoryStack {
     }
 
     fn switch_to_home_directory(&mut self, variables: &Variables) -> Result<(), Cow<'static, str>> {
-        home_dir().map_or(
+        sys_env::home_dir().map_or(
             Err(Cow::Borrowed("ion: failed to get home directory")),
             |home| {
                 home.to_str().map_or(

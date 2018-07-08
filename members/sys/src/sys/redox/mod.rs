@@ -284,3 +284,14 @@ pub mod variables {
         }
     }
 }
+
+pub mod env {
+    use std::{
+        env,
+        path::PathBuf,
+    };
+
+    pub fn home_dir() -> Option<PathBuf> {
+        env::var_os("HOME").map(PathBuf::from);
+    }
+}

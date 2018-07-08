@@ -10,7 +10,7 @@ use libc::{
 pub use libc::{ECHILD, EINTR, WCONTINUED, WNOHANG, WUNTRACED};
 
 use std::{
-    env,
+    env::{split_paths, var, vars},
     ffi::{CStr, CString},
     io,
     os::unix::io::RawFd,
@@ -130,12 +130,12 @@ pub fn fork_and_exec<F: Fn(), S: AsRef<str>>(
     let prog = if prog.contains('/') {
         // This is a fully specified path to an executable.
         Some(prog_str)
-    } else if let Ok(paths) = env::var("PATH") {
+    } else if let Ok(paths) = var("PATH") {
         // This is not a fully specified scheme or path.
         // Iterate through the possible paths in the
         // env var PATH that this executable may be found
         // in and return the first one found.
-        env::split_paths(&paths)
+        split_paths(&paths)
             .filter_map(|mut path| {
                 path.push(prog);
                 match (path.exists(), path.to_str()) {
@@ -153,7 +153,7 @@ pub fn fork_and_exec<F: Fn(), S: AsRef<str>>(
 
     // If clear_env is not specified build envp
     if !clear_env {
-        for (key, value) in env::vars() {
+        for (key, value) in vars() {
             match CString::new(format!("{}={}", key, value)) {
                 Ok(var) => env_vars.push(var),
                 Err(_) => {
@@ -240,12 +240,12 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
     let prog = if prog.contains('/') {
         // This is a fully specified path to an executable.
         Some(prog_str)
-    } else if let Ok(paths) = env::var("PATH") {
+    } else if let Ok(paths) = var("PATH") {
         // This is not a fully specified scheme or path.
         // Iterate through the possible paths in the
         // env var PATH that this executable may be found
         // in and return the first one found.
-        env::split_paths(&paths)
+        split_paths(&paths)
             .filter_map(|mut path| {
                 path.push(prog);
                 match (path.exists(), path.to_str()) {
@@ -263,7 +263,7 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
 
     // If clear_env is not specified build envp
     if !clear_env {
-        for (key, value) in env::vars() {
+        for (key, value) in vars() {
             match CString::new(format!("{}={}", key, value)) {
                 Ok(var) => env_vars.push(var),
                 Err(_) => {
@@ -377,6 +377,50 @@ pub mod variables {
             Some(unsafe { String::from_utf8_unchecked(host_name[..len].to_owned()) })
         } else {
             None
+        }
+    }
+}
+
+pub mod env {
+    use libc;
+    use std::{
+        env,
+        ffi::{CStr, OsString},
+        mem,
+        os::unix::ffi::OsStringExt,
+        path::PathBuf,
+        ptr,
+    };
+
+    pub fn home_dir() -> Option<PathBuf> {
+        return env::var_os("HOME").or_else(|| unsafe {
+            fallback()
+        }).map(PathBuf::from);
+
+        #[cfg(any(target_os = "android",
+                  target_os = "ios",
+                  target_os = "emscripten"))]
+        unsafe fn fallback() -> Option<OsString> { None }
+        #[cfg(not(any(target_os = "android",
+                      target_os = "ios",
+                      target_os = "emscripten")))]
+        unsafe fn fallback() -> Option<OsString> {
+            let amt = match libc::sysconf(libc::_SC_GETPW_R_SIZE_MAX) {
+                n if n < 0 => 512 as usize,
+                n => n as usize,
+            };
+            let mut buf = Vec::with_capacity(amt);
+            let mut passwd: libc::passwd = mem::zeroed();
+            let mut result = ptr::null_mut();
+            match libc::getpwuid_r(libc::getuid(), &mut passwd, buf.as_mut_ptr(),
+                                   buf.capacity(), &mut result) {
+                0 if !result.is_null() => {
+                    let ptr = passwd.pw_dir as *const _;
+                    let bytes = CStr::from_ptr(ptr).to_bytes().to_vec();
+                    Some(OsStringExt::from_vec(bytes))
+                },
+                _ => None,
+            }
         }
     }
 }
