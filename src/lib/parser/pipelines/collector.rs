@@ -163,7 +163,7 @@ impl<'a> Collector<'a> {
                             let heredoc = heredoc.lines().skip(1).collect::<Vec<&str>>();
                             if heredoc.len() > 1 {
                                 let herestring =
-                                    Input::HereString(heredoc[..heredoc.len() - 1].join("\n"));
+                                    Input::HereString(heredoc[..heredoc.len() - 1].join("\n").into());
                                 if let Some(x) = inputs.as_mut() { x.push(herestring.clone()) };
                             }
                         }
@@ -403,14 +403,14 @@ mod tests {
     fn stderr_redirection() {
         if let Statement::Pipeline(pipeline) = parse("git rev-parse --abbrev-ref HEAD ^> /dev/null")
         {
-            assert_eq!("git", pipeline.items[0].job.args[0]);
-            assert_eq!("rev-parse", pipeline.items[0].job.args[1]);
-            assert_eq!("--abbrev-ref", pipeline.items[0].job.args[2]);
-            assert_eq!("HEAD", pipeline.items[0].job.args[3]);
+            assert_eq!("git", pipeline.items[0].job.args[0].as_str());
+            assert_eq!("rev-parse", pipeline.items[0].job.args[1].as_str());
+            assert_eq!("--abbrev-ref", pipeline.items[0].job.args[2].as_str());
+            assert_eq!("HEAD", pipeline.items[0].job.args[3].as_str());
 
             let expected = vec![Redirection {
                 from:   RedirectFrom::Stderr,
-                file:   "/dev/null".to_owned(),
+                file:   "/dev/null".into(),
                 append: false,
             }];
 
@@ -424,8 +424,8 @@ mod tests {
     fn braces() {
         if let Statement::Pipeline(pipeline) = parse("echo {a b} {a {b c}}") {
             let items = pipeline.items;
-            assert_eq!("{a b}", items[0].job.args[1]);
-            assert_eq!("{a {b c}}", items[0].job.args[2]);
+            assert_eq!("{a b}", items[0].job.args[1].as_str());
+            assert_eq!("{a {b c}}", items[0].job.args[2].as_str());
         } else {
             assert!(false);
         }
@@ -435,9 +435,9 @@ mod tests {
     fn methods() {
         if let Statement::Pipeline(pipeline) = parse("echo @split(var, ', ') $join(array, ',')") {
             let items = pipeline.items;
-            assert_eq!("echo", items[0].job.args[0]);
-            assert_eq!("@split(var, ', ')", items[0].job.args[1]);
-            assert_eq!("$join(array, ',')", items[0].job.args[2]);
+            assert_eq!("echo", items[0].job.args[0].as_str());
+            assert_eq!("@split(var, ', ')", items[0].job.args[1].as_str());
+            assert_eq!("$join(array, ',')", items[0].job.args[2].as_str());
         } else {
             assert!(false);
         }
@@ -447,8 +447,8 @@ mod tests {
     fn nested_process() {
         if let Statement::Pipeline(pipeline) = parse("echo $(echo one $(echo two) three)") {
             let items = pipeline.items;
-            assert_eq!("echo", items[0].job.args[0]);
-            assert_eq!("$(echo one $(echo two) three)", items[0].job.args[1]);
+            assert_eq!("echo", items[0].job.args[0].as_str());
+            assert_eq!("$(echo one $(echo two) three)", items[0].job.args[1].as_str());
         } else {
             assert!(false);
         }
@@ -458,8 +458,8 @@ mod tests {
     fn nested_array_process() {
         if let Statement::Pipeline(pipeline) = parse("echo @(echo one @(echo two) three)") {
             let items = pipeline.items;
-            assert_eq!("echo", items[0].job.args[0]);
-            assert_eq!("@(echo one @(echo two) three)", items[0].job.args[1]);
+            assert_eq!("echo", items[0].job.args[0].as_str());
+            assert_eq!("@(echo one @(echo two) three)", items[0].job.args[1].as_str());
         } else {
             assert!(false);
         }
@@ -469,8 +469,8 @@ mod tests {
     fn quoted_process() {
         if let Statement::Pipeline(pipeline) = parse("echo \"$(seq 1 10)\"") {
             let items = pipeline.items;
-            assert_eq!("echo", items[0].job.args[0]);
-            assert_eq!("\"$(seq 1 10)\"", items[0].job.args[1]);
+            assert_eq!("echo", items[0].job.args[0].as_str());
+            assert_eq!("\"$(seq 1 10)\"", items[0].job.args[1].as_str());
             assert_eq!(2, items[0].job.args.len());
         } else {
             assert!(false);
@@ -481,8 +481,8 @@ mod tests {
     fn process() {
         if let Statement::Pipeline(pipeline) = parse("echo $(seq 1 10 | head -1)") {
             let items = pipeline.items;
-            assert_eq!("echo", items[0].job.args[0]);
-            assert_eq!("$(seq 1 10 | head -1)", items[0].job.args[1]);
+            assert_eq!("echo", items[0].job.args[0].as_str());
+            assert_eq!("$(seq 1 10 | head -1)", items[0].job.args[1].as_str());
             assert_eq!(2, items[0].job.args.len());
         } else {
             assert!(false);
@@ -493,8 +493,8 @@ mod tests {
     fn array_process() {
         if let Statement::Pipeline(pipeline) = parse("echo @(seq 1 10 | head -1)") {
             let items = pipeline.items;
-            assert_eq!("echo", items[0].job.args[0]);
-            assert_eq!("@(seq 1 10 | head -1)", items[0].job.args[1]);
+            assert_eq!("echo", items[0].job.args[0].as_str());
+            assert_eq!("@(seq 1 10 | head -1)", items[0].job.args[1].as_str());
             assert_eq!(2, items[0].job.args.len());
         } else {
             assert!(false);
@@ -506,7 +506,7 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("cat") {
             let items = pipeline.items;
             assert_eq!(1, items.len());
-            assert_eq!("cat", items[0].job.command);
+            assert_eq!("cat", items[0].job.command.as_str());
             assert_eq!(1, items[0].job.args.len());
         } else {
             assert!(false);
@@ -518,10 +518,10 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo a b c") {
             let items = pipeline.items;
             assert_eq!(1, items.len());
-            assert_eq!("echo", items[0].job.args[0]);
-            assert_eq!("a", items[0].job.args[1]);
-            assert_eq!("b", items[0].job.args[2]);
-            assert_eq!("c", items[0].job.args[3]);
+            assert_eq!("echo", items[0].job.args[0].as_str());
+            assert_eq!("a", items[0].job.args[1].as_str());
+            assert_eq!("b", items[0].job.args[2].as_str());
+            assert_eq!("c", items[0].job.args[3].as_str());
             assert_eq!(4, items[0].job.args.len());
         } else {
             assert!(false);
@@ -533,9 +533,9 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("ls -al dir") {
             let items = pipeline.items;
             assert_eq!(1, items.len());
-            assert_eq!("ls", items[0].job.command);
-            assert_eq!("-al", items[0].job.args[1]);
-            assert_eq!("dir", items[0].job.args[2]);
+            assert_eq!("ls", items[0].job.command.as_str());
+            assert_eq!("-al", items[0].job.args[1].as_str());
+            assert_eq!("dir", items[0].job.args[2].as_str());
         } else {
             assert!(false);
         }
@@ -555,9 +555,9 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("ls \t -al\t\tdir") {
             let items = pipeline.items;
             assert_eq!(1, items.len());
-            assert_eq!("ls", items[0].job.command);
-            assert_eq!("-al", items[0].job.args[1]);
-            assert_eq!("dir", items[0].job.args[2]);
+            assert_eq!("ls", items[0].job.command.as_str());
+            assert_eq!("-al", items[0].job.args[1].as_str());
+            assert_eq!("dir", items[0].job.args[2].as_str());
         } else {
             assert!(false);
         }
@@ -567,8 +567,8 @@ mod tests {
     fn trailing_whitespace() {
         if let Statement::Pipeline(pipeline) = parse("ls -al\t ") {
             assert_eq!(1, pipeline.items.len());
-            assert_eq!("ls", pipeline.items[0].job.command);
-            assert_eq!("-al", pipeline.items[0].job.args[1]);
+            assert_eq!("ls", pipeline.items[0].job.command.as_str());
+            assert_eq!("-al", pipeline.items[0].job.args[1].as_str());
         } else {
             assert!(false);
         }
@@ -578,8 +578,8 @@ mod tests {
     fn double_quoting() {
         if let Statement::Pipeline(pipeline) = parse("echo \"a > 10\" \"a < 10\"") {
             let items = pipeline.items;
-            assert_eq!("\"a > 10\"", items[0].job.args[1]);
-            assert_eq!("\"a < 10\"", items[0].job.args[2]);
+            assert_eq!("\"a > 10\"", items[0].job.args[1].as_str());
+            assert_eq!("\"a < 10\"", items[0].job.args[2].as_str());
             assert_eq!(3, items[0].job.args.len());
         } else {
             assert!(false)
@@ -591,7 +591,7 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo \"Hello 'Rusty' World\"") {
             let items = pipeline.items;
             assert_eq!(2, items[0].job.args.len());
-            assert_eq!("\"Hello \'Rusty\' World\"", items[0].job.args[1]);
+            assert_eq!("\"Hello \'Rusty\' World\"", items[0].job.args[1].as_str());
         } else {
             assert!(false)
         }
@@ -602,7 +602,7 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo \"Hello \"Rusty\" World\"") {
             let items = pipeline.items;
             assert_eq!(2, items[0].job.args.len());
-            assert_eq!("\"Hello \"Rusty\" World\"", items[0].job.args[1]);
+            assert_eq!("\"Hello \"Rusty\" World\"", items[0].job.args[1].as_str());
         } else {
             assert!(false)
         }
@@ -610,7 +610,7 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo \'Hello \'Rusty\' World\'") {
             let items = pipeline.items;
             assert_eq!(2, items[0].job.args.len());
-            assert_eq!("\'Hello \'Rusty\' World\'", items[0].job.args[1]);
+            assert_eq!("\'Hello \'Rusty\' World\'", items[0].job.args[1].as_str());
         } else {
             assert!(false)
         }
@@ -676,7 +676,7 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("    \techo") {
             let items = pipeline.items;
             assert_eq!(1, items.len());
-            assert_eq!("echo", items[0].job.command);
+            assert_eq!("echo", items[0].job.command.as_str());
         } else {
             assert!(false);
         }
@@ -686,7 +686,7 @@ mod tests {
     fn single_quoting() {
         if let Statement::Pipeline(pipeline) = parse("echo '#!!;\"\\'") {
             let items = pipeline.items;
-            assert_eq!("'#!!;\"\\'", items[0].job.args[1]);
+            assert_eq!("'#!!;\"\\'", items[0].job.args[1].as_str());
         } else {
             assert!(false);
         }
@@ -698,11 +698,11 @@ mod tests {
             parse("echo 123 456 \"ABC 'DEF' GHI\" 789 one'  'two")
         {
             let items = pipeline.items;
-            assert_eq!("123", items[0].job.args[1]);
-            assert_eq!("456", items[0].job.args[2]);
-            assert_eq!("\"ABC 'DEF' GHI\"", items[0].job.args[3]);
-            assert_eq!("789", items[0].job.args[4]);
-            assert_eq!("one'  'two", items[0].job.args[5]);
+            assert_eq!("123", items[0].job.args[1].as_str());
+            assert_eq!("456", items[0].job.args[2].as_str());
+            assert_eq!("\"ABC 'DEF' GHI\"", items[0].job.args[3].as_str());
+            assert_eq!("789", items[0].job.args[4].as_str());
+            assert_eq!("one'  'two", items[0].job.args[5].as_str());
         } else {
             assert!(false);
         }
@@ -724,12 +724,12 @@ mod tests {
         let input = "cat | echo hello | cat < stuff > other";
         if let Statement::Pipeline(pipeline) = parse(input) {
             assert_eq!(3, pipeline.items.len());
-            assert_eq!("cat", &pipeline.clone().items[0].job.args[0]);
-            assert_eq!("echo", &pipeline.clone().items[1].job.args[0]);
-            assert_eq!("hello", &pipeline.clone().items[1].job.args[1]);
-            assert_eq!("cat", &pipeline.clone().items[2].job.args[0]);
+            assert_eq!("cat", pipeline.clone().items[0].job.args[0].as_str());
+            assert_eq!("echo", pipeline.clone().items[1].job.args[0].as_str());
+            assert_eq!("hello", pipeline.clone().items[1].job.args[1].as_str());
+            assert_eq!("cat", pipeline.clone().items[2].job.args[0].as_str());
             assert_eq!(vec![Input::File("stuff".into())], pipeline.items[2].inputs);
-            assert_eq!("other", &pipeline.clone().items[2].outputs[0].file);
+            assert_eq!("other", pipeline.clone().items[2].outputs[0].file.as_str());
             assert!(!pipeline.clone().items[2].outputs[0].append);
             assert_eq!(input.to_owned(), pipeline.to_string());
         } else {
@@ -744,7 +744,7 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat < stuff >> other") {
             assert_eq!(3, pipeline.items.len());
             assert_eq!(Input::File("stuff".into()), pipeline.items[2].inputs[0]);
-            assert_eq!("other", pipeline.items[2].outputs[0].file);
+            assert_eq!("other", pipeline.items[2].outputs[0].file.as_str());
             assert!(pipeline.items[2].outputs[0].append);
         } else {
             assert!(false);
@@ -756,8 +756,8 @@ mod tests {
     // '^' while not in the top level
     fn args_loop_terminates() {
         if let Statement::Pipeline(pipeline) = parse("$(^) '$(^)'") {
-            assert_eq!("$(^)", pipeline.items[0].job.args[0]);
-            assert_eq!("\'$(^)\'", pipeline.items[0].job.args[1]);
+            assert_eq!("$(^)", pipeline.items[0].job.args[0].as_str());
+            assert_eq!("\'$(^)\'", pipeline.items[0].job.args[1].as_str());
         } else {
             assert!(false);
         }
@@ -873,7 +873,7 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat > stuff < other") {
             assert_eq!(3, pipeline.items.len());
             assert_eq!(vec![Input::File("other".into())], pipeline.items[2].inputs);
-            assert_eq!("stuff", pipeline.items[2].outputs[0].file);
+            assert_eq!("stuff", pipeline.items[2].outputs[0].file.as_str());
         } else {
             assert!(false);
         }
@@ -883,19 +883,19 @@ mod tests {
     fn var_meets_quote() {
         if let Statement::Pipeline(pipeline) = parse("echo $x '{()}' test") {
             assert_eq!(1, pipeline.items.len());
-            assert_eq!("echo", &pipeline.clone().items[0].job.args[0]);
-            assert_eq!("$x", &pipeline.clone().items[0].job.args[1]);
-            assert_eq!("'{()}'", &pipeline.clone().items[0].job.args[2]);
-            assert_eq!("test", &pipeline.clone().items[0].job.args[3]);
+            assert_eq!("echo", pipeline.clone().items[0].job.args[0].as_str());
+            assert_eq!("$x", pipeline.clone().items[0].job.args[1].as_str());
+            assert_eq!("'{()}'", pipeline.clone().items[0].job.args[2].as_str());
+            assert_eq!("test", pipeline.clone().items[0].job.args[3].as_str());
         } else {
             assert!(false);
         }
 
         if let Statement::Pipeline(pipeline) = parse("echo $x'{()}' test") {
             assert_eq!(1, pipeline.items.len());
-            assert_eq!("echo", &pipeline.clone().items[0].job.args[0]);
-            assert_eq!("$x'{()}'", &pipeline.clone().items[0].job.args[1]);
-            assert_eq!("test", &pipeline.clone().items[0].job.args[2]);
+            assert_eq!("echo", pipeline.clone().items[0].job.args[0].as_str());
+            assert_eq!("$x'{()}'", pipeline.clone().items[0].job.args[1].as_str());
+            assert_eq!("test", pipeline.clone().items[0].job.args[2].as_str());
         } else {
             assert!(false);
         }
@@ -957,14 +957,14 @@ mod tests {
     fn awk_tests() {
         if let Statement::Pipeline(pipeline) = parse("awk -v x=$x '{ if (1) print $1 }' myfile") {
             assert_eq!(1, pipeline.items.len());
-            assert_eq!("awk", &pipeline.clone().items[0].job.args[0]);
-            assert_eq!("-v", &pipeline.clone().items[0].job.args[1]);
-            assert_eq!("x=$x", &pipeline.clone().items[0].job.args[2]);
+            assert_eq!("awk", pipeline.clone().items[0].job.args[0].as_str());
+            assert_eq!("-v", pipeline.clone().items[0].job.args[1].as_str());
+            assert_eq!("x=$x", pipeline.clone().items[0].job.args[2].as_str());
             assert_eq!(
                 "'{ if (1) print $1 }'",
-                &pipeline.clone().items[0].job.args[3]
+                pipeline.clone().items[0].job.args[3].as_str()
             );
-            assert_eq!("myfile", &pipeline.clone().items[0].job.args[4]);
+            assert_eq!("myfile", pipeline.clone().items[0].job.args[4].as_str());
         } else {
             assert!(false);
         }

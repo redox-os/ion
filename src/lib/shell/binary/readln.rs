@@ -1,11 +1,10 @@
 use super::super::{completer::*, Binary, DirectoryStack, Shell, Variables};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
-use smallstring::SmallString;
 use std::{
     env, io::{self, ErrorKind, Write}, mem, path::PathBuf,
 };
 use sys;
-use types::*;
+use types;
 
 pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
     {
@@ -17,7 +16,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                 // Map each underlying `liner::Buffer` into a `String`.
                 .map(|x| x.chars().cloned().collect())
                 // Collect each result into a vector to avoid borrowing issues.
-                .collect::<Vec<SmallString>>();
+                .collect::<Vec<types::Str>>();
 
         loop {
             let prompt = handle_prompt(shell.prompt()).unwrap();
@@ -64,17 +63,17 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                             // in the creation of a custom completer.
                             let words = builtins.keys().iter()
                                 // Add built-in commands to the completer's definitions.
-                                .map(|&s| Identifier::from(s))
+                                .map(|&s| s.to_string())
                                 // Add the history list to the completer's definitions.
-                                .chain(history.iter().cloned())
+                                .chain(history.iter().map(|s| s.to_string()))
                                 // Add the aliases to the completer's definitions.
-                                .chain(vars.aliases().map(|(key, _)| key.clone()))
+                                .chain(vars.aliases().map(|(key, _)| key.to_string()))
                                 // Add the list of available functions to the completer's definitions.
-                                .chain(vars.functions().map(|(key, _)| key.clone()))
+                                .chain(vars.functions().map(|(key, _)| key.to_string()))
                                 // Add the list of available variables to the completer's definitions.
                                 // TODO: We should make it free to do String->SmallString
                                 //       and mostly free to go back (free if allocated)
-                                .chain(vars.string_vars().map(|(s, _)| ["$", &s].concat().into()))
+                                .chain(vars.string_vars().map(|(s, _)| ["$", &s].concat()))
                                 .collect();
 
                             // Initialize a new completer from the definitions collected.

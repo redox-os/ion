@@ -2,6 +2,7 @@ use shell::{status::*, Shell};
 
 use regex::Regex;
 use std::io::{self, Write};
+use small;
 use types;
 
 bitflags! {
@@ -40,7 +41,7 @@ impl IgnoreSetting {
 pub(crate) trait ShellHistory {
     /// Prints the commands contained within the history buffers to standard
     /// output.
-    fn print_history(&self, _arguments: &[String]) -> i32;
+    fn print_history(&self, _arguments: &[small::String]) -> i32;
 
     /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if
     /// it
@@ -125,7 +126,7 @@ impl ShellHistory for Shell {
         context.history.set_max_size(max_history_size);
 
         if &*variables.get_str_or_empty("HISTFILE_ENABLED") == "1" {
-            context.history.set_file_name(variables.get::<types::Value>("HISTFILE"));
+            context.history.set_file_name(variables.get::<types::Str>("HISTFILE").map(|v| v.to_string()));
 
             let max_histfile_size = variables
                 .get_str_or_empty("HISTFILE_SIZE")
@@ -137,7 +138,7 @@ impl ShellHistory for Shell {
         }
     }
 
-    fn print_history(&self, _arguments: &[String]) -> i32 {
+    fn print_history(&self, _arguments: &[small::String]) -> i32 {
         if let Some(context) = self.context.as_ref() {
             let mut buffer = Vec::with_capacity(8 * 1024);
             for command in &context.lock().unwrap().history.buffers {

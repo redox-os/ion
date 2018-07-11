@@ -11,7 +11,7 @@ use shell::{
     assignments::VariableStore,
     variables::VariableType,
 };
-
+use small;
 use std::{
     io::{stdout, Write}, iter, mem,
 };
@@ -48,7 +48,7 @@ pub(crate) trait FlowLogic {
     fn execute_for(
         &mut self,
         variable: &str,
-        values: &[String],
+        values: &[small::String],
         statements: Vec<Statement>,
     ) -> Condition;
 
@@ -72,7 +72,7 @@ pub(crate) trait FlowLogic {
 
     /// Expand an expression and run a branch based on the value of the
     /// expanded expression
-    fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition;
+    fn execute_match(&mut self, expression: small::String, cases: Vec<Case>) -> Condition;
 }
 
 impl FlowLogic for Shell {
@@ -357,7 +357,7 @@ impl FlowLogic for Shell {
     fn execute_for(
         &mut self,
         variable: &str,
-        values: &[String],
+        values: &[small::String],
         statements: Vec<Statement>,
     ) -> Condition {
         let ignore_variable = variable == "_";
@@ -385,7 +385,7 @@ impl FlowLogic for Shell {
                 }
             },
             ForExpression::Normal(values) => for value in values.lines() {
-                self.set(variable, value.to_string());
+                self.set(variable, value);
                 match self.execute_statements(statements.clone()) {
                     Condition::Break => break,
                     Condition::SigInt => return Condition::SigInt,
@@ -625,7 +625,7 @@ impl FlowLogic for Shell {
         condition.unwrap_or(Condition::NoOp)
     }
 
-    fn execute_match(&mut self, expression: String, cases: Vec<Case>) -> Condition {
+    fn execute_match(&mut self, expression: small::String, cases: Vec<Case>) -> Condition {
         // Logic for determining if the LHS of a match-case construct (the value we are
         // matching against) matches the RHS of a match-case construct (a value
         // in a case statement). For example, checking to see if the value
@@ -661,9 +661,9 @@ impl FlowLogic for Shell {
                         } else {
                             previous_bind = self
                                 .variables
-                                .get::<types::Value>(bind)
+                                .get::<types::Str>(bind)
                                 .map(|x| VariableType::Str(x));
-                            self.set(&bind, value.join(" ").to_string());
+                            self.set(&bind, value.join(" "));
                         }
                     }
 
@@ -701,9 +701,9 @@ impl FlowLogic for Shell {
                         } else {
                             previous_bind = self
                                 .variables
-                                .get::<types::Value>(bind)
+                                .get::<types::Str>(bind)
                                 .map(|x| VariableType::Str(x));
-                            self.set(&bind, value.join(" ").to_string());
+                            self.set(&bind, value.join(" "));
                         }
                     }
 

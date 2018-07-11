@@ -1,5 +1,6 @@
 use builtins::man_pages::{MAN_STATUS};
 use shell::Shell;
+use small;
 
 use std::env;
 
@@ -12,7 +13,7 @@ bitflags! {
     }
 }
 
-pub(crate) fn status(args: &[String], shell: &mut Shell) -> Result<(), String> {
+pub(crate) fn status(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
     let mut flags = Flags::empty();
     let shell_args: Vec<_> = env::args().collect();
 

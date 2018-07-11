@@ -1,4 +1,5 @@
 use super::{Index, Range};
+use small;
 use std::cmp::Ordering;
 
 fn stepped_range_numeric<'a>(
@@ -6,7 +7,7 @@ fn stepped_range_numeric<'a>(
     end: isize,
     step: isize,
     nb_digits: usize,
-) -> Option<Box<Iterator<Item = String> + 'a>> {
+) -> Option<Box<Iterator<Item = small::String> + 'a>> {
     if step == 0 {
         None
     } else if start < end && step < 0 {
@@ -24,7 +25,7 @@ fn stepped_range_numeric<'a>(
             if end.cmp(index) == ordering {
                 let index_holder = *index;
                 *index += step; // This step adds
-                Some(format!("{:0width$}", index_holder, width = nb_digits))
+                Some(format!("{:0width$}", index_holder, width = nb_digits).into())
             } else {
                 None
             }
@@ -38,7 +39,7 @@ fn stepped_range_chars<'a>(
     start: u8,
     end: u8,
     step: u8,
-) -> Option<Box<Iterator<Item = String> + 'a>> {
+) -> Option<Box<Iterator<Item = small::String> + 'a>> {
     if step == 0 {
         None
     } else {
@@ -56,7 +57,7 @@ fn stepped_range_chars<'a>(
                     Ordering::Less => index.wrapping_sub(step),
                     _ => unreachable!(),
                 };
-                Some((index_holder as char).to_string())
+                Some((index_holder as char).to_string().into())
             } else {
                 None
             }
@@ -72,7 +73,7 @@ fn numeric_range<'a>(
     step: isize,
     inclusive: bool,
     nb_digits: usize,
-) -> Option<Box<Iterator<Item = String> + 'a>> {
+) -> Option<Box<Iterator<Item = small::String> + 'a>> {
     if start < end {
         if inclusive {
             end += 1;
@@ -84,7 +85,7 @@ fn numeric_range<'a>(
         }
         stepped_range_numeric(start, end, step, nb_digits)
     } else {
-        Some(Box::new(Some(start.to_string()).into_iter()))
+        Some(Box::new(Some(start.to_string().into()).into_iter()))
     }
 }
 
@@ -97,7 +98,7 @@ fn char_range<'a>(
     mut end: u8,
     step: isize,
     inclusive: bool,
-) -> Option<Box<Iterator<Item = String> + 'a>> {
+) -> Option<Box<Iterator<Item = small::String> + 'a>> {
     if !byte_is_valid_range(start) || !byte_is_valid_range(end) {
         return None;
     }
@@ -121,7 +122,7 @@ fn char_range<'a>(
         }
         stepped_range_chars(start, end, char_step)
     } else {
-        Some(Box::new(Some((start as char).to_string()).into_iter()))
+        Some(Box::new(Some((start as char).to_string().into()).into_iter()))
     }
 }
 
@@ -163,7 +164,7 @@ fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize, usize)> {
 //      Inclusive nonstepped: {start...end}
 //      Exclusive stepped: {start..step..end}
 //      Inclusive stepped: {start..step...end}
-pub fn parse_range<'a>(input: &str) -> Option<Box<Iterator<Item = String> + 'a>> {
+pub fn parse_range<'a>(input: &str) -> Option<Box<Iterator<Item = small::String> + 'a>> {
     let mut read = 0;
     let mut bytes_iterator = input.bytes();
     while let Some(byte) = bytes_iterator.next() {

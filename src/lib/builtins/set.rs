@@ -1,6 +1,7 @@
 use liner::KeyBindings;
 use shell::{flags::*, Shell};
 use types;
+use small;
 use std::iter;
 
 enum PositionalArgs {
@@ -10,7 +11,7 @@ enum PositionalArgs {
 
 use self::PositionalArgs::*;
 
-pub(crate) fn set(args: &[String], shell: &mut Shell) -> i32 {
+pub(crate) fn set(args: &[small::String], shell: &mut Shell) -> i32 {
     let mut args_iter = args.iter();
     let mut positionals = None;
 
@@ -75,12 +76,12 @@ pub(crate) fn set(args: &[String], shell: &mut Shell) -> i32 {
     match positionals {
         None => (),
         Some(kind) => {
-            let command: String = shell.variables.get::<types::Array>("args").unwrap()[0].to_owned();
+            let command = shell.variables.get::<types::Array>("args").unwrap()[0].clone();
             // This used to take a `&[String]` but cloned them all, so although
             // this is non-ideal and could probably be better done with `Rc`, it
             // hasn't got any slower.
             let arguments: types::Array = iter::once(command)
-                .chain(args_iter.map(|i| i.to_string()))
+                .chain(args_iter.cloned())
                 .collect();
             match kind {
                 UnsetIfNone => { shell.variables.set("args", arguments); }

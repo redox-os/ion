@@ -1,10 +1,11 @@
 use builtins::man_pages::{check_help, MAN_EXEC};
+use small;
 use shell::Shell;
 use std::error::Error;
 use sys::execve;
 
 /// Executes the givent commmand.
-pub(crate) fn exec(shell: &mut Shell, args: &[String]) -> Result<(), String> {
+pub(crate) fn exec(shell: &mut Shell, args: &[small::String]) -> Result<(), small::String> {
     const CLEAR_ENV: u8 = 1;
 
     let mut flags = 0u8;
@@ -30,8 +31,8 @@ pub(crate) fn exec(shell: &mut Shell, args: &[String]) -> Result<(), String> {
             shell.prep_for_exit();
             Err(execve(argument, args, (flags & CLEAR_ENV) == 1)
                 .description()
-                .to_owned())
+                .into())
         }
-        None => Err("no command provided".to_owned()),
+        None => Err("no command provided".into()),
     }
 }

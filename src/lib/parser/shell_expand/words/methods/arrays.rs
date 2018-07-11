@@ -5,9 +5,9 @@ use super::{
     strings::unescape, Pattern,
 };
 use ranges::Index;
-use smallstring::SmallString;
+use small;
 use std::char;
-use types::Array;
+use types::{self, Array};
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -30,8 +30,7 @@ impl<'a> ArrayMethod<'a> {
         Ok(variable
             .lines()
             .into_iter()
-            .map(|line| line.to_string())
-            .collect())
+            .map(|line| types::Str::from(line)) .collect())
     }
 
     fn chars<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
@@ -39,7 +38,7 @@ impl<'a> ArrayMethod<'a> {
         let len = variable.chars().count();
         Ok(variable
             .chars()
-            .map(|c| c.to_string())
+            .map(|c| types::Str::from(c.to_string()))
             .select(self.selection.clone(), len))
     }
 
@@ -48,13 +47,13 @@ impl<'a> ArrayMethod<'a> {
         let len = variable.as_bytes().len();
         Ok(variable
             .bytes()
-            .map(|b| b.to_string())
+            .map(|b| types::Str::from(b.to_string()))
             .select(self.selection.clone(), len))
     }
 
     fn graphemes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
-        let graphemes: Vec<String> = UnicodeSegmentation::graphemes(variable.as_str(), true)
+        let graphemes: Vec<types::Str> = UnicodeSegmentation::graphemes(variable.as_str(), true)
             .map(From::from)
             .collect();
         let len = graphemes.len();
@@ -71,7 +70,7 @@ impl<'a> ArrayMethod<'a> {
             {
                 if value < variable.len() {
                     let (l, r) = variable.split_at(value);
-                    Ok(array![SmallString::from(l), SmallString::from(r)])
+                    Ok(array![types::Str::from(l), types::Str::from(r)])
                 } else {
                     Err("value is out of bounds")
                 }
@@ -87,9 +86,9 @@ impl<'a> ArrayMethod<'a> {
         let res = match (&self.pattern, self.selection.clone()) {
             (_, Select::None) => Some("".into()).into_iter().collect(),
             (&Pattern::StringPattern(pattern), Select::All) => variable
-                .split(&unescape(
+                .split(unescape(
                     &expand_string(pattern, expand_func, false).join(" ")
-                )?)
+                )?.as_str())
                 .map(From::from)
                 .collect(),
             (&Pattern::Whitespace, Select::All) => variable
@@ -100,7 +99,7 @@ impl<'a> ArrayMethod<'a> {
             (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => variable
                 .split(&unescape(
                     &expand_string(pattern, expand_func, false).join(" ")
-                )?)
+                )?.as_str())
                 .nth(id)
                 .map(From::from)
                 .into_iter()
@@ -115,7 +114,7 @@ impl<'a> ArrayMethod<'a> {
             (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => variable
                 .rsplit(&unescape(
                     &expand_string(pattern, expand_func, false).join(" ")
-                )?)
+                )?.as_str())
                 .nth(id)
                 .map(From::from)
                 .into_iter()
@@ -129,7 +128,7 @@ impl<'a> ArrayMethod<'a> {
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Range(range)) => {
                 let expansion = unescape(&expand_string(pattern, expand_func, false).join(" "))?;
-                let iter = variable.split(&expansion);
+                let iter = variable.split(expansion.as_str());
                 if let Some((start, length)) = range.bounds(iter.clone().count()) {
                     iter.skip(start).take(length).map(From::from).collect()
                 } else {
@@ -170,11 +169,11 @@ impl<'a> ArrayMethod<'a> {
     }
 
     #[inline]
-    fn resolve_var<E: Expander>(&self, expand_func: &E) -> String {
+    fn resolve_var<E: Expander>(&self, expand_func: &E) -> types::Str {
         if let Some(variable) = expand_func.string(self.variable, false) {
             variable
         } else if is_expression(self.variable) {
-            expand_string(self.variable, expand_func, false).join(" ")
+            types::Str::from_string(expand_string(self.variable, expand_func, false).join(" "))
         } else {
             "".into()
         }
@@ -198,7 +197,7 @@ impl<'a> ArrayMethod<'a> {
         })
     }
 
-    pub(crate) fn handle<E: Expander>(&self, current: &mut String, expand_func: &E) {
+    pub(crate) fn handle<E: Expander>(&self, current: &mut small::String, expand_func: &E) {
         let res = match self.method {
             "split" => self.split(expand_func).map(|r| r.join(" ")),
             _ => Err("invalid array method"),
@@ -214,23 +213,23 @@ impl<'a> ArrayMethod<'a> {
 mod test {
     use super::*;
     use ranges::Range;
-    use types::Value;
+    use types;
 
     struct VariableExpander;
 
     impl Expander for VariableExpander {
-        fn array(&self, variable: &str, _: Select) -> Option<Array> {
+        fn array(&self, variable: &str, _: Select) -> Option<types::Array> {
             match variable {
                 "ARRAY" => Some(array!["a", "b", "c"].to_owned()),
                 _ => None,
             }
         }
 
-        fn string(&self, variable: &str, _: bool) -> Option<Value> {
+        fn string(&self, variable: &str, _: bool) -> Option<types::Str> {
             match variable {
-                "FOO" => Some("FOOBAR".to_owned()),
-                "SPACEDFOO" => Some("FOO BAR".to_owned()),
-                "MULTILINE" => Some("FOO\nBAR".to_owned()),
+                "FOO" => Some("FOOBAR".into()),
+                "SPACEDFOO" => Some("FOO BAR".into()),
+                "MULTILINE" => Some("FOO\nBAR".into()),
                 _ => None,
             }
         }
@@ -238,7 +237,7 @@ mod test {
 
     #[test]
     fn test_split_string_all() {
-        let mut output = String::new();
+        let mut output = types::Str::new();
         let method = ArrayMethod {
             method:    "split",
             variable:  "$FOO",
@@ -246,12 +245,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FO AR");
+        assert_eq!(&*output, "FO AR");
     }
 
     #[test]
     fn test_split_whitespace_all() {
-        let mut output = String::new();
+        let mut output = types::Str::new();
         let method = ArrayMethod {
             method:    "split",
             variable:  "$SPACEDFOO",
@@ -259,12 +258,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FOO BAR");
+        assert_eq!(&*output, "FOO BAR");
     }
 
     #[test]
     fn test_split_string_index_forward() {
-        let mut output = String::new();
+        let mut output = types::Str::new();
         let method = ArrayMethod {
             method:    "split",
             variable:  "$FOO",
@@ -272,12 +271,12 @@ mod test {
             selection: Select::Index(Index::Forward(1)),
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "AR");
+        assert_eq!(&*output, "AR");
     }
 
     #[test]
     fn test_split_whitespace_index_forward() {
-        let mut output = String::new();
+        let mut output = types::Str::new();
         let method = ArrayMethod {
             method:    "split",
             variable:  "$SPACEDFOO",
@@ -285,12 +284,12 @@ mod test {
             selection: Select::Index(Index::Forward(1)),
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "BAR");
+        assert_eq!(&*output, "BAR");
     }
 
     #[test]
     fn test_split_string_index_backward() {
-        let mut output = String::new();
+        let mut output = types::Str::new();
         let method = ArrayMethod {
             method:    "split",
             variable:  "$FOO",
@@ -298,12 +297,12 @@ mod test {
             selection: Select::Index(Index::Backward(1)),
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FO");
+        assert_eq!(&*output, "FO");
     }
 
     #[test]
     fn test_split_whitespace_index_backward() {
-        let mut output = String::new();
+        let mut output = types::Str::new();
         let method = ArrayMethod {
             method:    "split",
             variable:  "$SPACEDFOO",
@@ -311,12 +310,12 @@ mod test {
             selection: Select::Index(Index::Backward(1)),
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FOO");
+        assert_eq!(&*output, "FOO");
     }
 
     #[test]
     fn test_split_string_range() {
-        let mut output = String::new();
+        let mut output = types::Str::new();
         let method = ArrayMethod {
             method:    "split",
             variable:  "$FOO",
@@ -324,12 +323,12 @@ mod test {
             selection: Select::Range(Range::from(Index::Forward(0))),
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FO AR");
+        assert_eq!(&*output, "FO AR");
     }
 
     #[test]
     fn test_split_whitespace_range() {
-        let mut output = String::new();
+        let mut output = types::Str::new();
         let method = ArrayMethod {
             method:    "split",
             variable:  "$SPACEDFOO",
@@ -337,12 +336,12 @@ mod test {
             selection: Select::Range(Range::from(Index::Forward(0))),
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FOO BAR");
+        assert_eq!(&*output, "FOO BAR");
     }
 
     #[test]
     fn test_split_none() {
-        let mut output = String::new();
+        let mut output = types::Str::new();
         let method = ArrayMethod {
             method:    "split",
             variable:  "$SPACEDFOO",
@@ -350,12 +349,12 @@ mod test {
             selection: Select::None,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "");
+        assert_eq!(&*output, "");
     }
 
     #[test]
     fn test_split_key() {
-        let mut output = String::new();
+        let mut output = types::Str::new();
         let method = ArrayMethod {
             method:    "split",
             variable:  "$SPACEDFOO",
@@ -363,7 +362,7 @@ mod test {
             selection: Select::Key("1".into()),
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "");
+        assert_eq!(&*output, "");
     }
 
     #[test]

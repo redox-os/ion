@@ -26,6 +26,7 @@ use super::{
 };
 use builtins::{self, BuiltinFunction};
 use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
+use small;
 use smallvec::SmallVec;
 use std::{
     fs::{File, OpenOptions},
@@ -94,7 +95,7 @@ fn do_redirection(
     macro_rules! get_infile {
         ($input:expr) => {
             match $input {
-                Input::File(ref filename) => match File::open(filename) {
+                Input::File(ref filename) => match File::open(filename.as_str()) {
                     Ok(file) => Some(file),
                     Err(e) => {
                         eprintln!("ion: failed to redirect '{}' to stdin: {}", filename, e);
@@ -157,9 +158,9 @@ fn do_redirection(
                         .create(true)
                         .write(true)
                         .append(true)
-                        .open(&output.file)
+                        .open(output.file.as_str())
                 } else {
-                    File::create(&output.file)
+                    File::create(output.file.as_str())
                 } {
                     Ok(f) => match output.from {
                         RedirectFrom::Stderr => $job.stderr(f),
@@ -200,9 +201,9 @@ fn do_redirection(
                         .create(true)
                         .write(true)
                         .append(true)
-                        .open(&output.file)
+                        .open(output.file.as_str())
                 } else {
-                    File::create(&output.file)
+                    File::create(output.file.as_str())
                 } {
                     Ok(f) => match output.from {
                         RedirectFrom::$teed => tee.sinks.push(f),
@@ -306,9 +307,9 @@ fn do_redirection(
                             .create(true)
                             .write(true)
                             .append(true)
-                            .open(&output.file)
+                            .open(output.file.as_str())
                     } else {
-                        File::create(&output.file)
+                        File::create(output.file.as_str())
                     } {
                         Ok(f) => match output.from {
                             RedirectFrom::Stdout => tee_out.sinks.push(f),
@@ -392,7 +393,7 @@ pub(crate) trait PipelineExecution {
     fn exec_builtin(
         &mut self,
         main: BuiltinFunction,
-        args: &[String],
+        args: &[small::String],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
@@ -612,7 +613,7 @@ impl PipelineExecution for Shell {
     fn exec_builtin(
         &mut self,
         main: BuiltinFunction,
-        args: &[String],
+        args: &[small::String],
         stdout: &Option<File>,
         stderr: &Option<File>,
         stdin: &Option<File>,
@@ -987,7 +988,7 @@ fn spawn_proc(
         } => match unsafe { sys::fork() } {
             Ok(0) => {
                 prepare_child(block_child, pgid);
-                let ret = shell.exec_builtin(main, &args, stdout, stderr, stdin);
+                let ret = shell.exec_builtin(main, args, stdout, stderr, stdin);
                 close(stdout);
                 close(stderr);
                 close(stdin);

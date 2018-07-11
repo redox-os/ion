@@ -4,4 +4,4 @@ version = "0.1.0"
 authors = ["Michael Murphy <mmstickman@gmail.com>"]
 
 [dependencies]
-smallstring = "0.1"
+small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }

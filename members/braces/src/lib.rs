@@ -1,5 +1,6 @@
 extern crate permutate;
 extern crate smallvec;
+extern crate small;
 
 use permutate::Permutator;
 use smallvec::SmallVec;
@@ -7,14 +8,14 @@ use smallvec::SmallVec;
 #[derive(Debug)]
 /// A token primitive for the `expand_braces` function.
 pub enum BraceToken {
-    Normal(String),
+    Normal(small::String),
     Expander,
 }
 
 pub fn expand<'a>(
     tokens: &'a [BraceToken],
     expanders: &'a [&'a [&'a str]],
-) -> Box<Iterator<Item = String> + 'a> {
+) -> Box<Iterator<Item = small::String> + 'a> {
     if expanders.len() > 1 {
         let multiple_brace_expand = MultipleBraceExpand::new(tokens, expanders);
         Box::new(multiple_brace_expand)
@@ -70,7 +71,7 @@ impl<'a> MultipleBraceExpand<'a> {
 }
 
 impl<'a> Iterator for MultipleBraceExpand<'a> {
-    type Item = String;
+    type Item = small::String;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.permutator.next_with_buffer(&mut self.buffer) {
@@ -88,7 +89,7 @@ impl<'a> Iterator for MultipleBraceExpand<'a> {
                     }
                 },
             );
-            Some(unsafe { String::from_utf8_unchecked(small_vec.to_vec()) })
+            Some(unsafe { small::String::from_utf8_unchecked(small_vec.to_vec()) })
         } else {
             None
         }
@@ -108,7 +109,7 @@ impl<'a, 'b, I> Iterator for SingleBraceExpand<'a, 'b, I>
 where
     I: Iterator<Item = &'a str>,
 {
-    type Item = String;
+    type Item = small::String;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.loop_count {
@@ -127,7 +128,7 @@ where
                     },
                 );
                 self.loop_count = 1;
-                Some(unsafe { String::from_utf8_unchecked(small_vec.to_vec()) })
+                Some(unsafe { small::String::from_utf8_unchecked(small_vec.to_vec()) })
             }
             _ => {
                 if let Some(element) = self.elements.next() {
@@ -144,7 +145,7 @@ where
                             }
                         },
                     );
-                    Some(unsafe { String::from_utf8_unchecked(small_vec.to_vec()) })
+                    Some(unsafe { small::String::from_utf8_unchecked(small_vec.to_vec()) })
                 } else {
                     None
                 }
@@ -161,25 +162,25 @@ mod tests {
     fn test_multiple_brace_expand() {
         let expanders: &[&[&str]] = &[&["1", "2"][..], &["3", "4"][..], &["5", "6"][..]];
         let tokens: &[BraceToken] = &[
-            BraceToken::Normal("AB".to_owned()),
+            BraceToken::Normal("AB".into()),
             BraceToken::Expander,
-            BraceToken::Normal("CD".to_owned()),
+            BraceToken::Normal("CD".into()),
             BraceToken::Expander,
-            BraceToken::Normal("EF".to_owned()),
+            BraceToken::Normal("EF".into()),
             BraceToken::Expander,
-            BraceToken::Normal("GH".to_owned()),
+            BraceToken::Normal("GH".into()),
         ];
         assert_eq!(
-            MultipleBraceExpand::new(tokens, expanders).collect::<Vec<String>>(),
+            MultipleBraceExpand::new(tokens, expanders).collect::<Vec<small::String>>(),
             vec![
-                "AB1CD3EF5GH".to_owned(),
-                "AB1CD3EF6GH".to_owned(),
-                "AB1CD4EF5GH".to_owned(),
-                "AB1CD4EF6GH".to_owned(),
-                "AB2CD3EF5GH".to_owned(),
-                "AB2CD3EF6GH".to_owned(),
-                "AB2CD4EF5GH".to_owned(),
-                "AB2CD4EF6GH".to_owned(),
+                small::String::from("AB1CD3EF5GH"),
+                small::String::from("AB1CD3EF6GH"),
+                small::String::from("AB1CD4EF5GH"),
+                small::String::from("AB1CD4EF6GH"),
+                small::String::from("AB2CD3EF5GH"),
+                small::String::from("AB2CD3EF6GH"),
+                small::String::from("AB2CD4EF5GH"),
+                small::String::from("AB2CD4EF6GH"),
             ]
         );
     }
@@ -187,14 +188,18 @@ mod tests {
     #[test]
     fn test_single_brace_expand() {
         let elements = &["one", "two", "three"];
-        let tokens: &[BraceToken] = &[BraceToken::Normal("A=".to_owned()), BraceToken::Expander];
+        let tokens: &[BraceToken] = &[BraceToken::Normal("A=".into()), BraceToken::Expander];
         assert_eq!(
             SingleBraceExpand {
                 elements: elements.iter().map(|element| *element),
                 tokens,
                 loop_count: 0,
-            }.collect::<Vec<String>>(),
-            vec!["A=one".to_owned(), "A=two".to_owned(), "A=three".to_owned()]
+            }.collect::<Vec<small::String>>(),
+            vec![
+                small::String::from("A=one"),
+                small::String::from("A=two"),
+                small::String::from("A=three"),
+            ]
         );
     }
 }

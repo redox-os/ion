@@ -1,15 +1,15 @@
 use parser::{expand_string, Expander};
-use types::Value;
+use types;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum ForExpression {
-    Multiple(Vec<Value>),
-    Normal(Value),
+    Multiple(Vec<types::Str>),
+    Normal(types::Str),
     Range(usize, usize),
 }
 
 impl ForExpression {
-    pub(crate) fn new<E: Expander>(expression: &[String], expanders: &E) -> ForExpression {
+    pub(crate) fn new<E: Expander>(expression: &[types::Str], expanders: &E) -> ForExpression {
         let output: Vec<_> = expression
             .iter()
             .flat_map(|expression| expand_string(expression, expanders, true))
@@ -70,13 +70,13 @@ mod tests {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn string(&self, var: &str, _: bool) -> Option<Value> { self.0.get::<Value>(var) }
+        fn string(&self, var: &str, _: bool) -> Option<types::Str> { self.0.get::<types::Str>(var) }
     }
 
     #[test]
     fn for_inclusive_range() {
         let variables = Variables::default();
-        let input = &["1...10".to_owned()];
+        let input = &["1...10".into()];
         assert_eq!(
             ForExpression::new(input, &VariableExpander(variables)),
             ForExpression::Range(1, 11)
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn for_exclusive_range() {
         let variables = Variables::default();
-        let input = &["1..10".to_owned()];
+        let input = &["1..10".into()];
         assert_eq!(
             ForExpression::new(input, &VariableExpander(variables)),
             ForExpression::Range(1, 10)
@@ -97,11 +97,11 @@ mod tests {
     fn for_normal() {
         let variables = Variables::default();
         let output = vec![
-            "1".to_owned(),
-            "2".to_owned(),
-            "3".to_owned(),
-            "4".to_owned(),
-            "5".to_owned(),
+            "1".into(),
+            "2".into(),
+            "3".into(),
+            "4".into(),
+            "5".into(),
         ];
         assert_eq!(
             ForExpression::new(&output.clone(), &VariableExpander(variables)),
@@ -114,8 +114,8 @@ mod tests {
         let mut variables = Variables::default();
         variables.set("A", "1 2 3 4 5".to_string());
         assert_eq!(
-            ForExpression::new(&["$A".to_owned()], &VariableExpander(variables)),
-            ForExpression::Normal("1 2 3 4 5".to_owned())
+            ForExpression::new(&["$A".into()], &VariableExpander(variables)),
+            ForExpression::Normal("1 2 3 4 5".into())
         );
     }
 }

@@ -4,6 +4,7 @@ use super::{
     case, functions::{collect_arguments, parse_function},
 };
 use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};
+use small;
 use std::char;
 
 fn collect<F>(arguments: &str, statement: F) -> Statement
@@ -128,7 +129,7 @@ pub(crate) fn parse(code: &str) -> Statement {
             return Statement::For {
                 variable:   variable.into(),
                 values:     ArgumentSplitter::new(cmd[3..].trim_left())
-                    .map(String::from)
+                    .map(small::String::from)
                     .collect(),
                 statements: Vec::new(),
             };
@@ -183,7 +184,7 @@ pub(crate) fn parse(code: &str) -> Statement {
             match collect_arguments(args) {
                 Ok(args) => {
                     return Statement::Function {
-                        description: description.map(String::from),
+                        description: description.map(small::String::from),
                         name: name.into(),
                         args,
                         statements: Vec::new(),
@@ -233,12 +234,12 @@ mod tests {
         let correct_parse = Statement::If {
             expression: Pipeline {
                 items: vec![PipeItem {
-                    job:     Job::new(
+                    job: Job::new(
                         vec![
-                            "test".to_owned(),
-                            "1".to_owned(),
-                            "-eq".to_owned(),
-                            "2".to_owned(),
+                            "test".into(),
+                            "1".into(),
+                            "-eq".into(),
+                            "2".into(),
                         ].into_iter()
                             .collect(),
                         JobKind::Last,
@@ -337,7 +338,7 @@ mod tests {
 
         let parsed_if = parse("fn bob a b --bob is a nice function");
         let correct_parse = Statement::Function {
-            description: Some("bob is a nice function".to_string()),
+            description: Some("bob is a nice function".into()),
             name:        "bob".into(),
             args:        vec![
                 KeyBuf {

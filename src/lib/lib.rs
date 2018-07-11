@@ -18,7 +18,7 @@ extern crate lazy_static;
 extern crate libloading;
 extern crate liner;
 extern crate regex;
-extern crate smallstring;
+extern crate small;
 extern crate smallvec;
 extern crate unicode_segmentation;
 extern crate xdg;

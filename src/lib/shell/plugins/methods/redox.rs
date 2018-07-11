@@ -1,8 +1,9 @@
 use super::super::StringError;
+use small;
 
 pub(crate) enum MethodArguments {
-    StringArg(String, Vec<String>),
-    Array(Vec<String>, Vec<String>),
+    StringArg(small::String, Vec<small::String>),
+    Array(Vec<small::String>, Vec<small::String>),
     NoArgs,
 }
 
@@ -13,7 +14,7 @@ impl StringMethodPlugins {
         &self,
         _function: &str,
         _arguments: MethodArguments,
-    ) -> Result<Option<String>, StringError> {
+    ) -> Result<Option<small::String>, StringError> {
         Ok(None)
     }
 

@@ -1,5 +1,5 @@
 use std::fs::ReadDir;
-use types::Identifier;
+use types;
 
 pub(crate) struct Library;
 
@@ -15,7 +15,7 @@ impl LibraryIterator {
 impl Iterator for LibraryIterator {
     // The `Identifier` is the name of the namespace for which values may be pulled.
     // The `Library` is a handle to dynamic library loaded into memory.
-    type Item = (Identifier, Library);
+    type Item = (types::Str, Library);
 
-    fn next(&mut self) -> Option<(Identifier, Library)> { None }
+    fn next(&mut self) -> Option<(types::Str, Library)> { None }
 }

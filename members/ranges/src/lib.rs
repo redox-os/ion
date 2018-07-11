@@ -1,4 +1,4 @@
-extern crate smallstring;
+extern crate small;
 
 mod index;
 mod parse;
@@ -65,150 +65,150 @@ mod tests {
             panic!("parse_range() failed");
         }
 
-        let actual: Vec<String> = parse_range("-3...3").unwrap().collect();
-        let expected: Vec<String> = vec![
-            "-3".to_owned(),
-            "-2".to_owned(),
-            "-1".to_owned(),
-            "0".to_owned(),
-            "1".to_owned(),
-            "2".to_owned(),
-            "3".to_owned(),
+        let actual: Vec<small::String> = parse_range("-3...3").unwrap().collect();
+        let expected: Vec<small::String> = vec![
+            "-3".into(),
+            "-2".into(),
+            "-1".into(),
+            "0".into(),
+            "1".into(),
+            "2".into(),
+            "3".into(),
         ];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("07...12").unwrap().collect();
-        let expected: Vec<String> = vec![
-            "07".to_owned(),
-            "08".to_owned(),
-            "09".to_owned(),
-            "10".to_owned(),
-            "11".to_owned(),
-            "12".to_owned(),
+        let actual: Vec<small::String> = parse_range("07...12").unwrap().collect();
+        let expected: Vec<small::String> = vec![
+            "07".into(),
+            "08".into(),
+            "09".into(),
+            "10".into(),
+            "11".into(),
+            "12".into(),
         ];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("-3...10").unwrap().collect();
-        let expected: Vec<String> = vec![
-            "-3".to_owned(),
-            "-2".to_owned(),
-            "-1".to_owned(),
-            "0".to_owned(),
-            "1".to_owned(),
-            "2".to_owned(),
-            "3".to_owned(),
-            "4".to_owned(),
-            "5".to_owned(),
-            "6".to_owned(),
-            "7".to_owned(),
-            "8".to_owned(),
-            "9".to_owned(),
-            "10".to_owned(),
+        let actual: Vec<small::String> = parse_range("-3...10").unwrap().collect();
+        let expected: Vec<small::String> = vec![
+            "-3".into(),
+            "-2".into(),
+            "-1".into(),
+            "0".into(),
+            "1".into(),
+            "2".into(),
+            "3".into(),
+            "4".into(),
+            "5".into(),
+            "6".into(),
+            "7".into(),
+            "8".into(),
+            "9".into(),
+            "10".into(),
         ];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("3...-3").unwrap().collect();
-        let expected: Vec<String> = vec![
-            "3".to_owned(),
-            "2".to_owned(),
-            "1".to_owned(),
-            "0".to_owned(),
-            "-1".to_owned(),
-            "-2".to_owned(),
-            "-3".to_owned(),
+        let actual: Vec<small::String> = parse_range("3...-3").unwrap().collect();
+        let expected: Vec<small::String> = vec![
+            "3".into(),
+            "2".into(),
+            "1".into(),
+            "0".into(),
+            "-1".into(),
+            "-2".into(),
+            "-3".into(),
         ];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("03...-3").unwrap().collect();
-        let expected: Vec<String> = vec![
-            "03".to_owned(),
-            "02".to_owned(),
-            "01".to_owned(),
-            "00".to_owned(),
-            "-1".to_owned(),
-            "-2".to_owned(),
-            "-3".to_owned(),
+        let actual: Vec<small::String> = parse_range("03...-3").unwrap().collect();
+        let expected: Vec<small::String> = vec![
+            "03".into(),
+            "02".into(),
+            "01".into(),
+            "00".into(),
+            "-1".into(),
+            "-2".into(),
+            "-3".into(),
         ];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("3...-03").unwrap().collect();
-        let expected: Vec<String> = vec![
-            "003".to_owned(),
-            "002".to_owned(),
-            "001".to_owned(),
-            "000".to_owned(),
-            "-01".to_owned(),
-            "-02".to_owned(),
-            "-03".to_owned(),
+        let actual: Vec<small::String> = parse_range("3...-03").unwrap().collect();
+        let expected: Vec<small::String> = vec![
+            "003".into(),
+            "002".into(),
+            "001".into(),
+            "000".into(),
+            "-01".into(),
+            "-02".into(),
+            "-03".into(),
         ];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("a...c").unwrap().collect();
-        let expected: Vec<String> = vec!["a".to_owned(), "b".to_owned(), "c".to_owned()];
+        let actual: Vec<small::String> = parse_range("a...c").unwrap().collect();
+        let expected: Vec<small::String> = vec!["a".into(), "b".into(), "c".into()];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("c...a").unwrap().collect();
-        let expected: Vec<String> = vec!["c".to_owned(), "b".to_owned(), "a".to_owned()];
+        let actual: Vec<small::String> = parse_range("c...a").unwrap().collect();
+        let expected: Vec<small::String> = vec!["c".into(), "b".into(), "a".into()];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("A...C").unwrap().collect();
-        let expected: Vec<String> = vec!["A".to_owned(), "B".to_owned(), "C".to_owned()];
+        let actual: Vec<small::String> = parse_range("A...C").unwrap().collect();
+        let expected: Vec<small::String> = vec!["A".into(), "B".into(), "C".into()];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("C...A").unwrap().collect();
-        let expected: Vec<String> = vec!["C".to_owned(), "B".to_owned(), "A".to_owned()];
+        let actual: Vec<small::String> = parse_range("C...A").unwrap().collect();
+        let expected: Vec<small::String> = vec!["C".into(), "B".into(), "A".into()];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("C..A").unwrap().collect();
-        let expected: Vec<String> = vec!["C".to_owned(), "B".to_owned()];
+        let actual: Vec<small::String> = parse_range("C..A").unwrap().collect();
+        let expected: Vec<small::String> = vec!["C".into(), "B".into()];
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("c..a").unwrap().collect();
-        let expected: Vec<String> = vec!["c".to_owned(), "b".to_owned()];
+        let actual: Vec<small::String> = parse_range("c..a").unwrap().collect();
+        let expected: Vec<small::String> = vec!["c".into(), "b".into()];
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("-3..4").unwrap().collect();
-        let expected: Vec<String> = vec![
-            "-3".to_owned(),
-            "-2".to_owned(),
-            "-1".to_owned(),
-            "0".to_owned(),
-            "1".to_owned(),
-            "2".to_owned(),
-            "3".to_owned(),
+        let actual: Vec<small::String> = parse_range("-3..4").unwrap().collect();
+        let expected: Vec<small::String> = vec![
+            "-3".into(),
+            "-2".into(),
+            "-1".into(),
+            "0".into(),
+            "1".into(),
+            "2".into(),
+            "3".into(),
         ];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("3..-4").unwrap().collect();
-        let expected: Vec<String> = vec![
-            "3".to_owned(),
-            "2".to_owned(),
-            "1".to_owned(),
-            "0".to_owned(),
-            "-1".to_owned(),
-            "-2".to_owned(),
-            "-3".to_owned(),
+        let actual: Vec<small::String> = parse_range("3..-4").unwrap().collect();
+        let expected: Vec<small::String> = vec![
+            "3".into(),
+            "2".into(),
+            "1".into(),
+            "0".into(),
+            "-1".into(),
+            "-2".into(),
+            "-3".into(),
         ];
 
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("-3...0").unwrap().collect();
-        let expected: Vec<String> = vec!["-3".into(), "-2".into(), "-1".into(), "0".into()];
+        let actual: Vec<small::String> = parse_range("-3...0").unwrap().collect();
+        let expected: Vec<small::String> = vec!["-3".into(), "-2".into(), "-1".into(), "0".into()];
         assert_eq!(actual, expected);
 
-        let actual: Vec<String> = parse_range("-3..0").unwrap().collect();
-        let expected: Vec<String> = vec!["-3".into(), "-2".into(), "-1".into()];
+        let actual: Vec<small::String> = parse_range("-3..0").unwrap().collect();
+        let expected: Vec<small::String> = vec!["-3".into(), "-2".into(), "-1".into()];
         assert_eq!(actual, expected);
     }
 }

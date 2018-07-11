@@ -6,6 +6,7 @@ use self::strings::unescape;
 
 use lexers::ArgumentSplitter;
 use super::{expand_string, Expander};
+use small;
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Pattern<'a> {
@@ -20,15 +21,15 @@ pub(crate) struct MethodArgs<'a, 'b, E: 'b + Expander> {
 }
 
 impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
-    pub(crate) fn array<'c>(&'c self) -> impl Iterator<Item = String> + 'c {
+    pub(crate) fn array<'c>(&'c self) -> impl Iterator<Item = small::String> + 'c {
         ArgumentSplitter::new(self.args)
             .flat_map(move |x| expand_string(x, self.expand, false).into_iter())
-            .map(|s| unescape(&s).unwrap_or_else(|_| String::from("")))
+            .map(|s| unescape(&s).unwrap_or_else(|_| small::String::from("")))
     }
 
-    pub(crate) fn join(self, pattern: &str) -> String {
+    pub(crate) fn join(self, pattern: &str) -> small::String {
         unescape(&expand_string(self.args, self.expand, false).join(pattern))
-            .unwrap_or_else(|_| String::from(""))
+            .unwrap_or_else(|_| small::String::from(""))
     }
 
     pub(crate) fn new(args: &'a str, expand: &'b E) -> MethodArgs<'a, 'b, E> {

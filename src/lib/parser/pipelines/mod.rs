@@ -4,6 +4,7 @@ pub(crate) use self::collector::*;
 
 use super::expand_string;
 use shell::{Job, JobKind, Shell};
+use small;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -16,7 +17,7 @@ pub(crate) enum RedirectFrom {
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct Redirection {
     pub from:   RedirectFrom,
-    pub file:   String,
+    pub file:   small::String,
     pub append: bool,
 }
 
@@ -25,10 +26,10 @@ pub(crate) struct Redirection {
 pub(crate) enum Input {
     /// A file; the contents of said file will be written to the `stdin` of a
     /// process
-    File(String),
+    File(small::String),
     /// A string literal that is written to the `stdin` of a process.
     /// If there is a second string, that second string is the EOF phrase for the heredoc.
-    HereString(String),
+    HereString(small::String),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -49,13 +50,13 @@ impl PipeItem {
 
         for input in &mut self.inputs {
             *input = match input {
-                Input::File(ref s) => Input::File(expand_string(s, shell, false).join(" ")),
-                Input::HereString(ref s) => Input::HereString(expand_string(s, shell, true).join(" ")),
+                Input::File(ref s) => Input::File(expand_string(s, shell, false).join(" ").into()),
+                Input::HereString(ref s) => Input::HereString(expand_string(s, shell, true).join(" ").into()),
             };
         }
 
         for output in &mut self.outputs {
-            output.file = expand_string(output.file.as_str(), shell, false).join(" ");
+            output.file = expand_string(output.file.as_str(), shell, false).join(" ").into();
         }
     }
 
@@ -86,7 +87,7 @@ impl Pipeline {
 
 impl fmt::Display for Pipeline {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut tokens: Vec<String> = Vec::with_capacity(self.items.len());
+        let mut tokens: Vec<small::String> = Vec::with_capacity(self.items.len());
         for item in &self.items {
             let job = &item.job;
             let kind = job.kind;

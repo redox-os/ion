@@ -7,7 +7,6 @@ use super::{
 };
 use fnv::FnvHashMap;
 use liner::Context;
-use smallstring::SmallString;
 use std::{
     any::TypeId,
     env,
@@ -17,68 +16,66 @@ use std::{
     ops::{Deref, DerefMut}
 };
 use sys::{self, geteuid, getpid, getuid, is_root, variables as self_sys, env as sys_env};
-use types::{
-    self, Alias, Array, BTreeMap, HashMap, Identifier, Key, Value,
-};
+use types::{self, Array};
 use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
 
 lazy_static! {
-    static ref STRING_NAMESPACES: FnvHashMap<Identifier, StringNamespace> = namespaces::collect();
+    static ref STRING_NAMESPACES: FnvHashMap<types::Str, StringNamespace> = namespaces::collect();
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum VariableType {
-    Str(Value),
-    Alias(Alias),
-    Array(Array),
-    HashMap(HashMap),
-    BTreeMap(BTreeMap),
+    Str(types::Str),
+    Alias(types::Alias),
+    Array(types::Array),
+    HashMap(types::HashMap),
+    BTreeMap(types::BTreeMap),
     Function(Function),
     None,
 }
 
-impl From<VariableType> for String {
+impl From<VariableType> for types::Str {
     fn from(var: VariableType) -> Self {
         match var {
             VariableType::Str(string) => string,
-            _ => String::with_capacity(0),
+            _ => types::Str::with_capacity(0),
         }
     }
 }
 
-impl From<VariableType> for Alias {
+impl From<VariableType> for types::Alias {
     fn from(var: VariableType) -> Self {
         match var {
             VariableType::Alias(alias) => alias,
-            _ => Alias::empty(),
+            _ => types::Alias::empty(),
         }
     }
 }
 
-impl From<VariableType> for Array {
+impl From<VariableType> for types::Array {
     fn from(var: VariableType) -> Self {
         match var {
             VariableType::Array(array) => array,
-            _ => Array::with_capacity(0),
+            _ => types::Array::with_capacity(0),
         }
     }
 }
 
-impl From<VariableType> for HashMap {
+impl From<VariableType> for types::HashMap {
     fn from(var: VariableType) -> Self {
         match var {
             VariableType::HashMap(hash_map) => hash_map,
-            _ => HashMap::with_capacity_and_hasher(0, Default::default()),
+            _ => types::HashMap::with_capacity_and_hasher(0, Default::default()),
         }
     }
 }
 
-impl From<VariableType> for BTreeMap {
+impl From<VariableType> for types::BTreeMap {
     fn from(var: VariableType) -> Self {
         match var {
             VariableType::BTreeMap(btree_map) => btree_map,
-            _ => BTreeMap::new(),
+            _ => types::BTreeMap::new(),
         }
     }
 }
@@ -92,33 +89,45 @@ impl From<VariableType> for Function {
     }
 }
 
-impl From<String> for VariableType {
-    fn from(string: String) -> Self {
+impl<'a> From<&'a str> for VariableType {
+    fn from(string: &'a str) -> Self {
+        VariableType::Str(string.into())
+    }
+}
+
+impl From<types::Str> for VariableType {
+    fn from(string: types::Str) -> Self {
         VariableType::Str(string)
     }
 }
 
-impl From<Alias> for VariableType {
-    fn from(alias: Alias) -> Self {
+impl From<String> for VariableType {
+    fn from(string: String) -> Self {
+        VariableType::Str(string.into())
+    }
+}
+
+impl From<types::Alias> for VariableType {
+    fn from(alias: types::Alias) -> Self {
         VariableType::Alias(alias)
     }
 }
 
-impl From<Array> for VariableType {
-    fn from(array: Array) -> Self {
+impl From<types::Array> for VariableType {
+    fn from(array: types::Array) -> Self {
         VariableType::Array(array)
     }
 }
 
-impl From<HashMap> for VariableType {
-    fn from(hash_map: HashMap) -> Self {
-        VariableType::HashMap(hash_map)
+impl From<types::HashMap> for VariableType {
+    fn from(hmap: types::HashMap) -> Self {
+        VariableType::HashMap(hmap)
     }
 }
 
-impl From<BTreeMap> for VariableType {
-    fn from(btree_map: BTreeMap) -> Self {
-        VariableType::BTreeMap(btree_map)
+impl From<types::BTreeMap> for VariableType {
+    fn from(bmap: types::BTreeMap) -> Self {
+        VariableType::BTreeMap(bmap)
     }
 }
 
@@ -159,14 +168,14 @@ impl fmt::Display for VariableType {
 
 #[derive(Clone, Debug)]
 pub struct Scope {
-    vars: FnvHashMap<Identifier, VariableType>,
+    vars: FnvHashMap<types::Str, VariableType>,
     /// This scope is on a namespace boundary.
     /// Any previous scopes need to be accessed through `super::`.
     namespace: bool
 }
 
 impl Deref for Scope {
-    type Target = FnvHashMap<Identifier, VariableType>;
+    type Target = FnvHashMap<types::Str, VariableType>;
     fn deref(&self) -> &Self::Target {
         &self.vars
     }
@@ -187,7 +196,7 @@ pub struct Variables {
 
 impl Default for Variables {
     fn default() -> Self {
-        let mut map: FnvHashMap<Identifier, VariableType> = FnvHashMap::with_capacity_and_hasher(64, Default::default());
+        let mut map: FnvHashMap<types::Str, VariableType> = FnvHashMap::with_capacity_and_hasher(64, Default::default());
         map.insert("DIRECTORY_STACK_SIZE".into(), VariableType::Str("1000".into()));
         map.insert("HISTORY_SIZE".into(), VariableType::Str("1000".into()));
         map.insert("HISTFILE_SIZE".into(), VariableType::Str("100000".into()));
@@ -204,15 +213,15 @@ impl Default for Variables {
         // Set the PID, UID, and EUID variables.
         map.insert(
             "PID".into(),
-            VariableType::Str(getpid().ok().map_or("?".into(), |id| id.to_string())),
+            VariableType::Str(getpid().ok().map_or("?".into(), |id| id.to_string().into())),
         );
         map.insert(
             "UID".into(),
-            VariableType::Str(getuid().ok().map_or("?".into(), |id| id.to_string())),
+            VariableType::Str(getuid().ok().map_or("?".into(), |id| id.to_string().into())),
         );
         map.insert(
             "EUID".into(),
-            VariableType::Str(geteuid().ok().map_or("?".into(), |id| id.to_string())),
+            VariableType::Str(geteuid().ok().map_or("?".into(), |id| id.to_string().into())),
         );
 
         // Initialize the HISTFILE variable
@@ -296,8 +305,8 @@ impl Variables {
         None
     }
 
-    pub fn shadow(&mut self, name: SmallString, value: VariableType) -> Option<VariableType> {
-        self.scopes[self.current].insert(name, value)
+    pub fn shadow(&mut self, name: &str, value: VariableType) -> Option<VariableType> {
+        self.scopes[self.current].insert(name.into(), value)
     }
 
     pub fn get_ref(&self, mut name: &str) -> Option<&VariableType> {
@@ -353,24 +362,6 @@ impl Variables {
         None
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn is_hashmap_reference(key: &str) -> Option<(Identifier, Key)> {
-        let mut key_iter = key.split('[');
-
-        if let Some(map_name) = key_iter.next() {
-            if Variables::is_valid_variable_name(map_name) {
-                if let Some(mut inner_key) = key_iter.next() {
-                    if inner_key.ends_with(']') {
-                        inner_key = inner_key.split(']').next().unwrap_or("");
-                        inner_key = inner_key.trim_matches(|c| c == '\'' || c == '\"');
-                        return Some((map_name.into(), inner_key.into()));
-                    }
-                }
-            }
-        }
-        None
-    }
-
     pub(crate) fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> Option<String> {
         let mut chars = word.char_indices();
 
@@ -399,8 +390,8 @@ impl Variables {
                 Ok(var) => var + remainder,
                 _ => ["?", remainder].concat()
             }),
-            "-" => if let Some(oldpwd) = self.get::<Value>("OLDPWD") {
-                return Some(oldpwd.clone() + remainder);
+            "-" => if let Some(oldpwd) = self.get::<types::Str>("OLDPWD") {
+                return Some(oldpwd.to_string() + remainder);
             },
             _ => {
                 let neg;
@@ -446,7 +437,7 @@ impl Variables {
         c.is_alphanumeric() || c == '_' || c == '?' || c == '.' || c == '-' || c == '+'
     }
 
-    pub fn string_vars(&self) -> impl Iterator<Item = (&SmallString, &Value)> {
+    pub fn string_vars(&self) -> impl Iterator<Item = (&types::Str, &types::Str)> {
         self.scopes()
             .map(|map| {
                 map.iter()
@@ -459,14 +450,14 @@ impl Variables {
             .flat_map(|f| f)
     }
 
-    pub fn get_str_or_empty(&self, name: &str) -> String {
-        self.get::<String>(name).unwrap_or_default()
+    pub fn get_str_or_empty(&self, name: &str) -> types::Str {
+        self.get::<types::Str>(name).unwrap_or_default()
     }
 
     pub fn get<T: Clone + From<VariableType> + 'static>(&self, name: &str) -> Option<T> {
         let specified_type = TypeId::of::<T>();
 
-        if specified_type == TypeId::of::<types::Value>() {
+        if specified_type == TypeId::of::<types::Str>() {
             match name {
                 "MWD" => return Some(T::from(VariableType::Str(self.get_minimal_directory()))),
                 "SWD" => return Some(T::from(VariableType::Str(self.get_simplified_directory()))),
@@ -475,9 +466,9 @@ impl Variables {
             // If the parsed name contains the '::' pattern, then a namespace was
             // designated. Find it.
             match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
-                Some(("c", variable)) | Some(("color", variable)) => Colors::collect(variable).into_string().map(|s| T::from(VariableType::Str(s))),
+                Some(("c", variable)) | Some(("color", variable)) => Colors::collect(variable).into_string().map(|s| T::from(VariableType::Str(s.into()))),
                 Some(("x", variable)) | Some(("hex", variable)) => match u8::from_str_radix(variable, 16) {
-                    Ok(c) => Some(T::from(VariableType::Str((c as char).to_string()))),
+                    Ok(c) => Some(T::from(VariableType::Str((c as char).to_string().into()))),
                     Err(why) => {
                         eprintln!("ion: hex parse error: {}: {}", variable, why);
                         None
@@ -488,7 +479,7 @@ impl Variables {
                     // Otherwise, it's just a simple variable name.
                     match self.get_ref(name) {
                         Some(VariableType::Str(val)) => Some(T::from(VariableType::Str(val.clone()))),
-                        _ => env::var(name).ok().map(|s| T::from(VariableType::Str(s))),
+                        _ => env::var(name).ok().map(|s| T::from(VariableType::Str(s.into()))),
                     }
                 },
                 Some((_, variable)) => {
@@ -511,7 +502,7 @@ impl Variables {
                         // Attempt to execute the given function from that namespace, and map it's
                         // results.
                         match namespace.execute(variable.into()) {
-                            Ok(value) => value.map(|s| T::from(VariableType::Str(s))),
+                            Ok(value) => value.map(|s| T::from(VariableType::Str(s.into()))),
                             Err(why) => {
                                 eprintln!("ion: string namespace error: {}: {}", name, why);
                                 None
@@ -627,7 +618,7 @@ impl Variables {
         }
     }
 
-    pub fn aliases(&self) -> impl Iterator<Item = (&SmallString, &Value)> {
+    pub fn aliases(&self) -> impl Iterator<Item = (&types::Str, &types::Str)> {
         self.scopes.iter().rev()
             .map(|map| {
                 map.iter()
@@ -640,7 +631,7 @@ impl Variables {
             .flat_map(|f| f)
     }
 
-    pub fn functions(&self) -> impl Iterator<Item = (&SmallString, &Function)> {
+    pub fn functions(&self) -> impl Iterator<Item = (&types::Str, &Function)> {
         self.scopes.iter().rev()
             .map(|map| {
                 map.iter()
@@ -658,7 +649,7 @@ impl Variables {
     /// Further minimizes the directory path in the same manner that Fish does by default.
     /// That is, if more than two parents are visible in the path, all parent directories
     /// of the current directory will be reduced to a single character.
-    fn get_minimal_directory(&self) -> Value {
+    fn get_minimal_directory(&self) -> types::Str {
         let swd = self.get_simplified_directory();
 
         {
@@ -670,7 +661,7 @@ impl Variables {
                 .filter(|s| !s.is_empty())
                 .collect::<Vec<&str>>();
             if elements.len() > 2 {
-                let mut output = String::new();
+                let mut output = types::Str::new();
                 for element in &elements[0..elements.len() - 1] {
                     let mut segmenter = UnicodeSegmentation::graphemes(*element, true);
                     let grapheme = segmenter.next().unwrap();
@@ -692,17 +683,16 @@ impl Variables {
     ///
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
-    fn get_simplified_directory(&self) -> Value {
-        let home = match self.get::<Value>("HOME") {
+    fn get_simplified_directory(&self) -> types::Str {
+        let home = match self.get::<types::Str>("HOME") {
             Some(string) => string,
-            None => String::from("?"),
+            None => "?".into(),
         };
-        env::var("PWD")
-            .unwrap()
-            .replace(&home, "~")
+
+        env::var("PWD").unwrap().replace(&*home, "~").into()
     }
 
-    pub fn arrays(&self) -> impl Iterator<Item = (&SmallString, &Array)> {
+    pub fn arrays(&self) -> impl Iterator<Item = (&types::Str, &types::Array)> {
         self.scopes.iter().rev()
             .map(|map| {
                 map.iter()
@@ -724,7 +714,7 @@ impl Variables {
             for arg in args.into_iter().skip(1) {
                 match con.read_line(format!("{}=", arg.as_ref().trim()), None, &mut |_| {}) {
                     Ok(buffer) => {
-                        self.set(arg.as_ref(), buffer.trim().to_string());
+                        self.set(arg.as_ref(), buffer.trim());
                     }
                     Err(_) => return FAILURE,
                 }
@@ -735,7 +725,7 @@ impl Variables {
             let mut lines = handle.lines();
             for arg in args.into_iter().skip(1) {
                 if let Some(Ok(line)) = lines.next() {
-                    self.set(arg.as_ref(), line.trim().to_string());
+                    self.set(arg.as_ref(), line.trim());
                 }
             }
         }
@@ -757,8 +747,8 @@ mod tests {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn string(&self, var: &str, _: bool) -> Option<Value> {
-            self.0.get::<Value>(var)
+        fn string(&self, var: &str, _: bool) -> Option<types::Str> {
+            self.0.get::<types::Str>(var)
         }
     }
 
@@ -772,19 +762,9 @@ mod tests {
     #[test]
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
-        variables.set("FOO", "BAR".to_string());
+        variables.set("FOO", "BAR");
         let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
         assert_eq!("BAR", &expanded);
-    }
-
-    #[test]
-    fn decompose_map_reference() {
-        if let Some((map_name, inner_key)) = Variables::is_hashmap_reference("map[\'key\']") {
-            assert!(map_name == "map".into());
-            assert!(inner_key == "key".into());
-        } else {
-            assert!(false);
-        }
     }
 
     #[test]
@@ -792,8 +772,8 @@ mod tests {
         let variables = Variables::default();
         env::set_var("PWD", "/var/log/nix");
         assert_eq!(
-            "v/l/nix",
-            match variables.get::<Value>("MWD") {
+            types::Str::from("v/l/nix"),
+            match variables.get::<types::Str>("MWD") {
                 Some(string) => string,
                 None => panic!("no value returned")
             }
@@ -805,8 +785,8 @@ mod tests {
         let variables = Variables::default();
         env::set_var("PWD", "/var/log");
         assert_eq!(
-            "/var/log",
-            match variables.get::<Value>("MWD") {
+            types::Str::from("/var/log"),
+            match variables.get::<types::Str>("MWD") {
                 Some(string) => string,
                 None => panic!("no value returned")
             }

@@ -1,5 +1,5 @@
 use super::{parse_index_range, Index, Range};
-use smallstring::SmallString;
+use small;
 use std::{
     iter::{empty, FromIterator},
     str::FromStr,
@@ -17,7 +17,7 @@ pub enum Select {
     /// Select a range of elements
     Range(Range),
     /// Select an element by mapped key
-    Key(SmallString),
+    Key(small::String),
 }
 
 pub trait SelectWithSize {

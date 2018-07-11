@@ -6,3 +6,4 @@ authors = ["Michael Murphy <mmstickman@gmail.com>"]
 [dependencies]
 permutate = "0.3"
 smallvec = "0.6"
+small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }

@@ -34,7 +34,6 @@ use self::{
         VariableType,
     }
 };
-use types;
 use builtins::{BuiltinMap, BUILTINS};
 use lexers::ArgumentSplitter;
 use liner::Context;
@@ -49,7 +48,7 @@ use std::{
     sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
-use types::*;
+use types::{self, Array};
 use xdg::BaseDirectories;
 
 #[derive(Debug, Fail)]
@@ -226,7 +225,7 @@ impl Shell {
     }
 
     /// Obtains a variable, returning an empty string if it does not exist.
-    pub(crate) fn get_str_or_empty(&self, name: &str) -> String {
+    pub(crate) fn get_str_or_empty(&self, name: &str) -> types::Str {
         self.variables.get_str_or_empty(name)
     }
 
@@ -260,9 +259,9 @@ impl Shell {
 
                 if let Some(alias) = possible_alias {
                     let new_args = ArgumentSplitter::new(&alias)
-                        .map(String::from)
+                        .map(types::Str::from)
                         .chain(item.job.args.drain().skip(1))
-                        .collect::<Array>();
+                        .collect::<types::Array>();
                     if let Some(builtin) = BUILTINS.get(&new_args[0]) {
                         item.job.builtin = Some(builtin.main);
                     } else {
@@ -285,7 +284,7 @@ impl Shell {
                     Some(SUCCESS)
                 } else {
                     let borrowed = &pipeline.items[0].job.args;
-                    Some(main(&borrowed, self))
+                    Some(main(borrowed, self))
                 }
             } else {
                 Some(self.execute_pipeline(pipeline))
@@ -293,7 +292,7 @@ impl Shell {
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(function) = self.variables.get::<Function>(&pipeline.items[0].job.command) {
             if !pipeline.requires_piping() {
-                let args: &[String] = pipeline.items[0].job.args.deref();
+                let args = pipeline.items[0].job.args.deref();
                 match function.execute(self, args) {
                     Ok(()) => None,
                     Err(FunctionError::InvalidArgumentCount) => {
@@ -321,7 +320,7 @@ impl Shell {
         // pipline just executed to the the file and context histories. At the
         // moment, this means record how long it took.
         if let Some(context) = self.context.as_mut() {
-            if "1" == self.variables.get_str_or_empty("RECORD_SUMMARY") {
+            if "1" == &*self.variables.get_str_or_empty("RECORD_SUMMARY") {
                 if let Ok(elapsed_time) = command_start_time.elapsed() {
                     let summary = format!(
                         "#summary# elapsed real time: {}.{:09} seconds",
@@ -419,7 +418,7 @@ impl Shell {
 
 impl<'a> Expander for Shell {
     /// Uses a subshell to expand a given command.
-    fn command(&self, command: &str) -> Option<Value> {
+    fn command(&self, command: &str) -> Option<types::Str> {
         let mut output = None;
         match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| {
             shell.on_command(command)
@@ -440,28 +439,28 @@ impl<'a> Expander for Shell {
 
         // Ensure that the parent retains ownership of the terminal before exiting.
         let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
-        output
+        output.map(|s| s.into())
     }
 
     /// Expand a string variable given if its quoted / unquoted
-    fn string(&self, name: &str, quoted: bool) -> Option<Value> {
+    fn string(&self, name: &str, quoted: bool) -> Option<types::Str> {
         use ascii_helpers::AsciiReplace;
         if quoted {
-            self.get::<Value>(name)
+            self.get::<types::Str>(name)
         } else {
-            self.get::<Value>(name).map(|x| x.ascii_replace('\n', ' '))
+            self.get::<types::Str>(name).map(|x| x.ascii_replace('\n', ' '))
         }
     }
 
     /// Expand an array variable with some selection
-    fn array(&self, name: &str, selection: Select) -> Option<Array> {
-        if let Some(array) = self.variables.get::<Array>(name) {
+    fn array(&self, name: &str, selection: Select) -> Option<types::Array> {
+        if let Some(array) = self.variables.get::<types::Array>(name) {
             match selection {
                 Select::All => return Some(array.clone()),
                 Select::Index(id) => return id
                     .resolve(array.len())
                     .and_then(|n| array.get(n))
-                    .map(|x| Array::from_iter(Some(x.to_owned()))),
+                    .map(|x| types::Array::from_iter(Some(x.to_owned()))),
                 Select::Range(range) => if let Some((start, length)) = range.bounds(array.len()) {
                     if array.len() > start {
                         return Some(
@@ -470,23 +469,23 @@ impl<'a> Expander for Shell {
                                 .skip(start)
                                 .take(length)
                                 .map(|x| x.to_owned())
-                                .collect::<Array>(),
+                                .collect::<types::Array>(),
                         )
                     }
                 }
                 _ => (),
             }
-        } else if let Some(hmap) = self.variables.get::<HashMap>(name) {
+        } else if let Some(hmap) = self.variables.get::<types::HashMap>(name) {
             match selection {
                 Select::All => {
-                    let mut array = Array::new();
+                    let mut array = types::Array::new();
                     for (_, value) in hmap.iter() {
                         let f = format!("{}", value);
                         match *value {
-                            VariableType::Str(_) => array.push(f),
+                            VariableType::Str(_) => array.push(f.into()),
                             VariableType::Array(_) | VariableType::HashMap(_) | VariableType::BTreeMap(_) => {
                                 for split in f.split_whitespace() {
-                                    array.push(split.to_owned());
+                                    array.push(split.into());
                                 }
                             }
                             _ => (),
@@ -494,22 +493,22 @@ impl<'a> Expander for Shell {
                     }
                     return Some(array)
                 }
-                Select::Key(ref key) => {
-                    return Some(array![format!("{}", hmap.get(key).unwrap_or(&VariableType::Str("".into())))])
+                Select::Key(key) => {
+                    return Some(array![format!("{}", hmap.get(&*key).unwrap_or(&VariableType::Str("".into())))])
                 }
                 _ => (),
             }
-        } else if let Some(bmap) = self.variables.get::<BTreeMap>(name) {
+        } else if let Some(bmap) = self.variables.get::<types::BTreeMap>(name) {
             match selection {
                 Select::All => {
-                    let mut array = Array::new();
+                    let mut array = types::Array::new();
                     for (_, value) in bmap.iter() {
                         let f = format!("{}", value);
                         match *value {
-                            VariableType::Str(_) => array.push(f),
+                            VariableType::Str(_) => array.push(f.into()),
                             VariableType::Array(_) | VariableType::HashMap(_) | VariableType::BTreeMap(_) => {
                                 for split in f.split_whitespace() {
-                                    array.push(split.to_owned());
+                                    array.push(split.into());
                                 }
                             }
                             _ => (),
@@ -517,8 +516,8 @@ impl<'a> Expander for Shell {
                     }
                     return Some(array)
                 }
-                Select::Key(ref key) => {
-                    return Some(array![format!("{}", bmap.get(&(&*key).to_string()).unwrap_or(&VariableType::Str("".into())))])
+                Select::Key(key) => {
+                    return Some(array![format!("{}", bmap.get(&*key).unwrap_or(&VariableType::Str("".into())))])
                 }
                 _ => (),
             }

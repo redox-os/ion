@@ -2,7 +2,7 @@ use super::super::{config_dir, LibraryIterator, StringError};
 use fnv::FnvHashMap;
 use libloading::{os::unix::Symbol as RawSymbol, Library, Symbol};
 use std::{ffi::CString, fs::read_dir, os::raw::c_char, slice, str};
-use types::Identifier;
+use types;
 
 /// A dynamically-loaded string namespace from an external library.
 ///
@@ -18,7 +18,7 @@ pub(crate) struct StringNamespace {
     library: Library,
     /// A hash map of symbols collected from the `Library` stored in the `library` field.
     /// These are considered raw because they have their lifetimes erased.
-    symbols: FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn() -> *mut c_char>>,
+    symbols: FnvHashMap<types::Str, RawSymbol<unsafe extern "C" fn() -> *mut c_char>>,
 }
 
 impl StringNamespace {
@@ -26,7 +26,7 @@ impl StringNamespace {
     ///
     /// If the function exists, it is executed, and it's return value is then converted into a
     /// proper Rusty type.
-    pub(crate) fn execute(&self, function: Identifier) -> Result<Option<String>, StringError> {
+    pub(crate) fn execute(&self, function: types::Str) -> Result<Option<String>, StringError> {
         let func = self
             .symbols
             .get(&function)
@@ -77,7 +77,7 @@ impl StringNamespace {
                             // Grab a slice and ensure that the name of the function is UTF-8.
                             let slice = &symbol_list[start..counter];
                             let identifier = str::from_utf8(slice)
-                                .map(Identifier::from)
+                                .map(types::Str::from)
                                 .map_err(|_| StringError::UTF8Function)?;
 
                             // To obtain the symbol, we need to create a new `\0`-ended byte array.
@@ -108,7 +108,7 @@ impl StringNamespace {
                 if counter != start {
                     let slice = &symbol_list[start..];
                     let identifier = str::from_utf8(slice)
-                        .map(Identifier::from)
+                        .map(types::Str::from)
                         .map_err(|_| StringError::UTF8Function)?;
                     let mut symbol = Vec::new();
                     symbol.reserve_exact(slice.len() + 1);
@@ -130,7 +130,7 @@ impl StringNamespace {
 ///
 /// This function is meant to be called with `lazy_static` to ensure that there isn't a
 /// cost to collecting all this information when the shell never uses it in the first place!
-pub(crate) fn collect() -> FnvHashMap<Identifier, StringNamespace> {
+pub(crate) fn collect() -> FnvHashMap<types::Str, StringNamespace> {
     let mut hashmap = FnvHashMap::default();
     if let Some(mut path) = config_dir() {
         path.push("namespaces");

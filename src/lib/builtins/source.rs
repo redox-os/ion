@@ -1,10 +1,11 @@
 use shell::{FlowLogic, Shell};
 use std::{fs::File, io::Read};
+use small;
 
 /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
-pub(crate) fn source(shell: &mut Shell, arguments: &[String]) -> Result<(), String> {
+pub(crate) fn source(shell: &mut Shell, arguments: &[small::String]) -> Result<(), String> {
     match arguments.get(1) {
-        Some(argument) => if let Ok(mut file) = File::open(&argument) {
+        Some(argument) => if let Ok(mut file) = File::open(argument.as_str()) {
             let capacity = file.metadata().map(|x| x.len()).unwrap_or(0) as usize;
             let mut command_list = String::with_capacity(capacity);
             file.read_to_string(&mut command_list)

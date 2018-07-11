@@ -1,6 +1,8 @@
-pub(crate) fn check_help(args: &[String], man_page: &'static str) -> bool {
+use small;
+
+pub(crate) fn check_help(args: &[small::String], man_page: &'static str) -> bool {
     for arg in args {
-        if &**arg == "-h" || &**arg == "--help" {
+        if arg == "-h" || arg == "--help" {
             println!("{}", man_page);
             return true;
         }

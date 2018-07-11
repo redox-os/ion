@@ -8,6 +8,7 @@ use parser::assignments::is_array;
 use regex::Regex;
 use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};
 use std::path::Path;
+use small;
 use sys;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -15,10 +16,10 @@ lazy_static! {
     static ref STRING_METHODS: StringMethodPlugins = methods::collect();
 }
 
-pub(crate) fn unescape(input: &str) -> Result<String, &'static str> {
+pub(crate) fn unescape(input: &str) -> Result<small::String, &'static str> {
     let mut check = false;
-    let mut out = String::with_capacity(input.len());
-    let add_char = |out: &mut String, check: &mut bool, c| {
+    let mut out = small::String::with_capacity(input.len());
+    let add_char = |out: &mut small::String, check: &mut bool, c| {
         out.push(c);
         *check = false;
     };
@@ -33,7 +34,7 @@ pub(crate) fn unescape(input: &str) -> Result<String, &'static str> {
             'a' if check => add_char(&mut out, &mut check, '\u{0007}'),
             'b' if check => add_char(&mut out, &mut check, '\u{0008}'),
             'c' if check => {
-                out = String::from("");
+                out = small::String::from("");
                 break;
             }
             'e' if check => add_char(&mut out, &mut check, '\u{001B}'),
@@ -97,7 +98,7 @@ pub(crate) struct StringMethod<'a> {
 }
 
 impl<'a> StringMethod<'a> {
-    pub(crate) fn handle<E: Expander>(&self, output: &mut String, expand: &E) {
+    pub(crate) fn handle<E: Expander>(&self, output: &mut small::String, expand: &E) {
         let variable = self.variable;
         let pattern = MethodArgs::new(self.pattern, expand);
 
@@ -105,11 +106,11 @@ impl<'a> StringMethod<'a> {
             ($variable:ident $method:tt) => {{
                 let pattern = pattern.join(" ");
                 let is_true = if let Some(value) = expand.string($variable, false) {
-                    value.$method(&pattern)
+                    value.$method(pattern.as_str())
                 } else if is_expression($variable) {
                     expand_string($variable, expand, false)
                         .join(" ")
-                        .$method(&pattern)
+                        .$method(pattern.as_str())
                 } else {
                     false
                 };
@@ -121,7 +122,7 @@ impl<'a> StringMethod<'a> {
             ($method:tt) => {{
                 if let Some(value) = expand.string(variable, false) {
                     output.push_str(
-                        Path::new(&value)
+                        Path::new(&*value)
                             .$method()
                             .and_then(|os_str| os_str.to_str())
                             .unwrap_or(value.as_str()),
@@ -154,7 +155,7 @@ impl<'a> StringMethod<'a> {
                 if let Some(value) = expand.string(variable, false) {
                     value
                 } else {
-                    expand_string(variable, expand, false).join(" ")
+                    small::String::from(expand_string(variable, expand, false).join(" "))
                 }
             }};
         }
@@ -179,7 +180,7 @@ impl<'a> StringMethod<'a> {
                 let mut args = pattern.array();
                 match (args.next(), args.next()) {
                     (Some(replace), Some(with)) => {
-                        let res = &get_var!().replace(&replace, &with);
+                        let res = &get_var!().replace(replace.as_str(), &with);
                         output.push_str(res);
                     }
                     _ => eprintln!("ion: replace: two arguments are required"),
@@ -190,7 +191,7 @@ impl<'a> StringMethod<'a> {
                 match (args.next(), args.next(), args.next()) {
                     (Some(replace), Some(with), Some(nth)) => if let Ok(nth) = nth.parse::<usize>()
                     {
-                        let res = &get_var!().replacen(&replace, &with, nth);
+                        let res = &get_var!().replacen(replace.as_str(), &with, nth);
                         output.push_str(res);
                     } else {
                         eprintln!("ion: replacen: third argument isn't a valid integer");
@@ -254,11 +255,11 @@ impl<'a> StringMethod<'a> {
             },
             "find" => {
                 let out = if let Some(value) = expand.string(variable, false) {
-                    value.find(&pattern.join(" "))
+                    value.find(pattern.join(" ").as_str())
                 } else if is_expression(variable) {
                     expand_string(variable, expand, false)
                         .join(" ")
-                        .find(&pattern.join(" "))
+                        .find(pattern.join(" ").as_str())
                 } else {
                     None
                 };
@@ -268,7 +269,7 @@ impl<'a> StringMethod<'a> {
                 let out = if let Some(value) = expand.string(variable, false) {
                     value
                 } else if is_expression(variable) {
-                    expand_string(variable, expand, false).join(" ")
+                    expand_string(variable, expand, false).join(" ").into()
                 } else {
                     return;
                 };
@@ -281,7 +282,7 @@ impl<'a> StringMethod<'a> {
                 let word = if let Some(value) = expand.string(variable, false) {
                     value
                 } else if is_expression(variable) {
-                    expand_string(variable, expand, false).join(" ")
+                    expand_string(variable, expand, false).join(" ").into()
                 } else {
                     return;
                 };
@@ -328,14 +329,14 @@ impl<'a> StringMethod<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::Value;
+    use types;
 
     struct VariableExpander;
 
     impl Expander for VariableExpander {
-        fn string(&self, variable: &str, _: bool) -> Option<Value> {
+        fn string(&self, variable: &str, _: bool) -> Option<types::Str> {
             match variable {
-                "FOO" => Some("FOOBAR".to_owned()),
+                "FOO" => Some("FOOBAR".into()),
                 _ => None,
             }
         }
@@ -357,7 +358,7 @@ mod test {
 
     #[test]
     fn test_ends_with_succeeding() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "ends_with",
             variable:  "$FOO",
@@ -365,12 +366,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "1");
+        assert_eq!(&*output, "1");
     }
 
     #[test]
     fn test_ends_with_failing() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "ends_with",
             variable:  "$FOO",
@@ -378,12 +379,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "0");
+        assert_eq!(&*output, "0");
     }
 
     #[test]
     fn test_contains_succeeding() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "contains",
             variable:  "$FOO",
@@ -391,12 +392,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "1");
+        assert_eq!(&*output, "1");
     }
 
     #[test]
     fn test_contains_failing() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "contains",
             variable:  "$FOO",
@@ -404,12 +405,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "0");
+        assert_eq!(&*output, "0");
     }
 
     #[test]
     fn test_starts_with_succeeding() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "starts_with",
             variable:  "$FOO",
@@ -417,12 +418,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "1");
+        assert_eq!(&*output, "1");
     }
 
     #[test]
     fn test_starts_with_failing() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "starts_with",
             variable:  "$FOO",
@@ -430,12 +431,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "0");
+        assert_eq!(&*output, "0");
     }
 
     #[test]
     fn test_basename() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "basename",
             variable:  "\"/home/redox/file.txt\"",
@@ -443,12 +444,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "file.txt");
+        assert_eq!(&*output, "file.txt");
     }
 
     #[test]
     fn test_extension() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "extension",
             variable:  "\"/home/redox/file.txt\"",
@@ -456,12 +457,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "txt");
+        assert_eq!(&*output, "txt");
     }
 
     #[test]
     fn test_filename() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "filename",
             variable:  "\"/home/redox/file.txt\"",
@@ -469,12 +470,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "file");
+        assert_eq!(&*output, "file");
     }
 
     #[test]
     fn test_parent() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "parent",
             variable:  "\"/home/redox/file.txt\"",
@@ -482,12 +483,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "/home/redox");
+        assert_eq!(&*output, "/home/redox");
     }
 
     #[test]
     fn test_to_lowercase() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "to_lowercase",
             variable:  "\"Ford Prefect\"",
@@ -495,12 +496,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "ford prefect");
+        assert_eq!(&*output, "ford prefect");
     }
 
     #[test]
     fn test_to_uppercase() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "to_uppercase",
             variable:  "\"Ford Prefect\"",
@@ -508,12 +509,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FORD PREFECT");
+        assert_eq!(&*output, "FORD PREFECT");
     }
 
     #[test]
     fn test_repeat_succeeding() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "repeat",
             variable:  "$FOO",
@@ -521,12 +522,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FOOBARFOOBAR");
+        assert_eq!(&*output, "FOOBARFOOBAR");
     }
 
     #[test]
     fn test_repeat_failing() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "repeat",
             variable:  "$FOO",
@@ -534,12 +535,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "");
+        assert_eq!(&*output, "");
     }
 
     #[test]
     fn test_replace_succeeding() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "replace",
             variable:  "$FOO",
@@ -547,12 +548,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "BARBAR");
+        assert_eq!(&*output, "BARBAR");
     }
 
     #[test]
     fn test_replace_failing() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "replace",
             variable:  "$FOO",
@@ -560,12 +561,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "");
+        assert_eq!(&*output, "");
     }
 
     #[test]
     fn test_replacen_succeeding() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "replacen",
             variable:  "\"FOO$FOO\"",
@@ -573,12 +574,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "BARFOOBAR");
+        assert_eq!(&*output, "BARFOOBAR");
     }
 
     #[test]
     fn test_replacen_failing() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "replacen",
             variable:  "$FOO",
@@ -586,12 +587,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "");
+        assert_eq!(&*output, "");
     }
 
     #[test]
     fn test_regex_replace_succeeding() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "regex_replace",
             variable:  "$FOO",
@@ -599,12 +600,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "fOOBAR");
+        assert_eq!(&*output, "fOOBAR");
     }
 
     #[test]
     fn test_regex_replace_failing() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "regex_replace",
             variable:  "$FOO",
@@ -612,12 +613,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FOOBAR");
+        assert_eq!(&*output, "FOOBAR");
     }
 
     #[test]
     fn test_join_with_string() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "join",
             variable:  "[\"FOO\" \"BAR\"]",
@@ -625,12 +626,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FOO BAR");
+        assert_eq!(&*output, "FOO BAR");
     }
 
     #[test]
     fn test_join_with_array() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "join",
             variable:  "[\"FOO\" \"BAR\"]",
@@ -638,12 +639,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "FOO- -BAR");
+        assert_eq!(&*output, "FOO- -BAR");
     }
 
     #[test]
     fn test_len_with_array() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "len",
             variable:  "[\"1\"]",
@@ -651,12 +652,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "1");
+        assert_eq!(&*output, "1");
     }
 
     #[test]
     fn test_len_with_string() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "len",
             variable:  "\"FOO\"",
@@ -664,12 +665,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "3");
+        assert_eq!(&*output, "3");
     }
 
     #[test]
     fn test_len_with_variable() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "len",
             variable:  "$FOO",
@@ -677,12 +678,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "6");
+        assert_eq!(&*output, "6");
     }
 
     #[test]
     fn test_len_bytes_with_variable() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "len_bytes",
             variable:  "$FOO",
@@ -690,12 +691,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "6");
+        assert_eq!(&*output, "6");
     }
 
     #[test]
     fn test_len_bytes_with_string() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "len_bytes",
             variable:  "\"oh là là\"",
@@ -703,12 +704,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "10");
+        assert_eq!(&*output, "10");
     }
 
     #[test]
     fn test_reverse_with_variable() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "reverse",
             variable:  "$FOO",
@@ -716,12 +717,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "RABOOF");
+        assert_eq!(&*output, "RABOOF");
     }
 
     #[test]
     fn test_reverse_with_string() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "reverse",
             variable:  "\"FOOBAR\"",
@@ -729,12 +730,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "RABOOF");
+        assert_eq!(&*output, "RABOOF");
     }
 
     #[test]
     fn test_find_succeeding() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "find",
             variable:  "$FOO",
@@ -742,12 +743,12 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "1");
+        assert_eq!(&*output, "1");
     }
 
     #[test]
     fn test_find_failing() {
-        let mut output = String::new();
+        let mut output = small::String::new();
         let method = StringMethod {
             method:    "find",
             variable:  "$FOO",
@@ -755,6 +756,6 @@ mod test {
             selection: Select::All,
         };
         method.handle(&mut output, &VariableExpander);
-        assert_eq!(output, "-1");
+        assert_eq!(&*output, "-1");
     }
 }

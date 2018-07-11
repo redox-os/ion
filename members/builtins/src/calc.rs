@@ -1,5 +1,6 @@
 use calculate::{eval, eval_polish, CalcError, Value};
 use std::io::{self, Write};
+use small;
 
 const REPL_GUIDE: &'static str = r#"ion-calc
 Type in expressions to have them evaluated.
@@ -49,7 +50,7 @@ fn calc_or_polish_calc(args: &str) -> Result<Value, CalcError> {
     }
 }
 
-pub fn calc(args: &[String]) -> Result<(), String> {
+pub fn calc(args: &[small::String]) -> Result<(), String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     match args.first() {

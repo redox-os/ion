@@ -1,7 +1,7 @@
 use super::super::{expand_string, Expander};
 use lexers::assignments::{Primitive, TypeError};
 use shell::variables::VariableType;
-use types::*;
+use types;
 use std::iter::Iterator;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -143,7 +143,7 @@ fn is_float_array(value: VariableType) -> Result<VariableType, ()> {
 }
 
 fn get_string<E: Expander>(shell: &E, value: &str) -> VariableType {
-    VariableType::Str(expand_string(value, shell, false).join(" "))
+    VariableType::Str(types::Str::from(expand_string(value, shell, false).join(" ")))
 }
 
 fn get_array<E: Expander>(shell: &E, value: &str) -> VariableType {
@@ -152,7 +152,7 @@ fn get_array<E: Expander>(shell: &E, value: &str) -> VariableType {
 
 fn get_hash_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive) -> Result<VariableType, TypeError> {
     let array = expand_string(expression, shell, false);
-    let mut hmap: HashMap = HashMap::with_capacity_and_hasher(array.len(), Default::default());
+    let mut hmap = types::HashMap::with_capacity_and_hasher(array.len(), Default::default());
 
     for string in array {
         if let Some(found) = string.find('=') {
@@ -185,7 +185,7 @@ fn get_hash_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive
 
 fn get_btree_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive) -> Result<VariableType, TypeError> {
     let array = expand_string(expression, shell, false);
-    let mut bmap: BTreeMap = BTreeMap::new();
+    let mut bmap = types::BTreeMap::new();
 
     for string in array {
         if let Some(found) = string.find('=') {
@@ -241,7 +241,7 @@ pub(crate) fn value_check<E: Expander>(
         Primitive::Boolean if !is_array => {
             let value = get_string!();
             let value = is_boolean_string(&value).map_err(|_| TypeError::BadValue(expected.clone()))?;
-            Ok(VariableType::Str(value.to_owned()))
+            Ok(VariableType::Str(value.into()))
         }
         Primitive::BooleanArray if is_array => {
             let mut values = get_array!();
@@ -273,6 +273,7 @@ pub(crate) fn value_check<E: Expander>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use types::Array;
 
     #[test]
     fn is_array_() {

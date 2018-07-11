@@ -98,11 +98,11 @@ impl Binary for Shell {
             let mut context = Context::new();
             context.word_divider_fn = Box::new(word_divide);
             if "1" == self.get_str_or_empty("HISTFILE_ENABLED") {
-                let path = self.get::<types::Value>("HISTFILE").expect("shell didn't set HISTFILE");
-                context.history.set_file_name(Some(path.clone()));
+                let path = self.get::<types::Str>("HISTFILE").expect("shell didn't set HISTFILE");
+                context.history.set_file_name(Some(path.to_string()));
                 if !Path::new(path.as_str()).exists() {
                     eprintln!("ion: creating history file at \"{}\"", path);
-                    if let Err(why) = File::create(path) {
+                    if let Err(why) = File::create(&*path) {
                         eprintln!("ion: could not create history file: {}", why);
                     }
                 }
@@ -128,7 +128,7 @@ impl Binary for Shell {
         self.evaluate_init_file();
 
         self.variables
-            .set("args", iter::once(env::args().next().unwrap()).collect::<types::Array>());
+            .set("args", iter::once(env::args().next().unwrap().into()).collect::<types::Array>());
 
         loop {
             if let Some(command) = self.readln() {

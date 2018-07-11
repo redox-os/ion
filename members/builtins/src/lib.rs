@@ -2,7 +2,7 @@
 extern crate bitflags;
 extern crate calc as calculate;
 extern crate rand;
-extern crate smallstring;
+extern crate small;
 extern crate smallvec;
 
 pub mod calc;

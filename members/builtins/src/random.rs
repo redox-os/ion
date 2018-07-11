@@ -1,14 +1,15 @@
 use rand::{thread_rng, Rng};
 use std::io::{self, Write};
+use small;
 
 #[allow(unused_must_use)]
-fn rand_list(args: &[String]) -> Result<(), String> {
+fn rand_list(args: &[small::String]) -> Result<(), small::String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     let mut output = Vec::new();
     let arg1 = match args[0].parse::<usize>() {
         Ok(v) => v,
-        Err(_) => return Err(String::from("Invalid argument for random")),
+        Err(_) => return Err("Invalid argument for random".into()),
     };
     while output.len() < arg1 {
         let rand_num = thread_rng().gen_range(1, args.len());
@@ -21,8 +22,9 @@ fn rand_list(args: &[String]) -> Result<(), String> {
     writeln!(stdout);
     Ok(())
 }
+
 #[allow(unused_must_use)]
-pub fn random(args: &[String]) -> Result<(), String> {
+pub fn random(args: &[small::String]) -> Result<(), small::String> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     match args.len() {
@@ -39,14 +41,14 @@ pub fn random(args: &[String]) -> Result<(), String> {
         2 => {
             let arg1 = match args[0].parse::<u64>() {
                 Ok(v) => v,
-                Err(_) => return Err(String::from("Invalid argument for random")),
+                Err(_) => return Err("Invalid argument for random".into()),
             };
             let arg2 = match args[1].parse::<u64>() {
                 Ok(v) => v,
-                Err(_) => return Err(String::from("Invalid argument for random")),
+                Err(_) => return Err("Invalid argument for random".into()),
             };
             if arg2 <= arg1 {
-                return Err(String::from("END must be greater than START"));
+                return Err("END must be greater than START".into());
             }
             let rand_num = thread_rng().gen_range(arg1, arg2);
             writeln!(stdout, "{}", rand_num);
@@ -54,7 +56,7 @@ pub fn random(args: &[String]) -> Result<(), String> {
         3 => {
             let arg1 = match args[0].parse::<u64>() {
                 Ok(v) => v,
-                Err(_) => return Err(String::from("Invalid argument for random")),
+                Err(_) => return Err("Invalid argument for random".into()),
             };
             let arg2 = match args[1].parse::<u64>() {
                 Ok(v) => v,
@@ -63,7 +65,7 @@ pub fn random(args: &[String]) -> Result<(), String> {
             match args[2].parse::<u64>() {
                 Ok(v) => {
                     if arg2 <= arg1 {
-                        return Err(String::from("END must be greater than START"));
+                        return Err("END must be greater than START".into());
                     }
                     let mut end = v / arg2 + 1;
                     if arg1 / arg2 >= end {

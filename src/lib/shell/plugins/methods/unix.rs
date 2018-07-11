@@ -1,8 +1,9 @@
 use super::super::{config_dir, LibraryIterator, StringError};
 use fnv::FnvHashMap;
 use libloading::{os::unix::Symbol as RawSymbol, Library, Symbol};
+use small;
 use std::{ffi::CString, fs::read_dir, mem::forget, os::raw::c_char, ptr, slice, str};
-use types::Identifier;
+use types;
 
 /// Either one or the other will be set. Optional status can be conveyed by setting the
 /// corresponding field to `NULL`. Libraries importing this structure should check for nullness.
@@ -16,8 +17,8 @@ pub(crate) struct RawMethodArguments {
 }
 
 pub(crate) enum MethodArguments {
-    StringArg(String, Vec<String>),
-    Array(Vec<String>, Vec<String>),
+    StringArg(small::String, Vec<small::String>),
+    Array(Vec<small::String>, Vec<small::String>),
     NoArgs,
 }
 
@@ -100,7 +101,7 @@ pub(crate) struct StringMethodPlugins {
     libraries: Vec<Library>,
     /// A map of all the symbols that were collected from the above libraries.
     pub symbols:
-        FnvHashMap<Identifier, RawSymbol<unsafe extern "C" fn(RawMethodArguments) -> *mut c_char>>,
+        FnvHashMap<types::Str, RawSymbol<unsafe extern "C" fn(RawMethodArguments) -> *mut c_char>>,
 }
 
 impl StringMethodPlugins {
@@ -162,7 +163,7 @@ impl StringMethodPlugins {
                             // Grab a slice and ensure that the name of the function is UTF-8.
                             let slice = &symbol_list[start..counter];
                             let identifier = str::from_utf8(slice)
-                                .map(Identifier::from)
+                                .map(types::Str::from)
                                 .map_err(|_| StringError::UTF8Function)?;
 
                             // To obtain the symbol, we need to create a new `\0`-ended byte array.
@@ -193,7 +194,7 @@ impl StringMethodPlugins {
                 if counter != start {
                     let slice = &symbol_list[start..];
                     let identifier = str::from_utf8(slice)
-                        .map(Identifier::from)
+                        .map(types::Str::from)
                         .map_err(|_| StringError::UTF8Function)?;
                     let mut symbol = Vec::new();
                     symbol.reserve_exact(slice.len() + 1);

@@ -1,7 +1,7 @@
 use std::{
     fmt::{self, Display, Formatter}, io,
 };
-use types::Identifier;
+use types;
 
 #[derive(Debug)]
 /// A possible error that can be caused when attempting to obtain or execute a
@@ -18,7 +18,7 @@ pub(crate) enum StringError {
     UTF8Result,
     /// This infers that the user called a function that doesn't exist in the library. Bad
     /// user, bad.
-    FunctionMissing(Identifier),
+    FunctionMissing(types::Str),
 }
 
 impl Display for StringError {

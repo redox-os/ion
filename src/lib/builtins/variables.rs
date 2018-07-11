@@ -3,7 +3,7 @@
 use std::io::{self, Write};
 
 use shell::{status::*, variables::Variables};
-use types::*;
+use types;
 
 fn print_list(vars: &Variables) {
     let stdout = io::stdout();
@@ -19,10 +19,10 @@ fn print_list(vars: &Variables) {
 }
 
 enum Binding {
-    InvalidKey(Identifier),
+    InvalidKey(types::Str),
     ListEntries,
-    KeyOnly(Identifier),
-    KeyValue(Identifier, Value),
+    KeyOnly(types::Str),
+    KeyValue(types::Str, types::Str),
 }
 
 /// Parses alias as a `(key, value)` tuple.
@@ -49,18 +49,18 @@ fn parse_alias(args: &str) -> Binding {
         }
     }
 
-    let key: Identifier = key.into();
+    let key: types::Str = key.into();
 
     if !found_key && key.is_empty() {
         Binding::ListEntries
     } else {
-        let value: Value = char_iter.skip_while(|&x| x == ' ').collect();
+        let value: String = char_iter.skip_while(|&x| x == ' ').collect();
         if value.is_empty() {
             Binding::KeyOnly(key)
         } else if !Variables::is_valid_variable_name(&key) {
             Binding::InvalidKey(key)
         } else {
-            Binding::KeyValue(key, value)
+            Binding::KeyValue(key, value.into())
         }
     }
 }
@@ -74,7 +74,7 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
             return FAILURE;
         }
         Binding::KeyValue(key, value) => {
-            vars.set(&key, Alias(value));
+            vars.set(&key, types::Alias(value));
         }
         Binding::ListEntries => print_list(&vars),
         Binding::KeyOnly(key) => {
@@ -143,11 +143,12 @@ mod test {
     use super::*;
     use parser::{expand_string, Expander};
     use shell::status::{FAILURE, SUCCESS};
+    use types::Array;
 
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn string(&self, var: &str, _: bool) -> Option<Value> { self.0.get::<Value>(var) }
+        fn string(&self, var: &str, _: bool) -> Option<types::Str> { self.0.get::<types::Str>(var) }
     }
 
     // TODO: Rewrite tests now that let is part of the grammar.
@@ -177,7 +178,7 @@ mod test {
     #[test]
     fn drop_deletes_variable() {
         let mut variables = Variables::default();
-        variables.set("FOO", "BAR".to_string());
+        variables.set("FOO", "BAR");
         let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
         let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");

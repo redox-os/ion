@@ -1,8 +1,9 @@
 use shell::{flow::FlowLogic, Shell};
 use parser::{assignments::*, pipelines::Pipeline};
+use small;
 use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
-use types::Identifier;
+use types;
 use lexers::assignments::{KeyBuf, Operator, Primitive};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -69,14 +70,14 @@ pub(crate) enum Statement {
     },
     ElseIf(ElseIf),
     Function {
-        name:        Identifier,
-        description: Option<String>,
+        name:        types::Str,
+        description: Option<small::String>,
         args:        Vec<KeyBuf>,
         statements:  Vec<Statement>,
     },
     For {
-        variable:   Identifier,
-        values:     Vec<String>,
+        variable:   types::Str,
+        values:     Vec<small::String>,
         statements: Vec<Statement>,
     },
     While {
@@ -84,7 +85,7 @@ pub(crate) enum Statement {
         statements: Vec<Statement>,
     },
     Match {
-        expression: String,
+        expression: small::String,
         cases:      Vec<Case>,
     },
     Else,
@@ -146,8 +147,8 @@ impl Default for FlowControl {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Function {
-    description: Option<String>,
-    name:        Identifier,
+    description: Option<small::String>,
+    name:        types::Str,
     args:        Vec<KeyBuf>,
     statements:  Vec<Statement>,
 }
@@ -201,7 +202,7 @@ impl Function {
         shell.variables.new_scope(true);
 
         for (type_, value) in values {
-            shell.variables.shadow(type_.name.into(), value);
+            shell.variables.shadow(&type_.name, value);
         }
 
         shell.execute_statements(self.statements);
@@ -211,11 +212,11 @@ impl Function {
         Ok(())
     }
 
-    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a String> { self.description.as_ref() }
+    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a small::String> { self.description.as_ref() }
 
     pub(crate) fn new(
-        description: Option<String>,
-        name: Identifier,
+        description: Option<small::String>,
+        name: types::Str,
         args: Vec<KeyBuf>,
         statements: Vec<Statement>,
     ) -> Function {

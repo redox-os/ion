@@ -2,9 +2,8 @@ use super::Shell;
 use builtins::{BuiltinFunction, BUILTINS};
 use parser::{expand_string, pipelines::RedirectFrom};
 use shell::pipe_exec::PipelineExecution;
-use smallstring::SmallString;
 use std::{fmt, fs::File, str};
-use types::*;
+use types::{self, Array};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) enum JobKind {
@@ -16,8 +15,8 @@ pub(crate) enum JobKind {
 
 #[derive(Clone)]
 pub(crate) struct Job {
-    pub command: Identifier,
-    pub args:    Array,
+    pub command: types::Str,
+    pub args:    types::Array,
     pub kind:    JobKind,
     pub builtin: Option<BuiltinFunction>,
 }
@@ -26,14 +25,14 @@ impl Job {
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
     pub(crate) fn expand(&mut self, shell: &Shell) {
-        let mut expanded = Array::new();
+        let mut expanded = types::Array::new();
         expanded.grow(self.args.len());
         expanded.extend(self.args.drain().flat_map(|arg| expand_arg(&arg, shell)));
         self.args = expanded;
     }
 
-    pub(crate) fn new(args: Array, kind: JobKind) -> Self {
-        let command = SmallString::from_str(&args[0]);
+    pub(crate) fn new(args: types::Array, kind: JobKind) -> Self {
+        let command = args[0].clone();
         let builtin = BUILTINS.get(command.as_ref()).map(|b| b.main);
         Job {
             command,
@@ -61,7 +60,7 @@ impl fmt::Debug for Job {
 }
 
 /// Expands a given argument and returns it as an `Array`.
-fn expand_arg(arg: &str, shell: &Shell) -> Array {
+fn expand_arg(arg: &str, shell: &Shell) -> types::Array {
     let res = expand_string(&arg, shell, false);
     if res.is_empty() {
         array![""]
@@ -75,8 +74,8 @@ fn expand_arg(arg: &str, shell: &Shell) -> Array {
 pub(crate) enum RefinedJob {
     /// An external program that is executed by this shell
     External {
-        name:   Identifier,
-        args:   Array,
+        name:   types::Str,
+        args:   types::Array,
         stdin:  Option<File>,
         stdout: Option<File>,
         stderr: Option<File>,
@@ -84,15 +83,15 @@ pub(crate) enum RefinedJob {
     /// A procedure embedded into Ion
     Builtin {
         main:   BuiltinFunction,
-        args:   Array,
+        args:   types::Array,
         stdin:  Option<File>,
         stdout: Option<File>,
         stderr: Option<File>,
     },
     /// Functions can act as commands too!
     Function {
-        name:   Identifier,
-        args:   Array,
+        name:   types::Str,
+        args:   types::Array,
         stdin:  Option<File>,
         stdout: Option<File>,
         stderr: Option<File>,
@@ -236,7 +235,7 @@ impl RefinedJob {
                 ref stdout,
                 ref stderr,
             } => {
-                shell.exec_builtin(main, args, stdout, stderr, stdin)
+                shell.exec_builtin(main, &**args, stdout, stderr, stdin)
             }
             RefinedJob::Function {
                 ref name,
@@ -288,7 +287,7 @@ impl RefinedJob {
         }
     }
 
-    pub(crate) fn function(name: Identifier, args: Array) -> Self {
+    pub(crate) fn function(name: types::Str, args: types::Array) -> Self {
         RefinedJob::Function {
             name,
             args,
@@ -298,7 +297,7 @@ impl RefinedJob {
         }
     }
 
-    pub(crate) fn builtin(main: BuiltinFunction, args: Array) -> Self {
+    pub(crate) fn builtin(main: BuiltinFunction, args: types::Array) -> Self {
         RefinedJob::Builtin {
             main,
             args,
@@ -308,7 +307,7 @@ impl RefinedJob {
         }
     }
 
-    pub(crate) fn external(name: Identifier, args: Array) -> Self {
+    pub(crate) fn external(name: types::Str, args: types::Array) -> Self {
         RefinedJob::External {
             name,
             args,

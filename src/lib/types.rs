@@ -1,27 +1,25 @@
 use fnv::FnvHashMap;
-use smallstring::SmallString;
+use small;
 use smallvec::SmallVec;
 use shell::variables::VariableType;
 use std::{collections::BTreeMap as StdBTreeMap, ops::{Deref, DerefMut}};
 
-pub type Array = SmallVec<[Value; 4]>;
-pub type HashMap = FnvHashMap<Key, VariableType>;
-pub type BTreeMap = StdBTreeMap<String, VariableType>;
-pub type Identifier = SmallString;
-pub type Key = SmallString;
-pub type Value = String;
+pub type Array = SmallVec<[Str; 4]>;
+pub type HashMap = FnvHashMap<Str, VariableType>;
+pub type BTreeMap = StdBTreeMap<Str, VariableType>;
+pub type Str = small::String;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Alias(pub String);
+pub struct Alias(pub Str);
 
 impl Alias {
     pub fn empty() -> Self {
-        Alias(String::with_capacity(0))
+        Alias(Str::with_capacity(0))
     }
 }
 
 impl Deref for Alias {
-    type Target = String;
+    type Target = Str;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -34,8 +32,8 @@ impl DerefMut for Alias {
     }
 }
 
-impl Into<String> for Alias {
-    fn into(self) -> String {
+impl Into<Str> for Alias {
+    fn into(self) -> Str {
         self.0
     }
 }

@@ -26,6 +26,7 @@ use shell::{
     self, fork_function::fork_function, job_control::{JobControl, ProcessState}, status::*,
     FlowLogic, Shell, ShellHistory,
 };
+use small;
 use sys;
 use types;
 
@@ -37,7 +38,7 @@ const SOURCE_DESC: &str = "Evaluate the file following the command or re-initial
 const DISOWN_DESC: &str =
     "Disowning a process removes that process from the shell's background process table.";
 
-pub type BuiltinFunction = fn(&[String], &mut Shell) -> i32;
+pub type BuiltinFunction = fn(&[small::String], &mut Shell) -> i32;
 
 macro_rules! map {
     ($($name:expr => $func:ident: $help:expr),+) => {{
@@ -130,12 +131,12 @@ impl BuiltinMap {
     }
 }
 
-fn starts_with(args: &[String], _: &mut Shell) -> i32 { conditionals::starts_with(args) }
-fn ends_with(args: &[String], _: &mut Shell) -> i32 { conditionals::ends_with(args) }
-fn contains(args: &[String], _: &mut Shell) -> i32 { conditionals::contains(args) }
+fn starts_with(args: &[small::String], _: &mut Shell) -> i32 { conditionals::starts_with(args) }
+fn ends_with(args: &[small::String], _: &mut Shell) -> i32 { conditionals::ends_with(args) }
+fn contains(args: &[small::String], _: &mut Shell) -> i32 { conditionals::contains(args) }
 
 // Definitions of simple builtins go here
-fn builtin_status(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_status(args: &[small::String], shell: &mut Shell) -> i32 {
     match status(args, shell) {
         Ok(()) => SUCCESS,
         Err(why) => {
@@ -147,7 +148,7 @@ fn builtin_status(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-pub fn builtin_cd(args: &[String], shell: &mut Shell) -> i32 {
+pub fn builtin_cd(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_CD) {
         return SUCCESS;
     }
@@ -164,7 +165,7 @@ pub fn builtin_cd(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_bool(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_bool(args: &[small::String], shell: &mut Shell) -> i32 {
     if args.len() != 2 {
         let stderr = io::stderr();
         let mut stderr = stderr.lock();
@@ -172,7 +173,7 @@ fn builtin_bool(args: &[String], shell: &mut Shell) -> i32 {
         return FAILURE;
     }
 
-    let opt = shell.variables.get::<types::Value>(&args[1][1..]);
+    let opt = shell.variables.get::<types::Str>(&args[1][1..]);
     let sh_var: &str = match opt.as_ref() {
         Some(s) => s,
         None => "",
@@ -192,7 +193,7 @@ fn builtin_bool(args: &[String], shell: &mut Shell) -> i32 {
     SUCCESS
 }
 
-fn builtin_is(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_is(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_IS) {
         return SUCCESS;
     }
@@ -208,7 +209,7 @@ fn builtin_is(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_dirs(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_dirs(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_DIRS) {
         return SUCCESS;
     }
@@ -216,7 +217,7 @@ fn builtin_dirs(args: &[String], shell: &mut Shell) -> i32 {
     shell.directory_stack.dirs(args)
 }
 
-fn builtin_pushd(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_pushd(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_PUSHD) {
         return SUCCESS;
     }
@@ -231,7 +232,7 @@ fn builtin_pushd(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_popd(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_popd(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_POPD) {
         return SUCCESS;
     }
@@ -246,27 +247,27 @@ fn builtin_popd(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_alias(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_alias(args: &[small::String], shell: &mut Shell) -> i32 {
     let args_str = args[1..].join(" ");
     alias(&mut shell.variables, &args_str)
 }
 
-fn builtin_unalias(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_unalias(args: &[small::String], shell: &mut Shell) -> i32 {
     drop_alias(&mut shell.variables, args)
 }
 
 // TODO There is a man page for fn however the -h and --help flags are not
 // checked for.
-fn builtin_fn(_: &[String], shell: &mut Shell) -> i32 { fn_(&mut shell.variables) }
+fn builtin_fn(_: &[small::String], shell: &mut Shell) -> i32 { fn_(&mut shell.variables) }
 
-fn builtin_read(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_READ) {
         return SUCCESS;
     }
     shell.variables.read(args)
 }
 
-fn builtin_drop(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_drop(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_DROP) {
         return SUCCESS;
     }
@@ -277,14 +278,14 @@ fn builtin_drop(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_set(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_set(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_SET) {
         return SUCCESS;
     }
     set::set(args, shell)
 }
 
-fn builtin_eq(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_eq(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_EQ) {
         return SUCCESS;
     }
@@ -300,7 +301,7 @@ fn builtin_eq(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_eval(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_eval(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_EVAL) {
         return SUCCESS;
     }
@@ -315,14 +316,14 @@ fn builtin_eval(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_history(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_history(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_HISTORY) {
         return SUCCESS;
     }
     shell.print_history(args)
 }
 
-fn builtin_source(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_source(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_SOURCE) {
         return SUCCESS;
     }
@@ -337,7 +338,7 @@ fn builtin_source(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_echo(args: &[String], _: &mut Shell) -> i32 {
+fn builtin_echo(args: &[small::String], _: &mut Shell) -> i32 {
     if check_help(args, MAN_ECHO) {
         return SUCCESS;
     }
@@ -352,7 +353,7 @@ fn builtin_echo(args: &[String], _: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_test(args: &[String], _: &mut Shell) -> i32 {
+fn builtin_test(args: &[small::String], _: &mut Shell) -> i32 {
     // Do not use `check_help` for the `test` builtin. The
     // `test` builtin contains a "-h" option.
     match test(args) {
@@ -366,7 +367,7 @@ fn builtin_test(args: &[String], _: &mut Shell) -> i32 {
 }
 
 // TODO create manpage.
-fn builtin_calc(args: &[String], _: &mut Shell) -> i32 {
+fn builtin_calc(args: &[small::String], _: &mut Shell) -> i32 {
     match calc::calc(&args[1..]) {
         Ok(()) => SUCCESS,
         Err(why) => {
@@ -376,7 +377,7 @@ fn builtin_calc(args: &[String], _: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_random(args: &[String], _: &mut Shell) -> i32 {
+fn builtin_random(args: &[small::String], _: &mut Shell) -> i32 {
     if check_help(args, MAN_RANDOM) {
         return SUCCESS;
     }
@@ -389,12 +390,12 @@ fn builtin_random(args: &[String], _: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_true(args: &[String], _: &mut Shell) -> i32 {
+fn builtin_true(args: &[small::String], _: &mut Shell) -> i32 {
     check_help(args, MAN_TRUE);
     SUCCESS
 }
 
-fn builtin_false(args: &[String], _: &mut Shell) -> i32 {
+fn builtin_false(args: &[small::String], _: &mut Shell) -> i32 {
     if check_help(args, MAN_FALSE) {
         return SUCCESS;
     }
@@ -402,32 +403,32 @@ fn builtin_false(args: &[String], _: &mut Shell) -> i32 {
 }
 
 // TODO create a manpage
-fn builtin_wait(_: &[String], shell: &mut Shell) -> i32 {
+fn builtin_wait(_: &[small::String], shell: &mut Shell) -> i32 {
     shell.wait_for_background();
     SUCCESS
 }
 
-fn builtin_jobs(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_jobs(args: &[small::String], shell: &mut Shell) -> i32 {
     check_help(args, MAN_JOBS);
     job_control::jobs(shell);
     SUCCESS
 }
 
-fn builtin_bg(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_bg(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_BG) {
         return SUCCESS;
     }
     job_control::bg(shell, &args[1..])
 }
 
-fn builtin_fg(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_fg(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_FG) {
         return SUCCESS;
     }
     job_control::fg(shell, &args[1..])
 }
 
-fn builtin_suspend(args: &[String], _: &mut Shell) -> i32 {
+fn builtin_suspend(args: &[small::String], _: &mut Shell) -> i32 {
     if check_help(args, MAN_SUSPEND) {
         return SUCCESS;
     }
@@ -435,7 +436,7 @@ fn builtin_suspend(args: &[String], _: &mut Shell) -> i32 {
     SUCCESS
 }
 
-fn builtin_disown(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_disown(args: &[small::String], shell: &mut Shell) -> i32 {
     for arg in args {
         if *arg == "--help" {
             println!("{}", MAN_DISOWN);
@@ -451,7 +452,7 @@ fn builtin_disown(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_help(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_help(args: &[small::String], shell: &mut Shell) -> i32 {
     let builtins = shell.builtins;
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
@@ -477,7 +478,7 @@ fn builtin_help(args: &[String], shell: &mut Shell) -> i32 {
     SUCCESS
 }
 
-fn builtin_exit(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_exit(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_EXIT) {
         return SUCCESS;
     }
@@ -495,7 +496,7 @@ fn builtin_exit(args: &[String], shell: &mut Shell) -> i32 {
     )
 }
 
-fn builtin_exec(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_exec(args: &[small::String], shell: &mut Shell) -> i32 {
     match exec(shell, &args[1..]) {
         // Shouldn't ever hit this case.
         Ok(()) => SUCCESS,
@@ -509,7 +510,7 @@ fn builtin_exec(args: &[String], shell: &mut Shell) -> i32 {
 }
 
 use regex::Regex;
-fn builtin_matches(args: &[String], _: &mut Shell) -> i32 {
+fn builtin_matches(args: &[small::String], _: &mut Shell) -> i32 {
     if check_help(args, MAN_MATCHES) {
         return SUCCESS;
     }
@@ -538,7 +539,7 @@ fn builtin_matches(args: &[String], _: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_exists(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_exists(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_EXISTS) {
         return SUCCESS;
     }
@@ -552,21 +553,21 @@ fn builtin_exists(args: &[String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_which(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_which(args: &[small::String], shell: &mut Shell) -> i32 {
     match which(args, shell) {
         Ok(result) => result,
         Err(()) => FAILURE,
     }
 }
 
-fn builtin_type(args: &[String], shell: &mut Shell) -> i32 {
+fn builtin_type(args: &[small::String], shell: &mut Shell) -> i32 {
     match find_type(args, shell) {
         Ok(result) => result,
         Err(()) => FAILURE,
     }
 }
 
-fn builtin_isatty(args: &[String], _: &mut Shell) -> i32 {
+fn builtin_isatty(args: &[small::String], _: &mut Shell) -> i32 {
     if check_help(args, MAN_ISATTY) {
         return SUCCESS;
     }

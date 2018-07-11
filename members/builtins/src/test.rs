@@ -1,4 +1,4 @@
-use smallstring::SmallString;
+use small;
 use std::{
     fs,
     os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt},
@@ -118,12 +118,12 @@ const QUICK_GUIDE: &'static str =
 r#"Usage: test [EXPRESSION]
 Try 'test --help' for more information."#;
 
-pub fn test(args: &[String]) -> Result<bool, String> {
+pub fn test(args: &[small::String]) -> Result<bool, small::String> {
     let arguments = &args[1..];
     evaluate_arguments(arguments)
 }
 
-fn evaluate_arguments(arguments: &[String]) -> Result<bool, String> {
+fn evaluate_arguments(arguments: &[small::String]) -> Result<bool, small::String> {
     match arguments.first() {
         Some(ref s) if s.starts_with('-') && s[1..].starts_with(char::is_alphabetic) => {
             // Access the second character in the flag string: this will be type of the
@@ -151,7 +151,7 @@ fn evaluate_arguments(arguments: &[String]) -> Result<bool, String> {
                     // If there is no right hand argument, a condition was expected
                     let right_arg = arguments
                         .get(2)
-                        .ok_or_else(|| SmallString::from("parse error: condition expected"))?;
+                        .ok_or_else(|| small::String::from("parse error: condition expected"))?;
                     evaluate_expression(arg, operator, right_arg)
                 })
         }
@@ -162,7 +162,7 @@ fn evaluate_arguments(arguments: &[String]) -> Result<bool, String> {
     }
 }
 
-fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool, String> {
+fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool, small::String> {
     match operator {
         "=" | "==" => Ok(first == second),
         "!=" => Ok(first != second),
@@ -178,7 +178,7 @@ fn evaluate_expression(first: &str, operator: &str, second: &str) -> Result<bool
                 "-le" => Ok(left <= right),
                 "-lt" => Ok(left < right),
                 "-ne" => Ok(left != right),
-                _ => Err(format!("test: unknown condition: {:?}", operator)),
+                _ => Err(format!("test: unknown condition: {:?}", operator).into()),
             }
         }
     }
@@ -223,13 +223,13 @@ fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
 }
 
 /// Attempt to parse a &str as a usize.
-fn parse_integers(left: &str, right: &str) -> Result<(Option<isize>, Option<isize>), String> {
-    let parse_integer = |input: &str| -> Result<Option<isize>, String> {
+fn parse_integers(left: &str, right: &str) -> Result<(Option<isize>, Option<isize>), small::String> {
+    let parse_integer = |input: &str| -> Result<Option<isize>, small::String> {
         match input
             .parse::<isize>()
             .map_err(|_| format!("test: integer expression expected: {:?}", input))
         {
-            Err(why) => Err(why),
+            Err(why) => Err(why.into()),
             Ok(res) => Ok(Some(res)),
         }
     };
@@ -383,20 +383,20 @@ fn test_strings() {
 
 #[test]
 fn test_empty_str() {
-    let eval = |args: Vec<String>| evaluate_arguments(&args);
-    assert_eq!(eval(vec!["".to_owned()]), Ok(false));
+    let eval = |args: Vec<small::String>| evaluate_arguments(&args);
+    assert_eq!(eval(vec!["".into()]), Ok(false));
     assert_eq!(
-        eval(vec!["c".to_owned(), "=".to_owned(), "".to_owned()]),
+        eval(vec!["c".into(), "=".into(), "".into()]),
         Ok(false)
     );
 }
 
 #[test]
 fn test_integers_arguments() {
-    fn vec_string(args: &[&str]) -> Vec<String> {
+    fn vec_string(args: &[&str]) -> Vec<small::String> {
         args.iter()
-            .map(|s| (*s).to_owned())
-            .collect::<Vec<String>>()
+            .map(|s| (*s).into())
+            .collect()
     }
     // Equal To
     assert_eq!(

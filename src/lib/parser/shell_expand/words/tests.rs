@@ -1,5 +1,5 @@
 use super::*;
-use types::{Array, Value};
+use types::{self, Array};
 use ranges::{Index, Range};
 
 struct Empty;
@@ -264,10 +264,10 @@ fn test_braces() {
 struct WithVars;
 
 impl Expander for WithVars {
-    fn string(&self, var: &str, _: bool) -> Option<Value> {
+    fn string(&self, var: &str, _: bool) -> Option<types::Str> {
         match var {
-            "pkmn1" => "Pokémon".to_owned().into(),
-            "pkmn2" => "Poke\u{0301}mon".to_owned().into(),
+            "pkmn1" => Some("Pokémon".into()),
+            "pkmn2" => Some("Poke\u{0301}mon".into()),
             _ => None,
         }
     }

@@ -4,7 +4,7 @@ use super::{
 use itoa;
 use lexers::assignments::{Operator, Primitive};
 use parser::assignments::*;
-use smallstring::SmallString;
+use small;
 use smallvec::SmallVec;
 use shell::{
     history::ShellHistory,
@@ -22,7 +22,7 @@ fn list_vars(shell: &Shell) {
     let mut buffer = BufWriter::new(stdout.lock());
 
     // Small function for formatting and append an array entry to a string buffer.
-    fn print_array<W: Write>(buffer: &mut W, key: &str, array: &[String]) {
+    fn print_array<W: Write>(buffer: &mut W, key: &str, array: &[small::String]) {
         let _ = buffer.write([key, " = [ "].concat().as_bytes());
         if array.len() > 1 {
             let mut vars = array.iter();
@@ -47,7 +47,7 @@ fn list_vars(shell: &Shell) {
     // Then immediately follow that with a list of array variables.
     let _ = buffer.write(b"\n# Array Variables\n");
     for (key, val) in shell.variables.arrays() {
-        print_array(&mut buffer, &key, &val)
+        print_array(&mut buffer, &key, &**val)
     }
 }
 
@@ -64,9 +64,9 @@ impl VariableStore for Shell {
     fn export(&mut self, action: ExportAction) -> i32 {
         let actions = match action {
             ExportAction::Assign(ref keys, op, ref vals) => AssignmentActions::new(keys, op, vals),
-            ExportAction::LocalExport(ref key) => match self.get::<types::Value>(key) {
+            ExportAction::LocalExport(ref key) => match self.get::<types::Str>(key) {
                 Some(var) => {
-                    env::set_var(key, &var);
+                    env::set_var(key, &*var);
                     return SUCCESS;
                 }
                 None => {
@@ -106,10 +106,10 @@ impl VariableStore for Shell {
                     match value_check(self, &expression, &key.kind) {
                         Ok(VariableType::Str(value)) => {
                             let key_name: &str = &key.name;
-                            let lhs: String = self
+                            let lhs: types::Str = self
                                 .variables
-                                .get::<types::Value>(key_name)
-                                .unwrap_or_else(|| String::from("0"));
+                                .get::<types::Str>(key_name)
+                                .unwrap_or_else(|| "0".into());
 
                             let result = math(&lhs, &key.kind, operator, &value, |value| {
                                 env::set_var(key_name, &OsStr::from_bytes(value))
@@ -219,7 +219,7 @@ impl VariableStore for Shell {
                             Ok(VariableType::Array(values)) => {
                                 match self.variables.get_mut(key.name) {
                                     Some(VariableType::Array(ref mut array)) => {
-                                        let mut iterator: Box<Iterator<Item=&String>> = Box::new(array.iter());
+                                        let mut iterator: Box<Iterator<Item=&types::Str>> = Box::new(array.iter());
                                         for value in &values {
                                             iterator = Box::new(iterator.filter(move |item| *item != value));
                                         }
@@ -300,7 +300,7 @@ impl VariableStore for Shell {
                                     let result = math(&lhs, &key.kind, operator, &value, |value| {
                                         collected.insert(key.name, VariableType::Str(unsafe {
                                             str::from_utf8_unchecked(value)
-                                        }.to_owned()));
+                                        }.into()));
                                     });
 
                                     if let Err(why) = result {
@@ -344,7 +344,7 @@ impl VariableStore for Shell {
                                         }
 
                                         for i in 0..part.len() {
-                                            output.push(vec.extract(i).to_string());
+                                            output.push(vec.extract(i).to_string().into());
                                         }
                                     }
 
@@ -404,7 +404,7 @@ impl VariableStore for Shell {
                                     Ok(VariableType::Str(ref index)) => {
                                         match self.variables.get_mut(key.name) {
                                             Some(VariableType::HashMap(hmap)) => {
-                                                hmap.entry(SmallString::from_str(index)).or_insert(VariableType::Str(value));
+                                                hmap.entry(index.clone()).or_insert(VariableType::Str(value));
                                             }
                                             Some(VariableType::BTreeMap(bmap)) => {
                                                 bmap.entry(index.clone()).or_insert(VariableType::Str(value));

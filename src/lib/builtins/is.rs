@@ -1,7 +1,8 @@
 use shell::Shell;
 use types;
+use small;
 
-pub(crate) fn is(args: &[String], shell: &mut Shell) -> Result<(), String> {
+pub(crate) fn is(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
     match args.len() {
         4 => if args[1] != "not" {
             return Err(format!("Expected 'not' instead found '{}'\n", args[1]).to_string());
@@ -17,35 +18,35 @@ pub(crate) fn is(args: &[String], shell: &mut Shell) -> Result<(), String> {
     Ok(())
 }
 
-fn eval_arg(arg: &str, shell: &mut Shell) -> String {
+fn eval_arg(arg: &str, shell: &mut Shell) -> types::Str {
     let value = get_var_string(arg, shell);
-    if value != "" {
+    if &*value != "" {
         return value;
     }
-    arg.to_string()
+    arg.into()
 }
 
 // On error returns an empty String.
-fn get_var_string(name: &str, shell: &mut Shell) -> String {
+fn get_var_string(name: &str, shell: &mut Shell) -> types::Str {
     if name.chars().nth(0).unwrap() != '$' {
-        return String::new();
+        return "".into();
     }
 
-    match shell.variables.get::<types::Value>(&name[1..]) {
+    match shell.variables.get::<types::Str>(&name[1..]) {
         Some(s) => s,
-        None => String::new(),
+        None => "".into(),
     }
 }
 
 #[test]
 fn test_is() {
-    fn vec_string(args: &[&str]) -> Vec<String> {
-        args.iter().map(|s| (*s).to_owned()).collect::<Vec<String>>()
+    fn vec_string(args: &[&str]) -> Vec<small::String> {
+        args.iter().map(|s| (*s).into()).collect()
     }
     use shell::ShellBuilder;
     let mut shell = ShellBuilder::new().as_library();
-    shell.set("x", "value".to_string());
-    shell.set("y", "0".to_string());
+    shell.set("x", "value");
+    shell.set("y", "0");
 
     // Four arguments
     assert_eq!(

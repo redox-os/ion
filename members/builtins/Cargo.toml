@@ -8,5 +8,5 @@ publish = false
 bitflags = "1.0"
 calculate = "0.5"
 rand = "0.5"
-smallstring = "0.1"
+small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }
 smallvec = "0.6"
