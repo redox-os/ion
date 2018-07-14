@@ -352,7 +352,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "small"
 version = "0.1.0"
-source = "git+https://gitlab.redox-os.org/redox-os/small#80c808fac6cf3d13abbedce038fb1ef4a24ebb66"
+source = "git+https://gitlab.redox-os.org/redox-os/small#b3d41e641b5318080c652f272e735ffb3eccbc12"
 
 [[package]]
 name = "smallvec"
