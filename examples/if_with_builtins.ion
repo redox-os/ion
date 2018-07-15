@@ -1,0 +1,9 @@
+if not false
+    echo a
+end
+
+if not true
+    echo b
+else if not false
+    echo c
+end

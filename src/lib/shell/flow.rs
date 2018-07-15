@@ -56,7 +56,7 @@ pub(crate) trait FlowLogic {
     /// expressions
     fn execute_if(
         &mut self,
-        expression: Pipeline,
+        expression: Box<Statement>,
         success: Vec<Statement>,
         else_if: Vec<ElseIf>,
         failure: Vec<Statement>,
@@ -335,7 +335,7 @@ impl FlowLogic for Shell {
 
     fn execute_if(
         &mut self,
-        expression: Pipeline,
+        expression: Box<Statement>,
         success: Vec<Statement>,
         else_if: Vec<ElseIf>,
         failure: Vec<Statement>,
@@ -345,8 +345,12 @@ impl FlowLogic for Shell {
             .into_iter()
             .map(|cond| (cond.expression, cond.success));
 
-        for (mut condition, statements) in first_condition.chain(else_conditions) {
-            if self.run_pipeline(&mut condition) == Some(SUCCESS) {
+        for (condition, statements) in first_condition.chain(else_conditions) {
+            if let Condition::SigInt = self.execute_statements(vec![*condition]) {
+                return Condition::SigInt;
+            }
+
+            if self.previous_status == 0 {
                 return self.execute_statements(statements);
             }
         }

@@ -8,7 +8,7 @@ use lexers::assignments::{KeyBuf, Operator, Primitive};
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ElseIf {
-    pub expression: Pipeline,
+    pub expression: Box<Statement>,
     pub success:    Vec<Statement>,
 }
 
@@ -63,7 +63,7 @@ pub(crate) enum Statement {
     Case(Case),
     Export(ExportAction),
     If {
-        expression: Pipeline,
+        expression: Box<Statement>,
         success:    Vec<Statement>,
         else_if:    Vec<ElseIf>,
         failure:    Vec<Statement>,

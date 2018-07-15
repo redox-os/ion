@@ -81,12 +81,12 @@ pub(crate) fn parse(code: &str) -> Statement {
             return Statement::Export(ExportAction::Assign(keys, op, values));
         }
         _ if cmd.starts_with("if ") => {
-            return collect(cmd[3..].trim_left(), |pipeline| Statement::If {
-                expression: pipeline,
+            return Statement::If {
+                expression: Box::new(parse(cmd[3..].trim_left())),
                 success:    Vec::new(),
                 else_if:    Vec::new(),
                 failure:    Vec::new(),
-            })
+            }
         }
         "else" => return Statement::Else,
         _ if cmd.starts_with("else") => {
@@ -94,11 +94,9 @@ pub(crate) fn parse(code: &str) -> Statement {
             if cmd.is_empty() {
                 return Statement::Else;
             } else if cmd.starts_with("if ") {
-                return collect(cmd[3..].trim_left(), |pipeline| {
-                    Statement::ElseIf(ElseIf {
-                        expression: pipeline,
-                        success:    Vec::new(),
-                    })
+                return Statement::ElseIf(ElseIf {
+                    expression: Box::new(parse(cmd[3..].trim_left())),
+                    success: Vec::new()
                 });
             }
         }
@@ -209,7 +207,10 @@ pub(crate) fn parse(code: &str) -> Statement {
         _ if cmd.starts_with("not ") => {
             return Statement::Not(Box::new(parse(cmd[3..].trim_left())))
         }
-        _ if cmd.eq("not") => return Statement::Not(Box::new(Statement::Default)),
+        _ if cmd.starts_with("! ") => {
+            return Statement::Not(Box::new(parse(cmd[1..].trim_left())))
+        }
+        _ if cmd.eq("not") | cmd.eq("!") => return Statement::Not(Box::new(Statement::Default)),
         _ => (),
     }
 
@@ -232,7 +233,7 @@ mod tests {
         // Default case where spaced normally
         let parsed_if = parse("if test 1 -eq 2");
         let correct_parse = Statement::If {
-            expression: Pipeline {
+            expression: Box::new(Statement::Pipeline(Pipeline {
                 items: vec![PipeItem {
                     job: Job::new(
                         vec![
@@ -247,7 +248,7 @@ mod tests {
                     outputs: Vec::new(),
                     inputs:  Vec::new(),
                 }],
-            },
+            })),
             success:    vec![],
             else_if:    vec![],
             failure:    vec![],
