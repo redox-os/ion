@@ -767,8 +767,15 @@ mod tests {
         assert_eq!("BAR", &expanded);
     }
 
+    use std::sync::Mutex;
+    lazy_static! {
+        static ref ENVLOCK: Mutex<()> = Mutex::new(());
+    }
+
     #[test]
     fn minimal_directory_var_should_compact_path() {
+        // Make sure we dont read the other tests writes to env
+        let _guard = ENVLOCK.lock().unwrap();
         let variables = Variables::default();
         env::set_var("PWD", "/var/log/nix");
         assert_eq!(
@@ -782,6 +789,8 @@ mod tests {
 
     #[test]
     fn minimal_directory_var_shouldnt_compact_path() {
+        // Make sure we dont read the other tests writes to env
+        let _guard = ENVLOCK.lock().unwrap();
         let variables = Variables::default();
         env::set_var("PWD", "/var/log");
         assert_eq!(
