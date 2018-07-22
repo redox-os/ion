@@ -9,6 +9,7 @@ tests:
 	cargo test --manifest-path members/builtins/Cargo.toml
 	cargo test --manifest-path members/lexers/Cargo.toml
 	cargo test --manifest-path members/ranges/Cargo.toml
+	cargo test 
 	bash examples/run_examples.sh
 
 install: update-shells
