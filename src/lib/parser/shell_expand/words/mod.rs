@@ -3,9 +3,9 @@ mod methods;
 mod tests;
 
 pub(crate) use self::methods::{ArrayMethod, Pattern, StringMethod};
-pub use ranges::{Select, SelectWithSize};
-use lexers::ArgumentSplitter;
 use super::{expand_string, Expander};
+use lexers::ArgumentSplitter;
+pub use ranges::{Select, SelectWithSize};
 use shell::escape::unescape;
 use std::borrow::Cow;
 
@@ -47,7 +47,7 @@ pub(crate) struct WordIterator<'a, E: Expander + 'a> {
     read:      usize,
     flags:     Flags,
     expanders: &'a E,
-    do_glob: bool,
+    do_glob:   bool,
 }
 
 impl<'a, E: Expander + 'a> WordIterator<'a, E> {
@@ -172,7 +172,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 b',' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) && level == 0 => {
                     elements.push(&self.data[start..self.read]);
                     start = self.read + 1;
-                },
+                }
                 b'{' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => level += 1,
                 b'}' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => if level == 0 {
                     elements.push(&self.data[start..self.read]);
@@ -763,7 +763,10 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
             match character {
                 _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
                 b'\\' if !self.flags.contains(Flags::SQUOTE) => {
-                    pub(crate) fn maybe_unescape(input: &str, contains_escapeable: bool) -> Cow<str> {
+                    pub(crate) fn maybe_unescape(
+                        input: &str,
+                        contains_escapeable: bool,
+                    ) -> Cow<str> {
                         if !contains_escapeable {
                             input.into()
                         } else {
@@ -777,7 +780,16 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     if self.flags.contains(Flags::DQUOTE) {
                         let _ = iterator.next();
                         self.read += 1;
-                        return Some(WordToken::Normal(maybe_unescape(&self.data[start..self.read], next.map_or(true, |c| c == b'$' || c == b'@' || c == b'\\' || c == b'"')), glob, tilde));
+                        return Some(WordToken::Normal(
+                            maybe_unescape(
+                                &self.data[start..self.read],
+                                next.map_or(true, |c| {
+                                    c == b'$' || c == b'@' || c == b'\\' || c == b'"'
+                                }),
+                            ),
+                            glob,
+                            tilde,
+                        ));
                     }
                 }
                 b'\'' if !self.flags.contains(Flags::DQUOTE) => {
@@ -793,7 +805,11 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     return Some(WordToken::Normal(output.into(), glob, tilde));
                 }
                 b' ' | b'{' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
-                    return Some(WordToken::Normal(unescape(&self.data[start..self.read]), glob, tilde))
+                    return Some(WordToken::Normal(
+                        unescape(&self.data[start..self.read]),
+                        glob,
+                        tilde,
+                    ))
                 }
                 b'$' | b'@' if !self.flags.contains(Flags::SQUOTE) => {
                     if let Some(&character) = self.data.as_bytes().get(self.read) {
@@ -814,7 +830,11 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                     if self.glob_check(&mut iterator) {
                         glob = self.do_glob;
                     } else {
-                        return Some(WordToken::Normal(self.data[start..self.read].into(), glob, tilde));
+                        return Some(WordToken::Normal(
+                            self.data[start..self.read].into(),
+                            glob,
+                            tilde,
+                        ));
                     }
                 }
                 b'*' | b'?' if !self.flags.contains(Flags::SQUOTE) => {
@@ -828,7 +848,11 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
         if start == self.read {
             None
         } else {
-            Some(WordToken::Normal(unescape(&self.data[start..]), glob, tilde))
+            Some(WordToken::Normal(
+                unescape(&self.data[start..]),
+                glob,
+                tilde,
+            ))
         }
     }
 }

@@ -1,5 +1,8 @@
-use lexers::{ArgumentSplitter, assignments::{Key, KeyIterator, Operator, Primitive, TypeError}};
 use super::checker::*;
+use lexers::{
+    assignments::{Key, KeyIterator, Operator, Primitive, TypeError},
+    ArgumentSplitter,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
@@ -17,10 +20,16 @@ impl<'a> Display for AssignmentError<'a> {
                 write!(f, "expected {}, but received {}", expected, actual)
             }
             AssignmentError::TypeError(ref type_err) => write!(f, "{}", type_err),
-            AssignmentError::ExtraValues(ref prevkey, ref prevval) => write!(f, "extra values were supplied, and thus ignored. \
-                                                                                 Previous assignment: '{}' = '{}'", prevkey, prevval),
-            AssignmentError::ExtraKeys(ref prevkey, ref prevval) => write!(f, "extra keys were supplied, and thus ignored. \
-                                                                               Previous assignment: '{}' = '{}'", prevkey, prevval),
+            AssignmentError::ExtraValues(ref prevkey, ref prevval) => write!(
+                f,
+                "extra values were supplied, and thus ignored. Previous assignment: '{}' = '{}'",
+                prevkey, prevval
+            ),
+            AssignmentError::ExtraKeys(ref prevkey, ref prevval) => write!(
+                f,
+                "extra keys were supplied, and thus ignored. Previous assignment: '{}' = '{}'",
+                prevkey, prevval
+            ),
         }
     }
 }
@@ -58,22 +67,19 @@ impl<'a> Iterator for AssignmentActions<'a> {
         let next_key = self.keys.next();
         let next_value = self.values.next();
         match (next_key, next_value) {
-            (Some(key), Some(value)) => {
-                match key {
-                    Ok(key) => {
-                        self.prevkey = key.name;
-                        self.prevval = value;
-                        Some(Action::new(key, self.operator, value))
-                    }
-                    Err(why) => Some(Err(AssignmentError::TypeError(why))),
+            (Some(key), Some(value)) => match key {
+                Ok(key) => {
+                    self.prevkey = key.name;
+                    self.prevval = value;
+                    Some(Action::new(key, self.operator, value))
                 }
-            }
-            (None, Some(_)) => {
-                Some(Err(AssignmentError::ExtraValues(self.prevkey, self.prevval)))
-            }
-            (Some(_), None) => {
-                Some(Err(AssignmentError::ExtraKeys(self.prevkey, self.prevval)))
-            }
+                Err(why) => Some(Err(AssignmentError::TypeError(why))),
+            },
+            (None, Some(_)) => Some(Err(AssignmentError::ExtraValues(
+                self.prevkey,
+                self.prevval,
+            ))),
+            (Some(_), None) => Some(Err(AssignmentError::ExtraKeys(self.prevkey, self.prevval))),
             _ => None,
         }
     }
@@ -106,8 +112,8 @@ impl<'a> Action<'a> {
                 Ok(Action::UpdateArray(var, operator, value))
             } else {
                 Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))
-            }
-            Primitive::Indexed(_, _) => Ok(Action::UpdateArray(var, operator, value)),
+            },
+            Primitive::Indexed(..) => Ok(Action::UpdateArray(var, operator, value)),
             Primitive::Any if is_array(value) => Ok(Action::UpdateArray(var, operator, value)),
             Primitive::Any => Ok(Action::UpdateString(var, operator, value)),
             _ if is_array(value) => {
@@ -125,11 +131,7 @@ mod tests {
 
     fn split(input: &str) -> (String, Operator, String) {
         let (keys, op, vals) = assignment_lexer(input);
-        (
-            keys.unwrap().into(),
-            op.unwrap(),
-            vals.unwrap().into(),
-        )
+        (keys.unwrap().into(), op.unwrap(), vals.unwrap().into())
     }
 
     #[test]

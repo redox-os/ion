@@ -21,35 +21,39 @@ impl Operator {
             b'-' => Some(Operator::Subtract),
             b'/' => Some(Operator::Divide),
             b'*' => Some(Operator::Multiply),
-            _    => None,
+            _ => None,
         }
     }
 
     pub(crate) fn parse_double(data: &[u8]) -> Option<Operator> {
         match data {
-            b"//"   => Some(Operator::IntegerDivide),
-            b"**"   => Some(Operator::Exponent),
-            b"++"   => Some(Operator::Concatenate),
-            b"::"   => Some(Operator::ConcatenateHead),
+            b"//" => Some(Operator::IntegerDivide),
+            b"**" => Some(Operator::Exponent),
+            b"++" => Some(Operator::Concatenate),
+            b"::" => Some(Operator::ConcatenateHead),
             b"\\\\" => Some(Operator::Filter),
-            _       => None,
+            _ => None,
         }
     }
 }
 
 impl Display for Operator {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}", match *self {
-            Operator::Add => "+=",
-            Operator::Concatenate => "++=",
-            Operator::ConcatenateHead => "::=",
-            Operator::Filter => "\\\\=",
-            Operator::Divide => "/=",
-            Operator::Equal => "=",
-            Operator::Exponent => "**=",
-            Operator::IntegerDivide => "//=",
-            Operator::Multiply => "*=",
-            Operator::Subtract => "-=",
-        })
+        write!(
+            f,
+            "{}",
+            match *self {
+                Operator::Add => "+=",
+                Operator::Concatenate => "++=",
+                Operator::ConcatenateHead => "::=",
+                Operator::Filter => "\\\\=",
+                Operator::Divide => "/=",
+                Operator::Equal => "=",
+                Operator::Exponent => "**=",
+                Operator::IntegerDivide => "//=",
+                Operator::Multiply => "*=",
+                Operator::Subtract => "-=",
+            }
+        )
     }
 }

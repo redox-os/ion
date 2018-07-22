@@ -1,11 +1,11 @@
 mod arrays;
 mod strings;
 
-pub(crate) use self::{arrays::ArrayMethod, strings::StringMethod};
 use self::strings::unescape;
+pub(crate) use self::{arrays::ArrayMethod, strings::StringMethod};
 
-use lexers::ArgumentSplitter;
 use super::{expand_string, Expander};
+use lexers::ArgumentSplitter;
 use small;
 
 #[derive(Debug, PartialEq, Clone)]

@@ -1,8 +1,9 @@
-use lexers::{assignment_lexer, ArgumentSplitter};
 use super::{
     super::pipelines::{self, Pipeline},
-    case, functions::{collect_arguments, parse_function},
+    case,
+    functions::{collect_arguments, parse_function},
 };
+use lexers::{assignment_lexer, ArgumentSplitter};
 use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};
 use small;
 use std::char;
@@ -96,7 +97,7 @@ pub(crate) fn parse(code: &str) -> Statement {
             } else if cmd.starts_with("if ") {
                 return Statement::ElseIf(ElseIf {
                     expression: Box::new(parse(cmd[3..].trim_left())),
-                    success: Vec::new()
+                    success:    Vec::new(),
                 });
             }
         }
@@ -207,9 +208,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         _ if cmd.starts_with("not ") => {
             return Statement::Not(Box::new(parse(cmd[3..].trim_left())))
         }
-        _ if cmd.starts_with("! ") => {
-            return Statement::Not(Box::new(parse(cmd[1..].trim_left())))
-        }
+        _ if cmd.starts_with("! ") => return Statement::Not(Box::new(parse(cmd[1..].trim_left()))),
         _ if cmd.eq("not") | cmd.eq("!") => return Statement::Not(Box::new(Statement::Default)),
         _ => (),
     }
@@ -235,13 +234,9 @@ mod tests {
         let correct_parse = Statement::If {
             expression: Box::new(Statement::Pipeline(Pipeline {
                 items: vec![PipeItem {
-                    job: Job::new(
-                        vec![
-                            "test".into(),
-                            "1".into(),
-                            "-eq".into(),
-                            "2".into(),
-                        ].into_iter()
+                    job:     Job::new(
+                        vec!["test".into(), "1".into(), "-eq".into(), "2".into()]
+                            .into_iter()
                             .collect(),
                         JobKind::Last,
                     ),

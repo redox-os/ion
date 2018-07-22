@@ -5,8 +5,8 @@ mod words;
 
 pub(crate) use self::words::{Select, WordIterator, WordToken};
 use braces::{self, BraceToken};
-use ranges::{parse_range, Index, Range};
 use glob::glob;
+use ranges::{parse_range, Index, Range};
 use small;
 use std::{ptr, str};
 use types::{self, Array};
@@ -117,7 +117,11 @@ fn expand_brace<E: Expander>(
     }
 }
 
-fn array_expand<E: Expander>(elements: &[&str], expand_func: &E, selection: Select) -> types::Array {
+fn array_expand<E: Expander>(
+    elements: &[&str],
+    expand_func: &E,
+    selection: Select,
+) -> types::Array {
     match selection {
         Select::None => types::Array::new(),
         Select::All => elements
@@ -211,21 +215,27 @@ pub(crate) fn expand_string<E: Expander>(
                             if key.contains(' ') {
                                 for index in key.split(' ') {
                                     let select = index.parse::<Select>().unwrap_or(Select::None);
-                                    token_buffer.push(
-                                        WordToken::ArrayVariable(
-                                            data,
-                                            contains_quote,
-                                            select,
-                                        )
-                                    );
+                                    token_buffer.push(WordToken::ArrayVariable(
+                                        data,
+                                        contains_quote,
+                                        select,
+                                    ));
                                     token_buffer.push(WordToken::Whitespace(" "));
                                 }
                                 token_buffer.pop(); // Pop out the last unneeded whitespace token
                             } else {
-                                token_buffer.push(WordToken::ArrayVariable(data, contains_quote, Select::Key(key)));
+                                token_buffer.push(WordToken::ArrayVariable(
+                                    data,
+                                    contains_quote,
+                                    Select::Key(key),
+                                ));
                             }
                         } else {
-                            token_buffer.push(WordToken::ArrayVariable(data, contains_quote, selection));
+                            token_buffer.push(WordToken::ArrayVariable(
+                                data,
+                                contains_quote,
+                                selection,
+                            ));
                         }
                     }
                     _ => token_buffer.push(word),
@@ -378,36 +388,41 @@ fn expand_braces<E: Expander>(
         }
     }
 
-    expanded_words.into_iter().fold(types::Array::new(), |mut array, word| {
-        if word.find('*').is_some() {
-            if let Ok(mut paths) = glob(&word) {
-                match paths.next() {
-                    Some(path) => if let Ok(path_buf) = path {
-                        array.push((*path_buf.to_string_lossy()).into());
-                    } else {
-                        array.push("".into());
-                    },
-                    None => array.push(word),
-                }
-                for path in paths {
-                    if let Ok(path_buf) = path {
-                        array.push((*path_buf.to_string_lossy()).into());
-                    } else {
-                        array.push("".into());
+    expanded_words
+        .into_iter()
+        .fold(types::Array::new(), |mut array, word| {
+            if word.find('*').is_some() {
+                if let Ok(mut paths) = glob(&word) {
+                    match paths.next() {
+                        Some(path) => if let Ok(path_buf) = path {
+                            array.push((*path_buf.to_string_lossy()).into());
+                        } else {
+                            array.push("".into());
+                        },
+                        None => array.push(word),
                     }
+                    for path in paths {
+                        if let Ok(path_buf) = path {
+                            array.push((*path_buf.to_string_lossy()).into());
+                        } else {
+                            array.push("".into());
+                        }
+                    }
+                } else {
+                    array.push(word);
                 }
+                array
             } else {
                 array.push(word);
+                array
             }
-            array
-        } else {
-            array.push(word);
-            array
-        }
-    })
+        })
 }
 
-fn expand_single_array_token<E: Expander>(token: &WordToken, expand_func: &E) -> Option<types::Array> {
+fn expand_single_array_token<E: Expander>(
+    token: &WordToken,
+    expand_func: &E,
+) -> Option<types::Array> {
     let mut output = small::String::new();
     match *token {
         WordToken::Array(ref elements, ref index) => {
@@ -415,7 +430,9 @@ fn expand_single_array_token<E: Expander>(token: &WordToken, expand_func: &E) ->
         }
         WordToken::ArrayVariable(array, quoted, ref index) => {
             match expand_func.array(array, index.clone()) {
-                Some(ref array) if quoted => ::std::iter::once(Some(small::String::from(array.join(" ")))).collect(),
+                Some(ref array) if quoted => {
+                    ::std::iter::once(Some(small::String::from(array.join(" ")))).collect()
+                }
                 Some(array) => Some(array),
                 None => Some(types::Array::new()),
             }
@@ -424,7 +441,12 @@ fn expand_single_array_token<E: Expander>(token: &WordToken, expand_func: &E) ->
             Select::None => Some(types::Array::new()),
             Select::All => {
                 expand_process(&mut output, command, Select::All, expand_func, false);
-                Some(output.split_whitespace().map(From::from).collect::<types::Array>())
+                Some(
+                    output
+                        .split_whitespace()
+                        .map(From::from)
+                        .collect::<types::Array>(),
+                )
             }
             Select::Index(Index::Forward(id)) => {
                 expand_process(&mut output, command, Select::All, expand_func, false);

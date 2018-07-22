@@ -2,21 +2,23 @@ use super::{
     status::{FAILURE, SUCCESS},
     variables::Variables,
 };
-use sys::env as sys_env;
 use std::{
-    borrow::Cow, collections::VecDeque, env::{self, set_current_dir},
+    borrow::Cow,
+    collections::VecDeque,
+    env::{self, set_current_dir},
     path::{Component, Path, PathBuf},
 };
+use sys::env as sys_env;
 
 fn set_current_dir_ion(dir: &Path) -> Result<(), Cow<'static, str>> {
-    set_current_dir(dir)
-        .map_err(|why| Cow::Owned(format!("{}", why)))?;
+    set_current_dir(dir).map_err(|why| Cow::Owned(format!("{}", why)))?;
 
     env::set_var(
         "OLDPWD",
-        env::var("PWD").ok()
+        env::var("PWD")
+            .ok()
             .and_then(|pwd| if pwd.is_empty() { None } else { Some(pwd) })
-            .unwrap_or_else(|| "?".into())
+            .unwrap_or_else(|| "?".into()),
     );
 
     env::set_var("PWD", dir.to_str().unwrap_or_else(|| "?".into()));
@@ -198,9 +200,13 @@ impl DirectoryStack {
     }
 
     fn get_previous_dir(&self) -> Option<String> {
-        env::var("OLDPWD").ok().and_then(|pwd|
-            if pwd.is_empty() || pwd == "?" { None } else { Some(pwd) }
-        )
+        env::var("OLDPWD").ok().and_then(|pwd| {
+            if pwd.is_empty() || pwd == "?" {
+                None
+            } else {
+                Some(pwd)
+            }
+        })
     }
 
     fn switch_to_previous_directory(
@@ -339,12 +345,7 @@ impl DirectoryStack {
                         count_from_front = x;
                         num = y;
                     }
-                    None => {
-                        return Err(Cow::Owned(format!(
-                            "ion: popd: {}: invalid argument",
-                            arg
-                        )))
-                    }
+                    None => return Err(Cow::Owned(format!("ion: popd: {}: invalid argument", arg))),
                 };
             }
         }

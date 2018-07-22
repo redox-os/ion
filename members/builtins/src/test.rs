@@ -114,8 +114,7 @@ AUTHOR
     Written by Michael Murphy.
 "#;
 
-const QUICK_GUIDE: &'static str =
-r#"Usage: test [EXPRESSION]
+const QUICK_GUIDE: &'static str = r#"Usage: test [EXPRESSION]
 Try 'test --help' for more information."#;
 
 pub fn test(args: &[small::String]) -> Result<bool, small::String> {
@@ -223,7 +222,10 @@ fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
 }
 
 /// Attempt to parse a &str as a usize.
-fn parse_integers(left: &str, right: &str) -> Result<(Option<isize>, Option<isize>), small::String> {
+fn parse_integers(
+    left: &str,
+    right: &str,
+) -> Result<(Option<isize>, Option<isize>), small::String> {
     let parse_integer = |input: &str| -> Result<Option<isize>, small::String> {
         match input
             .parse::<isize>()
@@ -385,18 +387,13 @@ fn test_strings() {
 fn test_empty_str() {
     let eval = |args: Vec<small::String>| evaluate_arguments(&args);
     assert_eq!(eval(vec!["".into()]), Ok(false));
-    assert_eq!(
-        eval(vec!["c".into(), "=".into(), "".into()]),
-        Ok(false)
-    );
+    assert_eq!(eval(vec!["c".into(), "=".into(), "".into()]), Ok(false));
 }
 
 #[test]
 fn test_integers_arguments() {
     fn vec_string(args: &[&str]) -> Vec<small::String> {
-        args.iter()
-            .map(|s| (*s).into())
-            .collect()
+        args.iter().map(|s| (*s).into()).collect()
     }
     // Equal To
     assert_eq!(

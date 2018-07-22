@@ -142,8 +142,9 @@ impl<'a> Collector<'a> {
                             bytes.next();
                             bytes.next();
                             if let Some(cmd) = self.arg(&mut bytes)? {
-                                if let Some(x) = inputs.as_mut()
-                                    { x.push(Input::HereString(cmd.into())) };
+                                if let Some(x) = inputs.as_mut() {
+                                    x.push(Input::HereString(cmd.into()))
+                                };
                             } else {
                                 return Err("expected string argument after '<<<'");
                             }
@@ -162,14 +163,19 @@ impl<'a> Collector<'a> {
                             };
                             let heredoc = heredoc.lines().skip(1).collect::<Vec<&str>>();
                             if heredoc.len() > 1 {
-                                let herestring =
-                                    Input::HereString(heredoc[..heredoc.len() - 1].join("\n").into());
-                                if let Some(x) = inputs.as_mut() { x.push(herestring.clone()) };
+                                let herestring = Input::HereString(
+                                    heredoc[..heredoc.len() - 1].join("\n").into(),
+                                );
+                                if let Some(x) = inputs.as_mut() {
+                                    x.push(herestring.clone())
+                                };
                             }
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
                         // Otherwise interpret it as stdin redirection
-                        if let Some(x) = inputs.as_mut() { x.push(Input::File(file.into())) };
+                        if let Some(x) = inputs.as_mut() {
+                            x.push(Input::File(file.into()))
+                        };
                     } else {
                         return Err("expected file argument after redirection for input");
                     }
@@ -259,7 +265,7 @@ impl<'a> Collector<'a> {
                     bytes.next();
                 } else {
                     break;
-                }
+                },
                 // This is a tricky one: we only end the argment if `^` is followed by a
                 // redirection character
                 b'^' => {
@@ -366,7 +372,7 @@ impl<'a> Collector<'a> {
         I: Iterator<Item = (usize, u8)>,
     {
         while let Some(&(i, b)) = bytes.peek() {
-                // We return an inclusive range to keep the quote type intact
+            // We return an inclusive range to keep the quote type intact
             if let b'\'' = b {
                 bytes.next();
                 return Ok(&self.data[start..i + 1]);
@@ -394,7 +400,8 @@ impl<'a> Collector<'a> {
 #[cfg(test)]
 mod tests {
     use parser::{
-        pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection}, statement::parse,
+        pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection},
+        statement::parse,
     };
     use shell::{flow_control::Statement, Job, JobKind};
     use types::Array;
@@ -448,7 +455,10 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo $(echo one $(echo two) three)") {
             let items = pipeline.items;
             assert_eq!("echo", items[0].job.args[0].as_str());
-            assert_eq!("$(echo one $(echo two) three)", items[0].job.args[1].as_str());
+            assert_eq!(
+                "$(echo one $(echo two) three)",
+                items[0].job.args[1].as_str()
+            );
         } else {
             assert!(false);
         }
@@ -459,7 +469,10 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo @(echo one @(echo two) three)") {
             let items = pipeline.items;
             assert_eq!("echo", items[0].job.args[0].as_str());
-            assert_eq!("@(echo one @(echo two) three)", items[0].job.args[1].as_str());
+            assert_eq!(
+                "@(echo one @(echo two) three)",
+                items[0].job.args[1].as_str()
+            );
         } else {
             assert!(false);
         }

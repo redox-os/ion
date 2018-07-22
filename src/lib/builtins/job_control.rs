@@ -2,7 +2,10 @@
 //! control in the shell.
 
 use shell::{
-    job_control::{JobControl, ProcessState}, signals, status::*, Shell,
+    job_control::{JobControl, ProcessState},
+    signals,
+    status::*,
+    Shell,
 };
 use small;
 use smallvec::SmallVec;

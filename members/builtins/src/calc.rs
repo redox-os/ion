@@ -1,6 +1,6 @@
 use calculate::{eval, eval_polish, CalcError, Value};
-use std::io::{self, Write};
 use small;
+use std::io::{self, Write};
 
 const REPL_GUIDE: &'static str = r#"ion-calc
 Type in expressions to have them evaluated.

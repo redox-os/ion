@@ -10,7 +10,6 @@ pub(crate) fn check_help(args: &[small::String], man_page: &'static str) -> bool
     false
 }
 
-
 pub(crate) const MAN_STATUS: &str = r#"NAME
     status - Evaluates the current runtime status
 

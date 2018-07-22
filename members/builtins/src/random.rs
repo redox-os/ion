@@ -1,6 +1,6 @@
 use rand::{thread_rng, Rng};
-use std::io::{self, Write};
 use small;
+use std::io::{self, Write};
 
 #[allow(unused_must_use)]
 fn rand_list(args: &[small::String]) -> Result<(), small::String> {

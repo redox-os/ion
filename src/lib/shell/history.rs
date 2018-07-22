@@ -1,8 +1,8 @@
 use shell::{status::*, Shell};
 
 use regex::Regex;
-use std::io::{self, Write};
 use small;
+use std::io::{self, Write};
 use types;
 
 bitflags! {
@@ -109,7 +109,15 @@ impl ShellHistory for Shell {
         if self.should_save_command(command) {
             // Mark the command in the context history
             self.set_context_history_from_vars();
-            if let Err(err) = self.context.as_ref().unwrap().lock().unwrap().history.push(command.into()) {
+            if let Err(err) = self
+                .context
+                .as_ref()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .history
+                .push(command.into())
+            {
                 eprintln!("ion: {}", err);
             }
         }
@@ -126,7 +134,11 @@ impl ShellHistory for Shell {
         context.history.set_max_size(max_history_size);
 
         if &*variables.get_str_or_empty("HISTFILE_ENABLED") == "1" {
-            context.history.set_file_name(variables.get::<types::Str>("HISTFILE").map(|v| v.to_string()));
+            context.history.set_file_name(
+                variables
+                    .get::<types::Str>("HISTFILE")
+                    .map(|v| v.to_string()),
+            );
 
             let max_histfile_size = variables
                 .get_str_or_empty("HISTFILE_SIZE")
@@ -168,11 +180,14 @@ impl ShellHistoryPrivate for Shell {
 
         // Here we allow to also ignore the setting of the local variable because we
         // assume the user entered the leading whitespace on purpose.
-        if ignore.contains(IgnoreFlags::WHITESPACE) && command.chars().next().map_or(false, |b| b.is_whitespace()) {
+        if ignore.contains(IgnoreFlags::WHITESPACE)
+            && command.chars().next().map_or(false, |b| b.is_whitespace())
+        {
             return false;
         }
 
-        if ignore.contains(IgnoreFlags::NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND {
+        if ignore.contains(IgnoreFlags::NO_SUCH_COMMAND) && self.previous_status == NO_SUCH_COMMAND
+        {
             return false;
         }
 
@@ -180,20 +195,21 @@ impl ShellHistoryPrivate for Shell {
             if let Some(ref context) = self.context {
                 let mut context = context.lock().unwrap();
                 let buffers = &mut context.history.buffers;
-                *buffers = buffers.into_iter().filter_map(|buffer| {
-                    let hist_command = buffer.lines().concat();
-                    if hist_command != command {
-                        Some((*buffer).clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+                *buffers = buffers
+                    .into_iter()
+                    .filter_map(|buffer| {
+                        let hist_command = buffer.lines().concat();
+                        if hist_command != command {
+                            Some((*buffer).clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
                 return true;
             } else {
                 return false;
             }
-
         }
 
         if let Some(ref regexes) = *regexes {

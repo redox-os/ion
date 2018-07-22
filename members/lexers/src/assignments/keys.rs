@@ -1,5 +1,5 @@
-use std::fmt::{self, Display, Formatter};
 use super::Primitive;
+use std::fmt::{self, Display, Formatter};
 
 /// Keys are used in assignments to define which variable will be set, and whether the correct
 /// types are being assigned.
@@ -64,7 +64,9 @@ impl<'a> KeyIterator<'a> {
         loop {
             let mut eol = self.read + 1 >= self.data.len();
 
-            if self.data.as_bytes()[self.read] == b']' && (eol || self.data.as_bytes()[self.read + 1] == b' ') {
+            if self.data.as_bytes()[self.read] == b']'
+                && (eol || self.data.as_bytes()[self.read + 1] == b' ')
+            {
                 let kind = match &self.data[index_ident_start..self.read] {
                     "" => Primitive::AnyArray,
                     s => Primitive::Indexed(s.to_owned(), Box::new(Primitive::Any)),
@@ -72,7 +74,9 @@ impl<'a> KeyIterator<'a> {
                 self.read += 1;
 
                 break Ok(Key { name, kind });
-            } else if self.data.as_bytes()[self.read] == b']' && self.data.as_bytes()[self.read + 1] == b':' {
+            } else if self.data.as_bytes()[self.read] == b']'
+                && self.data.as_bytes()[self.read + 1] == b':'
+            {
                 let index_ident_end = self.read;
 
                 self.read += 2;
@@ -86,8 +90,12 @@ impl<'a> KeyIterator<'a> {
                     "" => Primitive::AnyArray,
                     s => match Primitive::parse(&self.data[index_ident_end + 2..self.read]) {
                         Some(kind) => Primitive::Indexed(s.to_owned(), Box::new(kind)),
-                        None => break Err(TypeError::Invalid(self.data[index_ident_end + 1..self.read].into())),
-                    }
+                        None => {
+                            break Err(TypeError::Invalid(
+                                self.data[index_ident_end + 1..self.read].into(),
+                            ))
+                        }
+                    },
                 };
 
                 break Ok(Key { name, kind });
@@ -164,11 +172,11 @@ mod tests {
 
     #[test]
     fn key_parsing() {
-        let mut parser = KeyIterator::new("a:int b[] c:bool d e:int[] \
-                                           f[0] g[$index] h[1]:int \
-                                           i:hmap[] j:hmap[float] k:hmap[int[]] l:hmap[hmap[bool[]]] \
-                                           m:bmap[] n:bmap[int] o:bmap[float[]] p:bmap[hmap[bool]] \
-                                           d:a");
+        let mut parser = KeyIterator::new(
+            "a:int b[] c:bool d e:int[] f[0] g[$index] h[1]:int i:hmap[] j:hmap[float] \
+             k:hmap[int[]] l:hmap[hmap[bool[]]] m:bmap[] n:bmap[int] o:bmap[float[]] \
+             p:bmap[hmap[bool]] d:a",
+        );
         assert_eq!(
             parser.next().unwrap(),
             Ok(Key {
@@ -250,7 +258,9 @@ mod tests {
             parser.next().unwrap(),
             Ok(Key {
                 name: "l",
-                kind: Primitive::HashMap(Box::new(Primitive::HashMap(Box::new(Primitive::BooleanArray)))),
+                kind: Primitive::HashMap(Box::new(Primitive::HashMap(Box::new(
+                    Primitive::BooleanArray
+                )))),
             },)
         );
         assert_eq!(
@@ -278,7 +288,9 @@ mod tests {
             parser.next().unwrap(),
             Ok(Key {
                 name: "p",
-                kind: Primitive::BTreeMap(Box::new(Primitive::HashMap(Box::new(Primitive::Boolean)))),
+                kind: Primitive::BTreeMap(Box::new(Primitive::HashMap(Box::new(
+                    Primitive::Boolean
+                )))),
             },)
         );
         assert_eq!(parser.next().unwrap(), Err(TypeError::Invalid("a".into())));

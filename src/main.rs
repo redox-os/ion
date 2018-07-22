@@ -5,14 +5,15 @@ extern crate smallvec;
 use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};
 use smallvec::SmallVec;
 use std::{
-    env, error::Error, io::{stdout, stdin, Write, BufRead, BufReader}, iter::FromIterator,
+    env,
+    error::Error,
+    io::{stdin, stdout, BufRead, BufReader, Write},
+    iter::FromIterator,
 };
 
 fn main() {
     let stdin_is_a_tty = sys::isatty(sys::STDIN_FILENO);
-    let mut shell = ShellBuilder::new()
-        .install_signal_handler()
-        .block_signals();
+    let mut shell = ShellBuilder::new().install_signal_handler().block_signals();
 
     if stdin_is_a_tty {
         shell = shell.set_unique_pid();

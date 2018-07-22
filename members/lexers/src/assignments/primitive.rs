@@ -34,22 +34,26 @@ impl Primitive {
                 fn parse_inner_hash_map(inner: &str) -> Option<Primitive> {
                     match inner {
                         "" => Some(Primitive::HashMap(Box::new(Primitive::Any))),
-                        _  => Primitive::parse(inner).map(|p| Primitive::HashMap(Box::new(p)))
+                        _ => Primitive::parse(inner).map(|p| Primitive::HashMap(Box::new(p))),
                     }
                 }
                 fn parse_inner_btree_map(inner: &str) -> Option<Primitive> {
                     match inner {
                         "" => Some(Primitive::BTreeMap(Box::new(Primitive::Any))),
-                        _  => Primitive::parse(inner).map(|p| Primitive::BTreeMap(Box::new(p)))
+                        _ => Primitive::parse(inner).map(|p| Primitive::BTreeMap(Box::new(p))),
                     }
                 }
 
                 let res = if kind.starts_with("hmap[") {
                     let kind = &kind[5..];
-                    kind.rfind(']').map(|found| &kind[..found]).and_then(parse_inner_hash_map)
+                    kind.rfind(']')
+                        .map(|found| &kind[..found])
+                        .and_then(parse_inner_hash_map)
                 } else if kind.starts_with("bmap[") {
                     let kind = &kind[5..];
-                    kind.rfind(']').map(|found| &kind[..found]).and_then(parse_inner_btree_map)
+                    kind.rfind(']')
+                        .map(|found| &kind[..found])
+                        .and_then(parse_inner_btree_map)
                 } else {
                     None
                 };
@@ -77,18 +81,14 @@ impl Display for Primitive {
             Primitive::Integer => write!(f, "int"),
             Primitive::IntegerArray => write!(f, "int[]"),
             Primitive::StrArray => write!(f, "str[]"),
-            Primitive::HashMap(ref kind) => {
-                match **kind {
-                    Primitive::Any | Primitive::Str => write!(f, "hmap[]"),
-                    ref kind => write!(f, "hmap[{}]", kind),
-                }
-            }
-            Primitive::BTreeMap(ref kind) => {
-                match **kind {
-                    Primitive::Any | Primitive::Str => write!(f, "bmap[]"),
-                    ref kind => write!(f, "bmap[{}]", kind),
-                }
-            }
+            Primitive::HashMap(ref kind) => match **kind {
+                Primitive::Any | Primitive::Str => write!(f, "hmap[]"),
+                ref kind => write!(f, "hmap[{}]", kind),
+            },
+            Primitive::BTreeMap(ref kind) => match **kind {
+                Primitive::Any | Primitive::Str => write!(f, "bmap[]"),
+                ref kind => write!(f, "bmap[{}]", kind),
+            },
             Primitive::Indexed(_, ref kind) => write!(f, "{}", kind),
         }
     }

@@ -1,10 +1,10 @@
-use shell::{flow::FlowLogic, Shell};
+use lexers::assignments::{KeyBuf, Operator, Primitive};
 use parser::{assignments::*, pipelines::Pipeline};
+use shell::{flow::FlowLogic, Shell};
 use small;
 use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
 use types;
-use lexers::assignments::{KeyBuf, Operator, Primitive};
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ElseIf {
@@ -170,7 +170,11 @@ impl Display for FunctionError {
 }
 
 impl Function {
-    pub(crate) fn execute<S: AsRef<str>>(self, shell: &mut Shell, args: &[S]) -> Result<(), FunctionError> {
+    pub(crate) fn execute<S: AsRef<str>>(
+        self,
+        shell: &mut Shell,
+        args: &[S],
+    ) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
             return Err(FunctionError::InvalidArgumentCount);
         }
@@ -193,7 +197,9 @@ impl Function {
             values.push((type_.clone(), value));
         }
 
-        let index = shell.variables.index_scope_for_var(&name)
+        let index = shell
+            .variables
+            .index_scope_for_var(&name)
             .expect("execute called with invalid function");
 
         // Pop off all scopes since function temporarily
@@ -212,7 +218,9 @@ impl Function {
         Ok(())
     }
 
-    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a small::String> { self.description.as_ref() }
+    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a small::String> {
+        self.description.as_ref()
+    }
 
     pub(crate) fn new(
         description: Option<small::String>,

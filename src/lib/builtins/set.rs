@@ -1,8 +1,8 @@
 use liner::KeyBindings;
 use shell::{flags::*, Shell};
-use types;
 use small;
 use std::iter;
+use types;
 
 enum PositionalArgs {
     UnsetIfNone,
@@ -80,11 +80,11 @@ pub(crate) fn set(args: &[small::String], shell: &mut Shell) -> i32 {
             // This used to take a `&[String]` but cloned them all, so although
             // this is non-ideal and could probably be better done with `Rc`, it
             // hasn't got any slower.
-            let arguments: types::Array = iter::once(command)
-                .chain(args_iter.cloned())
-                .collect();
+            let arguments: types::Array = iter::once(command).chain(args_iter.cloned()).collect();
             match kind {
-                UnsetIfNone => { shell.variables.set("args", arguments); }
+                UnsetIfNone => {
+                    shell.variables.set("args", arguments);
+                }
                 RetainIfNone => if arguments.len() != 1 {
                     shell.variables.set("args", arguments);
                 },

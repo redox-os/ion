@@ -680,7 +680,11 @@ impl PipelineExecution for Shell {
                         builtins::builtin_cd,
                         iter::once("cd".into()).chain(job.args.drain()).collect(),
                     )
-                } else if self.variables.get::<Function>(job.args[0].as_str()).is_some() {
+                } else if self
+                    .variables
+                    .get::<Function>(job.args[0].as_str())
+                    .is_some()
+                {
                     RefinedJob::function(job.args[0].clone().into(), job.args.drain().collect())
                 } else if let Some(builtin) = job.builtin {
                     RefinedJob::builtin(builtin, job.args.drain().collect())

@@ -1,14 +1,8 @@
 use std::{fs, os::unix::fs::PermissionsExt};
 
 #[cfg(test)]
-use shell::{
-    self,
-    flow_control::Statement,
-};
-use shell::{
-    flow_control::Function,
-    Shell,
-};
+use shell::{self, flow_control::Statement};
+use shell::{flow_control::Function, Shell};
 use small;
 use types;
 
@@ -157,27 +151,43 @@ fn test_evaluate_arguments() {
     assert_eq!(evaluate_arguments(&[], &shell), Ok(false));
     // multiple arguments
     // ignores all but the first argument
-    assert_eq!(evaluate_arguments(&["foo".into(), "bar".into()], &shell), Ok(true));
+    assert_eq!(
+        evaluate_arguments(&["foo".into(), "bar".into()], &shell),
+        Ok(true)
+    );
 
     // check `exists STRING`
     assert_eq!(evaluate_arguments(&["".into()], &shell), Ok(false));
     assert_eq!(evaluate_arguments(&["string".into()], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["string with space".into()], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-startswithdash".into()], &shell), Ok(true));
+    assert_eq!(
+        evaluate_arguments(&["string with space".into()], &shell),
+        Ok(true)
+    );
+    assert_eq!(
+        evaluate_arguments(&["-startswithdash".into()], &shell),
+        Ok(true)
+    );
 
     // check `exists -a`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-a".into()], &shell), Ok(true));
-    shell
-        .variables
-        .set("emptyarray", types::Array::new());
-    assert_eq!(evaluate_arguments(&["-a".into(), "emptyarray".into()], &shell), Ok(false));
+    shell.variables.set("emptyarray", types::Array::new());
+    assert_eq!(
+        evaluate_arguments(&["-a".into(), "emptyarray".into()], &shell),
+        Ok(false)
+    );
     let mut array = types::Array::new();
     array.push("element".into());
     shell.variables.set("array", array);
-    assert_eq!(evaluate_arguments(&["-a".into(), "array".into()], &shell), Ok(true));
+    assert_eq!(
+        evaluate_arguments(&["-a".into(), "array".into()], &shell),
+        Ok(true)
+    );
     shell.variables.remove_variable("array");
-    assert_eq!(evaluate_arguments(&["-a".into(), "array".into()], &shell), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&["-a".into(), "array".into()], &shell),
+        Ok(false)
+    );
 
     // check `exists -b`
     // TODO: see test_binary_is_in_path()
@@ -190,7 +200,10 @@ fn test_evaluate_arguments() {
         evaluate_arguments(&["-b".into(), "executable_file".into()], &shell),
         Ok(true)
     );
-    assert_eq!(evaluate_arguments(&["-b".into(), "empty_file".into()], &shell), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&["-b".into(), "empty_file".into()], &shell),
+        Ok(false)
+    );
     assert_eq!(
         evaluate_arguments(&["-b".into(), "file_does_not_exist".into()], &shell),
         Ok(false)
@@ -203,7 +216,10 @@ fn test_evaluate_arguments() {
     // check `exists -d`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-d".into()], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-d".into(), "testing/".into()], &shell), Ok(true));
+    assert_eq!(
+        evaluate_arguments(&["-d".into(), "testing/".into()], &shell),
+        Ok(true)
+    );
     assert_eq!(
         evaluate_arguments(&["-d".into(), "testing/empty_file".into()], &shell),
         Ok(false)
@@ -216,7 +232,10 @@ fn test_evaluate_arguments() {
     // check `exists -f`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-f".into()], &shell), Ok(true));
-    assert_eq!(evaluate_arguments(&["-f".into(), "testing/".into()], &shell), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&["-f".into(), "testing/".into()], &shell),
+        Ok(false)
+    );
     assert_eq!(
         evaluate_arguments(&["-f".into(), "testing/empty_file".into()], &shell),
         Ok(true)
@@ -230,17 +249,29 @@ fn test_evaluate_arguments() {
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-s".into()], &shell), Ok(true));
     shell.set("emptyvar", "".to_string());
-    assert_eq!(evaluate_arguments(&["-s".into(), "emptyvar".into()], &shell), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&["-s".into(), "emptyvar".into()], &shell),
+        Ok(false)
+    );
     shell.set("testvar", "foobar".to_string());
-    assert_eq!(evaluate_arguments(&["-s".into(), "testvar".into()], &shell), Ok(true));
+    assert_eq!(
+        evaluate_arguments(&["-s".into(), "testvar".into()], &shell),
+        Ok(true)
+    );
     shell.variables.remove_variable("testvar");
-    assert_eq!(evaluate_arguments(&["-s".into(), "testvar".into()], &shell), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&["-s".into(), "testvar".into()], &shell),
+        Ok(false)
+    );
     // also check that it doesn't trigger on arrays
     let mut array = types::Array::new();
     array.push("element".into());
     shell.variables.remove_variable("array");
     shell.variables.set("array", array);
-    assert_eq!(evaluate_arguments(&["-s".into(), "array".into()], &shell), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&["-s".into(), "array".into()], &shell),
+        Ok(false)
+    );
 
     // check `exists --fn`
     let name_str = "test_function";
@@ -259,9 +290,15 @@ fn test_evaluate_arguments() {
         Function::new(Some(description), name.clone(), args, statements),
     );
 
-    assert_eq!(evaluate_arguments(&["--fn".into(), name_str.into()], &shell), Ok(true));
+    assert_eq!(
+        evaluate_arguments(&["--fn".into(), name_str.into()], &shell),
+        Ok(true)
+    );
     shell.variables.remove_variable(name_str);
-    assert_eq!(evaluate_arguments(&["--fn".into(), name_str.into()], &shell), Ok(false));
+    assert_eq!(
+        evaluate_arguments(&["--fn".into(), name_str.into()], &shell),
+        Ok(false)
+    );
 
     // check invalid flags / parameters (should all be treated as strings and
     // therefore succeed)

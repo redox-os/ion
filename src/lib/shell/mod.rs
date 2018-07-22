@@ -18,21 +18,25 @@ pub mod status;
 pub mod variables;
 
 pub use self::{
-    binary::Binary, fork::{Capture, Fork, IonResult},
+    binary::Binary,
+    fork::{Capture, Fork, IonResult},
 };
 pub(crate) use self::{
-    flow::FlowLogic, history::{IgnoreSetting, ShellHistory}, job::{Job, JobKind},
+    flow::FlowLogic,
+    history::{IgnoreSetting, ShellHistory},
+    job::{Job, JobKind},
     pipe_exec::{foreground, job_control},
 };
 
 use self::{
-    directory_stack::DirectoryStack, flags::*,
-    flow_control::{FlowControl, Function, FunctionError}, foreground::ForegroundSignals,
-    job_control::{BackgroundProcess, JobControl}, pipe_exec::PipelineExecution, status::*,
-    variables::{
-        Variables,
-        VariableType,
-    }
+    directory_stack::DirectoryStack,
+    flags::*,
+    flow_control::{FlowControl, Function, FunctionError},
+    foreground::ForegroundSignals,
+    job_control::{BackgroundProcess, JobControl},
+    pipe_exec::PipelineExecution,
+    status::*,
+    variables::{VariableType, Variables},
 };
 use builtins::{BuiltinMap, BUILTINS};
 use lexers::ArgumentSplitter;
@@ -45,7 +49,8 @@ use std::{
     ops::Deref,
     path::Path,
     process,
-    sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
+    sync::{atomic::Ordering, Arc, Mutex},
+    time::SystemTime,
 };
 use sys;
 use types::{self, Array};
@@ -178,7 +183,11 @@ impl Shell {
 
     /// A method for executing a function with the given `name`, using `args` as the input.
     /// If the function does not exist, an `IonError::DoesNotExist` is returned.
-    pub fn execute_function<S: AsRef<str>>(&mut self, name: &str, args: &[S]) -> Result<i32, IonError> {
+    pub fn execute_function<S: AsRef<str>>(
+        &mut self,
+        name: &str,
+        args: &[S],
+    ) -> Result<i32, IonError> {
         self.variables
             .get::<Function>(name)
             .ok_or(IonError::DoesNotExist)
@@ -290,7 +299,10 @@ impl Shell {
                 Some(self.execute_pipeline(pipeline))
             }
         // Branch else if -> input == shell function and set the exit_status
-        } else if let Some(function) = self.variables.get::<Function>(&pipeline.items[0].job.command) {
+        } else if let Some(function) = self
+            .variables
+            .get::<Function>(&pipeline.items[0].job.command)
+        {
             if !pipeline.requires_piping() {
                 let args = pipeline.items[0].job.args.deref();
                 match function.execute(self, args) {
@@ -327,9 +339,14 @@ impl Shell {
                         elapsed_time.as_secs(),
                         elapsed_time.subsec_nanos()
                     );
-                    context.lock().unwrap().history.push(summary.into()).unwrap_or_else(|err| {
-                        eprintln!("ion: history append: {}", err);
-                    });
+                    context
+                        .lock()
+                        .unwrap()
+                        .history
+                        .push(summary.into())
+                        .unwrap_or_else(|err| {
+                            eprintln!("ion: history append: {}", err);
+                        });
                 }
             }
         }
@@ -448,7 +465,8 @@ impl<'a> Expander for Shell {
         if quoted {
             self.get::<types::Str>(name)
         } else {
-            self.get::<types::Str>(name).map(|x| x.ascii_replace('\n', ' '))
+            self.get::<types::Str>(name)
+                .map(|x| x.ascii_replace('\n', ' '))
         }
     }
 
@@ -457,10 +475,12 @@ impl<'a> Expander for Shell {
         if let Some(array) = self.variables.get::<types::Array>(name) {
             match selection {
                 Select::All => return Some(array.clone()),
-                Select::Index(id) => return id
-                    .resolve(array.len())
-                    .and_then(|n| array.get(n))
-                    .map(|x| types::Array::from_iter(Some(x.to_owned()))),
+                Select::Index(id) => {
+                    return id
+                        .resolve(array.len())
+                        .and_then(|n| array.get(n))
+                        .map(|x| types::Array::from_iter(Some(x.to_owned())))
+                }
                 Select::Range(range) => if let Some((start, length)) = range.bounds(array.len()) {
                     if array.len() > start {
                         return Some(
@@ -470,9 +490,9 @@ impl<'a> Expander for Shell {
                                 .take(length)
                                 .map(|x| x.to_owned())
                                 .collect::<types::Array>(),
-                        )
+                        );
                     }
-                }
+                },
                 _ => (),
             }
         } else if let Some(hmap) = self.variables.get::<types::HashMap>(name) {
@@ -483,7 +503,9 @@ impl<'a> Expander for Shell {
                         let f = format!("{}", value);
                         match *value {
                             VariableType::Str(_) => array.push(f.into()),
-                            VariableType::Array(_) | VariableType::HashMap(_) | VariableType::BTreeMap(_) => {
+                            VariableType::Array(_)
+                            | VariableType::HashMap(_)
+                            | VariableType::BTreeMap(_) => {
                                 for split in f.split_whitespace() {
                                     array.push(split.into());
                                 }
@@ -491,10 +513,13 @@ impl<'a> Expander for Shell {
                             _ => (),
                         }
                     }
-                    return Some(array)
+                    return Some(array);
                 }
                 Select::Key(key) => {
-                    return Some(array![format!("{}", hmap.get(&*key).unwrap_or(&VariableType::Str("".into())))])
+                    return Some(array![format!(
+                        "{}",
+                        hmap.get(&*key).unwrap_or(&VariableType::Str("".into()))
+                    )])
                 }
                 _ => (),
             }
@@ -506,7 +531,9 @@ impl<'a> Expander for Shell {
                         let f = format!("{}", value);
                         match *value {
                             VariableType::Str(_) => array.push(f.into()),
-                            VariableType::Array(_) | VariableType::HashMap(_) | VariableType::BTreeMap(_) => {
+                            VariableType::Array(_)
+                            | VariableType::HashMap(_)
+                            | VariableType::BTreeMap(_) => {
                                 for split in f.split_whitespace() {
                                     array.push(split.into());
                                 }
@@ -514,10 +541,13 @@ impl<'a> Expander for Shell {
                             _ => (),
                         }
                     }
-                    return Some(array)
+                    return Some(array);
                 }
                 Select::Key(key) => {
-                    return Some(array![format!("{}", bmap.get(&*key).unwrap_or(&VariableType::Str("".into())))])
+                    return Some(array![format!(
+                        "{}",
+                        bmap.get(&*key).unwrap_or(&VariableType::Str("".into()))
+                    )])
                 }
                 _ => (),
             }

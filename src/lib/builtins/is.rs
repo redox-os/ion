@@ -1,6 +1,6 @@
 use shell::Shell;
-use types;
 use small;
+use types;
 
 pub(crate) fn is(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
     match args.len() {
@@ -61,12 +61,24 @@ fn test_is() {
         is(&vec_string(&["is", "not", "$x", "$x"]), &mut shell),
         Err("".to_string())
     );
-    assert_eq!(is(&vec_string(&["is", "not", "2", "1"]), &mut shell), Ok(()));
-    assert_eq!(is(&vec_string(&["is", "not", "$x", "$y"]), &mut shell), Ok(()));
+    assert_eq!(
+        is(&vec_string(&["is", "not", "2", "1"]), &mut shell),
+        Ok(())
+    );
+    assert_eq!(
+        is(&vec_string(&["is", "not", "$x", "$y"]), &mut shell),
+        Ok(())
+    );
 
     // Three arguments
-    assert_eq!(is(&vec_string(&["is", "1", "2"]), &mut shell), Err("".to_string()));
-    assert_eq!(is(&vec_string(&["is", "$x", "$y"]), &mut shell), Err("".to_string()));
+    assert_eq!(
+        is(&vec_string(&["is", "1", "2"]), &mut shell),
+        Err("".to_string())
+    );
+    assert_eq!(
+        is(&vec_string(&["is", "$x", "$y"]), &mut shell),
+        Err("".to_string())
+    );
     assert_eq!(is(&vec_string(&["is", " ", " "]), &mut shell), Ok(()));
     assert_eq!(is(&vec_string(&["is", "$x", "$x"]), &mut shell), Ok(()));
 

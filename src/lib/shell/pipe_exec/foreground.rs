@@ -24,7 +24,9 @@ pub(crate) struct ForegroundSignals {
 }
 
 impl ForegroundSignals {
-    pub(crate) fn was_grabbed(&self, pid: u32) -> bool { self.grab.load(Ordering::SeqCst) as u32 == pid }
+    pub(crate) fn was_grabbed(&self, pid: u32) -> bool {
+        self.grab.load(Ordering::SeqCst) as u32 == pid
+    }
 
     pub(crate) fn was_processed(&self) -> Option<BackgroundResult> {
         let reply = self.reply.load(Ordering::SeqCst) as u8;
@@ -51,7 +53,9 @@ impl ForegroundSignals {
         self.reply.store(REPLIED as usize, Ordering::SeqCst);
     }
 
-    pub(crate) fn signal_to_grab(&self, pid: u32) { self.grab.store(pid as usize, Ordering::SeqCst); }
+    pub(crate) fn signal_to_grab(&self, pid: u32) {
+        self.grab.store(pid as usize, Ordering::SeqCst);
+    }
 
     pub(crate) fn new() -> ForegroundSignals {
         ForegroundSignals {

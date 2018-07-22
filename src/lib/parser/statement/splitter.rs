@@ -3,7 +3,8 @@
 // - Validate syntax in methods
 
 use std::{
-    fmt::{self, Display, Formatter}, u16,
+    fmt::{self, Display, Formatter},
+    u16,
 };
 
 bitflags! {
@@ -266,17 +267,16 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     }
                 }
                 b')' => self.paren_level -= 1,
-                b';' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 =>
-                {
+                b';' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 => {
                     let statement = self.get_statement(Flags::empty());
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(statement)),
-                    }
+                    };
                 }
-                b'&' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 =>
-                {
-                    if bytes.peek() == Some(&b'&') { // Detecting if there is a 2nd `&` character
+                b'&' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 => {
+                    if bytes.peek() == Some(&b'&') {
+                        // Detecting if there is a 2nd `&` character
                         let statement = self.get_statement(Flags::AND);
                         self.read += 1; // Have `read` skip the 2nd `&` character after reading
                         return match error {
@@ -285,9 +285,9 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         };
                     }
                 }
-                b'|' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 =>
-                {
-                    if bytes.peek() == Some(&b'|') { // Detecting if there is a 2nd `|` character
+                b'|' if !self.flags.contains(Flags::DQUOTE) && self.paren_level == 0 => {
+                    if bytes.peek() == Some(&b'|') {
+                        // Detecting if there is a 2nd `|` character
                         let statement = self.get_statement(Flags::OR);
                         self.read += 1; // Have `read` skip the 2nd `|` character after reading
                         return match error {
@@ -297,7 +297,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     }
                 }
 
-                b'#' if self.read == 1 || (!self.flags.contains(Flags::DQUOTE) && self.paren_level == 0
+                b'#' if self.read == 1
+                    || (!self.flags.contains(Flags::DQUOTE) && self.paren_level == 0
                         && match self.data.as_bytes()[self.read - 2] {
                             b' ' | b'\t' => true,
                             _ => false,
@@ -351,9 +352,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
             self.read = self.data.len();
             match error {
                 Some(error) => Some(Err(error)),
-                None if self.paren_level != 0 => {
-                    Some(Err(StatementError::UnterminatedSubshell))
-                }
+                None if self.paren_level != 0 => Some(Err(StatementError::UnterminatedSubshell)),
                 None if self.flags.contains(Flags::METHOD) => {
                     Some(Err(StatementError::UnterminatedMethod))
                 }
@@ -389,8 +388,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
 #[test]
 fn syntax_errors() {
     let command = "echo (echo one); echo $( (echo one); echo ) two; echo $(echo one";
-    let results = StatementSplitter::new(command)
-        .collect::<Vec<_>>();
+    let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results[0], Err(StatementError::InvalidCharacter('(', 6)));
     assert_eq!(results[1], Err(StatementError::InvalidCharacter('(', 26)));
     assert_eq!(results[2], Err(StatementError::InvalidCharacter(')', 43)));
@@ -415,8 +413,14 @@ fn syntax_errors() {
 fn methods() {
     let command = "echo $join(array, ', '); echo @join(var, ', ')";
     let statements = StatementSplitter::new(command).collect::<Vec<_>>();
-    assert_eq!(statements[0], Ok(StatementVariant::Default("echo $join(array, ', ')")));
-    assert_eq!(statements[1], Ok(StatementVariant::Default("echo @join(var, ', ')")));
+    assert_eq!(
+        statements[0],
+        Ok(StatementVariant::Default("echo $join(array, ', ')"))
+    );
+    assert_eq!(
+        statements[1],
+        Ok(StatementVariant::Default("echo @join(var, ', ')"))
+    );
     assert_eq!(statements.len(), 2);
 }
 
@@ -432,7 +436,10 @@ fn processes() {
 fn array_processes() {
     let command = "echo @(echo one; sleep 1); echo @(echo one; sleep 1)";
     for statement in StatementSplitter::new(command) {
-        assert_eq!(statement, Ok(StatementVariant::Default("echo @(echo one; sleep 1)")));
+        assert_eq!(
+            statement,
+            Ok(StatementVariant::Default("echo @(echo one; sleep 1)"))
+        );
     }
 }
 
@@ -449,8 +456,14 @@ fn quotes() {
     let command = "echo \"This ;'is a test\"; echo 'This ;\" is also a test'";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0], Ok(StatementVariant::Default("echo \"This ;'is a test\"")));
-    assert_eq!(results[1], Ok(StatementVariant::Default("echo 'This ;\" is also a test'")));
+    assert_eq!(
+        results[0],
+        Ok(StatementVariant::Default("echo \"This ;'is a test\""))
+    );
+    assert_eq!(
+        results[1],
+        Ok(StatementVariant::Default("echo 'This ;\" is also a test'"))
+    );
 }
 
 #[test]
@@ -458,7 +471,10 @@ fn comments() {
     let command = "echo $(echo one # two); echo three # four";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0], Ok(StatementVariant::Default("echo $(echo one # two)")));
+    assert_eq!(
+        results[0],
+        Ok(StatementVariant::Default("echo $(echo one # two)"))
+    );
     assert_eq!(results[1], Ok(StatementVariant::Default("echo three")));
 }
 
@@ -501,9 +517,28 @@ fn variants() {
     let command = r#"echo "Hello!"; echo "How are you doing?" && echo "I'm just an ordinary test." || echo "Helping by making sure your code works right."; echo "Have a good day!""#;
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 5);
-    assert_eq!(results[0], Ok(StatementVariant::Default(r#"echo "Hello!""#)));
-    assert_eq!(results[1], Ok(StatementVariant::Default(r#"echo "How are you doing?""#)));
-    assert_eq!(results[2], Ok(StatementVariant::And(r#"echo "I'm just an ordinary test.""#)));
-    assert_eq!(results[3], Ok(StatementVariant::Or(r#"echo "Helping by making sure your code works right.""#)));
-    assert_eq!(results[4], Ok(StatementVariant::Default(r#"echo "Have a good day!""#)));
+    assert_eq!(
+        results[0],
+        Ok(StatementVariant::Default(r#"echo "Hello!""#))
+    );
+    assert_eq!(
+        results[1],
+        Ok(StatementVariant::Default(r#"echo "How are you doing?""#))
+    );
+    assert_eq!(
+        results[2],
+        Ok(StatementVariant::And(
+            r#"echo "I'm just an ordinary test.""#
+        ))
+    );
+    assert_eq!(
+        results[3],
+        Ok(StatementVariant::Or(
+            r#"echo "Helping by making sure your code works right.""#
+        ))
+    );
+    assert_eq!(
+        results[4],
+        Ok(StatementVariant::Default(r#"echo "Have a good day!""#))
+    );
 }

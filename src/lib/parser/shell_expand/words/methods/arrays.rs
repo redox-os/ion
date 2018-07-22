@@ -1,8 +1,10 @@
 use super::{
     super::{
-        super::{expand_string, is_expression, Expander}, Select, SelectWithSize,
+        super::{expand_string, is_expression, Expander},
+        Select, SelectWithSize,
     },
-    strings::unescape, Pattern,
+    strings::unescape,
+    Pattern,
 };
 use ranges::Index;
 use small;
@@ -30,7 +32,8 @@ impl<'a> ArrayMethod<'a> {
         Ok(variable
             .lines()
             .into_iter()
-            .map(|line| types::Str::from(line)) .collect())
+            .map(|line| types::Str::from(line))
+            .collect())
     }
 
     fn chars<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
@@ -86,9 +89,7 @@ impl<'a> ArrayMethod<'a> {
         let res = match (&self.pattern, self.selection.clone()) {
             (_, Select::None) => Some("".into()).into_iter().collect(),
             (&Pattern::StringPattern(pattern), Select::All) => variable
-                .split(unescape(
-                    &expand_string(pattern, expand_func, false).join(" ")
-                )?.as_str())
+                .split(unescape(&expand_string(pattern, expand_func, false).join(" "))?.as_str())
                 .map(From::from)
                 .collect(),
             (&Pattern::Whitespace, Select::All) => variable
@@ -97,9 +98,7 @@ impl<'a> ArrayMethod<'a> {
                 .map(From::from)
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => variable
-                .split(&unescape(
-                    &expand_string(pattern, expand_func, false).join(" ")
-                )?.as_str())
+                .split(&unescape(&expand_string(pattern, expand_func, false).join(" "))?.as_str())
                 .nth(id)
                 .map(From::from)
                 .into_iter()
@@ -112,9 +111,7 @@ impl<'a> ArrayMethod<'a> {
                 .into_iter()
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => variable
-                .rsplit(&unescape(
-                    &expand_string(pattern, expand_func, false).join(" ")
-                )?.as_str())
+                .rsplit(&unescape(&expand_string(pattern, expand_func, false).join(" "))?.as_str())
                 .nth(id)
                 .map(From::from)
                 .into_iter()

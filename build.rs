@@ -4,7 +4,11 @@
 // const MIN_VERSION: &'static str = "1.19.0";
 
 use std::{
-    env, fs::File, io::{self, Read, Write}, path::Path, process::Command,
+    env,
+    fs::File,
+    io::{self, Read, Write},
+    path::Path,
+    process::Command,
 };
 
 fn main() {

@@ -1,4 +1,8 @@
-use super::{directory_stack::DirectoryStack, escape::{escape, unescape}, variables::Variables};
+use super::{
+    directory_stack::DirectoryStack,
+    escape::{escape, unescape},
+    variables::Variables,
+};
 use glob::glob;
 use liner::{Completer, FilenameCompleter};
 use smallvec::SmallVec;
@@ -74,9 +78,9 @@ impl Completer for IonFileCompleter {
                     for completion in iterator {
                         completions.push([start, &completion[expanded.len()..]].concat());
                     }
-                    // To save processing time, we should get obtain the index position where our
-                    // search pattern begins, and re-use that index to slice the completions so
-                    // that we may re-add the tilde character with the completion that follows.
+                // To save processing time, we should get obtain the index position where our
+                // search pattern begins, and re-use that index to slice the completions so
+                // that we may re-add the tilde character with the completion that follows.
                 } else if let Some(completion) = iterator.next() {
                     if let Some(e_index) = expanded.rfind(search) {
                         completions.push(escape(&[tilde, &completion[e_index..]].concat()));
@@ -95,9 +99,12 @@ impl Completer for IonFileCompleter {
     }
 }
 
-fn filename_completion<'a, LC>(start: &'a str, liner_complete: LC) -> impl Iterator<Item = String> + 'a
+fn filename_completion<'a, LC>(
+    start: &'a str,
+    liner_complete: LC,
+) -> impl Iterator<Item = String> + 'a
 where
-    LC: Fn(&str) -> Vec<String> + 'a
+    LC: Fn(&str) -> Vec<String> + 'a,
 {
     let unescaped_start = unescape(start);
 
@@ -135,7 +142,7 @@ where
 
     let iter_inner_glob: Box<Iterator<Item = String>> = match globs {
         Some(iter) => Box::new(iter),
-        None => Box::new(iter::once(escape(start)))
+        None => Box::new(iter::once(escape(start))),
     };
 
     // Use Liner::Completer as well, to preserve the previous behaviour

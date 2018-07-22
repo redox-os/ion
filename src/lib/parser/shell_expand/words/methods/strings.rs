@@ -1,14 +1,15 @@
 use super::{
     super::{
-        super::{expand_string, is_expression, slice, Expander}, Select,
+        super::{expand_string, is_expression, slice, Expander},
+        Select,
     },
     MethodArgs,
 };
 use parser::assignments::is_array;
 use regex::Regex;
 use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};
-use std::path::Path;
 use small;
+use std::path::Path;
 use sys;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -300,33 +301,42 @@ impl<'a> StringMethod<'a> {
                     small::String::new()
                 };
                 let second_array = pattern.array();
-                let first_maybe:Option<String> = if first_str != "" {Some(first_str.to_string())} else if first_str == "" {None} else {None};
+                let first_maybe: Option<String> = if first_str != "" {
+                    Some(first_str.to_string())
+                } else if first_str == "" {
+                    None
+                } else {
+                    None
+                };
                 match first_maybe {
                     Some(first) => output.push_str(&first),
                     None => {
-                        let split_and_cleaned_second = second_array.flat_map(|elem| 
-                            // Note that these commas should probably not be here and that this is the wrong place to handle this
-                            if elem != "" && elem != "," { 
-                                let elem_str = elem.to_string();
-                                // If the separation commas are properly removed from the pattern, then the cleaning on the next 7 lines is unnecessary
-                                let elem_str_clean = if elem_str.ends_with(",") {
+                        let split_and_cleaned_second = second_array
+                            .flat_map(|elem| {
+                                // Note that these commas should probably not be here and that this
+                                // is the wrong place to handle this
+                                if elem != "" && elem != "," {
+                                    let elem_str = elem.to_string();
+                                    // If the separation commas are properly removed from the pattern, then the cleaning on the next 7 lines is unnecessary
+                                    let elem_str_clean = if elem_str.ends_with(",") {
                                         let comma_pos = elem_str.rfind(",").unwrap();
                                         let (clean, _) = elem_str.split_at(comma_pos);
                                         clean.to_owned()
                                     } else {
                                         elem_str
                                     };
-                                Some(elem_str_clean)
-                            } else {
-                                None
-                            }
-                        ).collect::<Vec<String>>();
+                                    Some(elem_str_clean)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<String>>();
                         let second_leading_defined = split_and_cleaned_second.first();
                         match second_leading_defined {
                             Some(second) => output.push_str(&second),
                             None => return,
                         };
-                    },
+                    }
                 };
             }
             method => {
@@ -863,16 +873,16 @@ mod test {
         assert_eq!(&*output, "baz");
     }
 
-    /*#[test] //This one fails, but it ain't my fault, so I'm comenting out the test for now
-    fn test_or_no_pattern() {
-        let mut output = small::String::new();
-        let method = StringMethod {
-            method:    "or",
-            variable:  "$FOO",
-            pattern:   "\"\"",
-            selection: Select::All,
-        };
-        method.handle(&mut output, &VariableExpander);
-        assert_eq!(&*output, "FOOBAR");
-    }*/
+    // #[test] //This one fails, but it ain't my fault, so I'm comenting out the test for now
+    // fn test_or_no_pattern() {
+    // let mut output = small::String::new();
+    // let method = StringMethod {
+    // method:    "or",
+    // variable:  "$FOO",
+    // pattern:   "\"\"",
+    // selection: Select::All,
+    // };
+    // method.handle(&mut output, &VariableExpander);
+    // assert_eq!(&*output, "FOOBAR");
+    // }
 }

@@ -1,19 +1,19 @@
 use super::{
     flags::*,
     flow_control::{collect_cases, collect_if, collect_loops, Case, ElseIf, Function, Statement},
-    job_control::JobControl, status::*, Shell,
+    job_control::JobControl,
+    status::*,
+    Shell,
 };
 use parser::{
-    assignments::is_array, expand_string, parse_and_validate, pipelines::Pipeline,
-    ForExpression, StatementSplitter,
+    assignments::is_array, expand_string, parse_and_validate, pipelines::Pipeline, ForExpression,
+    StatementSplitter,
 };
-use shell::{
-    assignments::VariableStore,
-    variables::VariableType,
-};
+use shell::{assignments::VariableStore, variables::VariableType};
 use small;
 use std::{
-    io::{stdout, Write}, iter, mem,
+    io::{stdout, Write},
+    iter, mem,
 };
 use types;
 
@@ -621,7 +621,10 @@ impl FlowLogic for Shell {
         while let Some(statement) = iterator.next() {
             match self.execute_statement(&mut iterator, statement) {
                 Condition::NoOp => {}
-                cond => { condition = Some(cond); break; },
+                cond => {
+                    condition = Some(cond);
+                    break;
+                }
             }
         }
 
@@ -636,7 +639,7 @@ impl FlowLogic for Shell {
         // in a case statement). For example, checking to see if the value
         // "foo" matches the pattern "bar" would be invoked like so :
         // ```ignore
-        // matches("foo", "bar")
+        // matches("foo", "bar") 
         // ```
         fn matches(lhs: &types::Array, rhs: &types::Array) -> bool {
             for v in lhs {
@@ -684,9 +687,15 @@ impl FlowLogic for Shell {
                     if let Some(ref bind) = case.binding {
                         if let Some(value) = previous_bind {
                             match value {
-                                str_ @ VariableType::Str(_) => { self.set(bind, str_); }
-                                array @ VariableType::Array(_) => { self.variables.set(bind, array); }
-                                map @ VariableType::HashMap(_) => { self.variables.set(bind, map); }
+                                str_ @ VariableType::Str(_) => {
+                                    self.set(bind, str_);
+                                }
+                                array @ VariableType::Array(_) => {
+                                    self.variables.set(bind, array);
+                                }
+                                map @ VariableType::HashMap(_) => {
+                                    self.variables.set(bind, map);
+                                }
                                 _ => (),
                             }
                         }
@@ -724,9 +733,15 @@ impl FlowLogic for Shell {
                     if let Some(ref bind) = case.binding {
                         if let Some(value) = previous_bind {
                             match value {
-                                str_ @ VariableType::Str(_) => { self.set(bind, str_); }
-                                array @ VariableType::Array(_) => { self.set(bind, array); }
-                                map @ VariableType::HashMap(_) => { self.set(bind, map); }
+                                str_ @ VariableType::Str(_) => {
+                                    self.set(bind, str_);
+                                }
+                                array @ VariableType::Array(_) => {
+                                    self.set(bind, array);
+                                }
+                                map @ VariableType::HashMap(_) => {
+                                    self.set(bind, map);
+                                }
                                 _ => (),
                             }
                         }
@@ -742,8 +757,7 @@ impl FlowLogic for Shell {
 
     fn on_command(&mut self, command_string: &str) {
         self.break_flow = false;
-        let mut iterator =
-            StatementSplitter::new(command_string).map(parse_and_validate);
+        let mut iterator = StatementSplitter::new(command_string).map(parse_and_validate);
 
         // If the value is set to `0`, this means that we don't need to append to an
         // existing partial statement block in memory, but can read and execute
@@ -922,10 +936,10 @@ impl FlowLogic for Shell {
                         }
                         Statement::And(box_stmt) => if let SUCCESS = shell.previous_status {
                             execute_final(shell, *box_stmt);
-                        }
+                        },
                         Statement::Or(box_stmt) => if let FAILURE = shell.previous_status {
                             execute_final(shell, *box_stmt);
-                        }
+                        },
                         Statement::Not(box_stmt) => {
                             execute_final(shell, *box_stmt);
                             match shell.previous_status {
@@ -933,9 +947,7 @@ impl FlowLogic for Shell {
                                 SUCCESS => shell.previous_status = FAILURE,
                                 _ => (),
                             }
-                            shell
-                                .variables
-                                .set("?", shell.previous_status.to_string());
+                            shell.variables.set("?", shell.previous_status.to_string());
                         }
                         _ => (),
                     }

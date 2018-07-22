@@ -14,16 +14,30 @@ mod status;
 use ion_builtins::{calc, conditionals, echo, random, test};
 
 use self::{
-    command_info::*, echo::echo, exec::exec,
-    exists::exists, functions::fn_, is::is, man_pages::*, source::source,
-    status::status, test::test, variables::{alias, drop_alias, drop_array, drop_variable},
+    command_info::*,
+    echo::echo,
+    exec::exec,
+    exists::exists,
+    functions::fn_,
+    is::is,
+    man_pages::*,
+    source::source,
+    status::status,
+    test::test,
+    variables::{alias, drop_alias, drop_array, drop_variable},
 };
 
-use std::{error::Error, io::{self, Write}};
+use std::{
+    error::Error,
+    io::{self, Write},
+};
 
 use parser::Terminator;
 use shell::{
-    self, fork_function::fork_function, job_control::{JobControl, ProcessState}, status::*,
+    self,
+    fork_function::fork_function,
+    job_control::{JobControl, ProcessState},
+    status::*,
     FlowLogic, Shell, ShellHistory,
 };
 use small;

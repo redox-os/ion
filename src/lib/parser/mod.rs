@@ -7,7 +7,8 @@ mod statement;
 
 pub use self::quotes::Terminator;
 pub(crate) use self::{
-    loops::ForExpression, shell_expand::{expand_string, Expander, Select},
+    loops::ForExpression,
+    shell_expand::{expand_string, Expander, Select},
     statement::{parse_and_validate, StatementSplitter},
 };
 
@@ -15,7 +16,5 @@ pub(crate) use self::{
 pub mod fuzzing {
     use super::*;
 
-    pub fn statement_parse(data: &str) {
-        statement::parse::parse(data);
-    }
+    pub fn statement_parse(data: &str) { statement::parse::parse(data); }
 }

@@ -122,7 +122,9 @@ fn char_range<'a>(
         }
         stepped_range_chars(start, end, char_step)
     } else {
-        Some(Box::new(Some((start as char).to_string().into()).into_iter()))
+        Some(Box::new(
+            Some((start as char).to_string().into()).into_iter(),
+        ))
     }
 }
 

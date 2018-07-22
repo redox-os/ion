@@ -1,8 +1,8 @@
 use super::super::{expand_string, Expander};
 use lexers::assignments::{Primitive, TypeError};
 use shell::variables::VariableType;
-use types;
 use std::iter::Iterator;
+use types;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 enum IsArrayHelper {
@@ -143,14 +143,20 @@ fn is_float_array(value: VariableType) -> Result<VariableType, ()> {
 }
 
 fn get_string<E: Expander>(shell: &E, value: &str) -> VariableType {
-    VariableType::Str(types::Str::from(expand_string(value, shell, false).join(" ")))
+    VariableType::Str(types::Str::from(
+        expand_string(value, shell, false).join(" "),
+    ))
 }
 
 fn get_array<E: Expander>(shell: &E, value: &str) -> VariableType {
     VariableType::Array(expand_string(value, shell, false))
 }
 
-fn get_hash_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive) -> Result<VariableType, TypeError> {
+fn get_hash_map<E: Expander>(
+    shell: &E,
+    expression: &str,
+    inner_kind: &Primitive,
+) -> Result<VariableType, TypeError> {
     let array = expand_string(expression, shell, false);
     let mut hmap = types::HashMap::with_capacity_and_hasher(array.len(), Default::default());
 
@@ -174,16 +180,19 @@ fn get_hash_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive
                 Err(type_error) => return Err(type_error),
                 _ => (),
             }
-
         } else {
-            return Err(TypeError::BadValue(inner_kind.clone()))
+            return Err(TypeError::BadValue(inner_kind.clone()));
         }
     }
 
     Ok(VariableType::HashMap(hmap))
 }
 
-fn get_btree_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitive) -> Result<VariableType, TypeError> {
+fn get_btree_map<E: Expander>(
+    shell: &E,
+    expression: &str,
+    inner_kind: &Primitive,
+) -> Result<VariableType, TypeError> {
     let array = expand_string(expression, shell, false);
     let mut bmap = types::BTreeMap::new();
 
@@ -207,9 +216,8 @@ fn get_btree_map<E: Expander>(shell: &E, expression: &str, inner_kind: &Primitiv
                 Err(type_error) => return Err(type_error),
                 _ => (),
             }
-
         } else {
-            return Err(TypeError::BadValue(inner_kind.clone()))
+            return Err(TypeError::BadValue(inner_kind.clone()));
         }
     }
 
@@ -240,7 +248,8 @@ pub(crate) fn value_check<E: Expander>(
         Primitive::StrArray if is_array => Ok(get_array!()),
         Primitive::Boolean if !is_array => {
             let value = get_string!();
-            let value = is_boolean_string(&value).map_err(|_| TypeError::BadValue(expected.clone()))?;
+            let value =
+                is_boolean_string(&value).map_err(|_| TypeError::BadValue(expected.clone()))?;
             Ok(VariableType::Str(value.into()))
         }
         Primitive::BooleanArray if is_array => {

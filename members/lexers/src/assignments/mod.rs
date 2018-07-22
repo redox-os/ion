@@ -2,13 +2,17 @@ mod keys;
 mod operator;
 mod primitive;
 
-pub use self::keys::{Key, KeyBuf, KeyIterator, TypeError};
-pub use self::operator::Operator;
-pub use self::primitive::Primitive;
+pub use self::{
+    keys::{Key, KeyBuf, KeyIterator, TypeError},
+    operator::Operator,
+    primitive::Primitive,
+};
 
 /// Given an valid assignment expression, this will split it into `keys`,
 /// `operator`, `values`.
-pub fn assignment_lexer<'a>(statement: &'a str) -> (Option<&'a str>, Option<Operator>, Option<&'a str>) {
+pub fn assignment_lexer<'a>(
+    statement: &'a str,
+) -> (Option<&'a str>, Option<Operator>, Option<&'a str>) {
     let statement = statement.trim();
     if statement.is_empty() {
         return (None, None, None);
@@ -35,7 +39,7 @@ pub fn assignment_lexer<'a>(statement: &'a str) -> (Option<&'a str>, Option<Oper
                     operator = Some(op);
                     start = read;
                     read = found;
-                    break
+                    break;
                 }
             }
         }
@@ -59,10 +63,10 @@ pub fn assignment_lexer<'a>(statement: &'a str) -> (Option<&'a str>, Option<Oper
 fn find_operator(bytes: &[u8], read: usize) -> Option<(Operator, usize)> {
     if bytes.len() <= read + 3 {
         None
-    } else if bytes[read+1] == b'=' {
+    } else if bytes[read + 1] == b'=' {
         Operator::parse_single(bytes[read]).map(|op| (op, read + 2))
-    } else if bytes[read+2] == b'=' {
-        Operator::parse_double(&bytes[read..read+2]).map(|op| (op, read + 3))
+    } else if bytes[read + 2] == b'=' {
+        Operator::parse_double(&bytes[read..read + 2]).map(|op| (op, read + 3))
     } else {
         None
     }
@@ -74,14 +78,8 @@ mod tests {
 
     #[test]
     fn assignment_splitting() {
-        assert_eq!(
-            assignment_lexer(""),
-            (None, None, None)
-        );
-        assert_eq!(
-            assignment_lexer("abc"),
-            (Some("abc"), None, None)
-        );
+        assert_eq!(assignment_lexer(""), (None, None, None));
+        assert_eq!(assignment_lexer("abc"), (Some("abc"), None, None));
 
         assert_eq!(
             assignment_lexer("abc+=def"),

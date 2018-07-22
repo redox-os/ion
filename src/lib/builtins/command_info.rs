@@ -1,5 +1,5 @@
 use builtins::man_pages::*;
-use shell::{status::*, flow_control::Function, Shell};
+use shell::{flow_control::Function, status::*, Shell};
 use small;
 use sys;
 use types;
@@ -22,7 +22,7 @@ pub(crate) fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()
             match c_type.as_ref() {
                 "alias" => if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
                     println!("{}: alias to {}", command, &*alias);
-                }
+                },
                 "function" => println!("{}: function", command),
                 "builtin" => println!("{}: built-in shell command", command),
                 _path => println!("{}", _path),
@@ -47,7 +47,7 @@ pub(crate) fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32
             match c_type.as_ref() {
                 "alias" => if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
                     println!("{} is aliased to `{}`", command, &*alias);
-                }
+                },
                 // TODO Make it print the function.
                 "function" => println!("{} is a function", command),
                 "builtin" => println!("{} is a shell builtin", command),

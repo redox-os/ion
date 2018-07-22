@@ -5,13 +5,14 @@ mod readln;
 mod terminate;
 
 use self::{
-    prompt::{prompt, prompt_fn}, readln::readln,
+    prompt::{prompt, prompt_fn},
+    readln::readln,
     terminate::{terminate_quotes, terminate_script_quotes},
 };
 use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
-use types;
 use liner::{Buffer, Context};
 use std::{env, fs::File, io::ErrorKind, iter, path::Path, process, sync::Mutex};
+use types;
 
 pub const MAN_ION: &str = r#"NAME
     ion - ion shell
@@ -98,7 +99,9 @@ impl Binary for Shell {
             let mut context = Context::new();
             context.word_divider_fn = Box::new(word_divide);
             if "1" == self.get_str_or_empty("HISTFILE_ENABLED") {
-                let path = self.get::<types::Str>("HISTFILE").expect("shell didn't set HISTFILE");
+                let path = self
+                    .get::<types::Str>("HISTFILE")
+                    .expect("shell didn't set HISTFILE");
                 context.history.set_file_name(Some(path.to_string()));
                 if !Path::new(path.as_str()).exists() {
                     eprintln!("ion: creating history file at \"{}\"", path);
@@ -127,8 +130,10 @@ impl Binary for Shell {
 
         self.evaluate_init_file();
 
-        self.variables
-            .set("args", iter::once(env::args().next().unwrap().into()).collect::<types::Array>());
+        self.variables.set(
+            "args",
+            iter::once(env::args().next().unwrap().into()).collect::<types::Array>(),
+        );
 
         loop {
             if let Some(command) = self.readln() {

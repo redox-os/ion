@@ -22,7 +22,9 @@ impl<'a> Display for CaseError<'a> {
     }
 }
 
-pub(crate) fn parse_case(data: &str,) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError> {
+pub(crate) fn parse_case(
+    data: &str,
+) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError> {
     let mut splitter = ArgumentSplitter::new(data);
     // let argument = splitter.next().ok_or(CaseError::Empty)?;
     let mut argument = None;
@@ -34,12 +36,14 @@ pub(crate) fn parse_case(data: &str,) -> Result<(Option<&str>, Option<&str>, Opt
                 binding = Some(splitter.next().ok_or(CaseError::NoBindVariable)?);
                 match splitter.next() {
                     Some("if") => {
-                        // Joining by folding is more efficient than collecting into Vec and then joining
-                        let mut string = splitter.fold(String::with_capacity(5), |mut state, element| {
-                            state.push_str(element);
-                            state.push(' ');
-                            state
-                        });
+                        // Joining by folding is more efficient than collecting into Vec and then
+                        // joining
+                        let mut string =
+                            splitter.fold(String::with_capacity(5), |mut state, element| {
+                                state.push_str(element);
+                                state.push(' ');
+                                state
+                            });
                         string.pop(); // Pop out the unneeded ' ' character
                         if string.is_empty() {
                             return Err(CaseError::NoConditional);

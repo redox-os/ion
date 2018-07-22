@@ -1,5 +1,5 @@
-use shell::{Capture, Function, Shell};
 use parser::shell_expand::expand_string;
+use shell::{Capture, Function, Shell};
 use std::{io::Read, process};
 use sys;
 

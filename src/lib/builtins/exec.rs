@@ -1,6 +1,6 @@
 use builtins::man_pages::{check_help, MAN_EXEC};
-use small;
 use shell::Shell;
+use small;
 use std::error::Error;
 use sys::execve;
 

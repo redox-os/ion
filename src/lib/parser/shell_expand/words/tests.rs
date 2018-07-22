@@ -1,6 +1,6 @@
 use super::*;
-use types::{self, Array};
 use ranges::{Index, Range};
+use types::{self, Array};
 
 struct Empty;
 
@@ -94,9 +94,9 @@ fn array_process_within_string_process() {
             WordToken::Process(
                 "let free=[@(free -h)]; echo @free[6]@free[8]/@free[7]",
                 false,
-                Select::All
-            )
-        ]
+                Select::All,
+            ),
+        ],
     )
 }
 

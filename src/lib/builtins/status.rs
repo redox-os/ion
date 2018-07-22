@@ -1,4 +1,4 @@
-use builtins::man_pages::{MAN_STATUS};
+use builtins::man_pages::MAN_STATUS;
 use shell::Shell;
 use small;
 

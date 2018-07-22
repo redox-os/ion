@@ -1,7 +1,10 @@
 use super::super::{completer::*, Binary, DirectoryStack, Shell, Variables};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use std::{
-    env, io::{self, ErrorKind, Write}, mem, path::PathBuf,
+    env,
+    io::{self, ErrorKind, Write},
+    mem,
+    path::PathBuf,
 };
 use sys;
 use types;

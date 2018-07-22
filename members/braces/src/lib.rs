@@ -1,6 +1,6 @@
 extern crate permutate;
-extern crate smallvec;
 extern crate small;
+extern crate smallvec;
 
 use permutate::Permutator;
 use smallvec::SmallVec;

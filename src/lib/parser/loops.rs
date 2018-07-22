@@ -96,13 +96,7 @@ mod tests {
     #[test]
     fn for_normal() {
         let variables = Variables::default();
-        let output = vec![
-            "1".into(),
-            "2".into(),
-            "3".into(),
-            "4".into(),
-            "5".into(),
-        ];
+        let output = vec!["1".into(), "2".into(), "3".into(), "4".into(), "5".into()];
         assert_eq!(
             ForExpression::new(&output.clone(), &VariableExpander(variables)),
             ForExpression::Multiple(output)

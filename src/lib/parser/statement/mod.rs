@@ -7,7 +7,8 @@ pub mod parse;
 mod splitter;
 
 pub(crate) use self::{
-    parse::parse, splitter::{StatementVariant, StatementError, StatementSplitter},
+    parse::parse,
+    splitter::{StatementError, StatementSplitter, StatementVariant},
 };
 use shell::flow_control::Statement;
 
