@@ -5,7 +5,6 @@ use itoa;
 use lexers::assignments::{Operator, Primitive};
 use parser::assignments::*;
 use small;
-use smallvec::SmallVec;
 use shell::{
     history::ShellHistory,
     variables::VariableType
@@ -14,7 +13,7 @@ use types;
 use std::{
     collections::HashMap,
     env, ffi::OsStr, fmt::{self, Display}, io::{self, BufWriter, Write}, mem,
-    os::unix::ffi::OsStrExt, str, simd,
+    os::unix::ffi::OsStrExt, str
 };
 
 fn list_vars(shell: &Shell) {
@@ -295,7 +294,7 @@ impl VariableStore for Shell {
                                 }
                                 _ => (),
                             }
-                            match self.variables.get_ref(key.name) {
+                            match self.variables.get_mut(key.name) {
                                 Some(VariableType::Str(lhs)) => {
                                     let result = math(&lhs, &key.kind, operator, &value, |value| {
                                         collected.insert(key.name, VariableType::Str(unsafe {
@@ -309,8 +308,6 @@ impl VariableStore for Shell {
                                     }
                                 },
                                 Some(VariableType::Array(array)) => {
-                                    let mut output = SmallVec::with_capacity(array.len());
-
                                     let value = match value.parse::<f64>() {
                                         Ok(n) => n,
                                         Err(_) => {
@@ -319,36 +316,27 @@ impl VariableStore for Shell {
                                         }
                                     };
 
-                                    for part in array.chunks(8) {
-                                        let mut vec = simd::f64x8::splat(0.0);
-
-                                        for (i, value) in part.iter().enumerate() {
-                                            vec = vec.replace(i, match value.parse::<f64>() {
-                                                Ok(n) => n,
-                                                Err(_) => {
-                                                    eprintln!("ion: assignment error: array item is not a float");
-                                                    return FAILURE;
-                                                }
-                                            });
+                                    let action: Box<Fn(f64) -> f64> = match operator {
+                                        Operator::Add      => Box::new(|src| src + value),
+                                        Operator::Divide   => Box::new(|src| src / value),
+                                        Operator::Subtract => Box::new(|src| src - value),
+                                        Operator::Multiply => Box::new(|src| src * value),
+                                        _ => {
+                                            eprintln!("ion: assignment error: operator does not work on arrays");
+                                            return FAILURE;
                                         }
+                                    };
 
-                                        match operator {
-                                            Operator::Add => vec += value,
-                                            Operator::Divide => vec /= value,
-                                            Operator::Subtract => vec -= value,
-                                            Operator::Multiply => vec *= value,
-                                            _ => {
-                                                eprintln!("ion: assignment error: operator does not work on arrays");
+                                    for element in array {
+                                        match element.parse::<f64>() {
+                                            Ok(number) => *element = action(number).to_string().into(),
+                                            Err(_) => {
+                                                eprintln!("ion: assignment error: {} is not a float", element);
                                                 return FAILURE;
                                             }
-                                        }
 
-                                        for i in 0..part.len() {
-                                            output.push(vec.extract(i).to_string().into());
                                         }
                                     }
-
-                                    collected.insert(key.name, VariableType::Array(output));
                                 },
                                 _ => {
                                     eprintln!("ion: assignment error: type does not support this operator");

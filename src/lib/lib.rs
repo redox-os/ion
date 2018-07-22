@@ -1,7 +1,6 @@
 #![allow(unknown_lints)]
 #![allow(while_let_on_iterator)]
 #![feature(nll)]
-#![feature(stdsimd)]
 
 #[macro_use]
 extern crate bitflags;
