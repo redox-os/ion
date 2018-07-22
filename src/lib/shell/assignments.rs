@@ -218,11 +218,10 @@ impl VariableStore for Shell {
                             Ok(VariableType::Array(values)) => {
                                 match self.variables.get_mut(key.name) {
                                     Some(VariableType::Array(ref mut array)) => {
-                                        let mut iterator: Box<Iterator<Item=&types::Str>> = Box::new(array.iter());
-                                        for value in &values {
-                                            iterator = Box::new(iterator.filter(move |item| *item != value));
-                                        }
-                                        *array = iterator.cloned().collect();
+                                        *array = array.iter()
+                                            .filter(|item| values.iter().all(|value| *item != value))
+                                            .cloned()
+                                            .collect();
                                     }
                                     None => {
                                         eprintln!("ion: assignment error: {}: cannot head concatenate non-array variable", key.name);
