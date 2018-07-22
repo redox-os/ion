@@ -546,75 +546,123 @@ impl Variables {
 
     pub fn set<T: Into<VariableType>>(&mut self, name: &str, var: T) {
         let var = var.into();
-        match self.get_mut(&name) {
-            Some(VariableType::Str(ref mut str_)) => {
-                if !name.is_empty() {
-                    if let VariableType::Str(var_str) = var {
-                        if var_str.is_empty() {
-                            self.remove_variable(name);
-                        } else {
-                            if name == "NS_PLUGINS" {
-                                match &*var_str {
-                                    "0" => self.disable_plugins(),
-                                    "1" => self.enable_plugins(),
-                                    _ => eprintln!(
-                                        "ion: unsupported value for NS_PLUGINS. Value must be either 0 or 1."
-                                    ),
-                                }
-                                return;
+        enum UpperAction {
+            Remove,
+            Shadow,
+        }
+
+        enum Action<'a> {
+            UpperAction(UpperAction),
+            ReplaceAlias(&'a mut types::Alias),
+            ReplaceString(&'a mut types::Str),
+            ReplaceArray(&'a mut types::Array),
+            ReplaceFunction(&'a mut Function),
+            ReplaceHMap(&'a mut types::HashMap),
+        }
+
+        let mut upper_action = None;
+
+        {
+            let mut action = None;
+            let key = self.get_mut(&name);
+
+            match key {
+                Some(VariableType::Str(ref mut str_)) => {
+                    if !name.is_empty() {
+                        if let VariableType::Str(var_str) = &var {
+                            if var_str.is_empty() {
+                                action = Some(Action::UpperAction(UpperAction::Remove));
+                            } else {
+                                action = Some(Action::ReplaceString(str_));
                             }
-                            mem::replace(str_, var_str);
-                        }
-                    } else {
-                        self.shadow(name.into(), var);
-                    }
-                }
-            }
-            Some(VariableType::Alias(ref mut alias)) => {
-                if !name.is_empty() {
-                    if let VariableType::Alias(var_alias) = var {
-                        mem::replace(alias, var_alias);
-                    } else {
-                        self.shadow(name.into(), var);
-                    }
-                }
-            }
-            Some(VariableType::Array(ref mut array)) => {
-                if !name.is_empty() {
-                    if let VariableType::Array(var_array) = var {
-                        if var_array.is_empty() {
-                            self.remove_variable(name);
                         } else {
-                            mem::replace(array, var_array);
+                            action = Some(Action::UpperAction(UpperAction::Shadow));
                         }
-                    } else {
-                        self.shadow(name.into(), var);
                     }
                 }
-            }
-            Some(VariableType::HashMap(ref mut map)) => {
-                if !name.is_empty() {
-                    if let VariableType::HashMap(var_map) = var {
-                        if var_map.is_empty() {
-                            self.remove_variable(name);
+                Some(VariableType::Alias(ref mut alias)) => {
+                    if !name.is_empty() {
+                        if let VariableType::Alias(_) = &var {
+                            action = Some(Action::ReplaceAlias(alias))
                         } else {
-                            mem::replace(map, var_map);
+                            action = Some(Action::UpperAction(UpperAction::Shadow));
                         }
-                    } else {
-                        self.shadow(name.into(), var);
                     }
                 }
-            }
-            Some(VariableType::Function(ref mut func)) => {
-                if !name.is_empty() {
-                    if let VariableType::Function(var_func) = var {
-                        mem::replace(func, var_func);
-                    } else {
-                        self.shadow(name.into(), var);
+                Some(VariableType::Array(ref mut array)) => {
+                    if !name.is_empty() {
+                        if let VariableType::Array(var_array) = &var {
+                            if var_array.is_empty() {
+                                action = Some(Action::UpperAction(UpperAction::Remove));
+                            } else {
+                                action = Some(Action::ReplaceArray(array))
+                            }
+                        } else {
+                            action = Some(Action::UpperAction(UpperAction::Shadow));
+                        }
                     }
                 }
+                Some(VariableType::HashMap(ref mut map)) => {
+                    if !name.is_empty() {
+                        if let VariableType::HashMap(var_map) = &var {
+                            if var_map.is_empty() {
+                                action = Some(Action::UpperAction(UpperAction::Remove));
+                            } else {
+                                action = Some(Action::ReplaceHMap(map))
+                            }
+                        } else {
+                            action = Some(Action::UpperAction(UpperAction::Shadow));
+                        }
+                    }
+                }
+                Some(VariableType::Function(ref mut func)) => {
+                    if !name.is_empty() {
+                        if let VariableType::Function(_) = &var {
+                            action = Some(Action::ReplaceFunction(func))
+                        } else {
+                            action = Some(Action::UpperAction(UpperAction::Shadow));
+                        }
+                    }
+                }
+                _ => {
+                    action = Some(Action::UpperAction(UpperAction::Shadow));
+                }
+            };
+
+            match action {
+                Some(Action::UpperAction(action)) => upper_action = Some((action, var)),
+                Some(Action::ReplaceAlias(alias)) => match var {
+                    VariableType::Alias(mut alias_) => { mem::replace(alias, alias_); }
+                    _ => unreachable!()
+                }
+                Some(Action::ReplaceArray(array)) => match var {
+                    VariableType::Array(mut  array_) => { mem::replace(array, array_); }
+                    _ => unreachable!()
+                }
+                Some(Action::ReplaceString(str_)) => match var {
+                    VariableType::Str(mut var_str) => { mem::replace(str_, var_str); }
+                    _ => unreachable!()
+                }
+                Some(Action::ReplaceFunction(func)) => match var {
+                    VariableType::Function(mut  func_) => { mem::replace(func, func_); }
+                    _ => unreachable!()
+                }
+                Some(Action::ReplaceHMap(hmap)) => match var {
+                    VariableType::HashMap(mut  hmap_) => { mem::replace(hmap, hmap_); }
+                    _ => unreachable!()
+                }
+                None => ()
             }
-            _ => { self.shadow(name.into(), var); }
+        }
+
+        match upper_action {
+            Some((UpperAction::Remove, _)) => {
+                self.remove_variable(name);
+            }
+            Some((UpperAction::Shadow, var)) => {
+                self.shadow(name.into(), var);
+            }
+            None => ()
         }
     }
 

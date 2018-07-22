@@ -1,15 +1,18 @@
 before_script:
   - apt-get update -qq
   - apt-get install -qq build-essential curl git
-  - curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
+  - curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
   - source "$HOME/.cargo/env"
 
-linux-nightly:
+linux:
   script:
     - cargo build
     - make tests
+  cache:
+    paths:
+      - target
 
-redox-nightly:
+redox:
   variables:
     CC: "x86_64-unknown-redox-gcc"
   before_script:
@@ -23,3 +26,6 @@ redox-nightly:
     - rustup target add x86_64-unknown-redox
   script:
     - cargo build --target x86_64-unknown-redox
+  cache:
+    paths:
+      - target

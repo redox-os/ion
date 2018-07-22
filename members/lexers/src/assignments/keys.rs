@@ -137,10 +137,12 @@ impl<'a> Iterator for KeyIterator<'a> {
                     }))
                 }
                 b':' => {
-                    return Some(self.parse_parameter(&self.data[start..self.read - 1].trim()));
+                    let end = self.read - 1;
+                    return Some(self.parse_parameter(&self.data[start..end].trim()));
                 }
                 b'[' => {
-                    return Some(self.parse_array(&self.data[start..self.read - 1].trim()));
+                    let end = self.read - 1;
+                    return Some(self.parse_array(&self.data[start..end].trim()));
                 }
                 _ => (),
             }

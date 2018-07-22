@@ -1,4 +1,3 @@
-#![feature(nll)]
 #[macro_use]
 extern crate bitflags;
 

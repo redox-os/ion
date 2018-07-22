@@ -2,11 +2,13 @@
 
 authors = [
     "Michael Aaron Murphy <mmstickman@gmail.com>",
-    "Hunter Goldstein <hunter.d.goldstein@gmail.com>",
-    "Skyler Berg <skylertheberg@gmail.com>",
     "Jeremy Soller <jackpot51@gmail.com>",
-    "Michael Gattozzi <mgattozzi@gmail.com>",
-    "Łukasz Niemier <lukasz@niemier.pl>",
+    "Skyler Berg <skylertheberg@gmail.com>",
+    "stratact <stratact1@gmail.com>",
+    "Hunter Goldstein <hunter.d.goldstein@gmail.com>",
+    "jD91mZM2 <me@krake.one>",
+    "Agustin Chiappe Berrini <jnieve@gmail.com>",
+    "Sag0Sag0 <Sag0Sag0@users.noreply.github.com>",
 ]
 build = "build.rs"
 description = "The Ion Shell"

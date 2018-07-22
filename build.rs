@@ -1,9 +1,3 @@
-extern crate ansi_term;
-extern crate version_check;
-
-use ansi_term::Color::{Blue, Red, White};
-use version_check::supports_features;
-
 // Specifies the minimum version needed to compile Ion.
 // NOTE: 1.19 is required due to the usage of `break` with values for
 // `loop` (RFC 1624, rust-lang/rust GitHub issue #37339).
@@ -14,34 +8,6 @@ use std::{
 };
 
 fn main() {
-    match supports_features() {
-        Some(true) => (), // Success!
-        Some(false) => {
-            eprintln!(
-                "{} {}",
-                Red.bold().paint("Error:"),
-                White.paint("Ion requires nightly/dev to build.")
-            );
-            // print_version_err(&*version_string);
-            eprintln!(
-                "{}{}{}",
-                Blue.paint("Use `"),
-                White.paint("rustup update"),
-                Blue.paint("` to update to the latest nightly compiler.")
-            );
-            panic!("Aborting compilation due to incompatible compiler.")
-        }
-        _ => {
-            eprintln!(
-                "cargo:warning={}",
-                "Ion was unable to check rustc compatibility."
-            );
-            eprintln!(
-                "cargo:warning={}",
-                "Build may fail due to incompatible rustc version."
-            );
-        }
-    }
     match write_version_file() {
         Ok(_) => {}
         Err(e) => panic!("Failed to create a version file: {:?}", e),

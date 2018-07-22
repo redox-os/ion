@@ -573,7 +573,8 @@ impl FlowLogic for Shell {
                     SUCCESS => self.previous_status = FAILURE,
                     _ => (),
                 }
-                self.set("?", self.previous_status.to_string());
+                let previous_status = self.previous_status.to_string();
+                self.set("?", previous_status);
             }
             Statement::Break => return Condition::Break,
             Statement::Continue => return Condition::Continue,
