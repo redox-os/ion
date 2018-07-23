@@ -571,131 +571,88 @@ impl Variables {
 
     pub fn set<T: Into<VariableType>>(&mut self, name: &str, var: T) {
         let var = var.into();
+
         enum UpperAction {
             Remove,
             Shadow,
         }
 
         enum Action<'a> {
-            UpperAction(UpperAction),
-            ReplaceAlias(&'a mut types::Alias),
-            ReplaceString(&'a mut types::Str),
-            ReplaceArray(&'a mut types::Array),
-            ReplaceFunction(&'a mut Function),
-            ReplaceHMap(&'a mut types::HashMap),
+            Upper(UpperAction),
+            Alias(&'a mut types::Alias),
+            Str(&'a mut types::Str),
+            Array(&'a mut types::Array),
+            Function(&'a mut Function),
+            HashMap(&'a mut types::HashMap),
         }
 
-        let mut upper_action = None;
-
-        {
-            let mut action = None;
-            let key = self.get_mut(&name);
-
-            match key {
-                Some(VariableType::Str(ref mut str_)) => {
+        macro_rules! handle_type {
+            ($name:tt, $input:ty, $preferred:tt) => {
+                fn $name<'a>(
+                    name: &str,
+                    var: &VariableType,
+                    input: &'a mut $input,
+                ) -> Option<Action<'a>> {
                     if !name.is_empty() {
-                        if let VariableType::Str(var_str) = &var {
-                            if var_str.is_empty() {
-                                action = Some(Action::UpperAction(UpperAction::Remove));
+                        match var {
+                            VariableType::$preferred(var_value) => if var_value.is_empty() {
+                                Some(Action::Upper(UpperAction::Remove))
                             } else {
-                                action = Some(Action::ReplaceString(str_));
-                            }
-                        } else {
-                            action = Some(Action::UpperAction(UpperAction::Shadow));
+                                Some(Action::$preferred(input))
+                            },
+                            _ => Some(Action::Upper(UpperAction::Shadow)),
                         }
+                    } else {
+                        None
                     }
-                }
-                Some(VariableType::Alias(ref mut alias)) => {
-                    if !name.is_empty() {
-                        if let VariableType::Alias(_) = &var {
-                            action = Some(Action::ReplaceAlias(alias))
-                        } else {
-                            action = Some(Action::UpperAction(UpperAction::Shadow));
-                        }
-                    }
-                }
-                Some(VariableType::Array(ref mut array)) => {
-                    if !name.is_empty() {
-                        if let VariableType::Array(var_array) = &var {
-                            if var_array.is_empty() {
-                                action = Some(Action::UpperAction(UpperAction::Remove));
-                            } else {
-                                action = Some(Action::ReplaceArray(array))
-                            }
-                        } else {
-                            action = Some(Action::UpperAction(UpperAction::Shadow));
-                        }
-                    }
-                }
-                Some(VariableType::HashMap(ref mut map)) => {
-                    if !name.is_empty() {
-                        if let VariableType::HashMap(var_map) = &var {
-                            if var_map.is_empty() {
-                                action = Some(Action::UpperAction(UpperAction::Remove));
-                            } else {
-                                action = Some(Action::ReplaceHMap(map))
-                            }
-                        } else {
-                            action = Some(Action::UpperAction(UpperAction::Shadow));
-                        }
-                    }
-                }
-                Some(VariableType::Function(ref mut func)) => {
-                    if !name.is_empty() {
-                        if let VariableType::Function(_) = &var {
-                            action = Some(Action::ReplaceFunction(func))
-                        } else {
-                            action = Some(Action::UpperAction(UpperAction::Shadow));
-                        }
-                    }
-                }
-                _ => {
-                    action = Some(Action::UpperAction(UpperAction::Shadow));
                 }
             };
+        }
+
+        handle_type!(string_action, types::Str, Str);
+        handle_type!(alias_action, types::Alias, Alias);
+        handle_type!(array_action, types::Array, Array);
+        handle_type!(hashmap_action, types::HashMap, HashMap);
+        handle_type!(function_action, Function, Function);
+
+        let mut upper_action = {
+            let action = match self.get_mut(&name) {
+                Some(VariableType::Str(ref mut str_)) => string_action(name, &var, str_),
+                Some(VariableType::Alias(ref mut alias)) => alias_action(name, &var, alias),
+                Some(VariableType::Array(ref mut array)) => array_action(name, &var, array),
+                Some(VariableType::HashMap(ref mut map)) => hashmap_action(name, &var, map),
+                Some(VariableType::Function(ref mut func)) => function_action(name, &var, func),
+                _ => Some(Action::Upper(UpperAction::Shadow)),
+            };
+
+            macro_rules! handle_action {
+                ($value:ident, $variant:tt) => {{
+                    if let VariableType::$variant(mut with) = var {
+                        mem::replace($value, with);
+                        None
+                    } else {
+                        unreachable!();
+                    }
+                }};
+            }
 
             match action {
-                Some(Action::UpperAction(action)) => upper_action = Some((action, var)),
-                Some(Action::ReplaceAlias(alias)) => match var {
-                    VariableType::Alias(mut alias_) => {
-                        mem::replace(alias, alias_);
-                    }
-                    _ => unreachable!(),
-                },
-                Some(Action::ReplaceArray(array)) => match var {
-                    VariableType::Array(mut array_) => {
-                        mem::replace(array, array_);
-                    }
-                    _ => unreachable!(),
-                },
-                Some(Action::ReplaceString(str_)) => match var {
-                    VariableType::Str(mut var_str) => {
-                        mem::replace(str_, var_str);
-                    }
-                    _ => unreachable!(),
-                },
-                Some(Action::ReplaceFunction(func)) => match var {
-                    VariableType::Function(mut func_) => {
-                        mem::replace(func, func_);
-                    }
-                    _ => unreachable!(),
-                },
-                Some(Action::ReplaceHMap(hmap)) => match var {
-                    VariableType::HashMap(mut hmap_) => {
-                        mem::replace(hmap, hmap_);
-                    }
-                    _ => unreachable!(),
-                },
-                None => (),
+                Some(Action::Upper(action)) => Some((action, var)),
+                Some(Action::Alias(alias)) => handle_action!(alias, Alias),
+                Some(Action::Array(array)) => handle_action!(array, Array),
+                Some(Action::Str(str_)) => handle_action!(str_, Str),
+                Some(Action::Function(func)) => handle_action!(func, Function),
+                Some(Action::HashMap(hmap)) => handle_action!(hmap, HashMap),
+                None => None,
             }
-        }
+        };
 
         match upper_action {
             Some((UpperAction::Remove, _)) => {
                 self.remove_variable(name);
             }
             Some((UpperAction::Shadow, var)) => {
-                self.shadow(name.into(), var);
+                self.shadow(name, var);
             }
             None => (),
         }
@@ -751,7 +708,7 @@ impl Variables {
                 .collect::<Vec<&str>>();
             if elements.len() > 2 {
                 let mut output = types::Str::new();
-                for element in &elements[0..elements.len() - 1] {
+                for element in &elements[..elements.len() - 1] {
                     let mut segmenter = UnicodeSegmentation::graphemes(*element, true);
                     let grapheme = segmenter.next().unwrap();
                     output.push_str(grapheme);

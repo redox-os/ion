@@ -153,6 +153,10 @@ pub struct Function {
     statements:  Vec<Statement>,
 }
 
+impl Function {
+    pub fn is_empty(&self) -> bool { self.statements.is_empty() }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum FunctionError {
     InvalidArgumentCount,
