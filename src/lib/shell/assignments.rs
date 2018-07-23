@@ -360,7 +360,7 @@ impl VariableStore for Shell {
                                     };
 
                                     let action: Box<
-                                        Fn(f64) -> f64,
+                                        dyn Fn(f64) -> f64,
                                     > = match operator {
                                         Operator::Add => Box::new(|src| src + value),
                                         Operator::Divide => Box::new(|src| src / value),
@@ -447,11 +447,11 @@ impl VariableStore for Shell {
                                     match self.variables.get_mut(key.name) {
                                         Some(VariableType::HashMap(hmap)) => {
                                             hmap.entry(index.clone())
-                                                .or_insert(VariableType::Str(value));
+                                                .or_insert_with(|| VariableType::Str(value));
                                         }
                                         Some(VariableType::BTreeMap(bmap)) => {
                                             bmap.entry(index.clone())
-                                                .or_insert(VariableType::Str(value));
+                                                .or_insert_with(|| VariableType::Str(value));
                                         }
                                         Some(VariableType::Array(array)) => {
                                             let index_num = match index.parse::<usize>() {

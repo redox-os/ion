@@ -59,6 +59,7 @@ macro_rules! array [
     ( $($x:expr), *) => ({
         let mut _arr = Array::new();
         $(_arr.push($x.into());)*
+        #[allow(let_and_return)]
         _arr
     })
 ];

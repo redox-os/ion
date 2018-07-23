@@ -537,7 +537,7 @@ fn expand_single_string_token<E: Expander>(
     }
 
     if output.as_str() != "" {
-        expanded_words.push(output.into());
+        expanded_words.push(output);
     }
     expanded_words
 }

@@ -12,7 +12,6 @@ pub mod fork_function;
 mod history;
 mod job;
 pub(crate) mod pipe_exec;
-pub(crate) mod plugins;
 pub(crate) mod signals;
 pub mod status;
 pub mod variables;

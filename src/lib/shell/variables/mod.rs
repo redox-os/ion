@@ -2,7 +2,6 @@ use super::{
     colors::Colors,
     directory_stack::DirectoryStack,
     flow_control::Function,
-    plugins::namespaces::{self, StringNamespace},
     status::{FAILURE, SUCCESS},
 };
 use fnv::FnvHashMap;
@@ -14,14 +13,10 @@ use std::{
     mem,
     ops::{Deref, DerefMut},
 };
-use sys::{self, env as sys_env, geteuid, getpid, getuid, is_root, variables as self_sys};
+use sys::{self, env as sys_env, geteuid, getpid, getuid, variables as self_sys};
 use types::{self, Array};
 use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
-
-lazy_static! {
-    static ref STRING_NAMESPACES: FnvHashMap<types::Str, StringNamespace> = namespaces::collect();
-}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum VariableType {
@@ -244,7 +239,10 @@ impl Default for Variables {
         );
 
         // Initialize the HOST variable
-        env::set_var("HOST", &self_sys::get_host_name().unwrap_or("?".to_owned()));
+        env::set_var(
+            "HOST",
+            &self_sys::get_host_name().unwrap_or_else(|| "?".to_owned()),
+        );
 
         Variables {
             flags:   0,
@@ -256,8 +254,6 @@ impl Default for Variables {
         }
     }
 }
-
-const PLUGIN: u8 = 1;
 
 impl Variables {
     pub fn new_scope(&mut self, namespace: bool) {
@@ -497,36 +493,9 @@ impl Variables {
                             .map(|s| T::from(VariableType::Str(s.into()))),
                     }
                 }
-                Some((_, variable)) => {
-                    if is_root() {
-                        eprintln!("ion: root is not allowed to execute plugins");
-                        return None;
-                    }
-
-                    if !self.has_plugin_support() {
-                        eprintln!(
-                            "ion: plugins are disabled. Considering enabling them with `let \
-                             NS_PLUGINS = 1`"
-                        );
-                        return None;
-                    }
-
-                    // Attempt to obtain the given namespace from our lazily-generated map of
-                    // namespaces.
-                    if let Some(namespace) = STRING_NAMESPACES.get(name) {
-                        // Attempt to execute the given function from that namespace, and map it's
-                        // results.
-                        match namespace.execute(variable.into()) {
-                            Ok(value) => value.map(|s| T::from(VariableType::Str(s.into()))),
-                            Err(why) => {
-                                eprintln!("ion: string namespace error: {}: {}", name, why);
-                                None
-                            }
-                        }
-                    } else {
-                        eprintln!("ion: unsupported namespace: '{}'", name);
-                        None
-                    }
+                Some((..)) => {
+                    eprintln!("ion: unsupported namespace: '{}'", name);
+                    None
                 }
             }
         } else if specified_type == TypeId::of::<types::Alias>() {
@@ -615,7 +584,7 @@ impl Variables {
         handle_type!(hashmap_action, types::HashMap, HashMap);
         handle_type!(function_action, Function, Function);
 
-        let mut upper_action = {
+        let upper_action = {
             let action = match self.get_mut(&name) {
                 Some(VariableType::Str(ref mut str_)) => string_action(name, &var, str_),
                 Some(VariableType::Alias(ref mut alias)) => alias_action(name, &var, alias),
@@ -780,12 +749,6 @@ impl Variables {
         }
         SUCCESS
     }
-
-    pub(crate) fn disable_plugins(&mut self) { self.flags &= !PLUGIN; }
-
-    pub(crate) fn enable_plugins(&mut self) { self.flags |= PLUGIN; }
-
-    pub(crate) fn has_plugin_support(&self) -> bool { self.flags & PLUGIN == PLUGIN }
 }
 
 #[cfg(test)]

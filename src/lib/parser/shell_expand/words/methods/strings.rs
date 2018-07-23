@@ -7,15 +7,9 @@ use super::{
 };
 use parser::assignments::is_array;
 use regex::Regex;
-use shell::plugins::methods::{self, MethodArguments, StringMethodPlugins};
 use small;
 use std::path::Path;
-use sys;
 use unicode_segmentation::UnicodeSegmentation;
-
-lazy_static! {
-    static ref STRING_METHODS: StringMethodPlugins = methods::collect();
-}
 
 pub(crate) fn unescape(input: &str) -> Result<small::String, &'static str> {
     let mut check = false;
@@ -303,8 +297,6 @@ impl<'a> StringMethod<'a> {
                 let second_array = pattern.array();
                 let first_maybe: Option<String> = if first_str != "" {
                     Some(first_str.to_string())
-                } else if first_str == "" {
-                    None
                 } else {
                     None
                 };
@@ -339,36 +331,9 @@ impl<'a> StringMethod<'a> {
                     }
                 };
             }
-            method => {
-                if sys::is_root() {
-                    eprintln!("ion: root is not allowed to execute plugins");
-                    return;
-                }
-
-                let pattern = pattern.array().collect::<Vec<_>>();
-                let args = if variable.starts_with('@') || is_array(variable) {
-                    MethodArguments::Array(
-                        expand_string(variable, expand, false).into_vec(),
-                        pattern,
-                    )
-                } else if let Some(value) = expand.string(variable, false) {
-                    MethodArguments::StringArg(value, pattern)
-                } else if is_expression(variable) {
-                    let expanded = expand_string(variable, expand, false);
-                    match expanded.len() {
-                        0 => MethodArguments::NoArgs,
-                        1 => MethodArguments::StringArg(expanded[0].clone(), pattern),
-                        _ => MethodArguments::Array(expanded.into_vec(), pattern),
-                    }
-                } else {
-                    MethodArguments::NoArgs
-                };
-
-                match STRING_METHODS.execute(method, args) {
-                    Ok(Some(string)) => output.push_str(&string),
-                    Ok(None) => (),
-                    Err(why) => eprintln!("ion: method plugin: {}", why),
-                }
+            _ => {
+                eprintln!("ion: method namespace not found");
+                return;
             }
         }
     }

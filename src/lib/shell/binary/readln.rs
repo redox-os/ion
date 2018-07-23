@@ -21,7 +21,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                 // Collect each result into a vector to avoid borrowing issues.
                 .collect::<Vec<types::Str>>();
 
-        loop {
+        {
             let prompt = handle_prompt(shell.prompt()).unwrap();
             let vars = &shell.variables;
             let builtins = &shell.builtins;
@@ -124,7 +124,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                 // Handles Ctrl + C
                 Err(ref err) if err.kind() == ErrorKind::Interrupted => return None,
                 // Handles Ctrl + D
-                Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => break,
+                Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => (),
                 Err(err) => {
                     eprintln!("ion: liner: {}", err);
                     return None;

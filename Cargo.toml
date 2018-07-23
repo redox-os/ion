@@ -61,8 +61,5 @@ path = "src/lib/lib.rs"
 lto = true
 panic = "abort"
 
-[target."cfg(all(unix, not(target_os = \"redox\")))".dependencies]
-libloading = "0.5"
-
 [patch.crates-io]
 liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }

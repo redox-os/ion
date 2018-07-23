@@ -12,8 +12,6 @@ extern crate glob;
 extern crate itoa;
 #[macro_use]
 extern crate lazy_static;
-#[cfg(all(unix, not(target_os = "redox")))]
-extern crate libloading;
 extern crate liner;
 extern crate regex;
 extern crate small;
