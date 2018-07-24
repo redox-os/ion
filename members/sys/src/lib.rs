@@ -1,8 +1,6 @@
 #[cfg(all(unix, not(target_os = "redox")))]
 extern crate libc;
 #[cfg(all(unix, not(target_os = "redox")))]
-extern crate libloading;
-#[cfg(all(unix, not(target_os = "redox")))]
 extern crate users as users_unix;
 
 #[cfg(target_os = "redox")]
