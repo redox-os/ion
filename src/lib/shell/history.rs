@@ -4,6 +4,9 @@ use regex::Regex;
 use small;
 use std::io::{self, Write};
 use types;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+
 
 bitflags! {
     struct IgnoreFlags: u8 {
@@ -107,8 +110,32 @@ impl ShellHistory for Shell {
 
     fn save_command_in_history(&self, command: &str) {
         if self.should_save_command(command) {
+            let variables = &self.variables;
+            
             // Mark the command in the context history
             self.set_context_history_from_vars();
+
+            if variables.get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
+                // Get current time stamp
+                let since_unix_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                let cur_time_sys = ["#", &since_unix_epoch.to_owned().to_string()].concat();
+
+                // Push current time to history
+            	if let Err(err) = self
+                    .context
+                    .as_ref()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .history
+                    .push(cur_time_sys.into())
+            	{
+                    eprintln!("ion: {}", err)
+            	}
+            }
+
+
+            // Push command itself to history
             if let Err(err) = self
                 .context
                 .as_ref()

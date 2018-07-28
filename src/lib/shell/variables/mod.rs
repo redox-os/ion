@@ -227,6 +227,12 @@ impl Default for Variables {
             }
         }
 
+        // History Timestamps enabled variable, disabled by default
+        map.insert(
+            "HISTORY_TIMESTAMP".into(),
+            VariableType::Str("0".into())
+        );
+
         map.insert(
             "HISTORY_IGNORE".into(),
             VariableType::Array(array!["no_such_command", "whitespace", "duplicates"]),
