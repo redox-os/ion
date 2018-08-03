@@ -39,7 +39,7 @@ Then, it's just a matter of performing one of the following methods:
 ## Install Direct From Git
 
 ```sh
-cargo +nightly install --git https://gitlab.redox-os.org/redox-os/ion/
+cargo +nightly install --git https://gitlab.redox-os.org/redox-os/ion/ ion-shell
 ```
 
 ## Build Locally
