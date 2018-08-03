@@ -38,8 +38,15 @@ Then, it's just a matter of performing one of the following methods:
 
 ## Install Direct From Git
 
+For `ion-shell`
+
 ```sh
-cargo +nightly install --git https://gitlab.redox-os.org/redox-os/ion/
+cargo +nightly install --git https://gitlab.redox-os.org/redox-os/ion/ ion-shell
+```
+For `ion-shell-fuzz`
+
+```sh
+cargo +nightly install --git https://gitlab.redox-os.org/redox-os/ion/ ion-shell-fuzz
 ```
 
 ## Build Locally
