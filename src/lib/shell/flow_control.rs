@@ -16,12 +16,16 @@ pub(crate) struct ElseIf {
 /// ```ignore
 /// match value
 ///   ...
-///   case value
+///   case not_value
 ///     statement0
 ///     statement1
 ///     ...
 ///     statementN
-///   end
+///   case value
+///     statement0
+///     statement1
+///     ...
+///     statementM
 /// end
 /// ```
 /// would be represented by the Case object:
@@ -67,6 +71,7 @@ pub(crate) enum Statement {
         success:    Vec<Statement>,
         else_if:    Vec<ElseIf>,
         failure:    Vec<Statement>,
+        mode:       u8, // {0 = success, 1 = else_if, 2 = failure}
     },
     ElseIf(ElseIf),
     Function {
@@ -130,19 +135,147 @@ impl Statement {
 
 #[derive(Clone, Debug)]
 pub(crate) struct FlowControl {
-    pub level:             usize,
-    pub current_statement: Statement,
-    pub current_if_mode:   u8, // { 0 = SUCCESS; 1 = FAILURE }
+    pub block: Vec<Statement>,
+}
+
+impl FlowControl {
+    /// On error reset FlowControl fields.
+    pub(crate) fn reset(&mut self) { self.block.clear() }
+
+    /// Check if there isn't an unfinished block.
+    pub(crate) fn unclosed_block(&self) -> bool { self.block.len() > 0 }
 }
 
 impl Default for FlowControl {
     fn default() -> FlowControl {
         FlowControl {
-            level:             0,
-            current_statement: Statement::Default,
-            current_if_mode:   0,
+            block: Vec::with_capacity(5),
         }
     }
+}
+
+pub(crate) fn insert_statement(
+    flow_control: &mut FlowControl,
+    statement: Statement,
+) -> Result<Option<Statement>, &'static str> {
+    match statement {
+        // Push new block to stack
+        Statement::For { .. }
+        | Statement::While { .. }
+        | Statement::Match { .. }
+        | Statement::If { .. }
+        | Statement::Function { .. } => flow_control.block.push(statement),
+        // Case is special as it should pop back previous Case
+        Statement::Case(_) => {
+            let mut top_is_case = false;
+            match flow_control.block.last() {
+                Some(Statement::Case(_)) => top_is_case = true,
+                Some(Statement::Match { .. }) => (),
+                _ => return Err("ion: error: Case { .. } found outside of Match { .. } block"),
+            }
+
+            if top_is_case {
+                let case = flow_control.block.pop().unwrap();
+                let _ = insert_into_block(&mut flow_control.block, case);
+            }
+            flow_control.block.push(statement);
+        }
+        Statement::End => {
+            match flow_control.block.len() {
+                0 => return Err("ion: error: keyword End found but no block to close"),
+                // Ready to return the complete block
+                1 => return Ok(flow_control.block.pop()),
+                // Merge back the top block into the previous one
+                _ => {
+                    let block = flow_control.block.pop().unwrap();
+                    match block {
+                        Statement::Case(_) => {
+                            // Merge last Case back and pop off Match too
+                            insert_into_block(&mut flow_control.block, block)?;
+                            let match_stm = flow_control.block.pop().unwrap();
+                            if flow_control.block.len() > 0 {
+                                insert_into_block(&mut flow_control.block, match_stm)?;
+                            } else {
+                                return Ok(Some(match_stm));
+                            }
+                        }
+                        _ => insert_into_block(&mut flow_control.block, block)?,
+                    }
+                }
+            }
+        }
+        _ => if flow_control.block.len() > 0 {
+            insert_into_block(&mut flow_control.block, statement)?;
+        } else {
+            // Filter out toplevel statements that should be produce an error
+            // otherwise return the statement for immediat execution
+            match statement {
+                Statement::ElseIf(_) => {
+                    return Err("ion: error: found ElseIf { .. } without If { .. } block")
+                }
+                Statement::Else => return Err("ion: error: found Else without If { .. } block"),
+                Statement::Break => return Err("ion: error: found Break without loop body"),
+                Statement::Continue => return Err("ion: error: found Continue without loop body"),
+                // Toplevel statement, return to execute immediately
+                _ => return Ok(Some(statement)),
+            }
+        },
+    }
+    Ok(None)
+}
+
+fn insert_into_block(block: &mut Vec<Statement>, statement: Statement) -> Result<(), &'static str> {
+    if let Some(top_block) = block.last_mut() {
+        match top_block {
+            Statement::Function {
+                ref mut statements, ..
+            } => statements.push(statement),
+            Statement::For {
+                ref mut statements, ..
+            } => statements.push(statement),
+            Statement::While {
+                ref mut statements, ..
+            } => statements.push(statement),
+            Statement::Match { ref mut cases, .. } => match statement {
+                Statement::Case(case) => cases.push(case),
+                _ => {
+                    return Err(
+                        "ion: error: statement found outside of Case { .. } block in Match { .. }",
+                    );
+                }
+            },
+            Statement::Case(ref mut case) => case.statements.push(statement),
+            Statement::If {
+                ref mut success,
+                ref mut else_if,
+                ref mut failure,
+                ref mut mode,
+                ..
+            } => match statement {
+                Statement::ElseIf(eif) => if *mode > 1 {
+                    return Err("ion: error: ElseIf { .. } found after Else");
+                } else {
+                    *mode = 1;
+                    else_if.push(eif);
+                },
+                Statement::Else => if *mode == 2 {
+                    return Err("ion: error: Else block already exists");
+                } else {
+                    *mode = 2;
+                },
+                _ => match *mode {
+                    0 => success.push(statement),
+                    1 => else_if.last_mut().unwrap().success.push(statement),
+                    2 => failure.push(statement),
+                    _ => unreachable!(),
+                },
+            },
+            _ => unreachable!("Not block-like statement pushed to stack!"),
+        }
+    } else {
+        unreachable!("Should not insert statement if stack is empty!")
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -151,10 +284,6 @@ pub struct Function {
     name:        types::Str,
     args:        Vec<KeyBuf>,
     statements:  Vec<Statement>,
-}
-
-impl Function {
-    pub fn is_empty(&self) -> bool { self.statements.is_empty() }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -174,6 +303,8 @@ impl Display for FunctionError {
 }
 
 impl Function {
+    pub fn is_empty(&self) -> bool { self.statements.is_empty() }
+
     pub(crate) fn execute<S: AsRef<str>>(
         self,
         shell: &mut Shell,
@@ -241,204 +372,113 @@ impl Function {
     }
 }
 
-pub(crate) fn collect_cases<I>(
-    iterator: &mut I,
-    cases: &mut Vec<Case>,
-    level: &mut usize,
-) -> Result<(), String>
-where
-    I: Iterator<Item = Statement>,
-{
-    macro_rules! add_to_case {
-        ($statement:expr) => {
-            match cases.last_mut() {
-                // XXX: When does this actually happen? What syntax error is this???
-                None => {
-                    return Err([
-                        "ion: syntax error: encountered ",
-                        $statement.short(),
-                        " outside of `case ...` block",
-                    ].concat())
-                }
-                Some(ref mut case) => case.statements.push($statement),
-            }
-        };
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    while let Some(statement) = iterator.next() {
-        match statement {
-            Statement::Case(case) => {
-                if *level == 1 {
-                    // If the level is 1, then we are at a top-level case
-                    // statement for this match block and should push this case
-                    cases.push(case);
-                } else {
-                    // This is just part of the current case block
-                    add_to_case!(Statement::Case(case));
-                }
-            }
-            Statement::End => {
-                *level -= 1;
-                if *level == 0 {
-                    return Ok(());
-                }
-            }
-            Statement::While { .. }
-            | Statement::For { .. }
-            | Statement::If { .. }
-            | Statement::Match { .. }
-            | Statement::Function { .. } => {
-                *level += 1;
-                add_to_case!(statement);
-            }
-            Statement::Default
-            | Statement::Else
-            | Statement::ElseIf { .. }
-            | Statement::Error(_)
-            | Statement::Export(_)
-            | Statement::Continue
-            | Statement::Let { .. }
-            | Statement::Pipeline(_)
-            | Statement::Time(_)
-            | Statement::And(_)
-            | Statement::Or(_)
-            | Statement::Not(_)
-            | Statement::Break => {
-                // This is the default case with all of the other statements explicitly listed
-                add_to_case!(statement);
-            }
+    fn new_match() -> Statement {
+        Statement::Match {
+            expression: small::String::from(""),
+            cases:      Vec::new(),
         }
     }
-    Ok(())
-}
-
-pub(crate) fn collect_loops<I: Iterator<Item = Statement>>(
-    iterator: &mut I,
-    statements: &mut Vec<Statement>,
-    level: &mut usize,
-) {
-    #[allow(while_let_on_iterator)]
-    while let Some(statement) = iterator.next() {
-        match statement {
-            Statement::While { .. }
-            | Statement::For { .. }
-            | Statement::If { .. }
-            | Statement::Function { .. }
-            | Statement::Match { .. } => *level += 1,
-            Statement::Time(ref box_stmt) => match *box_stmt.as_ref() {
-                Statement::While { .. }
-                | Statement::For { .. }
-                | Statement::If { .. }
-                | Statement::Function { .. }
-                | Statement::Match { .. } => *level += 1,
-                Statement::End if *level == 1 => {
-                    *level = 0;
-                    break;
-                }
-                Statement::End => *level -= 1,
-                _ => (),
-            },
-            Statement::And(ref box_stmt) => match *box_stmt.as_ref() {
-                Statement::While { .. }
-                | Statement::For { .. }
-                | Statement::If { .. }
-                | Statement::Function { .. }
-                | Statement::Match { .. } => *level += 1,
-                Statement::End if *level == 1 => {
-                    *level = 0;
-                    break;
-                }
-                Statement::End => *level -= 1,
-                _ => (),
-            },
-            Statement::Or(ref box_stmt) => match *box_stmt.as_ref() {
-                Statement::While { .. }
-                | Statement::For { .. }
-                | Statement::If { .. }
-                | Statement::Function { .. }
-                | Statement::Match { .. } => *level += 1,
-                Statement::End if *level == 1 => {
-                    *level = 0;
-                    break;
-                }
-                Statement::End => *level -= 1,
-                _ => (),
-            },
-            Statement::Not(ref box_stmt) => match *box_stmt.as_ref() {
-                Statement::While { .. }
-                | Statement::For { .. }
-                | Statement::If { .. }
-                | Statement::Function { .. }
-                | Statement::Match { .. } => *level += 1,
-                Statement::End if *level == 1 => {
-                    *level = 0;
-                    break;
-                }
-                Statement::End => *level -= 1,
-                _ => (),
-            },
-            Statement::End if *level == 1 => {
-                *level = 0;
-                break;
-            }
-            Statement::End => *level -= 1,
-            _ => (),
+    fn new_if() -> Statement {
+        Statement::If {
+            expression: Box::new(Statement::Default),
+            success:    Vec::new(),
+            else_if:    Vec::new(),
+            failure:    Vec::new(),
+            mode:       0,
         }
-        statements.push(statement);
     }
-}
+    fn new_case() -> Statement {
+        Statement::Case(Case {
+            value:       None,
+            binding:     None,
+            conditional: None,
+            statements:  Vec::new(),
+        })
+    }
 
-pub(crate) fn collect_if<I>(
-    iterator: &mut I,
-    success: &mut Vec<Statement>,
-    else_if: &mut Vec<ElseIf>,
-    failure: &mut Vec<Statement>,
-    level: &mut usize,
-    mut current_block: u8,
-) -> Result<u8, &'static str>
-where
-    I: Iterator<Item = Statement>,
-{
-    #[allow(while_let_on_iterator)]
-    while let Some(statement) = iterator.next() {
-        match statement {
-            Statement::While { .. }
-            | Statement::For { .. }
-            | Statement::If { .. }
-            | Statement::Function { .. }
-            | Statement::Match { .. } => *level += 1,
-            Statement::ElseIf(ref elseif) if *level == 1 => if current_block == 1 {
-                return Err("ion: syntax error: else block already given");
-            } else {
-                current_block = 2;
-                else_if.push(elseif.clone());
-                continue;
-            },
-            Statement::Else if *level == 1 => {
-                current_block = 1;
-                continue;
-            }
-            Statement::Else if *level == 1 && current_block == 1 => {
-                return Err("ion: syntax error: else block already given")
-            }
-            Statement::End if *level == 1 => {
-                *level = 0;
-                break;
-            }
-            Statement::End => *level -= 1,
-            _ => (),
-        }
+    #[test]
+    fn if_inside_match() {
+        let mut flow_control = FlowControl::default();
 
-        match current_block {
-            0 => success.push(statement),
-            1 => failure.push(statement),
-            2 => {
-                let last = else_if.last_mut().unwrap(); // This is a bug if there isn't a value
-                last.success.push(statement);
-            }
-            _ => unreachable!(),
+        let res = insert_statement(&mut flow_control, new_match());
+        assert_eq!(flow_control.block.len(), 1);
+        assert_eq!(res, Ok(None));
+
+        let res = insert_statement(&mut flow_control, new_case());
+        assert_eq!(flow_control.block.len(), 2);
+        assert_eq!(res, Ok(None));
+
+        // Pops back top case, len stays 2
+        let res = insert_statement(&mut flow_control, new_case());
+        assert_eq!(flow_control.block.len(), 2);
+        assert_eq!(res, Ok(None));
+
+        let res = insert_statement(&mut flow_control, new_if());
+        assert_eq!(flow_control.block.len(), 3);
+        assert_eq!(res, Ok(None));
+
+        let res = insert_statement(&mut flow_control, Statement::End);
+        assert_eq!(flow_control.block.len(), 2);
+        assert_eq!(res, Ok(None));
+
+        let res = insert_statement(&mut flow_control, Statement::End);
+        assert_eq!(flow_control.block.len(), 0);
+        if let Ok(Some(Statement::Match { ref cases, .. })) = res {
+            assert_eq!(cases.len(), 2);
+            assert_eq!(cases.last().unwrap().statements.len(), 1);
+        } else {
+            assert!(false);
         }
     }
 
-    Ok(current_block)
+    #[test]
+    fn statement_outside_case() {
+        let mut flow_control = FlowControl::default();
+
+        let res = insert_statement(&mut flow_control, new_match());
+        assert_eq!(flow_control.block.len(), 1);
+        assert_eq!(res, Ok(None));
+
+        let res = insert_statement(&mut flow_control, Statement::Default);
+        if let Err(_) = res {
+            flow_control.reset();
+            assert_eq!(flow_control.block.len(), 0);
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn return_toplevel() {
+        let mut flow_control = FlowControl::default();
+        let oks = vec![
+            Statement::Error(1),
+            Statement::Time(Box::new(Statement::Default)),
+            Statement::And(Box::new(Statement::Default)),
+            Statement::Or(Box::new(Statement::Default)),
+            Statement::Not(Box::new(Statement::Default)),
+            Statement::Default,
+        ];
+        for ok in oks {
+            let res = insert_statement(&mut flow_control, ok.clone());
+            assert_eq!(Ok(Some(ok)), res);
+        }
+
+        let errs = vec![
+            Statement::Else,
+            Statement::End,
+            Statement::Break,
+            Statement::Continue,
+        ];
+        for err in errs {
+            let res = insert_statement(&mut flow_control, err);
+            if let Ok(_) = res {
+                assert!(false);
+            }
+        }
+    }
 }

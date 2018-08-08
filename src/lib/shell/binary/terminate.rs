@@ -37,12 +37,11 @@ pub(crate) fn terminate_script_quotes<I: Iterator<Item = String>>(
         shell.on_command(&buffer.consume());
     }
 
-    // The flow control level being non zero means that we have a statement that has
-    // only been partially parsed.
-    if shell.flow_control.level != 0 {
+    if shell.flow_control.unclosed_block() {
+        let open_block = shell.flow_control.block.last().unwrap();
         eprintln!(
             "ion: unexpected end of script: expected end block for `{}`",
-            shell.flow_control.current_statement.short()
+            open_block.short(),
         );
         return FAILURE;
     }
@@ -52,7 +51,6 @@ pub(crate) fn terminate_script_quotes<I: Iterator<Item = String>>(
 
 pub(crate) fn terminate_quotes(shell: &mut Shell, command: String) -> Result<String, ()> {
     let mut buffer = Terminator::new(command);
-    shell.flow_control.level += 1;
     while !buffer.is_terminated() {
         if let Some(command) = shell.readln() {
             if !command.starts_with('#') {
@@ -62,7 +60,6 @@ pub(crate) fn terminate_quotes(shell: &mut Shell, command: String) -> Result<Str
             return Err(());
         }
     }
-    shell.flow_control.level -= 1;
     let terminated = buffer.consume();
     Ok(terminated)
 }

@@ -1,7 +1,5 @@
 use super::{
-    super::pipelines::{self, Pipeline},
-    case,
-    functions::{collect_arguments, parse_function},
+    super::pipelines::{self, Pipeline}, case, functions::{collect_arguments, parse_function},
 };
 use lexers::{assignment_lexer, ArgumentSplitter};
 use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};
@@ -87,6 +85,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                 success:    Vec::new(),
                 else_if:    Vec::new(),
                 failure:    Vec::new(),
+                mode:       0,
             }
         }
         "else" => return Statement::Else,
@@ -247,6 +246,7 @@ mod tests {
             success:    vec![],
             else_if:    vec![],
             failure:    vec![],
+            mode:       0,
         };
         assert_eq!(correct_parse, parsed_if);
 

@@ -4,13 +4,13 @@ use std::{io::Read, process};
 use sys;
 
 pub(crate) fn prompt(shell: &mut Shell) -> String {
-    if shell.flow_control.level == 0 {
+    if shell.flow_control.block.len() == 0 {
         match prompt_fn(shell) {
             Some(prompt) => prompt,
             None => expand_string(&shell.get_str_or_empty("PROMPT"), shell, false).join(" "),
         }
     } else {
-        "    ".repeat(shell.flow_control.level as usize)
+        "    ".repeat(shell.flow_control.block.len())
     }
 }
 

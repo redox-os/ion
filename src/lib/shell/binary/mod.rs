@@ -5,11 +5,10 @@ mod readln;
 mod terminate;
 
 use self::{
-    prompt::{prompt, prompt_fn},
-    readln::readln,
+    prompt::{prompt, prompt_fn}, readln::readln,
     terminate::{terminate_quotes, terminate_script_quotes},
 };
-use super::{flow_control::Statement, status::*, FlowLogic, Shell, ShellHistory};
+use super::{status::*, FlowLogic, Shell, ShellHistory};
 use liner::{Buffer, Context};
 use std::{env, fs::File, io::ErrorKind, iter, path::Path, process, sync::Mutex};
 use types;
@@ -88,11 +87,7 @@ impl Binary for Shell {
         }
     }
 
-    fn reset_flow(&mut self) {
-        self.flow_control.level = 0;
-        self.flow_control.current_if_mode = 0;
-        self.flow_control.current_statement = Statement::Default;
-    }
+    fn reset_flow(&mut self) { self.flow_control.reset(); }
 
     fn execute_interactive(mut self) {
         self.context = Some({
@@ -168,11 +163,14 @@ impl Binary for Shell {
             self.exit(FAILURE);
         }
 
-        if self.flow_control.level != 0 {
-            eprintln!(
-                "ion: unexpected end of arguments: expected end block for `{}`",
-                self.flow_control.current_statement.short()
-            );
+        if self.flow_control.unclosed_block() {
+            {
+                let open_block = self.flow_control.block.last().unwrap();
+                eprintln!(
+                    "ion: unexpected end of arguments: expected end block for `{}`",
+                    open_block.short()
+                );
+            }
             self.exit(FAILURE);
         }
     }

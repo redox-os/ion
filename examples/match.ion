@@ -55,3 +55,31 @@ end
 animated "image/jpeg"
 animated "image/png"
 animated "image/gif"
+
+fn in_range min max val
+  if test $min -gt $max
+    let min max = $max $min
+  end
+  match $val
+    case @(seq $min $max);
+      if test $val -eq $min
+        echo "$val at minimum"
+      else if test $val -eq $max
+        echo "$val at maximum"
+      else
+        echo "$val is between $min and $max"
+      end
+    case _
+      if test $val -lt $min
+        echo "$val is less than min=$min"
+      else
+        echo "$val is more than max=$max"
+      end
+  end
+end
+
+in_range 0 10 5
+in_range 0 10 0
+in_range 0 10 10
+in_range 1 10 0
+in_range 0 9  10
