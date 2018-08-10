@@ -1,7 +1,6 @@
 use super::checker::*;
 use lexers::{
-    assignments::{Key, KeyIterator, Operator, Primitive, TypeError},
-    ArgumentSplitter,
+    assignments::{Key, KeyIterator, Operator, Primitive, TypeError}, ArgumentSplitter,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -11,6 +10,8 @@ pub(crate) enum AssignmentError<'a> {
     TypeError(TypeError),
     ExtraValues(&'a str, &'a str),
     ExtraKeys(&'a str, &'a str),
+    RepeatedKey(&'a str),
+    NoKey(&'a str),
 }
 
 impl<'a> Display for AssignmentError<'a> {
@@ -30,6 +31,16 @@ impl<'a> Display for AssignmentError<'a> {
                 "extra keys were supplied, and thus ignored. Previous assignment: '{}' = '{}'",
                 prevkey, prevval
             ),
+            AssignmentError::RepeatedKey(ref repkey) => write!(
+                f,
+                "repeated assignment to same key, and thus ignored. Repeated key: '{}'",
+                repkey
+            ),
+            AssignmentError::NoKey(ref lone_val) => write!(
+                f,
+                "no key to assign value, thus ignored. Value: '{}'",
+                lone_val
+            ),
         }
     }
 }
@@ -44,7 +55,7 @@ pub(crate) struct AssignmentActions<'a> {
     keys:     KeyIterator<'a>,
     operator: Operator,
     values:   ArgumentSplitter<'a>,
-    prevkey:  &'a str,
+    prevkeys: Vec<&'a str>,
     prevval:  &'a str,
 }
 
@@ -54,7 +65,7 @@ impl<'a> AssignmentActions<'a> {
             keys: KeyIterator::new(keys),
             operator,
             values: ArgumentSplitter::new(values),
-            prevkey: "",
+            prevkeys: Vec::new(),
             prevval: "",
         }
     }
@@ -69,17 +80,26 @@ impl<'a> Iterator for AssignmentActions<'a> {
         match (next_key, next_value) {
             (Some(key), Some(value)) => match key {
                 Ok(key) => {
-                    self.prevkey = key.name;
-                    self.prevval = value;
-                    Some(Action::new(key, self.operator, value))
+                    if self.prevkeys.contains(&key.name) {
+                        return Some(Err(AssignmentError::RepeatedKey(key.name)));
+                    } else {
+                        self.prevkeys.push(key.name);
+                        self.prevval = value;
+                        Some(Action::new(key, self.operator, value))
+                    }
                 }
                 Err(why) => Some(Err(AssignmentError::TypeError(why))),
             },
-            (None, Some(_)) => Some(Err(AssignmentError::ExtraValues(
-                self.prevkey,
-                self.prevval,
-            ))),
-            (Some(_), None) => Some(Err(AssignmentError::ExtraKeys(self.prevkey, self.prevval))),
+            (None, Some(lone_val)) => if let Some(&prevkey) = self.prevkeys.last() {
+                Some(Err(AssignmentError::ExtraValues(prevkey, self.prevval)))
+            } else {
+                Some(Err(AssignmentError::NoKey(lone_val)))
+            },
+            (Some(_), None) => if let Some(&prevkey) = self.prevkeys.last() {
+                Some(Err(AssignmentError::ExtraKeys(prevkey, self.prevval)))
+            } else {
+                unreachable!()
+            },
             _ => None,
         }
     }
@@ -292,5 +312,20 @@ mod tests {
                 "[foo bar baz]",
             ))
         );
+    }
+    #[test]
+    fn repeated_key() {
+        let (keys, op, vals) = split("x y z x = 1 2 3 4");
+        let actions = AssignmentActions::new(&keys, op, &vals).collect::<Vec<_>>();
+        assert_eq!(actions.len(), 4);
+        assert_eq!(actions[3], Err(AssignmentError::RepeatedKey("x")))
+    }
+
+    #[test]
+    fn no_key() {
+        let (keys, op, vals) = split(" = 1");
+        let actions = AssignmentActions::new(&keys, op, &vals).collect::<Vec<_>>();
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0], Err(AssignmentError::NoKey("1")))
     }
 }

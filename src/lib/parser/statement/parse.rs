@@ -2,7 +2,9 @@ use super::{
     super::pipelines::{self, Pipeline}, case, functions::{collect_arguments, parse_function},
 };
 use lexers::{assignment_lexer, ArgumentSplitter};
-use shell::flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement};
+use shell::{
+    flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement}, status::FAILURE,
+};
 use small;
 use std::char;
 
@@ -29,7 +31,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         "continue" => return Statement::Continue,
         "for" | "match" | "case" => {
             eprintln!("ion: syntax error: incomplete control flow statement");
-            return Statement::Default;
+            return Statement::Error(FAILURE);
         }
         "let" => {
             return Statement::Let(LocalAction::List);
@@ -48,7 +50,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                     } else {
                         eprintln!("ion: assignment error: no values supplied.")
                     }
-                    return Statement::Default;
+                    return Statement::Error(FAILURE);
                 }
             };
 
@@ -73,7 +75,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                     } else {
                         return Statement::Export(ExportAction::LocalExport(keys.unwrap().into()));
                     }
-                    return Statement::Default;
+                    return Statement::Error(FAILURE);
                 }
             };
 
@@ -112,7 +114,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                 Some(pos) => pos,
                 None => {
                     eprintln!("ion: syntax error: incorrect for loop syntax");
-                    return Statement::Default;
+                    return Statement::Error(FAILURE);
                 }
             };
 
@@ -121,7 +123,7 @@ pub(crate) fn parse(code: &str) -> Statement {
 
             if !cmd.starts_with("in ") {
                 eprintln!("ion: syntax error: incorrect for loop syntax");
-                return Statement::Default;
+                return Statement::Error(FAILURE);
             }
 
             return Statement::For {
@@ -140,7 +142,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                         Ok(values) => values,
                         Err(why) => {
                             eprintln!("ion: case error: {}", why);
-                            return Statement::Default;
+                            return Statement::Error(FAILURE);
                         }
                     };
                     let binding = binding.map(Into::into);
@@ -175,7 +177,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                      may only contain alphanumeric characters",
                     name
                 );
-                return Statement::Default;
+                return Statement::Error(FAILURE);
             }
 
             let (args, description) = parse_function(&cmd[pos..]);
@@ -190,7 +192,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
                 Err(why) => {
                     eprintln!("ion: function argument error: {}", why);
-                    return Statement::Default;
+                    return Statement::Error(FAILURE);
                 }
             }
         }

@@ -156,7 +156,11 @@ impl FlowLogic for Shell {
 
     fn execute_statement(&mut self, statement: Statement) -> Condition {
         match statement {
-            Statement::Error(number) => self.previous_status = number,
+            Statement::Error(number) => {
+                self.previous_status = number;
+                self.variables.set("?", self.previous_status.to_string());
+                self.flow_control.reset();
+            }
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
                 self.variables.set("?", self.previous_status.to_string());
