@@ -17,39 +17,25 @@ pub mod status;
 pub mod variables;
 
 pub use self::{
-    binary::Binary,
-    fork::{Capture, Fork, IonResult},
+    binary::Binary, fork::{Capture, Fork, IonResult},
 };
 pub(crate) use self::{
-    flow::FlowLogic,
-    history::{IgnoreSetting, ShellHistory},
-    job::{Job, JobKind},
+    flow::FlowLogic, history::{IgnoreSetting, ShellHistory}, job::{Job, JobKind},
     pipe_exec::{foreground, job_control},
 };
 
 use self::{
-    directory_stack::DirectoryStack,
-    flags::*,
-    flow_control::{FlowControl, Function, FunctionError},
-    foreground::ForegroundSignals,
-    job_control::{BackgroundProcess, JobControl},
-    pipe_exec::PipelineExecution,
-    status::*,
+    directory_stack::DirectoryStack, flags::*,
+    flow_control::{FlowControl, Function, FunctionError}, foreground::ForegroundSignals,
+    job_control::{BackgroundProcess, JobControl}, pipe_exec::PipelineExecution, status::*,
     variables::{VariableType, Variables},
 };
 use builtins::{BuiltinMap, BUILTINS};
-use lexers::ArgumentSplitter;
 use liner::Context;
 use parser::{pipelines::Pipeline, Expander, Select, Terminator};
 use std::{
-    fs::File,
-    io::{self, Read, Write},
-    iter::FromIterator,
-    ops::Deref,
-    path::Path,
-    process,
-    sync::{atomic::Ordering, Arc, Mutex},
-    time::SystemTime,
+    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
+    sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
 };
 use sys;
 use types::{self, Array};
@@ -250,35 +236,6 @@ impl Shell {
     /// Executes a pipeline and returns the final exit status of the pipeline.
     pub(crate) fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
         let command_start_time = SystemTime::now();
-
-        // Expand any aliases found
-        for item in &mut pipeline.items {
-            let mut last_command = String::with_capacity(32);
-            loop {
-                let possible_alias = {
-                    let key: &str = item.job.command.as_ref();
-                    if &last_command == key {
-                        break;
-                    }
-                    last_command.clear();
-                    last_command.push_str(key);
-                    self.variables.get::<types::Alias>(key)
-                };
-
-                if let Some(alias) = possible_alias {
-                    let new_args = ArgumentSplitter::new(&alias)
-                        .map(types::Str::from)
-                        .chain(item.job.args.drain().skip(1))
-                        .collect::<types::Array>();
-                    if let Some(builtin) = BUILTINS.get(&new_args[0]) {
-                        item.job.builtin = Some(builtin.main);
-                    } else {
-                        item.job.command = new_args[0].clone().into();
-                    }
-                    item.job.args = new_args;
-                }
-            }
-        }
 
         // Branch if -> input == shell command i.e. echo
         let exit_status = if let Some(main) = pipeline.items[0].job.builtin {

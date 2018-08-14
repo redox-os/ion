@@ -3,8 +3,8 @@ use super::{
     job_control::JobControl, status::*, Shell,
 };
 use parser::{
-    assignments::is_array, expand_string, parse_and_validate, pipelines::Pipeline, ForExpression,
-    StatementSplitter,
+    assignments::is_array, expand_string, parse_and_validate, pipelines::{PipeItem, Pipeline},
+    ForExpression, StatementSplitter,
 };
 use shell::{assignments::VariableStore, variables::VariableType};
 use small;
@@ -209,13 +209,25 @@ impl FlowLogic for Shell {
                     Function::new(description, name.clone(), args, statements),
                 );
             }
-            Statement::Pipeline(mut pipeline) => {
-                self.run_pipeline(&mut pipeline);
-                if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
-                    let status = self.previous_status;
-                    self.exit(status);
+            Statement::Pipeline(pipeline) => match expand_pipeline(&self, pipeline) {
+                Ok((mut pipeline, statements)) => {
+                    self.run_pipeline(&mut pipeline);
+                    if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
+                        let status = self.previous_status;
+                        self.exit(status);
+                    }
+                    if !statements.is_empty() {
+                        self.execute_statements(statements);
+                    }
                 }
-            }
+                Err(e) => {
+                    eprintln!("ion: pipeline expansion error: {}", e);
+                    self.previous_status = FAILURE;
+                    self.variables.set("?", self.previous_status.to_string());
+                    self.flow_control.reset();
+                    return Condition::Break;
+                }
+            },
             Statement::Time(box_statement) => {
                 let time = ::std::time::Instant::now();
 
@@ -466,4 +478,92 @@ impl FlowLogic for Shell {
             }
         }
     }
+}
+
+/// Expand a pipeline containing aliases. As aliases can split the pipeline by having logical
+/// operators in them, the function returns the first half of the pipeline and the rest of the
+/// statements, where the last statement has the other half of the pipeline merged.
+fn expand_pipeline(
+    shell: &Shell,
+    pipeline: Pipeline,
+) -> Result<(Pipeline, Vec<Statement>), String> {
+    let mut item_iter = pipeline.items.iter();
+    let mut items: Vec<PipeItem> = Vec::new();
+    let mut statements = Vec::new();
+
+    while let Some(item) = item_iter.next() {
+        let possible_alias = shell
+            .variables
+            .get::<types::Alias>(item.job.command.as_ref());
+        if let Some(alias) = possible_alias {
+            statements = StatementSplitter::new(alias.0.as_str())
+                .map(parse_and_validate)
+                .collect();
+
+            // First item in the alias should be a pipeline item, otherwise it cannot
+            // be placed into a pipeline!
+            let len = statements.len();
+            if let Some(Statement::Pipeline(ref mut pline)) = statements.first_mut() {
+                // Connect inputs and outputs of alias to pipeline
+                if let Some(first) = pline.items.first_mut() {
+                    first.inputs = item.inputs.clone();
+                }
+                if len == 1 {
+                    if let Some(last) = pline.items.last_mut() {
+                        last.outputs = item.outputs.clone();
+                        last.job.kind = item.job.kind;
+                    }
+                }
+                items.append(&mut pline.items);
+            } else {
+                return Err(format!(
+                    "unable to pipe inputs to alias: '{} = {}'",
+                    item.job.command.as_str(),
+                    alias.0.as_str()
+                ));
+            }
+            statements.remove(0);
+
+            // Handle pipeline being broken half by i.e.: '&&' or '||'
+            if statements.len() >= 1 {
+                let err = match statements.last_mut().unwrap() {
+                    Statement::And(ref mut boxed_stm)
+                    | Statement::Or(ref mut boxed_stm)
+                    | Statement::Not(ref mut boxed_stm)
+                    | Statement::Time(ref mut boxed_stm) => {
+                        let stm = &mut **boxed_stm;
+                        if let Statement::Pipeline(ref mut pline) = stm {
+                            // Set output of alias to be the output of last pipeline.
+                            if let Some(last) = pline.items.last_mut() {
+                                last.outputs = item.outputs.clone();
+                                last.job.kind = item.job.kind;
+                            }
+                            // Append rest of the pipeline to the last pipeline in the
+                            // alias.
+                            while let Some(item) = item_iter.next() {
+                                pline.items.push(item.clone());
+                            }
+                            // No error
+                            false
+                        } else {
+                            // Error in expansion
+                            true
+                        }
+                    }
+                    _ => true,
+                };
+                if err {
+                    return Err(format!(
+                        "unable to pipe outputs of alias: '{} = {}'",
+                        item.job.command.as_str(),
+                        alias.0.as_str()
+                    ));
+                }
+                break;
+            }
+        } else {
+            items.push(item.clone());
+        }
+    }
+    Ok((Pipeline { items }, statements))
 }

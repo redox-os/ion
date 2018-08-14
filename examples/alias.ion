@@ -1,0 +1,15 @@
+alias piped = "sed s/A/B/ | sed s/B/C/"
+alias logical = "echo LOGICAL1 && echo B"
+alias piped_and_logical = "sed s/A/B/ | sed s/B/PIPED_AND_LOGICAL1/ && echo B"
+
+# Alias contains only pipes
+echo A | piped | sed s/C/PIPED/
+
+# Alias containes logical operator
+logical | sed s/B/LOGICAL2/
+
+# Alias breaks pipeline into half by logical operator
+echo A | piped_and_logical | sed s/B/PIPED_AND_LOGICAL2/
+
+# Expanding multiple aliases in a singel pipeline
+echo A | piped | sed s/C/PIPED_OK/ && logical | piped_and_logical | sed s/B/DONE/
