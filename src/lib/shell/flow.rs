@@ -507,6 +507,13 @@ fn expand_pipeline(
                 // Connect inputs and outputs of alias to pipeline
                 if let Some(first) = pline.items.first_mut() {
                     first.inputs = item.inputs.clone();
+
+                    // Add alias arguments to expanded args if there's any.
+                    if item.job.args.len() > 1 {
+                        for arg in &item.job.args[1..] {
+                            first.job.args.push(arg.clone());
+                        }
+                    }
                 }
                 if len == 1 {
                     if let Some(last) = pline.items.last_mut() {
