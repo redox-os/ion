@@ -191,13 +191,16 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
     };
 
     if let Some(prog) = prog {
-        let fd = match syscall::open(prog.as_os_str().as_bytes(), syscall::O_RDONLY) {
+        let fd = match syscall::open(prog.as_os_str().as_bytes(), syscall::O_RDONLY | syscall::O_CLOEXEC) {
             Ok(fd) => fd,
             Err(err) => return io::Error::from_raw_os_error(err.errno)
         };
 
         // If we found the program. Run it!
         let error = syscall::fexec(fd, &cvt_args, &env_args);
+
+        let _ = syscall::close(fd);
+
         io::Error::from_raw_os_error(error.err().unwrap().errno)
     } else {
         // The binary was not found.
