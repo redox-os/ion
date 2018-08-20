@@ -7,6 +7,7 @@ pub enum Operator {
     ConcatenateHead,
     Divide,
     Equal,
+    OptionalEqual,
     Exponent,
     Filter,
     IntegerDivide,
@@ -21,6 +22,7 @@ impl Operator {
             b'-' => Some(Operator::Subtract),
             b'/' => Some(Operator::Divide),
             b'*' => Some(Operator::Multiply),
+            b'?' => Some(Operator::OptionalEqual),
             _ => None,
         }
     }
@@ -49,6 +51,7 @@ impl Display for Operator {
                 Operator::Filter => "\\\\=",
                 Operator::Divide => "/=",
                 Operator::Equal => "=",
+                Operator::OptionalEqual => "?=",
                 Operator::Exponent => "**=",
                 Operator::IntegerDivide => "//=",
                 Operator::Multiply => "*=",

@@ -1,0 +1,18 @@
+let a ?= 5
+echo $a
+let a ?= 10
+echo $a
+
+let b ?= [ 1 2 3 ]
+echo @b
+let b ?= [ 4 5 6 ]
+echo @b
+
+let c d e ?= [ 1 2 3 ] hello 5
+echo @c
+echo $d
+echo $e
+let c d e ?= [ 4 5 6 ] world 10
+echo @c
+echo $d
+echo $e

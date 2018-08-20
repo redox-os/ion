@@ -156,7 +156,8 @@ impl VariableStore for Shell {
             match action {
                 Ok(Action::UpdateArray(key, operator, expression)) => {
                     match operator {
-                        Operator::Equal => match value_check(self, &expression, &key.kind) {
+                        Operator::Equal | Operator::OptionalEqual => {
+                            match value_check(self, &expression, &key.kind) {
                             Ok(VariableType::Array(values)) => {
                                 // When we changed the HISTORY_IGNORE variable, update the
                                 // ignore patterns. This happens first because `set_array`
@@ -180,7 +181,8 @@ impl VariableStore for Shell {
                                 return FAILURE;
                             }
                             _ => (),
-                        },
+                            }
+                        }
                         Operator::Concatenate => match value_check(self, &expression, &key.kind) {
                             Ok(VariableType::Array(values)) => {
                                 match self.variables.get_mut(key.name) {
@@ -271,7 +273,7 @@ impl VariableStore for Shell {
                     match value_check(self, &expression, &key.kind) {
                         Ok(VariableType::Str(value)) => {
                             match operator {
-                                Operator::Equal => {
+                                Operator::Equal | Operator::OptionalEqual => {
                                     collected.insert(key.name, VariableType::Str(value));
                                     continue;
                                 }
@@ -415,7 +417,16 @@ impl VariableStore for Shell {
 
         for action in actions_step2 {
             match action {
-                Ok(Action::UpdateArray(key, ..)) => match collected.remove(key.name) {
+                Ok(Action::UpdateArray(key, operator, ..)) => {
+                    if operator == Operator::OptionalEqual {
+                        match self.variables.get_ref(key.name) {
+                            Some(_) => {
+                                continue;
+                            }
+                            _ => (),
+                        };
+                    }
+                    match collected.remove(key.name) {
                     hmap @ Some(VariableType::HashMap(_)) => {
                         if let Primitive::HashMap(_) = key.kind {
                             self.variables.set(key.name, hmap.unwrap());
@@ -493,8 +504,18 @@ impl VariableStore for Shell {
                         }
                     }
                     _ => (),
-                },
-                Ok(Action::UpdateString(key, ..)) => match collected.remove(key.name) {
+                    }
+                }
+                Ok(Action::UpdateString(key, operator, ..)) => {
+                    if operator == Operator::OptionalEqual {
+                        match self.variables.get_ref(key.name) {
+                            Some(_) => {
+                                continue;
+                            }
+                            _ => (),
+                        };
+                    }
+                    match collected.remove(key.name) {
                     str_ @ Some(VariableType::Str(_)) => {
                         self.variables.set(key.name, str_.unwrap());
                     }
@@ -502,7 +523,8 @@ impl VariableStore for Shell {
                         self.variables.set(key.name, array.unwrap());
                     }
                     _ => (),
-                },
+                    }
+                }
                 _ => unreachable!(),
             }
         }

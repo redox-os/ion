@@ -52,16 +52,12 @@ pub fn assignment_lexer<'a>(
 
     let keys = statement[..start].trim_right();
 
-    if read == statement.len() {
-        return (Some(keys), operator, None);
-    }
-
     let values = &statement[read..];
     (Some(keys), operator, Some(values.trim()))
 }
 
 fn find_operator(bytes: &[u8], read: usize) -> Option<(Operator, usize)> {
-    if bytes.len() <= read + 3 {
+    if bytes.len() < read + 3 {
         None
     } else if bytes[read + 1] == b'=' {
         Operator::parse_single(bytes[read]).map(|op| (op, read + 2))
@@ -84,6 +80,16 @@ mod tests {
         assert_eq!(
             assignment_lexer("abc+=def"),
             (Some("abc"), Some(Operator::Add), Some("def"))
+        );
+
+        assert_eq!(
+            assignment_lexer("a+=b"),
+            (Some("a"), Some(Operator::Add), Some("b"))
+        );
+
+        assert_eq!(
+            assignment_lexer("a=b"),
+            (Some("a"), Some(Operator::Equal), Some("b"))
         );
 
         assert_eq!(
@@ -110,6 +116,23 @@ mod tests {
             assignment_lexer("def ghi += 124 523"),
             (Some("def ghi"), Some(Operator::Add), Some("124 523"))
         )
+    }
+
+    #[test]
+    fn assignment_assignments() {
+        assert_eq!(
+            assignment_lexer("a ?= b"),
+            (Some("a"), Some(Operator::OptionalEqual), Some("b"))
+        );
+
+        assert_eq!(
+            assignment_lexer("abc def ?= 123 456"),
+            (
+                Some("abc def"),
+                Some(Operator::OptionalEqual),
+                Some("123 456")
+            )
+        );
     }
 
     #[test]
