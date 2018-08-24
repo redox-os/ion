@@ -1,16 +1,19 @@
 use super::{
-    flags::*, flow_control::{insert_statement, Case, ElseIf, Function, Statement},
-    job_control::JobControl, status::*, Shell,
+    flags::*,
+    flow_control::{insert_statement, Case, ElseIf, Function, Statement},
+    job_control::JobControl,
+    status::*,
+    Shell,
 };
 use parser::{
-    assignments::is_array, expand_string, parse_and_validate, pipelines::{PipeItem, Pipeline},
+    assignments::is_array,
+    expand_string, parse_and_validate,
+    pipelines::{PipeItem, Pipeline},
     ForExpression, StatementSplitter,
 };
 use shell::{assignments::VariableStore, variables::VariableType};
 use small;
-use std::{
-    io::{stdout, Write}, iter,
-};
+use std::io::{stdout, Write};
 use types;
 
 #[derive(Debug)]
@@ -27,7 +30,11 @@ pub(crate) trait FlowLogic {
 
     /// Executes all of the statements within a while block until a certain
     /// condition is met.
-    fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) -> Condition;
+    fn execute_while(
+        &mut self,
+        expression: Vec<Statement>,
+        statements: Vec<Statement>,
+    ) -> Condition;
 
     /// Executes all of the statements within a for block for each value
     /// specified in the range.
@@ -42,7 +49,7 @@ pub(crate) trait FlowLogic {
     /// expressions
     fn execute_if(
         &mut self,
-        expression: Box<Statement>,
+        expression: Vec<Statement>,
         success: Vec<Statement>,
         else_if: Vec<ElseIf>,
         failure: Vec<Statement>,
@@ -62,18 +69,26 @@ pub(crate) trait FlowLogic {
 impl FlowLogic for Shell {
     fn execute_if(
         &mut self,
-        expression: Box<Statement>,
+        expression: Vec<Statement>,
         success: Vec<Statement>,
         else_if: Vec<ElseIf>,
         failure: Vec<Statement>,
     ) -> Condition {
-        let first_condition = iter::once((expression, success));
-        let else_conditions = else_if
+        // Try execute success branch
+        if let Condition::SigInt = self.execute_statements(expression) {
+            return Condition::SigInt;
+        }
+        if self.previous_status == 0 {
+            return self.execute_statements(success);
+        }
+
+        // Try to execute else_if branches
+        let else_if_conditions = else_if
             .into_iter()
             .map(|cond| (cond.expression, cond.success));
 
-        for (condition, statements) in first_condition.chain(else_conditions) {
-            if let Condition::SigInt = self.execute_statements(vec![*condition]) {
+        for (condition, statements) in else_if_conditions {
+            if let Condition::SigInt = self.execute_statements(condition) {
                 return Condition::SigInt;
             }
 
@@ -142,13 +157,25 @@ impl FlowLogic for Shell {
         Condition::NoOp
     }
 
-    fn execute_while(&mut self, expression: Pipeline, statements: Vec<Statement>) -> Condition {
-        while self.run_pipeline(&mut expression.clone()) == Some(SUCCESS) {
-            // Cloning is needed so the statement can be re-iterated again if needed.
-            match self.execute_statements(statements.clone()) {
-                Condition::Break => break,
-                Condition::SigInt => return Condition::SigInt,
-                _ => (),
+    fn execute_while(
+        &mut self,
+        expression: Vec<Statement>,
+        statements: Vec<Statement>,
+    ) -> Condition {
+        loop {
+            let expression = {
+                self.execute_statements(expression.clone());
+                self.previous_status == 0
+            };
+            if expression {
+                // Cloning is needed so the statement can be re-iterated again if needed.
+                match self.execute_statements(statements.clone()) {
+                    Condition::Break => break,
+                    Condition::SigInt => return Condition::SigInt,
+                    _ => (),
+                }
+            } else {
+                break;
             }
         }
         Condition::NoOp

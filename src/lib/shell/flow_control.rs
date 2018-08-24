@@ -8,7 +8,7 @@ use types;
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ElseIf {
-    pub expression: Box<Statement>,
+    pub expression: Vec<Statement>,
     pub success:    Vec<Statement>,
 }
 
@@ -67,7 +67,7 @@ pub(crate) enum Statement {
     Case(Case),
     Export(ExportAction),
     If {
-        expression: Box<Statement>,
+        expression: Vec<Statement>,
         success:    Vec<Statement>,
         else_if:    Vec<ElseIf>,
         failure:    Vec<Statement>,
@@ -86,7 +86,7 @@ pub(crate) enum Statement {
         statements: Vec<Statement>,
     },
     While {
-        expression: Pipeline,
+        expression: Vec<Statement>,
         statements: Vec<Statement>,
     },
     Match {
@@ -204,10 +204,58 @@ pub(crate) fn insert_statement(
                 }
             }
         }
+        Statement::And(_) | Statement::Or(_) if flow_control.block.len() > 0 => {
+            let mut pushed = true;
+            if let Some(top) = flow_control.block.last_mut() {
+                match top {
+                    Statement::If {
+                        ref mut expression,
+                        ref mode,
+                        ref success,
+                        ref mut else_if,
+                        ..
+                    } => match *mode {
+                        0 if success.len() == 0 => {
+                            // Insert into If expression if there's no previous statement.
+                            expression.push(statement.clone());
+                        }
+                        1 => {
+                            // Try to insert into last ElseIf expression if there's no previous
+                            // statement.
+                            if let Some(mut eif) = else_if.last_mut() {
+                                if eif.success.len() == 0 {
+                                    eif.expression.push(statement.clone());
+                                } else {
+                                    pushed = false;
+                                }
+                            } else {
+                                // should not be reached...
+                                unreachable!("Missmatch in 'If' mode!")
+                            }
+                        }
+                        _ => pushed = false,
+                    },
+                    Statement::While {
+                        ref mut expression,
+                        ref statements,
+                    } => if statements.len() == 0 {
+                        expression.push(statement.clone());
+                    } else {
+                        pushed = false;
+                    },
+                    _ => pushed = false,
+                }
+            } else {
+                unreachable!()
+            }
+            if !pushed {
+                insert_into_block(&mut flow_control.block, statement)?;
+            }
+        }
         _ => if flow_control.block.len() > 0 {
             insert_into_block(&mut flow_control.block, statement)?;
         } else {
-            // Filter out toplevel statements that should be produce an error
+            // Filter out toplevel statements that should produce an error
             // otherwise return the statement for immediat execution
             match statement {
                 Statement::ElseIf(_) => {
@@ -384,7 +432,7 @@ mod tests {
     }
     fn new_if() -> Statement {
         Statement::If {
-            expression: Box::new(Statement::Default),
+            expression: vec![Statement::Default],
             success:    Vec::new(),
             else_if:    Vec::new(),
             failure:    Vec::new(),

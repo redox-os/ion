@@ -1,34 +1,33 @@
-
 use super::{
-    append_external_stdio_pipe,
-    pipe_fail,
+    super::job::{RefinedJob, TeeItem},
+    append_external_stdio_pipe, pipe_fail,
 };
-use super::super::job::{RefinedJob, TeeItem};
 
-use std::{
-    fs::File,
-    io,
-    os::unix::io::FromRawFd,
-};
+use std::{fs::File, os::unix::io::FromRawFd};
 use sys;
 
 pub(crate) struct TeePipe<'a> {
     parent:          &'a mut RefinedJob,
     ext_stdio_pipes: &'a mut Option<Vec<File>>,
-    is_external:     bool
+    is_external:     bool,
 }
 
 impl<'a> TeePipe<'a> {
     pub(crate) fn new(
-        parent:          &'a mut RefinedJob,
+        parent: &'a mut RefinedJob,
         ext_stdio_pipes: &'a mut Option<Vec<File>>,
-        is_external:     bool
+        is_external: bool,
     ) -> TeePipe<'a> {
-        TeePipe { parent, ext_stdio_pipes, is_external }
+        TeePipe {
+            parent,
+            ext_stdio_pipes,
+            is_external,
+        }
     }
 
     fn inner_connect<F>(&mut self, tee: &mut TeeItem, mut action: F)
-        where F: FnMut(&mut RefinedJob, File)
+    where
+        F: FnMut(&mut RefinedJob, File),
     {
         match sys::pipe2(sys::O_CLOEXEC) {
             Err(e) => pipe_fail(e),

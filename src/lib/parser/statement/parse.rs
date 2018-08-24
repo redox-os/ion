@@ -1,9 +1,12 @@
 use super::{
-    super::pipelines::{self, Pipeline}, case, functions::{collect_arguments, parse_function},
+    super::pipelines::{self, Pipeline},
+    case,
+    functions::{collect_arguments, parse_function},
 };
 use lexers::{assignment_lexer, ArgumentSplitter};
 use shell::{
-    flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement}, status::FAILURE,
+    flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement},
+    status::FAILURE,
 };
 use small;
 use std::char;
@@ -83,7 +86,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         _ if cmd.starts_with("if ") => {
             return Statement::If {
-                expression: Box::new(parse(cmd[3..].trim_left())),
+                expression: vec![parse(cmd[3..].trim_left())],
                 success:    Vec::new(),
                 else_if:    Vec::new(),
                 failure:    Vec::new(),
@@ -97,14 +100,14 @@ pub(crate) fn parse(code: &str) -> Statement {
                 return Statement::Else;
             } else if cmd.starts_with("if ") {
                 return Statement::ElseIf(ElseIf {
-                    expression: Box::new(parse(cmd[3..].trim_left())),
+                    expression: vec![parse(cmd[3..].trim_left())],
                     success:    Vec::new(),
                 });
             }
         }
         _ if cmd.starts_with("while ") => {
             return collect(cmd[6..].trim_left(), |pipeline| Statement::While {
-                expression: pipeline,
+                expression: vec![Statement::Pipeline(pipeline)],
                 statements: Vec::new(),
             })
         }
@@ -233,7 +236,7 @@ mod tests {
         // Default case where spaced normally
         let parsed_if = parse("if test 1 -eq 2");
         let correct_parse = Statement::If {
-            expression: Box::new(Statement::Pipeline(Pipeline {
+            expression: vec![Statement::Pipeline(Pipeline {
                 items: vec![PipeItem {
                     job:     Job::new(
                         vec!["test".into(), "1".into(), "-eq".into(), "2".into()]
@@ -244,7 +247,7 @@ mod tests {
                     outputs: Vec::new(),
                     inputs:  Vec::new(),
                 }],
-            })),
+            })],
             success:    vec![],
             else_if:    vec![],
             failure:    vec![],

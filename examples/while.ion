@@ -30,3 +30,12 @@ while test $outer_count -lt 4
         let inner_count += 1
     end
 end
+
+# Chained predicates
+
+let first = 1
+let second = 1
+while test $first -lt 13 && test $second -lt 20
+	echo $first $second
+	let first second = $second $((first + second))
+end

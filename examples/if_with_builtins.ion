@@ -7,3 +7,13 @@ if not true
 else if not false
     echo c
 end
+
+if true && false
+	echo NOPE
+else if true && not true
+	echo AHHH
+else if false || true
+	echo YAY
+else
+	echo PLEASE
+end

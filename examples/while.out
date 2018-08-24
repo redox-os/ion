@@ -28,3 +28,9 @@ outer loop #3
     inner loop #1
     inner loop #2
     inner loop #3
+1 1
+1 2
+2 3
+3 5
+5 8
+8 13
