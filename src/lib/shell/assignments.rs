@@ -96,7 +96,13 @@ impl VariableStore for Shell {
                             eprintln!("ion: assignment error: {}: {}", key.name, why);
                             return FAILURE;
                         }
-                        _ => unreachable!(),
+                        _ => {
+                            eprintln!(
+                                "ion: assignment error: export of type '{}' is not supported",
+                                key.kind
+                            );
+                            return FAILURE;
+                        }
                     }
                 }
                 Ok(Action::UpdateArray(..)) => {
@@ -158,29 +164,29 @@ impl VariableStore for Shell {
                     match operator {
                         Operator::Equal | Operator::OptionalEqual => {
                             match value_check(self, &expression, &key.kind) {
-                            Ok(VariableType::Array(values)) => {
-                                // When we changed the HISTORY_IGNORE variable, update the
-                                // ignore patterns. This happens first because `set_array`
-                                // consumes 'values'
-                                if key.name == "HISTORY_IGNORE" {
-                                    self.update_ignore_patterns(&values);
+                                Ok(VariableType::Array(values)) => {
+                                    // When we changed the HISTORY_IGNORE variable, update the
+                                    // ignore patterns. This happens first because `set_array`
+                                    // consumes 'values'
+                                    if key.name == "HISTORY_IGNORE" {
+                                        self.update_ignore_patterns(&values);
+                                    }
+                                    collected.insert(key.name, VariableType::Array(values));
                                 }
-                                collected.insert(key.name, VariableType::Array(values));
-                            }
-                            Ok(VariableType::Str(value)) => {
-                                collected.insert(key.name, VariableType::Str(value));
-                            }
-                            Ok(VariableType::HashMap(hmap)) => {
-                                collected.insert(key.name, VariableType::HashMap(hmap));
-                            }
-                            Ok(VariableType::BTreeMap(bmap)) => {
-                                collected.insert(key.name, VariableType::BTreeMap(bmap));
-                            }
-                            Err(why) => {
-                                eprintln!("ion: assignment error: {}: {}", key.name, why);
-                                return FAILURE;
-                            }
-                            _ => (),
+                                Ok(VariableType::Str(value)) => {
+                                    collected.insert(key.name, VariableType::Str(value));
+                                }
+                                Ok(VariableType::HashMap(hmap)) => {
+                                    collected.insert(key.name, VariableType::HashMap(hmap));
+                                }
+                                Ok(VariableType::BTreeMap(bmap)) => {
+                                    collected.insert(key.name, VariableType::BTreeMap(bmap));
+                                }
+                                Err(why) => {
+                                    eprintln!("ion: assignment error: {}: {}", key.name, why);
+                                    return FAILURE;
+                                }
+                                _ => (),
                             }
                         }
                         Operator::Concatenate => match value_check(self, &expression, &key.kind) {
@@ -234,27 +240,27 @@ impl VariableStore for Shell {
                             }
                         }
                         Operator::Filter => match value_check(self, &expression, &key.kind) {
-                            Ok(VariableType::Array(values)) => match self
-                                .variables
-                                .get_mut(key.name)
-                            {
-                                Some(VariableType::Array(ref mut array)) => {
-                                    *array = array
-                                        .iter()
-                                        .filter(|item| values.iter().all(|value| *item != value))
-                                        .cloned()
-                                        .collect();
+                            Ok(VariableType::Array(values)) => {
+                                match self.variables.get_mut(key.name) {
+                                    Some(VariableType::Array(ref mut array)) => {
+                                        *array = array
+                                            .iter()
+                                            .filter(|item| {
+                                                values.iter().all(|value| *item != value)
+                                            }).cloned()
+                                            .collect();
+                                    }
+                                    None => {
+                                        eprintln!(
+                                            "ion: assignment error: {}: cannot head concatenate \
+                                             non-array variable",
+                                            key.name
+                                        );
+                                        return FAILURE;
+                                    }
+                                    _ => (),
                                 }
-                                None => {
-                                    eprintln!(
-                                        "ion: assignment error: {}: cannot head concatenate \
-                                         non-array variable",
-                                        key.name
-                                    );
-                                    return FAILURE;
-                                }
-                                _ => (),
-                            },
+                            }
                             Err(why) => {
                                 eprintln!("ion: assignment error: {}: {}", key.name, why);
                                 return FAILURE;
@@ -427,83 +433,83 @@ impl VariableStore for Shell {
                         };
                     }
                     match collected.remove(key.name) {
-                    hmap @ Some(VariableType::HashMap(_)) => {
-                        if let Primitive::HashMap(_) = key.kind {
-                            self.variables.set(key.name, hmap.unwrap());
-                        } else if let Primitive::Indexed(..) = key.kind {
-                            eprintln!("ion: cannot insert hmap into index");
-                            return FAILURE;
-                        }
-                    }
-                    bmap @ Some(VariableType::BTreeMap(_)) => {
-                        if let Primitive::BTreeMap(_) = key.kind {
-                            self.variables.set(key.name, bmap.unwrap());
-                        } else if let Primitive::Indexed(..) = key.kind {
-                            eprintln!("ion: cannot insert bmap into index");
-                            return FAILURE;
-                        }
-                    }
-                    array @ Some(VariableType::Array(_)) => {
-                        if let Primitive::Indexed(..) = key.kind {
-                            eprintln!("ion: multi-dimensional arrays are not yet supported");
-                            return FAILURE;
-                        } else {
-                            self.variables.set(key.name, array.unwrap());
-                        }
-                    }
-                    Some(VariableType::Str(value)) => {
-                        if let Primitive::Indexed(ref index_value, ref index_kind) = key.kind {
-                            match value_check(self, index_value, index_kind) {
-                                Ok(VariableType::Str(ref index)) => {
-                                    match self.variables.get_mut(key.name) {
-                                        Some(VariableType::HashMap(hmap)) => {
-                                            hmap.entry(index.clone())
-                                                .or_insert_with(|| VariableType::Str(value));
-                                        }
-                                        Some(VariableType::BTreeMap(bmap)) => {
-                                            bmap.entry(index.clone())
-                                                .or_insert_with(|| VariableType::Str(value));
-                                        }
-                                        Some(VariableType::Array(array)) => {
-                                            let index_num = match index.parse::<usize>() {
-                                                Ok(num) => num,
-                                                Err(_) => {
-                                                    eprintln!(
-                                                        "ion: index variable does not contain a \
-                                                         numeric value: {}",
-                                                        index
-                                                    );
-                                                    return FAILURE;
-                                                }
-                                            };
-                                            if let Some(val) = array.get_mut(index_num) {
-                                                *val = value;
-                                            }
-                                        }
-                                        _ => (),
-                                    }
-                                }
-                                Ok(VariableType::Array(_)) => {
-                                    eprintln!("ion: index variable cannot be an array");
-                                    return FAILURE;
-                                }
-                                Ok(VariableType::HashMap(_)) => {
-                                    eprintln!("ion: index variable cannot be a hmap");
-                                    return FAILURE;
-                                }
-                                Ok(VariableType::BTreeMap(_)) => {
-                                    eprintln!("ion: index variable cannot be a bmap");
-                                    return FAILURE;
-                                }
-                                Err(why) => {
-                                    eprintln!("ion: assignment error: {}: {}", key.name, why);
-                                    return FAILURE;
-                                }
-                                _ => (),
+                        hmap @ Some(VariableType::HashMap(_)) => {
+                            if let Primitive::HashMap(_) = key.kind {
+                                self.variables.set(key.name, hmap.unwrap());
+                            } else if let Primitive::Indexed(..) = key.kind {
+                                eprintln!("ion: cannot insert hmap into index");
+                                return FAILURE;
                             }
                         }
-                    }
-                    _ => (),
+                        bmap @ Some(VariableType::BTreeMap(_)) => {
+                            if let Primitive::BTreeMap(_) = key.kind {
+                                self.variables.set(key.name, bmap.unwrap());
+                            } else if let Primitive::Indexed(..) = key.kind {
+                                eprintln!("ion: cannot insert bmap into index");
+                                return FAILURE;
+                            }
+                        }
+                        array @ Some(VariableType::Array(_)) => {
+                            if let Primitive::Indexed(..) = key.kind {
+                                eprintln!("ion: multi-dimensional arrays are not yet supported");
+                                return FAILURE;
+                            } else {
+                                self.variables.set(key.name, array.unwrap());
+                            }
+                        }
+                        Some(VariableType::Str(value)) => {
+                            if let Primitive::Indexed(ref index_value, ref index_kind) = key.kind {
+                                match value_check(self, index_value, index_kind) {
+                                    Ok(VariableType::Str(ref index)) => {
+                                        match self.variables.get_mut(key.name) {
+                                            Some(VariableType::HashMap(hmap)) => {
+                                                hmap.entry(index.clone())
+                                                    .or_insert_with(|| VariableType::Str(value));
+                                            }
+                                            Some(VariableType::BTreeMap(bmap)) => {
+                                                bmap.entry(index.clone())
+                                                    .or_insert_with(|| VariableType::Str(value));
+                                            }
+                                            Some(VariableType::Array(array)) => {
+                                                let index_num = match index.parse::<usize>() {
+                                                    Ok(num) => num,
+                                                    Err(_) => {
+                                                        eprintln!(
+                                                            "ion: index variable does not contain \
+                                                             a numeric value: {}",
+                                                            index
+                                                        );
+                                                        return FAILURE;
+                                                    }
+                                                };
+                                                if let Some(val) = array.get_mut(index_num) {
+                                                    *val = value;
+                                                }
+                                            }
+                                            _ => (),
+                                        }
+                                    }
+                                    Ok(VariableType::Array(_)) => {
+                                        eprintln!("ion: index variable cannot be an array");
+                                        return FAILURE;
+                                    }
+                                    Ok(VariableType::HashMap(_)) => {
+                                        eprintln!("ion: index variable cannot be a hmap");
+                                        return FAILURE;
+                                    }
+                                    Ok(VariableType::BTreeMap(_)) => {
+                                        eprintln!("ion: index variable cannot be a bmap");
+                                        return FAILURE;
+                                    }
+                                    Err(why) => {
+                                        eprintln!("ion: assignment error: {}: {}", key.name, why);
+                                        return FAILURE;
+                                    }
+                                    _ => (),
+                                }
+                            }
+                        }
+                        _ => (),
                     }
                 }
                 Ok(Action::UpdateString(key, operator, ..)) => {
@@ -516,13 +522,13 @@ impl VariableStore for Shell {
                         };
                     }
                     match collected.remove(key.name) {
-                    str_ @ Some(VariableType::Str(_)) => {
-                        self.variables.set(key.name, str_.unwrap());
-                    }
-                    array @ Some(VariableType::Array(_)) => {
-                        self.variables.set(key.name, array.unwrap());
-                    }
-                    _ => (),
+                        str_ @ Some(VariableType::Str(_)) => {
+                            self.variables.set(key.name, str_.unwrap());
+                        }
+                        array @ Some(VariableType::Array(_)) => {
+                            self.variables.set(key.name, array.unwrap());
+                        }
+                        _ => (),
                     }
                 }
                 _ => unreachable!(),
