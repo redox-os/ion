@@ -165,6 +165,18 @@ impl<'a> StringMethod<'a> {
             "parent" => path_eval!(parent),
             "to_lowercase" => string_case!(to_lowercase),
             "to_uppercase" => string_case!(to_uppercase),
+            "trim" => {
+                let word = get_var!();
+                output.push_str(word.trim());
+            },
+            "trim_right" => {
+                let word = get_var!();
+                output.push_str(word.trim_right());
+            },
+            "trim_left" => {
+                let word = get_var!();
+                output.push_str(word.trim_left());
+            },
             "repeat" => match pattern.join(" ").parse::<usize>() {
                 Ok(repeat) => output.push_str(&get_var!().repeat(repeat)),
                 Err(_) => {
@@ -350,6 +362,7 @@ mod test {
         fn string(&self, variable: &str, _: bool) -> Option<types::Str> {
             match variable {
                 "FOO" => Some("FOOBAR".into()),
+                "BAZ" => Some("  BARBAZ   ".into()),
                 "EMPTY" => Some("".into()),
                 _ => None,
             }
@@ -524,6 +537,85 @@ mod test {
         };
         method.handle(&mut output, &VariableExpander);
         assert_eq!(&*output, "FORD PREFECT");
+    }
+
+
+    #[test]
+    fn test_trim_with_string() {
+        let mut output = small::String::new();
+        let method = StringMethod {
+            method:    "trim",
+            variable:  "\"  Foo Bar \"",
+            pattern:   "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(&*output, "Foo Bar");
+    }
+
+    #[test]
+    fn test_trim_with_variable() {
+        let mut output = small::String::new();
+        let method = StringMethod {
+            method:    "trim",
+            variable:  "$BAZ",
+            pattern:   "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(&*output, "BARBAZ");
+    }
+
+    #[test]
+    fn test_trim_right_with_string() {
+        let mut output = small::String::new();
+        let method = StringMethod {
+            method:    "trim_right",
+            variable:  "\"  Foo Bar \"",
+            pattern:   "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(&*output, "  Foo Bar");
+    }
+
+    #[test]
+    fn test_trim_right_with_variable() {
+        let mut output = small::String::new();
+        let method = StringMethod {
+            method:    "trim_right",
+            variable:  "$BAZ",
+            pattern:   "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(&*output, "  BARBAZ");
+    }
+
+    #[test]
+    fn test_trim_left_with_string() {
+        let mut output = small::String::new();
+        let method = StringMethod {
+            method:    "trim_left",
+            variable:  "\"  Foo Bar \"",
+            pattern:   "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(&*output, "Foo Bar ");
+    }
+
+    #[test]
+    fn test_trim_left_with_variable() {
+        let mut output = small::String::new();
+        let method = StringMethod {
+            method:    "trim_left",
+            variable:  "$BAZ",
+            pattern:   "",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(&*output, "BARBAZ   ");
     }
 
     #[test]

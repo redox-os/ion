@@ -46,3 +46,11 @@ echo $regex_replace("one two onemy anemy town", "\ o|\ a" "\ e")
 
 echo $unescape('one two\"\tone')
 echo $escape("'one two'")
+
+let spacey = "  Spacey "
+echo $trim(" So Space  ")!
+echo $trim($spacey)!
+echo $trim_right(" So Space  ")!
+echo $trim_right($spacey)!
+echo $trim_left(" So Space  ")!
+echo $trim_left($spacey)!
