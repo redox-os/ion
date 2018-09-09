@@ -13,7 +13,9 @@ use unicode_segmentation::UnicodeSegmentation;
 
 pub(crate) fn unescape(input: &str) -> Result<small::String, &'static str> {
     let mut check = false;
-    let mut out = small::String::with_capacity(input.len());
+    // small::String cannot be created with a capacity of 0 without causing a panic
+    let len = if input.len() > 0 { input.len() } else { 1 };
+    let mut out = small::String::with_capacity(len);
     let add_char = |out: &mut small::String, check: &mut bool, c| {
         out.push(c);
         *check = false;

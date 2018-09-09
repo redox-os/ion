@@ -16,7 +16,7 @@ pub type Str = small::String;
 pub struct Alias(pub Str);
 
 impl Alias {
-    pub fn empty() -> Self { Alias(Str::with_capacity(0)) }
+    pub fn empty() -> Self { Alias(Str::with_capacity(1)) }
 }
 
 impl Deref for Alias {

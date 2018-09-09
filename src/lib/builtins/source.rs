@@ -6,7 +6,7 @@ use std::{fs::File, io::Read};
 pub(crate) fn source(shell: &mut Shell, arguments: &[small::String]) -> Result<(), String> {
     match arguments.get(1) {
         Some(argument) => if let Ok(mut file) = File::open(argument.as_str()) {
-            let capacity = file.metadata().map(|x| x.len()).unwrap_or(0) as usize;
+            let capacity = file.metadata().map(|x| x.len()).unwrap_or(1) as usize;
             let mut command_list = String::with_capacity(capacity);
             file.read_to_string(&mut command_list)
                 .map_err(|message| format!("ion: {}: failed to read {}\n", message, argument))
