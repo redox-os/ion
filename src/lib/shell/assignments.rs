@@ -544,6 +544,7 @@ enum MathError {
     RHS,
     LHS,
     Unsupported,
+    CalculationError
 }
 
 impl Display for MathError {
@@ -552,6 +553,7 @@ impl Display for MathError {
             MathError::RHS => write!(fmt, "right hand side has invalid type"),
             MathError::LHS => write!(fmt, "left hand side has invalid type"),
             MathError::Unsupported => write!(fmt, "type does not support operation"),
+            MathError::CalculationError => write!(fmt, "cannot calculate given operation")
         }
     }
 }
@@ -566,14 +568,29 @@ fn parse_f64<F: Fn(f64, f64) -> f64>(lhs: &str, rhs: &str, operation: F) -> Resu
         })
 }
 
-fn parse_i64<F: Fn(i64, i64) -> i64>(lhs: &str, rhs: &str, operation: F) -> Result<i64, MathError> {
-    lhs.parse::<i64>()
-        .map_err(|_| MathError::LHS)
-        .and_then(|lhs| {
-            rhs.parse::<i64>()
-                .map_err(|_| MathError::RHS)
-                .map(|rhs| operation(lhs, rhs))
-        })
+fn parse_i64<F: Fn(i64, i64) -> Option<i64>>(lhs: &str, rhs: &str, operation: F) -> Result<i64, MathError> {
+    let lhs = match lhs.parse::<i64>() {
+        Ok(e) => Ok(e),
+        Err(_) => Err(MathError::LHS)
+    };
+    if let Ok(lhs) = lhs {
+        let rhs = match rhs.parse::<i64>() {
+            Ok(e) => Ok(e),
+            Err(_) => Err(MathError::RHS)
+        };
+        if let Ok(rs) = rhs {
+            let ret = operation(lhs, rs);
+            if let Some(n) = ret {
+                Ok(n)
+            } else {
+                Err(MathError::CalculationError)
+            }
+        } else {
+            rhs
+        }
+    } else {
+        lhs
+    }
 }
 
 fn write_integer<F: FnMut(&[u8])>(integer: i64, mut func: F) {
@@ -597,7 +614,7 @@ fn math<'a, F: FnMut(&[u8])>(
                     .as_bytes(),
             );
         } else if let Primitive::Integer = key {
-            write_integer(parse_i64(lhs, value, |lhs, rhs| lhs + rhs)?, writefn);
+            write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs + rhs))?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
@@ -613,7 +630,14 @@ fn math<'a, F: FnMut(&[u8])>(
             }
         }
         Operator::IntegerDivide => if Primitive::Any == *key || Primitive::Float == *key {
-            write_integer(parse_i64(lhs, value, |lhs, rhs| lhs / rhs)?, writefn);
+            write_integer(parse_i64(lhs, value, |lhs, rhs| {
+                // We want to make sure we don't divide by zero, so instead, we give them a None as a result to signify that we were unable to calculate the result.
+                if rhs == 0 {
+                    None
+                } else {
+                    Some(lhs / rhs)
+                }
+            })?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
@@ -624,7 +648,7 @@ fn math<'a, F: FnMut(&[u8])>(
                     .as_bytes(),
             );
         } else if let Primitive::Integer = key {
-            write_integer(parse_i64(lhs, value, |lhs, rhs| lhs - rhs)?, writefn);
+            write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs - rhs))?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
@@ -635,7 +659,7 @@ fn math<'a, F: FnMut(&[u8])>(
                     .as_bytes(),
             );
         } else if let Primitive::Integer = key {
-            write_integer(parse_i64(lhs, value, |lhs, rhs| lhs * rhs)?, writefn);
+            write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs * rhs))?, writefn);
         } else {
             return Err(MathError::Unsupported);
         },
@@ -647,7 +671,7 @@ fn math<'a, F: FnMut(&[u8])>(
             );
         } else if let Primitive::Integer = key {
             write_integer(
-                parse_i64(lhs, value, |lhs, rhs| lhs.pow(rhs as u32))?,
+                parse_i64(lhs, value, |lhs, rhs| Some(lhs.pow(rhs as u32)))?,
                 writefn,
             );
         } else {
