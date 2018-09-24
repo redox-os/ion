@@ -102,3 +102,8 @@ Defaults to **$HOME/.local/share/ion/history**
 Specifies how many commands should be saved in `HISTFILE` at most.
 Ideally, this should have the same value as `HISTORY_SIZE`.
 Defaults to **100000**.
+
+### HISTORY_TIMESTAMP
+Specifies whether a corresponding timestamp should be recorded along with each command.
+The timestamp is indicated with a `#` and is unformatted as the seconds since the unix epoch.
+This feature is disabled by default and can be enabled by executing the following command: `let HISTORY_TIMESTAMP = 1`.
