@@ -2,7 +2,7 @@ extern crate libc;
 extern crate syscall;
 
 use std::{
-    env::{remove_var, split_paths, var, vars},
+    env::{split_paths, var, vars},
     io, mem,
     os::unix::{ffi::OsStrExt, io::RawFd},
     path::PathBuf,
@@ -147,11 +147,23 @@ pub fn fork_and_exec<F: Fn(), S: AsRef<str>>(
 pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Error {
     // Construct a valid set of arguments to pass to execve. Ensure
     // that the program is the first argument.
-    let mut cvt_args: Vec<[usize; 2]> = Vec::new();
+    let mut cvt_args: Vec<[usize; 2]> = Vec::with_capacity(args.len());
     cvt_args.push([prog.as_ptr() as usize, prog.len()]);
     for arg in args {
         let arg: &str = arg.as_ref();
         cvt_args.push([arg.as_ptr() as usize, arg.len()]);
+    }
+
+    let mut env_args: Vec<[usize; 2]> = Vec::new();
+    let mut env_key_value: Vec<String> = Vec::new();
+    if !clear_env {
+        for (key, value) in vars() {
+            env_key_value.push(key + "=" + &value);
+        }
+        // Can't use the same loop because pushing to a vector may reallocate.
+        for env in &env_key_value {
+            env_args.push([env.as_ptr() as usize, env.len()]);
+        }
     }
 
     // Get the PathBuf of the program if it exists.
@@ -178,16 +190,17 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
         None
     };
 
-    // If clear_env set, clear the env.
-    if clear_env {
-        for (key, _) in vars() {
-            remove_var(key);
-        }
-    }
-
     if let Some(prog) = prog {
+        let fd = match syscall::open(prog.as_os_str().as_bytes(), syscall::O_RDONLY | syscall::O_CLOEXEC) {
+            Ok(fd) => fd,
+            Err(err) => return io::Error::from_raw_os_error(err.errno)
+        };
+
         // If we found the program. Run it!
-        let error = syscall::execve(prog.as_os_str().as_bytes(), &cvt_args);
+        let error = syscall::fexec(fd, &cvt_args, &env_args);
+
+        let _ = syscall::close(fd);
+
         io::Error::from_raw_os_error(error.err().unwrap().errno)
     } else {
         // The binary was not found.
