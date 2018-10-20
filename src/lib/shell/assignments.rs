@@ -121,7 +121,13 @@ impl VariableStore for Shell {
                                 .unwrap_or_else(|| "0".into());
 
                             let result = math(&lhs, &key.kind, operator, &value, |value| {
-                                env::set_var(key_name, &OsStr::from_bytes(value))
+                                let str_value = unsafe {str::from_utf8_unchecked(value)};
+                                if key_name == "PATH" && str_value.find('~').is_some() {
+                                    let final_value = str_value.replace("~", env::var("HOME").as_ref().map(|s| s.as_str()).unwrap_or("~"));
+                                    env::set_var(key_name, &OsStr::from_bytes(final_value.as_bytes()))
+                                } else {
+                                    env::set_var(key_name, &OsStr::from_bytes(value))
+                                }
                             });
 
                             if let Err(why) = result {

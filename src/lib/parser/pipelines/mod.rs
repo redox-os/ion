@@ -3,9 +3,13 @@ mod collector;
 pub(crate) use self::collector::*;
 
 use super::expand_string;
-use shell::{Job, JobKind, Shell};
+use shell::{Job, JobKind, Shell, pipe_exec::stdin_of};
 use small;
-use std::fmt;
+use std::{
+    os::unix::io::FromRawFd,
+    fmt,
+    fs::File,
+};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) enum RedirectFrom {
@@ -30,6 +34,35 @@ pub(crate) enum Input {
     /// A string literal that is written to the `stdin` of a process.
     /// If there is a second string, that second string is the EOF phrase for the heredoc.
     HereString(small::String),
+}
+
+impl Input {
+    pub fn get_infile(&mut self) -> Option<File> {
+        match self {
+            Input::File(ref filename) => match File::open(filename.as_str()) {
+                Ok(file) => Some(file),
+                Err(e) => {
+                    eprintln!("ion: failed to redirect '{}' to stdin: {}", filename, e);
+                    None
+                }
+            },
+            Input::HereString(ref mut string) => {
+                if !string.ends_with('\n') {
+                    string.push('\n');
+                }
+                match unsafe { stdin_of(&string) } {
+                    Ok(stdio) => Some(unsafe { File::from_raw_fd(stdio) }),
+                    Err(e) => {
+                        eprintln!(
+                            "ion: failed to redirect herestring '{}' to stdin: {}",
+                            string, e
+                        );
+                        None
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]

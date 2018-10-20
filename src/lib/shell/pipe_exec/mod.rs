@@ -91,38 +91,9 @@ fn is_implicit_cd(argument: &str) -> bool {
 
 /// Insert the multiple redirects as pipelines if necessary. Handle both input and output
 /// redirection if necessary.
-fn do_redirection(
-    piped_commands: SmallVec<[RefinedItem; 16]>,
-) -> Option<SmallVec<[(RefinedJob, JobKind); 16]>> {
-    macro_rules! get_infile {
-        ($input:expr) => {
-            match $input {
-                Input::File(ref filename) => match File::open(filename.as_str()) {
-                    Ok(file) => Some(file),
-                    Err(e) => {
-                        eprintln!("ion: failed to redirect '{}' to stdin: {}", filename, e);
-                        None
-                    }
-                },
-                Input::HereString(ref mut string) => {
-                    if !string.ends_with('\n') {
-                        string.push('\n');
-                    }
-                    match unsafe { stdin_of(&string) } {
-                        Ok(stdio) => Some(unsafe { File::from_raw_fd(stdio) }),
-                        Err(e) => {
-                            eprintln!(
-                                "ion: failed to redirect herestring '{}' to stdin: {}",
-                                string, e
-                            );
-                            None
-                        }
-                    }
-                }
-            }
-        };
-    }
-
+fn do_redirection(piped_commands: SmallVec<[RefinedItem; 16]>)
+    -> Option<SmallVec<[(RefinedJob, JobKind); 16]>>
+{
     let need_tee = |outs: &[_], kind| {
         let (mut stdout_count, mut stderr_count) = (0, 0);
         match kind {
@@ -256,17 +227,17 @@ fn do_redirection(
         match (inputs.len(), prev_kind) {
             (0, _) => {}
             (1, JobKind::Pipe(_)) => {
-                let sources = vec![get_infile!(inputs[0])?];
+                let sources = vec![inputs[0].get_infile()?];
                 new_commands.push((
                     RefinedJob::cat(sources),
                     JobKind::Pipe(RedirectFrom::Stdout),
                 ));
             }
-            (1, _) => job.stdin(get_infile!(inputs[0])?),
+            (1, _) => job.stdin(inputs[0].get_infile()?),
             _ => {
                 let mut sources = Vec::new();
-                for mut input in inputs {
-                    sources.push(if let Some(f) = get_infile!(input) {
+                for ref mut input in inputs {
+                    sources.push(if let Some(f) = input.get_infile() {
                         f
                     } else {
                         return None;
@@ -654,12 +625,16 @@ impl PipelineExecution for Shell {
     }
 
     fn wait(&mut self, pgid: u32, commands: SmallVec<[RefinedJob; 16]>) -> i32 {
-        // TODO: Find a way to only do this when absolutely necessary.
-        let as_string = commands
+        let as_string = if commands.is_empty() {
+            // This doesn't allocate
+            String::new()
+        } else {
+            commands
             .iter()
             .map(RefinedJob::long)
             .collect::<Vec<String>>()
-            .join(" | ");
+            .join(" | ")
+        };
 
         // Watch the foreground group, dropping all commands that exit as they exit.
         self.watch_foreground(-(pgid as i32), &as_string)
@@ -723,28 +698,30 @@ impl PipelineExecution for Shell {
         };
 
         // If the given pipeline is a background task, fork the shell.
-        if let Some((command_name, disown)) = possible_background_name {
-            fork_pipe(
-                self,
-                piped_commands,
-                command_name,
-                if disown {
-                    ProcessState::Empty
-                } else {
-                    ProcessState::Running
-                },
-            )
-        } else {
-            // While active, the SIGTTOU signal will be ignored.
-            let _sig_ignore = SignalHandler::new();
-            let foreground = !self.is_background_shell;
-            // Execute each command in the pipeline, giving each command the foreground.
-            let exit_status = pipe(self, piped_commands, foreground);
-            // Set the shell as the foreground process again to regain the TTY.
-            if foreground && !self.is_library {
-                let _ = sys::tcsetpgrp(0, process::id());
+        match possible_background_name {
+            Some((command_name, disown)) =>
+                fork_pipe(
+                    self,
+                    piped_commands,
+                    command_name,
+                    if disown {
+                        ProcessState::Empty
+                    } else {
+                        ProcessState::Running
+                    },
+                ),
+            None => {
+                // While active, the SIGTTOU signal will be ignored.
+                let _sig_ignore = SignalHandler::new();
+                let foreground = !self.is_background_shell;
+                // Execute each command in the pipeline, giving each command the foreground.
+                let exit_status = pipe(self, piped_commands, foreground);
+                // Set the shell as the foreground process again to regain the TTY.
+                if foreground && !self.is_library {
+                    let _ = sys::tcsetpgrp(0, process::id());
+                }
+                exit_status
             }
-            exit_status
         }
     }
 }

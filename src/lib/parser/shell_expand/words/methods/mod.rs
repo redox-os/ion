@@ -24,12 +24,12 @@ impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
     pub(crate) fn array<'c>(&'c self) -> impl Iterator<Item = small::String> + 'c {
         ArgumentSplitter::new(self.args)
             .flat_map(move |x| expand_string(x, self.expand, false).into_iter())
-            .map(|s| unescape(&s).unwrap_or_else(|_| small::String::from("")))
+            .map(|s| unescape(&s).unwrap_or_default())
     }
 
     pub(crate) fn join(self, pattern: &str) -> small::String {
         unescape(&expand_string(self.args, self.expand, false).join(pattern))
-            .unwrap_or_else(|_| small::String::from(""))
+            .unwrap_or_default()
     }
 
     pub(crate) fn new(args: &'a str, expand: &'b E) -> MethodArgs<'a, 'b, E> {

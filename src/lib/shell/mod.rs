@@ -370,7 +370,7 @@ impl Shell {
     }
 
     pub(crate) fn new(is_library: bool) -> Shell {
-        Shell {
+        let mut shell = Shell {
             builtins: BUILTINS,
             context: None,
             variables: Variables::default(),
@@ -385,7 +385,10 @@ impl Shell {
             break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new()),
             ignore_setting: IgnoreSetting::default(),
-        }
+        };
+        let ignore_patterns = shell.variables.get("HISTORY_IGNORE").unwrap();
+        shell.update_ignore_patterns(&ignore_patterns);
+        shell
     }
 }
 

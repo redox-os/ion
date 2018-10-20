@@ -1,10 +1,29 @@
-#![allow(eq_op)] // Required as a macro sets this clippy warning off.
-
 use std::{collections::HashSet, iter::Peekable};
 
 use super::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use shell::{Job, JobKind};
 use types::*;
+
+trait AddItem {
+    fn add_item(&mut self, job_kind: JobKind, args: &mut Array, outputs: &mut Option<Vec<Redirection>>, inputs: &mut Option<Vec<Input>>);
+}
+
+impl AddItem for Pipeline {
+    fn add_item(&mut self,
+                job_kind: JobKind,
+                args: &mut Array,
+                outputs: &mut Option<Vec<Redirection>>,
+                inputs: &mut Option<Vec<Input>>)
+    {
+        if !args.is_empty() {
+            let job = Job::new(args.clone(), job_kind);
+            args.clear();
+            let item_out = outputs.take().unwrap_or_default();
+            let item_in = inputs.take().unwrap_or_default();
+            self.items.push(PipeItem::new(job, item_out, item_in));
+        }
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct Collector<'a> {
@@ -17,68 +36,54 @@ lazy_static! {
 }
 
 impl<'a> Collector<'a> {
+    /// Add a new argument that is re
+    #[inline(always)]
+    fn push_arg<I>(&self, args: &mut Array, bytes: &mut Peekable<I>) -> Result<(), &'static str>
+        where I: Iterator<Item=(usize, u8)>,
+    {
+        match self.arg(bytes) {
+            Ok(Some(v)) => {
+                args.push(v.into());
+                Ok(())
+            }
+            Err(why) => return Err(why),
+            _ => Ok(()),
+        }
+    }
+
+    /// Attempt to add a redirection
+    #[inline(always)]
+    fn push_redir_to_output<I>(&self,
+                               from: RedirectFrom,
+                               outputs: &mut Option<Vec<Redirection>>,
+                               bytes: &mut Peekable<I>) -> Result<(), &'static str>
+        where I: Iterator<Item=(usize, u8)>,
+    {
+        if outputs.is_none() {
+            *outputs = Some(Vec::new());
+        }
+        let append = if let Some(&(_, b'>')) = bytes.peek() {
+            bytes.next();
+            true
+        } else {
+            false
+        };
+        let arg = self.arg(bytes)?;
+        match arg {
+            Some(file) => {
+                outputs.as_mut().map(|o| o.push(Redirection { from: from, file: file.into(), append, }));
+                Ok(())
+            }
+            None => Err("expected file argument after redirection for output"),
+        }
+    }
+
     pub(crate) fn parse(&self) -> Result<Pipeline, &'static str> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Array::new();
         let mut pipeline = Pipeline::new();
         let mut outputs: Option<Vec<Redirection>> = None;
         let mut inputs: Option<Vec<Input>> = None;
-
-        /// Add a new argument that is re
-        macro_rules! push_arg {
-            () => {{
-                if let Some(v) = self.arg(&mut bytes)? {
-                    args.push(v.into());
-                }
-            }};
-        }
-
-        /// Attempt to add a redirection
-        macro_rules! try_redir_out {
-            ($from:expr) => {{
-                if outputs.is_none() {
-                    outputs = Some(Vec::new());
-                }
-                let append = if let Some(&(_, b'>')) = bytes.peek() {
-                    bytes.next();
-                    true
-                } else {
-                    false
-                };
-                if let Some(file) = self.arg(&mut bytes)? {
-                    outputs.as_mut().map(|o| {
-                        o.push(Redirection {
-                            from: $from,
-                            file: file.into(),
-                            append,
-                        })
-                    });
-                } else {
-                    return Err("expected file argument after redirection for output");
-                }
-            }};
-        };
-
-        /// Attempt to create a pipeitem and append it to the pipeline
-        macro_rules! try_add_item {
-            ($job_kind:expr) => {{
-                if !args.is_empty() {
-                    let job = Job::new(args.clone(), $job_kind);
-                    args.clear();
-                    let item_out = if let Some(out_tmp) = outputs.take() {
-                        out_tmp
-                    } else {
-                        Vec::new()
-                    };
-                    let item_in = if let Some(in_tmp) = inputs.take() {
-                        in_tmp
-                    } else {
-                        Vec::new()
-                    };
-                    pipeline.items.push(PipeItem::new(job, item_out, item_in));
-                }
-            }};
-        }
 
         while let Some(&(i, b)) = bytes.peek() {
             // Determine what production rule we are using based on the first character
@@ -90,18 +95,18 @@ impl<'a> Collector<'a> {
                         Some(&(_, b'>')) => {
                             // And this byte
                             bytes.next();
-                            try_redir_out!(RedirectFrom::Both);
+                            self.push_redir_to_output(RedirectFrom::Both, &mut outputs, &mut bytes)?;
                         }
                         Some(&(_, b'|')) => {
                             bytes.next();
-                            try_add_item!(JobKind::Pipe(RedirectFrom::Both));
+                            pipeline.add_item(JobKind::Pipe(RedirectFrom::Both), &mut args, &mut outputs, &mut inputs);
                         }
                         Some(&(_, b'!')) => {
                             bytes.next();
-                            try_add_item!(JobKind::Disown);
+                            pipeline.add_item(JobKind::Disown, &mut args, &mut outputs, &mut inputs);
                         }
                         Some(_) | None => {
-                            try_add_item!(JobKind::Background);
+                            pipeline.add_item(JobKind::Background, &mut args, &mut outputs, &mut inputs);
                         }
                     }
                 }
@@ -112,23 +117,23 @@ impl<'a> Collector<'a> {
                         Some(b'>') => {
                             bytes.next();
                             bytes.next();
-                            try_redir_out!(RedirectFrom::Stderr);
+                            self.push_redir_to_output(RedirectFrom::Stderr, &mut outputs, &mut bytes)?;
                         }
                         Some(b'|') => {
                             bytes.next();
                             bytes.next();
-                            try_add_item!(JobKind::Pipe(RedirectFrom::Stderr));
+                            pipeline.add_item(JobKind::Pipe(RedirectFrom::Stderr), &mut args, &mut outputs, &mut inputs);
                         }
-                        Some(_) | None => push_arg!(),
+                        Some(_) | None => self.push_arg(&mut args, &mut bytes)?,
                     }
                 }
                 b'|' => {
                     bytes.next();
-                    try_add_item!(JobKind::Pipe(RedirectFrom::Stdout));
+                    pipeline.add_item(JobKind::Pipe(RedirectFrom::Stdout), &mut args, &mut outputs, &mut inputs);
                 }
                 b'>' => {
                     bytes.next();
-                    try_redir_out!(RedirectFrom::Stdout);
+                    self.push_redir_to_output(RedirectFrom::Stdout, &mut outputs, &mut bytes)?;
                 }
                 b'<' => {
                     if inputs.is_none() {
@@ -185,12 +190,12 @@ impl<'a> Collector<'a> {
                     bytes.next();
                 }
                 // Assume that the next character starts an argument and parse that argument
-                _ => push_arg!(),
+                _ => self.push_arg(&mut args, &mut bytes)?,
             }
         }
 
         if !args.is_empty() {
-            try_add_item!(JobKind::Last);
+            pipeline.add_item(JobKind::Last, &mut args, &mut outputs, &mut inputs);
         }
 
         Ok(pipeline)

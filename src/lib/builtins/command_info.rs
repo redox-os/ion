@@ -18,17 +18,18 @@ pub(crate) fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()
 
     let mut result = SUCCESS;
     for command in &args[1..] {
-        if let Ok(c_type) = get_command_info(&**command, shell) {
-            match c_type.as_ref() {
-                "alias" => if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
-                    println!("{}: alias to {}", command, &*alias);
-                },
-                "function" => println!("{}: function", command),
-                "builtin" => println!("{}: built-in shell command", command),
-                _path => println!("{}", _path),
+        match get_command_info(command, shell) {
+            Ok(c_type) =>  {
+                match c_type.as_ref() {
+                    "alias" => if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
+                        println!("{}: alias to {}", command, &*alias);
+                    },
+                    "function" => println!("{}: function", command),
+                    "builtin" => println!("{}: built-in shell command", command),
+                    _path => println!("{}", _path),
+                }
             }
-        } else {
-            result = FAILURE;
+            Err(_) => result = FAILURE,
         }
     }
     Ok(result)
@@ -43,19 +44,20 @@ pub(crate) fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32
 
     let mut result = FAILURE;
     for command in &args[1..] {
-        if let Ok(c_type) = get_command_info(&**command, shell) {
-            match c_type.as_ref() {
-                "alias" => if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
-                    println!("{} is aliased to `{}`", command, &*alias);
-                },
-                // TODO Make it print the function.
-                "function" => println!("{} is a function", command),
-                "builtin" => println!("{} is a shell builtin", command),
-                _path => println!("{} is {}", command, _path),
+        match get_command_info(command, shell) {
+            Ok(c_type) => {
+                match c_type.as_ref() {
+                    "alias" => if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
+                        println!("{} is aliased to `{}`", command, &*alias);
+                    },
+                    // TODO Make it print the function.
+                    "function" => println!("{} is a function", command),
+                    "builtin" => println!("{} is a shell builtin", command),
+                    _path => println!("{} is {}", command, _path),
+                }
+                result = SUCCESS;
             }
-            result = SUCCESS;
-        } else {
-            eprintln!("type: {}: not found", command);
+            Err(_) => eprintln!("type: {}: not found", command),
         }
     }
     Ok(result)
