@@ -4,7 +4,6 @@ pub(crate) mod colors;
 mod completer;
 pub(crate) mod directory_stack;
 pub(crate) mod escape;
-pub mod flags;
 mod flow;
 pub(crate) mod flow_control;
 mod fork;
@@ -15,6 +14,19 @@ pub(crate) mod pipe_exec;
 pub(crate) mod signals;
 pub mod status;
 pub mod variables;
+
+pub mod flags {
+    /// Exit from the shell on the first error.
+    pub const ERR_EXIT: u8 = 1;
+    /// Print commands that are to be executed.
+    pub const PRINT_COMMS: u8 = 2;
+    /// Do not execute any commands given to the shell.
+    pub const NO_EXEC: u8 = 4;
+    /// Hangup on exiting the shell.
+    pub const HUPONEXIT: u8 = 8;
+    /// Used by an interactive session to know when the input is not terminated.
+    pub const UNTERMINATED: u8 = 16;
+}
 
 pub use self::{
     binary::Binary, fork::{Capture, Fork, IonResult},

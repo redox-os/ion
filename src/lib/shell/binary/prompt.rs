@@ -1,16 +1,19 @@
 use parser::shell_expand::expand_string;
-use shell::{Capture, Function, Shell};
+use shell::{flags::UNTERMINATED, Capture, Function, Shell};
 use std::{io::Read, process};
 use sys;
 
 pub(crate) fn prompt(shell: &mut Shell) -> String {
-    if shell.flow_control.block.len() == 0 {
+    let blocks = shell.flow_control.block.len()
+        + if shell.flags & UNTERMINATED != 0 { 1 } else { 0 };
+
+    if blocks == 0 {
         match prompt_fn(shell) {
             Some(prompt) => prompt,
             None => expand_string(&shell.get_str_or_empty("PROMPT"), shell, false).join(" "),
         }
     } else {
-        "    ".repeat(shell.flow_control.block.len())
+        "    ".repeat(blocks)
     }
 }
 
