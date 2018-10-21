@@ -75,7 +75,7 @@ pub struct Shell {
     pub(crate) builtins: &'static BuiltinMap,
     /// Contains the history, completions, and manages writes to the history file.
     /// Note that the context is only available in an interactive session.
-    pub(crate) context: Option<Mutex<Context>>,
+    pub(crate) context: Option<Context>,
     /// Contains the aliases, strings, and array variable maps.
     pub variables: Variables,
     /// Contains the current state of flow control parameters.
@@ -308,8 +308,6 @@ impl Shell {
                         elapsed_time.subsec_nanos()
                     );
                     context
-                        .lock()
-                        .unwrap()
                         .history
                         .push(summary.into())
                         .unwrap_or_else(|err| {
@@ -366,8 +364,11 @@ impl Shell {
                 self.resume_stopped();
                 self.background_send(sys::SIGHUP);
             }
-            let mut context = self.context.as_ref().unwrap().lock().unwrap();
-            context.history.commit_history();
+            self.context
+                .as_mut()
+                .unwrap()
+                .history
+                .commit_to_file();
         }
     }
 

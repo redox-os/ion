@@ -10,7 +10,7 @@ use self::{
 };
 use super::{status::*, FlowLogic, Shell, ShellHistory};
 use liner::{Buffer, Context};
-use std::{env, fs::File, io::ErrorKind, iter, path::Path, process, sync::Mutex};
+use std::{env, iter, path::Path, process};
 use types;
 
 pub const MAN_ION: &str = r#"NAME
@@ -97,30 +97,12 @@ impl Binary for Shell {
                 let path = self
                     .get::<types::Str>("HISTFILE")
                     .expect("shell didn't set HISTFILE");
-                context.history.set_file_name(Some(path.to_string()));
                 if !Path::new(path.as_str()).exists() {
                     eprintln!("ion: creating history file at \"{}\"", path);
-                    if let Err(why) = File::create(&*path) {
-                        eprintln!("ion: could not create history file: {}", why);
-                    }
                 }
-                match context.history.load_history() {
-                    Ok(()) => {
-                        // pass
-                    }
-                    Err(ref err) if err.kind() == ErrorKind::NotFound => {
-                        let history_filename = self.get_str_or_empty("HISTFILE");
-                        eprintln!(
-                            "ion: failed to find history file {}: {}",
-                            history_filename, err
-                        );
-                    }
-                    Err(err) => {
-                        eprintln!("ion: failed to load history: {}", err);
-                    }
-                }
+                context.history.set_file_name_and_load_history(path.as_str());
             }
-            Mutex::new(context)
+            context
         });
 
         self.evaluate_init_file();

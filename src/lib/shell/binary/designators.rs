@@ -4,8 +4,7 @@ use std::{borrow::Cow, str};
 
 pub(crate) fn expand_designators<'a>(shell: &Shell, cmd: &'a str) -> Cow<'a, str> {
     if let Some(ref context) = shell.context {
-        let context = context.lock().unwrap();
-        if let Some(buffer) = context.history.buffers.iter().last() {
+        if let Some(buffer) = context.history.buffers.back() {
             let buffer = buffer.as_bytes();
             let buffer = unsafe { str::from_utf8_unchecked(&buffer) };
             let mut output = String::with_capacity(cmd.len());
