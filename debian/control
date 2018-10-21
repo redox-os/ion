@@ -1,0 +1,13 @@
+Source: ion-shell
+Section: admin
+Priority: optional
+Maintainer: Michael Aaron Murphy <michael@system76.com>
+Build-Depends: debhelper (>=9), cargo
+Standards-Version: 4.1.4
+Homepage: https://gitlab.redox-os.org/redox-os/ion
+
+Package: ion-shell
+Architecture: any
+Depends: ${shlibs:Depends}
+Description: A next generation system shell, written for Redox in Rust.
+ A next generation system shell, written for Redox in Rust.

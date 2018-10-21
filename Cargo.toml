@@ -63,3 +63,4 @@ panic = "abort"
 
 [patch.crates-io]
 liner = { git = "https://gitlab.redox-os.org/redox-os/liner" }
+redox_syscall = { git = "https://gitlab.redox-os.org/redox-os/syscall.git", branch = "relibc" }

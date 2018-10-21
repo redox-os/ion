@@ -1,8 +1,33 @@
-prefix ?= /usr/local
-BINARY = $(shell echo $(prefix)/bin/ion | sed 's/\/\//\//g')
+prefix ?= usr/local
+BINARY = $(prefix)/bin/ion
+RELEASE = debug
+DEBUG ?= 0
 
-all:
-	cargo build --release
+ifeq (0, $(DEBUG))
+	ARGS += --release
+	RELEASE = release
+endif
+
+ifeq (1,$(REDOX))
+	ARGS += --target x86_64-unknown-redox
+endif
+
+.PHONY: all clean distclean install uninstall
+
+all: .cargo/config
+	if [ -f vendor.tar.xz ]; \
+	then \
+		tar pxf vendor.tar.xz; \
+		cargo build $(ARGS) --frozen; \
+	else \
+		cargo build $(ARGS); \
+	fi
+
+clean:
+	cargo clean
+
+distclean:
+	rm -rf vendor vendor.tar.xz .cargo
 
 tests:
 	cargo test --manifest-path members/braces/Cargo.toml
@@ -12,11 +37,26 @@ tests:
 	cargo test 
 	bash examples/run_examples.sh
 
-install: update-shells
-	install -Dm0755 target/release/ion $(DESTDIR)/$(BINARY)
+install:
+	install -Dm0755 target/$(RELEASE)/ion $(DESTDIR)/$(BINARY)
 
 uninstall:
 	rm $(DESTDIR)/$(BINARY)
+
+.cargo/config:
+	mkdir -p .cargo
+	if [ -f vendor.tar.xz ]; then \
+		cp vendor_config $@; \
+	else \
+		cp nonvendor_config $@; \
+	fi \
+
+vendor.tar.xz:
+	cargo vendor
+	tar pcfJ vendor.tar.xz vendor
+	rm -rf vendor
+
+vendor: .cargo/config vendor.tar.xz
 
 update-shells:
 	if ! grep ion /etc/shells >/dev/null; then \

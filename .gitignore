@@ -1,7 +1,8 @@
-.*
-!.cargo
 !.travis
 cachegrind.*
 perf.*
 target
 manual/book
+.cargo/config
+vendor/
+vendor.tar.xz
