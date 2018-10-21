@@ -1,0 +1,7 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: ion
+Source: https://gitlab.redox-os.org/redox-os/ion
+
+Files: *
+Copyright: Copyright 2018 Redox OS
+License: MIT

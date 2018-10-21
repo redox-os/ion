@@ -28,26 +28,28 @@ The manual is located [here](https://doc.redox-os.org/ion-manual/) on Redox OS's
 also included in the source code for Ion, within the **manual** directory, which you may build
 with **mdbook**.
 
-# Compile / Install Instructions
+# Build dependencies
 
-Rust nightly is required for compiling Ion. Simplest way to obtain Rust/Cargo is by
-installing the [Rustup toolchain manager](https://rustup.rs/), in the event that your OS does
-not ship Rust natively, or if you want more flexibility in Rust compilation capabilities.
+Those who are developing software with Rust should install the [Rustup toolchain manager](https://rustup.rs/).
+After installing rustup, run `rustup default 1.28.0` to set your Rust toolchain to the version that Ion is
+targeting at the moment. To build for Redox OS, `rustup default nightly` is required to build the Redox
+dependencies.
 
-Then, it's just a matter of performing one of the following methods:
+> Distribution packagers must ensure that their distribution has packaged both cargo and rustc 1.28.0.
+> Distribution packagers should also currently build Ion from git. Release tarballs have not been made yet
+> due to the shell being incomplete in a few remaining areas.
 
-## Install Direct From Git
-
-```sh
-cargo +nightly install --git https://gitlab.redox-os.org/redox-os/ion/ ion-shell
-```
-
-## Build Locally
+# Compile instructions
 
 ```sh
 git clone https://gitlab.redox-os.org/redox-os/ion/
-cd ion && make && sudo make install prefix=/usr
+cd ion
+make
+sudo make install prefix=/usr
+sudo make update-shells
 ```
+
+> To compile in DEBUG mode, pass `DEBUG=1` as an argument to `make`
 
 # Vim/NeoVim Syntax Highlighting Plugin
 
