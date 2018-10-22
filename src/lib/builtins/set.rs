@@ -32,10 +32,10 @@ pub(crate) fn set(args: &[small::String], shell: &mut Shell) -> i32 {
                     b'e' => shell.flags |= ERR_EXIT,
                     b'o' => match args_iter.next().map(|s| s as &str) {
                         Some("vi") => if let Some(context) = shell.context.as_mut() {
-                            context.lock().unwrap().key_bindings = KeyBindings::Vi;
+                            context.key_bindings = KeyBindings::Vi;
                         },
                         Some("emacs") => if let Some(context) = shell.context.as_mut() {
-                            context.lock().unwrap().key_bindings = KeyBindings::Emacs;
+                            context.key_bindings = KeyBindings::Emacs;
                         },
                         Some("huponexit") => shell.flags |= HUPONEXIT,
                         Some(_) => {

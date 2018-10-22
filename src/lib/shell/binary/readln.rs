@@ -15,7 +15,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
         let dirs_ptr = &shell.directory_stack as *const DirectoryStack;
 
         // Collects the current list of values from history for completion.
-        let history = &shell.context.as_ref().unwrap().lock().unwrap().history.buffers.iter()
+        let history = shell.context.as_ref().unwrap().history.buffers.iter()
                 // Map each underlying `liner::Buffer` into a `String`.
                 .map(|x| x.chars().cloned().collect())
                 // Collect each result into a vector to avoid borrowing issues.
@@ -26,7 +26,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
             let vars = &shell.variables;
             let builtins = &shell.builtins;
 
-            let line = shell.context.as_mut().unwrap().lock().unwrap().read_line(
+            let line = shell.context.as_mut().unwrap().read_line(
                 prompt,
                 None,
                 &mut move |Event { editor, kind }| {

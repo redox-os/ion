@@ -6,8 +6,6 @@ use std::io::{self, Write};
 use types;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-
-
 bitflags! {
     struct IgnoreFlags: u8 {
         // Macro definition fails if last flag has a comment at the end of the line.
@@ -46,23 +44,9 @@ pub(crate) trait ShellHistory {
     /// output.
     fn print_history(&self, _arguments: &[small::String]) -> i32;
 
-    /// Sets the history size for the shell context equal to the HISTORY_SIZE shell variable if
-    /// it
-    /// is set otherwise to a default value (1000).
-    ///
-    /// If the HISTFILE_ENABLED shell variable is set to 1, then HISTFILE_SIZE is synced
-    /// with the shell context as well. Otherwise, the history file name is set to None in the
-    /// shell context.
-    ///
-    /// This is called in on_command so that the history length and history file state will be
-    /// updated correctly after a command is entered that alters them and just before loading
-    /// the
-    /// history file so that it will be loaded correctly.
-    fn set_context_history_from_vars(&self);
-
     /// Saves a command in the history, depending on @HISTORY_IGNORE. Should be called
     /// immediately after `on_command()`
-    fn save_command_in_history(&self, command: &str);
+    fn save_command_in_history(&mut self, command: &str);
 
     /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
     /// is changed.
@@ -72,7 +56,7 @@ pub(crate) trait ShellHistory {
 trait ShellHistoryPrivate {
     /// Returns true if the given command with the given exit status should be saved in the
     /// history
-    fn should_save_command(&self, command: &str) -> bool;
+    fn should_save_command(&mut self, command: &str) -> bool;
 }
 
 impl ShellHistory for Shell {
@@ -108,14 +92,9 @@ impl ShellHistory for Shell {
         }
     }
 
-    fn save_command_in_history(&self, command: &str) {
+    fn save_command_in_history(&mut self, command: &str) {
         if self.should_save_command(command) {
-            let variables = &self.variables;
-            
-            // Mark the command in the context history
-            self.set_context_history_from_vars();
-
-            if variables.get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
+            if self.variables.get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
                 // Get current time stamp
                 let since_unix_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                 let cur_time_sys = ["#", &since_unix_epoch.to_owned().to_string()].concat();
@@ -123,9 +102,7 @@ impl ShellHistory for Shell {
                 // Push current time to history
             	if let Err(err) = self
                     .context
-                    .as_ref()
-                    .unwrap()
-                    .lock()
+                    .as_mut()
                     .unwrap()
                     .history
                     .push(cur_time_sys.into())
@@ -138,9 +115,7 @@ impl ShellHistory for Shell {
             // Push command itself to history
             if let Err(err) = self
                 .context
-                .as_ref()
-                .unwrap()
-                .lock()
+                .as_mut()
                 .unwrap()
                 .history
                 .push(command.into())
@@ -150,37 +125,10 @@ impl ShellHistory for Shell {
         }
     }
 
-    fn set_context_history_from_vars(&self) {
-        let mut context = self.context.as_ref().unwrap().lock().unwrap();
-        let variables = &self.variables;
-        let max_history_size = variables
-            .get_str_or_empty("HISTORY_SIZE")
-            .parse()
-            .unwrap_or(1000);
-
-        context.history.set_max_size(max_history_size);
-
-        if &*variables.get_str_or_empty("HISTFILE_ENABLED") == "1" {
-            context.history.set_file_name(
-                variables
-                    .get::<types::Str>("HISTFILE")
-                    .map(|v| v.to_string()),
-            );
-
-            let max_histfile_size = variables
-                .get_str_or_empty("HISTFILE_SIZE")
-                .parse()
-                .unwrap_or(1000);
-            context.history.set_max_file_size(max_histfile_size);
-        } else {
-            context.history.set_file_name(None);
-        }
-    }
-
     fn print_history(&self, _arguments: &[small::String]) -> i32 {
         if let Some(context) = self.context.as_ref() {
             let mut buffer = Vec::with_capacity(8 * 1024);
-            for command in &context.lock().unwrap().history.buffers {
+            for command in &context.history {
                 let _ = writeln!(buffer, "{}", command);
             }
             let stdout = io::stdout();
@@ -194,7 +142,7 @@ impl ShellHistory for Shell {
 }
 
 impl ShellHistoryPrivate for Shell {
-    fn should_save_command(&self, command: &str) -> bool {
+    fn should_save_command(&mut self, command: &str) -> bool {
         // just for convenience and to make the code look a bit cleaner
         let ignore = &self.ignore_setting.flags;
         let regexes = &self.ignore_setting.regexes;
@@ -219,20 +167,8 @@ impl ShellHistoryPrivate for Shell {
         }
 
         if ignore.contains(IgnoreFlags::DUPLICATES) {
-            if let Some(ref context) = self.context {
-                let mut context = context.lock().unwrap();
-                let buffers = &mut context.history.buffers;
-                *buffers = buffers
-                    .into_iter()
-                    .filter_map(|buffer| {
-                        let hist_command = buffer.lines().concat();
-                        if hist_command != command {
-                            Some((*buffer).clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+            if let Some(ref mut context) = self.context {
+                context.history.remove_duplicates(command);
                 return true;
             } else {
                 return false;
