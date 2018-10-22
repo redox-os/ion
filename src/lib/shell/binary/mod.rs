@@ -100,7 +100,7 @@ impl Binary for Shell {
                 if !Path::new(path.as_str()).exists() {
                     eprintln!("ion: creating history file at \"{}\"", path);
                 }
-                context.history.set_file_name_and_load_history(path.as_str());
+                let _ = context.history.set_file_name_and_load_history(path.as_str());
             }
             context
         });
