@@ -122,7 +122,10 @@ where
 
     for element in split_start.skip(skip) {
         string.extend_from_slice(element.as_bytes());
-        string.extend_from_slice(b"*/");
+        
+        if element != ".." && element != "." {
+            string.extend_from_slice(b"*/");
+        }
     }
 
     string.pop(); // pop out the last '/' character
@@ -131,10 +134,11 @@ where
     let globs = glob(string).ok().and_then(|completions| {
         let mut completions = completions
             .filter_map(Result::ok)
-            .map(|x| x.to_string_lossy().into_owned());
+            .map(|x| x.to_string_lossy().into_owned())
+            .peekable();
 
-        if let Some(first) = completions.next() {
-            Some(iter::once(first).chain(completions))
+        if completions.peek().is_some() {
+            Some(completions)
         } else {
             None
         }
