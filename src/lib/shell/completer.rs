@@ -124,9 +124,11 @@ where
         string.extend_from_slice(element.as_bytes());
 
         if element != ".." && element != "." {
-            string.push(b'*');
+            string.extend_from_slice(b"*/");
+        } else {
+            string.extend_from_slice(element.as_bytes());
+            string.push(b'/');
         }
-        string.push(b'/');
     }
 
     string.pop(); // pop out the last '/' character
