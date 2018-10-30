@@ -122,10 +122,11 @@ where
 
     for element in split_start.skip(skip) {
         string.extend_from_slice(element.as_bytes());
-        
+
         if element != ".." && element != "." {
-            string.extend_from_slice(b"*/");
+            string.push(b'*');
         }
+        string.push(b'/');
     }
 
     string.pop(); // pop out the last '/' character
