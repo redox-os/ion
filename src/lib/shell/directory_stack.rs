@@ -21,7 +21,7 @@ fn set_current_dir_ion(dir: &Path) -> Result<(), Cow<'static, str>> {
             .unwrap_or_else(|| "?".into()),
     );
 
-    env::set_var("PWD", dir.to_str().unwrap_or_else(|| "?".into()));
+    env::set_var("PWD", dir.to_str().unwrap_or("?"));
     Ok(())
 }
 

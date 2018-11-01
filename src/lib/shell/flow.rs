@@ -369,7 +369,7 @@ impl FlowLogic for Shell {
         // in a case statement). For example, checking to see if the value
         // "foo" matches the pattern "bar" would be invoked like so :
         // ```ignore
-        // matches("foo", "bar") 
+        // matches("foo", "bar")
         // ```
         fn matches(lhs: &types::Array, rhs: &types::Array) -> bool {
             for v in lhs {
@@ -394,13 +394,13 @@ impl FlowLogic for Shell {
                             previous_bind = self
                                 .variables
                                 .get::<types::Array>(bind)
-                                .map(|x| VariableType::Array(x));
+                                .map(VariableType::Array);
                             self.variables.set(&bind, value.clone());
                         } else {
                             previous_bind = self
                                 .variables
                                 .get::<types::Str>(bind)
-                                .map(|x| VariableType::Str(x));
+                                .map(VariableType::Str);
                             self.set(&bind, value.join(" "));
                         }
                     }
@@ -440,13 +440,13 @@ impl FlowLogic for Shell {
                             previous_bind = self
                                 .variables
                                 .get::<types::Array>(bind)
-                                .map(|x| VariableType::Array(x));
+                                .map(VariableType::Array);
                             self.variables.set(&bind, value.clone());
                         } else {
                             previous_bind = self
                                 .variables
                                 .get::<types::Str>(bind)
-                                .map(|x| VariableType::Str(x));
+                                .map(VariableType::Str);
                             self.set(&bind, value.join(" "));
                         }
                     }
@@ -559,7 +559,7 @@ fn expand_pipeline(
             statements.remove(0);
 
             // Handle pipeline being broken half by i.e.: '&&' or '||'
-            if statements.len() >= 1 {
+            if ! statements.is_empty() {
                 let err = match statements.last_mut().unwrap() {
                     Statement::And(ref mut boxed_stm)
                     | Statement::Or(ref mut boxed_stm)

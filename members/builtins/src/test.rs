@@ -114,7 +114,7 @@ AUTHOR
     Written by Michael Murphy.
 "#;
 
-const QUICK_GUIDE: &'static str = r#"Usage: test [EXPRESSION]
+const QUICK_GUIDE: &str = r#"Usage: test [EXPRESSION]
 Try 'test --help' for more information."#;
 
 pub fn test(args: &[small::String]) -> Result<bool, small::String> {

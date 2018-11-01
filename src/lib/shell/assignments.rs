@@ -3,13 +3,13 @@ use super::{
     status::*,
     Shell,
 };
+use hashbrown::HashMap;
 use itoa;
 use lexers::assignments::{Operator, Primitive};
 use parser::assignments::*;
 use shell::{history::ShellHistory, variables::VariableType};
 use small;
 use std::{
-    collections::HashMap,
     env,
     ffi::OsStr,
     fmt::{self, Display},

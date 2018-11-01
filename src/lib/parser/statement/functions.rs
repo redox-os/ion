@@ -38,7 +38,7 @@ pub(crate) fn collect_arguments(args: KeyIterator) -> Result<Vec<KeyBuf>, Functi
             Ok(key) => {
                 let key: KeyBuf = key.into();
                 if keybuf.iter().any(|k| k.name == key.name) {
-                    return Err(FunctionParseError::RepeatedArgument(key.name.into()));
+                    return Err(FunctionParseError::RepeatedArgument(key.name));
                 } else {
                     keybuf.push(key);
                 }

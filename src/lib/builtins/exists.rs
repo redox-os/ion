@@ -193,7 +193,7 @@ fn test_evaluate_arguments() {
     // TODO: see test_binary_is_in_path()
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-b".into()], &shell), Ok(true));
-    let oldpath = shell.get::<types::Str>("PATH").unwrap_or("/usr/bin".into());
+    let oldpath = shell.get::<types::Str>("PATH").unwrap_or_else(|| "/usr/bin".into());
     shell.set("PATH", "testing/");
 
     assert_eq!(
