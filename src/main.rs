@@ -5,11 +5,15 @@ extern crate smallvec;
 use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};
 use smallvec::SmallVec;
 use std::{
+    alloc::System,
     env,
     error::Error,
     io::{stdin, stdout, BufRead, BufReader, Write},
     iter::FromIterator,
 };
+
+#[global_allocator]
+static A: System = System;
 
 fn main() {
     let stdin_is_a_tty = sys::isatty(sys::STDIN_FILENO);
