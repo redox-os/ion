@@ -46,7 +46,7 @@ impl<'a> Collector<'a> {
                 args.push(v.into());
                 Ok(())
             }
-            Err(why) => return Err(why),
+            Err(why) => Err(why),
             _ => Ok(()),
         }
     }
@@ -380,7 +380,7 @@ impl<'a> Collector<'a> {
             // We return an inclusive range to keep the quote type intact
             if let b'\'' = b {
                 bytes.next();
-                return Ok(&self.data[start..i + 1]);
+                return Ok(&self.data[start..=i]);
             }
             bytes.next();
         }

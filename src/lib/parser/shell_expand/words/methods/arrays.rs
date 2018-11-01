@@ -29,7 +29,7 @@ impl<'a> ArrayMethod<'a> {
 
     fn lines<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
-        Ok(variable.lines().into_iter().map(types::Str::from).collect())
+        Ok(variable.lines().map(types::Str::from).collect())
     }
 
     fn chars<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {

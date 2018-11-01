@@ -236,7 +236,7 @@ fn do_redirection(piped_commands: SmallVec<[RefinedItem; 16]>)
             (1, _) => job.stdin(inputs[0].get_infile()?),
             _ => {
                 let mut sources = Vec::new();
-                for ref mut input in inputs {
+                for input in &mut inputs {
                     sources.push(if let Some(f) = input.get_infile() {
                         f
                     } else {
@@ -662,11 +662,11 @@ impl PipelineExecution for Shell {
                     .get::<Function>(job.args[0].as_str())
                     .is_some()
                 {
-                    RefinedJob::function(job.args[0].clone().into(), job.args.drain().collect())
+                    RefinedJob::function(job.args[0].clone(), job.args.drain().collect())
                 } else if let Some(builtin) = job.builtin {
                     RefinedJob::builtin(builtin, job.args.drain().collect())
                 } else {
-                    RefinedJob::external(job.args[0].clone().into(), job.args.drain().collect())
+                    RefinedJob::external(job.args[0].clone(), job.args.drain().collect())
                 }
             };
             results.push((refined, job.kind, outputs, inputs));

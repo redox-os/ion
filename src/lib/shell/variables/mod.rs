@@ -4,7 +4,7 @@ use super::{
     flow_control::Function,
     status::{FAILURE, SUCCESS},
 };
-use fnv::FnvHashMap;
+use hashbrown::HashMap;
 use liner::Context;
 use std::{
     any::TypeId,
@@ -155,14 +155,14 @@ impl fmt::Display for VariableType {
 
 #[derive(Clone, Debug)]
 pub struct Scope {
-    vars: FnvHashMap<types::Str, VariableType>,
+    vars: HashMap<types::Str, VariableType>,
     /// This scope is on a namespace boundary.
     /// Any previous scopes need to be accessed through `super::`.
     namespace: bool,
 }
 
 impl Deref for Scope {
-    type Target = FnvHashMap<types::Str, VariableType>;
+    type Target = HashMap<types::Str, VariableType>;
 
     fn deref(&self) -> &Self::Target { &self.vars }
 }
@@ -180,8 +180,8 @@ pub struct Variables {
 
 impl Default for Variables {
     fn default() -> Self {
-        let mut map: FnvHashMap<types::Str, VariableType> =
-            FnvHashMap::with_capacity_and_hasher(64, Default::default());
+        let mut map: HashMap<types::Str, VariableType> =
+            HashMap::with_capacity(64);
         map.insert(
             "DIRECTORY_STACK_SIZE".into(),
             VariableType::Str("1000".into()),
@@ -266,7 +266,7 @@ impl Variables {
         self.current += 1;
         if self.current >= self.scopes.len() {
             self.scopes.push(Scope {
-                vars: FnvHashMap::with_capacity_and_hasher(64, Default::default()),
+                vars: HashMap::with_capacity(64),
                 namespace,
             });
         } else {

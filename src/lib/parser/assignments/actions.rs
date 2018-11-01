@@ -81,7 +81,7 @@ impl<'a> Iterator for AssignmentActions<'a> {
             (Some(key), Some(value)) => match key {
                 Ok(key) => {
                     if self.prevkeys.contains(&key.name) {
-                        return Some(Err(AssignmentError::RepeatedKey(key.name)));
+                        Some(Err(AssignmentError::RepeatedKey(key.name)))
                     } else {
                         self.prevkeys.push(key.name);
                         self.prevval = value;

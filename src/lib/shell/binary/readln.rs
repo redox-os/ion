@@ -2,7 +2,7 @@ use super::super::{completer::*, Binary, DirectoryStack, Shell, Variables};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use std::{
     env,
-    io::{self, ErrorKind, Write},
+    io::ErrorKind,
     mem,
     path::PathBuf,
 };

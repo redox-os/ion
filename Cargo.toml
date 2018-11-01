@@ -37,7 +37,6 @@ bitflags = "1.0"
 calculate = "0.5"
 failure = "0.1"
 failure_derive = "0.1"
-fnv = "1.0"
 glob = "0.2"
 itoa = "0.4"
 lazy_static = "1.0"
@@ -53,6 +52,7 @@ ion_builtins = { path = "members/builtins" }
 ion_lexers = { path = "members/lexers" }
 ion_sys = { path = "members/sys" }
 ion_ranges = { path = "members/ranges" }
+hashbrown = "0.1.2"
 
 [lib]
 path = "src/lib/lib.rs"

@@ -8,11 +8,7 @@ fn stepped_range_numeric<'a>(
     step: isize,
     nb_digits: usize,
 ) -> Option<Box<Iterator<Item = small::String> + 'a>> {
-    if step == 0 {
-        None
-    } else if start < end && step < 0 {
-        None
-    } else if start > end && step > 0 {
+    if step == 0 || (start < end && step < 0) || (start > end && step > 0) {
         None
     } else {
         let (x, y, ordering) = if start < end {

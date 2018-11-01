@@ -1,16 +1,17 @@
 let map:hmap[] = [key1=one key3=three]
-echo @map
 let map[key2] = two
-echo @map
 echo @map[key1]
 echo @map[key2]
 echo @map[key3]
 
 let map:hmap[int] = [uno=1 dos=2 tres=3]
-echo @map
+echo @map[uno]
+echo @map[tres]
+echo @map[dos]
 
 let map:hmap[int[]] = [key1=[1 2 3 4 5] key2=[6 7 8]]
-echo @map
+echo @map[key1]
+echo @map[key2]
 
 let map:bmap[] = [key1=one key3=three]
 echo @map

@@ -47,7 +47,7 @@ fn expand_process<E: Expander>(
             return;
         } else if quoted {
             let output: &str = if let Some(pos) = output.rfind(|x| x != '\n') {
-                &output[..pos + 1]
+                &output[..=pos]
             } else {
                 &output
             };
@@ -373,7 +373,7 @@ fn expand_braces<E: Expander>(
         }
     }
     if expanders.is_empty() {
-        expanded_words.push(output.into());
+        expanded_words.push(output);
     } else {
         if !output.is_empty() {
             tokens.push(BraceToken::Normal(output));
@@ -384,7 +384,7 @@ fn expand_braces<E: Expander>(
             .collect();
         let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
         for word in braces::expand(&tokens, &*vector_of_arrays) {
-            expanded_words.push(word.into());
+            expanded_words.push(word);
         }
     }
 
@@ -694,7 +694,7 @@ pub(crate) fn expand_tokens<E: Expander>(
 /// if `x=5` and `y=7`
 fn expand_arithmetic<E: Expander>(output: &mut small::String, input: &str, expander: &E) {
     // small::String cannot be created with a capacity of 0 without causing a panic
-    let len = if input.as_bytes().len() > 0 { input.as_bytes().len() } else { 1 };
+    let len = if input.as_bytes().is_empty() { input.as_bytes().len() } else { 1 };
     let mut intermediate = small::String::with_capacity(len);
     let mut varbuf = small::String::new();
     let flush = |var: &mut small::String, out: &mut small::String| {

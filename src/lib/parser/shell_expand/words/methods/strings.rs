@@ -14,7 +14,7 @@ use unicode_segmentation::UnicodeSegmentation;
 pub(crate) fn unescape(input: &str) -> Result<small::String, &'static str> {
     let mut check = false;
     // small::String cannot be created with a capacity of 0 without causing a panic
-    let len = if input.len() > 0 { input.len() } else { 1 };
+    let len = if ! input.is_empty() { input.len() } else { 1 };
     let mut out = small::String::with_capacity(len);
     let add_char = |out: &mut small::String, check: &mut bool, c| {
         out.push(c);
@@ -324,8 +324,8 @@ impl<'a> StringMethod<'a> {
                                 if elem != "" && elem != "," {
                                     let elem_str = elem.to_string();
                                     // If the separation commas are properly removed from the pattern, then the cleaning on the next 7 lines is unnecessary
-                                    let elem_str_clean = if elem_str.ends_with(",") {
-                                        let comma_pos = elem_str.rfind(",").unwrap();
+                                    let elem_str_clean = if elem_str.ends_with(',') {
+                                        let comma_pos = elem_str.rfind(',').unwrap();
                                         let (clean, _) = elem_str.split_at(comma_pos);
                                         clean.to_owned()
                                     } else {

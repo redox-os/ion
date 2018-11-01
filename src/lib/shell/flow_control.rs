@@ -143,7 +143,7 @@ impl FlowControl {
     pub(crate) fn reset(&mut self) { self.block.clear() }
 
     /// Check if there isn't an unfinished block.
-    pub(crate) fn unclosed_block(&self) -> bool { self.block.len() > 0 }
+    pub(crate) fn unclosed_block(&self) -> bool { ! self.block.is_empty() }
 }
 
 impl Default for FlowControl {
@@ -193,7 +193,7 @@ pub(crate) fn insert_statement(
                             // Merge last Case back and pop off Match too
                             insert_into_block(&mut flow_control.block, block)?;
                             let match_stm = flow_control.block.pop().unwrap();
-                            if flow_control.block.len() > 0 {
+                            if ! flow_control.block.is_empty() {
                                 insert_into_block(&mut flow_control.block, match_stm)?;
                             } else {
                                 return Ok(Some(match_stm));
@@ -204,7 +204,7 @@ pub(crate) fn insert_statement(
                 }
             }
         }
-        Statement::And(_) | Statement::Or(_) if flow_control.block.len() > 0 => {
+        Statement::And(_) | Statement::Or(_) if ! flow_control.block.is_empty() => {
             let mut pushed = true;
             if let Some(top) = flow_control.block.last_mut() {
                 match top {
@@ -215,7 +215,7 @@ pub(crate) fn insert_statement(
                         ref mut else_if,
                         ..
                     } => match *mode {
-                        0 if success.len() == 0 => {
+                        0 if success.is_empty() => {
                             // Insert into If expression if there's no previous statement.
                             expression.push(statement.clone());
                         }
@@ -223,7 +223,7 @@ pub(crate) fn insert_statement(
                             // Try to insert into last ElseIf expression if there's no previous
                             // statement.
                             if let Some(mut eif) = else_if.last_mut() {
-                                if eif.success.len() == 0 {
+                                if eif.success.is_empty() {
                                     eif.expression.push(statement.clone());
                                 } else {
                                     pushed = false;
@@ -238,7 +238,7 @@ pub(crate) fn insert_statement(
                     Statement::While {
                         ref mut expression,
                         ref statements,
-                    } => if statements.len() == 0 {
+                    } => if statements.is_empty() {
                         expression.push(statement.clone());
                     } else {
                         pushed = false;
@@ -252,7 +252,7 @@ pub(crate) fn insert_statement(
                 insert_into_block(&mut flow_control.block, statement)?;
             }
         }
-        _ => if flow_control.block.len() > 0 {
+        _ => if ! flow_control.block.is_empty() {
             insert_into_block(&mut flow_control.block, statement)?;
         } else {
             // Filter out toplevel statements that should produce an error
@@ -401,7 +401,7 @@ impl Function {
         Ok(())
     }
 
-    pub(crate) fn get_description<'a>(&'a self) -> Option<&'a small::String> {
+    pub(crate) fn get_description(&self) -> Option<&small::String> {
         self.description.as_ref()
     }
 
@@ -492,7 +492,7 @@ mod tests {
         assert_eq!(res, Ok(None));
 
         let res = insert_statement(&mut flow_control, Statement::Default);
-        if let Err(_) = res {
+        if res.is_err() {
             flow_control.reset();
             assert_eq!(flow_control.block.len(), 0);
         } else {
@@ -524,7 +524,7 @@ mod tests {
         ];
         for err in errs {
             let res = insert_statement(&mut flow_control, err);
-            if let Ok(_) = res {
+            if res.is_ok() {
                 assert!(false);
             }
         }

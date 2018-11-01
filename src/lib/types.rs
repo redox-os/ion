@@ -1,4 +1,4 @@
-use fnv::FnvHashMap;
+use hashbrown::HashMap as HashbrownMap;
 use shell::variables::VariableType;
 use small;
 use smallvec::SmallVec;
@@ -8,7 +8,7 @@ use std::{
 };
 
 pub type Array = SmallVec<[Str; 4]>;
-pub type HashMap = FnvHashMap<Str, VariableType>;
+pub type HashMap = HashbrownMap<Str, VariableType>;
 pub type BTreeMap = StdBTreeMap<Str, VariableType>;
 pub type Str = small::String;
 
@@ -38,7 +38,7 @@ impl Into<Str> for Alias {
 /// `array!` acts like the standard library's `vec!` macro, and can be thought
 /// of as a shorthand for:
 /// ```ignore,rust
-/// Array::from_vec(vec![...]) 
+/// Array::from_vec(vec![...])
 /// ```
 /// Additionally it will call `Into::into` on each of its members so that one
 /// can pass in any type with some `To<SmallString>` implementation; they will
@@ -59,7 +59,6 @@ macro_rules! array [
     ( $($x:expr), *) => ({
         let mut _arr = Array::new();
         $(_arr.push($x.into());)*
-        #[allow(let_and_return)]
         _arr
     })
 ];
