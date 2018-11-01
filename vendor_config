@@ -24,5 +24,10 @@ git = "https://gitlab.redox-os.org/redox-os/syscall.git"
 branch = "relibc"
 replace-with = "vendored-sources"
 
+[source."https://gitlab.redox-os.org/redox-os/termion"]
+git = "https://gitlab.redox-os.org/redox-os/termion"
+branch = "master"
+replace-with = "vendored-sources"
+
 [source.vendored-sources]
 directory = "vendor"
