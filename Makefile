@@ -3,31 +3,32 @@ BINARY = $(prefix)/bin/ion
 RELEASE = debug
 DEBUG ?= 0
 VENDORED = 0
+REDOX ?= 0
 
 ifeq (0,$(DEBUG))
 	ARGS += --release
 	RELEASE = release
 endif
 
-ifeq (1,$(REDOX))
-	ARGS += --target x86_64-unknown-redox
+ifneq ($(wildcard vendor.tar.xz),)
+	ARGSV += --frozen
 endif
 
-ifneq ($(wildcard vendor.tar.xz),)
-	VENDORED = 1
-	ARGSV += --frozen
+ifeq (1,$(REDOX))
+	undefine ARGSV
+	ARGS += --target x86_64-unknown-redox
 endif
 
 .PHONY: all clean distclean install uninstall
 
-all: extract .cargo/config
+all: version extract .cargo/config
 	cargo build $(ARGS) $(ARGSV)
 
 clean:
 	cargo clean
 
-distclean:
-	rm -rf vendor vendor.tar.xz .cargo
+distclean: clean
+	rm -rf vendor vendor.tar.xz .cargo git_revision.txt
 
 tests:
 	cargo test $(ARGSV)
@@ -44,22 +45,30 @@ uninstall:
 
 .cargo/config:
 	mkdir -p .cargo
-	if [ -f vendor.tar.xz ]; then \
+	echo $(wildcard vendor.tar.xz)
+	if [ "$(wildcard vendor.tar.xz)" != "" ]; then \
 		cp vendor_config $@; \
 	else \
 		cp nonvendor_config $@; \
-	fi \
+	fi
 
 vendor.tar.xz:
 	cargo vendor
 	tar pcfJ vendor.tar.xz vendor
 	rm -rf vendor
 
-vendor: .cargo/config vendor.tar.xz
+vendor: vendor.tar.xz .cargo/config
 
 extract:
-ifeq (1,$(VENDORED)$(wildcard vendor))
+ifneq ($(wildcard vendor.tar.xz),)
+ifneq (1,$(REDOX))
 	tar pxf vendor.tar.xz
+endif
+endif
+
+version:
+ifeq ($(wildcard git_revision.txt),)
+	git rev-parse master > git_revision.txt
 endif
 
 update-shells:
@@ -71,3 +80,4 @@ update-shells:
 			sed -i -e "s#$$shell#$(BINARY)#g" /etc/shells; \
 		fi \
 	fi
+

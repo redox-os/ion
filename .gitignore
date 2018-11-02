@@ -1,6 +1,7 @@
 !.travis
 cachegrind.*
 perf.*
+git_revision.txt
 target
 manual/book
 .cargo/config
