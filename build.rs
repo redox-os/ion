@@ -5,7 +5,7 @@
 
 use std::{
     env,
-    fs::File,
+    fs::{self, File},
     io::{self, Read, Write},
     path::Path,
     process::Command,
@@ -34,14 +34,19 @@ fn write_version_file() -> io::Result<()> {
 }
 
 fn get_git_rev() -> io::Result<String> {
-    let rev = match Command::new("git").arg("rev-parse").arg("master").output() {
-        Ok(out) => match String::from_utf8(out.stdout) {
-            Ok(s) => s,
-            Err(_) => git_rev_from_file()?,
-        },
-        Err(_) => git_rev_from_file()?,
-    };
-    Ok(rev)
+    let version_file = Path::new("git_revision.txt");
+    if version_file.exists() {
+        fs::read_to_string(&version_file)
+    } else {
+        Command::new("git").arg("rev-parse").arg("master").output()
+            .and_then(|out| {
+                String::from_utf8(out.stdout).map_err(|_| io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("git rev-parse master output was not UTF-8")
+                ))
+            })
+            .or_else(|_| git_rev_from_file())
+    }
 }
 
 fn git_rev_from_file() -> io::Result<String> {

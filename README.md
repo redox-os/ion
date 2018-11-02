@@ -28,6 +28,16 @@ The manual is located [here](https://doc.redox-os.org/ion-manual/) on Redox OS's
 also included in the source code for Ion, within the **manual** directory, which you may build
 with **mdbook**.
 
+# Packages
+
+## Pop!\_OS / Ubuntu
+
+The following PPA supports the 18.04 (bionic) and 18.10 (cosmic) releases. Bionic builds were made using the Pop\_OS PPA's rustc 1.28.0 package.
+
+```
+sudo add-apt-repository ppa:mmstick76/ion-shell
+```
+
 # Build dependencies
 
 Those who are developing software with Rust should install the [Rustup toolchain manager](https://rustup.rs/).

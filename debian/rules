@@ -4,8 +4,14 @@
 	dh $@
 
 override_dh_auto_clean:
+	cat git_revision.txt || echo git_revision.txt not found
 	make clean
 	make vendor
+	make version
+
+override_dh_auto_build:
+	cat .cargo/config
+	make all
 
 override_dh_auto_install:
 	dh_auto_install -- prefix=/usr
