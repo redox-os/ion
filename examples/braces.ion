@@ -7,10 +7,10 @@ echo It{{em,alic}iz,erat}e{d,}
 
 # inclusive ranges
 echo {-1...1}
-echo {2...0}
+echo {2..=0}
 echo {a...c}
-echo {d...b}
-echo {A...C}
+echo {d..=b}
+echo {A..=C}
 echo {D...B}
 
 # exclusive ranges

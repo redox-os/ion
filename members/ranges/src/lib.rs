@@ -33,6 +33,10 @@ mod tests {
                 "0...2",
             ),
             (
+                Range::inclusive(Index::Forward(0), Index::Forward(4)),
+                "0..=4",
+            ),
+            (
                 Range::inclusive(Index::Forward(2), Index::Backward(1)),
                 "2...-2",
             ),
@@ -52,7 +56,7 @@ mod tests {
             assert_eq!(Some(range), parse_index_range(string));
         }
 
-        let invalid_cases = vec!["0..A", "3-3..42"];
+        let invalid_cases = vec!["0..A", "3-3..42", "0.=3", "0=..3", "0.=.3"];
 
         for range in invalid_cases {
             assert_eq!(None, parse_index_range(range))
@@ -137,6 +141,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual: Vec<small::String> = parse_range("3...-03").unwrap().collect();
+        let also: Vec<small::String> = parse_range("3..=-03").unwrap().collect();
         let expected: Vec<small::String> = vec![
             "003".into(),
             "002".into(),
@@ -148,6 +153,7 @@ mod tests {
         ];
 
         assert_eq!(actual, expected);
+        assert_eq!(also, expected);
 
         let actual: Vec<small::String> = parse_range("a...c").unwrap().collect();
         let expected: Vec<small::String> = vec!["a".into(), "b".into(), "c".into()];
@@ -165,16 +171,20 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual: Vec<small::String> = parse_range("C...A").unwrap().collect();
+        let also: Vec<small::String> = parse_range("C..=A").unwrap().collect();
         let expected: Vec<small::String> = vec!["C".into(), "B".into(), "A".into()];
 
         assert_eq!(actual, expected);
+        assert_eq!(also, expected);
 
         let actual: Vec<small::String> = parse_range("C..A").unwrap().collect();
         let expected: Vec<small::String> = vec!["C".into(), "B".into()];
+
         assert_eq!(actual, expected);
 
         let actual: Vec<small::String> = parse_range("c..a").unwrap().collect();
         let expected: Vec<small::String> = vec!["c".into(), "b".into()];
+
         assert_eq!(actual, expected);
 
         let actual: Vec<small::String> = parse_range("-3..4").unwrap().collect();

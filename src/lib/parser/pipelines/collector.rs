@@ -32,7 +32,7 @@ pub(crate) struct Collector<'a> {
 
 lazy_static! {
     /// The set of bytes that will always indicate an end of an arg
-    static ref FOLLOW_ARGS: HashSet<u8> = b"&|<> \t".into_iter().cloned().collect();
+    static ref FOLLOW_ARGS: HashSet<u8> = b"&|<> \t".iter().cloned().collect();
 }
 
 impl<'a> Collector<'a> {

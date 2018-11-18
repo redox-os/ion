@@ -157,12 +157,13 @@ fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize, usize)> {
     }
 }
 
+// TODO: Make this an iterator structure.
 // In a range we allow the following syntax:
 //      Exclusive nonstepped: {start..end}
 //      Inclusive nonstepped: {start...end}
 //      Exclusive stepped: {start..step..end}
 //      Inclusive stepped: {start..step...end}
-pub fn parse_range<'a>(input: &str) -> Option<Box<Iterator<Item = small::String> + 'a>> {
+pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
     let mut read = 0;
     let mut bytes_iterator = input.bytes();
     while let Some(byte) = bytes_iterator.next() {
@@ -224,7 +225,7 @@ pub fn parse_range<'a>(input: &str) -> Option<Box<Iterator<Item = small::String>
                 if let Some(b) = bytes_iterator.next() {
                     read += 1;
                     match b {
-                        b'.' => {
+                        b'.' | b'=' => {
                             // this can only be an inclusive range
                             finish!(true, read);
                         }
@@ -285,7 +286,10 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                 let first = &input[..id];
 
                 let mut dots = 1;
-                while let Some((_, byte)) = bytes_iterator.next() {
+                let mut last_byte = 0;
+
+                for (_, byte) in bytes_iterator {
+                    last_byte = byte;
                     if byte == b'.' {
                         dots += 1
                     } else {
@@ -293,41 +297,34 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                     }
                 }
 
-                let inclusive = match dots {
-                    2 => false,
-                    3 => true,
-                    _ => break,
-                };
+                if dots < 2 || dots > 3 {
+                    break;
+                }
 
-                let end = &input[id + dots..];
+                let inclusive = dots == 3
+                    || (dots == 2 && last_byte == b'=');
+
+                let end = &input[id + if inclusive { 3 } else { 2 }..];
 
                 if first.is_empty() {
                     return if end.is_empty() {
                         None
                     } else {
-                        match end.parse::<isize>() {
-                            Ok(end) => Some(Range::to(Index::new(end))),
-                            Err(_) => None,
-                        }
+                        end.parse::<isize>().map(|end| Range::to(Index::new(end))).ok()
                     };
                 } else if end.is_empty() {
-                    return match first.parse::<isize>() {
-                        Ok(start) => Some(Range::from(Index::new(start))),
-                        Err(_) => None,
-                    };
+                    return first.parse::<isize>()
+                        .map(|start| Range::from(Index::new(start))).ok();
                 }
 
-                if let Ok(start) = first.parse::<isize>() {
-                    if let Ok(end) = end.parse::<isize>() {
-                        return Some(if inclusive {
-                            Range::inclusive(Index::new(start), Index::new(end))
-                        } else {
-                            Range::exclusive(Index::new(start), Index::new(end))
-                        });
-                    }
-                } else {
-                    break;
-                }
+                return first.parse::<isize>()
+                    .and_then(|start| end.parse::<isize>().map(|end| (start, end)))
+                    .map(|(start, end)| if inclusive {
+                        Range::inclusive(Index::new(start), Index::new(end))
+                    } else {
+                        Range::exclusive(Index::new(start), Index::new(end))
+                    })
+                    .ok();
             }
             _ => break,
         }
