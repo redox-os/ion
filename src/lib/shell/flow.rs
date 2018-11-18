@@ -1,3 +1,4 @@
+use itertools::{Chunk, Itertools};
 use super::{
     flags::*,
     flow_control::{insert_statement, Case, ElseIf, Function, Statement},
@@ -50,7 +51,7 @@ pub(crate) trait FlowLogic {
     /// specified in the range.
     fn execute_for(
         &mut self,
-        variable: &str,
+        variables: &[types::Str],
         values: &[small::String],
         statements: Vec<Statement>,
     ) -> Condition;
@@ -112,34 +113,36 @@ impl FlowLogic for Shell {
 
     fn execute_for(
         &mut self,
-        variable: &str,
+        variables: &[types::Str],
         values: &[small::String],
         statements: Vec<Statement>,
     ) -> Condition {
-        let ignore_variable = variable == "_";
-        match ForValueExpression::new(values, self) {
-            ForValueExpression::Multiple(ref mut values) if ignore_variable => for _ in values.iter() {
+        macro_rules! set_vars_then_exec {
+            ($chunk:expr, $def:expr) => (
+                for (key, value) in variables.iter().zip($chunk.chain(::std::iter::repeat($def))) {
+                    if key != "_" {
+                        self.set(key, value.clone());
+                    }
+                }
+
                 handle_signal!(self.execute_statements(statements.clone()));
-            },
-            ForValueExpression::Multiple(values) => for value in &values {
-                self.set(variable, value.clone());
-                handle_signal!(self.execute_statements(statements.clone()));
-            },
-            ForValueExpression::Normal(ref mut values) if ignore_variable => for _ in values.lines() {
-                handle_signal!(self.execute_statements(statements.clone()));
-            },
-            ForValueExpression::Normal(values) => for value in values.lines() {
-                self.set(variable, value);
-                handle_signal!(self.execute_statements(statements.clone()));
-            },
-            ForValueExpression::Range(ref mut range) if ignore_variable => for _ in range {
-                handle_signal!(self.execute_statements(statements.clone()));
-            },
-            ForValueExpression::Range(ref mut range) => for value in range {
-                self.set(variable, value.clone());
-                handle_signal!(self.execute_statements(statements.clone()));
-            },
+            )
         }
+
+        let default = ::small::String::new();
+
+        match ForValueExpression::new(values, self) {
+            ForValueExpression::Multiple(values) => for chunk in &values.iter().chunks(variables.len()) {
+                set_vars_then_exec!(chunk, &default);
+            },
+            ForValueExpression::Normal(values) => for chunk in &values.lines().chunks(variables.len()) {
+                set_vars_then_exec!(chunk, "");
+            },
+            ForValueExpression::Range(range) => for chunk in &range.chunks(variables.len()) {
+                set_vars_then_exec!(chunk, default.clone());
+            },
+        };
+
         Condition::NoOp
     }
 
@@ -191,11 +194,11 @@ impl FlowLogic for Shell {
                 }
             }
             Statement::For {
-                variable,
+                variables,
                 values,
                 statements,
             } => {
-                if let Condition::SigInt = self.execute_for(&variable, &values, statements) {
+                if let Condition::SigInt = self.execute_for(&variables, &values, statements) {
                     return Condition::SigInt;
                 }
             }
