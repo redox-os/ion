@@ -1,5 +1,5 @@
 [package]
-name = "ion_ranges"
+name = "ion-ranges"
 version = "0.1.0"
 authors = ["Michael Murphy <mmstickman@gmail.com>"]
 

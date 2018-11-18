@@ -3,7 +3,7 @@ fn fib n
         echo $n
     else
         let output previous = 1 1
-        for _ in 2..$n
+        for _ in 2..=$n
             let temp = $output
             let output += $previous
             let previous = $temp
@@ -12,6 +12,6 @@ fn fib n
     end
 end
 
-for i in 1..200
+for i in 1..=200
     fib $i
 end

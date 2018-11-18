@@ -7,7 +7,7 @@ mod statement;
 
 pub use self::quotes::Terminator;
 pub(crate) use self::{
-    loops::ForExpression,
+    loops::ForValueExpression,
     shell_expand::{expand_string, Expander, Select},
     statement::{parse_and_validate, StatementSplitter},
 };

@@ -9,12 +9,22 @@ use parser::{
     assignments::is_array,
     expand_string, parse_and_validate,
     pipelines::{PipeItem, Pipeline},
-    ForExpression, StatementSplitter,
+    ForValueExpression, StatementSplitter,
 };
 use shell::{assignments::VariableStore, variables::VariableType};
 use small;
 use std::io::{stdout, Write};
 use types;
+
+macro_rules! handle_signal {
+    ($signal:expr) => (
+        match $signal {
+            Condition::Break => break,
+            Condition::SigInt => return Condition::SigInt,
+            _ => (),
+        }
+    )
+}
 
 #[derive(Debug)]
 pub(crate) enum Condition {
@@ -107,51 +117,27 @@ impl FlowLogic for Shell {
         statements: Vec<Statement>,
     ) -> Condition {
         let ignore_variable = variable == "_";
-        match ForExpression::new(values, self) {
-            ForExpression::Multiple(ref values) if ignore_variable => for _ in values.iter() {
-                match self.execute_statements(statements.clone()) {
-                    Condition::Break => break,
-                    Condition::SigInt => return Condition::SigInt,
-                    _ => (),
-                }
+        match ForValueExpression::new(values, self) {
+            ForValueExpression::Multiple(ref mut values) if ignore_variable => for _ in values.iter() {
+                handle_signal!(self.execute_statements(statements.clone()));
             },
-            ForExpression::Multiple(values) => for value in &values {
+            ForValueExpression::Multiple(values) => for value in &values {
                 self.set(variable, value.clone());
-                match self.execute_statements(statements.clone()) {
-                    Condition::Break => break,
-                    Condition::SigInt => return Condition::SigInt,
-                    _ => (),
-                }
+                handle_signal!(self.execute_statements(statements.clone()));
             },
-            ForExpression::Normal(ref values) if ignore_variable => for _ in values.lines() {
-                match self.execute_statements(statements.clone()) {
-                    Condition::Break => break,
-                    Condition::SigInt => return Condition::SigInt,
-                    _ => (),
-                }
+            ForValueExpression::Normal(ref mut values) if ignore_variable => for _ in values.lines() {
+                handle_signal!(self.execute_statements(statements.clone()));
             },
-            ForExpression::Normal(values) => for value in values.lines() {
+            ForValueExpression::Normal(values) => for value in values.lines() {
                 self.set(variable, value);
-                match self.execute_statements(statements.clone()) {
-                    Condition::Break => break,
-                    Condition::SigInt => return Condition::SigInt,
-                    _ => (),
-                }
+                handle_signal!(self.execute_statements(statements.clone()));
             },
-            ForExpression::Range(start, end) if ignore_variable => for _ in start..end {
-                match self.execute_statements(statements.clone()) {
-                    Condition::Break => break,
-                    Condition::SigInt => return Condition::SigInt,
-                    _ => (),
-                }
+            ForValueExpression::Range(ref mut range) if ignore_variable => for _ in range {
+                handle_signal!(self.execute_statements(statements.clone()));
             },
-            ForExpression::Range(start, end) => for value in (start..end).map(|x| x.to_string()) {
+            ForValueExpression::Range(ref mut range) => for value in range {
                 self.set(variable, value.clone());
-                match self.execute_statements(statements.clone()) {
-                    Condition::Break => break,
-                    Condition::SigInt => return Condition::SigInt,
-                    _ => (),
-                }
+                handle_signal!(self.execute_statements(statements.clone()));
             },
         }
         Condition::NoOp
