@@ -81,7 +81,7 @@ pub(crate) enum Statement {
         statements:  Vec<Statement>,
     },
     For {
-        variable:   types::Str,
+        variables:  SmallVec<[types::Str; 4]>,
         values:     Vec<small::String>,
         statements: Vec<Statement>,
     },

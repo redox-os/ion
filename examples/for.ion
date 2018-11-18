@@ -22,6 +22,10 @@ for i in 1{A{1,2},B{1,2}}
     echo $i
 end
 
+for x y z in 1..=10
+    echo $x, $y, $z
+end
+
 mkdir for_test
 cd for_test
 touch "a b c"

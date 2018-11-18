@@ -113,28 +113,37 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         _ if cmd.starts_with("for ") => {
             let mut cmd = cmd[4..].trim_left();
-            let pos = match cmd.find(char::is_whitespace) {
-                Some(pos) => pos,
-                None => {
-                    eprintln!("ion: syntax error: incorrect for loop syntax");
-                    return Statement::Error(FAILURE);
+            let mut variables = None;
+
+            if cmd.len() > 5 {
+                let mut cmdb = cmd.as_bytes();
+                for start in 0..cmd.len() - 4 {
+                    if &cmdb[start..start+4] == b" in " {
+                        variables = Some(
+                            cmd[..start].split_whitespace()
+                                .map(Into::into)
+                                .collect()
+                        );
+
+                        cmd = cmd[start + 3..].trim();
+
+                        break
+                    }
                 }
-            };
-
-            let variable = &cmd[..pos];
-            cmd = &cmd[pos..].trim_left();
-
-            if !cmd.starts_with("in ") {
-                eprintln!("ion: syntax error: incorrect for loop syntax");
-                return Statement::Error(FAILURE);
             }
 
-            return Statement::For {
-                variable:   variable.into(),
-                values:     ArgumentSplitter::new(cmd[3..].trim_left())
-                    .map(small::String::from)
-                    .collect(),
-                statements: Vec::new(),
+            return match variables {
+                Some(variables) => Statement::For {
+                    variables,
+                    values:     ArgumentSplitter::new(cmd)
+                        .map(small::String::from)
+                        .collect(),
+                    statements: Vec::new(),
+                },
+                None => {
+                    eprintln!("ion: syntax error: for loop lacks the `in` keyword");
+                    Statement::Error(FAILURE)
+                }
             };
         }
         _ if cmd.starts_with("case ") => {
@@ -230,6 +239,27 @@ mod tests {
     use super::*;
     use lexers::assignments::{KeyBuf, Primitive};
     use shell::{flow_control::Statement, Job, JobKind};
+
+    #[test]
+    fn parsing_for() {
+        assert_eq!(
+            parse("for x y z in 1..=10"),
+            Statement::For {
+                variables: vec!["x", "y", "z"].into_iter().map(Into::into).collect(),
+                values: vec!["1..=10"].into_iter().map(Into::into).collect(),
+                statements: Vec::new()
+            }
+        );
+
+        assert_eq!(
+            parse("for  x  in  {1..=10} {1..=10}"),
+            Statement::For {
+                variables: vec!["x"].into_iter().map(Into::into).collect(),
+                values: vec!["{1..=10}", "{1..=10}"].into_iter().map(Into::into).collect(),
+                statements: Vec::new()
+            }
+        );
+    }
 
     #[test]
     fn parsing_ifs() {

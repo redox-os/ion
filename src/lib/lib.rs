@@ -9,6 +9,7 @@ extern crate failure;
 extern crate failure_derive;
 extern crate glob;
 extern crate hashbrown;
+extern crate itertools;
 extern crate itoa;
 #[macro_use]
 extern crate lazy_static;
