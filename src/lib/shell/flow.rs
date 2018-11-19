@@ -1,4 +1,4 @@
-use itertools::{Chunk, Itertools};
+use itertools::Itertools;
 use super::{
     flags::*,
     flow_control::{insert_statement, Case, ElseIf, Function, Statement},

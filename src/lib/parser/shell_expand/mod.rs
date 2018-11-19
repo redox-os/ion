@@ -23,16 +23,25 @@ pub(crate) fn is_expression(s: &str) -> bool {
         || s.starts_with('\'')
 }
 
+pub type MapKeyIter<'a> = Box<dyn Iterator<Item = &'a types::Str> + 'a>;
+pub type MapValueIter<'a> = Box<dyn Iterator<Item = types::Str> + 'a>;
+
+// TODO: Make array expansions iterators instead of arrays.
+// TODO: Use Cow<'a, types::Str> for hashmap values.
 /// Trait representing different elements of string expansion
 pub(crate) trait Expander {
-    /// Expand a tilde form to the correct directory
+    /// Expand a tilde form to the correct directory.
     fn tilde(&self, &str) -> Option<String> { None }
-    /// Expand an array variable with some selection
+    /// Expand an array variable with some selection.
     fn array(&self, &str, Select) -> Option<types::Array> { None }
-    /// Expand a string variable given if its quoted / unquoted
+    /// Expand a string variable given if it's quoted / unquoted
     fn string(&self, &str, bool) -> Option<types::Str> { None }
-    /// Expand a subshell expression
+    /// Expand a subshell expression.
     fn command(&self, &str) -> Option<types::Str> { None }
+    /// Iterating upon key-value maps.
+    fn map_keys<'a>(&'a self, &str, Select) -> Option<MapKeyIter> { None }
+    /// Iterating upon key-value maps.
+    fn map_values<'a>(&'a self, &str, Select) -> Option<MapValueIter> { None }
 }
 
 fn expand_process<E: Expander>(

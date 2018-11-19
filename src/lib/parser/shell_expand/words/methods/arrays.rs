@@ -50,6 +50,18 @@ impl<'a> ArrayMethod<'a> {
             .select(self.selection.clone(), len))
     }
 
+    fn map_keys<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Array, &'static str> {
+        expand_func.map_keys(self.variable, self.selection.clone())
+            .ok_or("no map found")
+            .map(|x| x.cloned().collect())
+    }
+
+    fn map_values<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Array, &'static str> {
+        expand_func.map_values(self.variable, self.selection.clone())
+            .ok_or("no map found")
+            .map(|x| x.collect())
+    }
+
     fn graphemes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
         let graphemes: Vec<types::Str> = UnicodeSegmentation::graphemes(variable.as_str(), true)
@@ -174,13 +186,15 @@ impl<'a> ArrayMethod<'a> {
 
     pub(crate) fn handle_as_array<E: Expander>(&self, expand_func: &E) -> Array {
         let res = match self.method {
-            "split" => self.split(expand_func),
-            "split_at" => self.split_at(expand_func),
-            "graphemes" => self.graphemes(expand_func),
             "bytes" => self.bytes(expand_func),
             "chars" => self.chars(expand_func),
+            "graphemes" => self.graphemes(expand_func),
+            "keys" => self.map_keys(expand_func),
             "lines" => self.lines(expand_func),
             "reverse" => self.reverse(expand_func),
+            "split_at" => self.split_at(expand_func),
+            "split" => self.split(expand_func),
+            "values" => self.map_values(expand_func),
             _ => Err("invalid array method"),
         };
 

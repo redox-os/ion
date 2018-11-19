@@ -44,7 +44,7 @@ use self::{
 };
 use builtins::{BuiltinMap, BUILTINS};
 use liner::Context;
-use parser::{pipelines::Pipeline, Expander, Select, Terminator};
+use parser::{pipelines::Pipeline, Expander, MapKeyIter, MapValueIter, Select, Terminator};
 use std::{
     fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
     sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
@@ -471,7 +471,8 @@ impl<'a> Expander for Shell {
             match selection {
                 Select::All => {
                     let mut array = types::Array::new();
-                    for (_, value) in hmap.iter() {
+                    for (key, value) in hmap.iter() {
+                        array.push(key.clone());
                         let f = format!("{}", value);
                         match *value {
                             VariableType::Str(_) => array.push(f.into()),
@@ -499,7 +500,8 @@ impl<'a> Expander for Shell {
             match selection {
                 Select::All => {
                     let mut array = types::Array::new();
-                    for (_, value) in bmap.iter() {
+                    for (key, value) in bmap.iter() {
+                        array.push(key.clone());
                         let f = format!("{}", value);
                         match *value {
                             VariableType::Str(_) => array.push(f.into()),
@@ -524,6 +526,62 @@ impl<'a> Expander for Shell {
                 _ => (),
             }
         }
+        None
+    }
+
+    fn map_keys<'b>(&'b self, name: &str, select: Select) -> Option<MapKeyIter<'b>> {
+        let nvalues;
+        let map: Box<dyn Iterator<Item = &'b types::Str>> =
+            match self.variables.get_ref(name) {
+                Some(&VariableType::HashMap(ref map)) => {
+                    nvalues = map.len();
+                    Box::new(map.keys())
+                }
+                Some(&VariableType::BTreeMap(ref map)) => {
+                    nvalues = map.len();
+                    Box::new(map.keys())
+                }
+                _ => return None
+            };
+
+        match select {
+            Select::All => return Some(map),
+            Select::Range(range) => if let Some((start, length)) = range.bounds(nvalues) {
+                if nvalues > start {
+                    return Some(Box::new(map.skip(start).take(length)));
+                }
+            },
+            _ => ()
+        }
+
+        None
+    }
+
+    fn map_values<'b>(&'b self, name: &str, select: Select) -> Option<MapValueIter<'b>> {
+        let nvalues;
+        let map: Box<dyn Iterator<Item = types::Str>> =
+            match self.variables.get_ref(name) {
+                Some(&VariableType::HashMap(ref map)) => {
+                    nvalues = map.len();
+                    Box::new(map.values().map(|x| format!("{}", x).into()))
+                }
+                Some(&VariableType::BTreeMap(ref map)) => {
+                    nvalues = map.len();
+                    Box::new(map.values().map(|x| format!("{}", x).into()))
+                }
+                _ => return None
+            };
+
+        match select {
+            Select::All => return Some(map),
+            Select::Range(range) => if let Some((start, length)) = range.bounds(nvalues) {
+                if nvalues > start {
+                    return Some(Box::new(map.skip(start).take(length)));
+                }
+            },
+            _ => ()
+        }
+
         None
     }
 
