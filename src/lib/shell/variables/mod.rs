@@ -315,27 +315,35 @@ impl Variables {
     }
 
     pub fn get_ref(&self, mut name: &str) -> Option<&VariableType> {
-        let mut up_namespace: isize = 0;
-        if name.starts_with("global::") {
-            name = &name["global::".len()..];
+        const GLOBAL_NS: &str = "global::";
+        const SUPER_NS: &str = "super::";
+
+        let mut up_namespace: isize = if name.starts_with(GLOBAL_NS) {
+            name = &name[GLOBAL_NS.len()..];
             // Go up as many namespaces as possible
-            up_namespace = self.scopes().filter(|scope| scope.namespace).count() as isize;
+            self.scopes().filter(|scope| scope.namespace).count() as isize
         } else {
-            while name.starts_with("super::") {
-                name = &name["super::".len()..];
-                up_namespace += 1;
+            let mut up = 0;
+            while name.starts_with(SUPER_NS) {
+                name = &name[SUPER_NS.len()..];
+                up += 1;
             }
-        }
+
+            up
+        };
+
         for scope in self.scopes() {
             match scope.get(name) {
                 val @ Some(VariableType::Function(_)) => return val,
                 val @ Some(_) if up_namespace == 0 => return val,
                 _ => (),
             }
+
             if scope.namespace {
                 up_namespace -= 1;
             }
         }
+
         None
     }
 
