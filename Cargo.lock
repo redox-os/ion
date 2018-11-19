@@ -267,7 +267,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "liner"
 version = "0.4.5"
-source = "git+https://gitlab.redox-os.org/redox-os/liner#0ccda02de3bbd71a0d77b8e8460e286284596eb8"
+source = "git+https://gitlab.redox-os.org/redox-os/liner#741f36fb656b878b0036f702f2aa9316647c8b2a"
 dependencies = [
  "bytecount 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "termion 1.5.1 (git+https://gitlab.redox-os.org/redox-os/termion)",
@@ -346,11 +346,16 @@ version = "0.1.40"
 source = "git+https://gitlab.redox-os.org/redox-os/syscall.git?branch=relibc#739aef47b8e6b300874945c3c33bb9550414b5b8"
 
 [[package]]
+name = "redox_syscall"
+version = "0.1.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "redox_termios"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "redox_syscall 0.1.40 (git+https://gitlab.redox-os.org/redox-os/syscall.git?branch=relibc)",
+ "redox_syscall 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -442,7 +447,7 @@ source = "git+https://gitlab.redox-os.org/redox-os/termion#ce6b43d071cd6edfc4b36
 dependencies = [
  "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "numtoa 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "redox_syscall 0.1.40 (git+https://gitlab.redox-os.org/redox-os/syscall.git?branch=relibc)",
+ "redox_syscall 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_termios 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -579,6 +584,7 @@ source = "git+https://github.com/whitequark/rust-xdg#090afef2509d746e48d6bfa9b2e
 "checksum rand_core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1961a422c4d189dfb50ffa9320bf1f2a9bd54ecb92792fb9477f99a1045f3372"
 "checksum rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "0905b6b7079ec73b314d4c748701f6931eb79fd97c668caa3f1899b22b32c6db"
 "checksum redox_syscall 0.1.40 (git+https://gitlab.redox-os.org/redox-os/syscall.git?branch=relibc)" = "<none>"
+"checksum redox_syscall 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)" = "cf8fb82a4d1c9b28f1c26c574a5b541f5ffb4315f6c9a791fa47b6a04438fe93"
 "checksum redox_termios 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7e891cfe48e9100a70a3b6eb652fef28920c117d366339687bd5576160db0f76"
 "checksum regex 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "ee84f70c8c08744ea9641a731c7fadb475bf2ecc52d7f627feb833e0b3990467"
 "checksum regex-syntax 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "fbc557aac2b708fe84121caf261346cc2eed71978024337e42eb46b8a252ac6e"
