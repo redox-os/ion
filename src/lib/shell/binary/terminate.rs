@@ -58,6 +58,7 @@ pub(crate) fn terminate_quotes(shell: &mut Shell, command: String) -> Result<Str
                 buffer.append(&command);
             }
         } else {
+            shell.flags ^= UNTERMINATED;
             return Err(());
         }
     }
