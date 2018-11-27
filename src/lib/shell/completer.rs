@@ -93,6 +93,9 @@ impl Completer for IonFileCompleter {
 
                 return completions;
             }
+        } else if start.starts_with("./") && unescape(start).split('/').count() == 2 {
+            // Special case for ./scripts, the globbing code removes the ./
+            return self.inner.completions(&start);
         }
 
         filename_completion(&start, |x| self.inner.completions(x)).collect()
@@ -121,9 +124,8 @@ where
     };
 
     for element in split_start.skip(skip) {
-        string.extend_from_slice(element.as_bytes());
-
         if element != ".." && element != "." {
+            string.extend_from_slice(element.as_bytes());
             string.extend_from_slice(b"*/");
         } else {
             string.extend_from_slice(element.as_bytes());
