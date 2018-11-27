@@ -1,51 +1,54 @@
 # Table of Contents
 
-- [Introduction](ch01-00-introduction.md)
+- [Introduction](introduction.md)
 
-- [Feature Overview](ch02-00-features.md)
+- [Feature Overview](features.md)
 
-- [Miscellaneous](ch03-00-miscellaneous.md)
+- [Miscellaneous](misc/index.md)
 
-    - [Implicit `cd`](ch03-01-implicitcd.md)
-    - [XDG App Directories](ch03-02-xdg.md)
-    - [Quoting Rules](ch03-03-quotation.md)
-    - [Multi-line Arguments](ch03-04-multiargs.md)
-    - [Multi-line Comments](ch03-05-multicomments.md)
-    - [Prompt Function](ch03-06-prompt_fn.md)
-    - [General Tips](ch03-07-general.md)
+    - [Implicit `cd`](misc/01-implicitcd.md)
+    - [XDG App Directories](misc/02-xdg.md)
+    - [Quoting Rules](misc/03-quotation.md)
+    - [Multi-line Arguments](misc/04-multiargs.md)
+    - [Multi-line Comments](misc/05-multicomments.md)
+    - [Prompt Function](misc/06-prompt_fn.md)
+    - [General Tips](misc/07-general.md)
 
-- [Variable Assignments](ch04-00-variables.md)
+- [Variables](variables/00-variables.md)
 
-    - [String Variables](ch04-01-strings.md)
-    - [Array Variables](ch04-02-arrays.md)
-    - [Arithmetic Variables](ch04-03-arithmetic.md)
-    - [Exporting Variables](ch04-04-exporting.md)
-    - [Scopes](ch04-05-scopes.md)
+    - [String Variables](variables/01-strings.md)
+    - [Array Variables](variables/02-arrays.md)
+    - [Map Variables](variables/03-maps.md)
+    - [Arithmetic Variables](variables/04-arithmetic.md)
+    - [Exporting Variables](variables/05-exporting.md)
+    - [Scopes](variables/06-scopes.md)
 
-- [Expansions](ch05-00-expansions.md)
+- [Expansions](expansions/00-expansions.md)
 
-    - [Variable Expansions](ch05-01-variable.md)
-    - [Process Expansions](ch05-02-process.md)
-    - [Brace Expansions](ch05-03-brace.md)
-    - [Arithmetic Expansions](ch05-04-arithmetic.md)
-    - [Method Expansions](ch05-05-method.md)
+    - [Variable Expansions](expansions/01-variable.md)
+    - [Process Expansions](expansions/02-process.md)
+    - [Brace Expansions](expansions/03-brace.md)
+    - [Arithmetic Expansions](expansions/04-arithmetic.md)
+    - [Method Expansions](expansions/05-method.md)
 
-- [Slicing Syntax](ch06-00-slicing.md)
+- [Slicing Syntax](slicing.md)
 
-- [Control Flow](ch07-00-flow.md)
+- [Control Flow](control/00-flow.md)
 
-    - [Conditionals](ch07-01-conditionals.md)
-    - [Loops](ch07-02-loops.md)
-    - [Matches](ch07-03-matches.md)
+    - [Conditionals](control/01-conditionals.md)
+    - [Loops](control/02-loops.md)
+    - [Matches](control/03-matches.md)
 
-- [Functions](ch08-00-functions)
+- [Pipelines & Redirection](pipelines.md)
 
-- [Script Executions](ch09-00-scripts.md)
+- [Functions](functions.md)
 
-- [Signal Handling](ch10-00-signals.md)
+- [Script Executions](scripts.md)
 
-- [Job Control](ch11-00-jobs.md)
+- [Signal Handling](signals.md)
 
-- [Builtin Commands](ch12-00-builtins.md)
+- [Job Control](jobs.md)
 
-- [Command History](ch13-00-history.md)
+- [Builtin Commands](builtins.md)
+
+- [Command History](history.md)

@@ -48,7 +48,23 @@ ion: function argument has invalid type: expected int, found value 'a'
 
 You can use any of the [supported types](ch04-00-variables.md#Supported Types).
 
+## Multiple arguments
+
+As another example:
+
+```
+fn hello name age:int hobbies[]
+    echo $name ($age) has the following hobbies:
+    for hobby in @hobbies
+        echo "  $hobby"
+    end
+end
+
+hello John 25 [ coding eating sleeping ]
+```
+
 ## Function piping
+
 
 As with any other statement, you can pipe functions using `read`.
 
