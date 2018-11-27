@@ -16,10 +16,57 @@ is equivalent to invoking the `$join(array)` method.
 
 **NOTE**: Brace expansions also create arrays.
 
-```ion
+## Create a new array
+
+Arguments enclosed within brackets are treated as elements within an array.
+
+```sh
 let array = [ one two 'three four' ]
+```
+
+## Indexing into an array
+
+Values can be fetched from an array via their position in the array as the index.
+
+```
+let array = [ 1 2 3 4 5 6 7 8 9 10 ]
+echo @array[0]
+echo @array[5..=8]
+```
+
+## Copy array into a new array
+
+Passing an array within brackets enables performing a deep copy of that array.
+
+```sh
 let array_copy = [ @array ]
+```
+
+## Array join
+
+This will join each element of the array into a string, adding spaces between each element.
+
+```sh
+let array = [ hello world ]
 let as_string = @array
+```
+
+## Array concatenation
+
+The `++=` and `::=` operators can be used to efficient concatenate an array in-place.
+
+```sh
+let array = [1 2 3]
+let array ++= [5 6 7]
+let array ::= 0
+```
+
+## Expand array as arguments to a command
+
+Arrays are useful to pass as arguments to a command. Each element will be expanded as an
+individual argument, if any arguments exist.
+
+```sh
 let args = [-l -a --color]
 ls @args
 ```

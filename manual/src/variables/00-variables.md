@@ -1,4 +1,4 @@
-# Variable Assignments
+# Variables
 
 The `let` builtin is used to create local variables within the shell, and apply basic arithmetic
 to variables. The `export` keyword may be used to do the same for the creation of external
@@ -77,3 +77,5 @@ two three
 - int[]
 - str
 - str[]
+- hmap[]
+- bmap[]

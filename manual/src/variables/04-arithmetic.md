@@ -8,7 +8,7 @@ Operators currently supported are:
 - [x] Subtract (**-**)
 - [x] Multiply (**\***)
 - [x] Divide (**/**)
-- [ ] Integer Divide (**//**)
+- [x] Integer Divide (**//**)
 - [ ] Modulus (**%**)
 - [x] Powers  (**\*\***)
 
@@ -22,6 +22,8 @@ let value = 0
 let value += 5
 let value -= 2
 let value *= 3
+let value //= 2
+let value **= 10
 let value /= 2
 ```
 

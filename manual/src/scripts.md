@@ -2,7 +2,7 @@
 
 Scripts can be created by designating Ion as the interpreter in the shebang line.
 
-```ion
+```sh
 #!/usr/bin/env ion
 ```
 
@@ -11,7 +11,7 @@ shell by providing the path of the script to Ion as the argument, along with any
 arguments that the script may want to parse. Arguments can be accessed from the **@args** array,
 where the first element in the array is the name of the script being executed.
 
-```ion
+```sh
 #!/usr/bin/env ion
 
 if test $len(@args) -eq 1
