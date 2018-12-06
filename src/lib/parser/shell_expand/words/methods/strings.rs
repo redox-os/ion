@@ -932,16 +932,16 @@ mod test {
         assert_eq!(&*output, "baz");
     }
 
-    // #[test] //This one fails, but it ain't my fault, so I'm comenting out the test for now
-    // fn test_or_no_pattern() {
-    // let mut output = small::String::new();
-    // let method = StringMethod {
-    // method:    "or",
-    // variable:  "$FOO",
-    // pattern:   "\"\"",
-    // selection: Select::All,
-    // };
-    // method.handle(&mut output, &VariableExpander);
-    // assert_eq!(&*output, "FOOBAR");
-    // }
+    #[test]
+    fn test_or_no_pattern() {
+        let mut output = small::String::new();
+        let method = StringMethod {
+            method:    "or",
+            variable:  "$FOO",
+            pattern:   "\"\"",
+            selection: Select::All,
+        };
+        method.handle(&mut output, &VariableExpander);
+        assert_eq!(&*output, "FOOBAR");
+    }
 }
