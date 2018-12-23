@@ -209,7 +209,16 @@ pub(crate) fn parse(code: &str) -> Statement {
             }
         }
         _ if cmd.starts_with("time ") => {
-            return Statement::Time(Box::new(parse(cmd[4..].trim_left())))
+            // Ignore embedded time calls
+            let mut timed = cmd[4..].trim_left();
+            loop {
+                if timed.starts_with("time ") {
+                    timed = timed[4..].trim_left();
+                    continue;
+                }
+                break;
+            }
+            return Statement::Time(Box::new(parse(timed)))
         }
         _ if cmd.eq("time") => return Statement::Time(Box::new(Statement::Default)),
         _ if cmd.starts_with("and ") => {

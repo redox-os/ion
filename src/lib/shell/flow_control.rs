@@ -131,6 +131,19 @@ impl Statement {
             Statement::Default => "Default",
         }
     }
+    pub fn is_block(&self) -> bool {
+        match *self {
+            Statement::Case(_)
+            | Statement::If { .. }
+            | Statement::ElseIf(_)
+            | Statement::Function { .. }
+            | Statement::For { .. }
+            | Statement::While { .. }
+            | Statement::Match { .. }
+            | Statement::Else => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -252,6 +265,13 @@ pub(crate) fn insert_statement(
                 insert_into_block(&mut flow_control.block, statement)?;
             }
         }
+        Statement::Time(inner) => {
+            if inner.is_block() {
+                flow_control.block.push(Statement::Time(inner));
+            } else {
+                return Ok(Some(Statement::Time(inner)))
+            }
+        }
         _ => if ! flow_control.block.is_empty() {
             insert_into_block(&mut flow_control.block, statement)?;
         } else {
@@ -274,7 +294,12 @@ pub(crate) fn insert_statement(
 
 fn insert_into_block(block: &mut Vec<Statement>, statement: Statement) -> Result<(), &'static str> {
     if let Some(top_block) = block.last_mut() {
-        match top_block {
+        let block = match top_block {
+            Statement::Time(inner) => inner,
+            _ => top_block,
+        };
+
+        match block {
             Statement::Function {
                 ref mut statements, ..
             } => statements.push(statement),
