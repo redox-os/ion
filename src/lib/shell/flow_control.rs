@@ -266,11 +266,10 @@ pub(crate) fn insert_statement(
             }
         }
         Statement::Time(inner) => {
-            match *inner {
-                _ if inner.is_block() => {
-                    flow_control.block.push(Statement::Time(inner));
-                }
-                _ => return Ok(Some(Statement::Time(inner))),
+            if inner.is_block() {
+                flow_control.block.push(Statement::Time(inner));
+            } else {
+                return Ok(Some(Statement::Time(inner)))
             }
         }
         _ => if ! flow_control.block.is_empty() {
