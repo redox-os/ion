@@ -1,4 +1,6 @@
 extern crate libc;
+#[cfg(target_os = "dragonfly")]
+extern crate errno_dragonfly;
 
 pub mod signals;
 
@@ -57,7 +59,7 @@ fn errno() -> i32 { unsafe { *libc::__errno() } }
 fn errno() -> i32 { unsafe { *libc::__error() } }
 
 #[cfg(target_os = "dragonfly")]
-fn errno() -> i32 { unsafe { *libc::__dfly_error() } }
+fn errno() -> i32 { unsafe { *errno_dragonfly::errno_location()} }
 
 pub fn strerror(errno: i32) -> &'static str {
     unsafe {
