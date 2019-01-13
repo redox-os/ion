@@ -25,12 +25,12 @@ expressions as their arguments -- both for the input parameter, and any supplied
 control the behavior of the method.
 
 ```ion
-echo $method($(cmd...), arg)
+echo $method($(cmd...) arg)
 
 let string_var = "value in variable"
 echo $method(string_var)
 
-echo $method("actual value", arg)
+echo $method("actual value" arg)
 ```
 
 ## Overloaded Methods
@@ -55,7 +55,7 @@ is space-delimited.
 
 ```ion
 for elem in @split("some space-delimited values"); echo $elem; end
-for elem in @split("some, comma-separated, values", ", "); echo $elem; end
+for elem in @split("some, comma-separated, values" ", "); echo $elem; end
 ```
 
 ## String Methods
@@ -91,8 +91,8 @@ ends with it. Zero otherwise.
 #### Examples
 
 ```ion
-echo $ends_with("FOOBAR", "BAR")
-echo $ends_with("FOOBAR", "FOO")
+echo $ends_with("FOOBAR" "BAR")
+echo $ends_with("FOOBAR" "FOO")
 ```
 
 #### Output
@@ -110,8 +110,8 @@ contains with it. Zero otherwise.
 #### Examples
 
 ```ion
-echo $contains("FOOBAR", "OOB")
-echo $contains("FOOBAR", "foo")
+echo $contains("FOOBAR" "OOB")
+echo $contains("FOOBAR" "foo")
 ```
 
 #### Output
@@ -129,8 +129,8 @@ starts with it. Zero otherwise.
 #### Examples
 
 ```ion
-echo $starts_with("FOOBAR", "FOO")
-echo $starts_with("FOOBAR", "BAR")
+echo $starts_with("FOOBAR" "FOO")
+echo $starts_with("FOOBAR" "BAR")
 ```
 
 #### Output
@@ -202,7 +202,7 @@ be joined by a single space. Otherwise, each element will be joined with a given
 ```ion
 let array = [1 2 3 4 5]
 echo $join(array)
-echo $join(array, ", ")
+echo $join(array ", ")
 ```
 
 #### Output
@@ -220,8 +220,8 @@ string appears. It returns `-1` if it isn't contained.
 #### Examples
 
 ```ion
-echo $find("FOOBAR", "OB")
-echo $find("FOOBAR", "ob")
+echo $find("FOOBAR" "OB")
+echo $find("FOOBAR" "ob")
 ```
 
 #### Output
@@ -297,13 +297,13 @@ amount of times, where N is the supplied number.
 #### Examples
 
 ```ion
-echo $repeat("abc, ", 3)
+echo $repeat("abc, " 3)
 ```
 
 #### Output
 
 ```
-abc, abc, abc
+abc, abc, abc, 
 ```
 
 ### replace
@@ -316,7 +316,7 @@ with, a new string will be returned with all matches replaced.
 ```ion
 let input = "one two one two"
 echo $replace(input, one 1)
-echo $replace($replace(input, one 1), two 2)
+echo $replace($replace(input one 1) two 2)
 ```
 
 #### Output
@@ -335,8 +335,8 @@ of matches.
 
 ```ion
 let input = "one two one two"
-echo $replacen(input, "one" "three" 1)
-echo $replacen(input, "two" "three" 2)
+echo $replacen(input "one" "three" 1)
+echo $replacen(input "two" "three" 2)
 ```
 
 #### Output
@@ -354,8 +354,8 @@ as a regex.
 #### Examples
 
 ```ion
-echo $regex_replace("FOOBAR", "^F" "f")
-echo $regex_replace("FOOBAR", "^f" "F")
+echo $regex_replace("FOOBAR" "^F" "f")
+echo $regex_replace("FOOBAR" "^f" "F")
 ```
 
 #### Output
@@ -492,7 +492,7 @@ whitespace characters. Useful for splitting simple tabular data.
 #### Examples
 
 ```ion
-for data in @split("person, age, some data", ", ")
+for data in @split("person, age, some data" ", ")
     echo $data
 end
 
@@ -519,10 +519,10 @@ Defaults to string variables. The supplied string will be split in two pieces, f
 #### Examples
 
 ```
-echo @split_at("FOOBAR", "3")
+echo @split_at("FOOBAR" "3")
 echo @split_at("FOOBAR")
-echo @split_at("FOOBAR", "-1")
-echo @split_at("FOOBAR", "8")
+echo @split_at("FOOBAR" "-1")
+echo @split_at("FOOBAR" "8")
 ```
 
 #### Output
