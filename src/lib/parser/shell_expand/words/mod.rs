@@ -359,7 +359,12 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     let mut depth = 0;
                     while let Some(character) = iterator.next() {
                         match character {
-                            b',' if depth == 0 => {
+                            b'\'' => self.flags ^= Flags::SQUOTE,
+                            b'"' => self.flags ^= Flags::DQUOTE,
+                            b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth += 1,
+                            b']' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth -= 1,
+                            b' ' if depth == 0
+                                && !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                                 let variable = &self.data[start..self.read];
                                 self.read += 1;
                                 start = self.read;
@@ -486,7 +491,12 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     let mut depth = 0;
                     while let Some(character) = iterator.next() {
                         match character {
-                            b',' if depth == 0 => {
+                            b'\'' => self.flags ^= Flags::SQUOTE,
+                            b'"' => self.flags ^= Flags::DQUOTE,
+                            b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth += 1,
+                            b']' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth -= 1,
+                            b' ' if depth == 0
+                                && !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                                 let variable = &self.data[start..self.read];
                                 self.read += 1;
                                 start = self.read;

@@ -17,7 +17,7 @@ fn compare(input: &str, expected: Vec<WordToken>) {
 
 #[test]
 fn string_method() {
-    let input = "$join(array, 'pattern') $join(array, 'pattern')";
+    let input = "$join(array 'pattern') $join(array 'pattern')";
     let expected = vec![
         WordToken::StringMethod(StringMethod {
             method:    "join",
