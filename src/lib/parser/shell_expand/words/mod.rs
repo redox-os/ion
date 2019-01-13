@@ -24,6 +24,14 @@ bitflags! {
     }
 }
 
+impl Flags {
+    pub(crate) fn new() -> Self {
+        Flags {
+            bits: 0,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum WordToken<'a> {
     /// Represents a normal string who may contain a globbing character
@@ -348,6 +356,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     where
         I: Iterator<Item = u8>,
     {
+        let mut method_flags = Flags::new();
         let mut start = self.read;
         self.read += 1;
         while let Some(character) = iterator.next() {
@@ -359,12 +368,12 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     let mut depth = 0;
                     while let Some(character) = iterator.next() {
                         match character {
-                            b'\'' => self.flags ^= Flags::SQUOTE,
-                            b'"' => self.flags ^= Flags::DQUOTE,
-                            b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth += 1,
-                            b']' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth -= 1,
+                            b'\'' => method_flags ^= Flags::SQUOTE,
+                            b'"' => method_flags ^= Flags::DQUOTE,
+                            b'[' if !method_flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth += 1,
+                            b']' if !method_flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth -= 1,
                             b' ' if depth == 0
-                                && !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
+                                && !method_flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                                 let variable = &self.data[start..self.read];
                                 self.read += 1;
                                 start = self.read;
@@ -480,6 +489,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     where
         I: Iterator<Item = u8>,
     {
+        let mut method_flags = Flags::new();
         let mut start = self.read;
         self.read += 1;
         while let Some(character) = iterator.next() {
@@ -491,12 +501,12 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     let mut depth = 0;
                     while let Some(character) = iterator.next() {
                         match character {
-                            b'\'' => self.flags ^= Flags::SQUOTE,
-                            b'"' => self.flags ^= Flags::DQUOTE,
-                            b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth += 1,
-                            b']' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth -= 1,
+                            b'\'' => method_flags ^= Flags::SQUOTE,
+                            b'"' => method_flags ^= Flags::DQUOTE,
+                            b'[' if !method_flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth += 1,
+                            b']' if !method_flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => depth -= 1,
                             b' ' if depth == 0
-                                && !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
+                                && !method_flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                                 let variable = &self.data[start..self.read];
                                 self.read += 1;
                                 start = self.read;
