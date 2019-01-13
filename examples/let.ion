@@ -48,4 +48,4 @@ let a = [
     four five six
 
 ]
-echo $join(a, "\n")
+echo $join(a "\n")
