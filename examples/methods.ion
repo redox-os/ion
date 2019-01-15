@@ -1,10 +1,10 @@
 let array = [ one two three four ]
 let space_string = $join(array)
-let comma_string = $join(array, ', ')
+let comma_string = $join(array ', ')
 echo $space_string
 echo $comma_string
 echo @split(space_string)
-echo @split(comma_string, ', ')
+echo @split(comma_string ', ')
 
 let array = ["one two" "three four" "five six" "seven eight" "nine ten"]
 echo $len(@array)
@@ -18,31 +18,31 @@ for grapheme in 0..$len(string)
     echo $string[$grapheme]
 end
 
-echo $replace("one two one two", one 1)
-echo $replacen("one one one one", one 1 3)
-echo $starts_with("one two", one)
-echo $starts_with("one two", two)
-echo $ends_with("one two", one)
-echo $ends_with("one two", two)
-echo $contains("one two three", two)
-echo $contains("one two three", four)
-echo $repeat("one ", 5)
+echo $replace("one two one two" one 1)
+echo $replacen("one one one one" one 1 3)
+echo $starts_with("one two" one)
+echo $starts_with("one two" two)
+echo $ends_with("one two" one)
+echo $ends_with("one two" two)
+echo $contains("one two three" two)
+echo $contains("one two three" four)
+echo $repeat("one " 5)
 
-echo $join([one two three], "\n")
-echo $join([one two three], "\t")
-echo $join([one two three], '\\n')
-echo $join([one two three], "\\\\n")
-echo $replace($join([one two three], "\n"), "\n" "\t")
+echo $join([one two three] "\n")
+echo $join([one two three] "\t")
+echo $join([one two three] '\\n')
+echo $join([one two three] "\\\\n")
+echo $replace($join([one two three] "\n") "\n" "\t")
 let a = "applesauce"
-let pos = $find(a, "s")
-let array = [@split_at(a, $pos)]
-echo $join(array, "\n")
+let pos = $find(a "s")
+let array = [@split_at(a $pos)]
+echo $join(array "\n")
 
 let a = [1 2 3 4 5]
 let b = "1 2 3 4 5"
-echo $join(@split(b, " "), $join(a, " "))
+echo $join(@split(b " ") $join(a " "))
 
-echo $regex_replace("one two onemy anemy town", "\ o|\ a" "\ e")
+echo $regex_replace("one two onemy anemy town" "\ o|\ a" "\ e")
 
 echo $unescape('one two\"\tone')
 echo $escape("'one two'")

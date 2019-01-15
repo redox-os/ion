@@ -904,7 +904,7 @@ mod test {
     fn inline_expression() {
         let cases = vec![
             (array!["5"], "$len([0 1 2 3 4])"),
-            (array!["FxOxO"], "$join(@chars(FOO), 'x')"),
+            (array!["FxOxO"], "$join(@chars('FOO') 'x')"),
         ];
         for (expected, input) in cases {
             assert_eq!(expected, expand_string(input, &VariableExpander, false));
