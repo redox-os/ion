@@ -710,9 +710,9 @@ pub(crate) fn expand_tokens<E: Expander>(
                 WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
             }
         }
-        // I'm not entirely sure if empty strings are valid in any case- maarten
+
         if output.as_str() != "" {
-            expanded_words.push(output);
+            expanded_words.insert(0, output);
         }
         expanded_words
     } else {
