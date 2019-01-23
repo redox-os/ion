@@ -559,13 +559,37 @@ fn expand<E: Expander>(
     do_glob: bool,
     tilde: bool,
 ) {
+    let concat: small::String = match output.rfind(char::is_whitespace) {
+        Some(sep) => {
+            if sep != output.len() - 1 {
+                let word_start = sep + 1;
+                let mut t: small::String = output.split_at(word_start).1.into();
+                t.push_str(text);
+                output.truncate(word_start);
+                t
+            } else {
+                text.into()
+            }
+        }
+        None => {
+            if output.is_empty() {
+                text.into()
+            } else {
+                let mut t = output.clone();
+                t.push_str(text);
+                output.clear();
+                t
+            }
+        }
+    };
+
     let expanded: small::String = if tilde {
-        match expand_func.tilde(text) {
+        match expand_func.tilde(&concat) {
             Some(s) => s.into(),
-            None => text.into(),
+            None => concat,
         }
     } else {
-        text.into()
+        concat
     };
 
     if do_glob {
@@ -686,9 +710,9 @@ pub(crate) fn expand_tokens<E: Expander>(
                 WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
             }
         }
-        // I'm not entirely sure if empty strings are valid in any case- maarten
+
         if output.as_str() != "" {
-            expanded_words.push(output);
+            expanded_words.insert(0, output);
         }
         expanded_words
     } else {
