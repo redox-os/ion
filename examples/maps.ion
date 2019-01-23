@@ -23,3 +23,8 @@ echo @map[key3]
 
 let map:bmap[float] = [ichi=1.0 ni=2.0 san=3.0]
 echo @map
+
+let map[ichi] = foo
+echo @map
+let map[ni] = bar
+echo @map

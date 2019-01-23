@@ -12,3 +12,5 @@ one
 two
 three
 ichi 1.0 ni 2.0 san 3.0
+ichi foo ni 2.0 san 3.0
+ichi foo ni bar san 3.0
