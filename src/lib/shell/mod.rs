@@ -434,7 +434,9 @@ impl<'a> Expander for Shell {
     /// Expand a string variable given if its quoted / unquoted
     fn string(&self, name: &str, quoted: bool) -> Option<types::Str> {
         use ascii_helpers::AsciiReplace;
-        if quoted {
+        if name == "?" {
+            Some(types::Str::from(self.previous_status.to_string()))
+        } else if quoted {
             self.get::<types::Str>(name)
         } else {
             self.get::<types::Str>(name)

@@ -318,10 +318,6 @@ impl Variables {
         const GLOBAL_NS: &str = "global::";
         const SUPER_NS: &str = "super::";
 
-        if name == "?" {
-            return self.scopes().last()?.get("?");
-        }
-
         let mut up_namespace: isize = if name.starts_with(GLOBAL_NS) {
             name = &name[GLOBAL_NS.len()..];
             // Go up as many namespaces as possible
