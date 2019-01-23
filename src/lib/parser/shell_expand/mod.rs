@@ -408,7 +408,7 @@ fn expand_braces<E: Expander>(
                         } else {
                             array.push("".into());
                         },
-                        None => array.push(word),
+                        None => {}
                     }
                     for path in paths {
                         if let Ok(path_buf) = path {

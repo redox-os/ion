@@ -14,4 +14,4 @@ three two
 Cargo.lock Cargo.toml rustfmt.toml
 LICENSE README.md
 Cargo.lock Cargo.toml rustfmt.toml
-LICENSE R*E
+LICENSE
