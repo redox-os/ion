@@ -469,12 +469,10 @@ impl VariableStore for Shell {
                                     Ok(VariableType::Str(ref index)) => {
                                         match self.variables.get_mut(key.name) {
                                             Some(VariableType::HashMap(hmap)) => {
-                                                hmap.entry(index.clone())
-                                                    .or_insert_with(|| VariableType::Str(value));
+                                                hmap.insert(index.clone(), VariableType::Str(value));
                                             }
                                             Some(VariableType::BTreeMap(bmap)) => {
-                                                bmap.entry(index.clone())
-                                                    .or_insert_with(|| VariableType::Str(value));
+                                                bmap.insert(index.clone(), VariableType::Str(value));
                                             }
                                             Some(VariableType::Array(array)) => {
                                                 let index_num = match index.parse::<usize>() {
