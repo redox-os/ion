@@ -17,12 +17,13 @@ endif
 ifeq (1,$(REDOX))
 	undefine ARGSV
 	ARGS += --target x86_64-unknown-redox
+	PREARGS += +nightly
 endif
 
 .PHONY: all clean distclean install uninstall
 
 all: version extract .cargo/config
-	cargo build $(ARGS) $(ARGSV)
+	cargo $(PREARGS) build $(ARGS) $(ARGSV)
 
 clean:
 	cargo clean
