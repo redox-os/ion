@@ -11,7 +11,7 @@ let hashmap:hmap[] = [ foo=hello bar=world fizz=I buzz=was bazz=here ]
 ## Create a BTreeMap
 
 ```
-let hashmap:hmap[] = [ foo=hello bar=world fizz=I buzz=was bazz=here ]
+let btreemap:bmap[] = [ foo=hello bar=world fizz=I buzz=was bazz=here ]
 ```
 
 ## Fetch a variables by key
