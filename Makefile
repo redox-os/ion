@@ -5,6 +5,10 @@ DEBUG ?= 0
 VENDORED = 0
 REDOX ?= 0
 
+GIT_REVISION=git_revision.txt
+SRC=Cargo.toml src/* src/*/* members/* members/*/*
+VENDOR=.cargo/config vendor.tar.xz
+
 ifeq (0,$(DEBUG))
 	ARGS += --release
 	RELEASE = release
@@ -21,7 +25,11 @@ endif
 
 .PHONY: all clean distclean install uninstall
 
-all: version extract .cargo/config
+all: $(SRC) $(GIT_REVISION)
+ifeq (1,$(REDOX))
+	mkdir -p .cargo
+	grep redox .cargo/config || cat redox_linker >> .cargo/config
+endif
 	cargo build $(ARGS) $(ARGSV)
 
 clean:
@@ -43,33 +51,19 @@ install:
 uninstall:
 	rm $(DESTDIR)/$(BINARY)
 
-.cargo/config:
-	mkdir -p .cargo
-	echo $(wildcard vendor.tar.xz)
-	if [ "$(wildcard vendor.tar.xz)" != "" ]; then \
-		cp vendor_config $@; \
-	else \
-		cp nonvendor_config $@; \
-	fi
+vendor: $(VENDOR)
 
-vendor.tar.xz:
-	cargo vendor
+version: $(GIT_REVISION)
+
+$(GIT_REVISION):
+	git rev-parse master > git_revision.txt
+
+$(VENDOR):
+	mkdir -p .cargo
+	cargo vendor | head -n -1 > .cargo/config
+	echo 'directory = "vendor"' >> .cargo/config
 	tar pcfJ vendor.tar.xz vendor
 	rm -rf vendor
-
-vendor: vendor.tar.xz .cargo/config
-
-extract:
-ifneq ($(wildcard vendor.tar.xz),)
-ifneq (1,$(REDOX))
-	tar pxf vendor.tar.xz
-endif
-endif
-
-version:
-ifeq ($(wildcard git_revision.txt),)
-	git rev-parse master > git_revision.txt
-endif
 
 update-shells:
 	if ! grep ion /etc/shells >/dev/null; then \

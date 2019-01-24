@@ -1,4 +1,10 @@
-ion-shell (1.0.0-alpha0-cosmic2) cosmic; urgency=medium
+ion-shell (1:1.0.0-alpha1~cosmic0) cosmic; urgency=medium
+
+  * Upstream updates
+
+ -- Michael Aaron Murphy <michael@system76.com>  Wed, 23 Jan 2019 22:54:59 -0700
+
+ion-shell (1.0.0-alpha1~cosmic0) cosmic; urgency=medium
 
   * Add postinst script for setting the shell.
 

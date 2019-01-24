@@ -4,13 +4,14 @@
 	dh $@
 
 override_dh_auto_clean:
-	cat git_revision.txt || echo git_revision.txt not found
 	make clean
-	make vendor
 	make version
+	if ! ischroot; then \
+		make vendor; \
+	fi
 
 override_dh_auto_build:
-	cat .cargo/config
+	tar pxf vendor.tar.xz
 	make all
 
 override_dh_auto_install:
