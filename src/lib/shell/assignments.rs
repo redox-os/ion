@@ -36,8 +36,10 @@ fn list_vars(shell: &Shell) {
                 });
             }
             let _ = buffer.write(b"]\n");
-        } else {
+        } else if array.len() == 1 {
             let _ = buffer.write(["'", &array[0], "' ]\n"].concat().as_bytes());
+        } else {
+            let _ = buffer.write("]\n".as_bytes());
         }
     }
 
