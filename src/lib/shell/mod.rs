@@ -496,6 +496,17 @@ impl<'a> Expander for Shell {
                         hmap.get(&*key).unwrap_or(&VariableType::Str("".into()))
                     )])
                 }
+                Select::Index(index) => {
+                    use ranges::Index;
+                    return Some(array![format!(
+                        "{}",
+                        hmap.get(&types::Str::from(match index {
+                            Index::Forward(n) => n as isize,
+                            Index::Backward(n) => -((n+1) as isize)
+                        }.to_string()))
+                        .unwrap_or(&VariableType::Str("".into()))
+                    )])
+                }
                 _ => (),
             }
         } else if let Some(bmap) = self.variables.get::<types::BTreeMap>(name) {
@@ -523,6 +534,17 @@ impl<'a> Expander for Shell {
                     return Some(array![format!(
                         "{}",
                         bmap.get(&*key).unwrap_or(&VariableType::Str("".into()))
+                    )])
+                }
+                Select::Index(index) => {
+                    use ranges::Index;
+                    return Some(array![format!(
+                        "{}",
+                        bmap.get(&types::Str::from(match index {
+                            Index::Forward(n) => n as isize,
+                            Index::Backward(n) => -((n+1) as isize)
+                        }.to_string()))
+                        .unwrap_or(&VariableType::Str("".into()))
                     )])
                 }
                 _ => (),
