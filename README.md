@@ -56,7 +56,7 @@ git clone https://gitlab.redox-os.org/redox-os/ion/
 cd ion
 make
 sudo make install prefix=/usr
-sudo make update-shells
+sudo make update-shells prefix=/usr
 ```
 
 > To compile in DEBUG mode, pass `DEBUG=1` as an argument to `make`
