@@ -38,7 +38,7 @@ Before submitting a PR, ensure that you've run your tests locally and that they
 pass. This can be done by running the following two commands:
 
 ```sh
-cargo +nightly test --lib && bash examples/run_examples/sh
+cargo +nightly test --lib && bash examples/run_examples.sh
 ```
 
 ## Format your code
