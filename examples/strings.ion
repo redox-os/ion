@@ -6,3 +6,15 @@ echo "\$hello"
 echo "\\"
 echo "\n"
 echo "\""
+echo "<"
+echo '<'
+echo "<<"
+echo '<<'
+echo "<<<"
+echo '<<<'
+echo ">"
+echo '>'
+echo ">>"
+echo '>>'
+echo ">>>"
+echo '>>>'

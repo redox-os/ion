@@ -64,7 +64,7 @@ impl Terminator {
                             b'"' if !self.flags.intersects(Flags::SQUOTE) => {
                                 self.flags ^= Flags::DQUOTE
                             }
-                            b'<' if !self.flags.contains(Flags::SQUOTE | Flags::DQUOTE) => {
+                            b'<' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                                 let as_bytes = self.buffer.as_bytes();
                                 if Some(&b'<') == as_bytes.get(self.read) {
                                     self.read += 1;
