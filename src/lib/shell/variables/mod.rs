@@ -139,7 +139,7 @@ impl fmt::Display for VariableType {
             }
             VariableType::BTreeMap(ref map) => {
                 let mut format =
-                    map.into_iter()
+                    map.iter()
                         .fold(String::new(), |mut format, (_, var_type)| {
                             format.push_str(&format!("{}", var_type));
                             format.push(' ');

@@ -572,7 +572,7 @@ fn expand_pipeline(
                             }
                             // Append rest of the pipeline to the last pipeline in the
                             // alias.
-                            while let Some(item) = item_iter.next() {
+                            for item in item_iter {
                                 pline.items.push(item.clone());
                             }
                             // No error

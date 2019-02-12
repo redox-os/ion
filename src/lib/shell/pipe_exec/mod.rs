@@ -740,70 +740,99 @@ pub(crate) fn pipe(
     let mut commands = commands.into_iter().peekable();
     let mut ext_stdio_pipes: Option<Vec<File>> = None;
 
-    loop {
-        if let Some((mut parent, mut kind)) = commands.next() {
-            match kind {
-                JobKind::Pipe(mut mode) => {
-                    // We need to remember the commands as they own the file
-                    // descriptors that are created by sys::pipe.
-                    let remember: SmallVec<[RefinedJob; 16]> = SmallVec::new();
-                    let mut block_child = true;
-                    let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
+    while let Some((mut parent, mut kind)) = commands.next() {
+        match kind {
+            JobKind::Pipe(mut mode) => {
+                // We need to remember the commands as they own the file
+                // descriptors that are created by sys::pipe.
+                let remember: SmallVec<[RefinedJob; 16]> = SmallVec::new();
+                let mut block_child = true;
+                let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
 
-                    // Append jobs until all piped jobs are running
-                    while let Some((mut child, ckind)) = commands.next() {
-                        // If parent is a RefindJob::External, then we need to keep track of the
-                        // output pipes, so we can properly close them after the job has been
-                        // spawned.
-                        let is_external = if let JobVariant::External { .. } = parent.var {
-                            true
-                        } else {
-                            false
-                        };
+                // Append jobs until all piped jobs are running
+                while let Some((mut child, ckind)) = commands.next() {
+                    // If parent is a RefindJob::External, then we need to keep track of the
+                    // output pipes, so we can properly close them after the job has been
+                    // spawned.
+                    let is_external = if let JobVariant::External { .. } = parent.var {
+                        true
+                    } else {
+                        false
+                    };
 
-                        // TODO: Refactor this part
-                        // If we need to tee both stdout and stderr, we directly connect pipes to
-                        // the relevant sources in both of them.
-                        if let JobVariant::Tee {
-                            items: (Some(ref mut tee_out), Some(ref mut tee_err)),
-                            ..
-                        } = child.var
-                        {
-                            TeePipe::new(&mut parent, &mut ext_stdio_pipes, is_external)
-                                .connect(tee_out, tee_err);
-                        } else {
-                            // Pipe the previous command's stdin to this commands stdout/stderr.
-                            match sys::pipe2(sys::O_CLOEXEC) {
-                                Err(e) => pipe_fail(e),
-                                Ok((reader, writer)) => {
-                                    if is_external {
-                                        append_external_stdio_pipe(&mut ext_stdio_pipes, writer);
-                                    }
-                                    child.stdin(unsafe { File::from_raw_fd(reader) });
-                                    let writer = unsafe { File::from_raw_fd(writer) };
-                                    match mode {
-                                        RedirectFrom::Stderr => parent.stderr(writer),
-                                        RedirectFrom::Stdout => parent.stdout(writer),
-                                        RedirectFrom::Both => match writer.try_clone() {
-                                            Err(e) => {
-                                                eprintln!(
-                                                    "ion: failed to redirect stdout and stderr: {}",
-                                                    e
-                                                );
-                                            }
-                                            Ok(duped) => {
-                                                parent.stderr(writer);
-                                                parent.stdout(duped);
-                                            }
-                                        },
-                                    }
+                    // TODO: Refactor this part
+                    // If we need to tee both stdout and stderr, we directly connect pipes to
+                    // the relevant sources in both of them.
+                    if let JobVariant::Tee {
+                        items: (Some(ref mut tee_out), Some(ref mut tee_err)),
+                        ..
+                    } = child.var
+                    {
+                        TeePipe::new(&mut parent, &mut ext_stdio_pipes, is_external)
+                            .connect(tee_out, tee_err);
+                    } else {
+                        // Pipe the previous command's stdin to this commands stdout/stderr.
+                        match sys::pipe2(sys::O_CLOEXEC) {
+                            Err(e) => pipe_fail(e),
+                            Ok((reader, writer)) => {
+                                if is_external {
+                                    append_external_stdio_pipe(&mut ext_stdio_pipes, writer);
+                                }
+                                child.stdin(unsafe { File::from_raw_fd(reader) });
+                                let writer = unsafe { File::from_raw_fd(writer) };
+                                match mode {
+                                    RedirectFrom::Stderr => parent.stderr(writer),
+                                    RedirectFrom::Stdout => parent.stdout(writer),
+                                    RedirectFrom::Both => match writer.try_clone() {
+                                        Err(e) => {
+                                            eprintln!(
+                                                "ion: failed to redirect stdout and stderr: {}",
+                                                e
+                                            );
+                                        }
+                                        Ok(duped) => {
+                                            parent.stderr(writer);
+                                            parent.stdout(duped);
+                                        }
+                                    },
                                 }
                             }
                         }
+                    }
 
+                    match spawn_proc(
+                        shell,
+                        parent,
+                        kind,
+                        block_child,
+                        &mut last_pid,
+                        &mut current_pid,
+                        pgid,
+                    ) {
+                        SUCCESS => (),
+                        error_code => return error_code,
+                    }
+
+                    ext_stdio_pipes = None;
+
+                    if set_process_group(&mut pgid, current_pid)
+                        && foreground
+                        && !shell.is_library
+                    {
+                        let _ = sys::tcsetpgrp(0, pgid);
+                    }
+
+                    resume_prior_process(&mut last_pid, current_pid);
+
+                    if let JobKind::Pipe(m) = ckind {
+                        parent = child;
+                        mode = m;
+                    } else {
+                        kind = ckind;
+                        block_child = false;
                         match spawn_proc(
                             shell,
-                            parent,
+                            child,
                             kind,
                             block_child,
                             &mut last_pid,
@@ -814,57 +843,24 @@ pub(crate) fn pipe(
                             error_code => return error_code,
                         }
 
-                        ext_stdio_pipes = None;
-
-                        if set_process_group(&mut pgid, current_pid)
-                            && foreground
-                            && !shell.is_library
-                        {
-                            let _ = sys::tcsetpgrp(0, pgid);
-                        }
-
                         resume_prior_process(&mut last_pid, current_pid);
-
-                        if let JobKind::Pipe(m) = ckind {
-                            parent = child;
-                            mode = m;
-                        } else {
-                            kind = ckind;
-                            block_child = false;
-                            match spawn_proc(
-                                shell,
-                                child,
-                                kind,
-                                block_child,
-                                &mut last_pid,
-                                &mut current_pid,
-                                pgid,
-                            ) {
-                                SUCCESS => (),
-                                error_code => return error_code,
-                            }
-
-                            resume_prior_process(&mut last_pid, current_pid);
-                            break;
-                        }
-                    }
-
-                    set_process_group(&mut pgid, current_pid);
-
-                    previous_status = shell.wait(pgid, remember);
-                    if previous_status == TERMINATED {
-                        if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
-                            eprintln!("ion: failed to terminate foreground jobs: {}", why);
-                        }
-                        return previous_status;
+                        break;
                     }
                 }
-                _ => {
-                    previous_status = shell.exec_job(&mut parent, foreground);
+
+                set_process_group(&mut pgid, current_pid);
+
+                previous_status = shell.wait(pgid, remember);
+                if previous_status == TERMINATED {
+                    if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
+                        eprintln!("ion: failed to terminate foreground jobs: {}", why);
+                    }
+                    return previous_status;
                 }
             }
-        } else {
-            break;
+            _ => {
+                previous_status = shell.exec_job(&mut parent, foreground);
+            }
         }
     }
 

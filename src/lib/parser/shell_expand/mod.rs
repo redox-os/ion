@@ -104,7 +104,7 @@ fn expand_brace<E: Expander>(
 ) {
     let mut temp = Vec::new();
     for word in nodes
-        .into_iter()
+        .iter()
         .flat_map(|node| expand_string_no_glob(node, expand_func, reverse_quoting))
     {
         match parse_range(&word) {
@@ -406,15 +406,12 @@ fn expand_braces<E: Expander>(
         .fold(types::Array::new(), |mut array, word| {
             if word.find('*').is_some() {
                 if let Ok(mut paths) = glob(&word) {
-                    match paths.next() {
-                        Some(path) => {
-                            if let Ok(path_buf) = path {
-                                array.push((*path_buf.to_string_lossy()).into());
-                            } else {
-                                array.push("".into());
-                            }
+                    if let Some(path) = paths.next() {
+                        if let Ok(path_buf) = path {
+                            array.push((*path_buf.to_string_lossy()).into());
+                        } else {
+                            array.push("".into());
                         }
-                        None => {}
                     }
                     for path in paths {
                         if let Ok(path_buf) = path {
