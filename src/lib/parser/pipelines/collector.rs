@@ -82,13 +82,14 @@ impl<'a> Collector<'a> {
         let arg = self.arg(bytes)?;
         match arg {
             Some(file) => {
-                outputs.as_mut().map(|o| {
+                if let Some(o) = outputs.as_mut() {
                     o.push(Redirection {
                         from,
                         file: file.into(),
                         append,
-                    })
-                });
+                    });
+                }
+
                 Ok(())
             }
             None => Err("expected file argument after redirection for output"),
@@ -411,7 +412,7 @@ impl<'a> Collector<'a> {
                 // We return an inclusive range to keep the quote type intact
                 b'"' => {
                     bytes.next();
-                    return Ok(&self.data[start..i + 1]);
+                    return Ok(&self.data[start..=i]);
                 }
                 _ => (),
             }

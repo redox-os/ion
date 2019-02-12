@@ -169,7 +169,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         let mut start = self.read;
         let mut level = 0;
         let mut elements = Vec::new();
-        while let Some(character) = iterator.next() {
+        for character in iterator {
             match character {
                 _ if self.flags.contains(Flags::BACKSL) => self.flags ^= Flags::BACKSL,
                 b'\\' => self.flags ^= Flags::BACKSL,
@@ -480,7 +480,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     {
         self.read += 1;
         let start = self.read;
-        while let Some(character) = iterator.next() {
+        for character in iterator {
             if let b']' = character {
                 let value =
                     expand_string(&self.data[start..self.read], self.expanders, false).join(" ");
@@ -630,7 +630,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         I: Iterator<Item = u8>,
     {
         let start = self.read;
-        while let Some(character) = iterator.next() {
+        for character in iterator {
             if character == b'}' {
                 let output = &self.data[start..self.read];
                 self.read += 1;
@@ -650,12 +650,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     {
         let start = self.read;
         self.read += 1;
-        while let Some(character) = iterator.next() {
-            if character == b' ' {
-                self.read += 1;
-            } else {
-                return WordToken::Whitespace(&self.data[start..self.read]);
+        for character in iterator {
+            if character != b' ' {
+                break;
             }
+            self.read += 1;
         }
 
         WordToken::Whitespace(&self.data[start..self.read])

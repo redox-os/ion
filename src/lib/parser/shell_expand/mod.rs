@@ -722,7 +722,7 @@ pub(crate) fn expand_tokens<E: Expander>(
         }
         expanded_words
     } else {
-        array![]
+        Array::new()
     }
 }
 

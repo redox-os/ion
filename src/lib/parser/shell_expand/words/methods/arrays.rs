@@ -172,7 +172,7 @@ impl<'a> ArrayMethod<'a> {
         } else if is_expression(self.variable) {
             expand_string(self.variable, expand_func, false)
         } else {
-            array![]
+            Array::new()
         }
     }
 
@@ -203,7 +203,7 @@ impl<'a> ArrayMethod<'a> {
 
         res.unwrap_or_else(|m| {
             eprintln!("ion: {}: {}", self.method, m);
-            array![]
+            Array::new()
         })
     }
 

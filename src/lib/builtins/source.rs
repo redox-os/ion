@@ -15,7 +15,6 @@ pub(crate) fn source(shell: &mut Shell, arguments: &[small::String]) -> Result<(
                         for command in command_list.lines() {
                             shell.on_command(command);
                         }
-                        ()
                     })
             } else {
                 Err(format!("ion: failed to open {}\n", argument))
