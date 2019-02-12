@@ -5,7 +5,11 @@ use sys;
 
 pub(crate) fn prompt(shell: &mut Shell) -> String {
     let blocks = shell.flow_control.block.len()
-        + if shell.flags & UNTERMINATED != 0 { 1 } else { 0 };
+        + if shell.flags & UNTERMINATED != 0 {
+            1
+        } else {
+            0
+        };
 
     if blocks == 0 {
         match prompt_fn(shell) {

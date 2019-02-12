@@ -287,7 +287,9 @@ fn file_has_read_permission(filepath: &str) -> bool {
     const GUEST: u32 = 0b100;
 
     // Collect the mode of permissions for the file
-    fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
+    fs::metadata(filepath)
+        .map(|metadata| metadata.permissions().mode())
+        .ok()
         // If the mode is equal to any of the above, return `SUCCESS`
         .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
 }
@@ -302,7 +304,9 @@ fn file_has_write_permission(filepath: &str) -> bool {
     const GUEST: u32 = 0b10;
 
     // Collect the mode of permissions for the file
-    fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
+    fs::metadata(filepath)
+        .map(|metadata| metadata.permissions().mode())
+        .ok()
         // If the mode is equal to any of the above, return `SUCCESS`
         .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
 }
@@ -319,7 +323,9 @@ fn file_has_execute_permission(filepath: &str) -> bool {
     const GUEST: u32 = 0b1;
 
     // Collect the mode of permissions for the file
-    fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
+    fs::metadata(filepath)
+        .map(|metadata| metadata.permissions().mode())
+        .ok()
         // If the mode is equal to any of the above, return `SUCCESS`
         .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
 }

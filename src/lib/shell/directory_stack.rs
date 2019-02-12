@@ -134,16 +134,16 @@ impl DirectoryStack {
             self.dirs.truncate(1);
         }
 
-        let mapper: fn((usize, &PathBuf)) -> Cow<str> = match (
-            dirs_args & ABS_PATHNAMES > 0,
-            dirs_args & INDEX > 0,
-        ) {
-            // ABS, INDEX
-            (true, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, try_abs_path(x))),
-            (true, false) => |(_, x)| try_abs_path(x),
-            (false, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, x.to_string_lossy())),
-            (false, false) => |(_, x)| x.to_string_lossy(),
-        };
+        let mapper: fn((usize, &PathBuf)) -> Cow<str> =
+            match (dirs_args & ABS_PATHNAMES > 0, dirs_args & INDEX > 0) {
+                // ABS, INDEX
+                (true, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, try_abs_path(x))),
+                (true, false) => |(_, x)| try_abs_path(x),
+                (false, true) => {
+                    |(num, x)| Cow::Owned(format!(" {}  {}", num, x.to_string_lossy()))
+                }
+                (false, false) => |(_, x)| x.to_string_lossy(),
+            };
 
         let mut iter = self.dirs.iter().enumerate().map(mapper);
 
@@ -305,14 +305,18 @@ impl DirectoryStack {
                     self.dirs.swap(0, 1);
                 }
             }
-            Action::RotLeft(num) => if !keep_front {
-                self.set_current_dir_by_index(num, "pushd")?;
-                self.rotate_left(num);
-            },
-            Action::RotRight(num) => if !keep_front {
-                self.set_current_dir_by_index(len - (num % len), "pushd")?;
-                self.rotate_right(num);
-            },
+            Action::RotLeft(num) => {
+                if !keep_front {
+                    self.set_current_dir_by_index(num, "pushd")?;
+                    self.rotate_left(num);
+                }
+            }
+            Action::RotRight(num) => {
+                if !keep_front {
+                    self.set_current_dir_by_index(len - (num % len), "pushd")?;
+                    self.rotate_right(num);
+                }
+            }
             Action::Push(dir) => {
                 let index = if keep_front { 1 } else { 0 };
                 let new_dir = self.normalize_path(dir.to_str().unwrap());
@@ -423,7 +427,8 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
         Some('+') => Some(true),
         Some('-') => Some(false),
         _ => None,
-    }.and_then(|b| arg[1..].parse::<usize>().ok().map(|num| (b, num)))
+    }
+    .and_then(|b| arg[1..].parse::<usize>().ok().map(|num| (b, num)))
 }
 
 // converts pbuf to an absolute path if possible

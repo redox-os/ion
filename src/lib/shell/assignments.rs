@@ -123,10 +123,19 @@ impl VariableStore for Shell {
                                 .unwrap_or_else(|| "0".into());
 
                             let result = math(&lhs, &key.kind, operator, &value, |value| {
-                                let str_value = unsafe {str::from_utf8_unchecked(value)};
+                                let str_value = unsafe { str::from_utf8_unchecked(value) };
                                 if key_name == "PATH" && str_value.find('~').is_some() {
-                                    let final_value = str_value.replace("~", env::var("HOME").as_ref().map(|s| s.as_str()).unwrap_or("~"));
-                                    env::set_var(key_name, &OsStr::from_bytes(final_value.as_bytes()))
+                                    let final_value = str_value.replace(
+                                        "~",
+                                        env::var("HOME")
+                                            .as_ref()
+                                            .map(|s| s.as_str())
+                                            .unwrap_or("~"),
+                                    );
+                                    env::set_var(
+                                        key_name,
+                                        &OsStr::from_bytes(final_value.as_bytes()),
+                                    )
                                 } else {
                                     env::set_var(key_name, &OsStr::from_bytes(value))
                                 }
@@ -255,7 +264,8 @@ impl VariableStore for Shell {
                                             .iter()
                                             .filter(|item| {
                                                 values.iter().all(|value| *item != value)
-                                            }).cloned()
+                                            })
+                                            .cloned()
                                             .collect();
                                     }
                                     None => {
@@ -375,9 +385,7 @@ impl VariableStore for Shell {
                                         }
                                     };
 
-                                    let action: Box<
-                                        dyn Fn(f64) -> f64,
-                                    > = match operator {
+                                    let action: Box<dyn Fn(f64) -> f64> = match operator {
                                         Operator::Add => Box::new(|src| src + value),
                                         Operator::Divide => Box::new(|src| src / value),
                                         Operator::Subtract => Box::new(|src| src - value),
@@ -471,10 +479,16 @@ impl VariableStore for Shell {
                                     Ok(VariableType::Str(ref index)) => {
                                         match self.variables.get_mut(key.name) {
                                             Some(VariableType::HashMap(hmap)) => {
-                                                hmap.insert(index.clone(), VariableType::Str(value));
+                                                hmap.insert(
+                                                    index.clone(),
+                                                    VariableType::Str(value),
+                                                );
                                             }
                                             Some(VariableType::BTreeMap(bmap)) => {
-                                                bmap.insert(index.clone(), VariableType::Str(value));
+                                                bmap.insert(
+                                                    index.clone(),
+                                                    VariableType::Str(value),
+                                                );
                                             }
                                             Some(VariableType::Array(array)) => {
                                                 let index_num = match index.parse::<usize>() {
@@ -550,7 +564,7 @@ enum MathError {
     RHS,
     LHS,
     Unsupported,
-    CalculationError
+    CalculationError,
 }
 
 impl Display for MathError {
@@ -559,7 +573,7 @@ impl Display for MathError {
             MathError::RHS => write!(fmt, "right hand side has invalid type"),
             MathError::LHS => write!(fmt, "left hand side has invalid type"),
             MathError::Unsupported => write!(fmt, "type does not support operation"),
-            MathError::CalculationError => write!(fmt, "cannot calculate given operation")
+            MathError::CalculationError => write!(fmt, "cannot calculate given operation"),
         }
     }
 }
@@ -574,15 +588,19 @@ fn parse_f64<F: Fn(f64, f64) -> f64>(lhs: &str, rhs: &str, operation: F) -> Resu
         })
 }
 
-fn parse_i64<F: Fn(i64, i64) -> Option<i64>>(lhs: &str, rhs: &str, operation: F) -> Result<i64, MathError> {
+fn parse_i64<F: Fn(i64, i64) -> Option<i64>>(
+    lhs: &str,
+    rhs: &str,
+    operation: F,
+) -> Result<i64, MathError> {
     let lhs = match lhs.parse::<i64>() {
         Ok(e) => Ok(e),
-        Err(_) => Err(MathError::LHS)
+        Err(_) => Err(MathError::LHS),
     };
     if let Ok(lhs) = lhs {
         let rhs = match rhs.parse::<i64>() {
             Ok(e) => Ok(e),
-            Err(_) => Err(MathError::RHS)
+            Err(_) => Err(MathError::RHS),
         };
         if let Ok(rs) = rhs {
             let ret = operation(lhs, rs);
@@ -613,17 +631,19 @@ fn math<'a, F: FnMut(&[u8])>(
     mut writefn: F,
 ) -> Result<(), MathError> {
     match operator {
-        Operator::Add => if Primitive::Any == *key || Primitive::Float == *key {
-            writefn(
-                parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?
-                    .to_string()
-                    .as_bytes(),
-            );
-        } else if let Primitive::Integer = key {
-            write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs + rhs))?, writefn);
-        } else {
-            return Err(MathError::Unsupported);
-        },
+        Operator::Add => {
+            if Primitive::Any == *key || Primitive::Float == *key {
+                writefn(
+                    parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?
+                        .to_string()
+                        .as_bytes(),
+                );
+            } else if let Primitive::Integer = key {
+                write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs + rhs))?, writefn);
+            } else {
+                return Err(MathError::Unsupported);
+            }
+        }
         Operator::Divide => {
             if Primitive::Any == *key || Primitive::Float == *key || Primitive::Integer == *key {
                 writefn(
@@ -635,54 +655,65 @@ fn math<'a, F: FnMut(&[u8])>(
                 return Err(MathError::Unsupported);
             }
         }
-        Operator::IntegerDivide => if Primitive::Any == *key || Primitive::Float == *key {
-            write_integer(parse_i64(lhs, value, |lhs, rhs| {
-                // We want to make sure we don't divide by zero, so instead, we give them a None as a result to signify that we were unable to calculate the result.
-                if rhs == 0 {
-                    None
-                } else {
-                    Some(lhs / rhs)
-                }
-            })?, writefn);
-        } else {
-            return Err(MathError::Unsupported);
-        },
-        Operator::Subtract => if Primitive::Any == *key || Primitive::Float == *key {
-            writefn(
-                parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?
-                    .to_string()
-                    .as_bytes(),
-            );
-        } else if let Primitive::Integer = key {
-            write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs - rhs))?, writefn);
-        } else {
-            return Err(MathError::Unsupported);
-        },
-        Operator::Multiply => if Primitive::Any == *key || Primitive::Float == *key {
-            writefn(
-                parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?
-                    .to_string()
-                    .as_bytes(),
-            );
-        } else if let Primitive::Integer = key {
-            write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs * rhs))?, writefn);
-        } else {
-            return Err(MathError::Unsupported);
-        },
-        Operator::Exponent => if Primitive::Any == *key || Primitive::Float == *key {
-            writefn(
-                parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?
-                    .to_string()
-                    .as_bytes(),
-            );
-        } else if let Primitive::Integer = key {
-            write_integer(
-                parse_i64(lhs, value, |lhs, rhs| Some(lhs.pow(rhs as u32)))?,
-                writefn,
-            );
-        } else {
-            return Err(MathError::Unsupported);
-        },
+        Operator::IntegerDivide => {
+            if Primitive::Any == *key || Primitive::Float == *key {
+                write_integer(
+                    parse_i64(lhs, value, |lhs, rhs| {
+                        // We want to make sure we don't divide by zero, so instead, we give them a None as a result to signify that we were unable to calculate the result.
+                        if rhs == 0 {
+                            None
+                        } else {
+                            Some(lhs / rhs)
+                        }
+                    })?,
+                    writefn,
+                );
+            } else {
+                return Err(MathError::Unsupported);
+            }
+        }
+        Operator::Subtract => {
+            if Primitive::Any == *key || Primitive::Float == *key {
+                writefn(
+                    parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?
+                        .to_string()
+                        .as_bytes(),
+                );
+            } else if let Primitive::Integer = key {
+                write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs - rhs))?, writefn);
+            } else {
+                return Err(MathError::Unsupported);
+            }
+        }
+        Operator::Multiply => {
+            if Primitive::Any == *key || Primitive::Float == *key {
+                writefn(
+                    parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?
+                        .to_string()
+                        .as_bytes(),
+                );
+            } else if let Primitive::Integer = key {
+                write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs * rhs))?, writefn);
+            } else {
+                return Err(MathError::Unsupported);
+            }
+        }
+        Operator::Exponent => {
+            if Primitive::Any == *key || Primitive::Float == *key {
+                writefn(
+                    parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?
+                        .to_string()
+                        .as_bytes(),
+                );
+            } else if let Primitive::Integer = key {
+                write_integer(
+                    parse_i64(lhs, value, |lhs, rhs| Some(lhs.pow(rhs as u32)))?,
+                    writefn,
+                );
+            } else {
+                return Err(MathError::Unsupported);
+            }
+        }
         Operator::Equal => writefn(value.as_bytes()),
         _ => return Err(MathError::Unsupported),
     };

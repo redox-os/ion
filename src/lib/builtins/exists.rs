@@ -109,7 +109,9 @@ fn file_has_execute_permission(filepath: &str) -> bool {
     const GUEST: u32 = 0b1;
 
     // Collect the mode of permissions for the file
-    fs::metadata(filepath).map(|metadata| metadata.permissions().mode()).ok()
+    fs::metadata(filepath)
+        .map(|metadata| metadata.permissions().mode())
+        .ok()
         // If the mode is equal to any of the above, return `SUCCESS`
         .map_or(false, |mode| mode & (USER + GROUP + GUEST) != 0)
 }
@@ -193,7 +195,9 @@ fn test_evaluate_arguments() {
     // TODO: see test_binary_is_in_path()
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-b".into()], &shell), Ok(true));
-    let oldpath = shell.get::<types::Str>("PATH").unwrap_or_else(|| "/usr/bin".into());
+    let oldpath = shell
+        .get::<types::Str>("PATH")
+        .unwrap_or_else(|| "/usr/bin".into());
     shell.set("PATH", "testing/");
 
     assert_eq!(

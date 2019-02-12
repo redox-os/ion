@@ -7,7 +7,11 @@ use std::{
     fs::File,
     io::{self, prelude::*, BufReader, SeekFrom},
     mem,
-    os::unix::{ffi::OsStrExt, fs::MetadataExt, io::{AsRawFd, RawFd}},
+    os::unix::{
+        ffi::OsStrExt,
+        fs::MetadataExt,
+        io::{AsRawFd, RawFd},
+    },
     path::PathBuf,
     process::exit,
     slice,
@@ -175,7 +179,7 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
     if let Some(prog) = prog {
         let mut file = match File::open(&prog) {
             Ok(file) => file,
-            Err(err) => return err
+            Err(err) => return err,
         };
 
         // Construct a valid set of arguments to pass to execve. Ensure that
@@ -195,7 +199,7 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
                 match reader.read(&mut shebang[read..]) {
                     Ok(0) => break,
                     Ok(n) => read += n,
-                    Err(err) => return err
+                    Err(err) => return err,
                 }
             }
 
@@ -205,21 +209,21 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
                 // we need to make sure ourselves the file is executable
                 let metadata = match file.metadata() {
                     Ok(meta) => meta,
-                    Err(err) => return err
+                    Err(err) => return err,
                 };
 
                 let uid = match syscall::getuid() {
                     Ok(uid) => uid,
-                    Err(err) => return io::Error::from_raw_os_error(err.errno)
+                    Err(err) => return io::Error::from_raw_os_error(err.errno),
                 };
                 let gid = match syscall::getgid() {
                     Ok(gid) => gid,
-                    Err(err) => return io::Error::from_raw_os_error(err.errno)
+                    Err(err) => return io::Error::from_raw_os_error(err.errno),
                 };
                 let mode = if uid == metadata.uid() as usize {
-                    (metadata.mode() >> 3*2) & 0o7
+                    (metadata.mode() >> 3 * 2) & 0o7
                 } else if gid == metadata.gid() as usize {
-                    (metadata.mode() >> 3*1) & 0o7
+                    (metadata.mode() >> 3 * 1) & 0o7
                 } else {
                     metadata.mode() & 0o7
                 };
@@ -240,13 +244,13 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
                         // (But remember to make sure the vector lives long
                         // enough for the arguments!!)
                         Some(interpreter)
-                    },
-                    Err(err) => return err
+                    }
+                    Err(err) => return err,
                 }
             } else {
                 match reader.seek(SeekFrom::Start(0)) {
                     Ok(_) => (),
-                    Err(err) => return err
+                    Err(err) => return err,
                 }
                 None
             }
@@ -255,13 +259,16 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
             let path: &OsStr = OsStrExt::from_bytes(&interpreter);
             file = match File::open(path) {
                 Ok(file) => file,
-                Err(err) => return err
+                Err(err) => return err,
             };
             cvt_args.push([interpreter.as_ptr() as usize, interpreter.len()]);
         }
 
         // Push the program name
-        cvt_args.push([prog.as_os_str().as_bytes().as_ptr() as usize, prog.as_os_str().len()]);
+        cvt_args.push([
+            prog.as_os_str().as_bytes().as_ptr() as usize,
+            prog.as_os_str().len(),
+        ]);
 
         // Push all arguments
         for arg in args {

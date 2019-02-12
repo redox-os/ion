@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use super::{
     flags::*,
     flow_control::{insert_statement, Case, ElseIf, Function, Statement},
@@ -6,6 +5,7 @@ use super::{
     status::*,
     Shell,
 };
+use itertools::Itertools;
 use parser::{
     assignments::is_array,
     expand_string, parse_and_validate,
@@ -18,13 +18,13 @@ use std::io::{stdout, Write};
 use types;
 
 macro_rules! handle_signal {
-    ($signal:expr) => (
+    ($signal:expr) => {
         match $signal {
             Condition::Break => break,
             Condition::SigInt => return Condition::SigInt,
             _ => (),
         }
-    )
+    };
 }
 
 #[derive(Debug)]
@@ -118,29 +118,38 @@ impl FlowLogic for Shell {
         statements: Vec<Statement>,
     ) -> Condition {
         macro_rules! set_vars_then_exec {
-            ($chunk:expr, $def:expr) => (
-                for (key, value) in variables.iter().zip($chunk.chain(::std::iter::repeat($def))) {
+            ($chunk:expr, $def:expr) => {
+                for (key, value) in variables
+                    .iter()
+                    .zip($chunk.chain(::std::iter::repeat($def)))
+                {
                     if key != "_" {
                         self.set(key, value.clone());
                     }
                 }
 
                 handle_signal!(self.execute_statements(statements.clone()));
-            )
+            };
         }
 
         let default = ::small::String::new();
 
         match ForValueExpression::new(values, self) {
-            ForValueExpression::Multiple(values) => for chunk in &values.iter().chunks(variables.len()) {
-                set_vars_then_exec!(chunk, &default);
-            },
-            ForValueExpression::Normal(values) => for chunk in &values.lines().chunks(variables.len()) {
-                set_vars_then_exec!(chunk, "");
-            },
-            ForValueExpression::Range(range) => for chunk in &range.chunks(variables.len()) {
-                set_vars_then_exec!(chunk, default.clone());
-            },
+            ForValueExpression::Multiple(values) => {
+                for chunk in &values.iter().chunks(variables.len()) {
+                    set_vars_then_exec!(chunk, &default);
+                }
+            }
+            ForValueExpression::Normal(values) => {
+                for chunk in &values.lines().chunks(variables.len()) {
+                    set_vars_then_exec!(chunk, "");
+                }
+            }
+            ForValueExpression::Range(range) => {
+                for chunk in &range.chunks(variables.len()) {
+                    set_vars_then_exec!(chunk, default.clone());
+                }
+            }
         };
 
         Condition::NoOp
@@ -548,7 +557,7 @@ fn expand_pipeline(
             statements.remove(0);
 
             // Handle pipeline being broken half by i.e.: '&&' or '||'
-            if ! statements.is_empty() {
+            if !statements.is_empty() {
                 let err = match statements.last_mut().unwrap() {
                     Statement::And(ref mut boxed_stm)
                     | Statement::Or(ref mut boxed_stm)

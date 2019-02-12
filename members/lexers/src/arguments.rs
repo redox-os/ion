@@ -128,7 +128,9 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                     if !self
                         .bitflags
                         .intersects(ArgumentFlags::DOUBLE | ArgumentFlags::METHOD)
-                        && level == 0 && alevel == 0 && blevel == 0
+                        && level == 0
+                        && alevel == 0
+                        && blevel == 0
                     {
                         break;
                     }

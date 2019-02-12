@@ -25,10 +25,11 @@ pub(crate) fn duplicate_streams() -> io::Result<(Option<File>, File, File)> {
         .map(|fd| unsafe { File::from_raw_fd(fd) })
         .map(|stdout| (stdin, stdout))
         // And then meld stderr alongside stdin and stdout
-        .and_then(|(stdin, stdout)| sys::dup(sys::STDERR_FILENO)
-            .map(|fd| unsafe { File::from_raw_fd(fd) })
-            .map(|stderr| (stdin, stdout, stderr))
-        )
+        .and_then(|(stdin, stdout)| {
+            sys::dup(sys::STDERR_FILENO)
+                .map(|fd| unsafe { File::from_raw_fd(fd) })
+                .map(|stderr| (stdin, stdout, stderr))
+        })
 }
 
 pub(crate) fn redirect_streams(inp: Option<File>, out: File, err: File) {

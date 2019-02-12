@@ -28,8 +28,7 @@ impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
     }
 
     pub(crate) fn join(self, pattern: &str) -> small::String {
-        unescape(&expand_string(self.args, self.expand, false).join(pattern))
-            .unwrap_or_default()
+        unescape(&expand_string(self.args, self.expand, false).join(pattern)).unwrap_or_default()
     }
 
     pub(crate) fn new(args: &'a str, expand: &'b E) -> MethodArgs<'a, 'b, E> {

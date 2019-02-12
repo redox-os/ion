@@ -2,9 +2,11 @@ use shell::{status::*, Shell};
 
 use regex::Regex;
 use small;
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    time::{SystemTime, UNIX_EPOCH},
+};
 use types;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 bitflags! {
     struct IgnoreFlags: u8 {
@@ -96,30 +98,26 @@ impl ShellHistory for Shell {
         if self.should_save_command(command) {
             if self.variables.get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
                 // Get current time stamp
-                let since_unix_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                let since_unix_epoch = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
                 let cur_time_sys = ["#", &since_unix_epoch.to_owned().to_string()].concat();
 
                 // Push current time to history
-            	if let Err(err) = self
+                if let Err(err) = self
                     .context
                     .as_mut()
                     .unwrap()
                     .history
                     .push(cur_time_sys.into())
-            	{
+                {
                     eprintln!("ion: {}", err)
-            	}
+                }
             }
 
-
             // Push command itself to history
-            if let Err(err) = self
-                .context
-                .as_mut()
-                .unwrap()
-                .history
-                .push(command.into())
-            {
+            if let Err(err) = self.context.as_mut().unwrap().history.push(command.into()) {
                 eprintln!("ion: {}", err);
             }
         }

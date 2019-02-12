@@ -590,17 +590,21 @@ fn builtin_isatty(args: &[small::String], _: &mut Shell) -> i32 {
         // sys::isatty expects a usize if compiled for redox but otherwise a i32.
         #[cfg(target_os = "redox")]
         match args[1].parse::<usize>() {
-            Ok(r) => if sys::isatty(r) {
-                return SUCCESS;
-            },
+            Ok(r) => {
+                if sys::isatty(r) {
+                    return SUCCESS;
+                }
+            }
             Err(_) => eprintln!("ion: isatty given bad number"),
         }
 
         #[cfg(not(target_os = "redox"))]
         match args[1].parse::<i32>() {
-            Ok(r) => if sys::isatty(r) {
-                return SUCCESS;
-            },
+            Ok(r) => {
+                if sys::isatty(r) {
+                    return SUCCESS;
+                }
+            }
             Err(_) => eprintln!("ion: isatty given bad number"),
         }
     } else {

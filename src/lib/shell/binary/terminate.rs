@@ -1,5 +1,5 @@
-use shell::{flags::UNTERMINATED, status::*, Binary, FlowLogic, Shell};
 use parser::Terminator;
+use shell::{flags::UNTERMINATED, status::*, Binary, FlowLogic, Shell};
 
 pub(crate) fn terminate_script_quotes<I: Iterator<Item = String>>(
     shell: &mut Shell,
@@ -52,9 +52,9 @@ pub(crate) fn terminate_script_quotes<I: Iterator<Item = String>>(
 pub(crate) fn terminate_quotes(shell: &mut Shell, command: String) -> Result<String, ()> {
     let mut buffer = Terminator::new(command);
     shell.flags |= UNTERMINATED;
-    while ! buffer.is_terminated() {
+    while !buffer.is_terminated() {
         if let Some(command) = shell.readln() {
-            if ! command.starts_with('#') {
+            if !command.starts_with('#') {
                 buffer.append(&command);
             }
         } else {

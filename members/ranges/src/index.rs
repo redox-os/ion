@@ -13,11 +13,13 @@ impl Index {
     pub fn resolve(&self, vector_length: usize) -> Option<usize> {
         match *self {
             Index::Forward(n) => Some(n),
-            Index::Backward(n) => if n >= vector_length {
-                None
-            } else {
-                Some(vector_length - (n + 1))
-            },
+            Index::Backward(n) => {
+                if n >= vector_length {
+                    None
+                } else {
+                    Some(vector_length - (n + 1))
+                }
+            }
         }
     }
 
@@ -25,7 +27,7 @@ impl Index {
     /// - A positive value `n` represents `Forward(n)`
     /// - A negative value `-n` reprents `Backwards(n - 1)` such that:
     /// ```ignore,rust
-    /// assert_eq!(Index::new(-1), Index::Backward(0)) 
+    /// assert_eq!(Index::new(-1), Index::Backward(0))
     /// ```
     pub fn new(input: isize) -> Index {
         if input < 0 {

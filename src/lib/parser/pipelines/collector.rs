@@ -5,16 +5,23 @@ use shell::{Job, JobKind};
 use types::*;
 
 trait AddItem {
-    fn add_item(&mut self, job_kind: JobKind, args: &mut Array, outputs: &mut Option<Vec<Redirection>>, inputs: &mut Option<Vec<Input>>);
+    fn add_item(
+        &mut self,
+        job_kind: JobKind,
+        args: &mut Array,
+        outputs: &mut Option<Vec<Redirection>>,
+        inputs: &mut Option<Vec<Input>>,
+    );
 }
 
 impl AddItem for Pipeline {
-    fn add_item(&mut self,
-                job_kind: JobKind,
-                args: &mut Array,
-                outputs: &mut Option<Vec<Redirection>>,
-                inputs: &mut Option<Vec<Input>>)
-    {
+    fn add_item(
+        &mut self,
+        job_kind: JobKind,
+        args: &mut Array,
+        outputs: &mut Option<Vec<Redirection>>,
+        inputs: &mut Option<Vec<Input>>,
+    ) {
         if !args.is_empty() {
             let job = Job::new(args.clone(), job_kind);
             args.clear();
@@ -39,7 +46,8 @@ impl<'a> Collector<'a> {
     /// Add a new argument that is re
     #[inline(always)]
     fn push_arg<I>(&self, args: &mut Array, bytes: &mut Peekable<I>) -> Result<(), &'static str>
-        where I: Iterator<Item=(usize, u8)>,
+    where
+        I: Iterator<Item = (usize, u8)>,
     {
         match self.arg(bytes) {
             Ok(Some(v)) => {
@@ -53,11 +61,14 @@ impl<'a> Collector<'a> {
 
     /// Attempt to add a redirection
     #[inline(always)]
-    fn push_redir_to_output<I>(&self,
-                               from: RedirectFrom,
-                               outputs: &mut Option<Vec<Redirection>>,
-                               bytes: &mut Peekable<I>) -> Result<(), &'static str>
-        where I: Iterator<Item=(usize, u8)>,
+    fn push_redir_to_output<I>(
+        &self,
+        from: RedirectFrom,
+        outputs: &mut Option<Vec<Redirection>>,
+        bytes: &mut Peekable<I>,
+    ) -> Result<(), &'static str>
+    where
+        I: Iterator<Item = (usize, u8)>,
     {
         if outputs.is_none() {
             *outputs = Some(Vec::new());
@@ -71,7 +82,13 @@ impl<'a> Collector<'a> {
         let arg = self.arg(bytes)?;
         match arg {
             Some(file) => {
-                outputs.as_mut().map(|o| o.push(Redirection { from: from, file: file.into(), append, }));
+                outputs.as_mut().map(|o| {
+                    o.push(Redirection {
+                        from,
+                        file: file.into(),
+                        append,
+                    })
+                });
                 Ok(())
             }
             None => Err("expected file argument after redirection for output"),
@@ -95,18 +112,37 @@ impl<'a> Collector<'a> {
                         Some(&(_, b'>')) => {
                             // And this byte
                             bytes.next();
-                            self.push_redir_to_output(RedirectFrom::Both, &mut outputs, &mut bytes)?;
+                            self.push_redir_to_output(
+                                RedirectFrom::Both,
+                                &mut outputs,
+                                &mut bytes,
+                            )?;
                         }
                         Some(&(_, b'|')) => {
                             bytes.next();
-                            pipeline.add_item(JobKind::Pipe(RedirectFrom::Both), &mut args, &mut outputs, &mut inputs);
+                            pipeline.add_item(
+                                JobKind::Pipe(RedirectFrom::Both),
+                                &mut args,
+                                &mut outputs,
+                                &mut inputs,
+                            );
                         }
                         Some(&(_, b'!')) => {
                             bytes.next();
-                            pipeline.add_item(JobKind::Disown, &mut args, &mut outputs, &mut inputs);
+                            pipeline.add_item(
+                                JobKind::Disown,
+                                &mut args,
+                                &mut outputs,
+                                &mut inputs,
+                            );
                         }
                         Some(_) | None => {
-                            pipeline.add_item(JobKind::Background, &mut args, &mut outputs, &mut inputs);
+                            pipeline.add_item(
+                                JobKind::Background,
+                                &mut args,
+                                &mut outputs,
+                                &mut inputs,
+                            );
                         }
                     }
                 }
@@ -117,19 +153,33 @@ impl<'a> Collector<'a> {
                         Some(b'>') => {
                             bytes.next();
                             bytes.next();
-                            self.push_redir_to_output(RedirectFrom::Stderr, &mut outputs, &mut bytes)?;
+                            self.push_redir_to_output(
+                                RedirectFrom::Stderr,
+                                &mut outputs,
+                                &mut bytes,
+                            )?;
                         }
                         Some(b'|') => {
                             bytes.next();
                             bytes.next();
-                            pipeline.add_item(JobKind::Pipe(RedirectFrom::Stderr), &mut args, &mut outputs, &mut inputs);
+                            pipeline.add_item(
+                                JobKind::Pipe(RedirectFrom::Stderr),
+                                &mut args,
+                                &mut outputs,
+                                &mut inputs,
+                            );
                         }
                         Some(_) | None => self.push_arg(&mut args, &mut bytes)?,
                     }
                 }
                 b'|' => {
                     bytes.next();
-                    pipeline.add_item(JobKind::Pipe(RedirectFrom::Stdout), &mut args, &mut outputs, &mut inputs);
+                    pipeline.add_item(
+                        JobKind::Pipe(RedirectFrom::Stdout),
+                        &mut args,
+                        &mut outputs,
+                        &mut inputs,
+                    );
                 }
                 b'>' => {
                     bytes.next();
@@ -264,13 +314,15 @@ impl<'a> Collector<'a> {
                     array_brace_counter = array_brace_counter.wrapping_mul(2);
                     bytes.next();
                 }
-                b'}' => if array_brace_counter % 2 == 0 {
-                    brace_level -= 1;
-                    array_brace_counter /= 2;
-                    bytes.next();
-                } else {
-                    break;
-                },
+                b'}' => {
+                    if array_brace_counter % 2 == 0 {
+                        brace_level -= 1;
+                        array_brace_counter /= 2;
+                        bytes.next();
+                    } else {
+                        break;
+                    }
+                }
                 // This is a tricky one: we only end the argment if `^` is followed by a
                 // redirection character
                 b'^' => {

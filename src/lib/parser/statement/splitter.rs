@@ -198,16 +198,18 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b'{' if !self.flags.contains(Flags::DQUOTE) => self.brace_level += 1,
                 b'}' if self.flags.contains(Flags::VBRACE) => self.flags.toggle(Flags::VBRACE),
-                b'}' if !self.flags.contains(Flags::DQUOTE) => if self.brace_level == 0 {
-                    if error.is_none() {
-                        error = Some(StatementError::InvalidCharacter(
-                            character as char,
-                            self.read,
-                        ))
+                b'}' if !self.flags.contains(Flags::DQUOTE) => {
+                    if self.brace_level == 0 {
+                        if error.is_none() {
+                            error = Some(StatementError::InvalidCharacter(
+                                character as char,
+                                self.read,
+                            ))
+                        }
+                    } else {
+                        self.brace_level -= 1;
                     }
-                } else {
-                    self.brace_level -= 1;
-                },
+                }
                 b'(' if self.flags.contains(Flags::MATHEXPR) => {
                     self.math_paren_level += 1;
                 }
@@ -238,23 +240,27 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'(' if self.flags.intersects(Flags::VARIAB | Flags::ARRAY) => {
                     self.flags = (self.flags - (Flags::VARIAB | Flags::ARRAY)) | Flags::METHOD;
                 }
-                b')' if self.flags.contains(Flags::MATHEXPR) => if self.math_paren_level == 0 {
-                    if self.data.as_bytes().len() <= self.read {
-                        if error.is_none() {
-                            error = Some(StatementError::UnterminatedArithmetic)
+                b')' if self.flags.contains(Flags::MATHEXPR) => {
+                    if self.math_paren_level == 0 {
+                        if self.data.as_bytes().len() <= self.read {
+                            if error.is_none() {
+                                error = Some(StatementError::UnterminatedArithmetic)
+                            }
+                        } else {
+                            let next_character = self.data.as_bytes()[self.read] as char;
+                            if next_character == ')' {
+                                self.flags = (self.flags - Flags::MATHEXPR) | Flags::POST_MATHEXPR;
+                            } else if error.is_none() {
+                                error = Some(StatementError::InvalidCharacter(
+                                    next_character,
+                                    self.read,
+                                ));
+                            }
                         }
                     } else {
-                        let next_character = self.data.as_bytes()[self.read] as char;
-                        if next_character == ')' {
-                            self.flags = (self.flags - Flags::MATHEXPR) | Flags::POST_MATHEXPR;
-                        } else if error.is_none() {
-                            error =
-                                Some(StatementError::InvalidCharacter(next_character, self.read));
-                        }
+                        self.math_paren_level -= 1;
                     }
-                } else {
-                    self.math_paren_level -= 1;
-                },
+                }
                 b')' if self.flags.contains(Flags::METHOD) && self.paren_level == 0 => {
                     self.flags ^= Flags::METHOD;
                 }
@@ -298,7 +304,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
 
                 b'#' if self.read == 1
-                    || (!self.flags.contains(Flags::DQUOTE) && self.paren_level == 0
+                    || (!self.flags.contains(Flags::DQUOTE)
+                        && self.paren_level == 0
                         && match self.data.as_bytes()[self.read - 2] {
                             b' ' | b'\t' => true,
                             _ => false,
@@ -333,13 +340,15 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     }
                 }
                 // [^A-Za-z0-9_]
-                byte => if self.flags.intersects(Flags::VARIAB | Flags::ARRAY) {
-                    self.flags -= if is_invalid(byte) {
-                        Flags::VARIAB | Flags::ARRAY
-                    } else {
-                        Flags::empty()
-                    };
-                },
+                byte => {
+                    if self.flags.intersects(Flags::VARIAB | Flags::ARRAY) {
+                        self.flags -= if is_invalid(byte) {
+                            Flags::VARIAB | Flags::ARRAY
+                        } else {
+                            Flags::empty()
+                        };
+                    }
+                }
             }
             self.flags -= Flags::COMM_1 | Flags::COMM_2;
         }

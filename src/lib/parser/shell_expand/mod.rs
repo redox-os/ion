@@ -108,9 +108,11 @@ fn expand_brace<E: Expander>(
         .flat_map(|node| expand_string_no_glob(node, expand_func, reverse_quoting))
     {
         match parse_range(&word) {
-            Some(elements) => for word in elements {
-                temp.push(word)
-            },
+            Some(elements) => {
+                for word in elements {
+                    temp.push(word)
+                }
+            }
             None => temp.push(word),
         }
     }
@@ -172,18 +174,20 @@ fn slice<S: AsRef<str>>(output: &mut small::String, expanded: S, selection: Sele
     match selection {
         Select::None => (),
         Select::All => output.push_str(expanded.as_ref()),
-        Select::Index(Index::Forward(id)) => if let Some(character) =
-            UnicodeSegmentation::graphemes(expanded.as_ref(), true).nth(id)
-        {
-            output.push_str(character);
-        },
-        Select::Index(Index::Backward(id)) => if let Some(character) =
-            UnicodeSegmentation::graphemes(expanded.as_ref(), true)
+        Select::Index(Index::Forward(id)) => {
+            if let Some(character) = UnicodeSegmentation::graphemes(expanded.as_ref(), true).nth(id)
+            {
+                output.push_str(character);
+            }
+        }
+        Select::Index(Index::Backward(id)) => {
+            if let Some(character) = UnicodeSegmentation::graphemes(expanded.as_ref(), true)
                 .rev()
                 .nth(id)
-        {
-            output.push_str(character);
-        },
+            {
+                output.push_str(character);
+            }
+        }
         Select::Range(range) => {
             let graphemes = UnicodeSegmentation::graphemes(expanded.as_ref(), true);
             if let Some((start, length)) = range.bounds(graphemes.clone().count()) {
@@ -403,11 +407,13 @@ fn expand_braces<E: Expander>(
             if word.find('*').is_some() {
                 if let Ok(mut paths) = glob(&word) {
                     match paths.next() {
-                        Some(path) => if let Ok(path_buf) = path {
-                            array.push((*path_buf.to_string_lossy()).into());
-                        } else {
-                            array.push("".into());
-                        },
+                        Some(path) => {
+                            if let Ok(path_buf) = path {
+                                array.push((*path_buf.to_string_lossy()).into());
+                            } else {
+                                array.push("".into());
+                            }
+                        }
                         None => {}
                     }
                     for path in paths {
@@ -727,7 +733,11 @@ pub(crate) fn expand_tokens<E: Expander>(
 /// if `x=5` and `y=7`
 fn expand_arithmetic<E: Expander>(output: &mut small::String, input: &str, expander: &E) {
     // small::String cannot be created with a capacity of 0 without causing a panic
-    let len = if input.as_bytes().is_empty() { input.as_bytes().len() } else { 1 };
+    let len = if input.as_bytes().is_empty() {
+        input.as_bytes().len()
+    } else {
+        1
+    };
     let mut intermediate = small::String::with_capacity(len);
     let mut varbuf = small::String::new();
     let flush = |var: &mut small::String, out: &mut small::String| {

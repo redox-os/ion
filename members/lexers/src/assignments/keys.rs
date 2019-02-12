@@ -93,7 +93,7 @@ impl<'a> KeyIterator<'a> {
                         None => {
                             break Err(TypeError::Invalid(
                                 self.data[index_ident_end + 1..self.read].into(),
-                            ))
+                            ));
                         }
                     },
                 };
@@ -142,7 +142,7 @@ impl<'a> Iterator for KeyIterator<'a> {
                     return Some(Ok(Key {
                         name: &self.data[start..self.read].trim(),
                         kind: Primitive::Any,
-                    }))
+                    }));
                 }
                 b':' => {
                     let end = self.read - 1;

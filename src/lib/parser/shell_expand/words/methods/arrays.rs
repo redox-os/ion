@@ -51,13 +51,15 @@ impl<'a> ArrayMethod<'a> {
     }
 
     fn map_keys<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Array, &'static str> {
-        expand_func.map_keys(self.variable, self.selection.clone())
+        expand_func
+            .map_keys(self.variable, self.selection.clone())
             .ok_or("no map found")
             .map(|x| x.cloned().collect())
     }
 
     fn map_values<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Array, &'static str> {
-        expand_func.map_values(self.variable, self.selection.clone())
+        expand_func
+            .map_values(self.variable, self.selection.clone())
             .ok_or("no map found")
             .map(|x| x.collect())
     }
@@ -74,20 +76,21 @@ impl<'a> ArrayMethod<'a> {
     fn split_at<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
         match self.pattern {
-            Pattern::StringPattern(string) => if let Ok(value) =
-                expand_string(string, expand_func, false)
+            Pattern::StringPattern(string) => {
+                if let Ok(value) = expand_string(string, expand_func, false)
                     .join(" ")
                     .parse::<usize>()
-            {
-                if value < variable.len() {
-                    let (l, r) = variable.split_at(value);
-                    Ok(array![types::Str::from(l), types::Str::from(r)])
+                {
+                    if value < variable.len() {
+                        let (l, r) = variable.split_at(value);
+                        Ok(array![types::Str::from(l), types::Str::from(r)])
+                    } else {
+                        Err("value is out of bounds")
+                    }
                 } else {
-                    Err("value is out of bounds")
+                    Err("requires a valid number as an argument")
                 }
-            } else {
-                Err("requires a valid number as an argument")
-            },
+            }
             Pattern::Whitespace => Err("requires an argument"),
         }
     }

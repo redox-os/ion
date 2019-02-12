@@ -1,6 +1,7 @@
 use super::checker::*;
 use lexers::{
-    assignments::{Key, KeyIterator, Operator, Primitive, TypeError}, ArgumentSplitter,
+    assignments::{Key, KeyIterator, Operator, Primitive, TypeError},
+    ArgumentSplitter,
 };
 use std::fmt::{self, Display, Formatter};
 
@@ -90,16 +91,20 @@ impl<'a> Iterator for AssignmentActions<'a> {
                 }
                 Err(why) => Some(Err(AssignmentError::TypeError(why))),
             },
-            (None, Some(lone_val)) => if let Some(&prevkey) = self.prevkeys.last() {
-                Some(Err(AssignmentError::ExtraValues(prevkey, self.prevval)))
-            } else {
-                Some(Err(AssignmentError::NoKey(lone_val)))
-            },
-            (Some(_), None) => if let Some(&prevkey) = self.prevkeys.last() {
-                Some(Err(AssignmentError::ExtraKeys(prevkey, self.prevval)))
-            } else {
-                unreachable!()
-            },
+            (None, Some(lone_val)) => {
+                if let Some(&prevkey) = self.prevkeys.last() {
+                    Some(Err(AssignmentError::ExtraValues(prevkey, self.prevval)))
+                } else {
+                    Some(Err(AssignmentError::NoKey(lone_val)))
+                }
+            }
+            (Some(_), None) => {
+                if let Some(&prevkey) = self.prevkeys.last() {
+                    Some(Err(AssignmentError::ExtraKeys(prevkey, self.prevval)))
+                } else {
+                    unreachable!()
+                }
+            }
             _ => None,
         }
     }
@@ -128,11 +133,13 @@ impl<'a> Action<'a> {
             | Primitive::IntegerArray
             | Primitive::StrArray
             | Primitive::HashMap(_)
-            | Primitive::BTreeMap(_) => if is_array(value) {
-                Ok(Action::UpdateArray(var, operator, value))
-            } else {
-                Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))
-            },
+            | Primitive::BTreeMap(_) => {
+                if is_array(value) {
+                    Ok(Action::UpdateArray(var, operator, value))
+                } else {
+                    Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))
+                }
+            }
             Primitive::Indexed(..) => Ok(Action::UpdateArray(var, operator, value)),
             Primitive::Any if is_array(value) => Ok(Action::UpdateArray(var, operator, value)),
             Primitive::Any => Ok(Action::UpdateString(var, operator, value)),

@@ -76,19 +76,22 @@ impl<'a> Iterator for MultipleBraceExpand<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.permutator.next_with_buffer(&mut self.buffer) {
             let mut strings = self.buffer.iter();
-            let small_vec: SmallVec<[u8; 64]> = self.tokens.iter().fold(
-                SmallVec::with_capacity(64),
-                |mut small_vec, token| match *token {
-                    BraceToken::Normal(ref text) => {
-                        escape_string(&mut small_vec, text);
-                        small_vec
-                    }
-                    BraceToken::Expander => {
-                        escape_string(&mut small_vec, strings.next().unwrap());
-                        small_vec
-                    }
-                },
-            );
+            let small_vec: SmallVec<[u8; 64]> =
+                self.tokens
+                    .iter()
+                    .fold(
+                        SmallVec::with_capacity(64),
+                        |mut small_vec, token| match *token {
+                            BraceToken::Normal(ref text) => {
+                                escape_string(&mut small_vec, text);
+                                small_vec
+                            }
+                            BraceToken::Expander => {
+                                escape_string(&mut small_vec, strings.next().unwrap());
+                                small_vec
+                            }
+                        },
+                    );
             Some(unsafe { small::String::from_utf8_unchecked(small_vec.to_vec()) })
         } else {
             None
@@ -114,19 +117,22 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         match self.loop_count {
             0 => {
-                let small_vec: SmallVec<[u8; 64]> = self.tokens.iter().fold(
-                    SmallVec::with_capacity(64),
-                    |mut small_vec, token| match *token {
-                        BraceToken::Normal(ref text) => {
-                            escape_string(&mut small_vec, text);
-                            small_vec
-                        }
-                        BraceToken::Expander => {
-                            escape_string(&mut small_vec, self.elements.next().unwrap());
-                            small_vec
-                        }
-                    },
-                );
+                let small_vec: SmallVec<[u8; 64]> =
+                    self.tokens
+                        .iter()
+                        .fold(
+                            SmallVec::with_capacity(64),
+                            |mut small_vec, token| match *token {
+                                BraceToken::Normal(ref text) => {
+                                    escape_string(&mut small_vec, text);
+                                    small_vec
+                                }
+                                BraceToken::Expander => {
+                                    escape_string(&mut small_vec, self.elements.next().unwrap());
+                                    small_vec
+                                }
+                            },
+                        );
                 self.loop_count = 1;
                 Some(unsafe { small::String::from_utf8_unchecked(small_vec.to_vec()) })
             }
@@ -194,7 +200,8 @@ mod tests {
                 elements: elements.iter().map(|element| *element),
                 tokens,
                 loop_count: 0,
-            }.collect::<Vec<small::String>>(),
+            }
+            .collect::<Vec<small::String>>(),
             vec![
                 small::String::from("A=one"),
                 small::String::from("A=two"),

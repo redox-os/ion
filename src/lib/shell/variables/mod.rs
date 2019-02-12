@@ -180,8 +180,7 @@ pub struct Variables {
 
 impl Default for Variables {
     fn default() -> Self {
-        let mut map: HashMap<types::Str, VariableType> =
-            HashMap::with_capacity(64);
+        let mut map: HashMap<types::Str, VariableType> = HashMap::with_capacity(64);
         map.insert(
             "DIRECTORY_STACK_SIZE".into(),
             VariableType::Str("1000".into()),
@@ -228,10 +227,7 @@ impl Default for Variables {
         }
 
         // History Timestamps enabled variable, disabled by default
-        map.insert(
-            "HISTORY_TIMESTAMP".into(),
-            VariableType::Str("0".into())
-        );
+        map.insert("HISTORY_TIMESTAMP".into(), VariableType::Str("0".into()));
 
         map.insert(
             "HISTORY_IGNORE".into(),
@@ -394,18 +390,22 @@ impl Variables {
         }
 
         match tilde_prefix {
-            "" => if let Some(home) = sys_env::home_dir() {
-                return Some(home.to_string_lossy().to_string() + remainder);
-            },
+            "" => {
+                if let Some(home) = sys_env::home_dir() {
+                    return Some(home.to_string_lossy().to_string() + remainder);
+                }
+            }
             "+" => {
                 return Some(match env::var("PWD") {
                     Ok(var) => var + remainder,
                     _ => ["?", remainder].concat(),
-                })
+                });
             }
-            "-" => if let Some(oldpwd) = self.get::<types::Str>("OLDPWD") {
-                return Some(oldpwd.to_string() + remainder);
-            },
+            "-" => {
+                if let Some(oldpwd) = self.get::<types::Str>("OLDPWD") {
+                    return Some(oldpwd.to_string() + remainder);
+                }
+            }
             _ => {
                 let neg;
                 let tilde_num;
@@ -433,9 +433,11 @@ impl Variables {
                             return Some(path.to_str().unwrap().to_string());
                         }
                     }
-                    Err(_) => if let Some(home) = self_sys::get_user_home(tilde_prefix) {
-                        return Some(home + remainder);
-                    },
+                    Err(_) => {
+                        if let Some(home) = self_sys::get_user_home(tilde_prefix) {
+                            return Some(home + remainder);
+                        }
+                    }
                 }
             }
         }
@@ -578,11 +580,13 @@ impl Variables {
                 ) -> Option<Action<'a>> {
                     if !name.is_empty() {
                         match var {
-                            VariableType::$preferred(var_value) => if var_value.is_empty() {
-                                Some(Action::Upper(UpperAction::Remove))
-                            } else {
-                                Some(Action::$preferred(input))
-                            },
+                            VariableType::$preferred(var_value) => {
+                                if var_value.is_empty() {
+                                    Some(Action::Upper(UpperAction::Remove))
+                                } else {
+                                    Some(Action::$preferred(input))
+                                }
+                            }
                             _ => Some(Action::Upper(UpperAction::Shadow)),
                         }
                     } else {

@@ -145,10 +145,12 @@ impl Colors {
 
             match variable.len() {
                 // 256 colors: 0xF | 0xFF
-                1 | 2 => if let Ok(value) = u8::from_str_radix(variable, 16) {
-                    *field = Some(Mode::Range256(value));
-                    return true;
-                },
+                1 | 2 => {
+                    if let Ok(value) = u8::from_str_radix(variable, 16) {
+                        *field = Some(Mode::Range256(value));
+                        return true;
+                    }
+                }
                 // 24-bit Color 0xRGB
                 3 => {
                     let mut chars = variable.chars();
@@ -162,14 +164,16 @@ impl Colors {
                     }
                 }
                 // 24-bit Color 0xRRGGBB
-                6 => if let Ok(red) = u8::from_str_radix(&variable[0..2], 16) {
-                    if let Ok(green) = u8::from_str_radix(&variable[2..4], 16) {
-                        if let Ok(blue) = u8::from_str_radix(&variable[4..6], 16) {
-                            *field = Some(Mode::TrueColor(red, green, blue));
-                            return true;
+                6 => {
+                    if let Ok(red) = u8::from_str_radix(&variable[0..2], 16) {
+                        if let Ok(green) = u8::from_str_radix(&variable[2..4], 16) {
+                            if let Ok(blue) = u8::from_str_radix(&variable[4..6], 16) {
+                                *field = Some(Mode::TrueColor(red, green, blue));
+                                return true;
+                            }
                         }
                     }
-                },
+                }
                 _ => (),
             }
         } else if let Ok(value) = variable.parse::<u8>() {

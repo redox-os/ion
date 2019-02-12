@@ -19,16 +19,16 @@ pub(crate) fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()
     let mut result = SUCCESS;
     for command in &args[1..] {
         match get_command_info(command, shell) {
-            Ok(c_type) =>  {
-                match c_type.as_ref() {
-                    "alias" => if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
+            Ok(c_type) => match c_type.as_ref() {
+                "alias" => {
+                    if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
                         println!("{}: alias to {}", command, &*alias);
-                    },
-                    "function" => println!("{}: function", command),
-                    "builtin" => println!("{}: built-in shell command", command),
-                    _path => println!("{}", _path),
+                    }
                 }
-            }
+                "function" => println!("{}: function", command),
+                "builtin" => println!("{}: built-in shell command", command),
+                _path => println!("{}", _path),
+            },
             Err(_) => result = FAILURE,
         }
     }
@@ -47,9 +47,11 @@ pub(crate) fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32
         match get_command_info(command, shell) {
             Ok(c_type) => {
                 match c_type.as_ref() {
-                    "alias" => if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
-                        println!("{} is aliased to `{}`", command, &*alias);
-                    },
+                    "alias" => {
+                        if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
+                            println!("{} is aliased to `{}`", command, &*alias);
+                        }
+                    }
                     // TODO Make it print the function.
                     "function" => println!("{} is a function", command),
                     "builtin" => println!("{} is a shell builtin", command),

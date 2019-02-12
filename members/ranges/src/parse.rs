@@ -196,8 +196,7 @@ pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
                 macro_rules! finish {
                     ($inclusive:expr, $read:expr) => {
                         let end_str = &input[$read..];
-                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str)
-                        {
+                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str) {
                             return numeric_range(
                                 start,
                                 end,
@@ -211,8 +210,7 @@ pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
                     };
                     ($inclusive:expr, $read:expr, $step:expr) => {
                         let end_str = &input[$read..];
-                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str)
-                        {
+                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str) {
                             return numeric_range(start, end, $step, $inclusive, nb_digits);
                         } else {
                             finish_char!($inclusive, end_str, $step);
@@ -301,8 +299,7 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                     break;
                 }
 
-                let inclusive = dots == 3
-                    || (dots == 2 && last_byte == b'=');
+                let inclusive = dots == 3 || (dots == 2 && last_byte == b'=');
 
                 let end = &input[id + if inclusive { 3 } else { 2 }..];
 
@@ -310,19 +307,26 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                     return if end.is_empty() {
                         None
                     } else {
-                        end.parse::<isize>().map(|end| Range::to(Index::new(end))).ok()
+                        end.parse::<isize>()
+                            .map(|end| Range::to(Index::new(end)))
+                            .ok()
                     };
                 } else if end.is_empty() {
-                    return first.parse::<isize>()
-                        .map(|start| Range::from(Index::new(start))).ok();
+                    return first
+                        .parse::<isize>()
+                        .map(|start| Range::from(Index::new(start)))
+                        .ok();
                 }
 
-                return first.parse::<isize>()
+                return first
+                    .parse::<isize>()
                     .and_then(|start| end.parse::<isize>().map(|end| (start, end)))
-                    .map(|(start, end)| if inclusive {
-                        Range::inclusive(Index::new(start), Index::new(end))
-                    } else {
-                        Range::exclusive(Index::new(start), Index::new(end))
+                    .map(|(start, end)| {
+                        if inclusive {
+                            Range::inclusive(Index::new(start), Index::new(end))
+                        } else {
+                            Range::exclusive(Index::new(start), Index::new(end))
+                        }
                     })
                     .ok();
             }

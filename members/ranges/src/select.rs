@@ -45,11 +45,13 @@ where
                 .and_then(|idx| self.nth(idx))
                 .into_iter()
                 .collect(),
-            Select::Range(range) => if let Some((start, length)) = range.bounds(size) {
-                self.skip(start).take(length).collect()
-            } else {
-                empty().collect()
-            },
+            Select::Range(range) => {
+                if let Some((start, length)) = range.bounds(size) {
+                    self.skip(start).take(length).collect()
+                } else {
+                    empty().collect()
+                }
+            }
             Select::Key(_) => empty().collect(),
         }
     }

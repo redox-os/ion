@@ -4,14 +4,18 @@ use types;
 
 pub(crate) fn is(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
     match args.len() {
-        4 => if args[1] != "not" {
-            return Err(format!("Expected 'not' instead found '{}'\n", args[1]).to_string());
-        } else if eval_arg(&*args[2], shell) == eval_arg(&*args[3], shell) {
-            return Err("".to_string());
-        },
-        3 => if eval_arg(&*args[1], shell) != eval_arg(&*args[2], shell) {
-            return Err("".to_string());
-        },
+        4 => {
+            if args[1] != "not" {
+                return Err(format!("Expected 'not' instead found '{}'\n", args[1]).to_string());
+            } else if eval_arg(&*args[2], shell) == eval_arg(&*args[3], shell) {
+                return Err("".to_string());
+            }
+        }
+        3 => {
+            if eval_arg(&*args[1], shell) != eval_arg(&*args[2], shell) {
+                return Err("".to_string());
+            }
+        }
         _ => return Err("is needs 3 or 4 arguments\n".to_string()),
     }
 
