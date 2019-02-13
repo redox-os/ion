@@ -440,8 +440,10 @@ impl VariableStore for Shell {
         for action in actions_step2 {
             match action {
                 Ok(Action::UpdateArray(key, operator, ..)) => {
-                    if operator == Operator::OptionalEqual && self.variables.get_ref(key.name).is_some() {
-                            continue;
+                    if operator == Operator::OptionalEqual
+                        && self.variables.get_ref(key.name).is_some()
+                    {
+                        continue;
                     }
                     match collected.remove(key.name) {
                         hmap @ Some(VariableType::HashMap(_)) => {
@@ -528,7 +530,9 @@ impl VariableStore for Shell {
                     }
                 }
                 Ok(Action::UpdateString(key, operator, ..)) => {
-                    if operator == Operator::OptionalEqual && self.variables.get_ref(key.name).is_some() {
+                    if operator == Operator::OptionalEqual
+                        && self.variables.get_ref(key.name).is_some()
+                    {
                         continue;
                     }
                     match collected.remove(key.name) {

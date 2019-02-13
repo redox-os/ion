@@ -120,6 +120,7 @@ pub struct Shell {
     ignore_setting: IgnoreSetting,
 }
 
+#[derive(Default)]
 pub struct ShellBuilder;
 
 impl ShellBuilder {

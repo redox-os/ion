@@ -127,25 +127,19 @@ impl fmt::Display for VariableType {
             VariableType::Alias(ref alias) => write!(f, "{}", **alias),
             VariableType::Array(ref array) => write!(f, "{}", array.join(" ")),
             VariableType::HashMap(ref map) => {
-                let mut format =
-                    map.into_iter()
-                        .fold(String::new(), |mut format, (_, var_type)| {
-                            format.push_str(&format!("{}", var_type));
-                            format.push(' ');
-                            format
-                        });
-                format.pop();
+                let format = map
+                    .iter()
+                    .map(|(_, var_type)| format!("{}", var_type))
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 write!(f, "{}", format)
             }
             VariableType::BTreeMap(ref map) => {
-                let mut format =
-                    map.iter()
-                        .fold(String::new(), |mut format, (_, var_type)| {
-                            format.push_str(&format!("{}", var_type));
-                            format.push(' ');
-                            format
-                        });
-                format.pop();
+                let format = map
+                    .iter()
+                    .map(|(_, var_type)| format!("{}", var_type))
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 write!(f, "{}", format)
             }
             _ => write!(f, ""),

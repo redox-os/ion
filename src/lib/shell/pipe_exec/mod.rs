@@ -815,9 +815,7 @@ pub(crate) fn pipe(
 
                     ext_stdio_pipes = None;
 
-                    if set_process_group(&mut pgid, current_pid)
-                        && foreground
-                        && !shell.is_library
+                    if set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library
                     {
                         let _ = sys::tcsetpgrp(0, pgid);
                     }
