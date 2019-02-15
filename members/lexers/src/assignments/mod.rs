@@ -77,40 +77,22 @@ mod tests {
         assert_eq!(assignment_lexer(""), (None, None, None));
         assert_eq!(assignment_lexer("abc"), (Some("abc"), None, None));
 
-        assert_eq!(
-            assignment_lexer("abc+=def"),
-            (Some("abc"), Some(Operator::Add), Some("def"))
-        );
+        assert_eq!(assignment_lexer("abc+=def"), (Some("abc"), Some(Operator::Add), Some("def")));
 
-        assert_eq!(
-            assignment_lexer("a+=b"),
-            (Some("a"), Some(Operator::Add), Some("b"))
-        );
+        assert_eq!(assignment_lexer("a+=b"), (Some("a"), Some(Operator::Add), Some("b")));
 
-        assert_eq!(
-            assignment_lexer("a=b"),
-            (Some("a"), Some(Operator::Equal), Some("b"))
-        );
+        assert_eq!(assignment_lexer("a=b"), (Some("a"), Some(Operator::Equal), Some("b")));
 
-        assert_eq!(
-            assignment_lexer("abc ="),
-            (Some("abc"), Some(Operator::Equal), None)
-        );
+        assert_eq!(assignment_lexer("abc ="), (Some("abc"), Some(Operator::Equal), None));
 
-        assert_eq!(
-            assignment_lexer("abc =  "),
-            (Some("abc"), Some(Operator::Equal), None)
-        );
+        assert_eq!(assignment_lexer("abc =  "), (Some("abc"), Some(Operator::Equal), None));
 
         assert_eq!(
             assignment_lexer("abc = def"),
             (Some("abc"), Some(Operator::Equal), Some("def"))
         );
 
-        assert_eq!(
-            assignment_lexer("abc=def"),
-            (Some("abc"), Some(Operator::Equal), Some("def"))
-        );
+        assert_eq!(assignment_lexer("abc=def"), (Some("abc"), Some(Operator::Equal), Some("def")));
 
         assert_eq!(
             assignment_lexer("def ghi += 124 523"),
@@ -127,11 +109,7 @@ mod tests {
 
         assert_eq!(
             assignment_lexer("abc def ?= 123 456"),
-            (
-                Some("abc def"),
-                Some(Operator::OptionalEqual),
-                Some("123 456")
-            )
+            (Some("abc def"), Some(Operator::OptionalEqual), Some("123 456"))
         );
     }
 
@@ -147,10 +125,7 @@ mod tests {
             (Some("abc"), Some(Operator::Exponent), Some("def"))
         );
 
-        assert_eq!(
-            assignment_lexer("abc += def"),
-            (Some("abc"), Some(Operator::Add), Some("def"))
-        );
+        assert_eq!(assignment_lexer("abc += def"), (Some("abc"), Some(Operator::Add), Some("def")));
 
         assert_eq!(
             assignment_lexer("abc -= def"),

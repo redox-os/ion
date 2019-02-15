@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use super::{
     flags::*,
     flow_control::{insert_statement, Case, ElseIf, Function, Statement},
@@ -6,6 +5,7 @@ use super::{
     status::*,
     Shell,
 };
+use itertools::Itertools;
 use parser::{
     assignments::is_array,
     expand_string, parse_and_validate,
@@ -18,13 +18,13 @@ use std::io::{stdout, Write};
 use types;
 
 macro_rules! handle_signal {
-    ($signal:expr) => (
+    ($signal:expr) => {
         match $signal {
             Condition::Break => break,
             Condition::SigInt => return Condition::SigInt,
             _ => (),
         }
-    )
+    };
 }
 
 #[derive(Debug)]
@@ -94,9 +94,7 @@ impl FlowLogic for Shell {
         }
 
         // Try to execute else_if branches
-        let else_if_conditions = else_if
-            .into_iter()
-            .map(|cond| (cond.expression, cond.success));
+        let else_if_conditions = else_if.into_iter().map(|cond| (cond.expression, cond.success));
 
         for (condition, statements) in else_if_conditions {
             if let Condition::SigInt = self.execute_statements(condition) {
@@ -118,7 +116,7 @@ impl FlowLogic for Shell {
         statements: Vec<Statement>,
     ) -> Condition {
         macro_rules! set_vars_then_exec {
-            ($chunk:expr, $def:expr) => (
+            ($chunk:expr, $def:expr) => {
                 for (key, value) in variables.iter().zip($chunk.chain(::std::iter::repeat($def))) {
                     if key != "_" {
                         self.set(key, value.clone());
@@ -126,21 +124,27 @@ impl FlowLogic for Shell {
                 }
 
                 handle_signal!(self.execute_statements(statements.clone()));
-            )
+            };
         }
 
         let default = ::small::String::new();
 
         match ForValueExpression::new(values, self) {
-            ForValueExpression::Multiple(values) => for chunk in &values.iter().chunks(variables.len()) {
-                set_vars_then_exec!(chunk, &default);
-            },
-            ForValueExpression::Normal(values) => for chunk in &values.lines().chunks(variables.len()) {
-                set_vars_then_exec!(chunk, "");
-            },
-            ForValueExpression::Range(range) => for chunk in &range.chunks(variables.len()) {
-                set_vars_then_exec!(chunk, default.clone());
-            },
+            ForValueExpression::Multiple(values) => {
+                for chunk in &values.iter().chunks(variables.len()) {
+                    set_vars_then_exec!(chunk, &default);
+                }
+            }
+            ForValueExpression::Normal(values) => {
+                for chunk in &values.lines().chunks(variables.len()) {
+                    set_vars_then_exec!(chunk, "");
+                }
+            }
+            ForValueExpression::Range(range) => {
+                for chunk in &range.chunks(variables.len()) {
+                    set_vars_then_exec!(chunk, default.clone());
+                }
+            }
         };
 
         Condition::NoOp
@@ -185,45 +189,27 @@ impl FlowLogic for Shell {
                 self.previous_status = self.export(action);
                 self.variables.set("?", self.previous_status.to_string());
             }
-            Statement::While {
-                expression,
-                statements,
-            } => {
+            Statement::While { expression, statements } => {
                 if let Condition::SigInt = self.execute_while(expression, statements) {
                     return Condition::SigInt;
                 }
             }
-            Statement::For {
-                variables,
-                values,
-                statements,
-            } => {
+            Statement::For { variables, values, statements } => {
                 if let Condition::SigInt = self.execute_for(&variables, &values, statements) {
                     return Condition::SigInt;
                 }
             }
-            Statement::If {
-                expression,
-                success,
-                else_if,
-                failure,
-                ..
-            } => match self.execute_if(expression, success, else_if, failure) {
-                Condition::Break => return Condition::Break,
-                Condition::Continue => return Condition::Continue,
-                Condition::NoOp => (),
-                Condition::SigInt => return Condition::SigInt,
-            },
-            Statement::Function {
-                name,
-                args,
-                statements,
-                description,
-            } => {
-                self.variables.set(
-                    &name,
-                    Function::new(description, name.clone(), args, statements),
-                );
+            Statement::If { expression, success, else_if, failure, .. } => {
+                match self.execute_if(expression, success, else_if, failure) {
+                    Condition::Break => return Condition::Break,
+                    Condition::Continue => return Condition::Continue,
+                    Condition::NoOp => (),
+                    Condition::SigInt => return Condition::SigInt,
+                }
+            }
+            Statement::Function { name, args, statements, description } => {
+                self.variables
+                    .set(&name, Function::new(description, name.clone(), args, statements));
             }
             Statement::Pipeline(pipeline) => match expand_pipeline(&self, pipeline) {
                 Ok((mut pipeline, statements)) => {
@@ -380,16 +366,12 @@ impl FlowLogic for Shell {
                     let mut previous_bind = None;
                     if let Some(ref bind) = case.binding {
                         if is_array {
-                            previous_bind = self
-                                .variables
-                                .get::<types::Array>(bind)
-                                .map(VariableType::Array);
+                            previous_bind =
+                                self.variables.get::<types::Array>(bind).map(VariableType::Array);
                             self.variables.set(&bind, value.clone());
                         } else {
-                            previous_bind = self
-                                .variables
-                                .get::<types::Str>(bind)
-                                .map(VariableType::Str);
+                            previous_bind =
+                                self.variables.get::<types::Str>(bind).map(VariableType::Str);
                             self.set(&bind, value.join(" "));
                         }
                     }
@@ -426,16 +408,12 @@ impl FlowLogic for Shell {
                     let mut previous_bind = None;
                     if let Some(ref bind) = case.binding {
                         if is_array {
-                            previous_bind = self
-                                .variables
-                                .get::<types::Array>(bind)
-                                .map(VariableType::Array);
+                            previous_bind =
+                                self.variables.get::<types::Array>(bind).map(VariableType::Array);
                             self.variables.set(&bind, value.clone());
                         } else {
-                            previous_bind = self
-                                .variables
-                                .get::<types::Str>(bind)
-                                .map(VariableType::Str);
+                            previous_bind =
+                                self.variables.get::<types::Str>(bind).map(VariableType::Str);
                             self.set(&bind, value.join(" "));
                         }
                     }
@@ -508,13 +486,9 @@ fn expand_pipeline(
     let mut statements = Vec::new();
 
     while let Some(item) = item_iter.next() {
-        let possible_alias = shell
-            .variables
-            .get::<types::Alias>(item.job.command.as_ref());
+        let possible_alias = shell.variables.get::<types::Alias>(item.job.command.as_ref());
         if let Some(alias) = possible_alias {
-            statements = StatementSplitter::new(alias.0.as_str())
-                .map(parse_and_validate)
-                .collect();
+            statements = StatementSplitter::new(alias.0.as_str()).map(parse_and_validate).collect();
 
             // First item in the alias should be a pipeline item, otherwise it cannot
             // be placed into a pipeline!
@@ -548,7 +522,7 @@ fn expand_pipeline(
             statements.remove(0);
 
             // Handle pipeline being broken half by i.e.: '&&' or '||'
-            if ! statements.is_empty() {
+            if !statements.is_empty() {
                 let err = match statements.last_mut().unwrap() {
                     Statement::And(ref mut boxed_stm)
                     | Statement::Or(ref mut boxed_stm)
@@ -563,7 +537,7 @@ fn expand_pipeline(
                             }
                             // Append rest of the pipeline to the last pipeline in the
                             // alias.
-                            while let Some(item) = item_iter.next() {
+                            for item in item_iter {
                                 pline.items.push(item.clone());
                             }
                             // No error

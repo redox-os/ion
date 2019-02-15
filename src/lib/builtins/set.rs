@@ -31,12 +31,16 @@ pub(crate) fn set(args: &[small::String], shell: &mut Shell) -> i32 {
                 match flag {
                     b'e' => shell.flags |= ERR_EXIT,
                     b'o' => match args_iter.next().map(|s| s as &str) {
-                        Some("vi") => if let Some(context) = shell.context.as_mut() {
-                            context.key_bindings = KeyBindings::Vi;
-                        },
-                        Some("emacs") => if let Some(context) = shell.context.as_mut() {
-                            context.key_bindings = KeyBindings::Emacs;
-                        },
+                        Some("vi") => {
+                            if let Some(context) = shell.context.as_mut() {
+                                context.key_bindings = KeyBindings::Vi;
+                            }
+                        }
+                        Some("emacs") => {
+                            if let Some(context) = shell.context.as_mut() {
+                                context.key_bindings = KeyBindings::Emacs;
+                            }
+                        }
                         Some("huponexit") => shell.flags |= HUPONEXIT,
                         Some(_) => {
                             eprintln!("ion: set: invalid option");
@@ -85,9 +89,11 @@ pub(crate) fn set(args: &[small::String], shell: &mut Shell) -> i32 {
                 UnsetIfNone => {
                     shell.variables.set("args", arguments);
                 }
-                RetainIfNone => if arguments.len() != 1 {
-                    shell.variables.set("args", arguments);
-                },
+                RetainIfNone => {
+                    if arguments.len() != 1 {
+                        shell.variables.set("args", arguments);
+                    }
+                }
             }
         }
     }

@@ -131,6 +131,7 @@ impl Statement {
             Statement::Default => "Default",
         }
     }
+
     pub fn is_block(&self) -> bool {
         match *self {
             Statement::Case(_)
@@ -156,15 +157,11 @@ impl FlowControl {
     pub(crate) fn reset(&mut self) { self.block.clear() }
 
     /// Check if there isn't an unfinished block.
-    pub(crate) fn unclosed_block(&self) -> bool { ! self.block.is_empty() }
+    pub(crate) fn unclosed_block(&self) -> bool { !self.block.is_empty() }
 }
 
 impl Default for FlowControl {
-    fn default() -> FlowControl {
-        FlowControl {
-            block: Vec::with_capacity(5),
-        }
-    }
+    fn default() -> FlowControl { FlowControl { block: Vec::with_capacity(5) } }
 }
 
 pub(crate) fn insert_statement(
@@ -206,7 +203,7 @@ pub(crate) fn insert_statement(
                             // Merge last Case back and pop off Match too
                             insert_into_block(&mut flow_control.block, block)?;
                             let match_stm = flow_control.block.pop().unwrap();
-                            if ! flow_control.block.is_empty() {
+                            if !flow_control.block.is_empty() {
                                 insert_into_block(&mut flow_control.block, match_stm)?;
                             } else {
                                 return Ok(Some(match_stm));
@@ -217,7 +214,7 @@ pub(crate) fn insert_statement(
                 }
             }
         }
-        Statement::And(_) | Statement::Or(_) if ! flow_control.block.is_empty() => {
+        Statement::And(_) | Statement::Or(_) if !flow_control.block.is_empty() => {
             let mut pushed = true;
             if let Some(top) = flow_control.block.last_mut() {
                 match top {
@@ -248,14 +245,13 @@ pub(crate) fn insert_statement(
                         }
                         _ => pushed = false,
                     },
-                    Statement::While {
-                        ref mut expression,
-                        ref statements,
-                    } => if statements.is_empty() {
-                        expression.push(statement.clone());
-                    } else {
-                        pushed = false;
-                    },
+                    Statement::While { ref mut expression, ref statements } => {
+                        if statements.is_empty() {
+                            expression.push(statement.clone());
+                        } else {
+                            pushed = false;
+                        }
+                    }
                     _ => pushed = false,
                 }
             } else {
@@ -269,25 +265,29 @@ pub(crate) fn insert_statement(
             if inner.is_block() {
                 flow_control.block.push(Statement::Time(inner));
             } else {
-                return Ok(Some(Statement::Time(inner)))
+                return Ok(Some(Statement::Time(inner)));
             }
         }
-        _ => if ! flow_control.block.is_empty() {
-            insert_into_block(&mut flow_control.block, statement)?;
-        } else {
-            // Filter out toplevel statements that should produce an error
-            // otherwise return the statement for immediat execution
-            match statement {
-                Statement::ElseIf(_) => {
-                    return Err("ion: error: found ElseIf { .. } without If { .. } block")
+        _ => {
+            if !flow_control.block.is_empty() {
+                insert_into_block(&mut flow_control.block, statement)?;
+            } else {
+                // Filter out toplevel statements that should produce an error
+                // otherwise return the statement for immediat execution
+                match statement {
+                    Statement::ElseIf(_) => {
+                        return Err("ion: error: found ElseIf { .. } without If { .. } block");
+                    }
+                    Statement::Else => return Err("ion: error: found Else without If { .. } block"),
+                    Statement::Break => return Err("ion: error: found Break without loop body"),
+                    Statement::Continue => {
+                        return Err("ion: error: found Continue without loop body");
+                    }
+                    // Toplevel statement, return to execute immediately
+                    _ => return Ok(Some(statement)),
                 }
-                Statement::Else => return Err("ion: error: found Else without If { .. } block"),
-                Statement::Break => return Err("ion: error: found Break without loop body"),
-                Statement::Continue => return Err("ion: error: found Continue without loop body"),
-                // Toplevel statement, return to execute immediately
-                _ => return Ok(Some(statement)),
             }
-        },
+        }
     }
     Ok(None)
 }
@@ -300,20 +300,14 @@ fn insert_into_block(block: &mut Vec<Statement>, statement: Statement) -> Result
         };
 
         match block {
-            Statement::Function {
-                ref mut statements, ..
-            } => statements.push(statement),
-            Statement::For {
-                ref mut statements, ..
-            } => statements.push(statement),
-            Statement::While {
-                ref mut statements, ..
-            } => statements.push(statement),
+            Statement::Function { ref mut statements, .. } => statements.push(statement),
+            Statement::For { ref mut statements, .. } => statements.push(statement),
+            Statement::While { ref mut statements, .. } => statements.push(statement),
             Statement::Match { ref mut cases, .. } => match statement {
                 Statement::Case(case) => cases.push(case),
                 _ => {
                     return Err(
-                        "ion: error: statement found outside of Case { .. } block in Match { .. }",
+                        "ion: error: statement found outside of Case { .. } block in Match { .. }"
                     );
                 }
             },
@@ -325,17 +319,21 @@ fn insert_into_block(block: &mut Vec<Statement>, statement: Statement) -> Result
                 ref mut mode,
                 ..
             } => match statement {
-                Statement::ElseIf(eif) => if *mode > 1 {
-                    return Err("ion: error: ElseIf { .. } found after Else");
-                } else {
-                    *mode = 1;
-                    else_if.push(eif);
-                },
-                Statement::Else => if *mode == 2 {
-                    return Err("ion: error: Else block already exists");
-                } else {
-                    *mode = 2;
-                },
+                Statement::ElseIf(eif) => {
+                    if *mode > 1 {
+                        return Err("ion: error: ElseIf { .. } found after Else");
+                    } else {
+                        *mode = 1;
+                        else_if.push(eif);
+                    }
+                }
+                Statement::Else => {
+                    if *mode == 2 {
+                        return Err("ion: error: Else block already exists");
+                    } else {
+                        *mode = 2;
+                    }
+                }
                 _ => match *mode {
                     0 => success.push(statement),
                     1 => else_if.last_mut().unwrap().success.push(statement),
@@ -398,7 +396,7 @@ impl Function {
                     return Err(FunctionError::InvalidArgumentType(
                         type_.kind.clone(),
                         value.as_ref().into(),
-                    ))
+                    ));
                 }
             };
 
@@ -426,9 +424,7 @@ impl Function {
         Ok(())
     }
 
-    pub(crate) fn get_description(&self) -> Option<&small::String> {
-        self.description.as_ref()
-    }
+    pub(crate) fn get_description(&self) -> Option<&small::String> { self.description.as_ref() }
 
     pub(crate) fn new(
         description: Option<small::String>,
@@ -436,12 +432,7 @@ impl Function {
         args: Vec<KeyBuf>,
         statements: Vec<Statement>,
     ) -> Function {
-        Function {
-            description,
-            name,
-            args,
-            statements,
-        }
+        Function { description, name, args, statements }
     }
 }
 
@@ -450,10 +441,7 @@ mod tests {
     use super::*;
 
     fn new_match() -> Statement {
-        Statement::Match {
-            expression: small::String::from(""),
-            cases:      Vec::new(),
-        }
+        Statement::Match { expression: small::String::from(""), cases: Vec::new() }
     }
     fn new_if() -> Statement {
         Statement::If {
@@ -541,12 +529,7 @@ mod tests {
             assert_eq!(Ok(Some(ok)), res);
         }
 
-        let errs = vec![
-            Statement::Else,
-            Statement::End,
-            Statement::Break,
-            Statement::Continue,
-        ];
+        let errs = vec![Statement::Else, Statement::End, Statement::Break, Statement::Continue];
         for err in errs {
             let res = insert_statement(&mut flow_control, err);
             if res.is_ok() {

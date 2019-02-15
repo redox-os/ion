@@ -34,12 +34,7 @@ impl Job {
     pub(crate) fn new(args: types::Array, kind: JobKind) -> Self {
         let command = args[0].clone();
         let builtin = BUILTINS.get(command.as_ref()).map(|b| b.main);
-        Job {
-            command,
-            args,
-            kind,
-            builtin,
-        }
+        Job { command, args, kind, builtin }
     }
 }
 
@@ -75,29 +70,18 @@ pub struct RefinedJob {
     pub stdin:  Option<File>,
     pub stdout: Option<File>,
     pub stderr: Option<File>,
-    pub var:    JobVariant
+    pub var:    JobVariant,
 }
 
 pub enum JobVariant {
     /// An external program that is executed by this shell
-    External {
-        name: types::Str,
-        args: types::Array
-    },
+    External { name: types::Str, args: types::Array },
     /// A procedure embedded into Ion
-    Builtin {
-        main: BuiltinFunction,
-        args: types::Array,
-    },
+    Builtin { main: BuiltinFunction, args: types::Array },
     /// Functions can act as commands too!
-    Function {
-       name: types::Str,
-       args: types::Array,
-    },
+    Function { name: types::Str, args: types::Array },
     /// Represents redirection into stdin from more than one source
-    Cat {
-        sources: Vec<File>,
-    },
+    Cat { sources: Vec<File> },
     Tee {
         /// 0 for stdout, 1 for stderr
         items: (Option<TeeItem>, Option<TeeItem>),
@@ -201,18 +185,15 @@ impl RefinedJob {
         let stdout = &self.stdout;
         let stderr = &self.stderr;
         match self.var {
-            JobVariant::External {
-                ref name,
-                ref args,
-            } => shell.exec_external(&name, &args[1..], stdin, stdout, stderr),
-            JobVariant::Builtin {
-                main,
-                ref args,
-            } => shell.exec_builtin(main, &**args, stdout, stderr, stdin),
-            JobVariant::Function {
-                ref name,
-                ref args,
-            } => shell.exec_function(name, args, stdout, stderr, stdin),
+            JobVariant::External { ref name, ref args } => {
+                shell.exec_external(&name, &args[1..], stdin, stdout, stderr)
+            }
+            JobVariant::Builtin { main, ref args } => {
+                shell.exec_builtin(main, &**args, stdout, stderr, stdin)
+            }
+            JobVariant::Function { ref name, ref args } => {
+                shell.exec_function(name, args, stdout, stderr, stdin)
+            }
             _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
         }
     }
@@ -225,32 +206,21 @@ impl RefinedJob {
         self.stderr = Some(file);
     }
 
-    pub(crate) fn stdout(&mut self, file: File) {
-        self.stdout = Some(file);
-    }
+    pub(crate) fn stdout(&mut self, file: File) { self.stdout = Some(file); }
 
-    pub(crate) fn stdin(&mut self, file: File) {
-        self.stdin = Some(file);
-    }
+    pub(crate) fn stdin(&mut self, file: File) { self.stdin = Some(file); }
 
     pub(crate) fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
         RefinedJob {
             stdin:  None,
             stdout: None,
             stderr: None,
-            var: JobVariant::Tee {
-                items:  (tee_out, tee_err),
-            }
+            var:    JobVariant::Tee { items: (tee_out, tee_err) },
         }
     }
 
     pub(crate) fn cat(sources: Vec<File>) -> Self {
-        RefinedJob {
-            stdin:  None,
-            stdout: None,
-            stderr: None,
-            var: JobVariant::Cat { sources }
-        }
+        RefinedJob { stdin: None, stdout: None, stderr: None, var: JobVariant::Cat { sources } }
     }
 
     pub(crate) fn function(name: types::Str, args: types::Array) -> Self {
@@ -258,7 +228,7 @@ impl RefinedJob {
             stdin:  None,
             stdout: None,
             stderr: None,
-            var: JobVariant::Function { name, args }
+            var:    JobVariant::Function { name, args },
         }
     }
 
@@ -267,7 +237,7 @@ impl RefinedJob {
             stdin:  None,
             stdout: None,
             stderr: None,
-            var: JobVariant::Builtin { main, args }
+            var:    JobVariant::Builtin { main, args },
         }
     }
 
@@ -276,7 +246,7 @@ impl RefinedJob {
             stdin:  None,
             stdout: None,
             stderr: None,
-            var: JobVariant::External { name, args }
+            var:    JobVariant::External { name, args },
         }
     }
 }

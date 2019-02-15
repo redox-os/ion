@@ -18,11 +18,7 @@ impl<'a> TeePipe<'a> {
         ext_stdio_pipes: &'a mut Option<Vec<File>>,
         is_external: bool,
     ) -> TeePipe<'a> {
-        TeePipe {
-            parent,
-            ext_stdio_pipes,
-            is_external,
-        }
+        TeePipe { parent, ext_stdio_pipes, is_external }
     }
 
     fn inner_connect<F>(&mut self, tee: &mut TeeItem, mut action: F)

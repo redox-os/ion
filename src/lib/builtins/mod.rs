@@ -503,11 +503,7 @@ fn builtin_exit(args: &[small::String], shell: &mut Shell) -> i32 {
         }
     }
     let previous_status = shell.previous_status;
-    shell.exit(
-        args.get(1)
-            .and_then(|status| status.parse::<i32>().ok())
-            .unwrap_or(previous_status),
-    )
+    shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok()).unwrap_or(previous_status))
 }
 
 fn builtin_exec(args: &[small::String], shell: &mut Shell) -> i32 {
@@ -590,17 +586,21 @@ fn builtin_isatty(args: &[small::String], _: &mut Shell) -> i32 {
         // sys::isatty expects a usize if compiled for redox but otherwise a i32.
         #[cfg(target_os = "redox")]
         match args[1].parse::<usize>() {
-            Ok(r) => if sys::isatty(r) {
-                return SUCCESS;
-            },
+            Ok(r) => {
+                if sys::isatty(r) {
+                    return SUCCESS;
+                }
+            }
             Err(_) => eprintln!("ion: isatty given bad number"),
         }
 
         #[cfg(not(target_os = "redox"))]
         match args[1].parse::<i32>() {
-            Ok(r) => if sys::isatty(r) {
-                return SUCCESS;
-            },
+            Ok(r) => {
+                if sys::isatty(r) {
+                    return SUCCESS;
+                }
+            }
             Err(_) => eprintln!("ion: isatty given bad number"),
         }
     } else {

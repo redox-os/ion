@@ -13,3 +13,5 @@ struct_field_align_threshold = 30
 use_field_init_shorthand = true
 wrap_comments = true
 merge_imports = true
+force_multiline_blocks = false
+use_small_heuristics = "Max"

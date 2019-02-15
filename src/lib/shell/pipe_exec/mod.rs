@@ -8,12 +8,13 @@
 pub mod foreground;
 mod fork;
 pub mod job_control;
-pub mod streams;
 mod pipes;
+pub mod streams;
 
 use self::{
     fork::fork_pipe,
     job_control::{JobControl, ProcessState},
+    pipes::TeePipe,
     streams::{duplicate_streams, redir, redirect_streams},
 };
 use super::{
@@ -38,7 +39,6 @@ use std::{
     process::{self, exit},
 };
 use sys;
-use self::pipes::TeePipe;
 
 type RefinedItem = (RefinedJob, JobKind, Vec<Redirection>, Vec<Input>);
 
@@ -91,9 +91,9 @@ fn is_implicit_cd(argument: &str) -> bool {
 
 /// Insert the multiple redirects as pipelines if necessary. Handle both input and output
 /// redirection if necessary.
-fn do_redirection(piped_commands: SmallVec<[RefinedItem; 16]>)
-    -> Option<SmallVec<[(RefinedJob, JobKind); 16]>>
-{
+fn do_redirection(
+    piped_commands: SmallVec<[RefinedItem; 16]>,
+) -> Option<SmallVec<[(RefinedJob, JobKind); 16]>> {
     let need_tee = |outs: &[_], kind| {
         let (mut stdout_count, mut stderr_count) = (0, 0);
         match kind {
@@ -164,10 +164,7 @@ fn do_redirection(piped_commands: SmallVec<[RefinedItem; 16]>)
 
     macro_rules! set_one_tee {
         ($new:ident, $outputs:ident, $job:ident, $kind:ident, $teed:ident, $other:ident) => {{
-            let mut tee = TeeItem {
-                sinks:  Vec::new(),
-                source: None,
-            };
+            let mut tee = TeeItem { sinks: Vec::new(), source: None };
             for output in $outputs {
                 match if output.append {
                     OpenOptions::new()
@@ -180,11 +177,13 @@ fn do_redirection(piped_commands: SmallVec<[RefinedItem; 16]>)
                 } {
                     Ok(f) => match output.from {
                         RedirectFrom::$teed => tee.sinks.push(f),
-                        RedirectFrom::$other => if RedirectFrom::Stdout == RedirectFrom::$teed {
-                            $job.stderr(f);
-                        } else {
-                            $job.stdout(f);
-                        },
+                        RedirectFrom::$other => {
+                            if RedirectFrom::Stdout == RedirectFrom::$teed {
+                                $job.stderr(f);
+                            } else {
+                                $job.stdout(f);
+                            }
+                        }
                         RedirectFrom::Both => match f.try_clone() {
                             Ok(f_copy) => {
                                 if RedirectFrom::Stdout == RedirectFrom::$teed {
@@ -196,7 +195,8 @@ fn do_redirection(piped_commands: SmallVec<[RefinedItem; 16]>)
                             }
                             Err(e) => {
                                 eprintln!(
-                                    "ion: failed to redirect both stdout and stderr to file '{:?}': {}",
+                                    "ion: failed to redirect both stdout and stderr to file \
+                                     '{:?}': {}",
                                     f, e
                                 );
                                 return None;
@@ -228,10 +228,7 @@ fn do_redirection(piped_commands: SmallVec<[RefinedItem; 16]>)
             (0, _) => {}
             (1, JobKind::Pipe(_)) => {
                 let sources = vec![inputs[0].get_infile()?];
-                new_commands.push((
-                    RefinedJob::cat(sources),
-                    JobKind::Pipe(RedirectFrom::Stdout),
-                ));
+                new_commands.push((RefinedJob::cat(sources), JobKind::Pipe(RedirectFrom::Stdout)));
             }
             (1, _) => job.stdin(inputs[0].get_infile()?),
             _ => {
@@ -243,10 +240,7 @@ fn do_redirection(piped_commands: SmallVec<[RefinedItem; 16]>)
                         return None;
                     });
                 }
-                new_commands.push((
-                    RefinedJob::cat(sources),
-                    JobKind::Pipe(RedirectFrom::Stdout),
-                ));
+                new_commands.push((RefinedJob::cat(sources), JobKind::Pipe(RedirectFrom::Stdout)));
             }
         }
         prev_kind = kind;
@@ -266,14 +260,8 @@ fn do_redirection(piped_commands: SmallVec<[RefinedItem; 16]>)
             (true, false) => set_one_tee!(new_commands, outputs, job, kind, Stdout, Stderr),
             // tee both
             (true, true) => {
-                let mut tee_out = TeeItem {
-                    sinks:  Vec::new(),
-                    source: None,
-                };
-                let mut tee_err = TeeItem {
-                    sinks:  Vec::new(),
-                    source: None,
-                };
+                let mut tee_out = TeeItem { sinks: Vec::new(), source: None };
+                let mut tee_err = TeeItem { sinks: Vec::new(), source: None };
                 for output in outputs {
                     match if output.append {
                         OpenOptions::new()
@@ -359,8 +347,8 @@ pub(crate) trait PipelineExecution {
     /// # Args
     /// * `shell`: A `Shell` that forwards relevant information to the builtin
     /// * `name`: Name of the builtin to execute.
-    /// * `stdin`, `stdout`, `stderr`: File descriptors that will replace the
-    ///    respective standard streams if they are not `None`
+    /// * `stdin`, `stdout`, `stderr`: File descriptors that will replace the respective standard
+    ///   streams if they are not `None`
     /// # Preconditions
     /// * `shell.builtins.contains_key(name)`; otherwise this function will panic
     fn exec_builtin(
@@ -421,21 +409,9 @@ impl PipelineExecution for Shell {
         let result = sys::fork_and_exec(
             name,
             args,
-            if let Some(ref f) = *stdin {
-                Some(f.as_raw_fd())
-            } else {
-                None
-            },
-            if let Some(ref f) = *stdout {
-                Some(f.as_raw_fd())
-            } else {
-                None
-            },
-            if let Some(ref f) = *stderr {
-                Some(f.as_raw_fd())
-            } else {
-                None
-            },
+            if let Some(ref f) = *stdin { Some(f.as_raw_fd()) } else { None },
+            if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
+            if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
             false,
             || prepare_child(true, 0),
         );
@@ -613,10 +589,7 @@ impl PipelineExecution for Shell {
                 return code;
             }
 
-            eprintln!(
-                "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
-                long
-            );
+            eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", long);
 
             COULD_NOT_EXEC
         }
@@ -629,11 +602,7 @@ impl PipelineExecution for Shell {
             // This doesn't allocate
             String::new()
         } else {
-            commands
-            .iter()
-            .map(RefinedJob::long)
-            .collect::<Vec<String>>()
-            .join(" | ")
+            commands.iter().map(RefinedJob::long).collect::<Vec<String>>().join(" | ")
         };
 
         // Watch the foreground group, dropping all commands that exit as they exit.
@@ -646,22 +615,14 @@ impl PipelineExecution for Shell {
     ) -> Result<SmallVec<[RefinedItem; 16]>, i32> {
         let mut results: SmallVec<[RefinedItem; 16]> = SmallVec::new();
         for item in pipeline.items.drain(..) {
-            let PipeItem {
-                mut job,
-                outputs,
-                inputs,
-            } = item;
+            let PipeItem { mut job, outputs, inputs } = item;
             let refined = {
                 if is_implicit_cd(&job.args[0]) {
                     RefinedJob::builtin(
                         builtins::builtin_cd,
                         iter::once("cd".into()).chain(job.args.drain()).collect(),
                     )
-                } else if self
-                    .variables
-                    .get::<Function>(job.args[0].as_str())
-                    .is_some()
-                {
+                } else if self.variables.get::<Function>(job.args[0].as_str()).is_some() {
                     RefinedJob::function(job.args[0].clone(), job.args.drain().collect())
                 } else if let Some(builtin) = job.builtin {
                     RefinedJob::builtin(builtin, job.args.drain().collect())
@@ -699,17 +660,12 @@ impl PipelineExecution for Shell {
 
         // If the given pipeline is a background task, fork the shell.
         match possible_background_name {
-            Some((command_name, disown)) =>
-                fork_pipe(
-                    self,
-                    piped_commands,
-                    command_name,
-                    if disown {
-                        ProcessState::Empty
-                    } else {
-                        ProcessState::Running
-                    },
-                ),
+            Some((command_name, disown)) => fork_pipe(
+                self,
+                piped_commands,
+                command_name,
+                if disown { ProcessState::Empty } else { ProcessState::Running },
+            ),
             None => {
                 // While active, the SIGTTOU signal will be ignored.
                 let _sig_ignore = SignalHandler::new();
@@ -738,72 +694,94 @@ pub(crate) fn pipe(
     let mut commands = commands.into_iter().peekable();
     let mut ext_stdio_pipes: Option<Vec<File>> = None;
 
-    loop {
-        if let Some((mut parent, mut kind)) = commands.next() {
-            match kind {
-                JobKind::Pipe(mut mode) => {
-                    // We need to remember the commands as they own the file
-                    // descriptors that are created by sys::pipe.
-                    let remember: SmallVec<[RefinedJob; 16]> = SmallVec::new();
-                    let mut block_child = true;
-                    let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
+    while let Some((mut parent, mut kind)) = commands.next() {
+        match kind {
+            JobKind::Pipe(mut mode) => {
+                // We need to remember the commands as they own the file
+                // descriptors that are created by sys::pipe.
+                let remember: SmallVec<[RefinedJob; 16]> = SmallVec::new();
+                let mut block_child = true;
+                let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
 
-                    // Append jobs until all piped jobs are running
-                    while let Some((mut child, ckind)) = commands.next() {
-                        // If parent is a RefindJob::External, then we need to keep track of the
-                        // output pipes, so we can properly close them after the job has been
-                        // spawned.
-                        let is_external = if let JobVariant::External { .. } = parent.var {
-                            true
-                        } else {
-                            false
-                        };
+                // Append jobs until all piped jobs are running
+                while let Some((mut child, ckind)) = commands.next() {
+                    // If parent is a RefindJob::External, then we need to keep track of the
+                    // output pipes, so we can properly close them after the job has been
+                    // spawned.
+                    let is_external =
+                        if let JobVariant::External { .. } = parent.var { true } else { false };
 
-                        // TODO: Refactor this part
-                        // If we need to tee both stdout and stderr, we directly connect pipes to
-                        // the relevant sources in both of them.
-                        if let JobVariant::Tee {
-                            items: (Some(ref mut tee_out), Some(ref mut tee_err)),
-                            ..
-                        } = child.var {
-                            TeePipe::new(&mut parent, &mut ext_stdio_pipes, is_external)
-                                .connect(tee_out, tee_err);
-                        } else {
-                            // Pipe the previous command's stdin to this commands stdout/stderr.
-                            match sys::pipe2(sys::O_CLOEXEC) {
-                                Err(e) => pipe_fail(e),
-                                Ok((reader, writer)) => {
-                                    if is_external {
-                                        append_external_stdio_pipe(&mut ext_stdio_pipes, writer);
-                                    }
-                                    child.stdin(unsafe { File::from_raw_fd(reader) });
-                                    let writer = unsafe { File::from_raw_fd(writer) };
-                                    match mode {
-                                        RedirectFrom::Stderr => parent.stderr(writer),
-                                        RedirectFrom::Stdout => parent.stdout(writer),
-                                        RedirectFrom::Both => {
-                                            match writer.try_clone() {
-                                                Err(e) => {
-                                                    eprintln!(
-                                                        "ion: failed to redirect stdout and \
-                                                         stderr: {}",
-                                                        e
-                                                    );
-                                                }
-                                                Ok(duped) => {
-                                                    parent.stderr(writer);
-                                                    parent.stdout(duped);
-                                                }
-                                            }
+                    // TODO: Refactor this part
+                    // If we need to tee both stdout and stderr, we directly connect pipes to
+                    // the relevant sources in both of them.
+                    if let JobVariant::Tee {
+                        items: (Some(ref mut tee_out), Some(ref mut tee_err)),
+                        ..
+                    } = child.var
+                    {
+                        TeePipe::new(&mut parent, &mut ext_stdio_pipes, is_external)
+                            .connect(tee_out, tee_err);
+                    } else {
+                        // Pipe the previous command's stdin to this commands stdout/stderr.
+                        match sys::pipe2(sys::O_CLOEXEC) {
+                            Err(e) => pipe_fail(e),
+                            Ok((reader, writer)) => {
+                                if is_external {
+                                    append_external_stdio_pipe(&mut ext_stdio_pipes, writer);
+                                }
+                                child.stdin(unsafe { File::from_raw_fd(reader) });
+                                let writer = unsafe { File::from_raw_fd(writer) };
+                                match mode {
+                                    RedirectFrom::Stderr => parent.stderr(writer),
+                                    RedirectFrom::Stdout => parent.stdout(writer),
+                                    RedirectFrom::Both => match writer.try_clone() {
+                                        Err(e) => {
+                                            eprintln!(
+                                                "ion: failed to redirect stdout and stderr: {}",
+                                                e
+                                            );
                                         }
-                                    }
+                                        Ok(duped) => {
+                                            parent.stderr(writer);
+                                            parent.stdout(duped);
+                                        }
+                                    },
                                 }
                             }
                         }
+                    }
 
+                    match spawn_proc(
+                        shell,
+                        parent,
+                        kind,
+                        block_child,
+                        &mut last_pid,
+                        &mut current_pid,
+                        pgid,
+                    ) {
+                        SUCCESS => (),
+                        error_code => return error_code,
+                    }
+
+                    ext_stdio_pipes = None;
+
+                    if set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library
+                    {
+                        let _ = sys::tcsetpgrp(0, pgid);
+                    }
+
+                    resume_prior_process(&mut last_pid, current_pid);
+
+                    if let JobKind::Pipe(m) = ckind {
+                        parent = child;
+                        mode = m;
+                    } else {
+                        kind = ckind;
+                        block_child = false;
                         match spawn_proc(
                             shell,
-                            parent,
+                            child,
                             kind,
                             block_child,
                             &mut last_pid,
@@ -814,59 +792,24 @@ pub(crate) fn pipe(
                             error_code => return error_code,
                         }
 
-                        ext_stdio_pipes = None;
-
-                        if set_process_group(&mut pgid, current_pid)
-                            && foreground
-                            && !shell.is_library
-                        {
-                            let _ = sys::tcsetpgrp(0, pgid);
-                        }
-
                         resume_prior_process(&mut last_pid, current_pid);
-
-                        if let JobKind::Pipe(m) = ckind {
-                            parent = child;
-                            mode = m;
-                        } else {
-
-
-                            kind = ckind;
-                            block_child = false;
-                            match spawn_proc(
-                                shell,
-                                child,
-                                kind,
-                                block_child,
-                                &mut last_pid,
-                                &mut current_pid,
-                                pgid,
-                            ) {
-                                SUCCESS => (),
-                                error_code => return error_code,
-                            }
-
-                            resume_prior_process(&mut last_pid, current_pid);
-                            break;
-                        }
-                    }
-
-                    set_process_group(&mut pgid, current_pid);
-
-                    previous_status = shell.wait(pgid, remember);
-                    if previous_status == TERMINATED {
-                        if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
-                            eprintln!("ion: failed to terminate foreground jobs: {}", why);
-                        }
-                        return previous_status;
+                        break;
                     }
                 }
-                _ => {
-                    previous_status = shell.exec_job(&mut parent, foreground);
+
+                set_process_group(&mut pgid, current_pid);
+
+                previous_status = shell.wait(pgid, remember);
+                if previous_status == TERMINATED {
+                    if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
+                        eprintln!("ion: failed to terminate foreground jobs: {}", why);
+                    }
+                    return previous_status;
                 }
             }
-        } else {
-            break;
+            _ => {
+                previous_status = shell.exec_job(&mut parent, foreground);
+            }
         }
     }
 
@@ -925,9 +868,9 @@ fn spawn_proc(
                 last_pid,
                 current_pid,
                 pgid,
-                |stdout, stderr, stdin| shell.exec_builtin(main, args, stdout, stderr, stdin)
+                |stdout, stderr, stdin| shell.exec_builtin(main, args, stdout, stderr, stdin),
             );
-        },
+        }
         JobVariant::Function { ref mut name, ref mut args } => {
             fork_exec_internal(
                 stdout,
@@ -937,9 +880,9 @@ fn spawn_proc(
                 last_pid,
                 current_pid,
                 pgid,
-                |stdout, stderr, stdin| shell.exec_function(name, &args, stdout, stderr, stdin)
+                |stdout, stderr, stdin| shell.exec_function(name, &args, stdout, stderr, stdin),
             );
-        },
+        }
         JobVariant::Cat { ref mut sources } => {
             fork_exec_internal(
                 stdout,
@@ -949,9 +892,9 @@ fn spawn_proc(
                 last_pid,
                 current_pid,
                 pgid,
-                |stdout, _, stdin| shell.exec_multi_in(sources, stdout, stdin)
+                |stdout, _, stdin| shell.exec_multi_in(sources, stdout, stdin),
             );
-        },
+        }
         JobVariant::Tee { ref mut items } => {
             fork_exec_internal(
                 stdout,
@@ -961,9 +904,9 @@ fn spawn_proc(
                 last_pid,
                 current_pid,
                 pgid,
-                |stdout, stderr, stdin| shell.exec_multi_out(items, stdout, stderr, stdin, kind)
+                |stdout, stderr, stdin| shell.exec_multi_out(items, stdout, stderr, stdin, kind),
             );
-        },
+        }
     }
     SUCCESS
 }
@@ -978,7 +921,9 @@ fn fork_exec_internal<F>(
     current_pid: &mut u32,
     pgid: u32,
     mut exec_action: F,
-) where F: FnMut(&mut Option<File>, &mut Option<File>, &mut Option<File>) -> i32 {
+) where
+    F: FnMut(&mut Option<File>, &mut Option<File>, &mut Option<File>) -> i32,
+{
     match unsafe { sys::fork() } {
         Ok(0) => {
             prepare_child(block_child, pgid);
@@ -996,7 +941,7 @@ fn fork_exec_internal<F>(
             *last_pid = *current_pid;
             *current_pid = pid;
         }
-        Err(e) => pipe_fail(e)
+        Err(e) => pipe_fail(e),
     }
 }
 

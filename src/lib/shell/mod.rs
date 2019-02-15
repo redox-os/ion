@@ -29,25 +29,38 @@ pub mod flags {
 }
 
 pub use self::{
-    binary::Binary, fork::{Capture, Fork, IonResult},
+    binary::Binary,
+    fork::{Capture, Fork, IonResult},
 };
 pub(crate) use self::{
-    flow::FlowLogic, history::{IgnoreSetting, ShellHistory}, job::{Job, JobKind},
+    flow::FlowLogic,
+    history::{IgnoreSetting, ShellHistory},
+    job::{Job, JobKind},
     pipe_exec::{foreground, job_control},
 };
 
 use self::{
-    directory_stack::DirectoryStack, flags::*,
-    flow_control::{FlowControl, Function, FunctionError}, foreground::ForegroundSignals,
-    job_control::{BackgroundProcess, JobControl}, pipe_exec::PipelineExecution, status::*,
+    directory_stack::DirectoryStack,
+    flags::*,
+    flow_control::{FlowControl, Function, FunctionError},
+    foreground::ForegroundSignals,
+    job_control::{BackgroundProcess, JobControl},
+    pipe_exec::PipelineExecution,
+    status::*,
     variables::{VariableType, Variables},
 };
 use builtins::{BuiltinMap, BUILTINS};
 use liner::Context;
 use parser::{pipelines::Pipeline, Expander, MapKeyIter, MapValueIter, Select, Terminator};
 use std::{
-    fs::File, io::{self, Read, Write}, iter::FromIterator, ops::Deref, path::Path, process,
-    sync::{atomic::Ordering, Arc, Mutex}, time::SystemTime,
+    fs::File,
+    io::{self, Read, Write},
+    iter::FromIterator,
+    ops::Deref,
+    path::Path,
+    process,
+    sync::{atomic::Ordering, Arc, Mutex},
+    time::SystemTime,
 };
 use sys;
 use types::{self, Array};
@@ -107,12 +120,13 @@ pub struct Shell {
     ignore_setting: IgnoreSetting,
 }
 
+#[derive(Default)]
 pub struct ShellBuilder;
 
 impl ShellBuilder {
-    pub fn as_binary(self) -> Shell { Shell::new(false) }
+    pub fn as_binary(&self) -> Shell { Shell::new(false) }
 
-    pub fn as_library(self) -> Shell { Shell::new(true) }
+    pub fn as_library(&self) -> Shell { Shell::new(true) }
 
     pub fn set_unique_pid(self) -> ShellBuilder {
         if let Ok(pid) = sys::getpid() {
@@ -185,15 +199,12 @@ impl Shell {
         name: &str,
         args: &[S],
     ) -> Result<i32, IonError> {
-        self.variables
-            .get::<Function>(name)
-            .ok_or(IonError::DoesNotExist)
-            .and_then(|function| {
-                function
-                    .execute(self, args)
-                    .map(|_| self.previous_status)
-                    .map_err(|err| IonError::Function { why: err })
-            })
+        self.variables.get::<Function>(name).ok_or(IonError::DoesNotExist).and_then(|function| {
+            function
+                .execute(self, args)
+                .map(|_| self.previous_status)
+                .map_err(|err| IonError::Function { why: err })
+        })
     }
 
     /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
@@ -267,9 +278,8 @@ impl Shell {
                 Some(self.execute_pipeline(pipeline))
             }
         // Branch else if -> input == shell function and set the exit_status
-        } else if let Some(function) = self
-            .variables
-            .get::<Function>(&pipeline.items[0].job.command)
+        } else if let Some(function) =
+            self.variables.get::<Function>(&pipeline.items[0].job.command)
         {
             if !pipeline.requires_piping() {
                 let args = pipeline.items[0].job.args.deref();
@@ -307,12 +317,9 @@ impl Shell {
                         elapsed_time.as_secs(),
                         elapsed_time.subsec_nanos()
                     );
-                    context
-                        .history
-                        .push(summary.into())
-                        .unwrap_or_else(|err| {
-                            eprintln!("ion: history append: {}", err);
-                        });
+                    context.history.push(summary.into()).unwrap_or_else(|err| {
+                        eprintln!("ion: history append: {}", err);
+                    });
                 }
             }
         }
@@ -364,11 +371,7 @@ impl Shell {
                 self.resume_stopped();
                 self.background_send(sys::SIGHUP);
             }
-            self.context
-                .as_mut()
-                .unwrap()
-                .history
-                .commit_to_file();
+            self.context.as_mut().unwrap().history.commit_to_file();
         }
     }
 
@@ -409,9 +412,7 @@ impl<'a> Expander for Shell {
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<types::Str> {
         let mut output = None;
-        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| {
-            shell.on_command(command)
-        }) {
+        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command)) {
             Ok(result) => {
                 let mut string = String::with_capacity(1024);
                 match result.stdout.unwrap().read_to_string(&mut string) {
@@ -439,8 +440,7 @@ impl<'a> Expander for Shell {
         } else if quoted {
             self.get::<types::Str>(name)
         } else {
-            self.get::<types::Str>(name)
-                .map(|x| x.ascii_replace('\n', ' '))
+            self.get::<types::Str>(name).map(|x| x.ascii_replace('\n', ' '))
         }
     }
 
@@ -453,20 +453,22 @@ impl<'a> Expander for Shell {
                     return id
                         .resolve(array.len())
                         .and_then(|n| array.get(n))
-                        .map(|x| types::Array::from_iter(Some(x.to_owned())))
+                        .map(|x| types::Array::from_iter(Some(x.to_owned())));
                 }
-                Select::Range(range) => if let Some((start, length)) = range.bounds(array.len()) {
-                    if array.len() > start {
-                        return Some(
-                            array
-                                .iter()
-                                .skip(start)
-                                .take(length)
-                                .map(|x| x.to_owned())
-                                .collect::<types::Array>(),
-                        );
+                Select::Range(range) => {
+                    if let Some((start, length)) = range.bounds(array.len()) {
+                        if array.len() > start {
+                            return Some(
+                                array
+                                    .iter()
+                                    .skip(start)
+                                    .take(length)
+                                    .map(|x| x.to_owned())
+                                    .collect::<types::Array>(),
+                            );
+                        }
                     }
-                },
+                }
                 _ => (),
             }
         } else if let Some(hmap) = self.variables.get::<types::HashMap>(name) {
@@ -494,18 +496,21 @@ impl<'a> Expander for Shell {
                     return Some(array![format!(
                         "{}",
                         hmap.get(&*key).unwrap_or(&VariableType::Str("".into()))
-                    )])
+                    )]);
                 }
                 Select::Index(index) => {
                     use ranges::Index;
                     return Some(array![format!(
                         "{}",
-                        hmap.get(&types::Str::from(match index {
-                            Index::Forward(n) => n as isize,
-                            Index::Backward(n) => -((n+1) as isize)
-                        }.to_string()))
+                        hmap.get(&types::Str::from(
+                            match index {
+                                Index::Forward(n) => n as isize,
+                                Index::Backward(n) => -((n + 1) as isize),
+                            }
+                            .to_string()
+                        ))
                         .unwrap_or(&VariableType::Str("".into()))
-                    )])
+                    )]);
                 }
                 _ => (),
             }
@@ -534,18 +539,21 @@ impl<'a> Expander for Shell {
                     return Some(array![format!(
                         "{}",
                         bmap.get(&*key).unwrap_or(&VariableType::Str("".into()))
-                    )])
+                    )]);
                 }
                 Select::Index(index) => {
                     use ranges::Index;
                     return Some(array![format!(
                         "{}",
-                        bmap.get(&types::Str::from(match index {
-                            Index::Forward(n) => n as isize,
-                            Index::Backward(n) => -((n+1) as isize)
-                        }.to_string()))
+                        bmap.get(&types::Str::from(
+                            match index {
+                                Index::Forward(n) => n as isize,
+                                Index::Backward(n) => -((n + 1) as isize),
+                            }
+                            .to_string()
+                        ))
                         .unwrap_or(&VariableType::Str("".into()))
-                    )])
+                    )]);
                 }
                 _ => (),
             }
@@ -555,27 +563,28 @@ impl<'a> Expander for Shell {
 
     fn map_keys<'b>(&'b self, name: &str, select: Select) -> Option<MapKeyIter<'b>> {
         let nvalues;
-        let map: Box<dyn Iterator<Item = &'b types::Str>> =
-            match self.variables.get_ref(name) {
-                Some(&VariableType::HashMap(ref map)) => {
-                    nvalues = map.len();
-                    Box::new(map.keys())
-                }
-                Some(&VariableType::BTreeMap(ref map)) => {
-                    nvalues = map.len();
-                    Box::new(map.keys())
-                }
-                _ => return None
-            };
+        let map: Box<dyn Iterator<Item = &'b types::Str>> = match self.variables.get_ref(name) {
+            Some(&VariableType::HashMap(ref map)) => {
+                nvalues = map.len();
+                Box::new(map.keys())
+            }
+            Some(&VariableType::BTreeMap(ref map)) => {
+                nvalues = map.len();
+                Box::new(map.keys())
+            }
+            _ => return None,
+        };
 
         match select {
             Select::All => return Some(map),
-            Select::Range(range) => if let Some((start, length)) = range.bounds(nvalues) {
-                if nvalues > start {
-                    return Some(Box::new(map.skip(start).take(length)));
+            Select::Range(range) => {
+                if let Some((start, length)) = range.bounds(nvalues) {
+                    if nvalues > start {
+                        return Some(Box::new(map.skip(start).take(length)));
+                    }
                 }
-            },
-            _ => ()
+            }
+            _ => (),
         }
 
         None
@@ -583,27 +592,28 @@ impl<'a> Expander for Shell {
 
     fn map_values<'b>(&'b self, name: &str, select: Select) -> Option<MapValueIter<'b>> {
         let nvalues;
-        let map: Box<dyn Iterator<Item = types::Str>> =
-            match self.variables.get_ref(name) {
-                Some(&VariableType::HashMap(ref map)) => {
-                    nvalues = map.len();
-                    Box::new(map.values().map(|x| format!("{}", x).into()))
-                }
-                Some(&VariableType::BTreeMap(ref map)) => {
-                    nvalues = map.len();
-                    Box::new(map.values().map(|x| format!("{}", x).into()))
-                }
-                _ => return None
-            };
+        let map: Box<dyn Iterator<Item = types::Str>> = match self.variables.get_ref(name) {
+            Some(&VariableType::HashMap(ref map)) => {
+                nvalues = map.len();
+                Box::new(map.values().map(|x| format!("{}", x).into()))
+            }
+            Some(&VariableType::BTreeMap(ref map)) => {
+                nvalues = map.len();
+                Box::new(map.values().map(|x| format!("{}", x).into()))
+            }
+            _ => return None,
+        };
 
         match select {
             Select::All => return Some(map),
-            Select::Range(range) => if let Some((start, length)) = range.bounds(nvalues) {
-                if nvalues > start {
-                    return Some(Box::new(map.skip(start).take(length)));
+            Select::Range(range) => {
+                if let Some((start, length)) = range.bounds(nvalues) {
+                    if nvalues > start {
+                        return Some(Box::new(map.skip(start).take(length)));
+                    }
                 }
-            },
-            _ => ()
+            }
+            _ => (),
         }
 
         None

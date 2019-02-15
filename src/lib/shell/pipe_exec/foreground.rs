@@ -34,9 +34,7 @@ impl ForegroundSignals {
         if reply & ERRORED != 0 {
             Some(BackgroundResult::Errored)
         } else if reply & REPLIED != 0 {
-            Some(BackgroundResult::Status(
-                self.status.load(Ordering::SeqCst) as u8
-            ))
+            Some(BackgroundResult::Status(self.status.load(Ordering::SeqCst) as u8))
         } else {
             None
         }

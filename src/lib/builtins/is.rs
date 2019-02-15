@@ -4,14 +4,18 @@ use types;
 
 pub(crate) fn is(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
     match args.len() {
-        4 => if args[1] != "not" {
-            return Err(format!("Expected 'not' instead found '{}'\n", args[1]).to_string());
-        } else if eval_arg(&*args[2], shell) == eval_arg(&*args[3], shell) {
-            return Err("".to_string());
-        },
-        3 => if eval_arg(&*args[1], shell) != eval_arg(&*args[2], shell) {
-            return Err("".to_string());
-        },
+        4 => {
+            if args[1] != "not" {
+                return Err(format!("Expected 'not' instead found '{}'\n", args[1]).to_string());
+            } else if eval_arg(&*args[2], shell) == eval_arg(&*args[3], shell) {
+                return Err("".to_string());
+            }
+        }
+        3 => {
+            if eval_arg(&*args[1], shell) != eval_arg(&*args[2], shell) {
+                return Err("".to_string());
+            }
+        }
         _ => return Err("is needs 3 or 4 arguments\n".to_string()),
     }
 
@@ -53,32 +57,14 @@ fn test_is() {
         is(&vec_string(&["is", " ", " ", " "]), &mut shell),
         Err("Expected 'not' instead found ' '\n".to_string())
     );
-    assert_eq!(
-        is(&vec_string(&["is", "not", " ", " "]), &mut shell),
-        Err("".to_string())
-    );
-    assert_eq!(
-        is(&vec_string(&["is", "not", "$x", "$x"]), &mut shell),
-        Err("".to_string())
-    );
-    assert_eq!(
-        is(&vec_string(&["is", "not", "2", "1"]), &mut shell),
-        Ok(())
-    );
-    assert_eq!(
-        is(&vec_string(&["is", "not", "$x", "$y"]), &mut shell),
-        Ok(())
-    );
+    assert_eq!(is(&vec_string(&["is", "not", " ", " "]), &mut shell), Err("".to_string()));
+    assert_eq!(is(&vec_string(&["is", "not", "$x", "$x"]), &mut shell), Err("".to_string()));
+    assert_eq!(is(&vec_string(&["is", "not", "2", "1"]), &mut shell), Ok(()));
+    assert_eq!(is(&vec_string(&["is", "not", "$x", "$y"]), &mut shell), Ok(()));
 
     // Three arguments
-    assert_eq!(
-        is(&vec_string(&["is", "1", "2"]), &mut shell),
-        Err("".to_string())
-    );
-    assert_eq!(
-        is(&vec_string(&["is", "$x", "$y"]), &mut shell),
-        Err("".to_string())
-    );
+    assert_eq!(is(&vec_string(&["is", "1", "2"]), &mut shell), Err("".to_string()));
+    assert_eq!(is(&vec_string(&["is", "$x", "$y"]), &mut shell), Err("".to_string()));
     assert_eq!(is(&vec_string(&["is", " ", " "]), &mut shell), Ok(()));
     assert_eq!(is(&vec_string(&["is", "$x", "$x"]), &mut shell), Ok(()));
 

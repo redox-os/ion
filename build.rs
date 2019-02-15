@@ -38,12 +38,17 @@ fn get_git_rev() -> io::Result<String> {
     if version_file.exists() {
         fs::read_to_string(&version_file)
     } else {
-        Command::new("git").arg("rev-parse").arg("master").output()
+        Command::new("git")
+            .arg("rev-parse")
+            .arg("master")
+            .output()
             .and_then(|out| {
-                String::from_utf8(out.stdout).map_err(|_| io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("git rev-parse master output was not UTF-8")
-                ))
+                String::from_utf8(out.stdout).map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "git rev-parse master output was not UTF-8",
+                    )
+                })
             })
             .or_else(|_| git_rev_from_file())
     }

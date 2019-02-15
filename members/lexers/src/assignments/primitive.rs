@@ -46,14 +46,10 @@ impl Primitive {
 
                 let res = if kind.starts_with("hmap[") {
                     let kind = &kind[5..];
-                    kind.rfind(']')
-                        .map(|found| &kind[..found])
-                        .and_then(parse_inner_hash_map)
+                    kind.rfind(']').map(|found| &kind[..found]).and_then(parse_inner_hash_map)
                 } else if kind.starts_with("bmap[") {
                     let kind = &kind[5..];
-                    kind.rfind(']')
-                        .map(|found| &kind[..found])
-                        .and_then(parse_inner_btree_map)
+                    kind.rfind(']').map(|found| &kind[..found]).and_then(parse_inner_btree_map)
                 } else {
                     None
                 };

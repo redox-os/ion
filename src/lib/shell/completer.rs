@@ -26,11 +26,7 @@ impl IonFileCompleter {
         dir_stack: *const DirectoryStack,
         vars: *const Variables,
     ) -> IonFileCompleter {
-        IonFileCompleter {
-            inner: FilenameCompleter::new(path),
-            dir_stack,
-            vars,
-        }
+        IonFileCompleter { inner: FilenameCompleter::new(path), dir_stack, vars }
     }
 }
 
@@ -137,10 +133,8 @@ where
     let string = unsafe { &str::from_utf8_unchecked(&string) };
 
     let globs = glob(string).ok().and_then(|completions| {
-        let mut completions = completions
-            .filter_map(Result::ok)
-            .map(|x| x.to_string_lossy().into_owned())
-            .peekable();
+        let mut completions =
+            completions.filter_map(Result::ok).map(|x| x.to_string_lossy().into_owned()).peekable();
 
         if completions.peek().is_some() {
             Some(completions)
@@ -156,11 +150,8 @@ where
 
     // Use Liner::Completer as well, to preserve the previous behaviour
     // around single-directory completions
-    iter_inner_glob.flat_map(move |path| {
-        liner_complete(&path)
-            .into_iter()
-            .map(|x| escape(x.as_str()))
-    })
+    iter_inner_glob
+        .flat_map(move |path| liner_complete(&path).into_iter().map(|x| escape(x.as_str())))
 }
 
 /// A completer that combines suggestions from multiple completers.
@@ -211,16 +202,10 @@ mod tests {
             &Variables::default(),
         );
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
-        assert_eq!(
-            completer.completions("testing/file"),
-            vec!["testing/file_with_text"]
-        );
+        assert_eq!(completer.completions("testing/file"), vec!["testing/file_with_text"]);
 
         assert_eq!(completer.completions("~"), vec!["~/"]);
 
-        assert_eq!(
-            completer.completions("tes/fil"),
-            vec!["testing/file_with_text"]
-        );
+        assert_eq!(completer.completions("tes/fil"), vec!["testing/file_with_text"]);
     }
 }
