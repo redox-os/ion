@@ -35,15 +35,17 @@ pub(crate) fn status(args: &[small::String], shell: &mut Shell) -> Result<(), St
                 "--is-login" => flags |= Flags::LOGIN_SHELL,
                 "--is-interactive" => flags |= Flags::INTERACTIVE,
                 "--current-filename" => flags |= Flags::FILENAME,
-                _ => if arg.starts_with('-') {
-                    match arg.chars().nth(1).unwrap() {
-                        'h' => flags |= Flags::HELP,
-                        'l' => flags |= Flags::LOGIN_SHELL,
-                        'i' => flags |= Flags::INTERACTIVE,
-                        'f' => flags |= Flags::FILENAME,
-                        _ => (),
+                _ => {
+                    if arg.starts_with('-') {
+                        match arg.chars().nth(1).unwrap() {
+                            'h' => flags |= Flags::HELP,
+                            'l' => flags |= Flags::LOGIN_SHELL,
+                            'i' => flags |= Flags::INTERACTIVE,
+                            'f' => flags |= Flags::FILENAME,
+                            _ => (),
+                        }
                     }
-                },
+                }
             }
         }
         let err = "".to_string();

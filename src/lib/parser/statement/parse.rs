@@ -91,7 +91,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                 else_if:    Vec::new(),
                 failure:    Vec::new(),
                 mode:       0,
-            }
+            };
         }
         "else" => return Statement::Else,
         _ if cmd.starts_with("else") => {
@@ -109,7 +109,7 @@ pub(crate) fn parse(code: &str) -> Statement {
             return collect(cmd[6..].trim_left(), |pipeline| Statement::While {
                 expression: vec![Statement::Pipeline(pipeline)],
                 statements: Vec::new(),
-            })
+            });
         }
         _ if cmd.starts_with("for ") => {
             let mut cmd = cmd[4..].trim_left();
@@ -118,16 +118,12 @@ pub(crate) fn parse(code: &str) -> Statement {
             if cmd.len() > 5 {
                 let mut cmdb = cmd.as_bytes();
                 for start in 0..cmd.len() - 4 {
-                    if &cmdb[start..start+4] == b" in " {
-                        variables = Some(
-                            cmd[..start].split_whitespace()
-                                .map(Into::into)
-                                .collect()
-                        );
+                    if &cmdb[start..start + 4] == b" in " {
+                        variables = Some(cmd[..start].split_whitespace().map(Into::into).collect());
 
                         cmd = cmd[start + 3..].trim();
 
-                        break
+                        break;
                     }
                 }
             }
@@ -135,9 +131,7 @@ pub(crate) fn parse(code: &str) -> Statement {
             return match variables {
                 Some(variables) => Statement::For {
                     variables,
-                    values:     ArgumentSplitter::new(cmd)
-                        .map(small::String::from)
-                        .collect(),
+                    values: ArgumentSplitter::new(cmd).map(small::String::from).collect(),
                     statements: Vec::new(),
                 },
                 None => {
@@ -166,18 +160,13 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             };
 
-            return Statement::Case(Case {
-                value,
-                binding,
-                conditional,
-                statements: Vec::new(),
-            });
+            return Statement::Case(Case { value, binding, conditional, statements: Vec::new() });
         }
         _ if cmd.starts_with("match ") => {
             return Statement::Match {
                 expression: cmd[6..].trim_left().into(),
                 cases:      Vec::new(),
-            }
+            };
         }
         _ if cmd.starts_with("fn ") => {
             let cmd = cmd[3..].trim_left();
@@ -200,7 +189,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                         name: name.into(),
                         args,
                         statements: Vec::new(),
-                    }
+                    };
                 }
                 Err(why) => {
                     eprintln!("ion: function argument error: {}", why);
@@ -218,17 +207,17 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
                 break;
             }
-            return Statement::Time(Box::new(parse(timed)))
+            return Statement::Time(Box::new(parse(timed)));
         }
         _ if cmd.eq("time") => return Statement::Time(Box::new(Statement::Default)),
         _ if cmd.starts_with("and ") => {
-            return Statement::And(Box::new(parse(cmd[3..].trim_left())))
+            return Statement::And(Box::new(parse(cmd[3..].trim_left())));
         }
         _ if cmd.eq("and") => return Statement::And(Box::new(Statement::Default)),
         _ if cmd.starts_with("or ") => return Statement::Or(Box::new(parse(cmd[2..].trim_left()))),
         _ if cmd.eq("or") => return Statement::Or(Box::new(Statement::Default)),
         _ if cmd.starts_with("not ") => {
-            return Statement::Not(Box::new(parse(cmd[3..].trim_left())))
+            return Statement::Not(Box::new(parse(cmd[3..].trim_left())));
         }
         _ if cmd.starts_with("! ") => return Statement::Not(Box::new(parse(cmd[1..].trim_left()))),
         _ if cmd.eq("not") | cmd.eq("!") => return Statement::Not(Box::new(Statement::Default)),
@@ -254,18 +243,18 @@ mod tests {
         assert_eq!(
             parse("for x y z in 1..=10"),
             Statement::For {
-                variables: vec!["x", "y", "z"].into_iter().map(Into::into).collect(),
-                values: vec!["1..=10"].into_iter().map(Into::into).collect(),
-                statements: Vec::new()
+                variables:  vec!["x", "y", "z"].into_iter().map(Into::into).collect(),
+                values:     vec!["1..=10"].into_iter().map(Into::into).collect(),
+                statements: Vec::new(),
             }
         );
 
         assert_eq!(
             parse("for  x  in  {1..=10} {1..=10}"),
             Statement::For {
-                variables: vec!["x"].into_iter().map(Into::into).collect(),
-                values: vec!["{1..=10}", "{1..=10}"].into_iter().map(Into::into).collect(),
-                statements: Vec::new()
+                variables:  vec!["x"].into_iter().map(Into::into).collect(),
+                values:     vec!["{1..=10}", "{1..=10}"].into_iter().map(Into::into).collect(),
+                statements: Vec::new(),
             }
         );
     }
@@ -359,14 +348,8 @@ mod tests {
             description: None,
             name:        "bob".into(),
             args:        vec![
-                KeyBuf {
-                    name: "a".into(),
-                    kind: Primitive::Any,
-                },
-                KeyBuf {
-                    name: "b".into(),
-                    kind: Primitive::Any,
-                },
+                KeyBuf { name: "a".into(), kind: Primitive::Any },
+                KeyBuf { name: "b".into(), kind: Primitive::Any },
             ],
             statements:  Default::default(),
         };
@@ -381,14 +364,8 @@ mod tests {
             description: Some("bob is a nice function".into()),
             name:        "bob".into(),
             args:        vec![
-                KeyBuf {
-                    name: "a".into(),
-                    kind: Primitive::Any,
-                },
-                KeyBuf {
-                    name: "b".into(),
-                    kind: Primitive::Any,
-                },
+                KeyBuf { name: "a".into(), kind: Primitive::Any },
+                KeyBuf { name: "b".into(), kind: Primitive::Any },
             ],
             statements:  vec![],
         };

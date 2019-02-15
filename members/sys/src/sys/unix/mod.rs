@@ -1,6 +1,6 @@
-extern crate libc;
 #[cfg(target_os = "dragonfly")]
 extern crate errno_dragonfly;
+extern crate libc;
 
 pub mod signals;
 
@@ -40,26 +40,14 @@ pub const STDIN_FILENO: i32 = libc::STDIN_FILENO;
 #[cfg(target_os = "linux")]
 fn errno() -> i32 { unsafe { *libc::__errno_location() } }
 
-#[cfg(
-    any(
-        target_os = "openbsd",
-        target_os = "bitrig",
-        target_os = "android"
-    )
-)]
+#[cfg(any(target_os = "openbsd", target_os = "bitrig", target_os = "android"))]
 fn errno() -> i32 { unsafe { *libc::__errno() } }
 
-#[cfg(
-    any(
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "freebsd"
-    )
-)]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
 fn errno() -> i32 { unsafe { *libc::__error() } }
 
 #[cfg(target_os = "dragonfly")]
-fn errno() -> i32 { unsafe { *errno_dragonfly::errno_location()} }
+fn errno() -> i32 { unsafe { *errno_dragonfly::errno_location() } }
 
 pub fn strerror(errno: i32) -> &'static str {
     unsafe {
@@ -383,10 +371,7 @@ pub mod variables {
         if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) }
             == 0
         {
-            let len = host_name
-                .iter()
-                .position(|i| *i == 0)
-                .unwrap_or_else(|| host_name.len());
+            let len = host_name.iter().position(|i| *i == 0).unwrap_or_else(|| host_name.len());
 
             Some(unsafe { String::from_utf8_unchecked(host_name[..len].to_owned()) })
         } else {
@@ -407,27 +392,11 @@ pub mod env {
     };
 
     pub fn home_dir() -> Option<PathBuf> {
-        return env::var_os("HOME")
-            .or_else(|| unsafe { fallback() })
-            .map(PathBuf::from);
+        return env::var_os("HOME").or_else(|| unsafe { fallback() }).map(PathBuf::from);
 
-        #[cfg(
-            any(
-                target_os = "android",
-                target_os = "ios",
-                target_os = "emscripten"
-            )
-        )]
+        #[cfg(any(target_os = "android", target_os = "ios", target_os = "emscripten"))]
         unsafe fn fallback() -> Option<OsString> { None }
-        #[cfg(
-            not(
-                any(
-                    target_os = "android",
-                    target_os = "ios",
-                    target_os = "emscripten"
-                )
-            )
-        )]
+        #[cfg(not(any(target_os = "android", target_os = "ios", target_os = "emscripten")))]
         unsafe fn fallback() -> Option<OsString> {
             let amt = match libc::sysconf(libc::_SC_GETPW_R_SIZE_MAX) {
                 n if n < 0 => 512 as usize,

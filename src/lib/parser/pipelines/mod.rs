@@ -3,13 +3,9 @@ mod collector;
 pub(crate) use self::collector::*;
 
 use super::expand_string;
-use shell::{Job, JobKind, Shell, pipe_exec::stdin_of};
+use shell::{pipe_exec::stdin_of, Job, JobKind, Shell};
 use small;
-use std::{
-    os::unix::io::FromRawFd,
-    fmt,
-    fs::File,
-};
+use std::{fmt, fs::File, os::unix::io::FromRawFd};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) enum RedirectFrom {
@@ -91,18 +87,12 @@ impl PipeItem {
         }
 
         for output in &mut self.outputs {
-            output.file = expand_string(output.file.as_str(), shell, false)
-                .join(" ")
-                .into();
+            output.file = expand_string(output.file.as_str(), shell, false).join(" ").into();
         }
     }
 
     pub(crate) fn new(job: Job, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
-        PipeItem {
-            job,
-            outputs,
-            inputs,
-        }
+        PipeItem { job, outputs, inputs }
     }
 }
 

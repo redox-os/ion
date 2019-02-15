@@ -51,22 +51,23 @@ impl<'a> ArrayMethod<'a> {
     }
 
     fn map_keys<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Array, &'static str> {
-        expand_func.map_keys(self.variable, self.selection.clone())
+        expand_func
+            .map_keys(self.variable, self.selection.clone())
             .ok_or("no map found")
             .map(|x| x.cloned().collect())
     }
 
     fn map_values<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Array, &'static str> {
-        expand_func.map_values(self.variable, self.selection.clone())
+        expand_func
+            .map_values(self.variable, self.selection.clone())
             .ok_or("no map found")
             .map(|x| x.collect())
     }
 
     fn graphemes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
-        let graphemes: Vec<types::Str> = UnicodeSegmentation::graphemes(variable.as_str(), true)
-            .map(From::from)
-            .collect();
+        let graphemes: Vec<types::Str> =
+            UnicodeSegmentation::graphemes(variable.as_str(), true).map(From::from).collect();
         let len = graphemes.len();
         Ok(graphemes.into_iter().select(self.selection.clone(), len))
     }
@@ -74,20 +75,20 @@ impl<'a> ArrayMethod<'a> {
     fn split_at<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
         match self.pattern {
-            Pattern::StringPattern(string) => if let Ok(value) =
-                expand_string(string, expand_func, false)
-                    .join(" ")
-                    .parse::<usize>()
-            {
-                if value < variable.len() {
-                    let (l, r) = variable.split_at(value);
-                    Ok(array![types::Str::from(l), types::Str::from(r)])
+            Pattern::StringPattern(string) => {
+                if let Ok(value) =
+                    expand_string(string, expand_func, false).join(" ").parse::<usize>()
+                {
+                    if value < variable.len() {
+                        let (l, r) = variable.split_at(value);
+                        Ok(array![types::Str::from(l), types::Str::from(r)])
+                    } else {
+                        Err("value is out of bounds")
+                    }
                 } else {
-                    Err("value is out of bounds")
+                    Err("requires a valid number as an argument")
                 }
-            } else {
-                Err("requires a valid number as an argument")
-            },
+            }
             Pattern::Whitespace => Err("requires an argument"),
         }
     }
@@ -141,10 +142,7 @@ impl<'a> ArrayMethod<'a> {
                 }
             }
             (&Pattern::Whitespace, Select::Range(range)) => {
-                let len = variable
-                    .split(char::is_whitespace)
-                    .filter(|x| !x.is_empty())
-                    .count();
+                let len = variable.split(char::is_whitespace).filter(|x| !x.is_empty()).count();
                 if let Some((start, length)) = range.bounds(len) {
                     variable
                         .split(char::is_whitespace)
@@ -169,7 +167,7 @@ impl<'a> ArrayMethod<'a> {
         } else if is_expression(self.variable) {
             expand_string(self.variable, expand_func, false)
         } else {
-            array![]
+            Array::new()
         }
     }
 
@@ -200,7 +198,7 @@ impl<'a> ArrayMethod<'a> {
 
         res.unwrap_or_else(|m| {
             eprintln!("ion: {}: {}", self.method, m);
-            array![]
+            Array::new()
         })
     }
 
@@ -413,10 +411,7 @@ mod test {
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
-        assert_eq!(
-            method.handle_as_array(&VariableExpander),
-            array!["FOO", "BAR"]
-        );
+        assert_eq!(method.handle_as_array(&VariableExpander), array!["FOO", "BAR"]);
     }
 
     #[test]
@@ -427,10 +422,7 @@ mod test {
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
-        assert_eq!(
-            method.handle_as_array(&VariableExpander),
-            array!["F", "O", "O", "B", "A", "R"]
-        );
+        assert_eq!(method.handle_as_array(&VariableExpander), array!["F", "O", "O", "B", "A", "R"]);
     }
 
     #[test]
@@ -455,10 +447,7 @@ mod test {
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
-        assert_eq!(
-            method.handle_as_array(&VariableExpander),
-            array!["F", "O", "O", "B", "A", "R"]
-        );
+        assert_eq!(method.handle_as_array(&VariableExpander), array!["F", "O", "O", "B", "A", "R"]);
     }
 
     #[test]
@@ -469,10 +458,7 @@ mod test {
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
-        assert_eq!(
-            method.handle_as_array(&VariableExpander),
-            array!["FOO", "BAR"]
-        );
+        assert_eq!(method.handle_as_array(&VariableExpander), array!["FOO", "BAR"]);
     }
 
     #[test]
@@ -483,9 +469,6 @@ mod test {
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
-        assert_eq!(
-            method.handle_as_array(&VariableExpander),
-            array!["c", "b", "a"]
-        );
+        assert_eq!(method.handle_as_array(&VariableExpander), array!["c", "b", "a"]);
     }
 }

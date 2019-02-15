@@ -7,7 +7,11 @@ use std::{
     fs::File,
     io::{self, prelude::*, BufReader, SeekFrom},
     mem,
-    os::unix::{ffi::OsStrExt, fs::MetadataExt, io::{AsRawFd, RawFd}},
+    os::unix::{
+        ffi::OsStrExt,
+        fs::MetadataExt,
+        io::{AsRawFd, RawFd},
+    },
     path::PathBuf,
     process::exit,
     slice,
@@ -69,10 +73,7 @@ pub fn waitpid(pid: i32, status: &mut i32, options: i32) -> Result<i32, i32> {
 }
 
 pub fn strerror(errno: i32) -> &'static str {
-    syscall::error::STR_ERROR
-        .get(errno as usize)
-        .map(|err| *err)
-        .unwrap_or("Unknown Error")
+    syscall::error::STR_ERROR.get(errno as usize).map(|err| *err).unwrap_or("Unknown Error")
 }
 
 pub fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
@@ -175,7 +176,7 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
     if let Some(prog) = prog {
         let mut file = match File::open(&prog) {
             Ok(file) => file,
-            Err(err) => return err
+            Err(err) => return err,
         };
 
         // Construct a valid set of arguments to pass to execve. Ensure that
@@ -195,7 +196,7 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
                 match reader.read(&mut shebang[read..]) {
                     Ok(0) => break,
                     Ok(n) => read += n,
-                    Err(err) => return err
+                    Err(err) => return err,
                 }
             }
 
@@ -205,21 +206,21 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
                 // we need to make sure ourselves the file is executable
                 let metadata = match file.metadata() {
                     Ok(meta) => meta,
-                    Err(err) => return err
+                    Err(err) => return err,
                 };
 
                 let uid = match syscall::getuid() {
                     Ok(uid) => uid,
-                    Err(err) => return io::Error::from_raw_os_error(err.errno)
+                    Err(err) => return io::Error::from_raw_os_error(err.errno),
                 };
                 let gid = match syscall::getgid() {
                     Ok(gid) => gid,
-                    Err(err) => return io::Error::from_raw_os_error(err.errno)
+                    Err(err) => return io::Error::from_raw_os_error(err.errno),
                 };
                 let mode = if uid == metadata.uid() as usize {
-                    (metadata.mode() >> 3*2) & 0o7
+                    (metadata.mode() >> 3 * 2) & 0o7
                 } else if gid == metadata.gid() as usize {
-                    (metadata.mode() >> 3*1) & 0o7
+                    (metadata.mode() >> 3 * 1) & 0o7
                 } else {
                     metadata.mode() & 0o7
                 };
@@ -240,13 +241,13 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
                         // (But remember to make sure the vector lives long
                         // enough for the arguments!!)
                         Some(interpreter)
-                    },
-                    Err(err) => return err
+                    }
+                    Err(err) => return err,
                 }
             } else {
                 match reader.seek(SeekFrom::Start(0)) {
                     Ok(_) => (),
-                    Err(err) => return err
+                    Err(err) => return err,
                 }
                 None
             }
@@ -255,7 +256,7 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
             let path: &OsStr = OsStrExt::from_bytes(&interpreter);
             file = match File::open(path) {
                 Ok(file) => file,
-                Err(err) => return err
+                Err(err) => return err,
             };
             cvt_args.push([interpreter.as_ptr() as usize, interpreter.len()]);
         }
@@ -315,10 +316,7 @@ pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
 
     let pgid_usize = pgid as usize;
     let res = syscall::write(fd, unsafe {
-        slice::from_raw_parts(
-            &pgid_usize as *const usize as *const u8,
-            mem::size_of::<usize>(),
-        )
+        slice::from_raw_parts(&pgid_usize as *const usize as *const u8, mem::size_of::<usize>())
     });
 
     let _ = syscall::close(fd);
@@ -370,10 +368,7 @@ pub mod variables {
         if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) }
             == 0
         {
-            let len = host_name
-                .iter()
-                .position(|i| *i == 0)
-                .unwrap_or(host_name.len());
+            let len = host_name.iter().position(|i| *i == 0).unwrap_or(host_name.len());
 
             Some(unsafe { String::from_utf8_unchecked(host_name[..len].to_owned()) })
         } else {

@@ -24,11 +24,7 @@ pub struct ArgumentSplitter<'a> {
 
 impl<'a> ArgumentSplitter<'a> {
     pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
-        ArgumentSplitter {
-            data,
-            read: 0,
-            bitflags: ArgumentFlags::empty(),
-        }
+        ArgumentSplitter { data, read: 0, bitflags: ArgumentFlags::empty() }
     }
 }
 
@@ -72,16 +68,14 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 // Disable COMM_1 and enable COMM_2 + ARRAY.
                 b'@' => {
                     self.bitflags.remove(ArgumentFlags::COMM_1);
-                    self.bitflags
-                        .insert(ArgumentFlags::COMM_2 | ArgumentFlags::ARRAY);
+                    self.bitflags.insert(ArgumentFlags::COMM_2 | ArgumentFlags::ARRAY);
                     self.read += 1;
                     continue;
                 }
                 // Disable COMM_2 and enable COMM_1 + VARIAB.
                 b'$' => {
                     self.bitflags.remove(ArgumentFlags::COMM_2);
-                    self.bitflags
-                        .insert(ArgumentFlags::COMM_1 | ArgumentFlags::VARIAB);
+                    self.bitflags.insert(ArgumentFlags::COMM_1 | ArgumentFlags::VARIAB);
                     self.read += 1;
                     continue;
                 }
@@ -96,12 +90,8 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b'(' => {
                     // Disable VARIAB + ARRAY and enable METHOD.
                     // if variab or array are set
-                    if self
-                        .bitflags
-                        .intersects(ArgumentFlags::VARIAB | ArgumentFlags::ARRAY)
-                    {
-                        self.bitflags
-                            .remove(ArgumentFlags::VARIAB | ArgumentFlags::ARRAY);
+                    if self.bitflags.intersects(ArgumentFlags::VARIAB | ArgumentFlags::ARRAY) {
+                        self.bitflags.remove(ArgumentFlags::VARIAB | ArgumentFlags::ARRAY);
                         self.bitflags.insert(ArgumentFlags::METHOD);
                     }
                     level += 1
@@ -125,10 +115,10 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 }
                 // Break from the loop once a root-level space is found.
                 b' ' => {
-                    if !self
-                        .bitflags
-                        .intersects(ArgumentFlags::DOUBLE | ArgumentFlags::METHOD)
-                        && level == 0 && alevel == 0 && blevel == 0
+                    if !self.bitflags.intersects(ArgumentFlags::DOUBLE | ArgumentFlags::METHOD)
+                        && level == 0
+                        && alevel == 0
+                        && blevel == 0
                     {
                         break;
                     }
@@ -138,8 +128,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
 
             self.read += 1;
             // disable COMM_1 and COMM_2
-            self.bitflags
-                .remove(ArgumentFlags::COMM_1 | ArgumentFlags::COMM_2);
+            self.bitflags.remove(ArgumentFlags::COMM_1 | ArgumentFlags::COMM_2);
         }
 
         if start == self.read {
@@ -179,22 +168,14 @@ mod tests {
     #[test]
     fn arrays() {
         let input = "echo [ one two @[echo three four] five ] [ six seven ]";
-        let expected = vec![
-            "echo",
-            "[ one two @[echo three four] five ]",
-            "[ six seven ]",
-        ];
+        let expected = vec!["echo", "[ one two @[echo three four] five ]", "[ six seven ]"];
         compare(input, expected);
     }
 
     #[test]
     fn quotes() {
         let input = "echo 'one two \"three four\"' \"five six 'seven eight'\"";
-        let expected = vec![
-            "echo",
-            "'one two \"three four\"'",
-            "\"five six 'seven eight'\"",
-        ];
+        let expected = vec!["echo", "'one two \"three four\"'", "\"five six 'seven eight'\""];
         compare(input, expected);
     }
 }

@@ -5,7 +5,8 @@ mod readln;
 mod terminate;
 
 use self::{
-    prompt::{prompt, prompt_fn}, readln::readln,
+    prompt::{prompt, prompt_fn},
+    readln::readln,
     terminate::{terminate_quotes, terminate_script_quotes},
 };
 use super::{status::*, FlowLogic, Shell, ShellHistory};
@@ -94,9 +95,7 @@ impl Binary for Shell {
             let mut context = Context::new();
             context.word_divider_fn = Box::new(word_divide);
             if "1" == self.get_str_or_empty("HISTFILE_ENABLED") {
-                let path = self
-                    .get::<types::Str>("HISTFILE")
-                    .expect("shell didn't set HISTFILE");
+                let path = self.get::<types::Str>("HISTFILE").expect("shell didn't set HISTFILE");
                 if !Path::new(path.as_str()).exists() {
                     eprintln!("ion: creating history file at \"{}\"", path);
                 }
@@ -107,16 +106,15 @@ impl Binary for Shell {
 
         self.evaluate_init_file();
 
-        self.variables.set(
-            "args",
-            iter::once(env::args().next().unwrap().into()).collect::<types::Array>(),
-        );
+        self.variables
+            .set("args", iter::once(env::args().next().unwrap().into()).collect::<types::Array>());
 
         loop {
             if let Some(command) = self.readln() {
                 if !command.is_empty() {
                     if let Ok(command) = self.terminate_quotes(command.replace("\\\n", "")) {
-                        let cmd: &str = &designators::expand_designators(&self, command.trim_right());
+                        let cmd: &str =
+                            &designators::expand_designators(&self, command.trim_right());
                         self.on_command(&cmd);
                         self.save_command(&cmd);
                     } else {
@@ -231,9 +229,5 @@ where
 
 fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
     // -> impl Iterator<Item = (usize, usize)> + 'a
-    WordDivide {
-        iter:       buf.chars().cloned().enumerate(),
-        count:      0,
-        word_start: None,
-    }.collect() // TODO: return iterator directly :D
+    WordDivide { iter: buf.chars().cloned().enumerate(), count: 0, word_start: None }.collect() // TODO: return iterator directly :D
 }

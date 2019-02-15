@@ -17,18 +17,17 @@ pub(crate) fn redir(old: RawFd, new: RawFd) {
 /// when dropped.
 pub(crate) fn duplicate_streams() -> io::Result<(Option<File>, File, File)> {
     // STDIN may have been closed for a background shell, so it is ok if it cannot be duplicated.
-    let stdin = sys::dup(sys::STDIN_FILENO)
-        .ok()
-        .map(|fd| unsafe { File::from_raw_fd(fd) });
+    let stdin = sys::dup(sys::STDIN_FILENO).ok().map(|fd| unsafe { File::from_raw_fd(fd) });
 
     sys::dup(sys::STDOUT_FILENO)
         .map(|fd| unsafe { File::from_raw_fd(fd) })
         .map(|stdout| (stdin, stdout))
         // And then meld stderr alongside stdin and stdout
-        .and_then(|(stdin, stdout)| sys::dup(sys::STDERR_FILENO)
-            .map(|fd| unsafe { File::from_raw_fd(fd) })
-            .map(|stderr| (stdin, stdout, stderr))
-        )
+        .and_then(|(stdin, stdout)| {
+            sys::dup(sys::STDERR_FILENO)
+                .map(|fd| unsafe { File::from_raw_fd(fd) })
+                .map(|stderr| (stdin, stdout, stderr))
+        })
 }
 
 pub(crate) fn redirect_streams(inp: Option<File>, out: File, err: File) {

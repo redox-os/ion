@@ -127,25 +127,19 @@ impl fmt::Display for VariableType {
             VariableType::Alias(ref alias) => write!(f, "{}", **alias),
             VariableType::Array(ref array) => write!(f, "{}", array.join(" ")),
             VariableType::HashMap(ref map) => {
-                let mut format =
-                    map.into_iter()
-                        .fold(String::new(), |mut format, (_, var_type)| {
-                            format.push_str(&format!("{}", var_type));
-                            format.push(' ');
-                            format
-                        });
-                format.pop();
+                let format = map
+                    .iter()
+                    .map(|(_, var_type)| format!("{}", var_type))
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 write!(f, "{}", format)
             }
             VariableType::BTreeMap(ref map) => {
-                let mut format =
-                    map.into_iter()
-                        .fold(String::new(), |mut format, (_, var_type)| {
-                            format.push_str(&format!("{}", var_type));
-                            format.push(' ');
-                            format
-                        });
-                format.pop();
+                let format = map
+                    .iter()
+                    .map(|(_, var_type)| format!("{}", var_type))
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 write!(f, "{}", format)
             }
             _ => write!(f, ""),
@@ -180,12 +174,8 @@ pub struct Variables {
 
 impl Default for Variables {
     fn default() -> Self {
-        let mut map: HashMap<types::Str, VariableType> =
-            HashMap::with_capacity(64);
-        map.insert(
-            "DIRECTORY_STACK_SIZE".into(),
-            VariableType::Str("1000".into()),
-        );
+        let mut map: HashMap<types::Str, VariableType> = HashMap::with_capacity(64);
+        map.insert("DIRECTORY_STACK_SIZE".into(), VariableType::Str("1000".into()));
         map.insert("HISTORY_SIZE".into(), VariableType::Str("1000".into()));
         map.insert("HISTFILE_SIZE".into(), VariableType::Str("100000".into()));
         map.insert(
@@ -209,11 +199,7 @@ impl Default for Variables {
         );
         map.insert(
             "EUID".into(),
-            VariableType::Str(
-                geteuid()
-                    .ok()
-                    .map_or("?".into(), |id| id.to_string().into()),
-            ),
+            VariableType::Str(geteuid().ok().map_or("?".into(), |id| id.to_string().into())),
         );
 
         // Initialize the HISTFILE variable
@@ -228,10 +214,7 @@ impl Default for Variables {
         }
 
         // History Timestamps enabled variable, disabled by default
-        map.insert(
-            "HISTORY_TIMESTAMP".into(),
-            VariableType::Str("0".into())
-        );
+        map.insert("HISTORY_TIMESTAMP".into(), VariableType::Str("0".into()));
 
         map.insert(
             "HISTORY_IGNORE".into(),
@@ -245,19 +228,9 @@ impl Default for Variables {
         );
 
         // Initialize the HOST variable
-        env::set_var(
-            "HOST",
-            &self_sys::get_host_name().unwrap_or_else(|| "?".to_owned()),
-        );
+        env::set_var("HOST", &self_sys::get_host_name().unwrap_or_else(|| "?".to_owned()));
 
-        Variables {
-            flags:   0,
-            scopes:  vec![Scope {
-                vars:      map,
-                namespace: false,
-            }],
-            current: 0,
-        }
+        Variables { flags: 0, scopes: vec![Scope { vars: map, namespace: false }], current: 0 }
     }
 }
 
@@ -265,10 +238,7 @@ impl Variables {
     pub fn new_scope(&mut self, namespace: bool) {
         self.current += 1;
         if self.current >= self.scopes.len() {
-            self.scopes.push(Scope {
-                vars: HashMap::with_capacity(64),
-                namespace,
-            });
+            self.scopes.push(Scope { vars: HashMap::with_capacity(64), namespace });
         } else {
             self.scopes[self.current].namespace = namespace;
         }
@@ -394,18 +364,22 @@ impl Variables {
         }
 
         match tilde_prefix {
-            "" => if let Some(home) = sys_env::home_dir() {
-                return Some(home.to_string_lossy().to_string() + remainder);
-            },
+            "" => {
+                if let Some(home) = sys_env::home_dir() {
+                    return Some(home.to_string_lossy().to_string() + remainder);
+                }
+            }
             "+" => {
                 return Some(match env::var("PWD") {
                     Ok(var) => var + remainder,
                     _ => ["?", remainder].concat(),
-                })
+                });
             }
-            "-" => if let Some(oldpwd) = self.get::<types::Str>("OLDPWD") {
-                return Some(oldpwd.to_string() + remainder);
-            },
+            "-" => {
+                if let Some(oldpwd) = self.get::<types::Str>("OLDPWD") {
+                    return Some(oldpwd.to_string() + remainder);
+                }
+            }
             _ => {
                 let neg;
                 let tilde_num;
@@ -433,9 +407,11 @@ impl Variables {
                             return Some(path.to_str().unwrap().to_string());
                         }
                     }
-                    Err(_) => if let Some(home) = self_sys::get_user_home(tilde_prefix) {
-                        return Some(home + remainder);
-                    },
+                    Err(_) => {
+                        if let Some(home) = self_sys::get_user_home(tilde_prefix) {
+                            return Some(home + remainder);
+                        }
+                    }
                 }
             }
         }
@@ -492,19 +468,16 @@ impl Variables {
                         }
                     }
                 }
-                Some(("env", variable)) => env::var(variable)
-                    .map(Into::into)
-                    .ok()
-                    .map(|s| T::from(VariableType::Str(s))),
+                Some(("env", variable)) => {
+                    env::var(variable).map(Into::into).ok().map(|s| T::from(VariableType::Str(s)))
+                }
                 Some(("super", _)) | Some(("global", _)) | None => {
                     // Otherwise, it's just a simple variable name.
                     match self.get_ref(name) {
                         Some(VariableType::Str(val)) => {
                             Some(T::from(VariableType::Str(val.clone())))
                         }
-                        _ => env::var(name)
-                            .ok()
-                            .map(|s| T::from(VariableType::Str(s.into()))),
+                        _ => env::var(name).ok().map(|s| T::from(VariableType::Str(s.into()))),
                     }
                 }
                 Some((..)) => {
@@ -578,11 +551,13 @@ impl Variables {
                 ) -> Option<Action<'a>> {
                     if !name.is_empty() {
                         match var {
-                            VariableType::$preferred(var_value) => if var_value.is_empty() {
-                                Some(Action::Upper(UpperAction::Remove))
-                            } else {
-                                Some(Action::$preferred(input))
-                            },
+                            VariableType::$preferred(var_value) => {
+                                if var_value.is_empty() {
+                                    Some(Action::Upper(UpperAction::Remove))
+                                } else {
+                                    Some(Action::$preferred(input))
+                                }
+                            }
                             _ => Some(Action::Upper(UpperAction::Shadow)),
                         }
                     } else {
@@ -685,10 +660,7 @@ impl Variables {
             // Temporarily borrow the `swd` variable while we attempt to assemble a minimal
             // variant of the directory path. If that is not possible, we will cancel the
             // borrow and return `swd` itself as the minified path.
-            let elements = swd
-                .split('/')
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<&str>>();
+            let elements = swd.split('/').filter(|s| !s.is_empty()).collect::<Vec<&str>>();
             if elements.len() > 2 {
                 let mut output = types::Str::new();
                 for element in &elements[..elements.len() - 1] {

@@ -6,10 +6,7 @@ struct StaticMap {
 
 impl StaticMap {
     fn get(&self, key: &str) -> Option<&'static str> {
-        self.keys
-            .binary_search(&key)
-            .ok()
-            .map(|pos| unsafe { *self.values.get_unchecked(pos) })
+        self.keys.binary_search(&key).ok().map(|pos| unsafe { *self.values.get_unchecked(pos) })
     }
 }
 
@@ -145,10 +142,12 @@ impl Colors {
 
             match variable.len() {
                 // 256 colors: 0xF | 0xFF
-                1 | 2 => if let Ok(value) = u8::from_str_radix(variable, 16) {
-                    *field = Some(Mode::Range256(value));
-                    return true;
-                },
+                1 | 2 => {
+                    if let Ok(value) = u8::from_str_radix(variable, 16) {
+                        *field = Some(Mode::Range256(value));
+                        return true;
+                    }
+                }
                 // 24-bit Color 0xRGB
                 3 => {
                     let mut chars = variable.chars();
@@ -162,14 +161,16 @@ impl Colors {
                     }
                 }
                 // 24-bit Color 0xRRGGBB
-                6 => if let Ok(red) = u8::from_str_radix(&variable[0..2], 16) {
-                    if let Ok(green) = u8::from_str_radix(&variable[2..4], 16) {
-                        if let Ok(blue) = u8::from_str_radix(&variable[4..6], 16) {
-                            *field = Some(Mode::TrueColor(red, green, blue));
-                            return true;
+                6 => {
+                    if let Ok(red) = u8::from_str_radix(&variable[0..2], 16) {
+                        if let Ok(green) = u8::from_str_radix(&variable[2..4], 16) {
+                            if let Ok(blue) = u8::from_str_radix(&variable[4..6], 16) {
+                                *field = Some(Mode::TrueColor(red, green, blue));
+                                return true;
+                            }
                         }
                     }
-                },
+                }
                 _ => (),
             }
         } else if let Ok(value) = variable.parse::<u8>() {
@@ -200,18 +201,10 @@ impl Colors {
     /// transformation into ANSI code parameters, which may be obtained by calling the
     /// `into_string()` method on the newly-created `Colors` structure.
     pub(crate) fn collect(input: &str) -> Colors {
-        let mut colors = Colors {
-            foreground: None,
-            background: None,
-            attributes: None,
-        };
+        let mut colors = Colors { foreground: None, background: None, attributes: None };
         for variable in input.split(',') {
             if variable == "reset" {
-                return Colors {
-                    foreground: None,
-                    background: None,
-                    attributes: Some(vec!["0"]),
-                };
+                return Colors { foreground: None, background: None, attributes: Some(vec!["0"]) };
             } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
                 colors.append_attribute(attribute);
             } else if let Some(color) = COLORS.get(&variable) {
@@ -255,11 +248,8 @@ mod test {
 
     #[test]
     fn set_multiple_color_attributes() {
-        let expected = Colors {
-            attributes: Some(vec!["1", "4", "5"]),
-            background: None,
-            foreground: None,
-        };
+        let expected =
+            Colors { attributes: Some(vec!["1", "4", "5"]), background: None, foreground: None };
         let actual = Colors::collect("bold,underlined,blink");
         assert_eq!(actual, expected);
         assert_eq!(Some("\x1b[1;4;5m".to_owned()), actual.into_string());
@@ -286,10 +276,7 @@ mod test {
         };
         let actual = Colors::collect("0x4b,0x4dbg");
         assert_eq!(actual, expected);
-        assert_eq!(
-            Some("\x1b[38;5;75;48;5;77m".to_owned()),
-            actual.into_string()
-        )
+        assert_eq!(Some("\x1b[38;5;75;48;5;77m".to_owned()), actual.into_string())
     }
 
     #[test]
@@ -301,10 +288,7 @@ mod test {
         };
         let actual = Colors::collect("78bg,32");
         assert_eq!(actual, expected);
-        assert_eq!(
-            Some("\x1b[38;5;32;48;5;78m".to_owned()),
-            actual.into_string()
-        )
+        assert_eq!(Some("\x1b[38;5;32;48;5;78m".to_owned()), actual.into_string())
     }
 
     #[test]
@@ -316,10 +300,7 @@ mod test {
         };
         let actual = Colors::collect("0x000,0xFFFbg");
         assert_eq!(expected, actual);
-        assert_eq!(
-            Some("\x1b[38;2;0;0;0;48;2;255;255;255m".to_owned()),
-            actual.into_string()
-        );
+        assert_eq!(Some("\x1b[38;2;0;0;0;48;2;255;255;255m".to_owned()), actual.into_string());
     }
 
     #[test]

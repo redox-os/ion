@@ -14,7 +14,7 @@ use unicode_segmentation::UnicodeSegmentation;
 pub(crate) fn unescape(input: &str) -> Result<small::String, &'static str> {
     let mut check = false;
     // small::String cannot be created with a capacity of 0 without causing a panic
-    let len = if ! input.is_empty() { input.len() } else { 1 };
+    let len = if !input.is_empty() { input.len() } else { 1 };
     let mut out = small::String::with_capacity(len);
     let add_char = |out: &mut small::String, check: &mut bool, c| {
         out.push(c);
@@ -64,7 +64,8 @@ fn escape(input: &str) -> Result<String, &'static str> {
             12 => output.push_str("\\f"),
             13 => output.push_str("\\r"),
             27 => output.push_str("\\e"),
-            n if n != 59 && n != 95
+            n if n != 59
+                && n != 95
                 && ((n >= 33 && n < 48)
                     || (n >= 58 && n < 65)
                     || (n >= 91 && n < 97)
@@ -105,9 +106,7 @@ impl<'a> StringMethod<'a> {
                 let is_true = if let Some(value) = expand.string($variable, false) {
                     value.$method(pattern.as_str())
                 } else if is_expression($variable) {
-                    expand_string($variable, expand, false)
-                        .join(" ")
-                        .$method(pattern.as_str())
+                    expand_string($variable, expand, false).join(" ").$method(pattern.as_str())
                 } else {
                     false
                 };
@@ -170,15 +169,15 @@ impl<'a> StringMethod<'a> {
             "trim" => {
                 let word = get_var!();
                 output.push_str(word.trim());
-            },
+            }
             "trim_right" => {
                 let word = get_var!();
                 output.push_str(word.trim_right());
-            },
+            }
             "trim_left" => {
                 let word = get_var!();
                 output.push_str(word.trim_left());
-            },
+            }
             "repeat" => match pattern.join(" ").parse::<usize>() {
                 Ok(repeat) => output.push_str(&get_var!().repeat(repeat)),
                 Err(_) => {
@@ -198,13 +197,14 @@ impl<'a> StringMethod<'a> {
             "replacen" => {
                 let mut args = pattern.array();
                 match (args.next(), args.next(), args.next()) {
-                    (Some(replace), Some(with), Some(nth)) => if let Ok(nth) = nth.parse::<usize>()
-                    {
-                        let res = &get_var!().replacen(replace.as_str(), &with, nth);
-                        output.push_str(res);
-                    } else {
-                        eprintln!("ion: replacen: third argument isn't a valid integer");
-                    },
+                    (Some(replace), Some(with), Some(nth)) => {
+                        if let Ok(nth) = nth.parse::<usize>() {
+                            let res = &get_var!().replacen(replace.as_str(), &with, nth);
+                            output.push_str(res);
+                        } else {
+                            eprintln!("ion: replacen: third argument isn't a valid integer");
+                        }
+                    }
                     _ => eprintln!("ion: replacen: three arguments required"),
                 }
             }
@@ -237,31 +237,37 @@ impl<'a> StringMethod<'a> {
                     );
                 }
             }
-            "len" => if variable.starts_with('@') || is_array(variable) {
-                let expanded = expand_string(variable, expand, false);
-                output.push_str(&expanded.len().to_string());
-            } else if let Some(value) = expand.string(variable, false) {
-                let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
-                output.push_str(&count.to_string());
-            } else if is_expression(variable) {
-                let word = expand_string(variable, expand, false).join(" ");
-                let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
-                output.push_str(&count.to_string());
-            },
-            "len_bytes" => if let Some(value) = expand.string(variable, false) {
-                output.push_str(&value.as_bytes().len().to_string());
-            } else if is_expression(variable) {
-                let word = expand_string(variable, expand, false).join(" ");
-                output.push_str(&word.as_bytes().len().to_string());
-            },
-            "reverse" => if let Some(value) = expand.string(variable, false) {
-                let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
-                output.push_str(rev_graphs.collect::<String>().as_str());
-            } else if is_expression(variable) {
-                let word = expand_string(variable, expand, false).join(" ");
-                let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
-                output.push_str(rev_graphs.collect::<String>().as_str());
-            },
+            "len" => {
+                if variable.starts_with('@') || is_array(variable) {
+                    let expanded = expand_string(variable, expand, false);
+                    output.push_str(&expanded.len().to_string());
+                } else if let Some(value) = expand.string(variable, false) {
+                    let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
+                    output.push_str(&count.to_string());
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, expand, false).join(" ");
+                    let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
+                    output.push_str(&count.to_string());
+                }
+            }
+            "len_bytes" => {
+                if let Some(value) = expand.string(variable, false) {
+                    output.push_str(&value.as_bytes().len().to_string());
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, expand, false).join(" ");
+                    output.push_str(&word.as_bytes().len().to_string());
+                }
+            }
+            "reverse" => {
+                if let Some(value) = expand.string(variable, false) {
+                    let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
+                    output.push_str(rev_graphs.collect::<String>().as_str());
+                } else if is_expression(variable) {
+                    let word = expand_string(variable, expand, false).join(" ");
+                    let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
+                    output.push_str(rev_graphs.collect::<String>().as_str());
+                }
+            }
             "find" => {
                 let out = if let Some(value) = expand.string(variable, false) {
                     value.find(pattern.join(" ").as_str())
@@ -309,11 +315,8 @@ impl<'a> StringMethod<'a> {
                     small::String::new()
                 };
                 let second_array = pattern.array();
-                let first_maybe: Option<String> = if first_str != "" {
-                    Some(first_str.to_string())
-                } else {
-                    None
-                };
+                let first_maybe: Option<String> =
+                    if first_str != "" { Some(first_str.to_string()) } else { None };
                 match first_maybe {
                     Some(first) => output.push_str(&first),
                     None => {
@@ -540,7 +543,6 @@ mod test {
         method.handle(&mut output, &VariableExpander);
         assert_eq!(&*output, "FORD PREFECT");
     }
-
 
     #[test]
     fn test_trim_with_string() {

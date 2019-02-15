@@ -61,22 +61,10 @@ mod tests {
         assert_eq!(
             args,
             Ok(vec![
-                KeyBuf {
-                    name: "a".into(),
-                    kind: Primitive::Integer,
-                },
-                KeyBuf {
-                    name: "b".into(),
-                    kind: Primitive::Boolean,
-                },
-                KeyBuf {
-                    name: "c".into(),
-                    kind: Primitive::AnyArray,
-                },
-                KeyBuf {
-                    name: "d".into(),
-                    kind: Primitive::Any,
-                },
+                KeyBuf { name: "a".into(), kind: Primitive::Integer },
+                KeyBuf { name: "b".into(), kind: Primitive::Boolean },
+                KeyBuf { name: "c".into(), kind: Primitive::AnyArray },
+                KeyBuf { name: "d".into(), kind: Primitive::Any },
             ])
         );
         assert_eq!(description, Some("description"))

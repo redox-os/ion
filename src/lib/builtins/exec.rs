@@ -23,15 +23,9 @@ pub(crate) fn exec(shell: &mut Shell, args: &[small::String]) -> Result<(), smal
 
     match args.get(idx) {
         Some(argument) => {
-            let args = if args.len() > idx + 1 {
-                &args[idx + 1..]
-            } else {
-                &[]
-            };
+            let args = if args.len() > idx + 1 { &args[idx + 1..] } else { &[] };
             shell.prep_for_exit();
-            Err(execve(argument, args, (flags & CLEAR_ENV) == 1)
-                .description()
-                .into())
+            Err(execve(argument, args, (flags & CLEAR_ENV) == 1).description().into())
         }
         None => Err("no command provided".into()),
     }

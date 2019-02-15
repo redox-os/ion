@@ -1,14 +1,11 @@
-use std::str;
+use itertools::Itertools;
+use std::{iter::Peekable, mem, str};
 
 bitflags! {
     pub struct Flags : u8 {
         const SQUOTE = 1;
         const DQUOTE = 2;
         const TRIM   = 4;
-        const ARRAY  = 8;
-        const COMM   = 16;
-        const EOF    = 32;
-        const ERROR  = 64;
     }
 }
 
@@ -36,140 +33,174 @@ impl From<String> for Terminator {
     fn from(string: String) -> Terminator { Terminator::new(string) }
 }
 
+#[derive(Debug)]
+enum NotTerminatedErr {
+    StartEof,
+    Eof,
+    Comment,
+    UnclosedArray,
+    UnclosedString,
+    EscapedNewline,
+    AndOrClause,
+}
+
+#[derive(Clone, Debug)]
+pub struct RearPeekable<I: Iterator> {
+    iter: Peekable<I>,
+    now:  Option<I::Item>,
+    last: Option<I::Item>,
+}
+
+impl<I> Iterator for RearPeekable<I>
+where
+    I: Iterator,
+    I::Item: Copy,
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn next(&mut self) -> Option<I::Item> {
+        let next = self.iter.next();
+        if next.is_some() {
+            self.last = mem::replace(&mut self.now, next);
+        }
+        next
+    }
+}
+
+impl<I: Iterator> RearPeekable<I> {
+    #[inline]
+    pub fn peek(&mut self) -> Option<&I::Item> { self.iter.peek() }
+
+    #[inline]
+    pub fn prev(&self) -> Option<&I::Item> { self.last.as_ref() }
+
+    #[inline]
+    pub fn now(&self) -> Option<&I::Item> { self.now.as_ref() }
+}
+
 impl Terminator {
     /// Consumes the `Terminator`, and returns the underlying `String`.
     pub fn consume(self) -> String { self.buffer }
 
-    pub fn is_terminated(&mut self) -> bool {
-        let mut eof_line = None;
-        let eof = self.eof.clone();
-        let status = if let Some(ref eof) = eof {
-            let line = &self.eof_buffer;
-            eof_line = Some([&line, "\n"].concat());
-            line.trim() == eof
-        } else {
-            {
-                let mut instance = Flags::empty();
-                {
-                    let mut bytes = self.buffer.bytes().skip(self.read);
-                    while let Some(character) = bytes.next() {
-                        self.read += 1;
-                        match character {
-                            b'\\' => {
-                                let _ = bytes.next();
-                            }
-                            b'\'' if !self.flags.intersects(Flags::DQUOTE) => {
-                                self.flags ^= Flags::SQUOTE
-                            }
-                            b'"' if !self.flags.intersects(Flags::SQUOTE) => {
-                                self.flags ^= Flags::DQUOTE
-                            }
-                            b'<' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
-                                let as_bytes = self.buffer.as_bytes();
-                                if Some(&b'<') == as_bytes.get(self.read) {
-                                    self.read += 1;
-                                    if Some(&b'<') != as_bytes.get(self.read) {
-                                        let eof_phrase = unsafe {
-                                            str::from_utf8_unchecked(&as_bytes[self.read..])
-                                        };
-                                        self.eof = Some(eof_phrase.trim().to_owned());
-                                        instance |= Flags::EOF;
-                                        break;
-                                    }
-                                }
-                            }
-                            b'[' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
-                                self.flags |= Flags::ARRAY;
-                                self.array += 1;
-                            }
-                            b']' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
-                                if self.array > 0 {
-                                    self.array -= 1;
-                                } else if self.array == 0 && self.flags.contains(Flags::ARRAY) {
-                                    instance |= Flags::ERROR;
-                                    break;
-                                }
+    fn pair_components(&mut self) -> Result<(), NotTerminatedErr> {
+        if self.eof.as_ref() == Some(&self.eof_buffer) {
+            return Err(NotTerminatedErr::StartEof);
+        } else if self.eof.is_some() {
+            return Err(NotTerminatedErr::Eof);
+        }
 
-                                if self.array == 0 {
-                                    self.flags -= Flags::ARRAY
-                                }
-                            }
-                            b'#' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
-                                if self.read > 1 {
-                                    let character =
-                                        self.buffer.as_bytes().get(self.read - 2).unwrap();
-                                    if [b' ', b'\n'].contains(character) {
-                                        instance |= Flags::COMM;
-                                        break;
-                                    }
-                                } else {
-                                    instance |= Flags::COMM;
-                                    break;
-                                }
-                            }
-                            _ => (),
-                        }
+        let bytes = self
+            .buffer
+            .bytes()
+            .enumerate()
+            .skip(self.read)
+            .coalesce(
+                |prev, next| {
+                    if prev.1 == b'\\' {
+                        Ok((next.0, 0))
+                    } else {
+                        Err((prev, next))
+                    }
+                },
+            )
+            .filter(|&(_, c)| c != 0)
+            .peekable();
+
+        let mut bytes = RearPeekable { iter: bytes, now: None, last: None };
+
+        while let Some((i, character)) = bytes.next() {
+            self.read = i + 1;
+
+            match character {
+                b'\'' if !self.flags.intersects(Flags::DQUOTE) => {
+                    if bytes.find(|&(_, c)| c == b'\'').is_none() {
+                        self.flags ^= Flags::SQUOTE;
                     }
                 }
-                if instance.contains(Flags::ERROR) {
-                    self.buffer.clear();
-                    self.buffer.push('\n');
-                    return true;
-                } else if instance.contains(Flags::EOF) {
-                    self.buffer.push('\n');
-                    return false;
-                } else if instance.contains(Flags::COMM) {
-                    self.buffer.truncate(self.read - 1);
-                    return !self
-                        .flags
-                        .intersects(Flags::SQUOTE | Flags::DQUOTE | Flags::ARRAY);
+                b'"' if !self.flags.intersects(Flags::SQUOTE) => {
+                    if bytes.find(|&(_, c)| c == b'"').is_none() {
+                        self.flags ^= Flags::DQUOTE;
+                    }
                 }
-            }
-
-            if self
-                .flags
-                .intersects(Flags::SQUOTE | Flags::DQUOTE | Flags::ARRAY)
-            {
-                if let Some(b'\\') = self.buffer.bytes().last() {
-                    let _ = self.buffer.pop();
-                    self.read -= 1;
-                    self.flags |= Flags::TRIM;
-                } else {
-                    self.read += 1;
-                    self.buffer.push(if self.flags.contains(Flags::ARRAY) {
-                        ' '
+                b'<' if bytes.prev() == Some(&(i - 1, b'<')) => {
+                    if bytes.peek() == Some(&(i + 1, b'<')) {
+                        bytes.next();
                     } else {
-                        '\n'
-                    });
+                        let bytes = &self.buffer.as_bytes()[self.read..];
+                        let eof_phrase = unsafe { str::from_utf8_unchecked(bytes) };
+                        self.eof = Some(eof_phrase.trim().to_owned());
+                        return Err(NotTerminatedErr::Eof);
+                    }
                 }
-                false
-            } else if let Some(b'\\') = self.buffer.bytes().last() {
-                let _ = self.buffer.pop();
+                b'[' => {
+                    self.array += 1;
+                }
+                b']' => {
+                    if self.array > 0 {
+                        self.array -= 1;
+                    }
+                }
+                b'#' if bytes
+                    .prev()
+                    .filter(|&(j, c)| !(*j == i - 1 && [b' ', b'\n'].contains(c)))
+                    .is_none() =>
+                {
+                    return Err(NotTerminatedErr::Comment);
+                }
+                _ => (),
+            }
+        }
+
+        if let Some((_, b'\\')) = bytes.now() {
+            Err(NotTerminatedErr::EscapedNewline)
+        } else if self.array > 0 {
+            Err(NotTerminatedErr::UnclosedArray)
+        } else if self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) {
+            Err(NotTerminatedErr::UnclosedString)
+        } else if bytes
+            .now()
+            .filter(|&&(_, now)| now == b'&' || now == b'|')
+            .and_then(|&(_, now)| bytes.prev().filter(|&&(_, prev)| prev == now))
+            .is_some()
+        {
+            Err(NotTerminatedErr::AndOrClause)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn is_terminated(&mut self) -> bool {
+        match self.pair_components() {
+            Err(NotTerminatedErr::StartEof) => {
+                self.eof = None;
+                self.buffer.push('\n');
+                true
+            }
+            Err(NotTerminatedErr::Eof) => false,
+            Err(NotTerminatedErr::Comment) => {
+                self.buffer.truncate(self.read - 1);
+                self.array == 0 && !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE)
+            }
+            Err(NotTerminatedErr::EscapedNewline) => {
+                self.buffer.pop();
                 self.read -= 1;
                 self.flags |= Flags::TRIM;
                 false
-            } else {
-                // If the last two bytes are either '&&' or '||', we aren't terminated yet.
-                let bytes = self.buffer.as_bytes();
-                if bytes.len() >= 2 {
-                    let bytes = &bytes[bytes.len() - 2..];
-                    bytes != [b'&', b'&'] && bytes != [b'|', b'|']
-                } else {
-                    true
-                }
             }
-        };
-
-        if let Some(line) = eof_line {
-            self.buffer.push_str(&line);
-        }
-        if self.eof.is_some() {
-            self.eof_buffer.clear();
-            if status {
-                self.eof = None;
+            Err(NotTerminatedErr::UnclosedString) => {
+                self.read += 1;
+                self.buffer.push('\n');
+                false
             }
+            Err(NotTerminatedErr::UnclosedArray) => {
+                self.read += 1;
+                self.buffer.push(' ');
+                false
+            }
+            Err(NotTerminatedErr::AndOrClause) => false,
+            Ok(()) => true,
         }
-        status
     }
 
     /// Appends a string to the internal buffer.
@@ -181,7 +212,10 @@ impl Terminator {
                 input
             });
         } else {
-            self.eof_buffer.push_str(input);
+            self.eof_buffer.clear();
+            self.eof_buffer.push_str(input.trim());
+            self.buffer.push('\n');
+            self.buffer.push_str(input);
         }
     }
 

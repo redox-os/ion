@@ -1,11 +1,6 @@
 use super::super::{completer::*, Binary, DirectoryStack, Shell, Variables};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
-use std::{
-    env,
-    io::ErrorKind,
-    mem,
-    path::PathBuf,
-};
+use std::{env, io::ErrorKind, mem, path::PathBuf};
 use sys;
 use types;
 
@@ -15,11 +10,17 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
         let dirs_ptr = &shell.directory_stack as *const DirectoryStack;
 
         // Collects the current list of values from history for completion.
-        let history = shell.context.as_ref().unwrap().history.buffers.iter()
-                // Map each underlying `liner::Buffer` into a `String`.
-                .map(|x| x.chars().cloned().collect())
-                // Collect each result into a vector to avoid borrowing issues.
-                .collect::<Vec<types::Str>>();
+        let history = shell
+            .context
+            .as_ref()
+            .unwrap()
+            .history
+            .buffers
+            .iter()
+            // Map each underlying `liner::Buffer` into a `String`.
+            .map(|x| x.chars().cloned().collect())
+            // Collect each result into a vector to avoid borrowing issues.
+            .collect::<Vec<types::Str>>();
 
         {
             let prompt = shell.prompt();
@@ -64,17 +65,21 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                             // Creates a list of definitions from the shell environment that
                             // will be used
                             // in the creation of a custom completer.
-                            let words = builtins.keys().iter()
+                            let words = builtins
+                                .keys()
+                                .iter()
                                 // Add built-in commands to the completer's definitions.
                                 .map(|&s| s.to_string())
                                 // Add the history list to the completer's definitions.
                                 .chain(history.iter().map(|s| s.to_string()))
                                 // Add the aliases to the completer's definitions.
                                 .chain(vars.aliases().map(|(key, _)| key.to_string()))
-                                // Add the list of available functions to the completer's definitions.
+                                // Add the list of available functions to the completer's
+                                // definitions.
                                 .chain(vars.functions().map(|(key, _)| key.to_string()))
-                                // Add the list of available variables to the completer's definitions.
-                                // TODO: We should make it free to do String->SmallString
+                                // Add the list of available variables to the completer's
+                                // definitions. TODO: We should make
+                                // it free to do String->SmallString
                                 //       and mostly free to go back (free if allocated)
                                 .chain(vars.string_vars().map(|(s, _)| ["$", &s].concat()))
                                 .collect();

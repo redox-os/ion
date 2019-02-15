@@ -67,12 +67,14 @@ pub(crate) fn parse_case(
                 }
                 conditional = Some(string);
             }
-            Some(inner) => if argument.is_none() {
-                argument = Some(inner);
-                continue;
-            } else {
-                return Err(CaseError::ExtraVar(inner));
-            },
+            Some(inner) => {
+                if argument.is_none() {
+                    argument = Some(inner);
+                    continue;
+                } else {
+                    return Err(CaseError::ExtraVar(inner));
+                }
+            }
             None => (),
         }
         break;
@@ -90,10 +92,7 @@ mod tests {
             Ok((Some("test"), Some("test"), Some("exists".into()))),
             parse_case("test @ test if exists")
         );
-        assert_eq!(
-            Ok((Some("test"), Some("test"), None)),
-            parse_case("test @ test")
-        );
+        assert_eq!(Ok((Some("test"), Some("test"), None)), parse_case("test @ test"));
         assert_eq!(Ok((Some("test"), None, None)), parse_case("test"));
     }
 }

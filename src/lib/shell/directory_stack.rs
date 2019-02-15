@@ -76,10 +76,7 @@ impl DirectoryStack {
         caller: &str,
     ) -> Result<(), Cow<'static, str>> {
         let dir = self.dirs.get(index).ok_or_else(|| {
-            Cow::Owned(format!(
-                "ion: {}: {}: directory stack out of range",
-                caller, index
-            ))
+            Cow::Owned(format!("ion: {}: {}: directory stack out of range", caller, index))
         })?;
 
         set_current_dir_ion(dir)
@@ -134,16 +131,16 @@ impl DirectoryStack {
             self.dirs.truncate(1);
         }
 
-        let mapper: fn((usize, &PathBuf)) -> Cow<str> = match (
-            dirs_args & ABS_PATHNAMES > 0,
-            dirs_args & INDEX > 0,
-        ) {
-            // ABS, INDEX
-            (true, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, try_abs_path(x))),
-            (true, false) => |(_, x)| try_abs_path(x),
-            (false, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, x.to_string_lossy())),
-            (false, false) => |(_, x)| x.to_string_lossy(),
-        };
+        let mapper: fn((usize, &PathBuf)) -> Cow<str> =
+            match (dirs_args & ABS_PATHNAMES > 0, dirs_args & INDEX > 0) {
+                // ABS, INDEX
+                (true, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, try_abs_path(x))),
+                (true, false) => |(_, x)| try_abs_path(x),
+                (false, true) => {
+                    |(num, x)| Cow::Owned(format!(" {}  {}", num, x.to_string_lossy()))
+                }
+                (false, false) => |(_, x)| x.to_string_lossy(),
+            };
 
         let mut iter = self.dirs.iter().enumerate().map(mapper);
 
@@ -153,11 +150,8 @@ impl DirectoryStack {
                 None => return FAILURE,
             };
         } else {
-            let folder: fn(String, Cow<str>) -> String = if dirs_args & MULTILINE > 0 {
-                |x, y| x + "\n" + &y
-            } else {
-                |x, y| x + " " + &y
-            };
+            let folder: fn(String, Cow<str>) -> String =
+                if dirs_args & MULTILINE > 0 { |x, y| x + "\n" + &y } else { |x, y| x + " " + &y };
 
             let first = match iter.next() {
                 Some(x) => x.to_string(),
@@ -228,9 +222,7 @@ impl DirectoryStack {
             Err(Cow::Borrowed("ion: failed to get home directory")),
             |home| {
                 home.to_str().map_or(
-                    Err(Cow::Borrowed(
-                        "ion: failed to convert home directory to str",
-                    )),
+                    Err(Cow::Borrowed("ion: failed to convert home directory to str")),
                     |home| self.change_and_push_dir(home, variables),
                 )
             },
@@ -305,14 +297,18 @@ impl DirectoryStack {
                     self.dirs.swap(0, 1);
                 }
             }
-            Action::RotLeft(num) => if !keep_front {
-                self.set_current_dir_by_index(num, "pushd")?;
-                self.rotate_left(num);
-            },
-            Action::RotRight(num) => if !keep_front {
-                self.set_current_dir_by_index(len - (num % len), "pushd")?;
-                self.rotate_right(num);
-            },
+            Action::RotLeft(num) => {
+                if !keep_front {
+                    self.set_current_dir_by_index(num, "pushd")?;
+                    self.rotate_left(num);
+                }
+            }
+            Action::RotRight(num) => {
+                if !keep_front {
+                    self.set_current_dir_by_index(len - (num % len), "pushd")?;
+                    self.rotate_right(num);
+                }
+            }
             Action::Push(dir) => {
                 let index = if keep_front { 1 } else { 0 };
                 let new_dir = self.normalize_path(dir.to_str().unwrap());
@@ -391,10 +387,7 @@ impl DirectoryStack {
     /// variable,
     /// else it will return a default value of 1000.
     fn get_size(variables: &Variables) -> usize {
-        variables
-            .get_str_or_empty("DIRECTORY_STACK_SIZE")
-            .parse::<usize>()
-            .unwrap_or(1000)
+        variables.get_str_or_empty("DIRECTORY_STACK_SIZE").parse::<usize>().unwrap_or(1000)
     }
 
     /// Create a new `DirectoryStack` containing the current working directory,
@@ -423,15 +416,11 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
         Some('+') => Some(true),
         Some('-') => Some(false),
         _ => None,
-    }.and_then(|b| arg[1..].parse::<usize>().ok().map(|num| (b, num)))
+    }
+    .and_then(|b| arg[1..].parse::<usize>().ok().map(|num| (b, num)))
 }
 
 // converts pbuf to an absolute path if possible
 fn try_abs_path(pbuf: &PathBuf) -> Cow<str> {
-    Cow::Owned(
-        pbuf.canonicalize()
-            .unwrap_or_else(|_| pbuf.clone())
-            .to_string_lossy()
-            .to_string(),
-    )
+    Cow::Owned(pbuf.canonicalize().unwrap_or_else(|_| pbuf.clone()).to_string_lossy().to_string())
 }

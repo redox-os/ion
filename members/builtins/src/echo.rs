@@ -19,7 +19,7 @@ pub fn echo(args: &[small::String]) -> Result<(), io::Error> {
             "--escape" => flags |= Flags::ESCAPE,
             "--no-newline" => flags |= Flags::NO_NEWLINE,
             "--no-spaces" => flags |= Flags::NO_SPACES,
-            _ => if arg.starts_with('-') {
+            _ if arg.starts_with('-') => {
                 let mut is_opts = true;
                 let opts = &arg[1..];
                 let mut short_flags = Flags::empty();
@@ -39,9 +39,10 @@ pub fn echo(args: &[small::String]) -> Result<(), io::Error> {
                 } else {
                     data.push(arg);
                 }
-            } else {
+            }
+            _ => {
                 data.push(arg);
-            },
+            }
         }
     }
 

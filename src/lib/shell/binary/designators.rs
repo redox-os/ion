@@ -32,15 +32,19 @@ fn command(text: &str) -> &str { ArgumentSplitter::new(text).next().unwrap_or(te
 
 fn args(text: &str) -> &str {
     let bytes = text.as_bytes();
-    bytes.iter()
+    bytes
+        .iter()
         // Obtain position of the first space character,
         .position(|&x| x == b' ')
         // and then obtain the arguments to the command.
-        .and_then(|fp| bytes[fp+1..].iter()
-            // Find the position of the first character in the first argument.
-            .position(|&x| x != b' ')
-            // Then slice the argument string from the original command.
-            .map(|sp| &text[fp+sp+1..]))
+        .and_then(|fp| {
+            bytes[fp + 1..]
+                .iter()
+                // Find the position of the first character in the first argument.
+                .position(|&x| x != b' ')
+                // Then slice the argument string from the original command.
+                .map(|sp| &text[fp + sp + 1..])
+        })
         // Unwrap the arguments string if it exists, else return the original string.
         .unwrap_or(text)
 }

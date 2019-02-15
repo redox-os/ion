@@ -42,12 +42,7 @@ impl<'a> Key<'a> {
 }
 
 impl<'a> From<Key<'a>> for KeyBuf {
-    fn from(key: Key<'a>) -> KeyBuf {
-        KeyBuf {
-            kind: key.kind,
-            name: key.name.to_owned(),
-        }
-    }
+    fn from(key: Key<'a>) -> KeyBuf { KeyBuf { kind: key.kind, name: key.name.to_owned() } }
 }
 
 /// Quite simply, an iterator that returns keys.
@@ -93,7 +88,7 @@ impl<'a> KeyIterator<'a> {
                         None => {
                             break Err(TypeError::Invalid(
                                 self.data[index_ident_end + 1..self.read].into(),
-                            ))
+                            ));
                         }
                     },
                 };
@@ -142,7 +137,7 @@ impl<'a> Iterator for KeyIterator<'a> {
                     return Some(Ok(Key {
                         name: &self.data[start..self.read].trim(),
                         kind: Primitive::Any,
-                    }))
+                    }));
                 }
                 b':' => {
                     let end = self.read - 1;
@@ -158,10 +153,7 @@ impl<'a> Iterator for KeyIterator<'a> {
         if start == self.read {
             None
         } else {
-            Some(Ok(Key {
-                name: &self.data[start..self.read].trim(),
-                kind: Primitive::Any,
-            }))
+            Some(Ok(Key { name: &self.data[start..self.read].trim(), kind: Primitive::Any }))
         }
     }
 }
@@ -177,47 +169,14 @@ mod tests {
              k:hmap[int[]] l:hmap[hmap[bool[]]] m:bmap[] n:bmap[int] o:bmap[float[]] \
              p:bmap[hmap[bool]] d:a",
         );
+        assert_eq!(parser.next().unwrap(), Ok(Key { name: "a", kind: Primitive::Integer },));
+        assert_eq!(parser.next().unwrap(), Ok(Key { name: "b", kind: Primitive::AnyArray },));
+        assert_eq!(parser.next().unwrap(), Ok(Key { name: "c", kind: Primitive::Boolean },));
+        assert_eq!(parser.next().unwrap(), Ok(Key { name: "d", kind: Primitive::Any },));
+        assert_eq!(parser.next().unwrap(), Ok(Key { name: "e", kind: Primitive::IntegerArray },));
         assert_eq!(
             parser.next().unwrap(),
-            Ok(Key {
-                name: "a",
-                kind: Primitive::Integer,
-            },)
-        );
-        assert_eq!(
-            parser.next().unwrap(),
-            Ok(Key {
-                name: "b",
-                kind: Primitive::AnyArray,
-            },)
-        );
-        assert_eq!(
-            parser.next().unwrap(),
-            Ok(Key {
-                name: "c",
-                kind: Primitive::Boolean,
-            },)
-        );
-        assert_eq!(
-            parser.next().unwrap(),
-            Ok(Key {
-                name: "d",
-                kind: Primitive::Any,
-            },)
-        );
-        assert_eq!(
-            parser.next().unwrap(),
-            Ok(Key {
-                name: "e",
-                kind: Primitive::IntegerArray,
-            },)
-        );
-        assert_eq!(
-            parser.next().unwrap(),
-            Ok(Key {
-                name: "f",
-                kind: Primitive::Indexed("0".into(), Box::new(Primitive::Any)),
-            },)
+            Ok(Key { name: "f", kind: Primitive::Indexed("0".into(), Box::new(Primitive::Any)) },)
         );
         assert_eq!(
             parser.next().unwrap(),
@@ -235,24 +194,15 @@ mod tests {
         );
         assert_eq!(
             parser.next().unwrap(),
-            Ok(Key {
-                name: "i",
-                kind: Primitive::HashMap(Box::new(Primitive::Any)),
-            },)
+            Ok(Key { name: "i", kind: Primitive::HashMap(Box::new(Primitive::Any)) },)
         );
         assert_eq!(
             parser.next().unwrap(),
-            Ok(Key {
-                name: "j",
-                kind: Primitive::HashMap(Box::new(Primitive::Float)),
-            },)
+            Ok(Key { name: "j", kind: Primitive::HashMap(Box::new(Primitive::Float)) },)
         );
         assert_eq!(
             parser.next().unwrap(),
-            Ok(Key {
-                name: "k",
-                kind: Primitive::HashMap(Box::new(Primitive::IntegerArray)),
-            },)
+            Ok(Key { name: "k", kind: Primitive::HashMap(Box::new(Primitive::IntegerArray)) },)
         );
         assert_eq!(
             parser.next().unwrap(),
@@ -265,24 +215,15 @@ mod tests {
         );
         assert_eq!(
             parser.next().unwrap(),
-            Ok(Key {
-                name: "m",
-                kind: Primitive::BTreeMap(Box::new(Primitive::Any)),
-            },)
+            Ok(Key { name: "m", kind: Primitive::BTreeMap(Box::new(Primitive::Any)) },)
         );
         assert_eq!(
             parser.next().unwrap(),
-            Ok(Key {
-                name: "n",
-                kind: Primitive::BTreeMap(Box::new(Primitive::Integer)),
-            },)
+            Ok(Key { name: "n", kind: Primitive::BTreeMap(Box::new(Primitive::Integer)) },)
         );
         assert_eq!(
             parser.next().unwrap(),
-            Ok(Key {
-                name: "o",
-                kind: Primitive::BTreeMap(Box::new(Primitive::FloatArray)),
-            },)
+            Ok(Key { name: "o", kind: Primitive::BTreeMap(Box::new(Primitive::FloatArray)) },)
         );
         assert_eq!(
             parser.next().unwrap(),
