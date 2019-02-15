@@ -124,9 +124,9 @@ pub struct Shell {
 pub struct ShellBuilder;
 
 impl ShellBuilder {
-    pub fn as_binary(self) -> Shell { Shell::new(false) }
+    pub fn as_binary(&self) -> Shell { Shell::new(false) }
 
-    pub fn as_library(self) -> Shell { Shell::new(true) }
+    pub fn as_library(&self) -> Shell { Shell::new(true) }
 
     pub fn set_unique_pid(self) -> ShellBuilder {
         if let Ok(pid) = sys::getpid() {
