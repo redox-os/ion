@@ -65,16 +65,12 @@ fn match_option_argument(option: &str, argument: &str, shell: &Shell) -> bool {
 
 /// Returns true if the file is a regular file
 fn path_is_file(filepath: &str) -> bool {
-    fs::metadata(filepath)
-        .ok()
-        .map_or(false, |metadata| metadata.file_type().is_file())
+    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_file())
 }
 
 /// Returns true if the file is a directory
 fn path_is_directory(filepath: &str) -> bool {
-    fs::metadata(filepath)
-        .ok()
-        .map_or(false, |metadata| metadata.file_type().is_dir())
+    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_dir())
 }
 
 /// Returns true if the binary is found in path (and is executable)
@@ -150,65 +146,36 @@ fn test_evaluate_arguments() {
     assert_eq!(evaluate_arguments(&[], &shell), Ok(false));
     // multiple arguments
     // ignores all but the first argument
-    assert_eq!(
-        evaluate_arguments(&["foo".into(), "bar".into()], &shell),
-        Ok(true)
-    );
+    assert_eq!(evaluate_arguments(&["foo".into(), "bar".into()], &shell), Ok(true));
 
     // check `exists STRING`
     assert_eq!(evaluate_arguments(&["".into()], &shell), Ok(false));
     assert_eq!(evaluate_arguments(&["string".into()], &shell), Ok(true));
-    assert_eq!(
-        evaluate_arguments(&["string with space".into()], &shell),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&["-startswithdash".into()], &shell),
-        Ok(true)
-    );
+    assert_eq!(evaluate_arguments(&["string with space".into()], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-startswithdash".into()], &shell), Ok(true));
 
     // check `exists -a`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-a".into()], &shell), Ok(true));
     shell.variables.set("emptyarray", types::Array::new());
-    assert_eq!(
-        evaluate_arguments(&["-a".into(), "emptyarray".into()], &shell),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&["-a".into(), "emptyarray".into()], &shell), Ok(false));
     let mut array = types::Array::new();
     array.push("element".into());
     shell.variables.set("array", array);
-    assert_eq!(
-        evaluate_arguments(&["-a".into(), "array".into()], &shell),
-        Ok(true)
-    );
+    assert_eq!(evaluate_arguments(&["-a".into(), "array".into()], &shell), Ok(true));
     shell.variables.remove_variable("array");
-    assert_eq!(
-        evaluate_arguments(&["-a".into(), "array".into()], &shell),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&["-a".into(), "array".into()], &shell), Ok(false));
 
     // check `exists -b`
     // TODO: see test_binary_is_in_path()
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-b".into()], &shell), Ok(true));
-    let oldpath = shell
-        .get::<types::Str>("PATH")
-        .unwrap_or_else(|| "/usr/bin".into());
+    let oldpath = shell.get::<types::Str>("PATH").unwrap_or_else(|| "/usr/bin".into());
     shell.set("PATH", "testing/");
 
-    assert_eq!(
-        evaluate_arguments(&["-b".into(), "executable_file".into()], &shell),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&["-b".into(), "empty_file".into()], &shell),
-        Ok(false)
-    );
-    assert_eq!(
-        evaluate_arguments(&["-b".into(), "file_does_not_exist".into()], &shell),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&["-b".into(), "executable_file".into()], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-b".into(), "empty_file".into()], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-b".into(), "file_does_not_exist".into()], &shell), Ok(false));
 
     // restore original PATH. Not necessary for the currently defined test cases
     // but this might change in the future? Better safe than sorry!
@@ -217,89 +184,47 @@ fn test_evaluate_arguments() {
     // check `exists -d`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-d".into()], &shell), Ok(true));
-    assert_eq!(
-        evaluate_arguments(&["-d".into(), "testing/".into()], &shell),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&["-d".into(), "testing/empty_file".into()], &shell),
-        Ok(false)
-    );
-    assert_eq!(
-        evaluate_arguments(&["-d".into(), "does/not/exist/".into()], &shell),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&["-d".into(), "testing/".into()], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-d".into(), "testing/empty_file".into()], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-d".into(), "does/not/exist/".into()], &shell), Ok(false));
 
     // check `exists -f`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-f".into()], &shell), Ok(true));
-    assert_eq!(
-        evaluate_arguments(&["-f".into(), "testing/".into()], &shell),
-        Ok(false)
-    );
-    assert_eq!(
-        evaluate_arguments(&["-f".into(), "testing/empty_file".into()], &shell),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&["-f".into(), "does-not-exist".into()], &shell),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&["-f".into(), "testing/".into()], &shell), Ok(false));
+    assert_eq!(evaluate_arguments(&["-f".into(), "testing/empty_file".into()], &shell), Ok(true));
+    assert_eq!(evaluate_arguments(&["-f".into(), "does-not-exist".into()], &shell), Ok(false));
 
     // check `exists -s`
     // no argument means we treat it as a string
     assert_eq!(evaluate_arguments(&["-s".into()], &shell), Ok(true));
     shell.set("emptyvar", "".to_string());
-    assert_eq!(
-        evaluate_arguments(&["-s".into(), "emptyvar".into()], &shell),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&["-s".into(), "emptyvar".into()], &shell), Ok(false));
     shell.set("testvar", "foobar".to_string());
-    assert_eq!(
-        evaluate_arguments(&["-s".into(), "testvar".into()], &shell),
-        Ok(true)
-    );
+    assert_eq!(evaluate_arguments(&["-s".into(), "testvar".into()], &shell), Ok(true));
     shell.variables.remove_variable("testvar");
-    assert_eq!(
-        evaluate_arguments(&["-s".into(), "testvar".into()], &shell),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&["-s".into(), "testvar".into()], &shell), Ok(false));
     // also check that it doesn't trigger on arrays
     let mut array = types::Array::new();
     array.push("element".into());
     shell.variables.remove_variable("array");
     shell.variables.set("array", array);
-    assert_eq!(
-        evaluate_arguments(&["-s".into(), "array".into()], &shell),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&["-s".into(), "array".into()], &shell), Ok(false));
 
     // check `exists --fn`
     let name_str = "test_function";
     let name = small::String::from(name_str);
     let mut args = Vec::new();
-    args.push(KeyBuf {
-        name: "testy".into(),
-        kind: Primitive::Any,
-    });
+    args.push(KeyBuf { name: "testy".into(), kind: Primitive::Any });
     let mut statements = Vec::new();
     statements.push(Statement::End);
     let description: small::String = "description".into();
 
-    shell.variables.set(
-        &name,
-        Function::new(Some(description), name.clone(), args, statements),
-    );
+    shell.variables.set(&name, Function::new(Some(description), name.clone(), args, statements));
 
-    assert_eq!(
-        evaluate_arguments(&["--fn".into(), name_str.into()], &shell),
-        Ok(true)
-    );
+    assert_eq!(evaluate_arguments(&["--fn".into(), name_str.into()], &shell), Ok(true));
     shell.variables.remove_variable(name_str);
-    assert_eq!(
-        evaluate_arguments(&["--fn".into(), name_str.into()], &shell),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&["--fn".into(), name_str.into()], &shell), Ok(false));
 
     // check invalid flags / parameters (should all be treated as strings and
     // therefore succeed)
@@ -313,26 +238,11 @@ fn test_match_flag_argument() {
 
     // we don't really care about the passed values, as long as both sited return
     // the same value
-    assert_eq!(
-        match_flag_argument('a', "ARRAY", &shell),
-        array_var_is_not_empty("ARRAY", &shell)
-    );
-    assert_eq!(
-        match_flag_argument('b', "binary", &shell),
-        binary_is_in_path("binary", &shell)
-    );
-    assert_eq!(
-        match_flag_argument('d', "path", &shell),
-        path_is_directory("path")
-    );
-    assert_eq!(
-        match_flag_argument('f', "file", &shell),
-        path_is_file("file")
-    );
-    assert_eq!(
-        match_flag_argument('s', "STR", &shell),
-        string_var_is_not_empty("STR", &shell)
-    );
+    assert_eq!(match_flag_argument('a', "ARRAY", &shell), array_var_is_not_empty("ARRAY", &shell));
+    assert_eq!(match_flag_argument('b', "binary", &shell), binary_is_in_path("binary", &shell));
+    assert_eq!(match_flag_argument('d', "path", &shell), path_is_directory("path"));
+    assert_eq!(match_flag_argument('f', "file", &shell), path_is_file("file"));
+    assert_eq!(match_flag_argument('s', "STR", &shell), string_var_is_not_empty("STR", &shell));
 
     // Any flag which is not implemented
     assert_eq!(match_flag_argument('x', "ARG", &shell), false);
@@ -344,10 +254,7 @@ fn test_match_option_argument() {
 
     // we don't really care about the passed values, as long as both sited return
     // the same value
-    assert_eq!(
-        match_option_argument("fn", "FUN", &shell),
-        array_var_is_not_empty("FUN", &shell)
-    );
+    assert_eq!(match_option_argument("fn", "FUN", &shell), array_var_is_not_empty("FUN", &shell));
 
     // Any option which is not implemented
     assert_eq!(match_option_argument("foo", "ARG", &shell), false);
@@ -448,18 +355,12 @@ fn test_function_is_defined() {
     let name_str = "test_function";
     let name: small::String = name_str.into();
     let mut args = Vec::new();
-    args.push(KeyBuf {
-        name: "testy".into(),
-        kind: Primitive::Any,
-    });
+    args.push(KeyBuf { name: "testy".into(), kind: Primitive::Any });
     let mut statements = Vec::new();
     statements.push(Statement::End);
     let description: small::String = "description".into();
 
-    shell.variables.set(
-        &name,
-        Function::new(Some(description), name.clone(), args, statements),
-    );
+    shell.variables.set(&name, Function::new(Some(description), name.clone(), args, statements));
 
     assert_eq!(function_is_defined(name_str, &shell), true);
     shell.variables.remove_variable(name_str);

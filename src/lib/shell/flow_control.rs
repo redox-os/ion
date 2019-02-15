@@ -161,11 +161,7 @@ impl FlowControl {
 }
 
 impl Default for FlowControl {
-    fn default() -> FlowControl {
-        FlowControl {
-            block: Vec::with_capacity(5),
-        }
-    }
+    fn default() -> FlowControl { FlowControl { block: Vec::with_capacity(5) } }
 }
 
 pub(crate) fn insert_statement(
@@ -249,10 +245,7 @@ pub(crate) fn insert_statement(
                         }
                         _ => pushed = false,
                     },
-                    Statement::While {
-                        ref mut expression,
-                        ref statements,
-                    } => {
+                    Statement::While { ref mut expression, ref statements } => {
                         if statements.is_empty() {
                             expression.push(statement.clone());
                         } else {
@@ -307,20 +300,14 @@ fn insert_into_block(block: &mut Vec<Statement>, statement: Statement) -> Result
         };
 
         match block {
-            Statement::Function {
-                ref mut statements, ..
-            } => statements.push(statement),
-            Statement::For {
-                ref mut statements, ..
-            } => statements.push(statement),
-            Statement::While {
-                ref mut statements, ..
-            } => statements.push(statement),
+            Statement::Function { ref mut statements, .. } => statements.push(statement),
+            Statement::For { ref mut statements, .. } => statements.push(statement),
+            Statement::While { ref mut statements, .. } => statements.push(statement),
             Statement::Match { ref mut cases, .. } => match statement {
                 Statement::Case(case) => cases.push(case),
                 _ => {
                     return Err(
-                        "ion: error: statement found outside of Case { .. } block in Match { .. }",
+                        "ion: error: statement found outside of Case { .. } block in Match { .. }"
                     );
                 }
             },
@@ -445,12 +432,7 @@ impl Function {
         args: Vec<KeyBuf>,
         statements: Vec<Statement>,
     ) -> Function {
-        Function {
-            description,
-            name,
-            args,
-            statements,
-        }
+        Function { description, name, args, statements }
     }
 }
 
@@ -459,10 +441,7 @@ mod tests {
     use super::*;
 
     fn new_match() -> Statement {
-        Statement::Match {
-            expression: small::String::from(""),
-            cases:      Vec::new(),
-        }
+        Statement::Match { expression: small::String::from(""), cases: Vec::new() }
     }
     fn new_if() -> Statement {
         Statement::If {
@@ -550,12 +529,7 @@ mod tests {
             assert_eq!(Ok(Some(ok)), res);
         }
 
-        let errs = vec![
-            Statement::Else,
-            Statement::End,
-            Statement::Break,
-            Statement::Continue,
-        ];
+        let errs = vec![Statement::Else, Statement::End, Statement::Break, Statement::Continue];
         for err in errs {
             let res = insert_statement(&mut flow_control, err);
             if res.is_ok() {

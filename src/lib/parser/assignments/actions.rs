@@ -37,11 +37,9 @@ impl<'a> Display for AssignmentError<'a> {
                 "repeated assignment to same key, and thus ignored. Repeated key: '{}'",
                 repkey
             ),
-            AssignmentError::NoKey(ref lone_val) => write!(
-                f,
-                "no key to assign value, thus ignored. Value: '{}'",
-                lone_val
-            ),
+            AssignmentError::NoKey(ref lone_val) => {
+                write!(f, "no key to assign value, thus ignored. Value: '{}'", lone_val)
+            }
         }
     }
 }
@@ -169,10 +167,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                Key {
-                    name: "abc",
-                    kind: Primitive::Any,
-                },
+                Key { name: "abc", kind: Primitive::Any },
                 Operator::Equal,
                 "123",
             ))
@@ -180,10 +175,7 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateString(
-                Key {
-                    name: "def",
-                    kind: Primitive::Any,
-                },
+                Key { name: "def", kind: Primitive::Any },
                 Operator::Equal,
                 "456",
             ))
@@ -195,10 +187,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                Key {
-                    name: "ab",
-                    kind: Primitive::Integer,
-                },
+                Key { name: "ab", kind: Primitive::Integer },
                 Operator::Multiply,
                 "3",
             ))
@@ -210,10 +199,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                Key {
-                    name: "a",
-                    kind: Primitive::Any,
-                },
+                Key { name: "a", kind: Primitive::Any },
                 Operator::Equal,
                 "one",
             ))
@@ -221,10 +207,7 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateArray(
-                Key {
-                    name: "b",
-                    kind: Primitive::AnyArray,
-                },
+                Key { name: "b", kind: Primitive::AnyArray },
                 Operator::Equal,
                 "[two three]",
             ))
@@ -232,10 +215,7 @@ mod tests {
         assert_eq!(
             actions[2],
             Ok(Action::UpdateArray(
-                Key {
-                    name: "c",
-                    kind: Primitive::IntegerArray,
-                },
+                Key { name: "c", kind: Primitive::IntegerArray },
                 Operator::Equal,
                 "[4 5 6]",
             ))
@@ -247,10 +227,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateArray(
-                Key {
-                    name: "a",
-                    kind: Primitive::AnyArray,
-                },
+                Key { name: "a", kind: Primitive::AnyArray },
                 Operator::Equal,
                 "[one two]",
             ))
@@ -258,10 +235,7 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateString(
-                Key {
-                    name: "b",
-                    kind: Primitive::Any,
-                },
+                Key { name: "b", kind: Primitive::Any },
                 Operator::Equal,
                 "three",
             ))
@@ -269,10 +243,7 @@ mod tests {
         assert_eq!(
             actions[2],
             Ok(Action::UpdateArray(
-                Key {
-                    name: "c",
-                    kind: Primitive::AnyArray,
-                },
+                Key { name: "c", kind: Primitive::AnyArray },
                 Operator::Equal,
                 "[four five]",
             ))
@@ -283,10 +254,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateArray(
-                Key {
-                    name: "array",
-                    kind: Primitive::Any,
-                },
+                Key { name: "array", kind: Primitive::Any },
                 Operator::Concatenate,
                 "[one two three four five]",
             ))
@@ -297,10 +265,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateArray(
-                Key {
-                    name: "array",
-                    kind: Primitive::Any,
-                },
+                Key { name: "array", kind: Primitive::Any },
                 Operator::ConcatenateHead,
                 "[1 2 3 4 5]",
             ))
@@ -311,10 +276,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateArray(
-                Key {
-                    name: "array",
-                    kind: Primitive::Any,
-                },
+                Key { name: "array", kind: Primitive::Any },
                 Operator::Filter,
                 "[foo bar baz]",
             ))

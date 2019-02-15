@@ -13,13 +13,8 @@ impl Index {
     pub fn resolve(&self, vector_length: usize) -> Option<usize> {
         match *self {
             Index::Forward(n) => Some(n),
-            Index::Backward(n) => {
-                if n >= vector_length {
-                    None
-                } else {
-                    Some(vector_length - (n + 1))
-                }
-            }
+            Index::Backward(n) if n >= vector_length => None,
+            Index::Backward(n) => Some(vector_length - (n + 1)),
         }
     }
 

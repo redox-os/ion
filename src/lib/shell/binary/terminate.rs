@@ -20,10 +20,7 @@ pub(crate) fn terminate_script_quotes<I: Iterator<Item = String>>(
 
     if shell.flow_control.unclosed_block() {
         let open_block = shell.flow_control.block.last().unwrap();
-        eprintln!(
-            "ion: unexpected end of script: expected end block for `{}`",
-            open_block.short(),
-        );
+        eprintln!("ion: unexpected end of script: expected end block for `{}`", open_block.short(),);
         return FAILURE;
     }
 

@@ -118,9 +118,7 @@ fn char_range<'a>(
         }
         stepped_range_chars(start, end, char_step)
     } else {
-        Some(Box::new(
-            Some((start as char).to_string().into()).into_iter(),
-        ))
+        Some(Box::new(Some((start as char).to_string().into()).into_iter()))
     }
 }
 
@@ -307,15 +305,10 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                     return if end.is_empty() {
                         None
                     } else {
-                        end.parse::<isize>()
-                            .map(|end| Range::to(Index::new(end)))
-                            .ok()
+                        end.parse::<isize>().map(|end| Range::to(Index::new(end))).ok()
                     };
                 } else if end.is_empty() {
-                    return first
-                        .parse::<isize>()
-                        .map(|start| Range::from(Index::new(start)))
-                        .ok();
+                    return first.parse::<isize>().map(|start| Range::from(Index::new(start))).ok();
                 }
 
                 return first

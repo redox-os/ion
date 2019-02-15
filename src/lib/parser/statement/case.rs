@@ -92,10 +92,7 @@ mod tests {
             Ok((Some("test"), Some("test"), Some("exists".into()))),
             parse_case("test @ test if exists")
         );
-        assert_eq!(
-            Ok((Some("test"), Some("test"), None)),
-            parse_case("test @ test")
-        );
+        assert_eq!(Ok((Some("test"), Some("test"), None)), parse_case("test @ test"));
         assert_eq!(Ok((Some("test"), None, None)), parse_case("test"));
     }
 }

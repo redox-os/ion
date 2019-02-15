@@ -144,15 +144,13 @@ fn evaluate_arguments(arguments: &[small::String]) -> Result<bool, small::String
         }
         Some(arg) => {
             // If there is no operator, check if the first argument is non-zero
-            arguments
-                .get(1)
-                .map_or(Ok(string_is_nonzero(arg)), |operator| {
-                    // If there is no right hand argument, a condition was expected
-                    let right_arg = arguments
-                        .get(2)
-                        .ok_or_else(|| small::String::from("parse error: condition expected"))?;
-                    evaluate_expression(arg, operator, right_arg)
-                })
+            arguments.get(1).map_or(Ok(string_is_nonzero(arg)), |operator| {
+                // If there is no right hand argument, a condition was expected
+                let right_arg = arguments
+                    .get(2)
+                    .ok_or_else(|| small::String::from("parse error: condition expected"))?;
+                evaluate_expression(arg, operator, right_arg)
+            })
         }
         None => {
             println!("{}", QUICK_GUIDE);
@@ -189,7 +187,8 @@ fn files_have_same_device_and_inode_numbers(first: &str, second: &str) -> bool {
     get_dev_and_inode(first).map_or(false, |left| {
         // Obtain the device and inode of the second file or return FAILED
         get_dev_and_inode(second).map_or(false, |right| {
-            // Compare the device and inodes of the first and second files
+            // Compare the device and inodes of the
+            // first and second files
             left == right
         })
     })
@@ -197,18 +196,19 @@ fn files_have_same_device_and_inode_numbers(first: &str, second: &str) -> bool {
 
 /// Obtains the device and inode numbers of the file specified
 fn get_dev_and_inode(filename: &str) -> Option<(u64, u64)> {
-    fs::metadata(filename)
-        .map(|file| (file.dev(), file.ino()))
-        .ok()
+    fs::metadata(filename).map(|file| (file.dev(), file.ino())).ok()
 }
 
 /// Exits SUCCESS if the first file is newer than the second file.
 fn file_is_newer_than(first: &str, second: &str) -> bool {
     // Obtain the modified file time of the first file or return FAILED
     get_modified_file_time(first).map_or(false, |left| {
-        // Obtain the modified file time of the second file or return FAILED
+        // Obtain the modified file time of the second file or return
+        // FAILED
         get_modified_file_time(second).map_or(false, |right| {
-            // If the first file is newer than the right file, return SUCCESS
+            // If the first file is newer
+            // than the right file,
+            // return SUCCESS
             left > right
         })
     })
@@ -216,9 +216,7 @@ fn file_is_newer_than(first: &str, second: &str) -> bool {
 
 /// Obtain the time the file was last modified as a `SystemTime` type.
 fn get_modified_file_time(filename: &str) -> Option<SystemTime> {
-    fs::metadata(filename)
-        .ok()
-        .and_then(|file| file.modified().ok())
+    fs::metadata(filename).ok().and_then(|file| file.modified().ok())
 }
 
 /// Attempt to parse a &str as a usize.
@@ -272,9 +270,7 @@ fn match_flag_argument(flag: char, argument: &str) -> bool {
 
 /// Exits SUCCESS if the file size is greather than zero.
 fn file_size_is_greater_than_zero(filepath: &str) -> bool {
-    fs::metadata(filepath)
-        .ok()
-        .map_or(false, |metadata| metadata.len() > 0)
+    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.len() > 0)
 }
 
 /// Exits SUCCESS if the file has read permissions. This function is rather low level because
@@ -332,23 +328,17 @@ fn file_has_execute_permission(filepath: &str) -> bool {
 
 /// Exits SUCCESS if the file argument is a socket
 fn file_is_socket(filepath: &str) -> bool {
-    fs::metadata(filepath)
-        .ok()
-        .map_or(false, |metadata| metadata.file_type().is_socket())
+    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_socket())
 }
 
 /// Exits SUCCESS if the file argument is a block device
 fn file_is_block_device(filepath: &str) -> bool {
-    fs::metadata(filepath)
-        .ok()
-        .map_or(false, |metadata| metadata.file_type().is_block_device())
+    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_block_device())
 }
 
 /// Exits SUCCESS if the file argument is a character device
 fn file_is_character_device(filepath: &str) -> bool {
-    fs::metadata(filepath)
-        .ok()
-        .map_or(false, |metadata| metadata.file_type().is_char_device())
+    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_char_device())
 }
 
 /// Exits SUCCESS if the file exists
@@ -356,23 +346,17 @@ fn file_exists(filepath: &str) -> bool { Path::new(filepath).exists() }
 
 /// Exits SUCCESS if the file is a regular file
 fn file_is_regular(filepath: &str) -> bool {
-    fs::metadata(filepath)
-        .ok()
-        .map_or(false, |metadata| metadata.file_type().is_file())
+    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_file())
 }
 
 /// Exits SUCCESS if the file is a directory
 fn file_is_directory(filepath: &str) -> bool {
-    fs::metadata(filepath)
-        .ok()
-        .map_or(false, |metadata| metadata.file_type().is_dir())
+    fs::metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_dir())
 }
 
 /// Exits SUCCESS if the file is a symbolic link
 fn file_is_symlink(filepath: &str) -> bool {
-    fs::symlink_metadata(filepath)
-        .ok()
-        .map_or(false, |metadata| metadata.file_type().is_symlink())
+    fs::symlink_metadata(filepath).ok().map_or(false, |metadata| metadata.file_type().is_symlink())
 }
 
 /// Exits SUCCESS if the string is not empty
@@ -402,128 +386,44 @@ fn test_integers_arguments() {
         args.iter().map(|s| (*s).into()).collect()
     }
     // Equal To
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["10", "-eq", "10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["10", "-eq", "5"])),
-        Ok(false)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-10", "-eq", "-10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-10", "-eq", "10"])),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&vec_string(&["10", "-eq", "10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["10", "-eq", "5"])), Ok(false));
+    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-eq", "-10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-eq", "10"])), Ok(false));
 
     // Greater Than or Equal To
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["10", "-ge", "10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["10", "-ge", "5"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["5", "-ge", "10"])),
-        Ok(false)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-9", "-ge", "-10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-10", "-ge", "-10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-10", "-ge", "10"])),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&vec_string(&["10", "-ge", "10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["10", "-ge", "5"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["5", "-ge", "10"])), Ok(false));
+    assert_eq!(evaluate_arguments(&vec_string(&["-9", "-ge", "-10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-ge", "-10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-ge", "10"])), Ok(false));
 
     // Less Than or Equal To
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["5", "-le", "5"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["5", "-le", "10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["10", "-le", "5"])),
-        Ok(false)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-11", "-le", "-10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-10", "-le", "-10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["10", "-le", "-10"])),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&vec_string(&["5", "-le", "5"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["5", "-le", "10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["10", "-le", "5"])), Ok(false));
+    assert_eq!(evaluate_arguments(&vec_string(&["-11", "-le", "-10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-le", "-10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["10", "-le", "-10"])), Ok(false));
 
     // Less Than
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["5", "-lt", "10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["10", "-lt", "5"])),
-        Ok(false)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-11", "-lt", "-10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["10", "-lt", "-10"])),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&vec_string(&["5", "-lt", "10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["10", "-lt", "5"])), Ok(false));
+    assert_eq!(evaluate_arguments(&vec_string(&["-11", "-lt", "-10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["10", "-lt", "-10"])), Ok(false));
 
     // Greater Than
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["10", "-gt", "5"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["5", "-gt", "10"])),
-        Ok(false)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-9", "-gt", "-10"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-10", "-gt", "10"])),
-        Ok(false)
-    );
+    assert_eq!(evaluate_arguments(&vec_string(&["10", "-gt", "5"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["5", "-gt", "10"])), Ok(false));
+    assert_eq!(evaluate_arguments(&vec_string(&["-9", "-gt", "-10"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-gt", "10"])), Ok(false));
 
     // Not Equal To
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["10", "-ne", "5"])),
-        Ok(true)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["5", "-ne", "5"])),
-        Ok(false)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-10", "-ne", "-10"])),
-        Ok(false)
-    );
-    assert_eq!(
-        evaluate_arguments(&vec_string(&["-10", "-ne", "10"])),
-        Ok(true)
-    );
+    assert_eq!(evaluate_arguments(&vec_string(&["10", "-ne", "5"])), Ok(true));
+    assert_eq!(evaluate_arguments(&vec_string(&["5", "-ne", "5"])), Ok(false));
+    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-ne", "-10"])), Ok(false));
+    assert_eq!(evaluate_arguments(&vec_string(&["-10", "-ne", "10"])), Ok(true));
 }
 
 #[test]
@@ -552,24 +452,12 @@ fn test_file_is_symlink() {
 
 #[test]
 fn test_file_has_execute_permission() {
-    assert_eq!(
-        file_has_execute_permission("../../testing/executable_file"),
-        true
-    );
-    assert_eq!(
-        file_has_execute_permission("../../testing/empty_file"),
-        false
-    );
+    assert_eq!(file_has_execute_permission("../../testing/executable_file"), true);
+    assert_eq!(file_has_execute_permission("../../testing/empty_file"), false);
 }
 
 #[test]
 fn test_file_size_is_greater_than_zero() {
-    assert_eq!(
-        file_size_is_greater_than_zero("../../testing/file_with_text"),
-        true
-    );
-    assert_eq!(
-        file_size_is_greater_than_zero("../../testing/empty_file"),
-        false
-    );
+    assert_eq!(file_size_is_greater_than_zero("../../testing/file_with_text"), true);
+    assert_eq!(file_size_is_greater_than_zero("../../testing/empty_file"), false);
 }

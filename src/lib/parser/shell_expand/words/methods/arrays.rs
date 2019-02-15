@@ -66,9 +66,8 @@ impl<'a> ArrayMethod<'a> {
 
     fn graphemes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
-        let graphemes: Vec<types::Str> = UnicodeSegmentation::graphemes(variable.as_str(), true)
-            .map(From::from)
-            .collect();
+        let graphemes: Vec<types::Str> =
+            UnicodeSegmentation::graphemes(variable.as_str(), true).map(From::from).collect();
         let len = graphemes.len();
         Ok(graphemes.into_iter().select(self.selection.clone(), len))
     }
@@ -77,9 +76,8 @@ impl<'a> ArrayMethod<'a> {
         let variable = self.resolve_var(expand_func);
         match self.pattern {
             Pattern::StringPattern(string) => {
-                if let Ok(value) = expand_string(string, expand_func, false)
-                    .join(" ")
-                    .parse::<usize>()
+                if let Ok(value) =
+                    expand_string(string, expand_func, false).join(" ").parse::<usize>()
                 {
                     if value < variable.len() {
                         let (l, r) = variable.split_at(value);
@@ -144,10 +142,7 @@ impl<'a> ArrayMethod<'a> {
                 }
             }
             (&Pattern::Whitespace, Select::Range(range)) => {
-                let len = variable
-                    .split(char::is_whitespace)
-                    .filter(|x| !x.is_empty())
-                    .count();
+                let len = variable.split(char::is_whitespace).filter(|x| !x.is_empty()).count();
                 if let Some((start, length)) = range.bounds(len) {
                     variable
                         .split(char::is_whitespace)
@@ -416,10 +411,7 @@ mod test {
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
-        assert_eq!(
-            method.handle_as_array(&VariableExpander),
-            array!["FOO", "BAR"]
-        );
+        assert_eq!(method.handle_as_array(&VariableExpander), array!["FOO", "BAR"]);
     }
 
     #[test]
@@ -430,10 +422,7 @@ mod test {
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
-        assert_eq!(
-            method.handle_as_array(&VariableExpander),
-            array!["F", "O", "O", "B", "A", "R"]
-        );
+        assert_eq!(method.handle_as_array(&VariableExpander), array!["F", "O", "O", "B", "A", "R"]);
     }
 
     #[test]
@@ -458,10 +447,7 @@ mod test {
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
-        assert_eq!(
-            method.handle_as_array(&VariableExpander),
-            array!["F", "O", "O", "B", "A", "R"]
-        );
+        assert_eq!(method.handle_as_array(&VariableExpander), array!["F", "O", "O", "B", "A", "R"]);
     }
 
     #[test]
@@ -472,10 +458,7 @@ mod test {
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
-        assert_eq!(
-            method.handle_as_array(&VariableExpander),
-            array!["FOO", "BAR"]
-        );
+        assert_eq!(method.handle_as_array(&VariableExpander), array!["FOO", "BAR"]);
     }
 
     #[test]
@@ -486,9 +469,6 @@ mod test {
             pattern:   Pattern::StringPattern("3"),
             selection: Select::All,
         };
-        assert_eq!(
-            method.handle_as_array(&VariableExpander),
-            array!["c", "b", "a"]
-        );
+        assert_eq!(method.handle_as_array(&VariableExpander), array!["c", "b", "a"]);
     }
 }

@@ -87,18 +87,12 @@ impl PipeItem {
         }
 
         for output in &mut self.outputs {
-            output.file = expand_string(output.file.as_str(), shell, false)
-                .join(" ")
-                .into();
+            output.file = expand_string(output.file.as_str(), shell, false).join(" ").into();
         }
     }
 
     pub(crate) fn new(job: Job, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
-        PipeItem {
-            job,
-            outputs,
-            inputs,
-        }
+        PipeItem { job, outputs, inputs }
     }
 }
 

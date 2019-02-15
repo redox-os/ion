@@ -30,9 +30,8 @@ pub(crate) fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), St
             "-h" => flags |= NO_SIGHUP,
             "-r" => flags |= RUN_JOBS,
             _ => {
-                let jobspec = arg
-                    .parse::<u32>()
-                    .map_err(|_| format!("invalid jobspec: '{}'", arg))?;
+                let jobspec =
+                    arg.parse::<u32>().map_err(|_| format!("invalid jobspec: '{}'", arg))?;
                 collected_jobs.push(jobspec);
             }
         }
@@ -48,13 +47,9 @@ pub(crate) fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), St
     let mut process_table = shell.background.lock().unwrap();
     if collected_jobs.is_empty() && flags & ALL_JOBS != 0 {
         if flags & NO_SIGHUP != 0 {
-            process_table
-                .iter_mut()
-                .for_each(|process| process.ignore_sighup = true);
+            process_table.iter_mut().for_each(|process| process.ignore_sighup = true);
         } else {
-            process_table
-                .iter_mut()
-                .for_each(|process| process.state = ProcessState::Empty);
+            process_table.iter_mut().for_each(|process| process.state = ProcessState::Empty);
         }
     } else {
         collected_jobs.sort();
@@ -90,10 +85,7 @@ pub(crate) fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), St
 pub(crate) fn jobs(shell: &mut Shell) {
     for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
         if process.state != ProcessState::Empty {
-            eprintln!(
-                "[{}] {} {}\t{}",
-                id, process.pid, process.state, process.name
-            );
+            eprintln!("[{}] {} {}\t{}", id, process.pid, process.state, process.name);
         }
     }
 }
@@ -152,13 +144,7 @@ pub(crate) fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
 /// Resumes a stopped background process, if it was stopped.
 pub(crate) fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
-        if let Some(job) = shell
-            .background
-            .lock()
-            .unwrap()
-            .iter_mut()
-            .nth(njob as usize)
-        {
+        if let Some(job) = shell.background.lock().unwrap().iter_mut().nth(njob as usize) {
             match job.state {
                 ProcessState::Running => {
                     eprintln!("ion: bg: job {} is already running", njob);

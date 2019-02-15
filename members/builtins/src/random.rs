@@ -33,10 +33,7 @@ pub fn random(args: &[small::String]) -> Result<(), small::String> {
             writeln!(stdout, "{}", rand_num);
         }
         1 => {
-            writeln!(
-                stdout,
-                "Ion Shell does not currently support changing the seed"
-            );
+            writeln!(stdout, "Ion Shell does not currently support changing the seed");
         }
         2 => {
             let arg1 = match args[0].parse::<u64>() {

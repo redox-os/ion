@@ -164,10 +164,7 @@ fn do_redirection(
 
     macro_rules! set_one_tee {
         ($new:ident, $outputs:ident, $job:ident, $kind:ident, $teed:ident, $other:ident) => {{
-            let mut tee = TeeItem {
-                sinks:  Vec::new(),
-                source: None,
-            };
+            let mut tee = TeeItem { sinks: Vec::new(), source: None };
             for output in $outputs {
                 match if output.append {
                     OpenOptions::new()
@@ -231,10 +228,7 @@ fn do_redirection(
             (0, _) => {}
             (1, JobKind::Pipe(_)) => {
                 let sources = vec![inputs[0].get_infile()?];
-                new_commands.push((
-                    RefinedJob::cat(sources),
-                    JobKind::Pipe(RedirectFrom::Stdout),
-                ));
+                new_commands.push((RefinedJob::cat(sources), JobKind::Pipe(RedirectFrom::Stdout)));
             }
             (1, _) => job.stdin(inputs[0].get_infile()?),
             _ => {
@@ -246,10 +240,7 @@ fn do_redirection(
                         return None;
                     });
                 }
-                new_commands.push((
-                    RefinedJob::cat(sources),
-                    JobKind::Pipe(RedirectFrom::Stdout),
-                ));
+                new_commands.push((RefinedJob::cat(sources), JobKind::Pipe(RedirectFrom::Stdout)));
             }
         }
         prev_kind = kind;
@@ -269,14 +260,8 @@ fn do_redirection(
             (true, false) => set_one_tee!(new_commands, outputs, job, kind, Stdout, Stderr),
             // tee both
             (true, true) => {
-                let mut tee_out = TeeItem {
-                    sinks:  Vec::new(),
-                    source: None,
-                };
-                let mut tee_err = TeeItem {
-                    sinks:  Vec::new(),
-                    source: None,
-                };
+                let mut tee_out = TeeItem { sinks: Vec::new(), source: None };
+                let mut tee_err = TeeItem { sinks: Vec::new(), source: None };
                 for output in outputs {
                     match if output.append {
                         OpenOptions::new()
@@ -424,21 +409,9 @@ impl PipelineExecution for Shell {
         let result = sys::fork_and_exec(
             name,
             args,
-            if let Some(ref f) = *stdin {
-                Some(f.as_raw_fd())
-            } else {
-                None
-            },
-            if let Some(ref f) = *stdout {
-                Some(f.as_raw_fd())
-            } else {
-                None
-            },
-            if let Some(ref f) = *stderr {
-                Some(f.as_raw_fd())
-            } else {
-                None
-            },
+            if let Some(ref f) = *stdin { Some(f.as_raw_fd()) } else { None },
+            if let Some(ref f) = *stdout { Some(f.as_raw_fd()) } else { None },
+            if let Some(ref f) = *stderr { Some(f.as_raw_fd()) } else { None },
             false,
             || prepare_child(true, 0),
         );
@@ -616,10 +589,7 @@ impl PipelineExecution for Shell {
                 return code;
             }
 
-            eprintln!(
-                "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
-                long
-            );
+            eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", long);
 
             COULD_NOT_EXEC
         }
@@ -632,11 +602,7 @@ impl PipelineExecution for Shell {
             // This doesn't allocate
             String::new()
         } else {
-            commands
-                .iter()
-                .map(RefinedJob::long)
-                .collect::<Vec<String>>()
-                .join(" | ")
+            commands.iter().map(RefinedJob::long).collect::<Vec<String>>().join(" | ")
         };
 
         // Watch the foreground group, dropping all commands that exit as they exit.
@@ -649,22 +615,14 @@ impl PipelineExecution for Shell {
     ) -> Result<SmallVec<[RefinedItem; 16]>, i32> {
         let mut results: SmallVec<[RefinedItem; 16]> = SmallVec::new();
         for item in pipeline.items.drain(..) {
-            let PipeItem {
-                mut job,
-                outputs,
-                inputs,
-            } = item;
+            let PipeItem { mut job, outputs, inputs } = item;
             let refined = {
                 if is_implicit_cd(&job.args[0]) {
                     RefinedJob::builtin(
                         builtins::builtin_cd,
                         iter::once("cd".into()).chain(job.args.drain()).collect(),
                     )
-                } else if self
-                    .variables
-                    .get::<Function>(job.args[0].as_str())
-                    .is_some()
-                {
+                } else if self.variables.get::<Function>(job.args[0].as_str()).is_some() {
                     RefinedJob::function(job.args[0].clone(), job.args.drain().collect())
                 } else if let Some(builtin) = job.builtin {
                     RefinedJob::builtin(builtin, job.args.drain().collect())
@@ -706,11 +664,7 @@ impl PipelineExecution for Shell {
                 self,
                 piped_commands,
                 command_name,
-                if disown {
-                    ProcessState::Empty
-                } else {
-                    ProcessState::Running
-                },
+                if disown { ProcessState::Empty } else { ProcessState::Running },
             ),
             None => {
                 // While active, the SIGTTOU signal will be ignored.
@@ -754,11 +708,8 @@ pub(crate) fn pipe(
                     // If parent is a RefindJob::External, then we need to keep track of the
                     // output pipes, so we can properly close them after the job has been
                     // spawned.
-                    let is_external = if let JobVariant::External { .. } = parent.var {
-                        true
-                    } else {
-                        false
-                    };
+                    let is_external =
+                        if let JobVariant::External { .. } = parent.var { true } else { false };
 
                     // TODO: Refactor this part
                     // If we need to tee both stdout and stderr, we directly connect pipes to
@@ -881,10 +832,7 @@ fn spawn_proc(
     let stdout = &mut cmd.stdout;
     let stderr = &mut cmd.stderr;
     match cmd.var {
-        JobVariant::External {
-            ref mut name,
-            ref mut args,
-        } => {
+        JobVariant::External { ref mut name, ref mut args } => {
             let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
             let mut result = sys::fork_and_exec(
                 name,
@@ -923,10 +871,7 @@ fn spawn_proc(
                 |stdout, stderr, stdin| shell.exec_builtin(main, args, stdout, stderr, stdin),
             );
         }
-        JobVariant::Function {
-            ref mut name,
-            ref mut args,
-        } => {
+        JobVariant::Function { ref mut name, ref mut args } => {
             fork_exec_internal(
                 stdout,
                 stderr,
@@ -1052,7 +997,5 @@ pub fn pipe_fail(why: io::Error) {
 }
 
 pub fn append_external_stdio_pipe(pipes: &mut Option<Vec<File>>, file: RawFd) {
-    pipes
-        .get_or_insert_with(|| Vec::with_capacity(4))
-        .push(unsafe { File::from_raw_fd(file) });
+    pipes.get_or_insert_with(|| Vec::with_capacity(4)).push(unsafe { File::from_raw_fd(file) });
 }

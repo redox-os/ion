@@ -170,10 +170,9 @@ impl VariableStore for Shell {
                 list_vars(&self);
                 return SUCCESS;
             }
-            LocalAction::Assign(ref keys, op, ref vals) => (
-                AssignmentActions::new(keys, op, vals),
-                AssignmentActions::new(keys, op, vals),
-            ),
+            LocalAction::Assign(ref keys, op, ref vals) => {
+                (AssignmentActions::new(keys, op, vals), AssignmentActions::new(keys, op, vals))
+            }
         };
         for action in actions_step1 {
             match action {
@@ -473,39 +472,34 @@ impl VariableStore for Shell {
                         Some(VariableType::Str(value)) => {
                             if let Primitive::Indexed(ref index_value, ref index_kind) = key.kind {
                                 match value_check(self, index_value, index_kind) {
-                                    Ok(VariableType::Str(ref index)) => {
-                                        match self.variables.get_mut(key.name) {
-                                            Some(VariableType::HashMap(hmap)) => {
-                                                hmap.insert(
-                                                    index.clone(),
-                                                    VariableType::Str(value),
-                                                );
-                                            }
-                                            Some(VariableType::BTreeMap(bmap)) => {
-                                                bmap.insert(
-                                                    index.clone(),
-                                                    VariableType::Str(value),
-                                                );
-                                            }
-                                            Some(VariableType::Array(array)) => {
-                                                let index_num = match index.parse::<usize>() {
-                                                    Ok(num) => num,
-                                                    Err(_) => {
-                                                        eprintln!(
-                                                            "ion: index variable does not contain \
-                                                             a numeric value: {}",
-                                                            index
-                                                        );
-                                                        return FAILURE;
-                                                    }
-                                                };
-                                                if let Some(val) = array.get_mut(index_num) {
-                                                    *val = value;
-                                                }
-                                            }
-                                            _ => (),
+                                    Ok(VariableType::Str(ref index)) => match self
+                                        .variables
+                                        .get_mut(key.name)
+                                    {
+                                        Some(VariableType::HashMap(hmap)) => {
+                                            hmap.insert(index.clone(), VariableType::Str(value));
                                         }
-                                    }
+                                        Some(VariableType::BTreeMap(bmap)) => {
+                                            bmap.insert(index.clone(), VariableType::Str(value));
+                                        }
+                                        Some(VariableType::Array(array)) => {
+                                            let index_num = match index.parse::<usize>() {
+                                                Ok(num) => num,
+                                                Err(_) => {
+                                                    eprintln!(
+                                                        "ion: index variable does not contain a \
+                                                         numeric value: {}",
+                                                        index
+                                                    );
+                                                    return FAILURE;
+                                                }
+                                            };
+                                            if let Some(val) = array.get_mut(index_num) {
+                                                *val = value;
+                                            }
+                                        }
+                                        _ => (),
+                                    },
                                     Ok(VariableType::Array(_)) => {
                                         eprintln!("ion: index variable cannot be an array");
                                         return FAILURE;
@@ -573,13 +567,9 @@ impl Display for MathError {
 }
 
 fn parse_f64<F: Fn(f64, f64) -> f64>(lhs: &str, rhs: &str, operation: F) -> Result<f64, MathError> {
-    lhs.parse::<f64>()
-        .map_err(|_| MathError::LHS)
-        .and_then(|lhs| {
-            rhs.parse::<f64>()
-                .map_err(|_| MathError::RHS)
-                .map(|rhs| operation(lhs, rhs))
-        })
+    lhs.parse::<f64>().map_err(|_| MathError::LHS).and_then(|lhs| {
+        rhs.parse::<f64>().map_err(|_| MathError::RHS).map(|rhs| operation(lhs, rhs))
+    })
 }
 
 fn parse_i64<F: Fn(i64, i64) -> Option<i64>>(
@@ -627,11 +617,7 @@ fn math<'a, F: FnMut(&[u8])>(
     match operator {
         Operator::Add => {
             if Primitive::Any == *key || Primitive::Float == *key {
-                writefn(
-                    parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?
-                        .to_string()
-                        .as_bytes(),
-                );
+                writefn(parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?.to_string().as_bytes());
             } else if let Primitive::Integer = key {
                 write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs + rhs))?, writefn);
             } else {
@@ -640,11 +626,7 @@ fn math<'a, F: FnMut(&[u8])>(
         }
         Operator::Divide => {
             if Primitive::Any == *key || Primitive::Float == *key || Primitive::Integer == *key {
-                writefn(
-                    parse_f64(lhs, value, |lhs, rhs| lhs / rhs)?
-                        .to_string()
-                        .as_bytes(),
-                );
+                writefn(parse_f64(lhs, value, |lhs, rhs| lhs / rhs)?.to_string().as_bytes());
             } else {
                 return Err(MathError::Unsupported);
             }
@@ -668,11 +650,7 @@ fn math<'a, F: FnMut(&[u8])>(
         }
         Operator::Subtract => {
             if Primitive::Any == *key || Primitive::Float == *key {
-                writefn(
-                    parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?
-                        .to_string()
-                        .as_bytes(),
-                );
+                writefn(parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?.to_string().as_bytes());
             } else if let Primitive::Integer = key {
                 write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs - rhs))?, writefn);
             } else {
@@ -681,11 +659,7 @@ fn math<'a, F: FnMut(&[u8])>(
         }
         Operator::Multiply => {
             if Primitive::Any == *key || Primitive::Float == *key {
-                writefn(
-                    parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?
-                        .to_string()
-                        .as_bytes(),
-                );
+                writefn(parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?.to_string().as_bytes());
             } else if let Primitive::Integer = key {
                 write_integer(parse_i64(lhs, value, |lhs, rhs| Some(lhs * rhs))?, writefn);
             } else {
@@ -694,11 +668,7 @@ fn math<'a, F: FnMut(&[u8])>(
         }
         Operator::Exponent => {
             if Primitive::Any == *key || Primitive::Float == *key {
-                writefn(
-                    parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?
-                        .to_string()
-                        .as_bytes(),
-                );
+                writefn(parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?.to_string().as_bytes());
             } else if let Primitive::Integer = key {
                 write_integer(
                     parse_i64(lhs, value, |lhs, rhs| Some(lhs.pow(rhs as u32)))?,

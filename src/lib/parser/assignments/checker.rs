@@ -143,9 +143,7 @@ fn is_float_array(value: VariableType) -> Result<VariableType, ()> {
 }
 
 fn get_string<E: Expander>(shell: &E, value: &str) -> VariableType {
-    VariableType::Str(types::Str::from(
-        expand_string(value, shell, false).join(" "),
-    ))
+    VariableType::Str(types::Str::from(expand_string(value, shell, false).join(" ")))
 }
 
 fn get_array<E: Expander>(shell: &E, value: &str) -> VariableType {
@@ -306,13 +304,7 @@ mod test {
     #[test]
     fn is_integer_array_() {
         let expected = Ok(VariableType::Array(array!["1", "2", "3"]));
-        assert_eq!(
-            is_integer_array(VariableType::Array(array!["1", "2", "3"])),
-            expected
-        );
-        assert_eq!(
-            is_integer_array(VariableType::Array(array!["1", "2", "three"])),
-            Err(())
-        );
+        assert_eq!(is_integer_array(VariableType::Array(array!["1", "2", "3"])), expected);
+        assert_eq!(is_integer_array(VariableType::Array(array!["1", "2", "three"])), Err(()));
     }
 }

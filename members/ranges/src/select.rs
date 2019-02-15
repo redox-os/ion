@@ -40,19 +40,14 @@ where
         match s {
             Select::None => empty().collect(),
             Select::All => self.collect(),
-            Select::Index(idx) => idx
-                .resolve(size)
-                .and_then(|idx| self.nth(idx))
-                .into_iter()
-                .collect(),
-            Select::Range(range) => {
-                if let Some((start, length)) = range.bounds(size) {
-                    self.skip(start).take(length).collect()
-                } else {
-                    empty().collect()
-                }
+            Select::Index(idx) => {
+                idx.resolve(size).and_then(|idx| self.nth(idx)).into_iter().collect()
             }
-            Select::Key(_) => empty().collect(),
+            Select::Range(range) if range.bounds(size).is_some() => range
+                .bounds(size)
+                .map(|(start, length)| self.skip(start).take(length).collect())
+                .unwrap(),
+            _ => empty().collect(),
         }
     }
 }

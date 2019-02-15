@@ -172,10 +172,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 {
                     // If we are just ending the braced section continue as normal
                     if error.is_none() {
-                        error = Some(StatementError::InvalidCharacter(
-                            character as char,
-                            self.read,
-                        ))
+                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 }
                 b'\'' if !self.flags.contains(Flags::DQUOTE) => {
@@ -201,10 +198,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'}' if !self.flags.contains(Flags::DQUOTE) => {
                     if self.brace_level == 0 {
                         if error.is_none() {
-                            error = Some(StatementError::InvalidCharacter(
-                                character as char,
-                                self.read,
-                            ))
+                            error =
+                                Some(StatementError::InvalidCharacter(character as char, self.read))
                         }
                     } else {
                         self.brace_level -= 1;
@@ -213,15 +208,9 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'(' if self.flags.contains(Flags::MATHEXPR) => {
                     self.math_paren_level += 1;
                 }
-                b'(' if !self
-                    .flags
-                    .intersects(Flags::COMM_1 | Flags::VARIAB | Flags::ARRAY) =>
-                {
+                b'(' if !self.flags.intersects(Flags::COMM_1 | Flags::VARIAB | Flags::ARRAY) => {
                     if error.is_none() && !self.flags.contains(Flags::DQUOTE) {
-                        error = Some(StatementError::InvalidCharacter(
-                            character as char,
-                            self.read,
-                        ))
+                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 }
                 b'(' if self.flags.intersects(Flags::COMM_1 | Flags::METHOD) => {
@@ -266,10 +255,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b')' if self.paren_level == 0 => {
                     if error.is_none() && !self.flags.contains(Flags::DQUOTE) {
-                        error = Some(StatementError::InvalidCharacter(
-                            character as char,
-                            self.read,
-                        ))
+                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
                     }
                 }
                 b')' => self.paren_level -= 1,
@@ -381,9 +367,9 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         }
                         b'|' => Some(Err(StatementError::ExpectedCommandButFound("pipe"))),
                         b'&' => Some(Err(StatementError::ExpectedCommandButFound("&"))),
-                        b'*' | b'%' | b'?' | b'{' | b'}' => Some(Err(
-                            StatementError::IllegalCommandName(String::from(output)),
-                        )),
+                        b'*' | b'%' | b'?' | b'{' | b'}' => {
+                            Some(Err(StatementError::IllegalCommandName(String::from(output))))
+                        }
                         _ => Some(Ok(self.get_statement_from(output))),
                     }
                 }
@@ -404,10 +390,7 @@ fn syntax_errors() {
 
     let command = ">echo";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
-    assert_eq!(
-        results[0],
-        Err(StatementError::ExpectedCommandButFound("redirection"))
-    );
+    assert_eq!(results[0], Err(StatementError::ExpectedCommandButFound("redirection")));
     assert_eq!(results.len(), 1);
 
     let command = "echo $((foo bar baz)";
@@ -420,14 +403,8 @@ fn syntax_errors() {
 fn methods() {
     let command = "echo $join(array, ', '); echo @join(var, ', ')";
     let statements = StatementSplitter::new(command).collect::<Vec<_>>();
-    assert_eq!(
-        statements[0],
-        Ok(StatementVariant::Default("echo $join(array, ', ')"))
-    );
-    assert_eq!(
-        statements[1],
-        Ok(StatementVariant::Default("echo @join(var, ', ')"))
-    );
+    assert_eq!(statements[0], Ok(StatementVariant::Default("echo $join(array, ', ')")));
+    assert_eq!(statements[1], Ok(StatementVariant::Default("echo @join(var, ', ')")));
     assert_eq!(statements.len(), 2);
 }
 
@@ -443,10 +420,7 @@ fn processes() {
 fn array_processes() {
     let command = "echo @(echo one; sleep 1); echo @(echo one; sleep 1)";
     for statement in StatementSplitter::new(command) {
-        assert_eq!(
-            statement,
-            Ok(StatementVariant::Default("echo @(echo one; sleep 1)"))
-        );
+        assert_eq!(statement, Ok(StatementVariant::Default("echo @(echo one; sleep 1)")));
     }
 }
 
@@ -463,14 +437,8 @@ fn quotes() {
     let command = "echo \"This ;'is a test\"; echo 'This ;\" is also a test'";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 2);
-    assert_eq!(
-        results[0],
-        Ok(StatementVariant::Default("echo \"This ;'is a test\""))
-    );
-    assert_eq!(
-        results[1],
-        Ok(StatementVariant::Default("echo 'This ;\" is also a test'"))
-    );
+    assert_eq!(results[0], Ok(StatementVariant::Default("echo \"This ;'is a test\"")));
+    assert_eq!(results[1], Ok(StatementVariant::Default("echo 'This ;\" is also a test'")));
 }
 
 #[test]
@@ -478,10 +446,7 @@ fn comments() {
     let command = "echo $(echo one # two); echo three # four";
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 2);
-    assert_eq!(
-        results[0],
-        Ok(StatementVariant::Default("echo $(echo one # two)"))
-    );
+    assert_eq!(results[0], Ok(StatementVariant::Default("echo $(echo one # two)")));
     assert_eq!(results[1], Ok(StatementVariant::Default("echo three")));
 }
 
@@ -524,28 +489,12 @@ fn variants() {
     let command = r#"echo "Hello!"; echo "How are you doing?" && echo "I'm just an ordinary test." || echo "Helping by making sure your code works right."; echo "Have a good day!""#;
     let results = StatementSplitter::new(command).collect::<Vec<_>>();
     assert_eq!(results.len(), 5);
-    assert_eq!(
-        results[0],
-        Ok(StatementVariant::Default(r#"echo "Hello!""#))
-    );
-    assert_eq!(
-        results[1],
-        Ok(StatementVariant::Default(r#"echo "How are you doing?""#))
-    );
-    assert_eq!(
-        results[2],
-        Ok(StatementVariant::And(
-            r#"echo "I'm just an ordinary test.""#
-        ))
-    );
+    assert_eq!(results[0], Ok(StatementVariant::Default(r#"echo "Hello!""#)));
+    assert_eq!(results[1], Ok(StatementVariant::Default(r#"echo "How are you doing?""#)));
+    assert_eq!(results[2], Ok(StatementVariant::And(r#"echo "I'm just an ordinary test.""#)));
     assert_eq!(
         results[3],
-        Ok(StatementVariant::Or(
-            r#"echo "Helping by making sure your code works right.""#
-        ))
+        Ok(StatementVariant::Or(r#"echo "Helping by making sure your code works right.""#))
     );
-    assert_eq!(
-        results[4],
-        Ok(StatementVariant::Default(r#"echo "Have a good day!""#))
-    );
+    assert_eq!(results[4], Ok(StatementVariant::Default(r#"echo "Have a good day!""#)));
 }

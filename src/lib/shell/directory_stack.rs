@@ -76,10 +76,7 @@ impl DirectoryStack {
         caller: &str,
     ) -> Result<(), Cow<'static, str>> {
         let dir = self.dirs.get(index).ok_or_else(|| {
-            Cow::Owned(format!(
-                "ion: {}: {}: directory stack out of range",
-                caller, index
-            ))
+            Cow::Owned(format!("ion: {}: {}: directory stack out of range", caller, index))
         })?;
 
         set_current_dir_ion(dir)
@@ -153,11 +150,8 @@ impl DirectoryStack {
                 None => return FAILURE,
             };
         } else {
-            let folder: fn(String, Cow<str>) -> String = if dirs_args & MULTILINE > 0 {
-                |x, y| x + "\n" + &y
-            } else {
-                |x, y| x + " " + &y
-            };
+            let folder: fn(String, Cow<str>) -> String =
+                if dirs_args & MULTILINE > 0 { |x, y| x + "\n" + &y } else { |x, y| x + " " + &y };
 
             let first = match iter.next() {
                 Some(x) => x.to_string(),
@@ -228,9 +222,7 @@ impl DirectoryStack {
             Err(Cow::Borrowed("ion: failed to get home directory")),
             |home| {
                 home.to_str().map_or(
-                    Err(Cow::Borrowed(
-                        "ion: failed to convert home directory to str",
-                    )),
+                    Err(Cow::Borrowed("ion: failed to convert home directory to str")),
                     |home| self.change_and_push_dir(home, variables),
                 )
             },
@@ -395,10 +387,7 @@ impl DirectoryStack {
     /// variable,
     /// else it will return a default value of 1000.
     fn get_size(variables: &Variables) -> usize {
-        variables
-            .get_str_or_empty("DIRECTORY_STACK_SIZE")
-            .parse::<usize>()
-            .unwrap_or(1000)
+        variables.get_str_or_empty("DIRECTORY_STACK_SIZE").parse::<usize>().unwrap_or(1000)
     }
 
     /// Create a new `DirectoryStack` containing the current working directory,
@@ -433,10 +422,5 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
 
 // converts pbuf to an absolute path if possible
 fn try_abs_path(pbuf: &PathBuf) -> Cow<str> {
-    Cow::Owned(
-        pbuf.canonicalize()
-            .unwrap_or_else(|_| pbuf.clone())
-            .to_string_lossy()
-            .to_string(),
-    )
+    Cow::Owned(pbuf.canonicalize().unwrap_or_else(|_| pbuf.clone()).to_string_lossy().to_string())
 }

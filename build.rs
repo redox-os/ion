@@ -46,7 +46,7 @@ fn get_git_rev() -> io::Result<String> {
                 String::from_utf8(out.stdout).map_err(|_| {
                     io::Error::new(
                         io::ErrorKind::InvalidData,
-                        format!("git rev-parse master output was not UTF-8"),
+                        "git rev-parse master output was not UTF-8",
                     )
                 })
             })

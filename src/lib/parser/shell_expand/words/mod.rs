@@ -617,11 +617,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             self.read += 1;
         }
 
-        WordToken::Variable(
-            &self.data[start..],
-            self.flags.contains(Flags::DQUOTE),
-            Select::All,
-        )
+        WordToken::Variable(&self.data[start..], self.flags.contains(Flags::DQUOTE), Select::All)
     }
 
     // Contains the logic for parsing braced variables
@@ -661,13 +657,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     pub(crate) fn new(data: &'a str, expanders: &'a E, do_glob: bool) -> WordIterator<'a, E> {
-        WordIterator {
-            data,
-            read: 0,
-            flags: Flags::empty(),
-            expanders,
-            do_glob,
-        }
+        WordIterator { data, read: 0, flags: Flags::empty(), expanders, do_glob }
     }
 }
 
@@ -885,11 +875,7 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
         if start == self.read {
             None
         } else {
-            Some(WordToken::Normal(
-                unescape(&self.data[start..]),
-                glob,
-                tilde,
-            ))
+            Some(WordToken::Normal(unescape(&self.data[start..]), glob, tilde))
         }
     }
 }

@@ -73,10 +73,7 @@ pub fn waitpid(pid: i32, status: &mut i32, options: i32) -> Result<i32, i32> {
 }
 
 pub fn strerror(errno: i32) -> &'static str {
-    syscall::error::STR_ERROR
-        .get(errno as usize)
-        .map(|err| *err)
-        .unwrap_or("Unknown Error")
+    syscall::error::STR_ERROR.get(errno as usize).map(|err| *err).unwrap_or("Unknown Error")
 }
 
 pub fn getpid() -> io::Result<u32> { cvt(syscall::getpid()).map(|pid| pid as u32) }
@@ -265,10 +262,7 @@ pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Err
         }
 
         // Push the program name
-        cvt_args.push([
-            prog.as_os_str().as_bytes().as_ptr() as usize,
-            prog.as_os_str().len(),
-        ]);
+        cvt_args.push([prog.as_os_str().as_bytes().as_ptr() as usize, prog.as_os_str().len()]);
 
         // Push all arguments
         for arg in args {
@@ -322,10 +316,7 @@ pub fn tcsetpgrp(tty_fd: RawFd, pgid: u32) -> io::Result<()> {
 
     let pgid_usize = pgid as usize;
     let res = syscall::write(fd, unsafe {
-        slice::from_raw_parts(
-            &pgid_usize as *const usize as *const u8,
-            mem::size_of::<usize>(),
-        )
+        slice::from_raw_parts(&pgid_usize as *const usize as *const u8, mem::size_of::<usize>())
     });
 
     let _ = syscall::close(fd);
@@ -377,10 +368,7 @@ pub mod variables {
         if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) }
             == 0
         {
-            let len = host_name
-                .iter()
-                .position(|i| *i == 0)
-                .unwrap_or(host_name.len());
+            let len = host_name.iter().position(|i| *i == 0).unwrap_or(host_name.len());
 
             Some(unsafe { String::from_utf8_unchecked(host_name[..len].to_owned()) })
         } else {

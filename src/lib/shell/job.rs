@@ -34,12 +34,7 @@ impl Job {
     pub(crate) fn new(args: types::Array, kind: JobKind) -> Self {
         let command = args[0].clone();
         let builtin = BUILTINS.get(command.as_ref()).map(|b| b.main);
-        Job {
-            command,
-            args,
-            kind,
-            builtin,
-        }
+        Job { command, args, kind, builtin }
     }
 }
 
@@ -80,20 +75,11 @@ pub struct RefinedJob {
 
 pub enum JobVariant {
     /// An external program that is executed by this shell
-    External {
-        name: types::Str,
-        args: types::Array,
-    },
+    External { name: types::Str, args: types::Array },
     /// A procedure embedded into Ion
-    Builtin {
-        main: BuiltinFunction,
-        args: types::Array,
-    },
+    Builtin { main: BuiltinFunction, args: types::Array },
     /// Functions can act as commands too!
-    Function {
-        name: types::Str,
-        args: types::Array,
-    },
+    Function { name: types::Str, args: types::Array },
     /// Represents redirection into stdin from more than one source
     Cat { sources: Vec<File> },
     Tee {
@@ -229,19 +215,12 @@ impl RefinedJob {
             stdin:  None,
             stdout: None,
             stderr: None,
-            var:    JobVariant::Tee {
-                items: (tee_out, tee_err),
-            },
+            var:    JobVariant::Tee { items: (tee_out, tee_err) },
         }
     }
 
     pub(crate) fn cat(sources: Vec<File>) -> Self {
-        RefinedJob {
-            stdin:  None,
-            stdout: None,
-            stderr: None,
-            var:    JobVariant::Cat { sources },
-        }
+        RefinedJob { stdin: None, stdout: None, stderr: None, var: JobVariant::Cat { sources } }
     }
 
     pub(crate) fn function(name: types::Str, args: types::Array) -> Self {

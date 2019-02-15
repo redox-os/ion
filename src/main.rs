@@ -37,10 +37,7 @@ fn main() {
             "-h" | "--help" => {
                 let stdout = stdout();
                 let mut stdout = stdout.lock();
-                match stdout
-                    .write_all(MAN_ION.as_bytes())
-                    .and_then(|_| stdout.flush())
-                {
+                match stdout.write_all(MAN_ION.as_bytes()).and_then(|_| stdout.flush()) {
                     Ok(_) => return,
                     Err(err) => panic!("{}", err.description().to_owned()),
                 }

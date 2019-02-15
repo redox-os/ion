@@ -59,17 +59,10 @@ pub(crate) fn add_to_background(
     command: String,
 ) -> u32 {
     let mut processes = processes.lock().unwrap();
-    match (*processes)
-        .iter()
-        .position(|x| x.state == ProcessState::Empty)
-    {
+    match (*processes).iter().position(|x| x.state == ProcessState::Empty) {
         Some(id) => {
-            (*processes)[id] = BackgroundProcess {
-                pid,
-                ignore_sighup: false,
-                state,
-                name: command,
-            };
+            (*processes)[id] =
+                BackgroundProcess { pid, ignore_sighup: false, state, name: command };
             id as u32
         }
         None => {

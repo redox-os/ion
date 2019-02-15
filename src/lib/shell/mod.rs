@@ -199,15 +199,12 @@ impl Shell {
         name: &str,
         args: &[S],
     ) -> Result<i32, IonError> {
-        self.variables
-            .get::<Function>(name)
-            .ok_or(IonError::DoesNotExist)
-            .and_then(|function| {
-                function
-                    .execute(self, args)
-                    .map(|_| self.previous_status)
-                    .map_err(|err| IonError::Function { why: err })
-            })
+        self.variables.get::<Function>(name).ok_or(IonError::DoesNotExist).and_then(|function| {
+            function
+                .execute(self, args)
+                .map(|_| self.previous_status)
+                .map_err(|err| IonError::Function { why: err })
+        })
     }
 
     /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
@@ -281,9 +278,8 @@ impl Shell {
                 Some(self.execute_pipeline(pipeline))
             }
         // Branch else if -> input == shell function and set the exit_status
-        } else if let Some(function) = self
-            .variables
-            .get::<Function>(&pipeline.items[0].job.command)
+        } else if let Some(function) =
+            self.variables.get::<Function>(&pipeline.items[0].job.command)
         {
             if !pipeline.requires_piping() {
                 let args = pipeline.items[0].job.args.deref();
@@ -416,9 +412,7 @@ impl<'a> Expander for Shell {
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<types::Str> {
         let mut output = None;
-        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| {
-            shell.on_command(command)
-        }) {
+        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command)) {
             Ok(result) => {
                 let mut string = String::with_capacity(1024);
                 match result.stdout.unwrap().read_to_string(&mut string) {
@@ -446,8 +440,7 @@ impl<'a> Expander for Shell {
         } else if quoted {
             self.get::<types::Str>(name)
         } else {
-            self.get::<types::Str>(name)
-                .map(|x| x.ascii_replace('\n', ' '))
+            self.get::<types::Str>(name).map(|x| x.ascii_replace('\n', ' '))
         }
     }
 

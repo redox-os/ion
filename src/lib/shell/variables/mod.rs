@@ -175,10 +175,7 @@ pub struct Variables {
 impl Default for Variables {
     fn default() -> Self {
         let mut map: HashMap<types::Str, VariableType> = HashMap::with_capacity(64);
-        map.insert(
-            "DIRECTORY_STACK_SIZE".into(),
-            VariableType::Str("1000".into()),
-        );
+        map.insert("DIRECTORY_STACK_SIZE".into(), VariableType::Str("1000".into()));
         map.insert("HISTORY_SIZE".into(), VariableType::Str("1000".into()));
         map.insert("HISTFILE_SIZE".into(), VariableType::Str("100000".into()));
         map.insert(
@@ -202,11 +199,7 @@ impl Default for Variables {
         );
         map.insert(
             "EUID".into(),
-            VariableType::Str(
-                geteuid()
-                    .ok()
-                    .map_or("?".into(), |id| id.to_string().into()),
-            ),
+            VariableType::Str(geteuid().ok().map_or("?".into(), |id| id.to_string().into())),
         );
 
         // Initialize the HISTFILE variable
@@ -235,19 +228,9 @@ impl Default for Variables {
         );
 
         // Initialize the HOST variable
-        env::set_var(
-            "HOST",
-            &self_sys::get_host_name().unwrap_or_else(|| "?".to_owned()),
-        );
+        env::set_var("HOST", &self_sys::get_host_name().unwrap_or_else(|| "?".to_owned()));
 
-        Variables {
-            flags:   0,
-            scopes:  vec![Scope {
-                vars:      map,
-                namespace: false,
-            }],
-            current: 0,
-        }
+        Variables { flags: 0, scopes: vec![Scope { vars: map, namespace: false }], current: 0 }
     }
 }
 
@@ -255,10 +238,7 @@ impl Variables {
     pub fn new_scope(&mut self, namespace: bool) {
         self.current += 1;
         if self.current >= self.scopes.len() {
-            self.scopes.push(Scope {
-                vars: HashMap::with_capacity(64),
-                namespace,
-            });
+            self.scopes.push(Scope { vars: HashMap::with_capacity(64), namespace });
         } else {
             self.scopes[self.current].namespace = namespace;
         }
@@ -488,19 +468,16 @@ impl Variables {
                         }
                     }
                 }
-                Some(("env", variable)) => env::var(variable)
-                    .map(Into::into)
-                    .ok()
-                    .map(|s| T::from(VariableType::Str(s))),
+                Some(("env", variable)) => {
+                    env::var(variable).map(Into::into).ok().map(|s| T::from(VariableType::Str(s)))
+                }
                 Some(("super", _)) | Some(("global", _)) | None => {
                     // Otherwise, it's just a simple variable name.
                     match self.get_ref(name) {
                         Some(VariableType::Str(val)) => {
                             Some(T::from(VariableType::Str(val.clone())))
                         }
-                        _ => env::var(name)
-                            .ok()
-                            .map(|s| T::from(VariableType::Str(s.into()))),
+                        _ => env::var(name).ok().map(|s| T::from(VariableType::Str(s.into()))),
                     }
                 }
                 Some((..)) => {
@@ -683,10 +660,7 @@ impl Variables {
             // Temporarily borrow the `swd` variable while we attempt to assemble a minimal
             // variant of the directory path. If that is not possible, we will cancel the
             // borrow and return `swd` itself as the minified path.
-            let elements = swd
-                .split('/')
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<&str>>();
+            let elements = swd.split('/').filter(|s| !s.is_empty()).collect::<Vec<&str>>();
             if elements.len() > 2 {
                 let mut output = types::Str::new();
                 for element in &elements[..elements.len() - 1] {

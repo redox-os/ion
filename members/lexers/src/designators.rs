@@ -28,10 +28,7 @@ impl<'a> DesignatorLexer<'a> {
     }
 
     pub fn new(data: &'a [u8]) -> DesignatorLexer {
-        DesignatorLexer {
-            data,
-            flags: Flags::empty(),
-        }
+        DesignatorLexer { data, flags: Flags::empty() }
     }
 }
 

@@ -95,25 +95,19 @@ impl Binary for Shell {
             let mut context = Context::new();
             context.word_divider_fn = Box::new(word_divide);
             if "1" == self.get_str_or_empty("HISTFILE_ENABLED") {
-                let path = self
-                    .get::<types::Str>("HISTFILE")
-                    .expect("shell didn't set HISTFILE");
+                let path = self.get::<types::Str>("HISTFILE").expect("shell didn't set HISTFILE");
                 if !Path::new(path.as_str()).exists() {
                     eprintln!("ion: creating history file at \"{}\"", path);
                 }
-                let _ = context
-                    .history
-                    .set_file_name_and_load_history(path.as_str());
+                let _ = context.history.set_file_name_and_load_history(path.as_str());
             }
             context
         });
 
         self.evaluate_init_file();
 
-        self.variables.set(
-            "args",
-            iter::once(env::args().next().unwrap().into()).collect::<types::Array>(),
-        );
+        self.variables
+            .set("args", iter::once(env::args().next().unwrap().into()).collect::<types::Array>());
 
         loop {
             if let Some(command) = self.readln() {
@@ -235,10 +229,5 @@ where
 
 fn word_divide(buf: &Buffer) -> Vec<(usize, usize)> {
     // -> impl Iterator<Item = (usize, usize)> + 'a
-    WordDivide {
-        iter:       buf.chars().cloned().enumerate(),
-        count:      0,
-        word_start: None,
-    }
-    .collect() // TODO: return iterator directly :D
+    WordDivide { iter: buf.chars().cloned().enumerate(), count: 0, word_start: None }.collect() // TODO: return iterator directly :D
 }

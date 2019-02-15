@@ -157,11 +157,7 @@ fn words_process_with_quotes() {
     let expected = vec![
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Process(
-            "git branch | rg '[*]' | awk '{print $2}'",
-            false,
-            Select::All,
-        ),
+        WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", false, Select::All),
     ];
     compare(input, expected);
 
@@ -169,11 +165,7 @@ fn words_process_with_quotes() {
     let expected = vec![
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Process(
-            "git branch | rg \"[*]\" | awk '{print $2}'",
-            false,
-            Select::All,
-        ),
+        WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", false, Select::All),
     ];
     compare(input, expected);
 }

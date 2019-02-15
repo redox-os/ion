@@ -33,10 +33,7 @@ pub(crate) struct IgnoreSetting {
 
 impl IgnoreSetting {
     pub(crate) fn default() -> IgnoreSetting {
-        IgnoreSetting {
-            flags:   IgnoreFlags::empty(),
-            regexes: None,
-        }
+        IgnoreSetting { flags: IgnoreFlags::empty(), regexes: None }
     }
 }
 
@@ -87,31 +84,19 @@ impl ShellHistory for Shell {
         }
 
         self.ignore_setting.flags = flags;
-        self.ignore_setting.regexes = if !regexes.is_empty() {
-            Some(regexes)
-        } else {
-            None
-        }
+        self.ignore_setting.regexes = if !regexes.is_empty() { Some(regexes) } else { None }
     }
 
     fn save_command_in_history(&mut self, command: &str) {
         if self.should_save_command(command) {
             if self.variables.get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
                 // Get current time stamp
-                let since_unix_epoch = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
+                let since_unix_epoch =
+                    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                 let cur_time_sys = ["#", &since_unix_epoch.to_owned().to_string()].concat();
 
                 // Push current time to history
-                if let Err(err) = self
-                    .context
-                    .as_mut()
-                    .unwrap()
-                    .history
-                    .push(cur_time_sys.into())
-                {
+                if let Err(err) = self.context.as_mut().unwrap().history.push(cur_time_sys.into()) {
                     eprintln!("ion: {}", err)
                 }
             }

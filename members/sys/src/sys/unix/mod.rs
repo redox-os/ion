@@ -371,10 +371,7 @@ pub mod variables {
         if unsafe { libc::gethostname(&mut host_name as *mut _ as *mut c_char, host_name.len()) }
             == 0
         {
-            let len = host_name
-                .iter()
-                .position(|i| *i == 0)
-                .unwrap_or_else(|| host_name.len());
+            let len = host_name.iter().position(|i| *i == 0).unwrap_or_else(|| host_name.len());
 
             Some(unsafe { String::from_utf8_unchecked(host_name[..len].to_owned()) })
         } else {
@@ -395,9 +392,7 @@ pub mod env {
     };
 
     pub fn home_dir() -> Option<PathBuf> {
-        return env::var_os("HOME")
-            .or_else(|| unsafe { fallback() })
-            .map(PathBuf::from);
+        return env::var_os("HOME").or_else(|| unsafe { fallback() }).map(PathBuf::from);
 
         #[cfg(any(target_os = "android", target_os = "ios", target_os = "emscripten"))]
         unsafe fn fallback() -> Option<OsString> { None }

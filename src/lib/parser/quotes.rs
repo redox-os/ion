@@ -95,21 +95,19 @@ impl Terminator {
             .bytes()
             .enumerate()
             .skip(self.read)
-            .coalesce(|prev, next| {
-                if prev.1 == b'\\' {
-                    Ok((next.0, 0))
-                } else {
-                    Err((prev, next))
-                }
-            })
+            .coalesce(
+                |prev, next| {
+                    if prev.1 == b'\\' {
+                        Ok((next.0, 0))
+                    } else {
+                        Err((prev, next))
+                    }
+                },
+            )
             .filter(|&(_, c)| c != 0)
             .peekable();
 
-        let mut bytes = RearPeekable {
-            iter: bytes,
-            now:  None,
-            last: None,
-        };
+        let mut bytes = RearPeekable { iter: bytes, now: None, last: None };
 
         while let Some((i, character)) = bytes.next() {
             self.read = i + 1;

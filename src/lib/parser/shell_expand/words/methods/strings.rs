@@ -106,9 +106,7 @@ impl<'a> StringMethod<'a> {
                 let is_true = if let Some(value) = expand.string($variable, false) {
                     value.$method(pattern.as_str())
                 } else if is_expression($variable) {
-                    expand_string($variable, expand, false)
-                        .join(" ")
-                        .$method(pattern.as_str())
+                    expand_string($variable, expand, false).join(" ").$method(pattern.as_str())
                 } else {
                     false
                 };
@@ -317,11 +315,8 @@ impl<'a> StringMethod<'a> {
                     small::String::new()
                 };
                 let second_array = pattern.array();
-                let first_maybe: Option<String> = if first_str != "" {
-                    Some(first_str.to_string())
-                } else {
-                    None
-                };
+                let first_maybe: Option<String> =
+                    if first_str != "" { Some(first_str.to_string()) } else { None };
                 match first_maybe {
                     Some(first) => output.push_str(&first),
                     None => {

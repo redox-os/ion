@@ -83,11 +83,7 @@ impl<'a> Collector<'a> {
         match arg {
             Some(file) => {
                 if let Some(o) = outputs.as_mut() {
-                    o.push(Redirection {
-                        from,
-                        file: file.into(),
-                        append,
-                    });
+                    o.push(Redirection { from, file: file.into(), append });
                 }
 
                 Ok(())
@@ -513,10 +509,7 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo $(echo one $(echo two) three)") {
             let items = pipeline.items;
             assert_eq!("echo", items[0].job.args[0].as_str());
-            assert_eq!(
-                "$(echo one $(echo two) three)",
-                items[0].job.args[1].as_str()
-            );
+            assert_eq!("$(echo one $(echo two) three)", items[0].job.args[1].as_str());
         } else {
             assert!(false);
         }
@@ -527,10 +520,7 @@ mod tests {
         if let Statement::Pipeline(pipeline) = parse("echo @(echo one @(echo two) three)") {
             let items = pipeline.items;
             assert_eq!("echo", items[0].job.args[0].as_str());
-            assert_eq!(
-                "@(echo one @(echo two) three)",
-                items[0].job.args[1].as_str()
-            );
+            assert_eq!("@(echo one @(echo two) three)", items[0].job.args[1].as_str());
         } else {
             assert!(false);
         }
@@ -1031,10 +1021,7 @@ mod tests {
             assert_eq!("awk", pipeline.clone().items[0].job.args[0].as_str());
             assert_eq!("-v", pipeline.clone().items[0].job.args[1].as_str());
             assert_eq!("x=$x", pipeline.clone().items[0].job.args[2].as_str());
-            assert_eq!(
-                "'{ if (1) print $1 }'",
-                pipeline.clone().items[0].job.args[3].as_str()
-            );
+            assert_eq!("'{ if (1) print $1 }'", pipeline.clone().items[0].job.args[3].as_str());
             assert_eq!("myfile", pipeline.clone().items[0].job.args[4].as_str());
         } else {
             assert!(false);
