@@ -180,29 +180,27 @@ impl VariableStore for Shell {
                     match operator {
                         Operator::Equal | Operator::OptionalEqual => {
                             match value_check(self, &expression, &key.kind) {
-                                Ok(VariableType::Array(values)) => {
-                                    // When we changed the HISTORY_IGNORE variable, update the
-                                    // ignore patterns. This happens first because `set_array`
-                                    // consumes 'values'
-                                    if key.name == "HISTORY_IGNORE" {
-                                        self.update_ignore_patterns(&values);
+                                Ok(var) => match var {
+                                    VariableType::Array(values) => {
+                                        // When we changed the HISTORY_IGNORE variable, update the
+                                        // ignore patterns. This happens first because `set_array`
+                                        // consumes 'values'
+                                        if key.name == "HISTORY_IGNORE" {
+                                            self.update_ignore_patterns(&values);
+                                        }
+                                        collected.insert(key.name, VariableType::Array(values));
+                                    },
+                                    VariableType::Str(_)
+                                    | VariableType::HashMap(_)
+                                    | VariableType::BTreeMap(_) => {
+                                        collected.insert(key.name, var);
                                     }
-                                    collected.insert(key.name, VariableType::Array(values));
-                                }
-                                Ok(VariableType::Str(value)) => {
-                                    collected.insert(key.name, VariableType::Str(value));
-                                }
-                                Ok(VariableType::HashMap(hmap)) => {
-                                    collected.insert(key.name, VariableType::HashMap(hmap));
-                                }
-                                Ok(VariableType::BTreeMap(bmap)) => {
-                                    collected.insert(key.name, VariableType::BTreeMap(bmap));
+                                    _ => (),
                                 }
                                 Err(why) => {
                                     eprintln!("ion: assignment error: {}: {}", key.name, why);
                                     return FAILURE;
                                 }
-                                _ => (),
                             }
                         }
                         Operator::Concatenate => match value_check(self, &expression, &key.kind) {
@@ -577,28 +575,11 @@ fn parse_i64<F: Fn(i64, i64) -> Option<i64>>(
     rhs: &str,
     operation: F,
 ) -> Result<i64, MathError> {
-    let lhs = match lhs.parse::<i64>() {
-        Ok(e) => Ok(e),
-        Err(_) => Err(MathError::LHS),
-    };
-    if let Ok(lhs) = lhs {
-        let rhs = match rhs.parse::<i64>() {
-            Ok(e) => Ok(e),
-            Err(_) => Err(MathError::RHS),
-        };
-        if let Ok(rs) = rhs {
-            let ret = operation(lhs, rs);
-            if let Some(n) = ret {
-                Ok(n)
-            } else {
-                Err(MathError::CalculationError)
-            }
-        } else {
-            rhs
-        }
-    } else {
-        lhs
-    }
+    lhs.parse::<i64>().map_err(|_| MathError::LHS).and_then(|lhs| {
+        rhs.parse::<i64>().map_err(|_| MathError::RHS).and_then(|rhs| {
+            operation(lhs, rhs).ok_or(MathError::CalculationError)
+        })
+    })
 }
 
 fn write_integer<F: FnMut(&[u8])>(integer: i64, mut func: F) {
