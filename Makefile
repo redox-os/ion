@@ -4,6 +4,7 @@ RELEASE = debug
 DEBUG ?= 0
 VENDORED = 0
 REDOX ?= 0
+TOOLCHAIN ?= 1.28.0
 
 GIT_REVISION=git_revision.txt
 SRC=Cargo.toml src/* src/*/* members/* members/*/*
@@ -21,6 +22,7 @@ endif
 ifeq (1,$(REDOX))
 	undefine ARGSV
 	ARGS += --target x86_64-unknown-redox
+	TOOLCHAIN = nightly
 endif
 
 .PHONY: all clean distclean install uninstall
@@ -30,7 +32,7 @@ ifeq (1,$(REDOX))
 	mkdir -p .cargo
 	grep redox .cargo/config || cat redox_linker >> .cargo/config
 endif
-	cargo build $(ARGS) $(ARGSV)
+	cargo +$(TOOLCHAIN) build $(ARGS) $(ARGSV)
 
 clean:
 	cargo clean
@@ -39,10 +41,10 @@ distclean: clean
 	rm -rf vendor vendor.tar.xz .cargo git_revision.txt
 
 tests:
-	cargo test $(ARGSV)
-	bash examples/run_examples.sh
+	cargo +$(TOOLCHAIN) test $(ARGSV)
+	TOOLCHAIN=$(TOOLCHAIN) bash examples/run_examples.sh
 	for crate in members/*; do \
-		cargo test $(ARGSV) --manifest-path $$crate/Cargo.toml; \
+		cargo +$(TOOLCHAIN) test $(ARGSV) --manifest-path $$crate/Cargo.toml; \
 	done
 
 install:
@@ -60,7 +62,7 @@ $(GIT_REVISION):
 
 $(VENDOR):
 	mkdir -p .cargo
-	cargo vendor | head -n -1 > .cargo/config
+	cargo +$(TOOLCHAIN) vendor | head -n -1 > .cargo/config
 	echo 'directory = "vendor"' >> .cargo/config
 	tar pcfJ vendor.tar.xz vendor
 	rm -rf vendor
