@@ -19,7 +19,7 @@ linux:
 linux:stable:
   script:
     - cargo build
-    - TOOLCHAIN=stable make tests
+    - TOOLCHAIN= make tests
 
 redox:
   variables:
@@ -33,4 +33,4 @@ redox:
     - rustup default nightly-2018-07-18
     - rustup target add x86_64-unknown-redox
   script:
-    - make REDOX=1
+    - make TOOLCHAIN= REDOX=1
