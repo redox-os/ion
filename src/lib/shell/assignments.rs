@@ -105,36 +105,40 @@ impl VariableStore for Shell {
                                                 supported yet."
                     .to_string()),
                 Action::UpdateString(key, operator, expression) => {
-                    match value_check(self, &expression, &key.kind) {
-                        Ok(VariableType::Str(value)) => {
-                            let key_name: &str = &key.name;
-                            let lhs = self
-                                .variables
-                                .get::<types::Str>(key_name)
-                                .unwrap_or_else(|| "0".into());
+                    value_check(self, &expression, &key.kind)
+                        .map_err(|why| format!("{}: {}", key.name, why))
+                        .and_then(|val| {
+                            if let VariableType::Str(value) = &val {
+                                let key_name: &str = &key.name;
+                                let lhs = self
+                                    .variables
+                                    .get::<types::Str>(key_name)
+                                    .unwrap_or_else(|| "0".into());
 
-                            math(&lhs, &key.kind, operator, &value, |value| {
-                                let mut str_value =
-                                    unsafe { str::from_utf8_unchecked(value) }.to_string();
-
-                                if key_name == "PATH" && str_value.find('~').is_some() {
-                                    str_value = str_value.replace(
-                                        "~",
-                                        env::var("HOME")
-                                            .as_ref()
-                                            .map(|s| s.as_str())
-                                            .unwrap_or("~"),
-                                    )
-                                }
-
-                                env::set_var(key_name, &OsStr::from_bytes(str_value.as_bytes()));
+                                math(&lhs, &key.kind, operator, &value, |value| {
+                                    let str_value = unsafe { str::from_utf8_unchecked(value) };
+                                    if key_name == "PATH" && str_value.find('~').is_some() {
+                                        let final_value = str_value.replace(
+                                            "~",
+                                            env::var("HOME")
+                                                .as_ref()
+                                                .map(|s| s.as_str())
+                                                .unwrap_or("~"),
+                                        );
+                                        env::set_var(
+                                            key_name,
+                                            &OsStr::from_bytes(final_value.as_bytes()),
+                                        )
+                                    } else {
+                                        env::set_var(key_name, &OsStr::from_bytes(value))
+                                    }
+                                    Ok(())
+                                })
+                                .map_err(|why| format!("{}", why))
+                            } else {
                                 Ok(())
-                            })
-                            .map_err(|e| e.to_string())
-                        }
-                        Err(why) => Err(format!("{}: {}", key.name, why)),
-                        _ => unreachable!(),
-                    }
+                            }
+                        })
                 }
             });
 
@@ -421,28 +425,11 @@ fn parse_i64<F: Fn(i64, i64) -> Option<i64>>(
     rhs: &str,
     operation: F,
 ) -> Result<i64, MathError> {
-    let lhs = match lhs.parse::<i64>() {
-        Ok(e) => Ok(e),
-        Err(_) => Err(MathError::LHS),
-    };
-    if let Ok(lhs) = lhs {
-        let rhs = match rhs.parse::<i64>() {
-            Ok(e) => Ok(e),
-            Err(_) => Err(MathError::RHS),
-        };
-        if let Ok(rs) = rhs {
-            let ret = operation(lhs, rs);
-            if let Some(n) = ret {
-                Ok(n)
-            } else {
-                Err(MathError::CalculationError)
-            }
-        } else {
-            rhs
-        }
-    } else {
-        lhs
-    }
+    lhs.parse::<i64>().map_err(|_| MathError::LHS).and_then(|lhs| {
+        rhs.parse::<i64>()
+            .map_err(|_| MathError::RHS)
+            .and_then(|rhs| operation(lhs, rhs).ok_or(MathError::CalculationError))
+    })
 }
 
 fn write_integer<F: FnMut(&[u8]) -> Result<(), MathError>>(

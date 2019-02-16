@@ -7,7 +7,6 @@ use super::{
 use hashbrown::HashMap;
 use liner::Context;
 use std::{
-    any::TypeId,
     env, fmt,
     io::{self, BufRead},
     mem,
@@ -29,96 +28,53 @@ pub enum VariableType {
     None,
 }
 
-impl From<VariableType> for types::Str {
-    fn from(var: VariableType) -> Self {
-        match var {
-            VariableType::Str(string) => string,
-            _ => types::Str::with_capacity(0),
+macro_rules! type_from_variable {
+    ($to:ty : $variant:ident else $defaultmethod:ident($($args:expr),*)) => {
+        impl From<VariableType> for $to {
+            fn from(var: VariableType) -> Self {
+                match var {
+                    VariableType::$variant(inner) => inner,
+                    _ => <$to>::$defaultmethod($($args),*),
+                }
+            }
         }
     }
 }
 
-impl From<VariableType> for types::Alias {
-    fn from(var: VariableType) -> Self {
-        match var {
-            VariableType::Alias(alias) => alias,
-            _ => types::Alias::empty(),
-        }
-    }
-}
+type_from_variable!(types::Str : Str else with_capacity(0));
+type_from_variable!(types::Alias : Alias else empty());
+type_from_variable!(types::Array : Array else with_capacity(0));
+type_from_variable!(types::HashMap : HashMap else with_capacity_and_hasher(0, Default::default()));
+type_from_variable!(types::BTreeMap : BTreeMap else new());
+type_from_variable!(Function : Function else
+    new(
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        Default::default()
+    )
+);
 
-impl From<VariableType> for types::Array {
-    fn from(var: VariableType) -> Self {
-        match var {
-            VariableType::Array(array) => array,
-            _ => types::Array::with_capacity(0),
-        }
-    }
-}
-
-impl From<VariableType> for types::HashMap {
-    fn from(var: VariableType) -> Self {
-        match var {
-            VariableType::HashMap(hash_map) => hash_map,
-            _ => types::HashMap::with_capacity_and_hasher(0, Default::default()),
-        }
-    }
-}
-
-impl From<VariableType> for types::BTreeMap {
-    fn from(var: VariableType) -> Self {
-        match var {
-            VariableType::BTreeMap(btree_map) => btree_map,
-            _ => types::BTreeMap::new(),
-        }
-    }
-}
-
-impl From<VariableType> for Function {
-    fn from(var: VariableType) -> Self {
-        match var {
-            VariableType::Function(function) => function,
-            _ => Function::new(
-                Default::default(),
-                Default::default(),
-                Default::default(),
-                Default::default(),
-            ),
-        }
-    }
-}
-
+// this one’s only special because of the lifetime parameter
 impl<'a> From<&'a str> for VariableType {
     fn from(string: &'a str) -> Self { VariableType::Str(string.into()) }
 }
 
-impl From<types::Str> for VariableType {
-    fn from(string: types::Str) -> Self { VariableType::Str(string) }
+macro_rules! variable_from_type {
+    ($arg:ident: $from:ty => $variant:ident($inner:expr)) => {
+        impl From<$from> for VariableType {
+            fn from($arg: $from) -> Self { VariableType::$variant($inner) }
+        }
+    };
 }
 
-impl From<String> for VariableType {
-    fn from(string: String) -> Self { VariableType::Str(string.into()) }
-}
-
-impl From<types::Alias> for VariableType {
-    fn from(alias: types::Alias) -> Self { VariableType::Alias(alias) }
-}
-
-impl From<types::Array> for VariableType {
-    fn from(array: types::Array) -> Self { VariableType::Array(array) }
-}
-
-impl From<types::HashMap> for VariableType {
-    fn from(hmap: types::HashMap) -> Self { VariableType::HashMap(hmap) }
-}
-
-impl From<types::BTreeMap> for VariableType {
-    fn from(bmap: types::BTreeMap) -> Self { VariableType::BTreeMap(bmap) }
-}
-
-impl From<Function> for VariableType {
-    fn from(function: Function) -> Self { VariableType::Function(function) }
-}
+variable_from_type!(string: types::Str => Str(string));
+variable_from_type!(string: String => Str(string.into()));
+variable_from_type!(alias: types::Alias => Alias(alias));
+variable_from_type!(array: types::Array => Array(array));
+variable_from_type!(hmap: types::HashMap => HashMap(hmap));
+variable_from_type!(bmap: types::BTreeMap => BTreeMap(bmap));
+variable_from_type!(function: Function => Function(function));
 
 impl fmt::Display for VariableType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -444,85 +400,11 @@ impl Variables {
         self.get::<types::Str>(name).unwrap_or_default()
     }
 
-    pub fn get<T: Clone + From<VariableType> + 'static>(&self, name: &str) -> Option<T> {
-        let specified_type = TypeId::of::<T>();
-
-        if specified_type == TypeId::of::<types::Str>() {
-            match name {
-                "MWD" => return Some(T::from(VariableType::Str(self.get_minimal_directory()))),
-                "SWD" => return Some(T::from(VariableType::Str(self.get_simplified_directory()))),
-                _ => (),
-            }
-            // If the parsed name contains the '::' pattern, then a namespace was
-            // designated. Find it.
-            match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
-                Some(("c", variable)) | Some(("color", variable)) => Colors::collect(variable)
-                    .into_string()
-                    .map(|s| T::from(VariableType::Str(s.into()))),
-                Some(("x", variable)) | Some(("hex", variable)) => {
-                    match u8::from_str_radix(variable, 16) {
-                        Ok(c) => Some(T::from(VariableType::Str((c as char).to_string().into()))),
-                        Err(why) => {
-                            eprintln!("ion: hex parse error: {}: {}", variable, why);
-                            None
-                        }
-                    }
-                }
-                Some(("env", variable)) => {
-                    env::var(variable).map(Into::into).ok().map(|s| T::from(VariableType::Str(s)))
-                }
-                Some(("super", _)) | Some(("global", _)) | None => {
-                    // Otherwise, it's just a simple variable name.
-                    match self.get_ref(name) {
-                        Some(VariableType::Str(val)) => {
-                            Some(T::from(VariableType::Str(val.clone())))
-                        }
-                        _ => env::var(name).ok().map(|s| T::from(VariableType::Str(s.into()))),
-                    }
-                }
-                Some((..)) => {
-                    eprintln!("ion: unsupported namespace: '{}'", name);
-                    None
-                }
-            }
-        } else if specified_type == TypeId::of::<types::Alias>() {
-            match self.get_ref(name) {
-                Some(VariableType::Alias(alias)) => {
-                    Some(T::from(VariableType::Alias((*alias).clone())))
-                }
-                _ => None,
-            }
-        } else if specified_type == TypeId::of::<types::Array>() {
-            match self.get_ref(name) {
-                Some(VariableType::Array(array)) => {
-                    Some(T::from(VariableType::Array(array.clone())))
-                }
-                _ => None,
-            }
-        } else if specified_type == TypeId::of::<types::HashMap>() {
-            match self.get_ref(name) {
-                Some(VariableType::HashMap(hmap)) => {
-                    Some(T::from(VariableType::HashMap(hmap.clone())))
-                }
-                _ => None,
-            }
-        } else if specified_type == TypeId::of::<types::BTreeMap>() {
-            match self.get_ref(name) {
-                Some(VariableType::BTreeMap(bmap)) => {
-                    Some(T::from(VariableType::BTreeMap(bmap.clone())))
-                }
-                _ => None,
-            }
-        } else if specified_type == TypeId::of::<Function>() {
-            match self.get_ref(name) {
-                Some(VariableType::Function(func)) => {
-                    Some(T::from(VariableType::Function(func.clone())))
-                }
-                _ => None,
-            }
-        } else {
-            None
-        }
+    pub fn get<T>(&self, name: &str) -> Option<T>
+    where
+        Variables: GetVariable<T>,
+    {
+        GetVariable::<T>::get(self, name)
     }
 
     pub fn set<T: Into<VariableType>>(&mut self, name: &str, var: T) {
@@ -736,6 +618,73 @@ impl Variables {
         SUCCESS
     }
 }
+
+pub trait GetVariable<T> {
+    fn get(&self, name: &str) -> Option<T>;
+}
+
+impl GetVariable<types::Str> for Variables {
+    fn get(&self, name: &str) -> Option<types::Str> {
+        use types::Str;
+
+        match name {
+            "MWD" => return Some(Str::from(VariableType::Str(self.get_minimal_directory()))),
+            "SWD" => return Some(Str::from(VariableType::Str(self.get_simplified_directory()))),
+            _ => (),
+        }
+        // If the parsed name contains the '::' pattern, then a namespace was
+        // designated. Find it.
+        match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
+            Some(("c", variable)) | Some(("color", variable)) => Colors::collect(variable)
+                .into_string()
+                .map(|s| Str::from(VariableType::Str(s.into()))),
+            Some(("x", variable)) | Some(("hex", variable)) => {
+                match u8::from_str_radix(variable, 16) {
+                    Ok(c) => Some(Str::from(VariableType::Str((c as char).to_string().into()))),
+                    Err(why) => {
+                        eprintln!("ion: hex parse error: {}: {}", variable, why);
+                        None
+                    }
+                }
+            }
+            Some(("env", variable)) => {
+                env::var(variable).map(Into::into).ok().map(|s| Str::from(VariableType::Str(s)))
+            }
+            Some(("super", _)) | Some(("global", _)) | None => {
+                // Otherwise, it's just a simple variable name.
+                match self.get_ref(name) {
+                    Some(VariableType::Str(val)) => Some(Str::from(VariableType::Str(val.clone()))),
+                    _ => env::var(name).ok().map(|s| Str::from(VariableType::Str(s.into()))),
+                }
+            }
+            Some((..)) => {
+                eprintln!("ion: unsupported namespace: '{}'", name);
+                None
+            }
+        }
+    }
+}
+
+macro_rules! get_var {
+    ($types:ty, $variant:ident($inner:ident) => $ret:expr) => {
+        impl GetVariable<$types> for Variables {
+            fn get(&self, name: &str) -> Option<$types> {
+                match self.get_ref(name) {
+                    Some(VariableType::$variant($inner)) => {
+                        Some(<$types>::from(VariableType::$variant($ret.clone())))
+                    }
+                    _ => None,
+                }
+            }
+        }
+    };
+}
+
+get_var!(types::Alias, Alias(alias) => (*alias));
+get_var!(types::Array, Array(array) => array);
+get_var!(types::HashMap, HashMap(hmap) => hmap);
+get_var!(types::BTreeMap, BTreeMap(bmap) => bmap);
+get_var!(Function, Function(func) => func);
 
 #[cfg(test)]
 mod tests {
