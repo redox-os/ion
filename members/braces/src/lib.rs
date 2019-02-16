@@ -20,11 +20,8 @@ pub fn expand<'a>(
         let multiple_brace_expand = MultipleBraceExpand::new(tokens, expanders);
         Box::new(multiple_brace_expand)
     } else if expanders.len() == 1 {
-        let single_brace_expand = SingleBraceExpand {
-            elements: expanders[0].iter().map(|element| *element),
-            tokens,
-            loop_count: 0,
-        };
+        let single_brace_expand =
+            SingleBraceExpand { elements: expanders[0].iter().cloned(), tokens, loop_count: 0 };
         Box::new(single_brace_expand)
     } else {
         Box::new(::std::iter::empty())
