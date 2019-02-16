@@ -10,9 +10,7 @@ pub use self::{
 
 /// Given an valid assignment expression, this will split it into `keys`,
 /// `operator`, `values`.
-pub fn assignment_lexer<'a>(
-    statement: &'a str,
-) -> (Option<&'a str>, Option<Operator>, Option<&'a str>) {
+pub fn assignment_lexer(statement: &str) -> (Option<&str>, Option<Operator>, Option<&str>) {
     let statement = statement.trim();
     if statement.is_empty() {
         return (None, None, None);
@@ -20,29 +18,27 @@ pub fn assignment_lexer<'a>(
 
     let (mut read, mut start) = (0, 0);
     let as_bytes = statement.as_bytes();
-    let mut bytes = statement.bytes();
+    let mut bytes = statement.bytes().peekable();
     let mut operator = None;
 
     while let Some(byte) = bytes.next() {
+        operator = Some(Operator::Equal);
         if b'=' == byte {
-            operator = Some(Operator::Equal);
-            if as_bytes.get(read + 1).is_none() {
-                return (Some(&statement[..read].trim()), operator, None);
+            if bytes.peek().is_none() {
+                return (Some(&statement[..read].trim()), Some(Operator::Equal), None);
             }
             start = read;
             read += 1;
             break;
-        } else {
-            match find_operator(as_bytes, read) {
-                None => (),
-                Some((op, found)) => {
-                    operator = Some(op);
-                    start = read;
-                    read = found;
-                    break;
-                }
-            }
         }
+
+        if let Some((op, found)) = find_operator(as_bytes, read) {
+            operator = Some(op);
+            start = read;
+            read = found;
+            break;
+        }
+
         read += 1;
     }
 
@@ -62,7 +58,7 @@ fn find_operator(bytes: &[u8], read: usize) -> Option<(Operator, usize)> {
     } else if bytes[read + 1] == b'=' {
         Operator::parse_single(bytes[read]).map(|op| (op, read + 2))
     } else if bytes[read + 2] == b'=' {
-        Operator::parse_double(&bytes[read..read + 2]).map(|op| (op, read + 3))
+        Operator::parse_double(&bytes[read..=read + 1]).map(|op| (op, read + 3))
     } else {
         None
     }

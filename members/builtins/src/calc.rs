@@ -2,7 +2,7 @@ use calculate::{eval, eval_polish, CalcError, Value};
 use small;
 use std::io::{self, Write};
 
-const REPL_GUIDE: &'static str = r#"ion-calc
+const REPL_GUIDE: &str = r#"ion-calc
 Type in expressions to have them evaluated.
 Type "help" for help."#;
 
@@ -26,10 +26,10 @@ SPECIAL EXPRESSIONS
         exits the program
 
 NOTATIONS
-    infix notation 
+    infix notation
         e.g. 3 * 4 + 5
 
-    polish notation 
+    polish notation
         e.g. + * 3 4 5
 
 EXAMPLES

@@ -55,7 +55,6 @@ type_from_variable!(Function : Function else
     )
 );
 
-
 // this one’s only special because of the lifetime parameter
 impl<'a> From<&'a str> for VariableType {
     fn from(string: &'a str) -> Self { VariableType::Str(string.into()) }
@@ -76,7 +75,6 @@ variable_from_type!(array: types::Array => Array(array));
 variable_from_type!(hmap: types::HashMap => HashMap(hmap));
 variable_from_type!(bmap: types::BTreeMap => BTreeMap(bmap));
 variable_from_type!(function: Function => Function(function));
-
 
 impl fmt::Display for VariableType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -655,9 +653,7 @@ impl GetVariable<types::Str> for Variables {
             Some(("super", _)) | Some(("global", _)) | None => {
                 // Otherwise, it's just a simple variable name.
                 match self.get_ref(name) {
-                    Some(VariableType::Str(val)) => {
-                        Some(Str::from(VariableType::Str(val.clone())))
-                    }
+                    Some(VariableType::Str(val)) => Some(Str::from(VariableType::Str(val.clone()))),
                     _ => env::var(name).ok().map(|s| Str::from(VariableType::Str(s.into()))),
                 }
             }

@@ -47,7 +47,7 @@ use self::{
     job_control::{BackgroundProcess, JobControl},
     pipe_exec::PipelineExecution,
     status::*,
-    variables::{VariableType, Variables, GetVariable},
+    variables::{GetVariable, VariableType, Variables},
 };
 use builtins::{BuiltinMap, BUILTINS};
 use liner::Context;
@@ -249,7 +249,7 @@ impl Shell {
     /// Gets any variable, if it exists within the shell's variable map.
     pub fn get<T>(&self, name: &str) -> Option<T>
     where
-        Variables : GetVariable<T>
+        Variables: GetVariable<T>,
     {
         self.variables.get::<T>(name)
     }
