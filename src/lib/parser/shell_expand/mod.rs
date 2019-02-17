@@ -5,9 +5,9 @@ mod words;
 
 pub(crate) use self::words::{Select, WordIterator, WordToken};
 use crate::{
-    shell::variables::VariableType,
     braces::{self, BraceToken},
     ranges::{parse_range, Index, Range},
+    shell::variables::VariableType,
     types::{self, Array},
 };
 use glob::glob;
@@ -83,9 +83,7 @@ fn expand_process<E: Expander>(
                 let mut prev_is_whitespace = true;
 
                 unsafe fn next_char(b: &[u8]) -> Option<char> {
-                    str::from_utf8_unchecked(b)
-                        .chars()
-                        .next()
+                    str::from_utf8_unchecked(b).chars().next()
                 }
 
                 while let Some(c) = next_char(&bytes[right_pos..]) {
@@ -108,7 +106,11 @@ fn expand_process<E: Expander>(
                     prev_is_whitespace = is_whitespace;
                 }
 
-                slice(current, str::from_utf8_unchecked(&bytes[..left_mut_pos]).trim_end(), selection);
+                slice(
+                    current,
+                    str::from_utf8_unchecked(&bytes[..left_mut_pos]).trim_end(),
+                    selection,
+                );
                 // `output` is not a valid utf8 string now.
                 // We drop it here to prevent accidental usage afterward.
                 ::std::mem::drop(output);

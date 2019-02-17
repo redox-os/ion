@@ -74,9 +74,7 @@ impl<'a> Iterator for AssignmentActions<'a> {
     type Item = Result<Action<'a>, AssignmentError<'a>>;
 
     fn next(&mut self) -> Option<Result<Action<'a>, AssignmentError<'a>>> {
-        let next_key = self.keys.next();
-        let next_value = self.values.next();
-        match (next_key, next_value) {
+        match (self.keys.next(), self.values.next()) {
             (Some(key), Some(value)) => match key {
                 Ok(key) => {
                     if self.prevkeys.contains(&key.name) {
@@ -84,7 +82,7 @@ impl<'a> Iterator for AssignmentActions<'a> {
                     } else {
                         self.prevkeys.push(key.name);
                         self.prevval = value;
-                        Some(Action::new(key, self.operator, value))
+                        Some(Action::new(key, self.operator, value, is_array(value)))
                     }
                 }
                 Err(why) => Some(Err(AssignmentError::TypeError(why))),
@@ -123,6 +121,7 @@ impl<'a> Action<'a> {
         var: Key<'a>,
         operator: Operator,
         value: &'a str,
+        is_array: bool,
     ) -> Result<Action<'a>, AssignmentError<'a>> {
         match var.kind {
             Primitive::StrArray
@@ -131,18 +130,15 @@ impl<'a> Action<'a> {
             | Primitive::IntegerArray
             | Primitive::HashMap(_)
             | Primitive::BTreeMap(_) => {
-                if is_array(value) {
+                if is_array {
                     Ok(Action::UpdateArray(var, operator, value))
                 } else {
                     Err(AssignmentError::InvalidValue(var.kind, Primitive::Str))
                 }
             }
             Primitive::Indexed(..) => Ok(Action::UpdateArray(var, operator, value)),
-            Primitive::Str if is_array(value) => Ok(Action::UpdateArray(var, operator, value)),
-            Primitive::Str => Ok(Action::UpdateString(var, operator, value)),
-            _ if is_array(value) => {
-                Err(AssignmentError::InvalidValue(var.kind, Primitive::StrArray))
-            }
+            Primitive::Str if is_array => Ok(Action::UpdateArray(var, operator, value)),
+            _ if is_array => Err(AssignmentError::InvalidValue(var.kind, Primitive::StrArray)),
             _ => Ok(Action::UpdateString(var, operator, value)),
         }
     }

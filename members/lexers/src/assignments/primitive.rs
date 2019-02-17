@@ -1,7 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 /// A primitive defines the type that a requested value should satisfy.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Primitive {
     Str,
     StrArray,

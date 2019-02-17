@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 
 /// Keys are used in assignments to define which variable will be set, and whether the correct
 /// types are being assigned.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Key<'a> {
     pub kind: Primitive,
     pub name: &'a str,

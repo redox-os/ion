@@ -4,7 +4,7 @@
 //! children of the shell.
 
 // use std::sync::atomic::{ATOMIC_U8_INIT, AtomicU8};
-use std::sync::atomic::{AtomicUsize};
+use std::sync::atomic::AtomicUsize;
 
 use crate::sys;
 

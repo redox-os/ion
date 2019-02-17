@@ -113,8 +113,7 @@ impl Binary for Shell {
             if let Some(command) = self.readln() {
                 if !command.is_empty() {
                     if let Ok(command) = self.terminate_quotes(command.replace("\\\n", "")) {
-                        let cmd: &str =
-                            &designators::expand_designators(&self, command.trim_end());
+                        let cmd: &str = &designators::expand_designators(&self, command.trim_end());
                         self.on_command(&cmd);
                         self.save_command(&cmd);
                     } else {

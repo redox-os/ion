@@ -629,7 +629,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             if character == b'}' {
                 let output = &self.data[start..self.read];
                 self.read += 1;
-                return WordToken::Variable(output, self.flags.contains(Flags::DQUOTE), Select::All);
+                return WordToken::Variable(
+                    output,
+                    self.flags.contains(Flags::DQUOTE),
+                    Select::All,
+                );
             }
             self.read += 1;
         }

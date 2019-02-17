@@ -216,12 +216,16 @@ pub(crate) fn parse(code: &str) -> Statement {
             return Statement::And(Box::new(parse(cmd[3..].trim_start())));
         }
         _ if cmd.eq("and") => return Statement::And(Box::new(Statement::Default)),
-        _ if cmd.starts_with("or ") => return Statement::Or(Box::new(parse(cmd[2..].trim_start()))),
+        _ if cmd.starts_with("or ") => {
+            return Statement::Or(Box::new(parse(cmd[2..].trim_start())))
+        }
         _ if cmd.eq("or") => return Statement::Or(Box::new(Statement::Default)),
         _ if cmd.starts_with("not ") => {
             return Statement::Not(Box::new(parse(cmd[3..].trim_start())));
         }
-        _ if cmd.starts_with("! ") => return Statement::Not(Box::new(parse(cmd[1..].trim_start()))),
+        _ if cmd.starts_with("! ") => {
+            return Statement::Not(Box::new(parse(cmd[1..].trim_start())))
+        }
         _ if cmd.eq("not") | cmd.eq("!") => return Statement::Not(Box::new(Statement::Default)),
         _ => (),
     }
