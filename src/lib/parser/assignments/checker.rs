@@ -22,7 +22,7 @@ pub(crate) fn is_array(value: &str) -> bool {
             Some(*state)
         });
         // final bracket should be the last char
-        brackets.find(|&x| x == 0).is_some() && brackets.next().is_none()
+        brackets.any(|x| x == 0) && brackets.next().is_none()
     } else {
         false
     }

@@ -25,13 +25,13 @@ fn list_vars(shell: &Shell) -> Result<(), io::Error> {
     let mut buffer = BufWriter::new(stdout.lock());
 
     // Write all the string variables to the buffer.
-    buffer.write(b"# String Variables\n")?;
+    buffer.write_all(b"# String Variables\n")?;
     for (key, val) in shell.variables.string_vars() {
         writeln!(buffer, "{} = {}", key, val)?;
     }
 
     // Then immediately follow that with a list of array variables.
-    buffer.write(b"\n# Array Variables\n")?;
+    buffer.write_all(b"\n# Array Variables\n")?;
     for (key, val) in shell.variables.arrays() {
         write!(buffer, "{} = [ ", key)?;
         let mut vars = val.iter();
