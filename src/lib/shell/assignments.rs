@@ -4,7 +4,7 @@ use super::{
     Shell,
 };
 use crate::{
-    lexers::assignments::{Operator, Primitive},
+    lexers::assignments::{Key, Operator, Primitive},
     parser::assignments::*,
     shell::{history::ShellHistory, variables::VariableType},
     types,
@@ -135,17 +135,15 @@ impl VariableStore for Shell {
     }
 
     fn local(&mut self, action: LocalAction) -> i32 {
-        let mut collected: HashMap<&str, VariableType> = HashMap::new();
-        let (actions_step1, actions_step2) = match action {
+        let mut collected: HashMap<Key, VariableType> = HashMap::new();
+        let actions = match action {
             LocalAction::List => {
                 let _ = list_vars(&self);
                 return SUCCESS;
             }
-            LocalAction::Assign(ref keys, op, ref vals) => {
-                (AssignmentActions::new(keys, op, vals), AssignmentActions::new(keys, op, vals))
-            }
+            LocalAction::Assign(ref keys, op, ref vals) => AssignmentActions::new(keys, op, vals),
         };
-        for action in actions_step1 {
+        for action in actions {
             let err = action.map_err(|e| e.to_string()).and_then(|act| match act {
                 Action::UpdateArray(key, operator, expression) => {
                     let right_hand_side = value_check(self, &expression, &key.kind);
@@ -167,7 +165,7 @@ impl VariableStore for Shell {
                                     }
                                 }
 
-                                return match (&rhs, key.kind) {
+                                return match (&rhs, &key.kind) {
                                     (VariableType::HashMap(_), Primitive::Indexed(..)) => {
                                         Err("cannot insert hmap into index".to_string())
                                     }
@@ -179,7 +177,7 @@ impl VariableStore for Shell {
                                             .to_string())
                                     }
                                     _ => {
-                                        collected.insert(key.name, rhs);
+                                        collected.insert(key, rhs);
                                         Ok(())
                                     }
                                 };
@@ -225,7 +223,7 @@ impl VariableStore for Shell {
                                 return Ok(());
                             }
                             if [Operator::Equal, Operator::OptionalEqual].contains(&operator) {
-                                collected.insert(key.name, rhs);
+                                collected.insert(key, rhs);
                                 return Ok(());
                             }
 
@@ -239,8 +237,7 @@ impl VariableStore for Shell {
                                     VariableType::Str(lhs) => math(&key.kind, operator, &rhs)
                                         .and_then(|action| parse(&lhs, |a| action(a)))
                                         .map(|value| {
-                                            collected
-                                                .insert(key.name, VariableType::Str(value.into()));
+                                            collected.insert(key, VariableType::Str(value.into()));
                                         })
                                         .map_err(|e| e.to_string()),
                                     VariableType::Array(ref mut array) => match operator {
@@ -284,81 +281,68 @@ impl VariableStore for Shell {
             }
         }
 
-        for action in actions_step2 {
-            match action.unwrap() {
-                Action::UpdateArray(key, ..) => {
-                    let err = collected
-                        .remove(key.name)
-                        .map(|var| match (&var, &key.kind) {
-                            (VariableType::HashMap(_), Primitive::HashMap(_))
-                            | (VariableType::BTreeMap(_), Primitive::BTreeMap(_))
-                            | (VariableType::Array(_), _) => {
-                                self.variables.set(key.name, var);
-                                Ok(())
-                            }
-                            (
-                                VariableType::Str(_),
-                                Primitive::Indexed(ref index_value, ref index_kind),
-                            ) => value_check(self, index_value, index_kind)
-                                .map_err(|why| format!("assignment error: {}: {}", key.name, why))
-                                .and_then(|rhs| match rhs {
-                                    VariableType::Str(ref index) => self
-                                        .variables
-                                        .get_mut(key.name)
-                                        .map(|lhs| match lhs {
-                                            VariableType::HashMap(hmap) => {
-                                                hmap.insert(index.clone(), var);
-                                                Ok(())
-                                            }
-                                            VariableType::BTreeMap(bmap) => {
-                                                bmap.insert(index.clone(), var);
-                                                Ok(())
-                                            }
-                                            VariableType::Array(array) => index
-                                                .parse::<usize>()
-                                                .map_err(|_| {
-                                                    format!(
-                                                        "index variable does not contain a \
-                                                         numeric value: `{}`",
-                                                        index
-                                                    )
-                                                })
-                                                .map(|index_num| {
-                                                    if let (Some(val), VariableType::Str(value)) =
-                                                        (array.get_mut(index_num), var)
-                                                    {
-                                                        *val = value;
-                                                    }
-                                                }),
-                                            _ => Ok(()),
+        for (key, val) in collected {
+            let err = match (&val, &key.kind) {
+                (VariableType::Str(_), Primitive::Indexed(ref index_name, ref index_kind)) => {
+                    value_check(self, index_name, index_kind)
+                        .map_err(|why| format!("assignment error: {}: {}", key.name, why))
+                        .and_then(|index| match index {
+                            VariableType::Str(ref index) => self
+                                .variables
+                                .get_mut(key.name)
+                                .map(|lhs| match lhs {
+                                    VariableType::HashMap(hmap) => {
+                                        hmap.insert(index.clone(), val);
+                                        Ok(())
+                                    }
+                                    VariableType::BTreeMap(bmap) => {
+                                        bmap.insert(index.clone(), val);
+                                        Ok(())
+                                    }
+                                    VariableType::Array(array) => index
+                                        .parse::<usize>()
+                                        .map_err(|_| {
+                                            format!(
+                                                "index variable does not contain a numeric value: \
+                                                 `{}`",
+                                                index
+                                            )
                                         })
-                                        .unwrap_or(Ok(())),
-                                    VariableType::Array(_) => {
-                                        Err("index variable cannot be an array".to_string())
-                                    }
-                                    VariableType::HashMap(_) => {
-                                        Err("index variable cannot be a hmap".to_string())
-                                    }
-                                    VariableType::BTreeMap(_) => {
-                                        Err("index variable cannot be a bmap".to_string())
-                                    }
+                                        .map(|index_num| {
+                                            if let (Some(var), VariableType::Str(value)) =
+                                                (array.get_mut(index_num), val)
+                                            {
+                                                *var = value;
+                                            }
+                                        }),
                                     _ => Ok(()),
-                                }),
+                                })
+                                .unwrap_or(Ok(())),
+                            VariableType::Array(_) => {
+                                Err("index variable cannot be an array".to_string())
+                            }
+                            VariableType::HashMap(_) => {
+                                Err("index variable cannot be a hmap".to_string())
+                            }
+                            VariableType::BTreeMap(_) => {
+                                Err("index variable cannot be a bmap".to_string())
+                            }
                             _ => Ok(()),
                         })
-                        .unwrap_or(Ok(()));
-
-                    if let Err(why) = err {
-                        eprintln!("ion: {}", why);
-                        return FAILURE;
-                    }
                 }
-                Action::UpdateString(key, ..) => match collected.remove(key.name) {
-                    Some(var @ VariableType::Str(_)) | Some(var @ VariableType::Array(_)) => {
-                        self.variables.set(key.name, var);
-                    }
-                    _ => (),
-                },
+                (VariableType::Str(_), _)
+                | (VariableType::HashMap(_), Primitive::HashMap(_))
+                | (VariableType::BTreeMap(_), Primitive::BTreeMap(_))
+                | (VariableType::Array(_), _) => {
+                    self.variables.set(key.name, val);
+                    Ok(())
+                }
+                _ => Ok(()),
+            };
+
+            if let Err(why) = err {
+                eprintln!("ion: {}", why);
+                return FAILURE;
             }
         }
 
