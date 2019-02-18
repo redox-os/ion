@@ -469,7 +469,7 @@ impl Variables {
 
             macro_rules! handle_action {
                 ($value:ident, $variant:tt) => {{
-                    if let VariableType::$variant(mut with) = var {
+                    if let VariableType::$variant(with) = var {
                         mem::replace($value, with);
                         None
                     } else {

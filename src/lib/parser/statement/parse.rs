@@ -118,7 +118,7 @@ pub(crate) fn parse(code: &str) -> Statement {
             let mut variables = None;
 
             if cmd.len() > 5 {
-                let mut cmdb = cmd.as_bytes();
+                let cmdb = cmd.as_bytes();
                 for start in 0..cmd.len() - 4 {
                     if &cmdb[start..start + 4] == b" in " {
                         variables = Some(cmd[..start].split_whitespace().map(Into::into).collect());

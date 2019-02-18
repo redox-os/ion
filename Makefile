@@ -4,7 +4,7 @@ RELEASE = debug
 DEBUG ?= 0
 VENDORED = 0
 REDOX ?= 0
-TOOLCHAIN ?= 1.30.0
+TOOLCHAIN ?= 1.31.0
 
 GIT_REVISION=git_revision.txt
 SRC=Cargo.toml src/* src/*/* members/* members/*/*

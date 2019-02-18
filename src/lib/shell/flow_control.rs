@@ -234,7 +234,7 @@ pub(crate) fn insert_statement(
                         1 => {
                             // Try to insert into last ElseIf expression if there's no previous
                             // statement.
-                            if let Some(mut eif) = else_if.last_mut() {
+                            if let Some(eif) = else_if.last_mut() {
                                 if eif.success.is_empty() {
                                     eif.expression.push(statement.clone());
                                 } else {
