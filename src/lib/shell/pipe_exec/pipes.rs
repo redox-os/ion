@@ -3,8 +3,8 @@ use super::{
     append_external_stdio_pipe, pipe_fail,
 };
 
+use crate::sys;
 use std::{fs::File, os::unix::io::FromRawFd};
-use sys;
 
 pub(crate) struct TeePipe<'a> {
     parent:          &'a mut RefinedJob,

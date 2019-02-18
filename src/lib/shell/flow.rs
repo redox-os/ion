@@ -5,17 +5,19 @@ use super::{
     status::*,
     Shell,
 };
-use itertools::Itertools;
-use parser::{
-    assignments::is_array,
-    expand_string, parse_and_validate,
-    pipelines::{PipeItem, Pipeline},
-    ForValueExpression, StatementSplitter,
+use crate::{
+    parser::{
+        assignments::is_array,
+        expand_string, parse_and_validate,
+        pipelines::{PipeItem, Pipeline},
+        ForValueExpression, StatementSplitter,
+    },
+    shell::{assignments::VariableStore, variables::VariableType},
+    types,
 };
-use shell::{assignments::VariableStore, variables::VariableType};
+use itertools::Itertools;
 use small;
 use std::io::{stdout, Write};
-use types;
 
 macro_rules! handle_signal {
     ($signal:expr) => {

@@ -1,6 +1,8 @@
 use super::*;
-use ranges::{Index, Range};
-use types::{self, Array};
+use crate::{
+    ranges::{Index, Range},
+    types::{self, Array},
+};
 
 struct Empty;
 

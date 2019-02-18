@@ -4,6 +4,10 @@ use super::{
     flow_control::Function,
     status::{FAILURE, SUCCESS},
 };
+use crate::{
+    sys::{self, env as sys_env, geteuid, getpid, getuid, variables as self_sys},
+    types::{self, Array},
+};
 use hashbrown::HashMap;
 use liner::Context;
 use std::{
@@ -12,8 +16,6 @@ use std::{
     mem,
     ops::{Deref, DerefMut},
 };
-use sys::{self, env as sys_env, geteuid, getpid, getuid, variables as self_sys};
-use types::{self, Array};
 use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
 
@@ -625,7 +627,7 @@ pub trait GetVariable<T> {
 
 impl GetVariable<types::Str> for Variables {
     fn get(&self, name: &str) -> Option<types::Str> {
-        use types::Str;
+        use crate::types::Str;
 
         match name {
             "MWD" => return Some(Str::from(VariableType::Str(self.get_minimal_directory()))),
@@ -689,7 +691,7 @@ get_var!(Function, Function(func) => func);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parser::{expand_string, Expander};
+    use crate::parser::{expand_string, Expander};
 
     struct VariableExpander(pub Variables);
 

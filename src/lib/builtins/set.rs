@@ -1,8 +1,10 @@
+use crate::{
+    shell::{flags::*, Shell},
+    types,
+};
 use liner::KeyBindings;
-use shell::{flags::*, Shell};
 use small;
 use std::iter;
-use types;
 
 enum PositionalArgs {
     UnsetIfNone,

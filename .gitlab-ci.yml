@@ -11,7 +11,7 @@ cache:
     - target/
 
 linux:
-  image: 'rust:1.28.0'
+  image: 'rust:1.30.0'
   script:
     - cargo build
     - make tests

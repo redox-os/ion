@@ -10,7 +10,7 @@ pub(crate) use self::{
     parse::parse,
     splitter::{StatementError, StatementSplitter, StatementVariant},
 };
-use shell::flow_control::Statement;
+use crate::shell::flow_control::Statement;
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`

@@ -1,12 +1,12 @@
-use shell::{status::*, Shell};
+use crate::shell::{status::*, Shell};
 
+use crate::types;
 use regex::Regex;
 use small;
 use std::{
     io::{self, Write},
     time::{SystemTime, UNIX_EPOCH},
 };
-use types;
 
 bitflags! {
     struct IgnoreFlags: u8 {

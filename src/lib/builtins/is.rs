@@ -1,6 +1,5 @@
-use shell::Shell;
+use crate::{shell::Shell, types};
 use small;
-use types;
 
 pub(crate) fn is(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
     match args.len() {
@@ -47,7 +46,7 @@ fn test_is() {
     fn vec_string(args: &[&str]) -> Vec<small::String> {
         args.iter().map(|s| (*s).into()).collect()
     }
-    use shell::ShellBuilder;
+    use crate::shell::ShellBuilder;
     let mut shell = ShellBuilder::new().as_library();
     shell.set("x", "value");
     shell.set("y", "0");

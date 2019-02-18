@@ -1,6 +1,8 @@
-use shell::{Capture, Function, Shell};
+use crate::{
+    shell::{Capture, Function, Shell},
+    sys,
+};
 use std::process;
-use sys;
 
 pub(crate) fn command_not_found(shell: &mut Shell, command: &str) -> bool {
     fork_function(shell, "COMMAND_NOT_FOUND", &["ion", command])

@@ -32,17 +32,18 @@ use std::{
     io::{self, Write},
 };
 
-use parser::Terminator;
-use shell::{
-    self,
-    fork_function::fork_function,
-    job_control::{JobControl, ProcessState},
-    status::*,
-    FlowLogic, Shell, ShellHistory,
+use crate::{
+    parser::Terminator,
+    shell::{
+        self,
+        fork_function::fork_function,
+        job_control::{JobControl, ProcessState},
+        status::*,
+        FlowLogic, Shell, ShellHistory,
+    },
+    sys, types,
 };
 use small;
-use sys;
-use types;
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
                          none specified\n    help <command>";

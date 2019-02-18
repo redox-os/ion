@@ -1,5 +1,7 @@
-use parser::Terminator;
-use shell::{flags::UNTERMINATED, status::*, Binary, FlowLogic, Shell};
+use crate::{
+    parser::Terminator,
+    shell::{flags::UNTERMINATED, status::*, Binary, FlowLogic, Shell},
+};
 
 pub(crate) fn terminate_script_quotes<I: Iterator<Item = String>>(
     shell: &mut Shell,

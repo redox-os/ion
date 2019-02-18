@@ -1,8 +1,10 @@
-use builtins::man_pages::{check_help, MAN_EXEC};
-use shell::Shell;
+use crate::{
+    builtins::man_pages::{check_help, MAN_EXEC},
+    shell::Shell,
+    sys::execve,
+};
 use small;
 use std::error::Error;
-use sys::execve;
 
 /// Executes the givent commmand.
 pub(crate) fn exec(shell: &mut Shell, args: &[small::String]) -> Result<(), small::String> {

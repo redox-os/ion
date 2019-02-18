@@ -1,4 +1,4 @@
-use shell::{FlowLogic, Shell};
+use crate::shell::{FlowLogic, Shell};
 use small;
 use std::{fs::File, io::Read};
 

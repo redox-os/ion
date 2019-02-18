@@ -3,10 +3,12 @@ use super::{
     case,
     functions::{collect_arguments, parse_function},
 };
-use lexers::{assignment_lexer, ArgumentSplitter};
-use shell::{
-    flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement},
-    status::FAILURE,
+use crate::{
+    lexers::{assignment_lexer, ArgumentSplitter},
+    shell::{
+        flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement},
+        status::FAILURE,
+    },
 };
 use small;
 use std::char;
@@ -235,8 +237,10 @@ pub(crate) fn parse(code: &str) -> Statement {
 mod tests {
     use self::pipelines::PipeItem;
     use super::*;
-    use lexers::assignments::{KeyBuf, Primitive};
-    use shell::{flow_control::Statement, Job, JobKind};
+    use crate::{
+        lexers::assignments::{KeyBuf, Primitive},
+        shell::{flow_control::Statement, Job, JobKind},
+    };
 
     #[test]
     fn parsing_for() {

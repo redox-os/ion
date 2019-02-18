@@ -1,5 +1,5 @@
+use crate::shell::variables::VariableType;
 use hashbrown::HashMap as HashbrownMap;
-use shell::variables::VariableType;
 use small;
 use smallvec::SmallVec;
 use std::{

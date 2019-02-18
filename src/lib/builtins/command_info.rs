@@ -1,8 +1,9 @@
-use builtins::man_pages::*;
-use shell::{flow_control::Function, status::*, Shell};
+use crate::{
+    builtins::man_pages::*,
+    shell::{flow_control::Function, status::*, Shell},
+    sys, types,
+};
 use small;
-use sys;
-use types;
 
 use std::{borrow::Cow, env, path::Path};
 

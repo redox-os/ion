@@ -1,7 +1,7 @@
 //! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job
 //! control in the shell.
 
-use shell::{
+use crate::shell::{
     job_control::{JobControl, ProcessState},
     signals,
     status::*,

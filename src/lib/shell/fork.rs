@@ -1,10 +1,10 @@
 use super::{IonError, Shell};
+use crate::sys;
 use std::{
     fs::File,
     io,
     os::unix::io::{AsRawFd, FromRawFd},
 };
-use sys;
 
 pub fn wait_for_child(pid: u32) -> io::Result<u8> {
     let mut status;

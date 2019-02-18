@@ -3,7 +3,7 @@ mod collector;
 pub(crate) use self::collector::*;
 
 use super::expand_string;
-use shell::{pipe_exec::stdin_of, Job, JobKind, Shell};
+use crate::shell::{pipe_exec::stdin_of, Job, JobKind, Shell};
 use small;
 use std::{fmt, fs::File, os::unix::io::FromRawFd};
 

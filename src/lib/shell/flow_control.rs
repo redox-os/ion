@@ -1,10 +1,12 @@
-use lexers::assignments::{KeyBuf, Operator, Primitive};
-use parser::{assignments::*, pipelines::Pipeline};
-use shell::{flow::FlowLogic, Shell};
+use crate::{
+    lexers::assignments::{KeyBuf, Operator, Primitive},
+    parser::{assignments::*, pipelines::Pipeline},
+    shell::{flow::FlowLogic, Shell},
+    types,
+};
 use small;
 use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
-use types;
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ElseIf {

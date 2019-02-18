@@ -1,5 +1,7 @@
-use lexers::{ArgumentSplitter, DesignatorLexer, DesignatorToken};
-use shell::Shell;
+use crate::{
+    lexers::{ArgumentSplitter, DesignatorLexer, DesignatorToken},
+    shell::Shell,
+};
 use std::{borrow::Cow, str};
 
 pub(crate) fn expand_designators<'a>(shell: &Shell, cmd: &'a str) -> Cow<'a, str> {

@@ -6,9 +6,9 @@
 // use std::sync::atomic::{ATOMIC_U8_INIT, AtomicU8};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 
-use sys;
+use crate::sys;
 
-pub(crate) use sys::signals::{block, unblock};
+pub(crate) use crate::sys::signals::{block, unblock};
 
 pub static PENDING: AtomicUsize = ATOMIC_USIZE_INIT;
 pub const SIGINT: u8 = 1;

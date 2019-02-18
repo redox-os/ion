@@ -1,7 +1,9 @@
-use parser::shell_expand::expand_string;
-use shell::{flags::UNTERMINATED, Capture, Function, Shell};
+use crate::{
+    parser::shell_expand::expand_string,
+    shell::{flags::UNTERMINATED, Capture, Function, Shell},
+    sys,
+};
 use std::{io::Read, process};
-use sys;
 
 pub(crate) fn prompt(shell: &mut Shell) -> String {
     let blocks =

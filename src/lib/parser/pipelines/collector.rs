@@ -1,8 +1,10 @@
 use std::{collections::HashSet, iter::Peekable};
 
 use super::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
-use shell::{Job, JobKind};
-use types::*;
+use crate::{
+    shell::{Job, JobKind},
+    types::*,
+};
 
 trait AddItem {
     fn add_item(
@@ -453,12 +455,14 @@ impl<'a> Collector<'a> {
 
 #[cfg(test)]
 mod tests {
-    use parser::{
-        pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection},
-        statement::parse,
+    use crate::{
+        parser::{
+            pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection},
+            statement::parse,
+        },
+        shell::{flow_control::Statement, Job, JobKind},
+        types::Array,
     };
-    use shell::{flow_control::Statement, Job, JobKind};
-    use types::Array;
 
     #[test]
     fn stderr_redirection() {

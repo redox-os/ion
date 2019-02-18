@@ -4,9 +4,8 @@ mod tests;
 
 pub(crate) use self::methods::{ArrayMethod, Pattern, StringMethod};
 use super::{expand_string, Expander};
-use lexers::ArgumentSplitter;
-pub use ranges::{Select, SelectWithSize};
-use shell::escape::unescape;
+pub use crate::ranges::{Select, SelectWithSize};
+use crate::{lexers::ArgumentSplitter, shell::escape::unescape};
 use std::borrow::Cow;
 
 // Bit Twiddling Guide:

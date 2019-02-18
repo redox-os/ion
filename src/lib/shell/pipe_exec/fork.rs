@@ -1,5 +1,5 @@
+use crate::sys;
 use smallvec::SmallVec;
-use sys;
 
 /// Ensures that the forked child is given a unique process ID.
 pub(crate) fn create_process_group(pgid: u32) { let _ = sys::setpgid(0, pgid); }
