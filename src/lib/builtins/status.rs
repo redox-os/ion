@@ -1,5 +1,4 @@
-use builtins::man_pages::MAN_STATUS;
-use shell::Shell;
+use crate::{builtins::man_pages::MAN_STATUS, shell::Shell};
 use small;
 
 use std::env;

@@ -1,5 +1,7 @@
-use parser::{expand_string, Expander};
-use types;
+use crate::{
+    parser::{expand_string, Expander},
+    types,
+};
 
 /// The expression given to a for loop as the value to iterate upon.
 pub(crate) enum ForValueExpression {
@@ -17,7 +19,7 @@ impl ForValueExpression {
 
         if output.len() == 1 {
             let output = output.into_iter().next().unwrap();
-            if let Some(range) = ::ranges::parse_range(&output) {
+            if let Some(range) = crate::ranges::parse_range(&output) {
                 return ForValueExpression::Range(range);
             }
 

@@ -2,8 +2,10 @@
 
 use std::io::{self, Write};
 
-use shell::{status::*, variables::Variables};
-use types;
+use crate::{
+    shell::{status::*, variables::Variables},
+    types,
+};
 
 fn print_list(vars: &Variables) {
     let stdout = io::stdout();
@@ -141,9 +143,11 @@ pub(crate) fn drop_variable<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> 
 #[cfg(test)]
 mod test {
     use super::*;
-    use parser::{expand_string, Expander};
-    use shell::status::{FAILURE, SUCCESS};
-    use types::Array;
+    use crate::{
+        parser::{expand_string, Expander},
+        shell::status::{FAILURE, SUCCESS},
+        types::Array,
+    };
 
     struct VariableExpander(pub Variables);
 

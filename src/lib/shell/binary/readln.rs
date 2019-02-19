@@ -1,8 +1,7 @@
 use super::super::{completer::*, Binary, DirectoryStack, Shell, Variables};
+use crate::{sys, types};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use std::{env, io::ErrorKind, mem, path::PathBuf};
-use sys;
-use types;
 
 pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
     {

@@ -2,13 +2,13 @@ use super::{
     super::{signals, status::*, Shell},
     foreground::{BackgroundResult, ForegroundSignals},
 };
+use crate::sys;
 use std::{
     fmt, process,
     sync::{Arc, Mutex},
     thread::{sleep, spawn},
     time::Duration,
 };
-use sys;
 
 /// When given a process ID, that process's group will be assigned as the
 /// foreground process group.
@@ -250,7 +250,7 @@ impl JobControl for Shell {
     }
 }
 
-use sys::{
+use crate::sys::{
     kill, strerror, waitpid, wcoredump, wexitstatus, wifcontinued, wifexited, wifsignaled,
     wifstopped, wstopsig, wtermsig, ECHILD, SIGINT, SIGPIPE, WCONTINUED, WNOHANG, WUNTRACED,
 };

@@ -1,4 +1,4 @@
-use shell::{status::*, variables::Variables};
+use crate::shell::{status::*, variables::Variables};
 use std::io::{self, Write};
 
 fn print_functions(vars: &Variables) {

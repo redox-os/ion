@@ -3,11 +3,14 @@ use super::{
     status::*,
     Shell,
 };
+use crate::{
+    lexers::assignments::{Operator, Primitive},
+    parser::assignments::*,
+    shell::{history::ShellHistory, variables::VariableType},
+    types,
+};
 use hashbrown::HashMap;
 use itoa;
-use lexers::assignments::{Operator, Primitive};
-use parser::assignments::*;
-use shell::{history::ShellHistory, variables::VariableType};
 use std::{
     env,
     ffi::OsStr,
@@ -18,7 +21,6 @@ use std::{
     result::Result,
     str,
 };
-use types;
 
 fn list_vars(shell: &Shell) -> Result<(), io::Error> {
     let stdout = io::stdout();
@@ -58,9 +60,9 @@ fn arithmetic_op(operator: Operator, value: f64) -> Result<Box<dyn Fn(f64) -> f6
 /// exporting variables to some global environment
 pub(crate) trait VariableStore {
     /// Set a local variable given a binding
-    fn local(&mut self, LocalAction) -> i32;
+    fn local(&mut self, action: LocalAction) -> i32;
     /// Export a variable to the process environment given a binding
-    fn export(&mut self, ExportAction) -> i32;
+    fn export(&mut self, action: ExportAction) -> i32;
 }
 
 impl VariableStore for Shell {

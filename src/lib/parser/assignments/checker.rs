@@ -1,8 +1,10 @@
 use super::super::{expand_string, Expander};
-use lexers::assignments::{Primitive, TypeError};
-use shell::variables::VariableType;
+use crate::{
+    lexers::assignments::{Primitive, TypeError},
+    shell::variables::VariableType,
+    types,
+};
 use std::iter::Iterator;
-use types;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 enum IsArrayHelper {
@@ -280,7 +282,7 @@ pub(crate) fn value_check<E: Expander>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::Array;
+    use crate::types::Array;
 
     #[test]
     fn is_array_() {

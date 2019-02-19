@@ -6,10 +6,12 @@ use super::{
     strings::unescape,
     Pattern,
 };
-use ranges::Index;
+use crate::{
+    ranges::Index,
+    types::{self, Array},
+};
 use small;
 use std::char;
-use types::{self, Array};
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -217,8 +219,7 @@ impl<'a> ArrayMethod<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ranges::Range;
-    use types;
+    use crate::{ranges::Range, types};
 
     struct VariableExpander;
 

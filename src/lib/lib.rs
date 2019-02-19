@@ -33,7 +33,7 @@ mod ascii_helpers;
 mod builtins;
 pub mod shell;
 
-pub use shell::{
+pub use crate::shell::{
     binary::MAN_ION, flags, pipe_exec::job_control::JobControl, status, Binary, Capture, Fork,
     IonError, IonResult, Shell, ShellBuilder,
 };

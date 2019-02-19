@@ -1,9 +1,9 @@
+use crate::sys;
 use std::{
     fs::File,
     io,
     os::unix::io::{AsRawFd, FromRawFd, RawFd},
 };
-use sys;
 
 /// Use dup2 to replace `old` with `new` using `old`s file descriptor ID
 pub(crate) fn redir(old: RawFd, new: RawFd) {

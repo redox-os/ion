@@ -4,12 +4,14 @@ extern crate calc;
 mod words;
 
 pub(crate) use self::words::{Select, WordIterator, WordToken};
-use braces::{self, BraceToken};
+use crate::{
+    braces::{self, BraceToken},
+    ranges::{parse_range, Index, Range},
+    types::{self, Array},
+};
 use glob::glob;
-use ranges::{parse_range, Index, Range};
 use small;
 use std::{ptr, str};
-use types::{self, Array};
 use unicode_segmentation::UnicodeSegmentation;
 
 /// Determines whether an input string is expression-like as compared to a
@@ -31,17 +33,17 @@ pub type MapValueIter<'a> = Box<dyn Iterator<Item = types::Str> + 'a>;
 /// Trait representing different elements of string expansion
 pub(crate) trait Expander {
     /// Expand a tilde form to the correct directory.
-    fn tilde(&self, &str) -> Option<String> { None }
+    fn tilde(&self, _input: &str) -> Option<String> { None }
     /// Expand an array variable with some selection.
-    fn array(&self, &str, Select) -> Option<types::Array> { None }
+    fn array(&self, _name: &str, _selection: Select) -> Option<types::Array> { None }
     /// Expand a string variable given if it's quoted / unquoted
-    fn string(&self, &str, bool) -> Option<types::Str> { None }
+    fn string(&self, _name: &str, _quoted: bool) -> Option<types::Str> { None }
     /// Expand a subshell expression.
-    fn command(&self, &str) -> Option<types::Str> { None }
+    fn command(&self, _command: &str) -> Option<types::Str> { None }
     /// Iterating upon key-value maps.
-    fn map_keys<'a>(&'a self, &str, Select) -> Option<MapKeyIter> { None }
+    fn map_keys<'a>(&'a self, _name: &str, _select: Select) -> Option<MapKeyIter> { None }
     /// Iterating upon key-value maps.
-    fn map_values<'a>(&'a self, &str, Select) -> Option<MapValueIter> { None }
+    fn map_values<'a>(&'a self, _name: &str, _select: Select) -> Option<MapValueIter> { None }
 }
 
 fn expand_process<E: Expander>(

@@ -5,7 +5,7 @@ use super::{
     },
     MethodArgs,
 };
-use parser::assignments::is_array;
+use crate::parser::assignments::is_array;
 use regex::Regex;
 use small;
 use std::path::Path;
@@ -359,7 +359,7 @@ impl<'a> StringMethod<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use types;
+    use crate::types;
 
     struct VariableExpander;
 

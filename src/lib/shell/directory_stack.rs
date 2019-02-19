@@ -2,13 +2,13 @@ use super::{
     status::{FAILURE, SUCCESS},
     variables::Variables,
 };
+use crate::sys::env as sys_env;
 use std::{
     borrow::Cow,
     collections::VecDeque,
     env::{self, set_current_dir},
     path::{Component, Path, PathBuf},
 };
-use sys::env as sys_env;
 
 fn set_current_dir_ion(dir: &Path) -> Result<(), Cow<'static, str>> {
     set_current_dir(dir).map_err(|why| Cow::Owned(format!("{}", why)))?;

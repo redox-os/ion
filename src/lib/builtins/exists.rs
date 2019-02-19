@@ -1,10 +1,12 @@
 use std::{fs, os::unix::fs::PermissionsExt};
 
 #[cfg(test)]
-use shell::{self, flow_control::Statement};
-use shell::{flow_control::Function, Shell};
+use crate::shell::{self, flow_control::Statement};
+use crate::{
+    shell::{flow_control::Function, Shell},
+    types,
+};
 use small;
-use types;
 
 pub(crate) fn exists(args: &[small::String], shell: &Shell) -> Result<bool, small::String> {
     let arguments = &args[1..];
@@ -138,7 +140,7 @@ fn function_is_defined(function: &str, shell: &Shell) -> bool {
 
 #[test]
 fn test_evaluate_arguments() {
-    use lexers::assignments::{KeyBuf, Primitive};
+    use crate::lexers::assignments::{KeyBuf, Primitive};
     let mut shell = shell::ShellBuilder::new().as_library();
 
     // assert_eq!(evaluate_arguments(&[], &mut sink, &shell), Ok(false));
@@ -348,7 +350,7 @@ fn test_string_var_is_not_empty() {
 
 #[test]
 fn test_function_is_defined() {
-    use lexers::assignments::{KeyBuf, Primitive};
+    use crate::lexers::assignments::{KeyBuf, Primitive};
     let mut shell = shell::ShellBuilder::new().as_library();
 
     // create a simple dummy function

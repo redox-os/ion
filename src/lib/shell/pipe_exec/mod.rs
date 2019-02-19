@@ -26,8 +26,11 @@ use super::{
     status::*,
     JobKind, Shell,
 };
-use builtins::{self, BuiltinFunction};
-use parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
+use crate::{
+    builtins::{self, BuiltinFunction},
+    parser::pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection},
+    sys,
+};
 use small;
 use smallvec::SmallVec;
 use std::{
@@ -38,7 +41,6 @@ use std::{
     path::Path,
     process::{self, exit},
 };
-use sys;
 
 type RefinedItem = (RefinedJob, JobKind, Vec<Redirection>, Vec<Input>);
 

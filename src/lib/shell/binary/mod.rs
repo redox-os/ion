@@ -10,9 +10,9 @@ use self::{
     terminate::{terminate_quotes, terminate_script_quotes},
 };
 use super::{status::*, FlowLogic, Shell, ShellHistory};
+use crate::types;
 use liner::{Buffer, Context};
 use std::{env, iter, path::Path, process};
-use types;
 
 pub const MAN_ION: &str = r#"NAME
     ion - ion shell

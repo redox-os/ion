@@ -49,9 +49,13 @@ use self::{
     status::*,
     variables::{GetVariable, VariableType, Variables},
 };
-use builtins::{BuiltinMap, BUILTINS};
+use crate::{
+    builtins::{BuiltinMap, BUILTINS},
+    parser::{pipelines::Pipeline, Expander, MapKeyIter, MapValueIter, Select, Terminator},
+    sys,
+    types::{self, Array},
+};
 use liner::Context;
-use parser::{pipelines::Pipeline, Expander, MapKeyIter, MapValueIter, Select, Terminator};
 use std::{
     fs::File,
     io::{self, Read, Write},
@@ -62,8 +66,6 @@ use std::{
     sync::{atomic::Ordering, Arc, Mutex},
     time::SystemTime,
 };
-use sys;
-use types::{self, Array};
 use xdg::BaseDirectories;
 
 #[derive(Debug, Fail)]
@@ -437,7 +439,7 @@ impl<'a> Expander for Shell {
 
     /// Expand a string variable given if its quoted / unquoted
     fn string(&self, name: &str, quoted: bool) -> Option<types::Str> {
-        use ascii_helpers::AsciiReplace;
+        use crate::ascii_helpers::AsciiReplace;
         if name == "?" {
             Some(types::Str::from(self.previous_status.to_string()))
         } else if quoted {
@@ -502,7 +504,7 @@ impl<'a> Expander for Shell {
                     )]);
                 }
                 Select::Index(index) => {
-                    use ranges::Index;
+                    use crate::ranges::Index;
                     return Some(array![format!(
                         "{}",
                         hmap.get(&types::Str::from(
@@ -545,7 +547,7 @@ impl<'a> Expander for Shell {
                     )]);
                 }
                 Select::Index(index) => {
-                    use ranges::Index;
+                    use crate::ranges::Index;
                     return Some(array![format!(
                         "{}",
                         bmap.get(&types::Str::from(

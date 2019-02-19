@@ -1,9 +1,11 @@
 use super::Shell;
-use builtins::{BuiltinFunction, BUILTINS};
-use parser::{expand_string, pipelines::RedirectFrom};
-use shell::pipe_exec::PipelineExecution;
+use crate::{
+    builtins::{BuiltinFunction, BUILTINS},
+    parser::{expand_string, pipelines::RedirectFrom},
+    shell::pipe_exec::PipelineExecution,
+    types::{self, Array},
+};
 use std::{fmt, fs::File, str};
-use types::{self, Array};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) enum JobKind {

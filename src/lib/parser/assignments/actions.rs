@@ -1,5 +1,5 @@
 use super::checker::*;
-use lexers::{
+use crate::lexers::{
     assignments::{Key, KeyIterator, Operator, Primitive, TypeError},
     ArgumentSplitter,
 };
@@ -152,7 +152,7 @@ impl<'a> Action<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lexers::assignments::*;
+    use crate::lexers::assignments::*;
 
     fn split(input: &str) -> (String, Operator, String) {
         let (keys, op, vals) = assignment_lexer(input);
