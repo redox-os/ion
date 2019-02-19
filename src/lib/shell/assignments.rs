@@ -51,6 +51,12 @@ pub(crate) trait VariableStore {
     fn local(&mut self, action: LocalAction) -> i32;
     /// Export a variable to the process environment given a binding
     fn export(&mut self, action: ExportAction) -> i32;
+    /// Collect all updates to perform on variables for a given assignement action
+    fn create_patch<'a>(
+        &mut self,
+        actions: AssignmentActions<'a>,
+    ) -> Result<HashMap<Key<'a>, VariableType>, String>;
+    fn patch(&mut self, patch: HashMap<Key, VariableType>) -> Result<(), String>;
 }
 
 impl VariableStore for Shell {
@@ -78,51 +84,42 @@ impl VariableStore for Shell {
         };
 
         for action in actions {
-            let err = action.map_err(|e| e.to_string()).and_then(|act| match act {
-                Action::UpdateArray(key, Operator::Equal, expression) => {
-                    value_check(self, &expression, &key.kind)
-                        .map_err(|e| format!("{}: {}", key.name, e))
-                        .and_then(|rhs| match rhs {
-                            VariableType::Array(values) => {
-                                env::set_var(key.name, values.join(" "));
-                                Ok(())
-                            }
-                            _ => Err(format!(
-                                "{}: export of type '{}' is not supported",
-                                key.name, key.kind
-                            )),
-                        })
-                }
-                Action::UpdateArray(..) => Err("arithmetic operators on array expressions aren't \
-                                                supported yet."
-                    .to_string()),
-                Action::UpdateString(key, operator, expression) => {
-                    value_check(self, &expression, &key.kind)
-                        .map_err(|why| format!("{}: {}", key.name, why))
-                        .and_then(|rhs| {
-                            if let VariableType::Str(rhs) = &rhs {
-                                let key_name: &str = &key.name;
-                                let lhs = self
-                                    .variables
-                                    .get::<types::Str>(key_name)
-                                    .unwrap_or_else(|| "0".into());
+            let err = action.map_err(|e| e.to_string()).and_then(|act| {
+                let Action(key, operator, expression) = act;
+                value_check(self, &expression, &key.kind)
+                    .map_err(|e| format!("{}: {}", key.name, e))
+                    .and_then(|rhs| match &rhs {
+                        VariableType::Array(values) if operator == Operator::Equal => {
+                            env::set_var(key.name, values.join(" "));
+                            Ok(())
+                        }
+                        VariableType::Array(_) => Err("arithmetic operators on array expressions \
+                                                       aren't supported yet."
+                            .to_string()),
+                        VariableType::Str(rhs) => {
+                            let key_name: &str = &key.name;
+                            let lhs = self
+                                .variables
+                                .get::<types::Str>(key_name)
+                                .unwrap_or_else(|| "0".into());
 
-                                math(&key.kind, operator, &rhs)
-                                    .and_then(|action| parse(&lhs, |a| action(a)))
-                                    .map(|mut value| {
-                                        if key_name == "PATH" {
-                                            if let Ok(home) = &env::var("HOME") {
-                                                value = value.replace('~', home);
-                                            }
+                            math(&key.kind, operator, &rhs)
+                                .and_then(|action| parse(&lhs, |a| action(a)))
+                                .map(|mut value| {
+                                    if key_name == "PATH" {
+                                        if let Ok(home) = &env::var("HOME") {
+                                            value = value.replace('~', home);
                                         }
-                                        env::set_var(key_name, &OsString::from(value))
-                                    })
-                                    .map_err(|why| why.to_string())
-                            } else {
-                                Ok(())
-                            }
-                        })
-                }
+                                    }
+                                    env::set_var(key_name, &OsString::from(value))
+                                })
+                                .map_err(|why| why.to_string())
+                        }
+                        _ => Err(format!(
+                            "{}: export of type '{}' is not supported",
+                            key.name, key.kind
+                        )),
+                    })
             });
 
             if let Err(why) = err {
@@ -134,112 +131,75 @@ impl VariableStore for Shell {
         SUCCESS
     }
 
-    fn local(&mut self, action: LocalAction) -> i32 {
-        let mut collected: HashMap<Key, VariableType> = HashMap::new();
-        let actions = match action {
-            LocalAction::List => {
-                let _ = list_vars(&self);
-                return SUCCESS;
-            }
-            LocalAction::Assign(ref keys, op, ref vals) => AssignmentActions::new(keys, op, vals),
-        };
-        for action in actions {
-            let err = action.map_err(|e| e.to_string()).and_then(|act| match act {
-                Action::UpdateArray(key, operator, expression) => {
-                    let right_hand_side = value_check(self, &expression, &key.kind);
-
-                    right_hand_side.map_err(|why| format!("{}: {}", key.name, why)).and_then(
-                        |rhs| {
-                            if operator == Operator::OptionalEqual
-                                && self.variables.get_ref(key.name).is_some()
-                            {
-                                return Ok(());
-                            }
-                            if [Operator::Equal, Operator::OptionalEqual].contains(&operator) {
-                                // When we changed the HISTORY_IGNORE variable, update the
-                                // ignore patterns. This happens first because `set_array`
-                                // consumes 'values'
-                                if key.name == "HISTORY_IGNORE" {
-                                    if let VariableType::Array(array) = &rhs {
-                                        self.update_ignore_patterns(array);
-                                    }
+    fn create_patch<'a>(
+        &mut self,
+        actions: AssignmentActions<'a>,
+    ) -> Result<HashMap<Key<'a>, VariableType>, String> {
+        let mut patch = HashMap::new();
+        actions
+            .map(|act| act.map_err(|e| e.to_string()))
+            .map(|action| {
+                action
+                    .and_then(|act| {
+                        // sanitize variable names
+                        if ["HOME", "HOST", "PWD", "MWD", "SWD", "?"].contains(&act.0.name) {
+                            Err(format!("not allowed to set `{}`", act.0.name))
+                        } else {
+                            Ok(act)
+                        }
+                    })
+                    .and_then(|Action(key, operator, expression)| {
+                        value_check(self, &expression, &key.kind)
+                            .map_err(|why| format!("{}: {}", key.name, why))
+                            .map(|rhs| (rhs, key, operator))
+                    })
+                    .and_then(|(rhs, key, operator)| {
+                        if operator == Operator::OptionalEqual
+                            && self.variables.get_ref(key.name).is_some()
+                        {
+                            return Ok(());
+                        }
+                        if [Operator::Equal, Operator::OptionalEqual].contains(&operator) {
+                            // When we changed the HISTORY_IGNORE variable, update the
+                            // ignore patterns. This happens first because `set_array`
+                            // consumes 'values'
+                            if key.name == "HISTORY_IGNORE" {
+                                if let VariableType::Array(array) = &rhs {
+                                    self.update_ignore_patterns(array);
                                 }
-
-                                return match (&rhs, &key.kind) {
-                                    (VariableType::HashMap(_), Primitive::Indexed(..)) => {
-                                        Err("cannot insert hmap into index".to_string())
-                                    }
-                                    (VariableType::BTreeMap(_), Primitive::Indexed(..)) => {
-                                        Err("cannot insert bmap into index".to_string())
-                                    }
-                                    (VariableType::Array(_), Primitive::Indexed(..)) => {
-                                        Err("multi-dimensional arrays are not yet supported"
-                                            .to_string())
-                                    }
-                                    _ => {
-                                        collected.insert(key, rhs);
-                                        Ok(())
-                                    }
-                                };
                             }
 
-                            let left_hand_side = self
-                                .variables
-                                .get_mut(key.name)
-                                .ok_or_else(|| "cannot concatenate non-array variable".to_string());
-                            if let VariableType::Array(values) = rhs {
-                                left_hand_side.map(|lhs| {
-                                    if let VariableType::Array(ref mut array) = lhs {
-                                        match operator {
-                                            Operator::Concatenate => array.extend(values),
-                                            Operator::ConcatenateHead => values
-                                                .into_iter()
-                                                .rev()
-                                                .for_each(|value| array.insert(0, value)),
-                                            Operator::Filter => {
-                                                array.retain(|item| !values.contains(item))
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                })
-                            } else {
-                                Ok(())
-                            }
-                        },
-                    )
-                }
-                Action::UpdateString(key, operator, expression) => {
-                    if ["HOME", "HOST", "PWD", "MWD", "SWD", "?"].contains(&key.name) {
-                        return Err(format!("not allowed to set `{}`", key.name));
-                    }
+                            return match (&rhs, &key.kind) {
+                                (VariableType::HashMap(_), Primitive::Indexed(..)) => {
+                                    Err("cannot insert hmap into index".to_string())
+                                }
+                                (VariableType::BTreeMap(_), Primitive::Indexed(..)) => {
+                                    Err("cannot insert bmap into index".to_string())
+                                }
+                                (VariableType::Array(_), Primitive::Indexed(..)) => {
+                                    Err("multi-dimensional arrays are not yet supported"
+                                        .to_string())
+                                }
+                                _ => {
+                                    patch.insert(key, rhs);
+                                    Ok(())
+                                }
+                            };
+                        }
 
-                    let right_hand_side = value_check(self, &expression, &key.kind);
-                    right_hand_side.map_err(|why| format!("{}: {}", key.name, why)).and_then(
-                        |rhs| {
-                            if operator == Operator::OptionalEqual
-                                && self.variables.get_ref(key.name).is_some()
-                            {
-                                return Ok(());
-                            }
-                            if [Operator::Equal, Operator::OptionalEqual].contains(&operator) {
-                                collected.insert(key, rhs);
-                                return Ok(());
-                            }
-
-                            let left_hand_side =
-                                self.variables.get_mut(key.name).ok_or_else(|| {
-                                    format!("cannot update non existing variable `{}`", key.name)
-                                });
-
-                            left_hand_side.and_then(|lhs| match rhs {
+                        self.variables
+                            .get_mut(key.name)
+                            .ok_or_else(|| {
+                                format!("cannot update non existing variable `{}`", key.name)
+                            })
+                            .and_then(|lhs| match rhs {
                                 VariableType::Str(rhs) => match lhs {
                                     VariableType::Str(lhs) => math(&key.kind, operator, &rhs)
                                         .and_then(|action| parse(&lhs, |a| action(a)))
                                         .map(|value| {
-                                            collected.insert(key, VariableType::Str(value.into()));
+                                            patch.insert(key, VariableType::Str(value.into()));
                                         })
-                                        .map_err(|e| e.to_string()),
+                                        .map_err(|why| why.to_string()),
                                     VariableType::Array(ref mut array) => match operator {
                                         Operator::Concatenate => {
                                             array.push(rhs);
@@ -268,25 +228,48 @@ impl VariableStore for Shell {
                                     },
                                     _ => Err("type does not support this operator".to_string()),
                                 },
+                                VariableType::Array(values) => {
+                                    if let VariableType::Array(ref mut array) = lhs {
+                                        match operator {
+                                            Operator::Concatenate => array.extend(values),
+                                            Operator::ConcatenateHead => values
+                                                .into_iter()
+                                                .rev()
+                                                .for_each(|value| array.insert(0, value)),
+                                            Operator::Filter => {
+                                                array.retain(|item| !values.contains(item))
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                    Ok(())
+                                }
                                 _ => unreachable!(),
                             })
-                        },
-                    )
-                }
-            });
+                    })
+            })
+            .find(|e| e.is_err())
+            .unwrap_or_else(|| Ok(()))
+            .map(|_| patch)
+    }
 
-            if let Err(why) = err {
-                eprintln!("ion: assignment error: {}", why);
-                return FAILURE;
-            }
-        }
-
-        for (key, val) in collected {
-            let err = match (&val, &key.kind) {
+    fn patch(&mut self, patch: HashMap<Key, VariableType>) -> Result<(), String> {
+        patch
+            .into_iter()
+            .map(|(key, val)| match (&val, &key.kind) {
                 (VariableType::Str(_), Primitive::Indexed(ref index_name, ref index_kind)) => {
                     value_check(self, index_name, index_kind)
                         .map_err(|why| format!("assignment error: {}: {}", key.name, why))
                         .and_then(|index| match index {
+                            VariableType::Array(_) => {
+                                Err("index variable cannot be an array".to_string())
+                            }
+                            VariableType::HashMap(_) => {
+                                Err("index variable cannot be a hmap".to_string())
+                            }
+                            VariableType::BTreeMap(_) => {
+                                Err("index variable cannot be a bmap".to_string())
+                            }
                             VariableType::Str(ref index) => self
                                 .variables
                                 .get_mut(key.name)
@@ -303,8 +286,7 @@ impl VariableStore for Shell {
                                         .parse::<usize>()
                                         .map_err(|_| {
                                             format!(
-                                                "index variable does not contain a numeric value: \
-                                                 `{}`",
+                                                "index variable is not a numeric value: `{}`",
                                                 index
                                             )
                                         })
@@ -318,15 +300,6 @@ impl VariableStore for Shell {
                                     _ => Ok(()),
                                 })
                                 .unwrap_or(Ok(())),
-                            VariableType::Array(_) => {
-                                Err("index variable cannot be an array".to_string())
-                            }
-                            VariableType::HashMap(_) => {
-                                Err("index variable cannot be a hmap".to_string())
-                            }
-                            VariableType::BTreeMap(_) => {
-                                Err("index variable cannot be a bmap".to_string())
-                            }
                             _ => Ok(()),
                         })
                 }
@@ -338,15 +311,27 @@ impl VariableStore for Shell {
                     Ok(())
                 }
                 _ => Ok(()),
-            };
+            })
+            .find(|e| e.is_err())
+            .unwrap_or_else(|| Ok(()))
+    }
 
-            if let Err(why) = err {
-                eprintln!("ion: {}", why);
-                return FAILURE;
+    fn local(&mut self, action: LocalAction) -> i32 {
+        match action {
+            LocalAction::List => {
+                let _ = list_vars(&self);
+                SUCCESS
+            }
+            LocalAction::Assign(ref keys, op, ref vals) => {
+                let actions = AssignmentActions::new(keys, op, vals);
+                if let Err(why) = self.create_patch(actions).and_then(|patch| self.patch(patch)) {
+                    eprintln!("ion: assignment error: {}", why);
+                    FAILURE
+                } else {
+                    SUCCESS
+                }
             }
         }
-
-        SUCCESS
     }
 }
 
