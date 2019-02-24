@@ -11,6 +11,8 @@ TAGPASS=$GREEN'[PASS]'$NC
 EXAMPLES_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR=$(dirname $(cargo locate-project | awk -F\" '{print $4}'))
 
+TOOLCHAIN=$(rustc --version | sed 's/rustc [0-9\.\-]*\(.*\) (.*)/\1/')
+
 EXIT_VAL=0
 
 # Some of the examples assume that the working directory is the project root

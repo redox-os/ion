@@ -54,7 +54,7 @@ pub fn assignment_lexer(statement: &str) -> (Option<&str>, Option<Operator>, Opt
         return (Some(statement.trim()), None, None);
     }
 
-    let keys = statement[..start].trim_right();
+    let keys = statement[..start].trim_end();
 
     let values = &statement[read..];
     (Some(keys), operator, Some(values.trim()))

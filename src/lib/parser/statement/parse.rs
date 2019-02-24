@@ -43,7 +43,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         _ if cmd.starts_with("let ") => {
             // Split the let expression and ensure that the statement is valid.
-            let (keys, op, vals) = assignment_lexer(cmd[4..].trim_left());
+            let (keys, op, vals) = assignment_lexer(cmd[4..].trim_start());
             let (keys, op, values) = match vals {
                 Some(vals) => {
                     // If the values exist, then the keys and operator also exists.
@@ -66,7 +66,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         _ if cmd.starts_with("export ") => {
             // Split the let expression and ensure that the statement is valid.
-            let (keys, op, vals) = assignment_lexer(cmd[7..].trim_left());
+            let (keys, op, vals) = assignment_lexer(cmd[7..].trim_start());
             let (keys, op, values) = match vals {
                 Some(vals) => {
                     // If the values exist, then the keys and operator also exists.
@@ -88,7 +88,7 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         _ if cmd.starts_with("if ") => {
             return Statement::If {
-                expression: vec![parse(cmd[3..].trim_left())],
+                expression: vec![parse(cmd[3..].trim_start())],
                 success:    Vec::new(),
                 else_if:    Vec::new(),
                 failure:    Vec::new(),
@@ -97,24 +97,24 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         "else" => return Statement::Else,
         _ if cmd.starts_with("else") => {
-            let cmd = cmd[4..].trim_left();
+            let cmd = cmd[4..].trim_start();
             if cmd.is_empty() {
                 return Statement::Else;
             } else if cmd.starts_with("if ") {
                 return Statement::ElseIf(ElseIf {
-                    expression: vec![parse(cmd[3..].trim_left())],
+                    expression: vec![parse(cmd[3..].trim_start())],
                     success:    Vec::new(),
                 });
             }
         }
         _ if cmd.starts_with("while ") => {
-            return collect(cmd[6..].trim_left(), |pipeline| Statement::While {
+            return collect(cmd[6..].trim_start(), |pipeline| Statement::While {
                 expression: vec![Statement::Pipeline(pipeline)],
                 statements: Vec::new(),
             });
         }
         _ if cmd.starts_with("for ") => {
-            let mut cmd = cmd[4..].trim_left();
+            let mut cmd = cmd[4..].trim_start();
             let mut variables = None;
 
             if cmd.len() > 5 {
@@ -143,7 +143,7 @@ pub(crate) fn parse(code: &str) -> Statement {
             };
         }
         _ if cmd.starts_with("case ") => {
-            let (value, binding, conditional) = match cmd[5..].trim_left() {
+            let (value, binding, conditional) = match cmd[5..].trim_start() {
                 "_" => (None, None, None),
                 value => {
                     let (value, binding, conditional) = match case::parse_case(value) {
@@ -166,12 +166,12 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         _ if cmd.starts_with("match ") => {
             return Statement::Match {
-                expression: cmd[6..].trim_left().into(),
+                expression: cmd[6..].trim_start().into(),
                 cases:      Vec::new(),
             };
         }
         _ if cmd.starts_with("fn ") => {
-            let cmd = cmd[3..].trim_left();
+            let cmd = cmd[3..].trim_start();
             let pos = cmd.find(char::is_whitespace).unwrap_or_else(|| cmd.len());
             let name = &cmd[..pos];
             if !is_valid_name(name) {
@@ -201,10 +201,10 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         _ if cmd.starts_with("time ") => {
             // Ignore embedded time calls
-            let mut timed = cmd[4..].trim_left();
+            let mut timed = cmd[4..].trim_start();
             loop {
                 if timed.starts_with("time ") {
-                    timed = timed[4..].trim_left();
+                    timed = timed[4..].trim_start();
                     continue;
                 }
                 break;
@@ -213,15 +213,15 @@ pub(crate) fn parse(code: &str) -> Statement {
         }
         _ if cmd.eq("time") => return Statement::Time(Box::new(Statement::Default)),
         _ if cmd.starts_with("and ") => {
-            return Statement::And(Box::new(parse(cmd[3..].trim_left())));
+            return Statement::And(Box::new(parse(cmd[3..].trim_start())));
         }
         _ if cmd.eq("and") => return Statement::And(Box::new(Statement::Default)),
-        _ if cmd.starts_with("or ") => return Statement::Or(Box::new(parse(cmd[2..].trim_left()))),
+        _ if cmd.starts_with("or ") => return Statement::Or(Box::new(parse(cmd[2..].trim_start()))),
         _ if cmd.eq("or") => return Statement::Or(Box::new(Statement::Default)),
         _ if cmd.starts_with("not ") => {
-            return Statement::Not(Box::new(parse(cmd[3..].trim_left())));
+            return Statement::Not(Box::new(parse(cmd[3..].trim_start())));
         }
-        _ if cmd.starts_with("! ") => return Statement::Not(Box::new(parse(cmd[1..].trim_left()))),
+        _ if cmd.starts_with("! ") => return Statement::Not(Box::new(parse(cmd[1..].trim_start()))),
         _ if cmd.eq("not") | cmd.eq("!") => return Statement::Not(Box::new(Statement::Default)),
         _ => (),
     }
