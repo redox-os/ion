@@ -20,23 +20,31 @@ pub fn assignment_lexer(statement: &str) -> (Option<&str>, Option<Operator>, Opt
     let as_bytes = statement.as_bytes();
     let mut bytes = statement.bytes().peekable();
     let mut operator = None;
+    let mut delimiter_stack = Vec::new();
 
     while let Some(byte) = bytes.next() {
         operator = Some(Operator::Equal);
-        if b'=' == byte {
-            if bytes.peek().is_none() {
-                return (Some(&statement[..read].trim()), Some(Operator::Equal), None);
-            }
-            start = read;
-            read += 1;
-            break;
-        }
 
-        if let Some((op, found)) = find_operator(as_bytes, read) {
-            operator = Some(op);
-            start = read;
-            read = found;
-            break;
+        if is_open_delimiter(byte) {
+            delimiter_stack.push(byte);
+        } else if delimiter_stack.last().map_or(false, |open| delimiters_match(*open, byte)) {
+            delimiter_stack.pop();
+        } else if delimiter_stack.is_empty() {
+            if b'=' == byte {
+                if bytes.peek().is_none() {
+                    return (Some(&statement[..read].trim()), Some(Operator::Equal), None);
+                }
+                start = read;
+                read += 1;
+                break;
+            }
+
+            if let Some((op, found)) = find_operator(as_bytes, read) {
+                operator = Some(op);
+                start = read;
+                read = found;
+                break;
+            }
         }
 
         read += 1;
@@ -61,6 +69,15 @@ fn find_operator(bytes: &[u8], read: usize) -> Option<(Operator, usize)> {
         Operator::parse_double(&bytes[read..=read + 1]).map(|op| (op, read + 3))
     } else {
         None
+    }
+}
+
+fn is_open_delimiter(byte: u8) -> bool { byte == b'[' }
+
+fn delimiters_match(open: u8, close: u8) -> bool {
+    match (open, close) {
+        (b'[', b']') => true,
+        _ => false,
     }
 }
 
@@ -158,5 +175,20 @@ mod tests {
             assignment_lexer("abc \\\\= def"),
             (Some("abc"), Some(Operator::Filter), Some("def"))
         )
+    }
+
+    #[test]
+    fn map_assignment() {
+        assert_eq!(assignment_lexer("abc[=]"), (Some("abc[=]"), None, None));
+
+        assert_eq!(
+            assignment_lexer("abc['='] = '='"),
+            (Some("abc['=']"), Some(Operator::Equal), Some("'='"))
+        );
+
+        assert_eq!(
+            assignment_lexer("abc[=] = []=[]"),
+            (Some("abc[=]"), Some(Operator::Equal), Some("[]=[]"))
+        );
     }
 }
