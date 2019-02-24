@@ -172,11 +172,11 @@ impl<'a> StringMethod<'a> {
             }
             "trim_right" => {
                 let word = get_var!();
-                output.push_str(word.trim_right());
+                output.push_str(word.trim_end());
             }
             "trim_left" => {
                 let word = get_var!();
-                output.push_str(word.trim_left());
+                output.push_str(word.trim_start());
             }
             "repeat" => match pattern.join(" ").parse::<usize>() {
                 Ok(repeat) => output.push_str(&get_var!().repeat(repeat)),

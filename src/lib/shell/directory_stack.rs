@@ -86,7 +86,7 @@ impl DirectoryStack {
         let dir = self.dirs.iter().fold(String::new(), |acc, dir| {
             acc + " " + dir.to_str().unwrap_or("ion: no directory found")
         });
-        println!("{}", dir.trim_left());
+        println!("{}", dir.trim_start());
     }
 
     pub(crate) fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> {

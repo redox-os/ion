@@ -4,13 +4,13 @@
 //! children of the shell.
 
 // use std::sync::atomic::{ATOMIC_U8_INIT, AtomicU8};
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+use std::sync::atomic::{AtomicUsize};
 
 use crate::sys;
 
 pub(crate) use crate::sys::signals::{block, unblock};
 
-pub static PENDING: AtomicUsize = ATOMIC_USIZE_INIT;
+pub static PENDING: AtomicUsize = AtomicUsize::new(0);
 pub const SIGINT: u8 = 1;
 pub const SIGHUP: u8 = 2;
 pub const SIGTERM: u8 = 4;
