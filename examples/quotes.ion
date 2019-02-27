@@ -1,0 +1,9 @@
+echo 'au\
+c'
+
+echo 'a<<b\
+      c'
+
+echo 'a\
+<<< b\
+'
