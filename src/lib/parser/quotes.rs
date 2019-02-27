@@ -105,6 +105,7 @@ impl Terminator {
                 },
             )
             .filter(|&(_, c)| c != 0)
+            //.inspect(|c| println!("{:?} {}", c.0, c.1 as char))
             .peekable();
 
         let mut bytes = RearPeekable { iter: bytes, now: None, last: None };
@@ -185,7 +186,7 @@ impl Terminator {
             Err(NotTerminatedErr::EscapedNewline) => {
                 self.buffer.pop();
                 self.read -= 1;
-                self.flags |= Flags::TRIM;
+                self.flags = Flags::TRIM;
                 false
             }
             Err(NotTerminatedErr::UnclosedString) => {
