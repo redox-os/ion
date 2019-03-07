@@ -1,0 +1,7 @@
+fn issue_838 a0 a1 a2 a3
+    echo $a0 $a1 $a2 $a3
+end
+
+let x y = "" ""
+let z = $(issue_838 $x $y $x $x)
+
