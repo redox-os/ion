@@ -5,6 +5,7 @@ mod words;
 
 pub(crate) use self::words::{Select, WordIterator, WordToken};
 use crate::{
+    shell::variables::VariableType,
     braces::{self, BraceToken},
     ranges::{parse_range, Index, Range},
     types::{self, Array},
@@ -31,7 +32,7 @@ pub type MapValueIter<'a> = Box<dyn Iterator<Item = types::Str> + 'a>;
 // TODO: Make array expansions iterators instead of arrays.
 // TODO: Use Cow<'a, types::Str> for hashmap values.
 /// Trait representing different elements of string expansion
-pub(crate) trait Expander {
+pub(crate) trait Expander: Sized {
     /// Expand a tilde form to the correct directory.
     fn tilde(&self, _input: &str) -> Option<String> { None }
     /// Expand an array variable with some selection.
@@ -44,6 +45,14 @@ pub(crate) trait Expander {
     fn map_keys<'a>(&'a self, _name: &str, _select: Select) -> Option<MapKeyIter> { None }
     /// Iterating upon key-value maps.
     fn map_values<'a>(&'a self, _name: &str, _select: Select) -> Option<MapValueIter> { None }
+    /// Get a string that exists in the shell.
+    fn get_string(&self, value: &str) -> VariableType {
+        VariableType::Str(types::Str::from(expand_string(value, self, false).join(" ")))
+    }
+    /// Get an array that exists in the shell.
+    fn get_array(&self, value: &str) -> VariableType {
+        VariableType::Array(expand_string(value, self, false))
+    }
 }
 
 fn expand_process<E: Expander>(

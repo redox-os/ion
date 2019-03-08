@@ -26,9 +26,7 @@ impl<'a> ArgumentSplitter<'a> {
     pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
         ArgumentSplitter { data, read: 0, bitflags: ArgumentFlags::empty() }
     }
-}
 
-impl<'a> ArgumentSplitter<'a> {
     fn scan_singlequotes<B: Iterator<Item = u8>>(&mut self, bytes: &mut B) {
         while let Some(character) = bytes.next() {
             match character {
