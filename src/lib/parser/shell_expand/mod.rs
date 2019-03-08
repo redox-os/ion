@@ -12,7 +12,7 @@ use crate::{
 };
 use glob::glob;
 use small;
-use std::{ptr, str};
+use std::str;
 use unicode_segmentation::UnicodeSegmentation;
 
 /// Determines whether an input string is expression-like as compared to a
@@ -70,33 +70,48 @@ fn expand_process<E: Expander>(
                 if let Some(pos) = output.rfind(|x| x != '\n') { &output[..=pos] } else { &output };
             slice(current, output, selection)
         } else {
-            // If we ever do something with UTF-8, this won't work
+            // The following code should produce the same result as
+            // slice(current,
+            //       &output.split_whitespace().collect::<Vec<_>>().join(" "),
+            //       selection)
+            // We optimize it so that no additional allocation is made.
+
             unsafe {
                 let bytes = output.as_bytes_mut();
-                let bytes_v = bytes.as_mut_ptr();
-                let mut size = bytes.len();
-                let mut i = 0;
+                let mut left_mut_pos = 0;
+                let mut right_pos = 0;
                 let mut prev_is_whitespace = true;
-                while i < size {
-                    let is_whitespace = char::is_whitespace(bytes[i] as char);
-                    if is_whitespace {
-                        bytes[i] = b' ';
-                    }
-                    if is_whitespace && prev_is_whitespace {
-                        size -= 1;
-                        if i != size - 1 {
-                            let offset = i as isize;
-                            ptr::copy(bytes_v.offset(offset + 1), bytes_v.offset(offset), size - i);
+
+                unsafe fn next_char(b: &[u8]) -> Option<char> {
+                    str::from_utf8_unchecked(b)
+                        .chars()
+                        .next()
+                }
+
+                while let Some(c) = next_char(&bytes[right_pos..]) {
+                    let is_whitespace = char::is_whitespace(c);
+                    let char_len_utf8 = c.len_utf8();
+
+                    if !prev_is_whitespace || !is_whitespace {
+                        if is_whitespace {
+                            bytes[left_mut_pos] = b' ';
+                            left_mut_pos += 1;
+                        } else {
+                            for i in 0..char_len_utf8 {
+                                bytes[left_mut_pos + i] = bytes[right_pos + i];
+                            }
+                            left_mut_pos += char_len_utf8;
                         }
-                    } else {
-                        i += 1;
-                        prev_is_whitespace = is_whitespace;
                     }
+
+                    right_pos += char_len_utf8;
+                    prev_is_whitespace = is_whitespace;
                 }
-                if prev_is_whitespace {
-                    size -= 1;
-                }
-                slice(current, str::from_utf8_unchecked(&bytes[..size]), selection)
+
+                slice(current, str::from_utf8_unchecked(&bytes[..left_mut_pos]).trim_end(), selection);
+                // `output` is not a valid utf8 string now.
+                // We drop it here to prevent accidental usage afterward.
+                ::std::mem::drop(output);
             }
         }
     }
@@ -761,9 +776,9 @@ mod test {
     #[test]
     fn expand_process_unquoted() {
         let mut output = small::String::new();
-        let line = " Mary   had\ta little  \n\t lamb\t";
+        let line = " Mary   had\ta\u{2009}little  \n\t lamb 😉😉\t";
         expand_process(&mut output, line, Select::All, &CommandExpander, false);
-        assert_eq!(output.as_str(), "Mary had a little lamb");
+        assert_eq!(output.as_str(), "Mary had a little lamb 😉😉");
     }
 
     #[test]
