@@ -1,17 +1,21 @@
 # Maps
 
-Maps, also known as dictionaries, provide key-value association of data. There are two variants of maps within Ion: BTree and Hash. Hash maps store data in a random order, but are fast; whereas BTree maps keep their data in a sorted order, and are slower.
+Maps, (AKA dictionaries), provide key-value data association. Ion has two variants of maps: BTree and Hash. Hash maps are fast but store data in a random order; whereas BTree maps are slower but keep their data in a sorted order. If not sure what to use, it's best to go with Hash maps.
+
+Creating maps uses the same right-hand-side array syntax. However for design simplicity, users must annotate the type to translate the array into a map.
+
+Please note, the map's inner type specifies the value's type and not of the key. Keys will always be typed `str`.
 
 ## Create a HashMap
 
 ```
-let hashmap:hmap[] = [ foo=hello bar=world fizz=I buzz=was bazz=here ]
+let hashmap:hmap[str] = [ foo=hello bar=world fizz=I buzz=was bazz=here ]
 ```
 
 ## Create a BTreeMap
 
 ```
-let btreemap:bmap[] = [ foo=hello bar=world fizz=I buzz=was bazz=here ]
+let btreemap:bmap[str] = [ foo=hello bar=world fizz=I buzz=was bazz=here ]
 ```
 
 ## Fetch a variables by key
