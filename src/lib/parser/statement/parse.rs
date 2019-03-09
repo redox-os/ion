@@ -352,8 +352,8 @@ mod tests {
             description: None,
             name:        "bob".into(),
             args:        vec![
-                KeyBuf { name: "a".into(), kind: Primitive::Any },
-                KeyBuf { name: "b".into(), kind: Primitive::Any },
+                KeyBuf { name: "a".into(), kind: Primitive::Str },
+                KeyBuf { name: "b".into(), kind: Primitive::Str },
             ],
             statements:  Default::default(),
         };
@@ -368,8 +368,8 @@ mod tests {
             description: Some("bob is a nice function".into()),
             name:        "bob".into(),
             args:        vec![
-                KeyBuf { name: "a".into(), kind: Primitive::Any },
-                KeyBuf { name: "b".into(), kind: Primitive::Any },
+                KeyBuf { name: "a".into(), kind: Primitive::Str },
+                KeyBuf { name: "b".into(), kind: Primitive::Str },
             ],
             statements:  vec![],
         };

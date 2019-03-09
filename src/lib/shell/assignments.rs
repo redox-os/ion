@@ -452,7 +452,7 @@ fn math<'a, F: FnMut(&[u8]) -> Result<(), MathError>>(
 ) -> Result<(), MathError> {
     match operator {
         Operator::Add => match key {
-            Primitive::Any | Primitive::Float => {
+            Primitive::Str | Primitive::Float => {
                 writefn(parse_f64(lhs, value, |lhs, rhs| lhs + rhs)?.to_string().as_bytes())
             }
             Primitive::Integer => {
@@ -461,13 +461,13 @@ fn math<'a, F: FnMut(&[u8]) -> Result<(), MathError>>(
             _ => Err(MathError::Unsupported),
         },
         Operator::Divide => match key {
-            Primitive::Any | Primitive::Float | Primitive::Integer => {
+            Primitive::Str | Primitive::Float | Primitive::Integer => {
                 writefn(parse_f64(lhs, value, |lhs, rhs| lhs / rhs)?.to_string().as_bytes())
             }
             _ => Err(MathError::Unsupported),
         },
         Operator::IntegerDivide => match key {
-            Primitive::Any | Primitive::Float => write_integer(
+            Primitive::Str | Primitive::Float => write_integer(
                 parse_i64(lhs, value, |lhs, rhs| {
                     // We want to make sure we don't divide by zero, so instead, we give them a None
                     // as a result to signify that we were unable to calculate the result.
@@ -482,7 +482,7 @@ fn math<'a, F: FnMut(&[u8]) -> Result<(), MathError>>(
             _ => Err(MathError::Unsupported),
         },
         Operator::Subtract => match key {
-            Primitive::Any | Primitive::Float => {
+            Primitive::Str | Primitive::Float => {
                 writefn(parse_f64(lhs, value, |lhs, rhs| lhs - rhs)?.to_string().as_bytes())
             }
             Primitive::Integer => {
@@ -491,7 +491,7 @@ fn math<'a, F: FnMut(&[u8]) -> Result<(), MathError>>(
             _ => Err(MathError::Unsupported),
         },
         Operator::Multiply => match key {
-            Primitive::Any | Primitive::Float => {
+            Primitive::Str | Primitive::Float => {
                 writefn(parse_f64(lhs, value, |lhs, rhs| lhs * rhs)?.to_string().as_bytes())
             }
             Primitive::Integer => {
@@ -500,7 +500,7 @@ fn math<'a, F: FnMut(&[u8]) -> Result<(), MathError>>(
             _ => Err(MathError::Unsupported),
         },
         Operator::Exponent => match key {
-            Primitive::Any | Primitive::Float => {
+            Primitive::Str | Primitive::Float => {
                 writefn(parse_f64(lhs, value, |lhs, rhs| lhs.powf(rhs))?.to_string().as_bytes())
             }
             Primitive::Integer => {
