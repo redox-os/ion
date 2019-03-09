@@ -149,7 +149,7 @@ pub(crate) fn value_check<E: Expander>(
             shell.get_string(value)
         };
     match expected {
-        Primitive::Any | Primitive::Str | Primitive::AnyArray | Primitive::StrArray => {
+        Primitive::Str | Primitive::StrArray => {
             Ok(extracted)
         }
         Primitive::Boolean | Primitive::Integer | Primitive::Float |

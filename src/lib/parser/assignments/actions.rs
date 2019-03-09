@@ -125,24 +125,23 @@ impl<'a> Action<'a> {
         value: &'a str,
     ) -> Result<Action<'a>, AssignmentError<'a>> {
         match var.kind {
-            Primitive::AnyArray
+            Primitive::StrArray
             | Primitive::BooleanArray
             | Primitive::FloatArray
             | Primitive::IntegerArray
-            | Primitive::StrArray
             | Primitive::HashMap(_)
             | Primitive::BTreeMap(_) => {
                 if is_array(value) {
                     Ok(Action::UpdateArray(var, operator, value))
                 } else {
-                    Err(AssignmentError::InvalidValue(var.kind, Primitive::Any))
+                    Err(AssignmentError::InvalidValue(var.kind, Primitive::Str))
                 }
             }
             Primitive::Indexed(..) => Ok(Action::UpdateArray(var, operator, value)),
-            Primitive::Any if is_array(value) => Ok(Action::UpdateArray(var, operator, value)),
-            Primitive::Any => Ok(Action::UpdateString(var, operator, value)),
+            Primitive::Str if is_array(value) => Ok(Action::UpdateArray(var, operator, value)),
+            Primitive::Str => Ok(Action::UpdateString(var, operator, value)),
             _ if is_array(value) => {
-                Err(AssignmentError::InvalidValue(var.kind, Primitive::AnyArray))
+                Err(AssignmentError::InvalidValue(var.kind, Primitive::StrArray))
             }
             _ => Ok(Action::UpdateString(var, operator, value)),
         }
@@ -167,7 +166,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                Key { name: "abc", kind: Primitive::Any },
+                Key { name: "abc", kind: Primitive::Str },
                 Operator::Equal,
                 "123",
             ))
@@ -175,7 +174,7 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateString(
-                Key { name: "def", kind: Primitive::Any },
+                Key { name: "def", kind: Primitive::Str },
                 Operator::Equal,
                 "456",
             ))
@@ -193,13 +192,13 @@ mod tests {
             ))
         );
 
-        let (keys, op, vals) = split("a b[] c:int[] = one [two three] [4 5 6]");
+        let (keys, op, vals) = split("a b[] c:[int] = one [two three] [4 5 6]");
         let actions = AssignmentActions::new(&keys, op, &vals).collect::<Vec<_>>();
         assert_eq!(actions.len(), 3);
         assert_eq!(
             actions[0],
             Ok(Action::UpdateString(
-                Key { name: "a", kind: Primitive::Any },
+                Key { name: "a", kind: Primitive::Str },
                 Operator::Equal,
                 "one",
             ))
@@ -207,7 +206,7 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateArray(
-                Key { name: "b", kind: Primitive::AnyArray },
+                Key { name: "b", kind: Primitive::StrArray },
                 Operator::Equal,
                 "[two three]",
             ))
@@ -227,7 +226,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateArray(
-                Key { name: "a", kind: Primitive::AnyArray },
+                Key { name: "a", kind: Primitive::StrArray },
                 Operator::Equal,
                 "[one two]",
             ))
@@ -235,7 +234,7 @@ mod tests {
         assert_eq!(
             actions[1],
             Ok(Action::UpdateString(
-                Key { name: "b", kind: Primitive::Any },
+                Key { name: "b", kind: Primitive::Str },
                 Operator::Equal,
                 "three",
             ))
@@ -243,7 +242,7 @@ mod tests {
         assert_eq!(
             actions[2],
             Ok(Action::UpdateArray(
-                Key { name: "c", kind: Primitive::AnyArray },
+                Key { name: "c", kind: Primitive::StrArray },
                 Operator::Equal,
                 "[four five]",
             ))
@@ -254,7 +253,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateArray(
-                Key { name: "array", kind: Primitive::Any },
+                Key { name: "array", kind: Primitive::Str },
                 Operator::Concatenate,
                 "[one two three four five]",
             ))
@@ -265,7 +264,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateArray(
-                Key { name: "array", kind: Primitive::Any },
+                Key { name: "array", kind: Primitive::Str },
                 Operator::ConcatenateHead,
                 "[1 2 3 4 5]",
             ))
@@ -276,7 +275,7 @@ mod tests {
         assert_eq!(
             actions[0],
             Ok(Action::UpdateArray(
-                Key { name: "array", kind: Primitive::Any },
+                Key { name: "array", kind: Primitive::Str },
                 Operator::Filter,
                 "[foo bar baz]",
             ))
