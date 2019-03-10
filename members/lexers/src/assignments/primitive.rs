@@ -28,11 +28,18 @@ impl Primitive {
             "float" => Some(Primitive::Float),
             "[float]" => Some(Primitive::FloatArray),
             kind => {
-                let inner = kind.rfind(']').map(|found| &kind[5..found]);
-                match &kind[..4] {
-                    "hmap" => inner.and_then(|inner| Primitive::parse(inner).map(|p| Primitive::HashMap(Box::new(p)))),
-                    "bmap" => inner.and_then(|inner| Primitive::parse(inner).map(|p| Primitive::BTreeMap(Box::new(p)))),
-                    _ => None,
+                let mut parts = kind.splitn(2, '[');
+                let collection = parts.next()?;
+                let inner = parts.next()?;
+                if let (inner, "]") = inner.split_at(inner.len() - 1) {
+                    let inner = Box::new(Primitive::parse(inner)?);
+                    match collection {
+                        "hmap" => Some(Primitive::HashMap(inner)),
+                        "bmap" => Some(Primitive::BTreeMap(inner)),
+                        _ => None,
+                    }
+                } else {
+                    None
                 }
             }
         }

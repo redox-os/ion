@@ -165,8 +165,8 @@ mod tests {
     #[test]
     fn key_parsing() {
         let mut parser = KeyIterator::new(
-            "a:int b[] c:bool d e:int[] f[0] g[$index] h[1]:int i:hmap[] j:hmap[float] \
-             k:hmap[int[]] l:hmap[hmap[bool[]]] m:bmap[] n:bmap[int] o:bmap[float[]] \
+            "a:int b[] c:bool d e:[int] f[0] g[$index] h[1]:int i:hmap[str] j:hmap[float] \
+             k:hmap[[int]] l:hmap[hmap[[bool]]] m:bmap[str] n:bmap[int] o:bmap[[float]] \
              p:bmap[hmap[bool]] d:a",
         );
         assert_eq!(parser.next().unwrap(), Ok(Key { name: "a", kind: Primitive::Integer },));
