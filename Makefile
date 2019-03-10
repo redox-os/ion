@@ -44,7 +44,7 @@ tests:
 	cargo +$(TOOLCHAIN) test $(ARGSV)
 	TOOLCHAIN=$(TOOLCHAIN) bash examples/run_examples.sh
 	for crate in members/*; do \
-		cargo +$(TOOLCHAIN) test $(ARGSV) --manifest-path $$crate/Cargo.toml; \
+		cargo +$(TOOLCHAIN) test $(ARGSV) --manifest-path $$crate/Cargo.toml || exit 1; \
 	done
 
 install:
