@@ -6,90 +6,74 @@ use crate::{
 };
 use std::iter::Iterator;
 
-#[derive(PartialEq, Clone, Copy, Debug)]
-enum IsArrayHelper {
-    Valid(usize),
-    RootBracketClosed,
-    Invalid,
-}
-
 /// Determines if the supplied value is either an array or a string.
 ///
 /// - `[ 1 2 3 ]` = Array
 /// - `[ 1 2 3 ][1]` = String
 /// - `string` = String
 pub(crate) fn is_array(value: &str) -> bool {
-    if value.starts_with('[') && value.ends_with(']') {
-        !value
-            .chars()
-            .scan(IsArrayHelper::Valid(0), |state, x| {
-                // If previous iteration was RootBracketClosed or Invalid then indicate invalid
-                if *state == IsArrayHelper::RootBracketClosed || *state == IsArrayHelper::Invalid {
-                    *state = IsArrayHelper::Invalid;
-                    return Some(*state);
-                }
-
-                if x == '[' {
-                    if let IsArrayHelper::Valid(open) = *state {
-                        *state = IsArrayHelper::Valid(open + 1);
-                    }
-                } else if x == ']' {
-                    if let IsArrayHelper::Valid(open) = *state {
-                        *state = IsArrayHelper::Valid(open - 1);
-                    }
-                }
-
-                // if true, root bracket was closed
-                // => any characters after this one indicate invalid array
-                if *state == IsArrayHelper::Valid(0) {
-                    *state = IsArrayHelper::RootBracketClosed;
-                }
-
-                Some(*state)
-            })
-            .any(|x| x == IsArrayHelper::Invalid)
+    if value.ends_with(']') {
+        let mut brackets = value.chars().scan(0, |state, c| {
+            *state += match c {
+                '[' => 1,
+                ']' => -1,
+                _ => 0,
+            };
+            Some(*state)
+        });
+        // final bracket should be the last char
+        brackets.any(|x| x == 0) && brackets.next().is_none()
     } else {
         false
     }
 }
 
-pub(crate) fn as_boolean(value: &mut small::String) -> &str {
-    if ["true", "1", "y"].contains(&&**value) {
+pub(crate) fn to_boolean(value: &mut types::Str) -> Result<(), ()> {
+    if ["true", "1", "y"].contains(&value.as_str()) {
         value.clear();
         value.push_str("true");
-    } else if ["false", "0", "n"].contains(&&**value) {
+        Ok(())
+    } else if ["false", "0", "n"].contains(&value.as_str()) {
         value.clear();
         value.push_str("false");
+        Ok(())
     } else {
-        value.clear();
-        value.push_str("invalid");
+        Err(())
     }
-    value.as_str()
 }
 
 fn is_expected_with(expected_type: Primitive, value: &mut VariableType) -> Result<(), TypeError> {
     let checks_out = if let VariableType::Array(ref mut items) = value {
-            match expected_type {
-                Primitive::BooleanArray => items.iter_mut().all(|item| ["true", "false"].contains(&as_boolean(item))),
-                Primitive::IntegerArray => items.iter().all(|num| num.parse::<i64>().is_ok()),
-                Primitive::FloatArray => items.iter().all(|num| num.parse::<f64>().is_ok()),
-                _ => false,
-            }
-        } else if let VariableType::Str(ref mut string) = value {
-            match expected_type {
-                Primitive::Boolean => ["true", "false"].contains(&as_boolean(string)),
-                Primitive::Integer => string.parse::<i64>().is_ok(),
-                Primitive::Float => string.parse::<f64>().is_ok(),
-                _ => false,
-            }
-        } else {
-            false
-        };
+        match expected_type {
+            Primitive::BooleanArray => items.iter_mut().all(|item| {
+                is_expected_with(Primitive::Boolean, &mut VariableType::Str(item.to_owned()))
+                    .is_ok()
+            }),
+            Primitive::IntegerArray => items.iter_mut().all(|item| {
+                is_expected_with(Primitive::Integer, &mut VariableType::Str(item.to_owned()))
+                    .is_ok()
+            }),
+            Primitive::FloatArray => items.iter_mut().all(|item| {
+                is_expected_with(Primitive::Float, &mut VariableType::Str(item.to_owned())).is_ok()
+            }),
+            _ => false,
+        }
+    } else if let VariableType::Str(ref mut string) = value {
+        match expected_type {
+            Primitive::Boolean => to_boolean(string).is_ok(),
+            Primitive::Integer => string.parse::<i64>().is_ok(),
+            Primitive::Float => string.parse::<f64>().is_ok(),
+            _ => false,
+        }
+    } else {
+        false
+    };
 
     if checks_out {
-        return Ok(());
+        Ok(())
+    } else {
+        Err(TypeError::BadValue(expected_type))
     }
-    Err(TypeError::BadValue(expected_type))
 }
 
 fn get_map_of<E: Expander>(
@@ -99,27 +83,30 @@ fn get_map_of<E: Expander>(
 ) -> Result<VariableType, TypeError> {
     let array = expand_string(expression, shell, false);
 
-    let inner = match primitive_type {
+    let inner_kind = match primitive_type {
         Primitive::HashMap(ref inner) => inner,
         Primitive::BTreeMap(ref inner) => inner,
         _ => unreachable!(),
     };
 
-    let iter = array.iter().map(|string| {
-        if let Some(found) = string.find('=') {
-            let key = &string[..found];
-            let value = value_check(shell, &string[found + 1..], inner)?;
-            match value {
-                VariableType::Str(_) | VariableType::Array(_) | VariableType::HashMap(_) | VariableType::BTreeMap(_) => return Ok((key.into(), value)),
-                _ => return Err(TypeError::BadValue((**inner).clone())),
-            }
+    let size = array.len();
+
+    let iter = array.into_iter().map(|string| {
+        match string.splitn(2, '=').collect::<Vec<_>>().as_slice() {
+            [key, value] => value_check(shell, value, inner_kind).and_then(|val| match val {
+                VariableType::Str(_)
+                | VariableType::Array(_)
+                | VariableType::HashMap(_)
+                | VariableType::BTreeMap(_) => Ok(((*key).into(), val)),
+                _ => Err(TypeError::BadValue((**inner_kind).clone())),
+            }),
+            _ => Err(TypeError::BadValue(*inner_kind.clone())),
         }
-        Err(TypeError::BadValue((**inner).clone()))
     });
 
     match primitive_type {
         Primitive::HashMap(_) => {
-            let mut hmap = types::HashMap::with_capacity_and_hasher(array.len(), Default::default());
+            let mut hmap = types::HashMap::with_capacity_and_hasher(size, Default::default());
             for item in iter {
                 let (key, value) = item?;
                 hmap.insert(key, value);
@@ -143,17 +130,16 @@ pub(crate) fn value_check<E: Expander>(
     value: &str,
     expected: &Primitive,
 ) -> Result<VariableType, TypeError> {
-    let mut extracted = if is_array(value) {
-            shell.get_array(value)
-        } else {
-            shell.get_string(value)
-        };
+    let mut extracted =
+        if is_array(value) { shell.get_array(value) } else { shell.get_string(value) };
     match expected {
-        Primitive::Str | Primitive::StrArray => {
-            Ok(extracted)
-        }
-        Primitive::Boolean | Primitive::Integer | Primitive::Float |
-        Primitive::BooleanArray | Primitive::IntegerArray | Primitive::FloatArray => {
+        Primitive::Str | Primitive::StrArray => Ok(extracted),
+        Primitive::Boolean
+        | Primitive::Integer
+        | Primitive::Float
+        | Primitive::BooleanArray
+        | Primitive::IntegerArray
+        | Primitive::FloatArray => {
             is_expected_with(expected.clone(), &mut extracted)?;
             Ok(extracted)
         }
@@ -178,18 +164,50 @@ mod test {
 
     #[test]
     fn is_boolean_() {
-        assert_eq!(as_boolean(&mut small::String::from("1")),     "true");
-        assert_eq!(as_boolean(&mut small::String::from("y")),     "true");
-        assert_eq!(as_boolean(&mut small::String::from("true")),  "true");
-        assert_eq!(as_boolean(&mut small::String::from("0")),     "false");
-        assert_eq!(as_boolean(&mut small::String::from("n")),     "false");
-        assert_eq!(as_boolean(&mut small::String::from("false")), "false");
-        assert_eq!(as_boolean(&mut small::String::from("other")), "invalid");
+        let mut test = small::String::from("1");
+        to_boolean(&mut test).unwrap();
+        assert_eq!(test, small::String::from("true"));
+        let mut test = small::String::from("y");
+        to_boolean(&mut test).unwrap();
+        assert_eq!(test, small::String::from("true"));
+        let mut test = small::String::from("true");
+        to_boolean(&mut test).unwrap();
+        assert_eq!(test, small::String::from("true"));
+
+        let mut test = small::String::from("0");
+        to_boolean(&mut test).unwrap();
+        assert_eq!(test, small::String::from("false"));
+        let mut test = small::String::from("n");
+        to_boolean(&mut test).unwrap();
+        assert_eq!(test, small::String::from("false"));
+        let mut test = small::String::from("false");
+        to_boolean(&mut test).unwrap();
+        assert_eq!(test, small::String::from("false"));
+
+        assert_eq!(to_boolean(&mut small::String::from("1")), Ok(()));
+        assert_eq!(to_boolean(&mut small::String::from("y")), Ok(()));
+        assert_eq!(to_boolean(&mut small::String::from("true")), Ok(()));
+        assert_eq!(to_boolean(&mut small::String::from("0")), Ok(()));
+        assert_eq!(to_boolean(&mut small::String::from("n")), Ok(()));
+        assert_eq!(to_boolean(&mut small::String::from("false")), Ok(()));
+        assert_eq!(to_boolean(&mut small::String::from("other")), Err(()));
     }
 
     #[test]
     fn is_integer_array_() {
-        assert_eq!(is_expected_with(Primitive::IntegerArray, &mut VariableType::Array(array!["1", "2", "3"])), Ok(()));
-        assert_eq!(is_expected_with(Primitive::IntegerArray, &mut VariableType::Array(array!["1", "2", "three"])), Err(TypeError::BadValue(Primitive::IntegerArray)));
+        assert_eq!(
+            is_expected_with(
+                Primitive::IntegerArray,
+                &mut VariableType::Array(array!["1", "2", "3"])
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            is_expected_with(
+                Primitive::IntegerArray,
+                &mut VariableType::Array(array!["1", "2", "three"])
+            ),
+            Err(TypeError::BadValue(Primitive::IntegerArray))
+        );
     }
 }

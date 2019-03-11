@@ -326,7 +326,8 @@ impl<'a> StringMethod<'a> {
                                 // is the wrong place to handle this
                                 if elem != "" && elem != "," {
                                     let elem_str = elem.to_string();
-                                    // If the separation commas are properly removed from the pattern, then the cleaning on the next 7 lines is unnecessary
+                                    // If the separation commas are properly removed from the
+                                    // pattern, then the cleaning on the next 7 lines is unnecessary
                                     let elem_str_clean = if elem_str.ends_with(',') {
                                         let comma_pos = elem_str.rfind(',').unwrap();
                                         let (clean, _) = elem_str.split_at(comma_pos);

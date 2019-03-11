@@ -341,7 +341,9 @@ impl DirectoryStack {
                         count_from_front = x;
                         num = y;
                     }
-                    None => return Err(Cow::Owned(format!("ion: popd: {}: invalid argument", arg))),
+                    None => {
+                        return Err(Cow::Owned(format!("ion: popd: {}: invalid argument", arg)))
+                    }
                 };
             }
         }
