@@ -5,19 +5,18 @@ use crate::{
 
 pub(crate) fn terminate_script_quotes<T: AsRef<str> + ToString, I: Iterator<Item = T>>(
     shell: &mut Shell,
-    mut lines: I,
+    lines: I,
 ) -> i32 {
+    let mut lines = lines.filter(|cmd| !cmd.starts_with('#'));
     while let Some(command) = lines.next() {
-        let mut buffer = Terminator::new(command.to_string());
-        while !buffer.is_terminated() {
-            if let Some(command) = lines.find(|cmd| !cmd.as_ref().starts_with('#')) {
-                buffer.append(command.as_ref().splitn(2, " #").next().unwrap());
-            } else {
+        let buffer = Terminator::new(command);
+        match buffer.terminate(&mut lines) {
+            Ok(buffer) => shell.on_command(&buffer),
+            Err(_) => {
                 eprintln!("ion: unterminated quote in script");
                 return FAILURE;
             }
         }
-        shell.on_command(&buffer.consume());
     }
 
     if shell.flow_control.unclosed_block() {
@@ -30,19 +29,13 @@ pub(crate) fn terminate_script_quotes<T: AsRef<str> + ToString, I: Iterator<Item
 }
 
 pub(crate) fn terminate_quotes(shell: &mut Shell, command: String) -> Result<String, ()> {
-    let mut buffer = Terminator::new(command);
+    let buffer = Terminator::new(command);
     shell.flags |= UNTERMINATED;
-    while !buffer.is_terminated() {
-        if let Some(command) = shell.readln() {
-            if !command.starts_with('#') {
-                buffer.append(&command);
-            }
-        } else {
-            shell.flags ^= UNTERMINATED;
-            return Err(());
-        }
-    }
+    let mut lines = itertools::repeat_call(|| shell.readln()).filter_map(|cmd| cmd).filter(|cmd| !cmd.starts_with('#'));
 
-    shell.flags ^= UNTERMINATED;
-    Ok(buffer.consume())
+    let stmt = buffer.terminate(&mut lines).map(|stmt| stmt.to_string());
+
+    shell.flags &= !UNTERMINATED;
+
+    stmt
 }

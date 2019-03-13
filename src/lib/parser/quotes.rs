@@ -22,6 +22,7 @@ pub struct Terminator {
     read:       usize,
     trim:       bool,
     quotes:     Quotes,
+    comment:    bool,
 }
 
 impl<'a> From<&'a str> for Terminator {
@@ -35,7 +36,6 @@ impl From<String> for Terminator {
 #[derive(Debug)]
 enum EarlyExit {
     Eof,
-    Comment,
 }
 
 #[derive(Clone, Debug)]
@@ -71,9 +71,6 @@ impl<I: Iterator> RearPeekable<I> {
 }
 
 impl Terminator {
-    /// Consumes the `Terminator`, and returns the underlying `String`.
-    pub fn consume(self) -> String { self.buffer }
-
     fn pair_components(&mut self) -> Option<EarlyExit> {
         let bytes = self
             .buffer
@@ -87,11 +84,20 @@ impl Terminator {
         while let Some((i, character)) = bytes.next() {
             self.read = i + 1;
 
-            if self.trim {
+            if self.comment && character == b'\n' {
+                self.comment = false;
+            } else if self.trim {
                 self.trim = false;
             } else if character == b'\\' {
                 self.trim = true;
-            } else if self.quotes == Quotes::None {
+            } else if self.quotes != Quotes::None {
+                match (character, &self.quotes) {
+                    (b'\'', Quotes::Single) | (b'"', Quotes::Double) => {
+                        self.quotes = Quotes::None;
+                    }
+                    _ => (),
+                }
+            } else {
                 match character {
                     b'\'' => {
                         self.quotes = Quotes::Single;
@@ -100,7 +106,7 @@ impl Terminator {
                         self.quotes = Quotes::Double;
                     }
                     b'<' if bytes.prev() == Some(&(i - 1, b'<')) => {
-                        if bytes.peek() == Some(&(i + 1, b'<')) {
+                        if let Some(&(_, b'<')) = bytes.peek() {
                             bytes.next();
                         } else {
                             let bytes = &self.buffer.as_bytes()[self.read..];
@@ -119,19 +125,13 @@ impl Terminator {
                     }
                     b'#' if bytes
                         .prev()
-                        .filter(|&(j, c)| !(*j == i - 1 && [b' ', b'\n'].contains(c)))
+                        .filter(|&(_, c)| ![b' ', b'\n'].contains(c))
                         .is_none() =>
                     {
-                        return Some(EarlyExit::Comment);
+                        self.comment = true;
+                        // self.buffer.truncate(self.read - 1);
                     }
                     _ => {},
-                }
-            } else {
-                match (character, &self.quotes) {
-                    (b'\'', Quotes::Single) | (b'"', Quotes::Double) => {
-                        self.quotes = Quotes::None;
-                    }
-                    _ => (),
                 }
             }
         }
@@ -139,7 +139,20 @@ impl Terminator {
         None
     }
 
-    pub fn is_terminated(&mut self) -> bool {
+    /// Consumes lines until a statement is formed or the iterator runs dry, and returns the underlying `String`.
+    pub fn terminate<'a, I, T>(mut self, lines: &mut I) -> Result<String, ()>
+        where I: Iterator<Item = T>, T: AsRef<str> {
+        while !self.is_terminated() {
+            if let Some(command) = lines.next() {
+                self.append(command.as_ref().splitn(2, " #").next().unwrap());
+            } else {
+                return Err(());
+            }
+        }
+        Ok(self.buffer)
+    }
+
+    fn is_terminated(&mut self) -> bool {
         if self.eof.as_ref() == Some(&self.eof_buffer) {
             self.eof = None;
             self.buffer.push('\n');
@@ -149,10 +162,6 @@ impl Terminator {
         } else {
             match self.pair_components() {
                 Some(EarlyExit::Eof) => false,
-                Some(EarlyExit::Comment) => {
-                    self.buffer.truncate(self.read - 1);
-                    self.array == 0 && self.quotes == Quotes::None
-                }
                 None => {
                     if let Some(b'\\') = self.buffer.bytes().last() {
                         self.buffer.pop();
@@ -205,6 +214,7 @@ impl Terminator {
             read:       0,
             trim:       false,
             quotes:     Quotes::None,
+            comment:    false,
         }
     }
 }

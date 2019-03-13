@@ -234,9 +234,9 @@ impl Shell {
     where
         CMD: Into<Terminator>,
     {
-        let mut terminator = command.into();
-        if terminator.is_terminated() {
-            self.on_command(&terminator.consume());
+        let terminator = command.into();
+        if let Ok(stmt) = terminator.terminate::<_, &str>(&mut std::iter::empty()) {
+            self.on_command(&stmt);
             Ok(self.previous_status)
         } else {
             Err(IonError::Unterminated)
