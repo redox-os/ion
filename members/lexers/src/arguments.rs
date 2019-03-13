@@ -13,6 +13,47 @@ bitflags! {
     }
 }
 
+enum Field {
+    Parens,
+    Array,
+    Braces,
+}
+use self::Field::*;
+
+struct Levels {
+    parens:  i32,
+    array:  i32,
+    braces: i32,
+}
+
+impl Levels {
+    fn new() -> Self {
+        Levels { parens: 0, array: 0, braces: 0, }
+    }
+
+    fn up(&mut self, field: Field) {
+        let level = match field {
+                Parens => &mut self.parens,
+                Array => &mut self.array,
+                Braces => &mut self.braces,
+            };
+        *level += 1;
+    }
+
+    fn down(&mut self, field: Field) {
+        let level = match field {
+                Parens => &mut self.parens,
+                Array => &mut self.array,
+                Braces => &mut self.braces,
+            };
+        *level -= 1;
+    }
+
+    fn are_rooted(&self) -> bool {
+        self.parens == 0 && self.array == 0 && self.braces == 0
+    }
+}
+
 /// An efficient `Iterator` structure for splitting arguments
 #[derive(Debug)]
 pub struct ArgumentSplitter<'a> {
@@ -53,7 +94,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
         }
         let start = self.read;
 
-        let (mut level, mut alevel, mut blevel) = (0, 0, 0);
+        let mut levels = Levels::new();
         let mut bytes = data.iter().cloned().skip(self.read);
         while let Some(character) = bytes.next() {
             match character {
@@ -77,14 +118,10 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                     self.read += 1;
                     continue;
                 }
-                // Increment the array level
-                b'[' => alevel += 1,
-                // Decrement the array level
-                b']' => alevel -= 1,
-
-                b'{' => blevel += 1,
-                b'}' => blevel -= 1,
-
+                b'[' => levels.up(Array),
+                b']' => levels.down(Array),
+                b'{' => levels.up(Braces),
+                b'}' => levels.down(Braces),
                 b'(' => {
                     // Disable VARIAB + ARRAY and enable METHOD.
                     // if variab or array are set
@@ -92,13 +129,13 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                         self.bitflags.remove(ArgumentFlags::VARIAB | ArgumentFlags::ARRAY);
                         self.bitflags.insert(ArgumentFlags::METHOD);
                     }
-                    level += 1
+                    levels.up(Parens);
                 }
                 b')' => {
                     if self.bitflags.contains(ArgumentFlags::METHOD) {
                         self.bitflags.remove(ArgumentFlags::METHOD);
                     }
-                    level -= 1;
+                    levels.down(Parens)
                 }
 
                 // Toggle double quote rules.
@@ -114,9 +151,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 // Break from the loop once a root-level space is found.
                 b' ' => {
                     if !self.bitflags.intersects(ArgumentFlags::DOUBLE | ArgumentFlags::METHOD)
-                        && level == 0
-                        && alevel == 0
-                        && blevel == 0
+                        && levels.are_rooted()
                     {
                         break;
                     }
