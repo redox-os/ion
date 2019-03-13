@@ -28,17 +28,17 @@ pub(crate) fn is_array(value: &str) -> bool {
     }
 }
 
-pub(crate) fn to_boolean(value: &mut types::Str) -> Result<(), ()> {
+pub(crate) fn is_boolean(value: &mut types::Str) -> bool {
     if ["true", "1", "y"].contains(&value.as_str()) {
         value.clear();
         value.push_str("true");
-        Ok(())
+        true
     } else if ["false", "0", "n"].contains(&value.as_str()) {
         value.clear();
         value.push_str("false");
-        Ok(())
+        true
     } else {
-        Err(())
+        false
     }
 }
 
@@ -60,7 +60,7 @@ fn is_expected_with(expected_type: Primitive, value: &mut Value) -> Result<(), T
         }
     } else if let Value::Str(ref mut string) = value {
         match expected_type {
-            Primitive::Boolean => to_boolean(string).is_ok(),
+            Primitive::Boolean => is_boolean(string),
             Primitive::Integer => string.parse::<i64>().is_ok(),
             Primitive::Float => string.parse::<f64>().is_ok(),
             _ => false,
@@ -164,33 +164,29 @@ mod test {
 
     #[test]
     fn is_boolean_() {
-        let mut test = small::String::from("1");
-        to_boolean(&mut test).unwrap();
-        assert_eq!(test, small::String::from("true"));
-        let mut test = small::String::from("y");
-        to_boolean(&mut test).unwrap();
-        assert_eq!(test, small::String::from("true"));
-        let mut test = small::String::from("true");
-        to_boolean(&mut test).unwrap();
-        assert_eq!(test, small::String::from("true"));
+        let mut test: small::String = "1".into();
+        assert!(is_boolean(&mut test));
+        assert_eq!(test, "true");
+        test = small::String::from("y");
+        assert!(is_boolean(&mut test));
+        assert_eq!(test, "true");
+        test = small::String::from("true");
+        assert!(is_boolean(&mut test));
+        assert_eq!(test, "true");
 
-        let mut test = small::String::from("0");
-        to_boolean(&mut test).unwrap();
-        assert_eq!(test, small::String::from("false"));
-        let mut test = small::String::from("n");
-        to_boolean(&mut test).unwrap();
-        assert_eq!(test, small::String::from("false"));
-        let mut test = small::String::from("false");
-        to_boolean(&mut test).unwrap();
-        assert_eq!(test, small::String::from("false"));
+        test = small::String::from("0");
+        assert!(is_boolean(&mut test));
+        assert_eq!(test, "false");
+        test = small::String::from("n");
+        assert!(is_boolean(&mut test));
+        assert_eq!(test, "false");
+        test = small::String::from("false");
+        assert!(is_boolean(&mut test));
+        assert_eq!(test, "false");
 
-        assert_eq!(to_boolean(&mut small::String::from("1")), Ok(()));
-        assert_eq!(to_boolean(&mut small::String::from("y")), Ok(()));
-        assert_eq!(to_boolean(&mut small::String::from("true")), Ok(()));
-        assert_eq!(to_boolean(&mut small::String::from("0")), Ok(()));
-        assert_eq!(to_boolean(&mut small::String::from("n")), Ok(()));
-        assert_eq!(to_boolean(&mut small::String::from("false")), Ok(()));
-        assert_eq!(to_boolean(&mut small::String::from("other")), Err(()));
+        test = small::String::from("other");
+        assert!(!is_boolean(&mut test));
+        assert_eq!(test, "other");
     }
 
     #[test]
