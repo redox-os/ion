@@ -584,19 +584,15 @@ impl PipelineExecution for Shell {
 
     fn exec_job(&mut self, job: &mut RefinedJob, _foreground: bool) -> i32 {
         // Duplicate file descriptors, execute command, and redirect back.
-        fn duplicate<F: FnMut() -> i32>(long: &str, mut func: F) -> i32 {
-            if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
-                let code = func();
-                redirect_streams(stdin_bk, stdout_bk, stderr_bk);
-                return code;
-            }
-
-            eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", long);
+        if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
+            let code = job.exec(self);
+            redirect_streams(&stdin_bk, &stdout_bk, &stderr_bk);
+            code
+        } else {
+            eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", job.long());
 
             COULD_NOT_EXEC
         }
-
-        duplicate(&job.long(), move || job.exec(self))
     }
 
     fn wait(&mut self, pgid: u32, commands: SmallVec<[RefinedJob; 16]>) -> i32 {
@@ -726,7 +722,7 @@ pub(crate) fn pipe(
                     } else {
                         // Pipe the previous command's stdin to this commands stdout/stderr.
                         match sys::pipe2(sys::O_CLOEXEC) {
-                            Err(e) => pipe_fail(e),
+                            Err(e) => pipe_fail(&e),
                             Ok((reader, writer)) => {
                                 if is_external {
                                     append_external_stdio_pipe(&mut ext_stdio_pipes, writer);
@@ -943,7 +939,7 @@ fn fork_exec_internal<F>(
             *last_pid = *current_pid;
             *current_pid = pid;
         }
-        Err(e) => pipe_fail(e),
+        Err(e) => pipe_fail(&e),
     }
 }
 
@@ -994,7 +990,7 @@ pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
     }
 }
 
-pub fn pipe_fail(why: io::Error) {
+pub fn pipe_fail(why: &io::Error) {
     eprintln!("ion: failed to create pipe: {:?}", why);
 }
 

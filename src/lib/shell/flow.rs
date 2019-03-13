@@ -213,7 +213,7 @@ impl FlowLogic for Shell {
                 self.variables
                     .set(&name, Function::new(description, name.clone(), args, statements));
             }
-            Statement::Pipeline(pipeline) => match expand_pipeline(&self, pipeline) {
+            Statement::Pipeline(pipeline) => match expand_pipeline(&self, &pipeline) {
                 Ok((mut pipeline, statements)) => {
                     self.run_pipeline(&mut pipeline);
                     if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
@@ -481,7 +481,7 @@ impl FlowLogic for Shell {
 /// statements, where the last statement has the other half of the pipeline merged.
 fn expand_pipeline(
     shell: &Shell,
-    pipeline: Pipeline,
+    pipeline: &Pipeline,
 ) -> Result<(Pipeline, Vec<Statement>), String> {
     let mut item_iter = pipeline.items.iter();
     let mut items: Vec<PipeItem> = Vec::new();

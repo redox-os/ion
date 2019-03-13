@@ -53,7 +53,7 @@ impl fmt::Display for ProcessState {
 }
 
 pub(crate) fn add_to_background(
-    processes: Arc<Mutex<Vec<BackgroundProcess>>>,
+    processes: &Arc<Mutex<Vec<BackgroundProcess>>>,
     pid: u32,
     state: ProcessState,
     command: String,
@@ -110,7 +110,7 @@ impl JobControl for Shell {
 
         // Add the process to the background list, and mark the job's ID as
         // the previous job in the shell (in case fg/bg is executed w/ no args).
-        let njob = add_to_background(processes.clone(), pid, state, command);
+        let njob = add_to_background(&processes, pid, state, command);
         self.previous_job = njob;
         eprintln!("ion: bg [{}] {}", njob, pid);
 
@@ -118,7 +118,7 @@ impl JobControl for Shell {
         // background process, updating it's state changes until it finally
         // exits.
         let _ = spawn(move || {
-            watch_background(fg_signals, processes, pid, njob as usize);
+            watch_background(&fg_signals, &processes, pid, njob as usize);
         });
     }
 
@@ -258,8 +258,8 @@ use crate::sys::{
 const OPTS: i32 = WUNTRACED | WCONTINUED | WNOHANG;
 
 pub(crate) fn watch_background(
-    fg: Arc<ForegroundSignals>,
-    processes: Arc<Mutex<Vec<BackgroundProcess>>>,
+    fg: &Arc<ForegroundSignals>,
+    processes: &Arc<Mutex<Vec<BackgroundProcess>>>,
     pgid: u32,
     njob: usize,
 ) {

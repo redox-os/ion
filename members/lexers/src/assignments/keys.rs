@@ -33,7 +33,7 @@ impl<'a> Display for TypeError {
 }
 
 impl<'a> Key<'a> {
-    fn new(name: &'a str, data: &'a str) -> Result<Key<'a>, TypeError> {
+    fn parse(name: &'a str, data: &'a str) -> Result<Key<'a>, TypeError> {
         match Primitive::parse(data) {
             Some(data) => Ok(Key { kind: data, name }),
             None => Err(TypeError::Invalid(data.into())),
@@ -109,7 +109,7 @@ impl<'a> KeyIterator<'a> {
             self.read += 1;
             match byte {
                 b' ' if start + 1 == self.read => start += 1,
-                b' ' => return Key::new(name, &self.data[start..self.read].trim()),
+                b' ' => return Key::parse(name, &self.data[start..self.read].trim()),
                 _ => (),
             }
         }
@@ -117,7 +117,7 @@ impl<'a> KeyIterator<'a> {
         if start == self.read {
             Err(TypeError::Invalid(String::new()))
         } else {
-            Key::new(name, &self.data[start..self.read].trim())
+            Key::parse(name, &self.data[start..self.read].trim())
         }
     }
 

@@ -17,7 +17,6 @@ enum Quotes {
 pub struct Terminator {
     buffer:     String,
     eof:        Option<String>,
-    eof_buffer: String,
     array:      usize,
     read:       usize,
     trim:       bool,
@@ -140,9 +139,9 @@ impl Terminator {
     }
 
     /// Consumes lines until a statement is formed or the iterator runs dry, and returns the underlying `String`.
-    pub fn terminate<'a, I, T>(mut self, lines: &mut I) -> Result<String, ()>
+    pub fn terminate<I, T>(mut self, lines: &mut I) -> Result<String, ()>
         where I: Iterator<Item = T>, T: AsRef<str> {
-        while !self.is_terminated() {
+        while self.eof.is_some() || !self.is_terminated() {
             if let Some(command) = lines.next() {
                 self.append(command.as_ref().splitn(2, " #").next().unwrap());
             } else {
@@ -153,55 +152,41 @@ impl Terminator {
     }
 
     fn is_terminated(&mut self) -> bool {
-        if self.eof.as_ref() == Some(&self.eof_buffer) {
-            self.eof = None;
-            self.buffer.push('\n');
-            true
-        } else if self.eof.is_some() {
-            false
-        } else {
-            match self.pair_components() {
-                Some(EarlyExit::Eof) => false,
-                None => {
-                    if let Some(b'\\') = self.buffer.bytes().last() {
-                        self.buffer.pop();
-                        self.read -= 1;
-                        false
-                    } else if self.array > 0 {
-                        self.read += 1;
-                        self.buffer.push(' ');
-                        false
-                    } else if self.quotes != Quotes::None {
-                        self.read += 1;
-                        self.buffer.push('\n');
-                        false
-                    } else {
-                        let mut last_chars = self.buffer.bytes().rev();
-                        last_chars
-                            .next()
-                            .filter(|&now| now == b'&' || now == b'|')
-                            .and_then(|now| last_chars.next().filter(|&prev| prev == now))
-                            .is_none()
-                    }
+        match self.pair_components() {
+            Some(EarlyExit::Eof) => false,
+            None => {
+                if let Some(b'\\') = self.buffer.bytes().last() {
+                    self.buffer.pop();
+                    self.read -= 1;
+                    false
+                } else if self.array > 0 {
+                    self.read += 1;
+                    self.buffer.push(' ');
+                    false
+                } else if self.quotes != Quotes::None {
+                    self.read += 1;
+                    self.buffer.push('\n');
+                    false
+                } else {
+                    let mut last_chars = self.buffer.bytes().rev();
+                    last_chars
+                        .next()
+                        .filter(|&now| now == b'&' || now == b'|')
+                        .and_then(|now| last_chars.next().filter(|&prev| prev == now))
+                        .is_none()
                 }
             }
         }
     }
 
     /// Appends a string to the internal buffer.
-    pub fn append(&mut self, input: &str) {
-        if self.eof.is_none() {
-            self.buffer.push_str(if self.trim {
-                self.trim = false;
-                input.trim()
-            } else {
-                input
-            });
-        } else {
-            self.eof_buffer.clear();
-            self.eof_buffer.push_str(input.trim());
-            self.buffer.push('\n');
-            self.buffer.push_str(input);
+    fn append(&mut self, input: &str) {
+        if self.eof.is_some() { self.buffer.push('\n') }
+        self.buffer.push_str(if self.trim { input.trim() } else { input });
+        self.trim = false;
+
+        if self.eof.as_ref().map(|s| s.as_str()) == Some(&input.trim()) {
+            self.eof = None;
         }
     }
 
@@ -209,7 +194,6 @@ impl Terminator {
         Terminator {
             buffer:     input,
             eof:        None,
-            eof_buffer: String::new(),
             array:      0,
             read:       0,
             trim:       false,

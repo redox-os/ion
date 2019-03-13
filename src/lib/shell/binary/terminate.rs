@@ -9,9 +9,8 @@ pub(crate) fn terminate_script_quotes<T: AsRef<str> + ToString, I: Iterator<Item
 ) -> i32 {
     let mut lines = lines.filter(|cmd| !cmd.starts_with('#'));
     while let Some(command) = lines.next() {
-        let buffer = Terminator::new(command);
-        match buffer.terminate(&mut lines) {
-            Ok(buffer) => shell.on_command(&buffer),
+        match Terminator::new(command).terminate(&mut lines) {
+            Ok(stmt) => shell.on_command(&stmt),
             Err(_) => {
                 eprintln!("ion: unterminated quote in script");
                 return FAILURE;

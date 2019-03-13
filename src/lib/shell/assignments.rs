@@ -104,7 +104,7 @@ impl VariableStore for Shell {
                                 .unwrap_or_else(|| "0".into());
 
                             math(&key.kind, operator, &rhs)
-                                .and_then(|action| parse(&lhs, |a| action(a)))
+                                .and_then(|action| parse(&lhs, &*action))
                                 .map(|mut value| {
                                     if key_name == "PATH" {
                                         if let Ok(home) = &env::var("HOME") {
@@ -195,7 +195,7 @@ impl VariableStore for Shell {
                             .and_then(|lhs| match rhs {
                                 Value::Str(rhs) => match lhs {
                                     Value::Str(lhs) => math(&key.kind, operator, &rhs)
-                                        .and_then(|action| parse(&lhs, |a| action(a)))
+                                        .and_then(|action| parse(&lhs, &*action))
                                         .map(|value| {
                                             patch.insert(key, Value::Str(value.into()));
                                         })
@@ -218,7 +218,7 @@ impl VariableStore for Shell {
                                                 array
                                                     .iter_mut()
                                                     .map(|el| {
-                                                        parse(el, |v| action(v))
+                                                        parse(el, &*action)
                                                             .map(|result| *el = result.into())
                                                     })
                                                     .find(|e| e.is_err())
