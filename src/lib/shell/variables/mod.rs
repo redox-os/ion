@@ -20,7 +20,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum VariableType {
+pub enum Value {
     Str(types::Str),
     Alias(types::Alias),
     Array(types::Array),
@@ -30,12 +30,12 @@ pub enum VariableType {
     None,
 }
 
-macro_rules! type_from_variable {
+macro_rules! type_from_value {
     ($to:ty : $variant:ident else $defaultmethod:ident($($args:expr),*)) => {
-        impl From<VariableType> for $to {
-            fn from(var: VariableType) -> Self {
+        impl From<Value> for $to {
+            fn from(var: Value) -> Self {
                 match var {
-                    VariableType::$variant(inner) => inner,
+                    Value::$variant(inner) => inner,
                     _ => <$to>::$defaultmethod($($args),*),
                 }
             }
@@ -43,12 +43,12 @@ macro_rules! type_from_variable {
     }
 }
 
-type_from_variable!(types::Str : Str else with_capacity(0));
-type_from_variable!(types::Alias : Alias else empty());
-type_from_variable!(types::Array : Array else with_capacity(0));
-type_from_variable!(types::HashMap : HashMap else with_capacity_and_hasher(0, Default::default()));
-type_from_variable!(types::BTreeMap : BTreeMap else new());
-type_from_variable!(Function : Function else
+type_from_value!(types::Str : Str else with_capacity(0));
+type_from_value!(types::Alias : Alias else empty());
+type_from_value!(types::Array : Array else with_capacity(0));
+type_from_value!(types::HashMap : HashMap else with_capacity_and_hasher(0, Default::default()));
+type_from_value!(types::BTreeMap : BTreeMap else new());
+type_from_value!(Function : Function else
     new(
         Default::default(),
         Default::default(),
@@ -58,33 +58,33 @@ type_from_variable!(Function : Function else
 );
 
 // this one’s only special because of the lifetime parameter
-impl<'a> From<&'a str> for VariableType {
-    fn from(string: &'a str) -> Self { VariableType::Str(string.into()) }
+impl<'a> From<&'a str> for Value {
+    fn from(string: &'a str) -> Self { Value::Str(string.into()) }
 }
 
-macro_rules! variable_from_type {
+macro_rules! value_from_type {
     ($arg:ident: $from:ty => $variant:ident($inner:expr)) => {
-        impl From<$from> for VariableType {
-            fn from($arg: $from) -> Self { VariableType::$variant($inner) }
+        impl From<$from> for Value {
+            fn from($arg: $from) -> Self { Value::$variant($inner) }
         }
     };
 }
 
-variable_from_type!(string: types::Str => Str(string));
-variable_from_type!(string: String => Str(string.into()));
-variable_from_type!(alias: types::Alias => Alias(alias));
-variable_from_type!(array: types::Array => Array(array));
-variable_from_type!(hmap: types::HashMap => HashMap(hmap));
-variable_from_type!(bmap: types::BTreeMap => BTreeMap(bmap));
-variable_from_type!(function: Function => Function(function));
+value_from_type!(string: types::Str => Str(string));
+value_from_type!(string: String => Str(string.into()));
+value_from_type!(alias: types::Alias => Alias(alias));
+value_from_type!(array: types::Array => Array(array));
+value_from_type!(hmap: types::HashMap => HashMap(hmap));
+value_from_type!(bmap: types::BTreeMap => BTreeMap(bmap));
+value_from_type!(function: Function => Function(function));
 
-impl fmt::Display for VariableType {
+impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            VariableType::Str(ref str_) => write!(f, "{}", str_),
-            VariableType::Alias(ref alias) => write!(f, "{}", **alias),
-            VariableType::Array(ref array) => write!(f, "{}", array.join(" ")),
-            VariableType::HashMap(ref map) => {
+            Value::Str(ref str_) => write!(f, "{}", str_),
+            Value::Alias(ref alias) => write!(f, "{}", **alias),
+            Value::Array(ref array) => write!(f, "{}", array.join(" ")),
+            Value::HashMap(ref map) => {
                 let format = map
                     .iter()
                     .map(|(_, var_type)| format!("{}", var_type))
@@ -92,7 +92,7 @@ impl fmt::Display for VariableType {
                     .join(" ");
                 write!(f, "{}", format)
             }
-            VariableType::BTreeMap(ref map) => {
+            Value::BTreeMap(ref map) => {
                 let format = map
                     .iter()
                     .map(|(_, var_type)| format!("{}", var_type))
@@ -107,14 +107,14 @@ impl fmt::Display for VariableType {
 
 #[derive(Clone, Debug)]
 pub struct Scope {
-    vars: HashMap<types::Str, VariableType>,
+    vars: HashMap<types::Str, Value>,
     /// This scope is on a namespace boundary.
     /// Any previous scopes need to be accessed through `super::`.
     namespace: bool,
 }
 
 impl Deref for Scope {
-    type Target = HashMap<types::Str, VariableType>;
+    type Target = HashMap<types::Str, Value>;
 
     fn deref(&self) -> &Self::Target { &self.vars }
 }
@@ -132,13 +132,13 @@ pub struct Variables {
 
 impl Default for Variables {
     fn default() -> Self {
-        let mut map: HashMap<types::Str, VariableType> = HashMap::with_capacity(64);
-        map.insert("DIRECTORY_STACK_SIZE".into(), VariableType::Str("1000".into()));
-        map.insert("HISTORY_SIZE".into(), VariableType::Str("1000".into()));
-        map.insert("HISTFILE_SIZE".into(), VariableType::Str("100000".into()));
+        let mut map: HashMap<types::Str, Value> = HashMap::with_capacity(64);
+        map.insert("DIRECTORY_STACK_SIZE".into(), Value::Str("1000".into()));
+        map.insert("HISTORY_SIZE".into(), Value::Str("1000".into()));
+        map.insert("HISTFILE_SIZE".into(), Value::Str("100000".into()));
         map.insert(
             "PROMPT".into(),
-            VariableType::Str(
+            Value::Str(
                 "${x::1B}]0;${USER}: \
                  ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# \
                  ${c::reset}"
@@ -149,15 +149,15 @@ impl Default for Variables {
         // Set the PID, UID, and EUID variables.
         map.insert(
             "PID".into(),
-            VariableType::Str(getpid().ok().map_or("?".into(), |id| id.to_string().into())),
+            Value::Str(getpid().ok().map_or("?".into(), |id| id.to_string().into())),
         );
         map.insert(
             "UID".into(),
-            VariableType::Str(getuid().ok().map_or("?".into(), |id| id.to_string().into())),
+            Value::Str(getuid().ok().map_or("?".into(), |id| id.to_string().into())),
         );
         map.insert(
             "EUID".into(),
-            VariableType::Str(geteuid().ok().map_or("?".into(), |id| id.to_string().into())),
+            Value::Str(geteuid().ok().map_or("?".into(), |id| id.to_string().into())),
         );
 
         // Initialize the HISTFILE variable
@@ -165,18 +165,18 @@ impl Default for Variables {
             if let Ok(path) = base_dirs.place_data_file("history") {
                 map.insert(
                     "HISTFILE".into(),
-                    VariableType::Str(path.to_str().unwrap_or("?").into()),
+                    Value::Str(path.to_str().unwrap_or("?").into()),
                 );
-                map.insert("HISTFILE_ENABLED".into(), VariableType::Str("1".into()));
+                map.insert("HISTFILE_ENABLED".into(), Value::Str("1".into()));
             }
         }
 
         // History Timestamps enabled variable, disabled by default
-        map.insert("HISTORY_TIMESTAMP".into(), VariableType::Str("0".into()));
+        map.insert("HISTORY_TIMESTAMP".into(), Value::Str("0".into()));
 
         map.insert(
             "HISTORY_IGNORE".into(),
-            VariableType::Array(array!["no_such_command", "whitespace", "duplicates"]),
+            Value::Array(array!["no_such_command", "whitespace", "duplicates"]),
         );
 
         // Initialize the HOME variable
@@ -238,11 +238,11 @@ impl Variables {
         None
     }
 
-    pub fn shadow(&mut self, name: &str, value: VariableType) -> Option<VariableType> {
+    pub fn shadow(&mut self, name: &str, value: Value) -> Option<Value> {
         self.scopes[self.current].insert(name.into(), value)
     }
 
-    pub fn get_ref(&self, mut name: &str) -> Option<&VariableType> {
+    pub fn get_ref(&self, mut name: &str) -> Option<&Value> {
         const GLOBAL_NS: &str = "global::";
         const SUPER_NS: &str = "super::";
 
@@ -262,7 +262,7 @@ impl Variables {
 
         for scope in self.scopes() {
             match scope.get(name) {
-                val @ Some(VariableType::Function(_)) => return val,
+                val @ Some(Value::Function(_)) => return val,
                 val @ Some(_) if up_namespace == 0 => return val,
                 _ => (),
             }
@@ -275,7 +275,7 @@ impl Variables {
         None
     }
 
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut VariableType> {
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Value> {
         if name.starts_with("super::") || name.starts_with("global::") {
             // Cannot mutate outer namespace
             return None;
@@ -292,7 +292,7 @@ impl Variables {
         None
     }
 
-    pub fn remove_variable(&mut self, name: &str) -> Option<VariableType> {
+    pub fn remove_variable(&mut self, name: &str) -> Option<Value> {
         for scope in self.scopes_mut() {
             if let val @ Some(_) = scope.remove(name) {
                 return val;
@@ -388,7 +388,7 @@ impl Variables {
         self.scopes()
             .map(|map| {
                 map.iter().filter_map(|(key, val)| {
-                    if let VariableType::Str(val) = val {
+                    if let Value::Str(val) = val {
                         Some((key, val))
                     } else {
                         None
@@ -409,7 +409,7 @@ impl Variables {
         GetVariable::<T>::get(self, name)
     }
 
-    pub fn set<T: Into<VariableType>>(&mut self, name: &str, var: T) {
+    pub fn set<T: Into<Value>>(&mut self, name: &str, var: T) {
         let var = var.into();
 
         enum UpperAction {
@@ -430,12 +430,12 @@ impl Variables {
             ($name:tt, $input:ty, $preferred:tt) => {
                 fn $name<'a>(
                     name: &str,
-                    var: &VariableType,
+                    var: &Value,
                     input: &'a mut $input,
                 ) -> Option<Action<'a>> {
                     if !name.is_empty() {
                         match var {
-                            VariableType::$preferred(var_value) => {
+                            Value::$preferred(var_value) => {
                                 if var_value.is_empty() {
                                     Some(Action::Upper(UpperAction::Remove))
                                 } else {
@@ -459,17 +459,17 @@ impl Variables {
 
         let upper_action = {
             let action = match self.get_mut(&name) {
-                Some(VariableType::Str(ref mut str_)) => string_action(name, &var, str_),
-                Some(VariableType::Alias(ref mut alias)) => alias_action(name, &var, alias),
-                Some(VariableType::Array(ref mut array)) => array_action(name, &var, array),
-                Some(VariableType::HashMap(ref mut map)) => hashmap_action(name, &var, map),
-                Some(VariableType::Function(ref mut func)) => function_action(name, &var, func),
+                Some(Value::Str(ref mut str_)) => string_action(name, &var, str_),
+                Some(Value::Alias(ref mut alias)) => alias_action(name, &var, alias),
+                Some(Value::Array(ref mut array)) => array_action(name, &var, array),
+                Some(Value::HashMap(ref mut map)) => hashmap_action(name, &var, map),
+                Some(Value::Function(ref mut func)) => function_action(name, &var, func),
                 _ => Some(Action::Upper(UpperAction::Shadow)),
             };
 
             macro_rules! handle_action {
                 ($value:ident, $variant:tt) => {{
-                    if let VariableType::$variant(with) = var {
+                    if let Value::$variant(with) = var {
                         mem::replace($value, with);
                         None
                     } else {
@@ -506,7 +506,7 @@ impl Variables {
             .rev()
             .map(|map| {
                 map.iter().filter_map(|(key, possible_alias)| {
-                    if let VariableType::Alias(alias) = possible_alias {
+                    if let Value::Alias(alias) = possible_alias {
                         Some((key, &**alias))
                     } else {
                         None
@@ -522,7 +522,7 @@ impl Variables {
             .rev()
             .map(|map| {
                 map.iter().filter_map(|(key, val)| {
-                    if let VariableType::Function(val) = val {
+                    if let Value::Function(val) = val {
                         Some((key, val))
                     } else {
                         None
@@ -583,7 +583,7 @@ impl Variables {
             .rev()
             .map(|map| {
                 map.iter().filter_map(|(key, val)| {
-                    if let VariableType::Array(val) = val {
+                    if let Value::Array(val) = val {
                         Some((key, val))
                     } else {
                         None
@@ -630,8 +630,8 @@ impl GetVariable<types::Str> for Variables {
         use crate::types::Str;
 
         match name {
-            "MWD" => return Some(Str::from(VariableType::Str(self.get_minimal_directory()))),
-            "SWD" => return Some(Str::from(VariableType::Str(self.get_simplified_directory()))),
+            "MWD" => return Some(Str::from(Value::Str(self.get_minimal_directory()))),
+            "SWD" => return Some(Str::from(Value::Str(self.get_simplified_directory()))),
             _ => (),
         }
         // If the parsed name contains the '::' pattern, then a namespace was
@@ -639,10 +639,10 @@ impl GetVariable<types::Str> for Variables {
         match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
             Some(("c", variable)) | Some(("color", variable)) => Colors::collect(variable)
                 .into_string()
-                .map(|s| Str::from(VariableType::Str(s.into()))),
+                .map(|s| Str::from(Value::Str(s.into()))),
             Some(("x", variable)) | Some(("hex", variable)) => {
                 match u8::from_str_radix(variable, 16) {
-                    Ok(c) => Some(Str::from(VariableType::Str((c as char).to_string().into()))),
+                    Ok(c) => Some(Str::from(Value::Str((c as char).to_string().into()))),
                     Err(why) => {
                         eprintln!("ion: hex parse error: {}: {}", variable, why);
                         None
@@ -650,13 +650,13 @@ impl GetVariable<types::Str> for Variables {
                 }
             }
             Some(("env", variable)) => {
-                env::var(variable).map(Into::into).ok().map(|s| Str::from(VariableType::Str(s)))
+                env::var(variable).map(Into::into).ok().map(|s| Str::from(Value::Str(s)))
             }
             Some(("super", _)) | Some(("global", _)) | None => {
                 // Otherwise, it's just a simple variable name.
                 match self.get_ref(name) {
-                    Some(VariableType::Str(val)) => Some(Str::from(VariableType::Str(val.clone()))),
-                    _ => env::var(name).ok().map(|s| Str::from(VariableType::Str(s.into()))),
+                    Some(Value::Str(val)) => Some(Str::from(Value::Str(val.clone()))),
+                    _ => env::var(name).ok().map(|s| Str::from(Value::Str(s.into()))),
                 }
             }
             Some((..)) => {
@@ -672,8 +672,8 @@ macro_rules! get_var {
         impl GetVariable<$types> for Variables {
             fn get(&self, name: &str) -> Option<$types> {
                 match self.get_ref(name) {
-                    Some(VariableType::$variant($inner)) => {
-                        Some(<$types>::from(VariableType::$variant($ret.clone())))
+                    Some(Value::$variant($inner)) => {
+                        Some(<$types>::from(Value::$variant($ret.clone())))
                     }
                     _ => None,
                 }

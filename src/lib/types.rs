@@ -1,4 +1,4 @@
-use crate::shell::variables::VariableType;
+use crate::shell::variables::Value;
 use hashbrown::HashMap as HashbrownMap;
 use small;
 use smallvec::SmallVec;
@@ -8,8 +8,8 @@ use std::{
 };
 
 pub type Array = SmallVec<[Str; 4]>;
-pub type HashMap = HashbrownMap<Str, VariableType>;
-pub type BTreeMap = StdBTreeMap<Str, VariableType>;
+pub type HashMap = HashbrownMap<Str, Value>;
+pub type BTreeMap = StdBTreeMap<Str, Value>;
 pub type Str = small::String;
 
 #[derive(Clone, Debug, PartialEq)]

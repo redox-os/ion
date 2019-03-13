@@ -7,7 +7,7 @@ pub(crate) use self::words::{Select, WordIterator, WordToken};
 use crate::{
     braces::{self, BraceToken},
     ranges::{parse_range, Index, Range},
-    shell::variables::VariableType,
+    shell::variables::Value,
     types::{self, Array},
 };
 use glob::glob;
@@ -46,12 +46,12 @@ pub(crate) trait Expander: Sized {
     /// Iterating upon key-value maps.
     fn map_values<'a>(&'a self, _name: &str, _select: Select) -> Option<MapValueIter> { None }
     /// Get a string that exists in the shell.
-    fn get_string(&self, value: &str) -> VariableType {
-        VariableType::Str(types::Str::from(expand_string(value, self, false).join(" ")))
+    fn get_string(&self, value: &str) -> Value {
+        Value::Str(types::Str::from(expand_string(value, self, false).join(" ")))
     }
     /// Get an array that exists in the shell.
-    fn get_array(&self, value: &str) -> VariableType {
-        VariableType::Array(expand_string(value, self, false))
+    fn get_array(&self, value: &str) -> Value {
+        Value::Array(expand_string(value, self, false))
     }
 }
 

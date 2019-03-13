@@ -6,7 +6,7 @@ use super::{
 use crate::{
     lexers::assignments::{Key, Operator, Primitive},
     parser::assignments::*,
-    shell::{history::ShellHistory, variables::VariableType},
+    shell::{history::ShellHistory, variables::Value},
     types,
 };
 use hashbrown::HashMap;
@@ -55,8 +55,8 @@ pub(crate) trait VariableStore {
     fn create_patch<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
-    ) -> Result<HashMap<Key<'a>, VariableType>, String>;
-    fn patch(&mut self, patch: HashMap<Key, VariableType>) -> Result<(), String>;
+    ) -> Result<HashMap<Key<'a>, Value>, String>;
+    fn patch(&mut self, patch: HashMap<Key, Value>) -> Result<(), String>;
 }
 
 impl VariableStore for Shell {
@@ -89,14 +89,14 @@ impl VariableStore for Shell {
                 value_check(self, &expression, &key.kind)
                     .map_err(|e| format!("{}: {}", key.name, e))
                     .and_then(|rhs| match &rhs {
-                        VariableType::Array(values) if operator == Operator::Equal => {
+                        Value::Array(values) if operator == Operator::Equal => {
                             env::set_var(key.name, values.join(" "));
                             Ok(())
                         }
-                        VariableType::Array(_) => Err("arithmetic operators on array expressions \
+                        Value::Array(_) => Err("arithmetic operators on array expressions \
                                                        aren't supported yet."
                             .to_string()),
-                        VariableType::Str(rhs) => {
+                        Value::Str(rhs) => {
                             let key_name: &str = &key.name;
                             let lhs = self
                                 .variables
@@ -134,7 +134,7 @@ impl VariableStore for Shell {
     fn create_patch<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
-    ) -> Result<HashMap<Key<'a>, VariableType>, String> {
+    ) -> Result<HashMap<Key<'a>, Value>, String> {
         let mut patch = HashMap::new();
         actions
             .map(|act| act.map_err(|e| e.to_string()))
@@ -164,19 +164,19 @@ impl VariableStore for Shell {
                             // ignore patterns. This happens first because `set_array`
                             // consumes 'values'
                             if key.name == "HISTORY_IGNORE" {
-                                if let VariableType::Array(array) = &rhs {
+                                if let Value::Array(array) = &rhs {
                                     self.update_ignore_patterns(array);
                                 }
                             }
 
                             return match (&rhs, &key.kind) {
-                                (VariableType::HashMap(_), Primitive::Indexed(..)) => {
+                                (Value::HashMap(_), Primitive::Indexed(..)) => {
                                     Err("cannot insert hmap into index".to_string())
                                 }
-                                (VariableType::BTreeMap(_), Primitive::Indexed(..)) => {
+                                (Value::BTreeMap(_), Primitive::Indexed(..)) => {
                                     Err("cannot insert bmap into index".to_string())
                                 }
-                                (VariableType::Array(_), Primitive::Indexed(..)) => {
+                                (Value::Array(_), Primitive::Indexed(..)) => {
                                     Err("multi-dimensional arrays are not yet supported"
                                         .to_string())
                                 }
@@ -193,14 +193,14 @@ impl VariableStore for Shell {
                                 format!("cannot update non existing variable `{}`", key.name)
                             })
                             .and_then(|lhs| match rhs {
-                                VariableType::Str(rhs) => match lhs {
-                                    VariableType::Str(lhs) => math(&key.kind, operator, &rhs)
+                                Value::Str(rhs) => match lhs {
+                                    Value::Str(lhs) => math(&key.kind, operator, &rhs)
                                         .and_then(|action| parse(&lhs, |a| action(a)))
                                         .map(|value| {
-                                            patch.insert(key, VariableType::Str(value.into()));
+                                            patch.insert(key, Value::Str(value.into()));
                                         })
                                         .map_err(|why| why.to_string()),
-                                    VariableType::Array(ref mut array) => match operator {
+                                    Value::Array(ref mut array) => match operator {
                                         Operator::Concatenate => {
                                             array.push(rhs);
                                             Ok(())
@@ -228,8 +228,8 @@ impl VariableStore for Shell {
                                     },
                                     _ => Err("type does not support this operator".to_string()),
                                 },
-                                VariableType::Array(values) => {
-                                    if let VariableType::Array(ref mut array) = lhs {
+                                Value::Array(values) => {
+                                    if let Value::Array(ref mut array) = lhs {
                                         match operator {
                                             Operator::Concatenate => array.extend(values),
                                             Operator::ConcatenateHead => values
@@ -253,36 +253,36 @@ impl VariableStore for Shell {
             .map(|_| patch)
     }
 
-    fn patch(&mut self, patch: HashMap<Key, VariableType>) -> Result<(), String> {
+    fn patch(&mut self, patch: HashMap<Key, Value>) -> Result<(), String> {
         patch
             .into_iter()
             .map(|(key, val)| match (&val, &key.kind) {
-                (VariableType::Str(_), Primitive::Indexed(ref index_name, ref index_kind)) => {
+                (Value::Str(_), Primitive::Indexed(ref index_name, ref index_kind)) => {
                     value_check(self, index_name, index_kind)
                         .map_err(|why| format!("assignment error: {}: {}", key.name, why))
                         .and_then(|index| match index {
-                            VariableType::Array(_) => {
+                            Value::Array(_) => {
                                 Err("index variable cannot be an array".to_string())
                             }
-                            VariableType::HashMap(_) => {
+                            Value::HashMap(_) => {
                                 Err("index variable cannot be a hmap".to_string())
                             }
-                            VariableType::BTreeMap(_) => {
+                            Value::BTreeMap(_) => {
                                 Err("index variable cannot be a bmap".to_string())
                             }
-                            VariableType::Str(ref index) => self
+                            Value::Str(ref index) => self
                                 .variables
                                 .get_mut(key.name)
                                 .map(|lhs| match lhs {
-                                    VariableType::HashMap(hmap) => {
+                                    Value::HashMap(hmap) => {
                                         hmap.insert(index.clone(), val);
                                         Ok(())
                                     }
-                                    VariableType::BTreeMap(bmap) => {
+                                    Value::BTreeMap(bmap) => {
                                         bmap.insert(index.clone(), val);
                                         Ok(())
                                     }
-                                    VariableType::Array(array) => index
+                                    Value::Array(array) => index
                                         .parse::<usize>()
                                         .map_err(|_| {
                                             format!(
@@ -291,7 +291,7 @@ impl VariableStore for Shell {
                                             )
                                         })
                                         .map(|index_num| {
-                                            if let (Some(var), VariableType::Str(value)) =
+                                            if let (Some(var), Value::Str(value)) =
                                                 (array.get_mut(index_num), val)
                                             {
                                                 *var = value;
@@ -303,10 +303,10 @@ impl VariableStore for Shell {
                             _ => Ok(()),
                         })
                 }
-                (VariableType::Str(_), _)
-                | (VariableType::HashMap(_), Primitive::HashMap(_))
-                | (VariableType::BTreeMap(_), Primitive::BTreeMap(_))
-                | (VariableType::Array(_), _) => {
+                (Value::Str(_), _)
+                | (Value::HashMap(_), Primitive::HashMap(_))
+                | (Value::BTreeMap(_), Primitive::BTreeMap(_))
+                | (Value::Array(_), _) => {
                     self.variables.set(key.name, val);
                     Ok(())
                 }

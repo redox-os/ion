@@ -12,7 +12,7 @@ use crate::{
         pipelines::{PipeItem, Pipeline},
         ForValueExpression, StatementSplitter,
     },
-    shell::{assignments::VariableStore, variables::VariableType},
+    shell::{assignments::VariableStore, variables::Value},
     types,
 };
 use itertools::Itertools;
@@ -369,11 +369,11 @@ impl FlowLogic for Shell {
                     if let Some(ref bind) = case.binding {
                         if is_array {
                             previous_bind =
-                                self.variables.get::<types::Array>(bind).map(VariableType::Array);
+                                self.variables.get::<types::Array>(bind).map(Value::Array);
                             self.variables.set(&bind, value.clone());
                         } else {
                             previous_bind =
-                                self.variables.get::<types::Str>(bind).map(VariableType::Str);
+                                self.variables.get::<types::Str>(bind).map(Value::Str);
                             self.set(&bind, value.join(" "));
                         }
                     }
@@ -390,13 +390,13 @@ impl FlowLogic for Shell {
                     if let Some(ref bind) = case.binding {
                         if let Some(value) = previous_bind {
                             match value {
-                                str_ @ VariableType::Str(_) => {
+                                str_ @ Value::Str(_) => {
                                     self.set(bind, str_);
                                 }
-                                array @ VariableType::Array(_) => {
+                                array @ Value::Array(_) => {
                                     self.variables.set(bind, array);
                                 }
-                                map @ VariableType::HashMap(_) => {
+                                map @ Value::HashMap(_) => {
                                     self.variables.set(bind, map);
                                 }
                                 _ => (),
@@ -411,11 +411,11 @@ impl FlowLogic for Shell {
                     if let Some(ref bind) = case.binding {
                         if is_array {
                             previous_bind =
-                                self.variables.get::<types::Array>(bind).map(VariableType::Array);
+                                self.variables.get::<types::Array>(bind).map(Value::Array);
                             self.variables.set(&bind, value.clone());
                         } else {
                             previous_bind =
-                                self.variables.get::<types::Str>(bind).map(VariableType::Str);
+                                self.variables.get::<types::Str>(bind).map(Value::Str);
                             self.set(&bind, value.join(" "));
                         }
                     }
@@ -432,13 +432,13 @@ impl FlowLogic for Shell {
                     if let Some(ref bind) = case.binding {
                         if let Some(value) = previous_bind {
                             match value {
-                                str_ @ VariableType::Str(_) => {
+                                str_ @ Value::Str(_) => {
                                     self.set(bind, str_);
                                 }
-                                array @ VariableType::Array(_) => {
+                                array @ Value::Array(_) => {
                                     self.set(bind, array);
                                 }
-                                map @ VariableType::HashMap(_) => {
+                                map @ Value::HashMap(_) => {
                                     self.set(bind, map);
                                 }
                                 _ => (),

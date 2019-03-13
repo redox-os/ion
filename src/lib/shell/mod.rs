@@ -47,7 +47,7 @@ use self::{
     job_control::{BackgroundProcess, JobControl},
     pipe_exec::PipelineExecution,
     status::*,
-    variables::{GetVariable, VariableType, Variables},
+    variables::{GetVariable, Value, Variables},
 };
 use crate::{
     builtins::{BuiltinMap, BUILTINS},
@@ -257,7 +257,7 @@ impl Shell {
     }
 
     /// Sets a variable of `name` with the given `value` in the shell's variable map.
-    pub fn set<T: Into<VariableType>>(&mut self, name: &str, value: T) {
+    pub fn set<T: Into<Value>>(&mut self, name: &str, value: T) {
         self.variables.set(name, value);
     }
 
@@ -484,10 +484,10 @@ impl<'a> Expander for Shell {
                         array.push(key.clone());
                         let f = format!("{}", value);
                         match *value {
-                            VariableType::Str(_) => array.push(f.into()),
-                            VariableType::Array(_)
-                            | VariableType::HashMap(_)
-                            | VariableType::BTreeMap(_) => {
+                            Value::Str(_) => array.push(f.into()),
+                            Value::Array(_)
+                            | Value::HashMap(_)
+                            | Value::BTreeMap(_) => {
                                 for split in f.split_whitespace() {
                                     array.push(split.into());
                                 }
@@ -500,7 +500,7 @@ impl<'a> Expander for Shell {
                 Select::Key(key) => {
                     return Some(array![format!(
                         "{}",
-                        hmap.get(&*key).unwrap_or(&VariableType::Str("".into()))
+                        hmap.get(&*key).unwrap_or(&Value::Str("".into()))
                     )]);
                 }
                 Select::Index(index) => {
@@ -514,7 +514,7 @@ impl<'a> Expander for Shell {
                             }
                             .to_string()
                         ))
-                        .unwrap_or(&VariableType::Str("".into()))
+                        .unwrap_or(&Value::Str("".into()))
                     )]);
                 }
                 _ => (),
@@ -527,10 +527,10 @@ impl<'a> Expander for Shell {
                         array.push(key.clone());
                         let f = format!("{}", value);
                         match *value {
-                            VariableType::Str(_) => array.push(f.into()),
-                            VariableType::Array(_)
-                            | VariableType::HashMap(_)
-                            | VariableType::BTreeMap(_) => {
+                            Value::Str(_) => array.push(f.into()),
+                            Value::Array(_)
+                            | Value::HashMap(_)
+                            | Value::BTreeMap(_) => {
                                 for split in f.split_whitespace() {
                                     array.push(split.into());
                                 }
@@ -543,7 +543,7 @@ impl<'a> Expander for Shell {
                 Select::Key(key) => {
                     return Some(array![format!(
                         "{}",
-                        bmap.get(&*key).unwrap_or(&VariableType::Str("".into()))
+                        bmap.get(&*key).unwrap_or(&Value::Str("".into()))
                     )]);
                 }
                 Select::Index(index) => {
@@ -557,7 +557,7 @@ impl<'a> Expander for Shell {
                             }
                             .to_string()
                         ))
-                        .unwrap_or(&VariableType::Str("".into()))
+                        .unwrap_or(&Value::Str("".into()))
                     )]);
                 }
                 _ => (),
@@ -569,11 +569,11 @@ impl<'a> Expander for Shell {
     fn map_keys<'b>(&'b self, name: &str, select: Select) -> Option<MapKeyIter<'b>> {
         let nvalues;
         let map: Box<dyn Iterator<Item = &'b types::Str>> = match self.variables.get_ref(name) {
-            Some(&VariableType::HashMap(ref map)) => {
+            Some(&Value::HashMap(ref map)) => {
                 nvalues = map.len();
                 Box::new(map.keys())
             }
-            Some(&VariableType::BTreeMap(ref map)) => {
+            Some(&Value::BTreeMap(ref map)) => {
                 nvalues = map.len();
                 Box::new(map.keys())
             }
@@ -598,11 +598,11 @@ impl<'a> Expander for Shell {
     fn map_values<'b>(&'b self, name: &str, select: Select) -> Option<MapValueIter<'b>> {
         let nvalues;
         let map: Box<dyn Iterator<Item = types::Str>> = match self.variables.get_ref(name) {
-            Some(&VariableType::HashMap(ref map)) => {
+            Some(&Value::HashMap(ref map)) => {
                 nvalues = map.len();
                 Box::new(map.values().map(|x| format!("{}", x).into()))
             }
-            Some(&VariableType::BTreeMap(ref map)) => {
+            Some(&Value::BTreeMap(ref map)) => {
                 nvalues = map.len();
                 Box::new(map.values().map(|x| format!("{}", x).into()))
             }
