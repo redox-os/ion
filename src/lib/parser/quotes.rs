@@ -1,12 +1,10 @@
-use itertools::Itertools;
 use std::{iter::Peekable, mem, str};
 
-bitflags! {
-    pub struct Flags : u8 {
-        const SQUOTE = 1;
-        const DQUOTE = 2;
-        const TRIM   = 4;
-    }
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum Quotes {
+    Single,
+    Double,
+    None,
 }
 
 /// Serves as a buffer for storing a string until that string can be terminated.
@@ -22,7 +20,8 @@ pub struct Terminator {
     eof_buffer: String,
     array:      usize,
     read:       usize,
-    flags:      Flags,
+    trim:       bool,
+    quotes:     Quotes,
 }
 
 impl<'a> From<&'a str> for Terminator {
@@ -34,14 +33,9 @@ impl From<String> for Terminator {
 }
 
 #[derive(Debug)]
-enum NotTerminatedErr {
-    StartEof,
+enum EarlyExit {
     Eof,
     Comment,
-    UnclosedArray,
-    UnclosedString,
-    EscapedNewline,
-    AndOrClause,
 }
 
 #[derive(Clone, Debug)]
@@ -74,38 +68,18 @@ impl<I: Iterator> RearPeekable<I> {
 
     #[inline]
     pub fn prev(&self) -> Option<&I::Item> { self.last.as_ref() }
-
-    #[inline]
-    pub fn now(&self) -> Option<&I::Item> { self.now.as_ref() }
 }
 
 impl Terminator {
     /// Consumes the `Terminator`, and returns the underlying `String`.
     pub fn consume(self) -> String { self.buffer }
 
-    fn pair_components(&mut self) -> Result<(), NotTerminatedErr> {
-        if self.eof.as_ref() == Some(&self.eof_buffer) {
-            return Err(NotTerminatedErr::StartEof);
-        } else if self.eof.is_some() {
-            return Err(NotTerminatedErr::Eof);
-        }
-
+    fn pair_components(&mut self) -> Option<EarlyExit> {
         let bytes = self
             .buffer
             .bytes()
             .enumerate()
             .skip(self.read)
-            .coalesce(
-                |prev, next| {
-                    if prev.1 == b'\\' {
-                        Ok((next.0, 0))
-                    } else {
-                        Err((prev, next))
-                    }
-                },
-            )
-            .filter(|&(_, c)| c != 0)
-            //.inspect(|c| println!("{:?} {}", c.0, c.1 as char))
             .peekable();
 
         let mut bytes = RearPeekable { iter: bytes, now: None, last: None };
@@ -113,101 +87,103 @@ impl Terminator {
         while let Some((i, character)) = bytes.next() {
             self.read = i + 1;
 
-            match character {
-                b'\'' if !self.flags.intersects(Flags::DQUOTE) => {
-                    if bytes.find(|&(_, c)| c == b'\'').is_none() {
-                        self.flags ^= Flags::SQUOTE;
+            if self.trim {
+                self.trim = false;
+            } else if character == b'\\' {
+                self.trim = true;
+            } else if self.quotes == Quotes::None {
+                match character {
+                    b'\'' => {
+                        self.quotes = Quotes::Single;
                     }
-                }
-                b'"' if !self.flags.intersects(Flags::SQUOTE) => {
-                    if bytes.find(|&(_, c)| c == b'"').is_none() {
-                        self.flags ^= Flags::DQUOTE;
+                    b'"' => {
+                        self.quotes = Quotes::Double;
                     }
-                }
-                b'<' if bytes.prev() == Some(&(i - 1, b'<')) => {
-                    if bytes.peek() == Some(&(i + 1, b'<')) {
-                        bytes.next();
-                    } else {
-                        let bytes = &self.buffer.as_bytes()[self.read..];
-                        let eof_phrase = unsafe { str::from_utf8_unchecked(bytes) };
-                        self.eof = Some(eof_phrase.trim().to_owned());
-                        return Err(NotTerminatedErr::Eof);
+                    b'<' if bytes.prev() == Some(&(i - 1, b'<')) => {
+                        if bytes.peek() == Some(&(i + 1, b'<')) {
+                            bytes.next();
+                        } else {
+                            let bytes = &self.buffer.as_bytes()[self.read..];
+                            let eof_phrase = unsafe { str::from_utf8_unchecked(bytes) };
+                            self.eof = Some(eof_phrase.trim().to_owned());
+                            return Some(EarlyExit::Eof);
+                        }
                     }
-                }
-                b'[' => {
-                    self.array += 1;
-                }
-                b']' => {
-                    if self.array > 0 {
-                        self.array -= 1;
+                    b'[' => {
+                        self.array += 1;
                     }
+                    b']' => {
+                        if self.array > 0 {
+                            self.array -= 1;
+                        }
+                    }
+                    b'#' if bytes
+                        .prev()
+                        .filter(|&(j, c)| !(*j == i - 1 && [b' ', b'\n'].contains(c)))
+                        .is_none() =>
+                    {
+                        return Some(EarlyExit::Comment);
+                    }
+                    _ => {},
                 }
-                b'#' if bytes
-                    .prev()
-                    .filter(|&(j, c)| !(*j == i - 1 && [b' ', b'\n'].contains(c)))
-                    .is_none() =>
-                {
-                    return Err(NotTerminatedErr::Comment);
+            } else {
+                match (character, &self.quotes) {
+                    (b'\'', Quotes::Single) | (b'"', Quotes::Double) => {
+                        self.quotes = Quotes::None;
+                    }
+                    _ => (),
                 }
-                _ => (),
             }
         }
 
-        if let Some((_, b'\\')) = bytes.now() {
-            Err(NotTerminatedErr::EscapedNewline)
-        } else if self.array > 0 {
-            Err(NotTerminatedErr::UnclosedArray)
-        } else if self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) {
-            Err(NotTerminatedErr::UnclosedString)
-        } else if bytes
-            .now()
-            .filter(|&&(_, now)| now == b'&' || now == b'|')
-            .and_then(|&(_, now)| bytes.prev().filter(|&&(_, prev)| prev == now))
-            .is_some()
-        {
-            Err(NotTerminatedErr::AndOrClause)
-        } else {
-            Ok(())
-        }
+        None
     }
 
     pub fn is_terminated(&mut self) -> bool {
-        match self.pair_components() {
-            Err(NotTerminatedErr::StartEof) => {
-                self.eof = None;
-                self.buffer.push('\n');
-                true
+        if self.eof.as_ref() == Some(&self.eof_buffer) {
+            self.eof = None;
+            self.buffer.push('\n');
+            true
+        } else if self.eof.is_some() {
+            false
+        } else {
+            match self.pair_components() {
+                Some(EarlyExit::Eof) => false,
+                Some(EarlyExit::Comment) => {
+                    self.buffer.truncate(self.read - 1);
+                    self.array == 0 && self.quotes == Quotes::None
+                }
+                None => {
+                    if let Some(b'\\') = self.buffer.bytes().last() {
+                        self.buffer.pop();
+                        self.read -= 1;
+                        false
+                    } else if self.array > 0 {
+                        self.read += 1;
+                        self.buffer.push(' ');
+                        false
+                    } else if self.quotes != Quotes::None {
+                        self.read += 1;
+                        self.buffer.push('\n');
+                        false
+                    } else {
+                        let mut last_chars = self.buffer.bytes().rev();
+                        last_chars
+                            .next()
+                            .filter(|&now| now == b'&' || now == b'|')
+                            .and_then(|now| last_chars.next().filter(|&prev| prev == now))
+                            .is_none()
+                    }
+                }
             }
-            Err(NotTerminatedErr::Eof) => false,
-            Err(NotTerminatedErr::Comment) => {
-                self.buffer.truncate(self.read - 1);
-                self.array == 0 && !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE)
-            }
-            Err(NotTerminatedErr::EscapedNewline) => {
-                self.buffer.pop();
-                self.read -= 1;
-                self.flags = Flags::TRIM;
-                false
-            }
-            Err(NotTerminatedErr::UnclosedString) => {
-                self.read += 1;
-                self.buffer.push('\n');
-                false
-            }
-            Err(NotTerminatedErr::UnclosedArray) => {
-                self.read += 1;
-                self.buffer.push(' ');
-                false
-            }
-            Err(NotTerminatedErr::AndOrClause) => false,
-            Ok(()) => true,
         }
     }
 
     /// Appends a string to the internal buffer.
     pub fn append(&mut self, input: &str) {
         if self.eof.is_none() {
-            self.buffer.push_str(if self.flags.contains(Flags::TRIM) {
+            self.buffer.push_str(if self.trim {
+                self.trim = false;
                 input.trim()
             } else {
                 input
@@ -227,7 +203,8 @@ impl Terminator {
             eof_buffer: String::new(),
             array:      0,
             read:       0,
-            flags:      Flags::empty(),
+            trim:       false,
+            quotes:     Quotes::None,
         }
     }
 }
