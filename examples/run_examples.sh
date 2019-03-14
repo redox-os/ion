@@ -21,19 +21,12 @@ EXIT_VAL=0
 # and it never hurts to force consistency regardless
 cd $PROJECT_DIR
 
-function check_return_value {
-
-    # Check number of parameters passed into the check function
-    if [[ $# -ne 1 ]]; then
-        echo -e "Illegal number of parameters.${TAGFAIL}";
-        return 1;
-    fi
-
+function test {
     # Replace .ion with .out in file name
-    EXPECTED_OUTPUT_FILE=$(echo $1 | sed 's/\.ion/\.out/')
+    EXPECTED_OUTPUT_FILE=$(echo $1 | sed 's/\..\+/\.out/')
 
     # Run script and redirect stdout into tmp file
-    $PROJECT_DIR/target/debug/ion $1 1> $EXAMPLES_DIR/tmp.out 2> /dev/null
+    $PROJECT_DIR/target/debug/ion "${@:2}" > $EXAMPLES_DIR/tmp.out 2> /dev/null
 
     # Compare real and expected output
     diff "$EXAMPLES_DIR"/tmp.out "$EXPECTED_OUTPUT_FILE" > "$EXAMPLES_DIR"/diff_tmp
@@ -43,7 +36,7 @@ function check_return_value {
     rm -f $EXAMPLES_DIR/tmp.out
 
     # Write result
-    if [[ $RET -ne 0 ]]; then
+    if [[ "$RET" -ne "0" ]]; then
         cat "$EXAMPLES_DIR"/diff_tmp
         rm "$EXAMPLES_DIR"/diff_tmp
         echo -e "Test ${1} ${TAGFAIL}";
@@ -55,6 +48,28 @@ function check_return_value {
     fi
 }
 
+function test_cli {
+    # Check number of parameters passed into the check function
+    if [[ $# -ne 1 ]]; then
+        echo -e "Illegal number of parameters.${TAGFAIL}";
+        return 1;
+    fi
+
+    # Run script and redirect stdout into tmp file
+    IFS=$'\n'; test $1 $(< $1)
+}
+
+function check_return_value {
+    # Check number of parameters passed into the check function
+    if [[ $# -ne 1 ]]; then
+        echo -e "Illegal number of parameters.${TAGFAIL}";
+        return 1;
+    fi
+
+    # Run script and redirect stdout into tmp file
+    test $1 $1 1
+}
+
 # Build debug binary
 cargo +$TOOLCHAIN build
 
@@ -62,6 +77,14 @@ set +e
 # Iterate over every Ion script in examples directory
 for i in $EXAMPLES_DIR/*.ion; do
     check_return_value $i;
+    if [[ $? -ne 0 ]]; then
+        EXIT_VAL=1;
+    fi
+done
+
+# Iterate over every parameter set
+for i in $EXAMPLES_DIR/*.params; do
+    test_cli $i;
     if [[ $? -ne 0 ]]; then
         EXIT_VAL=1;
     fi

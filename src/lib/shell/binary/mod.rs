@@ -12,37 +12,30 @@ use self::{
 use super::{status::*, FlowLogic, Shell, ShellHistory};
 use crate::types;
 use liner::{Buffer, Context};
-use std::{env, iter, path::Path, process};
+use std::{env, iter, path::Path};
 
-pub const MAN_ION: &str = r#"NAME
-    ion - ion shell
+pub const MAN_ION: &str = "NAME
+    Ion - The Ion shell
 
 SYNOPSIS
-    ion [ -h | --help ] [-c] [-n] [-v]
+    ion [options] [args...]
 
 DESCRIPTION
-    ion is a commandline shell created to be a faster and easier to use alternative to the
+    Ion is a commandline shell created to be a faster and easier to use alternative to the
     currently available shells. It is not POSIX compliant.
 
-OPTIONS
-    -c
-        evaluates given commands instead of reading from the commandline.
-
-    -n or --no-execute
-        do not execute any commands, just do syntax checking.
-
-    -v or --version
-        prints the version, platform and revision of ion then exits.
-"#;
+Args:
+    Script arguments (@args). If the -c option is not specified, the first parameter
+    is taken as a filename to execute";
 
 pub trait Binary {
     /// Parses and executes the arguments that were supplied to the shell.
-    fn execute_arguments<A: Iterator<Item = String>>(&mut self, args: A);
+    fn execute_script(&mut self, script: &str);
     /// Creates an interactive session that reads from a prompt provided by
     /// Liner.
     fn execute_interactive(self);
     /// Ensures that read statements from a script are terminated.
-    fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I) -> i32;
+    fn terminate_script_quotes<T: AsRef<str> + ToString, I: Iterator<Item = T>>(&mut self, lines: I) -> i32;
     /// Ensures that read statements from the interactive prompt is terminated.
     fn terminate_quotes(&mut self, command: String) -> Result<String, ()>;
     /// Ion's interface to Liner's `read_line` method, which handles everything related to
@@ -50,8 +43,6 @@ pub trait Binary {
     fn readln(&mut self) -> Option<String>;
     /// Generates the prompt that will be used by Liner.
     fn prompt(&mut self) -> String;
-    /// Display version information and exit
-    fn display_version(&self);
     // Executes the PROMPT function, if it exists, and returns the output.
     fn prompt_fn(&mut self) -> Option<String>;
     // Handles commands given by the REPL, and saves them to history.
@@ -61,11 +52,6 @@ pub trait Binary {
 }
 
 impl Binary for Shell {
-    fn display_version(&self) {
-        println!("{}", include!(concat!(env!("OUT_DIR"), "/version_string")));
-        process::exit(0);
-    }
-
     fn save_command(&mut self, cmd: &str) {
         if cmd.starts_with('~') {
             if !cmd.ends_with('/')
@@ -110,37 +96,25 @@ impl Binary for Shell {
             .set("args", iter::once(env::args().next().unwrap().into()).collect::<types::Array>());
 
         loop {
-            if let Some(command) = self.readln() {
-                if !command.is_empty() {
-                    if let Ok(command) = self.terminate_quotes(command.replace("\\\n", "")) {
-                        let cmd: &str = &designators::expand_designators(&self, command.trim_end());
-                        self.on_command(&cmd);
-                        self.save_command(&cmd);
-                    } else {
-                        self.reset_flow();
-                    }
+            match self.readln().and_then(|command| {
+                if command.is_empty() {
+                    None
+                } else {
+                    self.terminate_quotes(command.replace("\\\n", "")).ok()
                 }
-            } else {
-                self.reset_flow();
+            }) {
+                Some(command) => {
+                    let cmd: &str = &designators::expand_designators(&self, command.trim_end());
+                    self.on_command(&cmd);
+                    self.save_command(&cmd);
+                },
+                None => self.reset_flow(),
             }
         }
     }
 
-    fn execute_arguments<A: Iterator<Item = String>>(&mut self, mut args: A) {
-        if let Some(mut arg) = args.next() {
-            for argument in args {
-                arg.push(' ');
-                if argument == "" {
-                    arg.push_str("''");
-                } else {
-                    arg.push_str(&argument);
-                }
-            }
-            self.on_command(&arg);
-        } else {
-            eprintln!("ion: -c requires an argument");
-            self.exit(FAILURE);
-        }
+    fn execute_script(&mut self, script: &str) {
+        self.on_command(script);
 
         if self.flow_control.unclosed_block() {
             {
@@ -158,7 +132,7 @@ impl Binary for Shell {
         terminate_quotes(self, command)
     }
 
-    fn terminate_script_quotes<I: Iterator<Item = String>>(&mut self, lines: I) -> i32 {
+    fn terminate_script_quotes<T: AsRef<str> + ToString, I: Iterator<Item = T>>(&mut self, lines: I) -> i32 {
         terminate_script_quotes(self, lines)
     }
 

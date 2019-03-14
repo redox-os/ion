@@ -1,15 +1,16 @@
+extern crate getopts;
 extern crate ion_shell;
 extern crate ion_sys as sys;
+extern crate small;
 extern crate smallvec;
 
+use getopts::Options;
 use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};
 use smallvec::SmallVec;
 use std::{
     alloc::System,
     env,
-    error::Error,
-    io::{stdin, stdout, BufRead, BufReader, Write},
-    iter::FromIterator,
+    io::{stdin, BufRead, BufReader},
 };
 
 #[global_allocator]
@@ -25,46 +26,60 @@ fn main() {
 
     let mut shell = shell.as_binary();
 
-    let mut args = env::args().skip(1);
-    while let Some(path) = args.next() {
-        match path.as_str() {
-            "-n" | "--no-execute" => {
-                shell.flags |= NO_EXEC;
-                continue;
-            }
-            "-c" => shell.execute_arguments(args),
-            "-v" | "--version" => shell.display_version(),
-            "-h" | "--help" => {
-                let stdout = stdout();
-                let mut stdout = stdout.lock();
-                match stdout.write_all(MAN_ION.as_bytes()).and_then(|_| stdout.flush()) {
-                    Ok(_) => return,
-                    Err(err) => panic!("{}", err.description().to_owned()),
-                }
-            }
-            _ => {
-                let mut array = SmallVec::from_iter(Some(path.clone().into()));
-                for arg in args {
-                    array.push(arg.into());
-                }
-                shell.variables.set("args", array);
-                if let Err(err) = shell.execute_script(&path) {
-                    eprintln!("ion: {}", err);
-                }
-            }
-        }
+    let args: Vec<String> = env::args().collect();
 
-        shell.wait_for_background();
-        let previous_status = shell.previous_status;
-        shell.exit(previous_status);
+    let mut opts = Options::new();
+    opts.optopt(
+        "c",
+        "command",
+        "evaluates given commands instead of reading from the commandline",
+        "COMMAND",
+    );
+    opts.optflag("n", "no-execute", "do not execute any commands, just do syntax checking.");
+    opts.optflag("h", "help", "print this help menu");
+    opts.optflag("v", "version", "print the version");
+    let matches = opts
+        .parse(&args[1..])
+        .map_err(|e| {
+            eprintln!("Error: {}", e);
+            std::process::exit(64);
+        })
+        .unwrap();
+
+    if matches.opt_present("h") {
+        println!("{}", opts.usage(MAN_ION));
+        return;
     }
 
-    if stdin_is_a_tty {
+    if matches.opt_present("v") {
+        println!("{}", ion_shell::version());
+        return;
+    }
+
+    if matches.opt_present("n") {
+        shell.flags |= NO_EXEC;
+    }
+
+    let command = matches.opt_str("c");
+    let parameters = matches.free.into_iter().map(small::String::from).collect::<SmallVec<_>>();
+    let script_path = parameters.get(0).cloned();
+    if !parameters.is_empty() { shell.variables.set("args", parameters); }
+
+    let status = if let Some(command) = command {
+        shell.execute_script(&command);
+        shell.wait_for_background();
+        shell.previous_status
+    } else if let Some(path) = script_path {
+        shell.execute_file(&path.as_str());
+        shell.wait_for_background();
+        shell.previous_status
+    } else if stdin_is_a_tty {
         shell.execute_interactive();
+        unreachable!();
     } else {
         let reader = BufReader::new(stdin());
         let lines = reader.lines().filter_map(|line| line.ok());
-        let status = shell.terminate_script_quotes(lines);
-        shell.exit(status);
-    }
+        shell.terminate_script_quotes(lines)
+    };
+    shell.exit(status);
 }
