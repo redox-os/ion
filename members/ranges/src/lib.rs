@@ -63,7 +63,7 @@ mod tests {
 
     #[test]
     fn range_expand() {
-        if let Some(_) = parse_range("abc") {
+        if parse_range("abc").is_some() {
             panic!("parse_range() failed");
         }
 
@@ -79,36 +79,35 @@ mod tests {
         test_range("-3...0", -3..=0);
         test_range("-3..0", -3..0);
 
-        let actual: Vec<small::String> = parse_range("a...c").unwrap().collect();
-        let expected: Vec<small::String> = vec!["a".into(), "b".into(), "c".into()];
+        let actual_inclusive: &[Vec<small::String>] = &[
+            parse_range("a...c").unwrap().collect(),
+            parse_range("c...a").unwrap().collect(),
+            parse_range("A...C").unwrap().collect(),
+            parse_range("C...A").unwrap().collect(),
+            parse_range("C..=A").unwrap().collect(),
+        ];
+        let actual_exclusive: &[Vec<small::String>] = &[
+            parse_range("C..A").unwrap().collect(),
+            parse_range("c..a").unwrap().collect(),
+        ];
 
-        assert_eq!(actual, expected);
+        let expected_inclusive = &[
+            ["a", "b", "c"],
+            ["c", "b", "a"],
+            ["A", "B", "C"],
+            ["C", "B", "A"],
+            ["C", "B", "A"], // This is a duplicate on purpose
+        ];
+        let expected_exclusive = &[
+            ["C", "B"],
+            ["c", "b"],
+        ];
 
-        let actual: Vec<small::String> = parse_range("c...a").unwrap().collect();
-        let expected: Vec<small::String> = vec!["c".into(), "b".into(), "a".into()];
-
-        assert_eq!(actual, expected);
-
-        let actual: Vec<small::String> = parse_range("A...C").unwrap().collect();
-        let expected: Vec<small::String> = vec!["A".into(), "B".into(), "C".into()];
-
-        assert_eq!(actual, expected);
-
-        let actual: Vec<small::String> = parse_range("C...A").unwrap().collect();
-        let also: Vec<small::String> = parse_range("C..=A").unwrap().collect();
-        let expected: Vec<small::String> = vec!["C".into(), "B".into(), "A".into()];
-
-        assert_eq!(actual, expected);
-        assert_eq!(also, expected);
-
-        let actual: Vec<small::String> = parse_range("C..A").unwrap().collect();
-        let expected: Vec<small::String> = vec!["C".into(), "B".into()];
-
-        assert_eq!(actual, expected);
-
-        let actual: Vec<small::String> = parse_range("c..a").unwrap().collect();
-        let expected: Vec<small::String> = vec!["c".into(), "b".into()];
-
-        assert_eq!(actual, expected);
+        for (actual, expected) in actual_inclusive.iter().zip(expected_inclusive.iter()) {
+            assert_eq!(actual, expected);
+        }
+        for (actual, expected) in actual_exclusive.iter().zip(expected_exclusive.iter()) {
+            assert_eq!(actual, expected);
+        }
     }
 }

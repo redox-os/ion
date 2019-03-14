@@ -19,11 +19,11 @@ pub fn assignment_lexer(statement: &str) -> (Option<&str>, Option<Operator>, Opt
     let (mut read, mut start) = (0, 0);
     let as_bytes = statement.as_bytes();
     let mut bytes = statement.bytes().peekable();
-    let mut operator = None;
+    let mut operator = Operator::Equal;
     let mut delimiter_stack = Vec::new();
 
     while let Some(byte) = bytes.next() {
-        operator = Some(Operator::Equal);
+        operator = Operator::Equal;
 
         if is_open_delimiter(byte) {
             delimiter_stack.push(byte);
@@ -40,7 +40,7 @@ pub fn assignment_lexer(statement: &str) -> (Option<&str>, Option<Operator>, Opt
             }
 
             if let Some((op, found)) = find_operator(as_bytes, read) {
-                operator = Some(op);
+                operator = op;
                 start = read;
                 read = found;
                 break;
@@ -55,9 +55,8 @@ pub fn assignment_lexer(statement: &str) -> (Option<&str>, Option<Operator>, Opt
     }
 
     let keys = statement[..start].trim_end();
-
-    let values = &statement[read..];
-    (Some(keys), operator, Some(values.trim()))
+    let values = &statement[read..].trim();
+    (Some(keys), Some(operator), Some(values))
 }
 
 fn find_operator(bytes: &[u8], read: usize) -> Option<(Operator, usize)> {
