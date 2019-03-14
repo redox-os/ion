@@ -25,14 +25,20 @@ impl Range {
     /// assert_eq!(expected, selection);
     /// ```
     pub fn bounds(&self, vector_length: usize) -> Option<(usize, usize)> {
-        let start = self.start.resolve(vector_length)?;
-        let end = self.end.resolve(vector_length)?;
-        if end < start {
-            None
-        } else if self.inclusive {
-            Some((start, end - start + 1))
+        if let Some(start) = self.start.resolve(vector_length) {
+            if let Some(end) = self.end.resolve(vector_length) {
+                if end < start {
+                    None
+                } else if self.inclusive {
+                    Some((start, end - start + 1))
+                } else {
+                    Some((start, end - start))
+                }
+            } else {
+                None
+            }
         } else {
-            Some((start, end - start))
+            None
         }
     }
 

@@ -52,10 +52,11 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                     .map(|dir| IonFileCompleter::new(Some(dir), dirs_ptr, vars_ptr));
 
                 if filename {
-                    if let Some(dir_completer) = dir_completer {
-                        if let Some(ref mut context_completer) = editor.context().completer {
-                            mem::replace(context_completer, Box::new(dir_completer));
-                        }
+                    if let Some(completer) = dir_completer {
+                        mem::replace(
+                            &mut editor.context().completer,
+                            Some(Box::new(completer)),
+                        );
                     }
                 } else {
                     // Creates a list of definitions from the shell environment that
@@ -133,12 +134,18 @@ fn complete_as_file(current_dir: &PathBuf, filename: &str, index: usize) -> bool
     let filename = filename.trim();
     let mut file = current_dir.clone();
     file.push(&filename);
-
-    if filename.starts_with('.') || !filename.starts_with('$') || index > 0 || file.exists() {
-        // If the user explicitly requests a file through this syntax then complete as a file
-        // Or, if the file does not start with a dollar sign, it's also a file instead of variable
-        // Or, once we are beyond the first string, assume its a file
-        // Or, if we are referencing a file that exists then just complete to that file
+    if filename.starts_with('.') {
+        // If the user explicitly requests a file through this syntax then complete as
+        // a file
+        true
+    } else if filename.starts_with('$') {
+        // If the file starts with a dollar sign, it's a variable, not a file
+        false
+    } else if index > 0 {
+        // Once we are beyond the first string, assume its a file
+        true
+    } else if file.exists() {
+        // If we are referencing a file that exists then just complete to that file
         true
     } else if let Some(parent) = file.parent() {
         // If we have a partial file inside an existing directory, e.g. /foo/b when
