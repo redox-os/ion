@@ -5,7 +5,7 @@ use crate::{
     shell::{Job, JobKind},
     types::*,
 };
-use lexers::arguments::{Levels, Field};
+use crate::lexers::arguments::{Levels, Field};
 
 trait AddItem {
     fn add_item(
