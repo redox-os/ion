@@ -82,8 +82,7 @@ fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
     // *might* be possible TODO: that `exists` reports a binary to be in the
     // path, while the shell cannot find it or TODO: vice-versa
     if let Some(path) = shell.get::<types::Str>("PATH") {
-        for dir in path.split(':') {
-            let fname = format!("{}/{}", dir, binaryname);
+        for fname in path.split(':').map(|dir| format!("{}/{}", dir, binaryname)) {
             if let Ok(metadata) = fs::metadata(&fname) {
                 if metadata.is_file() && file_has_execute_permission(&fname) {
                     return true;
