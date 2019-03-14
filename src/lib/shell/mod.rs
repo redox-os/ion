@@ -230,12 +230,12 @@ impl Shell {
     /// the command(s) in the command line REPL interface for Ion. If the supplied command is
     /// not
     /// terminated, then an error will be returned.
-    pub fn execute_command<CMD>(&mut self, command: CMD) -> Result<i32, IonError>
+    pub fn execute_command<T>(&mut self, command: T) -> Result<i32, IonError>
     where
-        CMD: Into<Terminator>,
+        T: AsRef<str>,
     {
-        let terminator = command.into();
-        if let Ok(stmt) = terminator.terminate::<_, &str>(&mut std::iter::empty()) {
+        let terminator: Terminator<_, T> = command.into();
+        if let Ok(stmt) = terminator.terminate() {
             self.on_command(&stmt);
             Ok(self.previous_status)
         } else {
