@@ -2,12 +2,21 @@ use super::{Index, Range};
 use small;
 use std::cmp::Ordering;
 
-fn stepped_range_numeric<'a>(
+fn numeric_range<'a>(
     start: isize,
     end: isize,
     step: isize,
+    inclusive: bool,
     nb_digits: usize,
 ) -> Option<Box<Iterator<Item = small::String> + 'a>> {
+    let end = if start < end && inclusive {
+        end + 1
+    } else if start > end && inclusive {
+        end - 1
+    } else {
+        end
+    };
+
     if step == 0 || (start < end && step < 0) || (start > end && step > 0) {
         None
     } else {
@@ -31,55 +40,6 @@ fn stepped_range_numeric<'a>(
     }
 }
 
-fn stepped_range_chars<'a>(
-    start: u8,
-    end: u8,
-    step: u8,
-) -> Option<Box<Iterator<Item = small::String> + 'a>> {
-    if step == 0 {
-        None
-    } else {
-        let (x, y, ordering) = if start < end {
-            (start, end, Ordering::Greater)
-        } else {
-            (end, start, Ordering::Less)
-        };
-
-        let iter = (x..y).scan(start, move |index, _| {
-            if end.cmp(index) == ordering {
-                let index_holder = *index;
-                *index = match ordering {
-                    Ordering::Greater => index.wrapping_add(step),
-                    Ordering::Less => index.wrapping_sub(step),
-                    _ => unreachable!(),
-                };
-                Some((index_holder as char).to_string().into())
-            } else {
-                None
-            }
-        });
-
-        Some(Box::new(iter))
-    }
-}
-
-fn numeric_range<'a>(
-    start: isize,
-    end: isize,
-    step: isize,
-    inclusive: bool,
-    nb_digits: usize,
-) -> Option<Box<Iterator<Item = small::String> + 'a>> {
-    let end = if start < end && inclusive {
-        end + 1
-    } else if start > end && inclusive {
-        end - 1
-    } else {
-        end
-    };
-    stepped_range_numeric(start, end, step, nb_digits)
-}
-
 #[inline]
 fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') }
 
@@ -90,17 +50,10 @@ fn char_range<'a>(
     step: isize,
     inclusive: bool,
 ) -> Option<Box<Iterator<Item = small::String> + 'a>> {
-    if !byte_is_valid_range(start) || !byte_is_valid_range(end) {
+    let char_step = step.checked_abs()?;
+    if !byte_is_valid_range(start) || !byte_is_valid_range(end) || step == 0 || char_step > u8::MAX as isize {
         return None;
     }
-
-    let char_step = {
-        let v = step.checked_abs()?;
-        if v > u8::MAX as isize {
-            return None;
-        }
-        v as u8
-    };
 
     let end = if start < end && inclusive {
         end + 1
@@ -109,7 +62,27 @@ fn char_range<'a>(
     } else {
         end
     };
-    stepped_range_chars(start, end, char_step)
+    let (x, y, ordering) = if start < end {
+        (start, end, Ordering::Greater)
+    } else {
+        (end, start, Ordering::Less)
+    };
+
+    let iter = (x..y).scan(start, move |index, _| {
+        if end.cmp(index) == ordering {
+            let index_holder = *index;
+            *index = match ordering {
+                Ordering::Greater => index.wrapping_add(char_step as u8),
+                Ordering::Less => index.wrapping_sub(char_step as u8),
+                _ => unreachable!(),
+            };
+            Some((index_holder as char).to_string().into())
+        } else {
+            None
+        }
+    });
+
+    Some(Box::new(iter))
 }
 
 fn count_minimum_digits(a: &str) -> usize {
@@ -212,11 +185,7 @@ pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
                                     b'.' => {
                                         // stepped range input[start..read - 1] contains the step
                                         // size
-                                        let step = match (&input[start..read - 1]).parse::<isize>()
-                                        {
-                                            Ok(v) => v,
-                                            Err(_) => return None,
-                                        };
+                                        let step = (&input[start..read - 1]).parse::<isize>().ok()?;
                                         // count the dots to determine inclusive/exclusive
                                         let mut dots = 1;
                                         while let Some(b) = bytes_iterator.next() {
@@ -277,27 +246,24 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
 
                 let end = &input[id + if inclusive { 3 } else { 2 }..];
 
-                if first.is_empty() {
-                    return if end.is_empty() {
-                        None
-                    } else {
-                        end.parse::<isize>().map(|end| Range::to(Index::new(end))).ok()
-                    };
+                return if first.is_empty() && !end.is_empty() {
+                    end.parse::<isize>().map(|end| Range::to(Index::new(end))).ok()
                 } else if end.is_empty() {
-                    return first.parse::<isize>().map(|start| Range::from(Index::new(start))).ok();
-                }
+                    first.parse::<isize>().map(|start| Range::from(Index::new(start))).ok()
+                } else {
+                    first
+                        .parse::<isize>()
+                        .and_then(|start| end.parse::<isize>().map(|end| (start, end)))
+                        .map(|(start, end)| {
+                            if inclusive {
+                                Range::inclusive(Index::new(start), Index::new(end))
+                            } else {
+                                Range::exclusive(Index::new(start), Index::new(end))
+                            }
+                        })
+                        .ok()
+                };
 
-                return first
-                    .parse::<isize>()
-                    .and_then(|start| end.parse::<isize>().map(|end| (start, end)))
-                    .map(|(start, end)| {
-                        if inclusive {
-                            Range::inclusive(Index::new(start), Index::new(end))
-                        } else {
-                            Range::exclusive(Index::new(start), Index::new(end))
-                        }
-                    })
-                    .ok();
             }
             _ => break,
         }
