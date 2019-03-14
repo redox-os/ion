@@ -1,17 +1,13 @@
 fn fib n
-    if test $n -le 1
-        echo $n
-    else
-        let output previous = 1 1
-        for _ in 2..=$n
-            let temp = $output
-            let output += $previous
-            let previous = $temp
-        end
-        echo $output
+    let output previous = 0 1
+    for _ in 0..$n
+       let temp = $output
+       let output += $previous
+       let previous = $temp
     end
+    echo $output
 end
 
-for i in 1..=200
+for i in 0..200
     fib $i
 end
