@@ -10,10 +10,9 @@ pub(crate) fn prompt(shell: &mut Shell) -> String {
         shell.flow_control.block.len() + if shell.flags & UNTERMINATED != 0 { 1 } else { 0 };
 
     if blocks == 0 {
-        match prompt_fn(shell) {
-            Some(prompt) => prompt,
-            None => expand_string(&shell.get_str_or_empty("PROMPT"), shell, false).join(" "),
-        }
+        prompt_fn(shell).unwrap_or_else(|| {
+            expand_string(&shell.get_str_or_empty("PROMPT"), shell, false).join(" ")
+        })
     } else {
         "    ".repeat(blocks)
     }

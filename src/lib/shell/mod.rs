@@ -57,7 +57,7 @@ use crate::{
 };
 use liner::Context;
 use std::{
-    fs::File,
+    fs,
     io::{self, Read, Write},
     iter::FromIterator,
     ops::Deref,
@@ -212,15 +212,15 @@ impl Shell {
     /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
     /// method will attempt to execute that file as a script, and then returns the final exit
     /// status of the evaluated script.
-    pub fn execute_script<SCRIPT: AsRef<Path>>(&mut self, script: SCRIPT) -> io::Result<i32> {
-        let mut script = File::open(script.as_ref())?;
-        let capacity = script.metadata().ok().map_or(0, |x| x.len());
-        let mut command_list = String::with_capacity(capacity as usize);
-        let _ = script.read_to_string(&mut command_list)?;
-        if FAILURE == self.terminate_script_quotes(command_list.lines().map(|x| x.to_owned())) {
-            self.previous_status = FAILURE;
+    pub fn execute_file<P: AsRef<Path>>(&mut self, script: P) {
+        match fs::read_to_string(script.as_ref()) {
+            Ok(script) => {
+                if self.terminate_script_quotes(script.lines()) == FAILURE {
+                    self.previous_status = FAILURE;
+                }
+            }
+            Err(err) => eprintln!("ion: {}", err),
         }
-        Ok(self.previous_status)
     }
 
     /// A method for executing commands in the Ion shell without capturing. It takes command(s)
@@ -348,11 +348,7 @@ impl Shell {
             }
         };
         match base_dirs.find_config_file("initrc") {
-            Some(initrc) => {
-                if let Err(err) = self.execute_script(&initrc) {
-                    eprintln!("ion: {}", err);
-                }
-            }
+            Some(initrc) => self.execute_file(&initrc),
             None => {
                 if let Err(err) = base_dirs.place_config_file("initrc") {
                     eprintln!("ion: could not create initrc file: {}", err);
