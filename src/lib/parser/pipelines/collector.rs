@@ -5,6 +5,7 @@ use crate::{
     shell::{Job, JobKind},
     types::*,
 };
+use lexers::arguments::{Levels, Field};
 
 trait AddItem {
     fn add_item(
@@ -256,20 +257,12 @@ impl<'a> Collector<'a> {
     {
         // XXX: I don't think its the responsibility of the pipeline parser to do this
         // but I'm not sure of a better solution
-        let mut array_level = 0;
-        let mut proc_level = 0;
-        let mut brace_level = 0;
+        let mut levels = Levels::default();
         let mut start = None;
         let mut end = None;
         // Array increments * 2 + 1; brace * 2
         // Supports up to 31 nested arrays
         let mut array_brace_counter: u32 = 0;
-
-        macro_rules! is_toplevel {
-            () => {
-                array_level + proc_level + brace_level == 0
-            };
-        }
 
         // Skip over any leading whitespace
         while let Some(&(_, b)) = bytes.peek() {
@@ -287,20 +280,20 @@ impl<'a> Collector<'a> {
             }
             match b {
                 b'(' => {
-                    proc_level += 1;
+                    levels.up(Field::Proc);
                     bytes.next();
                 }
                 b')' => {
-                    proc_level -= 1;
+                    levels.down(Field::Proc);
                     bytes.next();
                 }
                 b'[' => {
-                    array_level += 1;
+                    levels.up(Field::Array);
                     array_brace_counter = array_brace_counter.wrapping_mul(2) + 1;
                     bytes.next();
                 }
                 b']' => {
-                    array_level -= 1;
+                    levels.down(Field::Array);
                     if array_brace_counter % 2 == 1 {
                         array_brace_counter = (array_brace_counter - 1) / 2;
                         bytes.next();
@@ -309,13 +302,13 @@ impl<'a> Collector<'a> {
                     }
                 }
                 b'{' => {
-                    brace_level += 1;
+                    levels.up(Field::Braces);
                     array_brace_counter = array_brace_counter.wrapping_mul(2);
                     bytes.next();
                 }
                 b'}' => {
                     if array_brace_counter % 2 == 0 {
-                        brace_level -= 1;
+                        levels.down(Field::Braces);
                         array_brace_counter /= 2;
                         bytes.next();
                     } else {
@@ -325,7 +318,7 @@ impl<'a> Collector<'a> {
                 // This is a tricky one: we only end the argment if `^` is followed by a
                 // redirection character
                 b'^' => {
-                    if is_toplevel!() {
+                    if levels.are_rooted() {
                         if let Some(next_byte) = self.peek(i + 1) {
                             // If the next byte is for stderr to file or next process, end this
                             // argument
@@ -359,7 +352,7 @@ impl<'a> Collector<'a> {
                 }
                 // If we see a byte from the follow set, we've definitely reached the end of
                 // the arguments
-                c if FOLLOW_ARGS.contains(&c) && is_toplevel!() => {
+                c if FOLLOW_ARGS.contains(&c) && levels.are_rooted() => {
                     end = Some(i);
                     break;
                 }
@@ -369,24 +362,9 @@ impl<'a> Collector<'a> {
                 }
             }
         }
-        if proc_level > 0 {
-            return Err("ion: syntax error: unmatched left paren");
-        }
-        if array_level > 0 {
-            return Err("ion: syntax error: unmatched left bracket");
-        }
-        if brace_level > 0 {
-            return Err("ion: syntax error: unmatched left brace");
-        }
-        if proc_level < 0 {
-            return Err("ion: syntax error: extra right paren(s)");
-        }
-        if array_level < 0 {
-            return Err("ion: syntax error: extra right bracket(s)");
-        }
-        if brace_level < 0 {
-            return Err("ion: syntax error: extra right brace(s)");
-        }
+
+        levels.check()?;
+
         match (start, end) {
             (Some(i), Some(j)) if i < j => Ok(Some(&self.data[i..j])),
             (Some(i), None) => Ok(Some(&self.data[i..])),

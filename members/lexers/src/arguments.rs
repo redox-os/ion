@@ -13,44 +13,59 @@ bitflags! {
     }
 }
 
-enum Field {
-    Parens,
+pub enum Field {
+    Proc,
     Array,
     Braces,
 }
 use self::Field::*;
 
-struct Levels {
-    parens:  i32,
+#[derive(Default)]
+pub struct Levels {
+    proc:  i32,
     array:  i32,
     braces: i32,
 }
 
 impl Levels {
-    fn new() -> Self {
-        Levels { parens: 0, array: 0, braces: 0, }
-    }
-
-    fn up(&mut self, field: Field) {
+    pub fn up(&mut self, field: Field) {
         let level = match field {
-                Parens => &mut self.parens,
+                Proc => &mut self.proc,
                 Array => &mut self.array,
                 Braces => &mut self.braces,
             };
         *level += 1;
     }
 
-    fn down(&mut self, field: Field) {
+    pub fn down(&mut self, field: Field) {
         let level = match field {
-                Parens => &mut self.parens,
+                Proc => &mut self.proc,
                 Array => &mut self.array,
                 Braces => &mut self.braces,
             };
         *level -= 1;
     }
 
-    fn are_rooted(&self) -> bool {
-        self.parens == 0 && self.array == 0 && self.braces == 0
+    pub fn are_rooted(&self) -> bool {
+        self.proc + self.array + self.braces == 0
+    }
+
+    pub fn check(&self) -> Result<(), &'static str> {
+        if self.proc > 0 {
+            Err("ion: syntax error: unmatched left paren")
+        } else if self.array > 0 {
+            Err("ion: syntax error: unmatched left bracket")
+        } else if self.braces > 0 {
+            Err("ion: syntax error: unmatched left brace")
+        } else if self.proc < 0 {
+            Err("ion: syntax error: extra right paren(s)")
+        } else if self.array < 0 {
+            Err("ion: syntax error: extra right bracket(s)")
+        } else if self.braces < 0 {
+            Err("ion: syntax error: extra right brace(s)")
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -94,7 +109,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
         }
         let start = self.read;
 
-        let mut levels = Levels::new();
+        let mut levels = Levels::default();
         let mut bytes = data.iter().cloned().skip(self.read);
         while let Some(character) = bytes.next() {
             match character {
@@ -129,13 +144,13 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                         self.bitflags.remove(ArgumentFlags::VARIAB | ArgumentFlags::ARRAY);
                         self.bitflags.insert(ArgumentFlags::METHOD);
                     }
-                    levels.up(Parens);
+                    levels.up(Proc);
                 }
                 b')' => {
                     if self.bitflags.contains(ArgumentFlags::METHOD) {
                         self.bitflags.remove(ArgumentFlags::METHOD);
                     }
-                    levels.down(Parens)
+                    levels.down(Proc)
                 }
 
                 // Toggle double quote rules.
