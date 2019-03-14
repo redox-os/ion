@@ -65,24 +65,19 @@ fn stepped_range_chars<'a>(
 
 fn numeric_range<'a>(
     start: isize,
-    mut end: isize,
+    end: isize,
     step: isize,
     inclusive: bool,
     nb_digits: usize,
 ) -> Option<Box<Iterator<Item = small::String> + 'a>> {
-    if start < end {
-        if inclusive {
-            end += 1;
-        }
-        stepped_range_numeric(start, end, step, nb_digits)
-    } else if start > end {
-        if inclusive {
-            end -= 1;
-        }
-        stepped_range_numeric(start, end, step, nb_digits)
+    let end = if start < end && inclusive {
+        end + 1
+    } else if start > end && inclusive {
+        end - 1
     } else {
-        Some(Box::new(Some(start.to_string().into()).into_iter()))
-    }
+        end
+    };
+    stepped_range_numeric(start, end, step, nb_digits)
 }
 
 #[inline]
@@ -91,7 +86,7 @@ fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' &
 use std::u8;
 fn char_range<'a>(
     start: u8,
-    mut end: u8,
+    end: u8,
     step: isize,
     inclusive: bool,
 ) -> Option<Box<Iterator<Item = small::String> + 'a>> {
@@ -107,52 +102,33 @@ fn char_range<'a>(
         v as u8
     };
 
-    if start < end {
-        if inclusive {
-            end += 1;
-        }
-        stepped_range_chars(start, end, char_step)
-    } else if start > end {
-        if inclusive {
-            end -= 1;
-        }
-        stepped_range_chars(start, end, char_step)
+    let end = if start < end && inclusive {
+        end + 1
+    } else if start > end && inclusive {
+        end - 1
     } else {
-        Some(Box::new(Some((start as char).to_string().into()).into_iter()))
-    }
+        end
+    };
+    stepped_range_chars(start, end, char_step)
 }
 
 fn count_minimum_digits(a: &str) -> usize {
-    let mut has_leading_zero = false;
     for c in a.chars() {
         match c {
             '-' => (),
-            '0' => {
-                has_leading_zero = true;
-                break;
-            }
+            '0' => return a.len(),
             '1'...'9' => break,
             _ => panic!("count_minimum_digits should only be called for a valid number."),
         }
     }
-    if !has_leading_zero {
-        0
-    } else {
-        a.len()
-    }
+    0
 }
 
 fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize, usize)> {
-    if let Ok(first) = a.parse::<isize>() {
-        if let Ok(sec) = b.parse::<isize>() {
-            let nb_digits = usize::max(count_minimum_digits(a), count_minimum_digits(b));
-            Some((first, sec, nb_digits))
-        } else {
-            None
-        }
-    } else {
-        None
-    }
+    let first: isize = a.parse().ok()?;
+    let second: isize = b.parse().ok()?;
+    let nb_digits = usize::max(count_minimum_digits(a), count_minimum_digits(b));
+    Some((first, second, nb_digits))
 }
 
 // TODO: Make this an iterator structure.
