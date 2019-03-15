@@ -25,6 +25,13 @@ members = [
     "members/ranges"
 ]
 
+[dev-dependencies]
+criterion = "0.2"
+
+[[bench]]
+name = "terminator"
+harness = false
+
 [[bin]]
 name = "ion"
 path = "src/main.rs"
