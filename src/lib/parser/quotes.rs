@@ -47,6 +47,8 @@ pub struct Terminator<I: Iterator<Item = u8>> {
     skip_next:  bool,
     quotes:     Quotes,
     terminated: bool,
+    and_or:     bool,
+    whitespace: bool,
 }
 
 impl<'a> From<&'a str> for Terminator<std::str::Bytes<'a>> {
@@ -98,80 +100,18 @@ impl<I: Iterator<Item = u8>> Iterator for Terminator<I> {
             return None;
         }
 
-        let out = self
-            .inner
-            .next()
-            .and_then(|character| {
-                if let Some(matcher) = self.eof.as_mut() {
-                    if matcher.next(character) {
-                        self.eof = None;
-                    }
-                } else if self.skip_next {
-                    self.skip_next = false;
-                } else if self.quotes != Quotes::None && character != b'\\' {
-                    match (character, &self.quotes) {
-                        (b'\'', Quotes::Single) | (b'"', Quotes::Double) => {
-                            self.quotes = Quotes::None;
-                        }
-                        _ => (),
-                    }
-                } else {
-                    match character {
-                        b'\'' => {
-                            self.quotes = Quotes::Single;
-                        }
-                        b'"' => {
-                            self.quotes = Quotes::Double;
-                        }
-                        b'<' if self.inner.prev() == Some(&b'<') => {
-                            if let Some(&b'<') = self.inner.peek() {
-                                self.skip_next = true; // avoid falling in the else at the next pass
-                            } else {
-                                self.eof = Some(EofMatcher::new());
-                            }
-                        }
-                        b'[' => {
-                            self.array += 1;
-                        }
-                        b']' => {
-                            if self.array > 0 {
-                                self.array -= 1;
-                            }
-                        }
-                        b'#' if self
-                            .inner
-                            .prev()
-                            .filter(|&c| ![b' ', b'\n'].contains(c))
-                            .is_none() =>
-                        {
-                            return self.inner.find(|&c| c == b'\n')
-                        }
-                        b'\\' => {
-                            if self.inner.peek() == Some(&b'\n') {
-                                return self.inner.find(|&c| !(c as char).is_whitespace());
-                            } else {
-                                self.skip_next = true;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
+        let next = self.inner.next();
+        let out = self.handle_char(next);
 
-                Some(character)
-            })
-            .map(|c| if c == b'\n' && self.array > 0 { b' ' } else { c });
-
-        //let prev = self.inner.prev().cloned();
-        //let next = self.inner.peek();
         /*println!(
-            "debug: \n\tarray: {}\n\tquotes: {:?}\n\tcharacter: {:?}\n\ttrim: {}",
-            self.array, self.quotes, out, self.skip_next
+            "debug: \n\tarray: {}\n\tquotes: {:?}\n\tcharacter: {:?}\n\ttrim: {}\n\twhitespace: {}",
+            self.array, self.quotes, out, self.skip_next, self.whitespace,
         );*/
-        if (out == Some(b'\n') || out == None)
+        if out.is_none()
             && self.eof.is_none()
             && self.array == 0
             && self.quotes == Quotes::None
-            //&& (![b'|', b'&'].contains(&character) || prev.filter(|c| c == character).is_none())
+            && !self.and_or
         {
             self.terminated = true;
         }
@@ -190,11 +130,86 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
         Ok(stmt)
     }
 
-    /// Appends a string to the internal buffer.
-    // fn append(&mut self, input: &str) {
-    // if self.eof.as_ref().filter(|s| s.as_str() == input.trim()).is_some() {
-    //     self.eof = None;
-    //}
+    fn handle_char(&mut self, character: Option<u8>) -> Option<u8> {
+        character
+            .and_then(|character| {
+            let prev_whitespace = self.whitespace;
+            self.whitespace = false;
+
+            if let Some(matcher) = self.eof.as_mut() {
+                if matcher.next(character) {
+                    self.eof = None;
+                }
+            } else if self.skip_next {
+                self.skip_next = false;
+            } else if self.quotes != Quotes::None && character != b'\\' {
+                match (character, &self.quotes) {
+                    (b'\'', Quotes::Single) | (b'"', Quotes::Double) => {
+                        self.quotes = Quotes::None;
+                    }
+                    _ => (),
+                }
+            } else {
+                match character {
+                    b'\'' => {
+                        self.quotes = Quotes::Single;
+                    }
+                    b'"' => {
+                        self.quotes = Quotes::Double;
+                    }
+                    b'<' if self.inner.prev() == Some(&b'<') => {
+                        if let Some(&b'<') = self.inner.peek() {
+                            self.skip_next = true; // avoid falling in the else at the next pass
+                        } else {
+                            self.eof = Some(EofMatcher::new());
+                        }
+                    }
+                    b'[' => {
+                        self.array += 1;
+                    }
+                    b']' => {
+                        if self.array > 0 {
+                            self.array -= 1;
+                        }
+                    }
+                    b'#' if self
+                        .inner
+                        .prev()
+                        .filter(|&c| ![b' ', b'\n'].contains(c))
+                        .is_none() =>
+                    {
+                        return self.inner.find(|&c| c == b'\n')
+                    }
+                    b'\\' => {
+                        if self.inner.peek() == Some(&b'\n') {
+                            let next = self.inner.find(|&c| !(c as char).is_whitespace());
+                            return self.handle_char(next);
+                        } else {
+                            self.skip_next = true;
+                        }
+                    }
+                    b'&' | b'|' if self.inner.prev() == Some(&character) => {
+                        self.and_or = true;
+                    }
+                    b'\n' if self.array == 0 && !self.and_or => {
+                        self.terminated = true;
+                    }
+                    _ if (character as char).is_whitespace() => {
+                        if prev_whitespace {
+                            let next = self.inner.find(|&c| !(c as char).is_whitespace());
+                            return self.handle_char(next);
+                        }
+                        self.whitespace = true;
+                    }
+                    _ => {
+                        self.and_or = false;
+                    }
+                }
+            }
+
+            Some(character)
+        }).map(|c| if c == b'\n' && self.array > 0 { b' ' } else { c })
+    }
 
     pub fn new(inner: I) -> Terminator<I> {
         Terminator {
@@ -205,6 +220,8 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
             skip_next:  false,
             quotes:     Quotes::None,
             terminated: false,
+            and_or:     false,
+            whitespace: false,
         }
     }
 }
