@@ -99,15 +99,15 @@ fn count_minimum_digits(a: &str) -> usize {
 
 fn finish(inclusive: bool, start_str: &str, end_str: &str, step: isize) -> Option<Box<Iterator<Item = small::String>>> {
     if let (Ok(start), Ok(end)) = (start_str.parse::<isize>(), end_str.parse::<isize>())  {
-        let step = if step == 1 {
-            if start < end { step } else { -step }
-        } else {
-            step
-        };
+        let step = if step == 1 && start >= end { -step } else { step };
         let nb_digits = usize::max(count_minimum_digits(start_str), count_minimum_digits(end_str));
         numeric_range(start, end, step, inclusive, nb_digits)
     } else {
-        char_range(start_str.bytes().next()?, end_str.bytes().next()?, step, inclusive)
+        if start_str.len() != 1 || end_str.len() != 1 {
+            None
+        } else {
+            char_range(start_str.as_bytes()[0], end_str.as_bytes()[0], step, inclusive)
+        }
     }
 }
 
@@ -118,44 +118,23 @@ fn finish(inclusive: bool, start_str: &str, end_str: &str, step: isize) -> Optio
 //      Exclusive stepped: {start..step..end}
 //      Inclusive stepped: {start..step...end}
 pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
-    let mut bytes_iterator = input.bytes().enumerate();
-    let separator = bytes_iterator.by_ref().take_while(|&(i, b)| match b {
-        b'a'...b'z' | b'-' | b'A'...b'Z' if i == 0 => true,
-        b'0'...b'9' | b'.' => true,
-        _ => false,
-    }).position(|(_, b)| b == b'.')?;
-    let start_str = &input[..separator];
-    // The next byte has to be a dot to be valid range
-    // syntax
-    bytes_iterator.next().filter(|&(_, b)| b == b'.')?;
+    let mut parts = input.split("..").collect::<Vec<_>>();
+    let len = parts.len();
 
-    // if the next byte is a dot we're certain it is an inclusive
-    // unstepped range otherwise it has to be [-0-9a-zA-Z]
-    bytes_iterator.next().and_then(|(start, b)| match b {
-        b'.' | b'=' => {
-            // this can only be an inclusive range
-            finish(true, start_str, &input[start + 1..], 1)
-        }
-        b'0'...b'9' | b'-' | b'a'...b'z' | b'A'...b'Z' => {
-            // further processing needed to find out if we're reading a step or
-            // the end of an exclusive range. Step until we find another dot or
-            // the iterator ends
-            if let Some(end) = bytes_iterator.position(|(_, b)| b == b'.') {
-                // stepped range input[start..read - 1] contains the step
-                // size
-                let step = (&input[start..=start + end]).parse::<isize>().ok()?;
-                // count the dots to determine inclusive/exclusive
-                let dots = bytes_iterator.take_while(|&(_, b)| b == b'.').count() + 1;
-                finish(dots == 3, start_str, &input[start + end + dots + 1..], step)
-            } else {
-                // exhausted the iterator without finding anything new means
-                // exclusive unstepped range
-                finish(false, start_str, &input[start..], 1)
-            }
-        }
+    // if the last separator contains three dots, this can only be an inclusive range
+    let inclusive = parts.last()?.starts_with(|c| c == '.' || c == '=');
+    if inclusive {
+        parts[len - 1] = parts[len - 1].trim_start_matches(|c| c == '.' || c == '=');
+    }
+
+    match len {
+        // two parts means unstepped range
+        2 => finish(inclusive, parts[0], parts[1], 1),
+        // middle string contains the step size
+        3 => finish(inclusive, parts[0], parts[2], parts[1].parse::<isize>().ok()?),
         // not a valid byte for ranges
         _ => None,
-    })
+    }
 }
 
 pub fn parse_index_range(input: &str) -> Option<Range> {
