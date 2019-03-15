@@ -75,9 +75,7 @@ where
     }
 
     #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.iter.size_hint()
-    }
+    fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
 impl<I: Iterator> RearPeekable<I> {
@@ -92,9 +90,7 @@ impl<I: Iterator<Item = u8>> Iterator for Terminator<I> {
     type Item = u8;
 
     #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
+    fn size_hint(&self) -> (usize, Option<usize>) { self.inner.size_hint() }
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -165,20 +161,19 @@ impl<I: Iterator<Item = u8>> Iterator for Terminator<I> {
             })
             .map(|c| if c == b'\n' && self.array > 0 { b' ' } else { c });
 
-        if let Some(character) = &out {
-            let prev = self.inner.prev().cloned();
-            let next = self.inner.peek();
-            // println!("debug: \n\tnext: {:?}\n\tarray: {}\n\tquotes: {:?}\n\tcharacter:
-            // {:?}\n\tprev: {:?}\n\ttrim: {}", next, self.array, self.quotes, character as char,
-            // prev, self.trim);
-            if (next == Some(&b'\n') || next == None)
-                && self.eof.is_none()
-                && self.array == 0
-                && self.quotes == Quotes::None
-                && (![b'|', b'&'].contains(&character) || prev.filter(|c| c == character).is_none())
-            {
-                self.terminated = true;
-            }
+        //let prev = self.inner.prev().cloned();
+        //let next = self.inner.peek();
+        /*println!(
+            "debug: \n\tarray: {}\n\tquotes: {:?}\n\tcharacter: {:?}\n\ttrim: {}",
+            self.array, self.quotes, out, self.skip_next
+        );*/
+        if (out == Some(b'\n') || out == None)
+            && self.eof.is_none()
+            && self.array == 0
+            && self.quotes == Quotes::None
+            //&& (![b'|', b'&'].contains(&character) || prev.filter(|c| c == character).is_none())
+        {
+            self.terminated = true;
         }
 
         out

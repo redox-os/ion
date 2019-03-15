@@ -11,7 +11,6 @@ use self::{
 };
 use super::{flags::UNTERMINATED, status::*, FlowLogic, Shell, ShellHistory};
 use crate::{parser::Terminator, types};
-use itertools::Itertools;
 use liner::{Buffer, Context};
 use std::path::Path;
 
@@ -98,9 +97,7 @@ impl Binary for Shell {
                 line
             })
             .filter_map(|cmd| cmd)
-            .filter(|cmd| !cmd.starts_with('#'))
-            .flat_map(|s| s.into_bytes().into_iter())
-            .intersperse(b'\n');
+            .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
             match Terminator::new(&mut lines).terminate().map(|stmt| stmt.to_string()).ok() {
                 Some(command) => {
                     self.flags &= !UNTERMINATED;

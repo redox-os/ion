@@ -2,10 +2,10 @@ use std::{collections::HashSet, iter::Peekable};
 
 use super::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use crate::{
+    lexers::arguments::{Field, Levels},
     shell::{Job, JobKind},
     types::*,
 };
-use crate::lexers::arguments::{Levels, Field};
 
 trait AddItem {
     fn add_item(
