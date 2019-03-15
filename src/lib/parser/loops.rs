@@ -17,15 +17,12 @@ impl ForValueExpression {
             .flat_map(|expression| expand_string(expression, expanders, true))
             .collect();
 
-        if output.len() == 1 {
-            let output = output.into_iter().next().unwrap();
-            if let Some(range) = crate::ranges::parse_range(&output) {
-                return ForValueExpression::Range(range);
-            }
-
-            ForValueExpression::Normal(output)
-        } else {
+        if let (Some(range), true) = (crate::ranges::parse_range(&output[0]), output.len() == 1) {
+            ForValueExpression::Range(range)
+        } else if output.len() > 1 {
             ForValueExpression::Multiple(output)
+        } else {
+            ForValueExpression::Normal(output[0].clone())
         }
     }
 }

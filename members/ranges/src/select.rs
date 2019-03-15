@@ -56,18 +56,14 @@ impl FromStr for Select {
     type Err = ();
 
     fn from_str(data: &str) -> Result<Select, ()> {
-        if ".." == data {
-            return Ok(Select::All);
+        if data == ".." {
+            Ok(Select::All)
+        } else if let Ok(index) = data.parse::<isize>() {
+            Ok(Select::Index(Index::new(index)))
+        } else if let Some(range) = parse_index_range(data) {
+            Ok(Select::Range(range))
+        } else {
+            Ok(Select::Key(data.into()))
         }
-
-        if let Ok(index) = data.parse::<isize>() {
-            return Ok(Select::Index(Index::new(index)));
-        }
-
-        if let Some(range) = parse_index_range(data) {
-            return Ok(Select::Range(range));
-        }
-
-        Ok(Select::Key(data.into()))
     }
 }

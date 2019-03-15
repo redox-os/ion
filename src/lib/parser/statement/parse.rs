@@ -31,46 +31,44 @@ fn is_valid_name(name: &str) -> bool { !name.chars().any(|c| !(c.is_alphanumeric
 pub(crate) fn parse(code: &str) -> Statement {
     let cmd = code.trim();
     match cmd {
-        "end" => return Statement::End,
-        "break" => return Statement::Break,
-        "continue" => return Statement::Continue,
+        "end" => Statement::End,
+        "break" => Statement::Break,
+        "continue" => Statement::Continue,
         "for" | "match" | "case" => {
             eprintln!("ion: syntax error: incomplete control flow statement");
-            return Statement::Error(FAILURE);
+            Statement::Error(FAILURE)
         }
         "let" => {
-            return Statement::Let(LocalAction::List);
+            Statement::Let(LocalAction::List)
         }
         _ if cmd.starts_with("let ") => {
             // Split the let expression and ensure that the statement is valid.
             let (keys, op, vals) = assignment_lexer(cmd[4..].trim_start());
-            let (keys, op, values) = match vals {
+            match vals {
                 Some(vals) => {
                     // If the values exist, then the keys and operator also exists.
-                    (keys.unwrap().into(), op.unwrap(), vals.into())
+                    Statement::Let(LocalAction::Assign(keys.unwrap().into(), op.unwrap(), vals.into()))
                 }
                 None => {
                     if op.is_none() {
                         eprintln!("ion: assignment error: no operator supplied.");
                     } else {
-                        eprintln!("ion: assignment error: no values supplied.")
+                        eprintln!("ion: assignment error: no values supplied.");
                     }
-                    return Statement::Error(FAILURE);
+                    Statement::Error(FAILURE)
                 }
-            };
-
-            return Statement::Let(LocalAction::Assign(keys, op, values));
+            }
         }
         "export" => {
-            return Statement::Export(ExportAction::List);
+            Statement::Export(ExportAction::List)
         }
         _ if cmd.starts_with("export ") => {
             // Split the let expression and ensure that the statement is valid.
             let (keys, op, vals) = assignment_lexer(cmd[7..].trim_start());
-            let (keys, op, values) = match vals {
+            match vals {
                 Some(vals) => {
                     // If the values exist, then the keys and operator also exists.
-                    (keys.unwrap().into(), op.unwrap(), vals.into())
+                    Statement::Export(ExportAction::Assign(keys.unwrap().into(), op.unwrap(), vals.into()))
                 }
                 None => {
                     if keys.is_none() {
@@ -80,38 +78,36 @@ pub(crate) fn parse(code: &str) -> Statement {
                     } else {
                         return Statement::Export(ExportAction::LocalExport(keys.unwrap().into()));
                     }
-                    return Statement::Error(FAILURE);
+                    Statement::Error(FAILURE)
                 }
-            };
-
-            return Statement::Export(ExportAction::Assign(keys, op, values));
+            }
         }
         _ if cmd.starts_with("if ") => {
-            return Statement::If {
+            Statement::If {
                 expression: vec![parse(cmd[3..].trim_start())],
                 success:    Vec::new(),
                 else_if:    Vec::new(),
                 failure:    Vec::new(),
                 mode:       0,
-            };
+            }
         }
-        "else" => return Statement::Else,
+        "else" => Statement::Else,
         _ if cmd.starts_with("else") => {
             let cmd = cmd[4..].trim_start();
-            if cmd.is_empty() {
-                return Statement::Else;
-            } else if cmd.starts_with("if ") {
-                return Statement::ElseIf(ElseIf {
+            if !cmd.is_empty() && cmd.starts_with("if ")  {
+                Statement::ElseIf(ElseIf {
                     expression: vec![parse(cmd[3..].trim_start())],
                     success:    Vec::new(),
-                });
+                })
+            } else {
+                Statement::Else
             }
         }
         _ if cmd.starts_with("while ") => {
-            return collect(cmd[6..].trim_start(), |pipeline| Statement::While {
+            collect(cmd[6..].trim_start(), |pipeline| Statement::While {
                 expression: vec![Statement::Pipeline(pipeline)],
                 statements: Vec::new(),
-            });
+            })
         }
         _ if cmd.starts_with("for ") => {
             let mut cmd = cmd[4..].trim_start();
@@ -130,7 +126,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             }
 
-            return match variables {
+            match variables {
                 Some(variables) => Statement::For {
                     variables,
                     values: ArgumentSplitter::new(cmd).map(small::String::from).collect(),
@@ -140,7 +136,7 @@ pub(crate) fn parse(code: &str) -> Statement {
                     eprintln!("ion: syntax error: for loop lacks the `in` keyword");
                     Statement::Error(FAILURE)
                 }
-            };
+            }
         }
         _ if cmd.starts_with("case ") => {
             let (value, binding, conditional) = match cmd[5..].trim_start() {
@@ -162,13 +158,13 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             };
 
-            return Statement::Case(Case { value, binding, conditional, statements: Vec::new() });
+            Statement::Case(Case { value, binding, conditional, statements: Vec::new() })
         }
         _ if cmd.starts_with("match ") => {
-            return Statement::Match {
+            Statement::Match {
                 expression: cmd[6..].trim_start().into(),
                 cases:      Vec::new(),
-            };
+            }
         }
         _ if cmd.starts_with("fn ") => {
             let cmd = cmd[3..].trim_start();
@@ -186,16 +182,16 @@ pub(crate) fn parse(code: &str) -> Statement {
             let (args, description) = parse_function(&cmd[pos..]);
             match collect_arguments(args) {
                 Ok(args) => {
-                    return Statement::Function {
+                    Statement::Function {
                         description: description.map(small::String::from),
                         name: name.into(),
                         args,
                         statements: Vec::new(),
-                    };
+                    }
                 }
                 Err(why) => {
                     eprintln!("ion: function argument error: {}", why);
-                    return Statement::Error(FAILURE);
+                    Statement::Error(FAILURE)
                 }
             }
         }
@@ -209,31 +205,18 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
                 break;
             }
-            return Statement::Time(Box::new(parse(timed)));
+            Statement::Time(Box::new(parse(timed)))
         }
-        _ if cmd.eq("time") => return Statement::Time(Box::new(Statement::Default)),
-        _ if cmd.starts_with("and ") => {
-            return Statement::And(Box::new(parse(cmd[3..].trim_start())));
-        }
-        _ if cmd.eq("and") => return Statement::And(Box::new(Statement::Default)),
-        _ if cmd.starts_with("or ") => {
-            return Statement::Or(Box::new(parse(cmd[2..].trim_start())))
-        }
-        _ if cmd.eq("or") => return Statement::Or(Box::new(Statement::Default)),
-        _ if cmd.starts_with("not ") => {
-            return Statement::Not(Box::new(parse(cmd[3..].trim_start())));
-        }
-        _ if cmd.starts_with("! ") => {
-            return Statement::Not(Box::new(parse(cmd[1..].trim_start())))
-        }
-        _ if cmd.eq("not") | cmd.eq("!") => return Statement::Not(Box::new(Statement::Default)),
-        _ => (),
-    }
-
-    if cmd.is_empty() || cmd.starts_with('#') {
-        Statement::Default
-    } else {
-        collect(cmd, Statement::Pipeline)
+        _ if cmd.eq("time") => Statement::Time(Box::new(Statement::Default)),
+        _ if cmd.starts_with("and ") => Statement::And(Box::new(parse(cmd[3..].trim_start()))),
+        _ if cmd.eq("and") => Statement::And(Box::new(Statement::Default)),
+        _ if cmd.starts_with("or ") => Statement::Or(Box::new(parse(cmd[2..].trim_start()))),
+        _ if cmd.eq("or") => Statement::Or(Box::new(Statement::Default)),
+        _ if cmd.starts_with("not ") => Statement::Not(Box::new(parse(cmd[3..].trim_start()))),
+        _ if cmd.starts_with("! ") => Statement::Not(Box::new(parse(cmd[1..].trim_start()))),
+        _ if cmd.eq("not") | cmd.eq("!") => Statement::Not(Box::new(Statement::Default)),
+        _ if cmd.is_empty() || cmd.starts_with('#') => Statement::Default,
+        _ => collect(cmd, Statement::Pipeline),
     }
 }
 
