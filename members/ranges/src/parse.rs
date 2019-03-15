@@ -1,6 +1,6 @@
 use super::{Index, Range};
 use small;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, u8};
 
 fn numeric_range<'a>(
     start: isize,
@@ -43,7 +43,6 @@ fn numeric_range<'a>(
 #[inline]
 fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') }
 
-use std::u8;
 fn char_range<'a>(
     start: u8,
     end: u8,
@@ -97,11 +96,18 @@ fn count_minimum_digits(a: &str) -> usize {
     0
 }
 
-fn strings_to_isizes(a: &str, b: &str) -> Option<(isize, isize, usize)> {
-    let first: isize = a.parse().ok()?;
-    let second: isize = b.parse().ok()?;
-    let nb_digits = usize::max(count_minimum_digits(a), count_minimum_digits(b));
-    Some((first, second, nb_digits))
+fn finish(inclusive: bool, start_str: &str, end_str: &str, step: isize) -> Option<Box<Iterator<Item = small::String>>> {
+    if let (Ok(start), Ok(end)) = (start_str.parse::<isize>(), end_str.parse::<isize>())  {
+        let step = if step == 1 {
+            if start < end { step } else { -step }
+        } else {
+            step
+        };
+        let nb_digits = usize::max(count_minimum_digits(start_str), count_minimum_digits(end_str));
+        numeric_range(start, end, step, inclusive, nb_digits)
+    } else {
+        char_range(start_str.bytes().next()?, end_str.bytes().next()?, step, inclusive)
+    }
 }
 
 // TODO: Make this an iterator structure.
@@ -119,50 +125,13 @@ pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
             b'a'...b'z' | b'-' | b'A'...b'Z' if read == 0 => read += 1,
             b'0'...b'9' => read += 1,
             b'.' => {
-                let first = &input[..read];
+                let start_str = &input[..read];
                 read += 1;
                 // The next byte has to be a dot to be valid range
                 // syntax
                 match bytes_iterator.next() {
                     Some(b'.') => read += 1,
                     _ => return None,
-                }
-
-                macro_rules! finish_char {
-                    ($inclusive:expr, $end_str:expr, $step:expr) => {
-                        if first.len() == 1 && $end_str.len() == 1 {
-                            let start = first.as_bytes()[0];
-                            let end = $end_str.as_bytes()[0];
-                            return char_range(start, end, $step, $inclusive);
-                        } else {
-                            return None;
-                        }
-                    };
-                }
-
-                macro_rules! finish {
-                    ($inclusive:expr, $read:expr) => {
-                        let end_str = &input[$read..];
-                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str) {
-                            return numeric_range(
-                                start,
-                                end,
-                                if start < end { 1 } else { -1 },
-                                $inclusive,
-                                nb_digits,
-                            );
-                        } else {
-                            finish_char!($inclusive, end_str, 1);
-                        }
-                    };
-                    ($inclusive:expr, $read:expr, $step:expr) => {
-                        let end_str = &input[$read..];
-                        if let Some((start, end, nb_digits)) = strings_to_isizes(first, end_str) {
-                            return numeric_range(start, end, $step, $inclusive, nb_digits);
-                        } else {
-                            finish_char!($inclusive, end_str, $step);
-                        }
-                    };
                 }
 
                 // if the next byte is a dot we're certain it is an inclusive
@@ -172,7 +141,7 @@ pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
                     match b {
                         b'.' | b'=' => {
                             // this can only be an inclusive range
-                            finish!(true, read);
+                            return finish(true, start_str, &input[read..], 1);
                         }
                         b'0'...b'9' | b'-' | b'a'...b'z' | b'A'...b'Z' => {
                             // further processing needed to find out if we're reading a step or
@@ -195,7 +164,7 @@ pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
                                                 _ => break,
                                             }
                                         }
-                                        finish!(dots == 3, read - 1, step);
+                                        return finish(dots == 3, start_str, &input[read - 1..], step);
                                     }
                                     // numeric values are OK but no letters anymore
                                     b'0'...b'9' => {}
@@ -205,7 +174,7 @@ pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
                             }
                             // exhausted the iterator without finding anything new means
                             // exclusive unstepped range
-                            finish!(false, start);
+                            return finish(false, start_str, &input[start..], 1);
                         }
                         // not a valid byte for ranges
                         _ => return None,
