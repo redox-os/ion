@@ -215,7 +215,7 @@ impl Shell {
     pub fn execute_file<P: AsRef<Path>>(&mut self, script: P) {
         match fs::read_to_string(script.as_ref()) {
             Ok(script) => {
-                if self.terminate_script_quotes(script.lines()) == FAILURE {
+                if self.terminate_script_quotes(script.bytes()) == FAILURE {
                     self.previous_status = FAILURE;
                 }
             }
@@ -230,11 +230,11 @@ impl Shell {
     /// the command(s) in the command line REPL interface for Ion. If the supplied command is
     /// not
     /// terminated, then an error will be returned.
-    pub fn execute_command<T>(&mut self, command: T) -> Result<i32, IonError>
+    pub fn execute_command<'a, T>(&mut self, command: &T) -> Result<i32, IonError>
     where
-        T: AsRef<str>,
+        T: 'a + AsRef<str> + std::clone::Clone + std::convert::From<&'a str>,
     {
-        let terminator: Terminator<_, T> = command.into();
+        let terminator: Terminator<_> = command.as_ref().into();
         if let Ok(stmt) = terminator.terminate() {
             self.on_command(&stmt);
             Ok(self.previous_status)
@@ -257,9 +257,7 @@ impl Shell {
     }
 
     /// Sets a variable of `name` with the given `value` in the shell's variable map.
-    pub fn set<T: Into<Value>>(&mut self, name: &str, value: T) {
-        self.variables.set(name, value);
-    }
+    pub fn set<T: Into<Value>>(&mut self, name: &str, value: T) { self.variables.set(name, value); }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
     pub(crate) fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
@@ -481,9 +479,7 @@ impl<'a> Expander for Shell {
                         let f = format!("{}", value);
                         match *value {
                             Value::Str(_) => array.push(f.into()),
-                            Value::Array(_)
-                            | Value::HashMap(_)
-                            | Value::BTreeMap(_) => {
+                            Value::Array(_) | Value::HashMap(_) | Value::BTreeMap(_) => {
                                 for split in f.split_whitespace() {
                                     array.push(split.into());
                                 }
@@ -524,9 +520,7 @@ impl<'a> Expander for Shell {
                         let f = format!("{}", value);
                         match *value {
                             Value::Str(_) => array.push(f.into()),
-                            Value::Array(_)
-                            | Value::HashMap(_)
-                            | Value::BTreeMap(_) => {
+                            Value::Array(_) | Value::HashMap(_) | Value::BTreeMap(_) => {
                                 for split in f.split_whitespace() {
                                     array.push(split.into());
                                 }

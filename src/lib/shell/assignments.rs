@@ -93,8 +93,8 @@ impl VariableStore for Shell {
                             env::set_var(key.name, values.join(" "));
                             Ok(())
                         }
-                        Value::Array(_) => Err("arithmetic operators on array expressions \
-                                                       aren't supported yet."
+                        Value::Array(_) => Err("arithmetic operators on array expressions aren't \
+                                                supported yet."
                             .to_string()),
                         Value::Str(rhs) => {
                             let key_name: &str = &key.name;
@@ -261,12 +261,8 @@ impl VariableStore for Shell {
                     value_check(self, index_name, index_kind)
                         .map_err(|why| format!("assignment error: {}: {}", key.name, why))
                         .and_then(|index| match index {
-                            Value::Array(_) => {
-                                Err("index variable cannot be an array".to_string())
-                            }
-                            Value::HashMap(_) => {
-                                Err("index variable cannot be a hmap".to_string())
-                            }
+                            Value::Array(_) => Err("index variable cannot be an array".to_string()),
+                            Value::HashMap(_) => Err("index variable cannot be a hmap".to_string()),
                             Value::BTreeMap(_) => {
                                 Err("index variable cannot be a bmap".to_string())
                             }

@@ -9,8 +9,9 @@ use self::{
     readln::readln,
     terminate::terminate_script_quotes,
 };
-use super::{status::*, FlowLogic, Shell, ShellHistory, flags::UNTERMINATED};
-use crate::{types, parser::Terminator};
+use super::{flags::UNTERMINATED, status::*, FlowLogic, Shell, ShellHistory};
+use crate::{parser::Terminator, types};
+use itertools::Itertools;
 use liner::{Buffer, Context};
 use std::path::Path;
 
@@ -35,7 +36,7 @@ pub trait Binary {
     /// Liner.
     fn execute_interactive(self);
     /// Ensures that read statements from a script are terminated.
-    fn terminate_script_quotes<T: AsRef<str> + ToString, I: Iterator<Item = T>>(&mut self, lines: I) -> i32;
+    fn terminate_script_quotes<I: Iterator<Item = u8>>(&mut self, lines: I) -> i32;
     /// Ion's interface to Liner's `read_line` method, which handles everything related to
     /// rendering, controlling, and getting input from the prompt.
     fn readln(&mut self) -> Option<String>;
@@ -95,14 +96,18 @@ impl Binary for Shell {
                 let line = self.readln();
                 self.flags |= UNTERMINATED;
                 line
-            }).filter_map(|cmd| cmd).filter(|cmd| !cmd.starts_with('#'));
+            })
+            .filter_map(|cmd| cmd)
+            .filter(|cmd| !cmd.starts_with('#'))
+            .flat_map(|s| s.into_bytes().into_iter())
+            .intersperse(b'\n');
             match Terminator::new(&mut lines).terminate().map(|stmt| stmt.to_string()).ok() {
                 Some(command) => {
                     self.flags &= !UNTERMINATED;
                     let cmd: &str = &designators::expand_designators(&self, command.trim_end());
                     self.on_command(&cmd);
                     self.save_command(&cmd);
-                },
+                }
                 None => self.reset_flow(),
             }
         }
@@ -123,7 +128,7 @@ impl Binary for Shell {
         }
     }
 
-    fn terminate_script_quotes<T: AsRef<str> + ToString, I: Iterator<Item = T>>(&mut self, lines: I) -> i32 {
+    fn terminate_script_quotes<I: Iterator<Item = u8>>(&mut self, lines: I) -> i32 {
         terminate_script_quotes(self, lines)
     }
 

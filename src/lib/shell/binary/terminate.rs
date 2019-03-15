@@ -3,11 +3,8 @@ use crate::{
     shell::{status::*, FlowLogic, Shell},
 };
 
-pub(crate) fn terminate_script_quotes<T: AsRef<str> + ToString, I: Iterator<Item = T>>(
-    shell: &mut Shell,
-    lines: I,
-) -> i32 {
-    let mut lines = lines.filter(|cmd| !cmd.as_ref().starts_with('#') && !cmd.as_ref().is_empty()).peekable();
+pub(crate) fn terminate_script_quotes<I: Iterator<Item = u8>>(shell: &mut Shell, lines: I) -> i32 {
+    let mut lines = lines.peekable();
     while lines.peek().is_some() {
         match Terminator::new(&mut lines).terminate() {
             Ok(stmt) => shell.on_command(&stmt),

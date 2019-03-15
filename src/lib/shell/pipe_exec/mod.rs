@@ -589,7 +589,10 @@ impl PipelineExecution for Shell {
             redirect_streams(&stdin_bk, &stdout_bk, &stderr_bk);
             code
         } else {
-            eprintln!("ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'", job.long());
+            eprintln!(
+                "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
+                job.long()
+            );
 
             COULD_NOT_EXEC
         }

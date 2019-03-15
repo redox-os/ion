@@ -21,7 +21,7 @@ pub enum Field {
 use self::Field::*;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct Levels {
+pub struct Levels {
     parens: i32,
     array:  i32,
     braces: i32,
@@ -30,25 +30,23 @@ struct Levels {
 impl Levels {
     pub fn up(&mut self, field: Field) {
         let level = match field {
-                Proc => &mut self.parens,
-                Array => &mut self.array,
-                Braces => &mut self.braces,
-            };
+            Proc => &mut self.parens,
+            Array => &mut self.array,
+            Braces => &mut self.braces,
+        };
         *level += 1;
     }
 
     pub fn down(&mut self, field: Field) {
         let level = match field {
-                Proc => &mut self.parens,
-                Array => &mut self.array,
-                Braces => &mut self.braces,
-            };
+            Proc => &mut self.parens,
+            Array => &mut self.array,
+            Braces => &mut self.braces,
+        };
         *level -= 1;
     }
 
-    pub fn are_rooted(&self) -> bool {
-        self.parens + self.array + self.braces == 0
-    }
+    pub fn are_rooted(&self) -> bool { self.parens == 0 && self.array == 0 && self.braces == 0 }
 
     pub fn check(&self) -> Result<(), &'static str> {
         if self.parens > 0 {

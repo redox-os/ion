@@ -372,8 +372,7 @@ impl FlowLogic for Shell {
                                 self.variables.get::<types::Array>(bind).map(Value::Array);
                             self.variables.set(&bind, value.clone());
                         } else {
-                            previous_bind =
-                                self.variables.get::<types::Str>(bind).map(Value::Str);
+                            previous_bind = self.variables.get::<types::Str>(bind).map(Value::Str);
                             self.set(&bind, value.join(" "));
                         }
                     }
@@ -414,8 +413,7 @@ impl FlowLogic for Shell {
                                 self.variables.get::<types::Array>(bind).map(Value::Array);
                             self.variables.set(&bind, value.clone());
                         } else {
-                            previous_bind =
-                                self.variables.get::<types::Str>(bind).map(Value::Str);
+                            previous_bind = self.variables.get::<types::Str>(bind).map(Value::Str);
                             self.set(&bind, value.join(" "));
                         }
                     }

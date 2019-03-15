@@ -319,7 +319,7 @@ fn builtin_eval(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_EVAL) {
         SUCCESS
     } else {
-        shell.execute_command(args[1..].join(" ")).unwrap_or_else(|_| {
+        shell.execute_command(&args[1..].join(" ")).unwrap_or_else(|_| {
             eprintln!("ion: supplied eval expression was not terminated");
             FAILURE
         })
