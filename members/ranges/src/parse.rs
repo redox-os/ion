@@ -130,23 +130,22 @@ pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
 
     // if the next byte is a dot we're certain it is an inclusive
     // unstepped range otherwise it has to be [-0-9a-zA-Z]
-    bytes_iterator.next().and_then(|(i, b)| match b {
+    bytes_iterator.next().and_then(|(start, b)| match b {
         b'.' | b'=' => {
             // this can only be an inclusive range
-            finish(true, start_str, &input[i+1..], 1)
+            finish(true, start_str, &input[start + 1..], 1)
         }
         b'0'...b'9' | b'-' | b'a'...b'z' | b'A'...b'Z' => {
             // further processing needed to find out if we're reading a step or
             // the end of an exclusive range. Step until we find another dot or
             // the iterator ends
-            let start = i;
             if let Some(end) = bytes_iterator.position(|(_, b)| b == b'.') {
                 // stepped range input[start..read - 1] contains the step
                 // size
-                let step = (&input[start..end]).parse::<isize>().ok()?;
+                let step = (&input[start..=start + end]).parse::<isize>().ok()?;
                 // count the dots to determine inclusive/exclusive
-                let dots = bytes_iterator.take_while(|&(_, b)| b == b'.').count();
-                finish(dots == 2, start_str, &input[i..], step)
+                let dots = bytes_iterator.take_while(|&(_, b)| b == b'.').count() + 1;
+                finish(dots == 3, start_str, &input[start + end + dots + 1..], step)
             } else {
                 // exhausted the iterator without finding anything new means
                 // exclusive unstepped range
