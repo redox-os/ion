@@ -46,12 +46,10 @@ fn is_expected_with(expected_type: Primitive, value: &mut Value) -> Result<(), T
     let checks_out = if let Value::Array(ref mut items) = value {
         match expected_type {
             Primitive::BooleanArray => items.iter_mut().all(|item| {
-                is_expected_with(Primitive::Boolean, &mut Value::Str(item.to_owned()))
-                    .is_ok()
+                is_expected_with(Primitive::Boolean, &mut Value::Str(item.to_owned())).is_ok()
             }),
             Primitive::IntegerArray => items.iter_mut().all(|item| {
-                is_expected_with(Primitive::Integer, &mut Value::Str(item.to_owned()))
-                    .is_ok()
+                is_expected_with(Primitive::Integer, &mut Value::Str(item.to_owned())).is_ok()
             }),
             Primitive::FloatArray => items.iter_mut().all(|item| {
                 is_expected_with(Primitive::Float, &mut Value::Str(item.to_owned())).is_ok()
@@ -94,10 +92,9 @@ fn get_map_of<E: Expander>(
     let iter = array.into_iter().map(|string| {
         match string.splitn(2, '=').collect::<Vec<_>>().as_slice() {
             [key, value] => value_check(shell, value, inner_kind).and_then(|val| match val {
-                Value::Str(_)
-                | Value::Array(_)
-                | Value::HashMap(_)
-                | Value::BTreeMap(_) => Ok(((*key).into(), val)),
+                Value::Str(_) | Value::Array(_) | Value::HashMap(_) | Value::BTreeMap(_) => {
+                    Ok(((*key).into(), val))
+                }
                 _ => Err(TypeError::BadValue((**inner_kind).clone())),
             }),
             _ => Err(TypeError::BadValue(*inner_kind.clone())),
@@ -192,17 +189,11 @@ mod test {
     #[test]
     fn is_integer_array_() {
         assert_eq!(
-            is_expected_with(
-                Primitive::IntegerArray,
-                &mut Value::Array(array!["1", "2", "3"])
-            ),
+            is_expected_with(Primitive::IntegerArray, &mut Value::Array(array!["1", "2", "3"])),
             Ok(())
         );
         assert_eq!(
-            is_expected_with(
-                Primitive::IntegerArray,
-                &mut Value::Array(array!["1", "2", "three"])
-            ),
+            is_expected_with(Primitive::IntegerArray, &mut Value::Array(array!["1", "2", "three"])),
             Err(TypeError::BadValue(Primitive::IntegerArray))
         );
     }

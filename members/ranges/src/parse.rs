@@ -50,7 +50,11 @@ fn char_range<'a>(
     inclusive: bool,
 ) -> Option<Box<Iterator<Item = small::String> + 'a>> {
     let char_step = step.checked_abs()?;
-    if !byte_is_valid_range(start) || !byte_is_valid_range(end) || step == 0 || char_step > u8::MAX as isize {
+    if !byte_is_valid_range(start)
+        || !byte_is_valid_range(end)
+        || step == 0
+        || char_step > u8::MAX as isize
+    {
         return None;
     }
 
@@ -61,11 +65,8 @@ fn char_range<'a>(
     } else {
         end
     };
-    let (x, y, ordering) = if start < end {
-        (start, end, Ordering::Greater)
-    } else {
-        (end, start, Ordering::Less)
-    };
+    let (x, y, ordering) =
+        if start < end { (start, end, Ordering::Greater) } else { (end, start, Ordering::Less) };
 
     let iter = (x..y).scan(start, move |index, _| {
         if end.cmp(index) == ordering {
@@ -181,7 +182,6 @@ pub fn parse_index_range(input: &str) -> Option<Range> {
                         })
                         .ok()
                 };
-
             }
             _ => break,
         }

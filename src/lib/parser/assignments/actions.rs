@@ -82,7 +82,7 @@ impl<'a> Iterator for AssignmentActions<'a> {
                     } else {
                         self.prevkeys.push(key.name);
                         self.prevval = value;
-                        Some(Action::new(key, self.operator, value, is_array(value)))
+                        Some(Action::parse(key, self.operator, value, is_array(value)))
                     }
                 }
                 Err(why) => Some(Err(AssignmentError::TypeError(why))),
@@ -114,7 +114,7 @@ impl<'a> Iterator for AssignmentActions<'a> {
 pub(crate) struct Action<'a>(pub Key<'a>, pub Operator, pub &'a str);
 
 impl<'a> Action<'a> {
-    fn new(
+    fn parse(
         var: Key<'a>,
         operator: Operator,
         value: &'a str,

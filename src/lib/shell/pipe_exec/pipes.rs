@@ -26,7 +26,7 @@ impl<'a> TeePipe<'a> {
         F: FnMut(&mut RefinedJob, File),
     {
         match sys::pipe2(sys::O_CLOEXEC) {
-            Err(e) => pipe_fail(e),
+            Err(e) => pipe_fail(&e),
             Ok((reader, writer)) => {
                 (*tee).source = Some(unsafe { File::from_raw_fd(reader) });
                 action(self.parent, unsafe { File::from_raw_fd(writer) });

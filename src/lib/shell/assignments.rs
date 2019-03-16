@@ -93,8 +93,8 @@ impl VariableStore for Shell {
                             env::set_var(key.name, values.join(" "));
                             Ok(())
                         }
-                        Value::Array(_) => Err("arithmetic operators on array expressions \
-                                                       aren't supported yet."
+                        Value::Array(_) => Err("arithmetic operators on array expressions aren't \
+                                                supported yet."
                             .to_string()),
                         Value::Str(rhs) => {
                             let key_name: &str = &key.name;
@@ -104,7 +104,7 @@ impl VariableStore for Shell {
                                 .unwrap_or_else(|| "0".into());
 
                             math(&key.kind, operator, &rhs)
-                                .and_then(|action| parse(&lhs, |a| action(a)))
+                                .and_then(|action| parse(&lhs, &*action))
                                 .map(|mut value| {
                                     if key_name == "PATH" {
                                         if let Ok(home) = &env::var("HOME") {
@@ -195,7 +195,7 @@ impl VariableStore for Shell {
                             .and_then(|lhs| match rhs {
                                 Value::Str(rhs) => match lhs {
                                     Value::Str(lhs) => math(&key.kind, operator, &rhs)
-                                        .and_then(|action| parse(&lhs, |a| action(a)))
+                                        .and_then(|action| parse(&lhs, &*action))
                                         .map(|value| {
                                             patch.insert(key, Value::Str(value.into()));
                                         })
@@ -218,7 +218,7 @@ impl VariableStore for Shell {
                                                 array
                                                     .iter_mut()
                                                     .map(|el| {
-                                                        parse(el, |v| action(v))
+                                                        parse(el, &*action)
                                                             .map(|result| *el = result.into())
                                                     })
                                                     .find(|e| e.is_err())
@@ -261,12 +261,8 @@ impl VariableStore for Shell {
                     value_check(self, index_name, index_kind)
                         .map_err(|why| format!("assignment error: {}: {}", key.name, why))
                         .and_then(|index| match index {
-                            Value::Array(_) => {
-                                Err("index variable cannot be an array".to_string())
-                            }
-                            Value::HashMap(_) => {
-                                Err("index variable cannot be a hmap".to_string())
-                            }
+                            Value::Array(_) => Err("index variable cannot be an array".to_string()),
+                            Value::HashMap(_) => Err("index variable cannot be a hmap".to_string()),
                             Value::BTreeMap(_) => {
                                 Err("index variable cannot be a bmap".to_string())
                             }

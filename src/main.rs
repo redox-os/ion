@@ -10,7 +10,7 @@ use smallvec::SmallVec;
 use std::{
     alloc::System,
     env,
-    io::{stdin, BufRead, BufReader},
+    io::{stdin, BufReader, Read},
 };
 
 #[global_allocator]
@@ -63,7 +63,9 @@ fn main() {
     let command = matches.opt_str("c");
     let parameters = matches.free.into_iter().map(small::String::from).collect::<SmallVec<_>>();
     let script_path = parameters.get(0).cloned();
-    if !parameters.is_empty() { shell.variables.set("args", parameters); }
+    if !parameters.is_empty() {
+        shell.variables.set("args", parameters);
+    }
 
     let status = if let Some(command) = command {
         shell.execute_script(&command);
@@ -77,9 +79,7 @@ fn main() {
         shell.execute_interactive();
         unreachable!();
     } else {
-        let reader = BufReader::new(stdin());
-        let lines = reader.lines().filter_map(|line| line.ok());
-        shell.terminate_script_quotes(lines)
+        shell.terminate_script_quotes(BufReader::new(stdin()).bytes().filter_map(|b| b.ok()))
     };
     shell.exit(status);
 }

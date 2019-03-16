@@ -163,10 +163,7 @@ impl Default for Variables {
         // Initialize the HISTFILE variable
         if let Ok(base_dirs) = BaseDirectories::with_prefix("ion") {
             if let Ok(path) = base_dirs.place_data_file("history") {
-                map.insert(
-                    "HISTFILE".into(),
-                    Value::Str(path.to_str().unwrap_or("?").into()),
-                );
+                map.insert("HISTFILE".into(), Value::Str(path.to_str().unwrap_or("?").into()));
                 map.insert("HISTFILE_ENABLED".into(), Value::Str("1".into()));
             }
         }
@@ -428,11 +425,7 @@ impl Variables {
 
         macro_rules! handle_type {
             ($name:tt, $input:ty, $preferred:tt) => {
-                fn $name<'a>(
-                    name: &str,
-                    var: &Value,
-                    input: &'a mut $input,
-                ) -> Option<Action<'a>> {
+                fn $name<'a>(name: &str, var: &Value, input: &'a mut $input) -> Option<Action<'a>> {
                     if !name.is_empty() {
                         match var {
                             Value::$preferred(var_value) => {
@@ -637,9 +630,9 @@ impl GetVariable<types::Str> for Variables {
         // If the parsed name contains the '::' pattern, then a namespace was
         // designated. Find it.
         match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
-            Some(("c", variable)) | Some(("color", variable)) => Colors::collect(variable)
-                .into_string()
-                .map(|s| Str::from(Value::Str(s.into()))),
+            Some(("c", variable)) | Some(("color", variable)) => {
+                Colors::collect(variable).into_string().map(|s| Str::from(Value::Str(s.into())))
+            }
             Some(("x", variable)) | Some(("hex", variable)) => {
                 match u8::from_str_radix(variable, 16) {
                     Ok(c) => Some(Str::from(Value::Str((c as char).to_string().into()))),

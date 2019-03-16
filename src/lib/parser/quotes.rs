@@ -1,11 +1,34 @@
-use itertools::Itertools;
-use std::{iter::Peekable, mem, str};
+use std::{iter::Peekable, str};
 
-bitflags! {
-    pub struct Flags : u8 {
-        const SQUOTE = 1;
-        const DQUOTE = 2;
-        const TRIM   = 4;
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum Quotes {
+    Single,
+    Double,
+    None,
+}
+
+#[derive(Debug)]
+struct EofMatcher {
+    eof:       Vec<u8>,
+    complete:  bool,
+    match_idx: usize,
+}
+
+impl EofMatcher {
+    fn new() -> Self { EofMatcher { eof: Vec::with_capacity(10), complete: false, match_idx: 0 } }
+
+    #[inline]
+    fn next(&mut self, c: u8) -> bool {
+        if self.complete && self.eof.get(self.match_idx) == Some(&c) {
+            self.match_idx += 1;
+        } else if self.complete {
+            self.match_idx = 0;
+        } else if c == b'\n' {
+            self.complete = true;
+        } else if !self.eof.is_empty() || !(c as char).is_whitespace() {
+            self.eof.push(c);
+        }
+        self.complete && self.match_idx == self.eof.len()
     }
 }
 
@@ -16,32 +39,19 @@ bitflags! {
 /// This example comes from the shell's REPL, which ensures that the user's input
 /// will only be submitted for execution once a terminated command is supplied.
 #[derive(Debug)]
-pub struct Terminator {
-    buffer:     String,
-    eof:        Option<String>,
-    eof_buffer: String,
+pub struct Terminator<I: Iterator<Item = u8>> {
+    inner:      RearPeekable<I>,
+    eof:        Option<EofMatcher>,
     array:      usize,
-    read:       usize,
-    flags:      Flags,
+    skip_next:  bool,
+    quotes:     Quotes,
+    terminated: bool,
+    and_or:     bool,
+    whitespace: bool,
 }
 
-impl<'a> From<&'a str> for Terminator {
-    fn from(string: &'a str) -> Terminator { Terminator::new(string.to_owned()) }
-}
-
-impl From<String> for Terminator {
-    fn from(string: String) -> Terminator { Terminator::new(string) }
-}
-
-#[derive(Debug)]
-enum NotTerminatedErr {
-    StartEof,
-    Eof,
-    Comment,
-    UnclosedArray,
-    UnclosedString,
-    EscapedNewline,
-    AndOrClause,
+impl<'a> From<&'a str> for Terminator<std::str::Bytes<'a>> {
+    fn from(string: &'a str) -> Self { Terminator::new(string.bytes()) }
 }
 
 #[derive(Clone, Debug)]
@@ -60,12 +70,13 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<I::Item> {
-        let next = self.iter.next();
-        if next.is_some() {
-            self.last = mem::replace(&mut self.now, next);
-        }
-        next
+        self.last = self.now;
+        self.now = self.iter.next();
+        self.now
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
 impl<I: Iterator> RearPeekable<I> {
@@ -74,160 +85,142 @@ impl<I: Iterator> RearPeekable<I> {
 
     #[inline]
     pub fn prev(&self) -> Option<&I::Item> { self.last.as_ref() }
-
-    #[inline]
-    pub fn now(&self) -> Option<&I::Item> { self.now.as_ref() }
 }
 
-impl Terminator {
-    /// Consumes the `Terminator`, and returns the underlying `String`.
-    pub fn consume(self) -> String { self.buffer }
+impl<I: Iterator<Item = u8>> Iterator for Terminator<I> {
+    type Item = u8;
 
-    fn pair_components(&mut self) -> Result<(), NotTerminatedErr> {
-        if self.eof.as_ref() == Some(&self.eof_buffer) {
-            return Err(NotTerminatedErr::StartEof);
-        } else if self.eof.is_some() {
-            return Err(NotTerminatedErr::Eof);
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) { self.inner.size_hint() }
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.terminated {
+            return None;
         }
 
-        let bytes = self
-            .buffer
-            .bytes()
-            .enumerate()
-            .skip(self.read)
-            .coalesce(
-                |prev, next| {
-                    if prev.1 == b'\\' {
-                        Ok((next.0, 0))
-                    } else {
-                        Err((prev, next))
-                    }
-                },
-            )
-            .filter(|&(_, c)| c != 0)
-            //.inspect(|c| println!("{:?} {}", c.0, c.1 as char))
-            .peekable();
+        let next = self.inner.next();
+        let out = self.handle_char(next);
 
-        let mut bytes = RearPeekable { iter: bytes, now: None, last: None };
-
-        while let Some((i, character)) = bytes.next() {
-            self.read = i + 1;
-
-            match character {
-                b'\'' if !self.flags.intersects(Flags::DQUOTE) => {
-                    if bytes.find(|&(_, c)| c == b'\'').is_none() {
-                        self.flags ^= Flags::SQUOTE;
-                    }
-                }
-                b'"' if !self.flags.intersects(Flags::SQUOTE) => {
-                    if bytes.find(|&(_, c)| c == b'"').is_none() {
-                        self.flags ^= Flags::DQUOTE;
-                    }
-                }
-                b'<' if bytes.prev() == Some(&(i - 1, b'<')) => {
-                    if bytes.peek() == Some(&(i + 1, b'<')) {
-                        bytes.next();
-                    } else {
-                        let bytes = &self.buffer.as_bytes()[self.read..];
-                        let eof_phrase = unsafe { str::from_utf8_unchecked(bytes) };
-                        self.eof = Some(eof_phrase.trim().to_owned());
-                        return Err(NotTerminatedErr::Eof);
-                    }
-                }
-                b'[' => {
-                    self.array += 1;
-                }
-                b']' => {
-                    if self.array > 0 {
-                        self.array -= 1;
-                    }
-                }
-                b'#' if bytes
-                    .prev()
-                    .filter(|&(j, c)| !(*j == i - 1 && [b' ', b'\n'].contains(c)))
-                    .is_none() =>
-                {
-                    return Err(NotTerminatedErr::Comment);
-                }
-                _ => (),
-            }
-        }
-
-        if let Some((_, b'\\')) = bytes.now() {
-            Err(NotTerminatedErr::EscapedNewline)
-        } else if self.array > 0 {
-            Err(NotTerminatedErr::UnclosedArray)
-        } else if self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) {
-            Err(NotTerminatedErr::UnclosedString)
-        } else if bytes
-            .now()
-            .filter(|&&(_, now)| now == b'&' || now == b'|')
-            .and_then(|&(_, now)| bytes.prev().filter(|&&(_, prev)| prev == now))
-            .is_some()
+        if out.is_none()
+            && self.eof.is_none()
+            && self.array == 0
+            && self.quotes == Quotes::None
+            && !self.and_or
         {
-            Err(NotTerminatedErr::AndOrClause)
+            self.terminated = true;
+        }
+
+        out
+    }
+}
+
+impl<I: Iterator<Item = u8>> Terminator<I> {
+    /// Consumes lines until a statement is formed or the iterator runs dry, and returns the
+    /// underlying `String`.
+    pub fn terminate(&mut self) -> Result<String, ()> {
+        let stmt = self.collect::<Vec<_>>();
+        let stmt = unsafe { String::from_utf8_unchecked(stmt) };
+
+        if self.terminated && !stmt.is_empty() {
+            Ok(stmt)
         } else {
-            Ok(())
+            Err(())
         }
     }
 
-    pub fn is_terminated(&mut self) -> bool {
-        match self.pair_components() {
-            Err(NotTerminatedErr::StartEof) => {
-                self.eof = None;
-                self.buffer.push('\n');
-                true
-            }
-            Err(NotTerminatedErr::Eof) => false,
-            Err(NotTerminatedErr::Comment) => {
-                self.buffer.truncate(self.read - 1);
-                self.array == 0 && !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE)
-            }
-            Err(NotTerminatedErr::EscapedNewline) => {
-                self.buffer.pop();
-                self.read -= 1;
-                self.flags = Flags::TRIM;
-                false
-            }
-            Err(NotTerminatedErr::UnclosedString) => {
-                self.read += 1;
-                self.buffer.push('\n');
-                false
-            }
-            Err(NotTerminatedErr::UnclosedArray) => {
-                self.read += 1;
-                self.buffer.push(' ');
-                false
-            }
-            Err(NotTerminatedErr::AndOrClause) => false,
-            Ok(()) => true,
-        }
+    fn handle_char(&mut self, character: Option<u8>) -> Option<u8> {
+        character
+            .and_then(|character| {
+                let prev_whitespace = self.whitespace;
+                self.whitespace = false;
+
+                if let Some(matcher) = self.eof.as_mut() {
+                    if matcher.next(character) {
+                        self.eof = None;
+                    }
+                } else if self.skip_next {
+                    self.skip_next = false;
+                } else if self.quotes != Quotes::None && character != b'\\' {
+                    match (character, &self.quotes) {
+                        (b'\'', Quotes::Single) | (b'"', Quotes::Double) => {
+                            self.quotes = Quotes::None;
+                        }
+                        _ => (),
+                    }
+                } else {
+                    match character {
+                        b'\'' => {
+                            self.quotes = Quotes::Single;
+                        }
+                        b'"' => {
+                            self.quotes = Quotes::Double;
+                        }
+                        b'<' if self.inner.prev() == Some(&b'<') => {
+                            if let Some(&b'<') = self.inner.peek() {
+                                self.skip_next = true; // avoid falling in the else at the next pass
+                            } else {
+                                self.eof = Some(EofMatcher::new());
+                            }
+                        }
+                        b'[' => {
+                            self.array += 1;
+                        }
+                        b']' => {
+                            if self.array > 0 {
+                                self.array -= 1;
+                            }
+                        }
+                        b'#' if self
+                            .inner
+                            .prev()
+                            .filter(|&c| ![b' ', b'\n'].contains(c))
+                            .is_none() =>
+                        {
+                            return self.inner.find(|&c| c == b'\n')
+                        }
+                        b'\\' => {
+                            if self.inner.peek() == Some(&b'\n') {
+                                let next = self.inner.find(|&c| !(c as char).is_whitespace());
+                                return self.handle_char(next);
+                            } else {
+                                self.skip_next = true;
+                            }
+                        }
+                        b'&' | b'|' if self.inner.prev() == Some(&character) => {
+                            self.and_or = true;
+                        }
+                        b'\n' if self.array == 0 && !self.and_or => {
+                            self.terminated = true;
+                        }
+                        _ if (character as char).is_whitespace() => {
+                            if prev_whitespace {
+                                let next = self.inner.find(|&c| !(c as char).is_whitespace());
+                                return self.handle_char(next);
+                            }
+                            self.whitespace = true;
+                        }
+                        _ => {
+                            self.and_or = false;
+                        }
+                    }
+                }
+
+                Some(character)
+            })
+            .map(|c| if c == b'\n' && self.array > 0 { b' ' } else { c })
     }
 
-    /// Appends a string to the internal buffer.
-    pub fn append(&mut self, input: &str) {
-        if self.eof.is_none() {
-            self.buffer.push_str(if self.flags.contains(Flags::TRIM) {
-                input.trim()
-            } else {
-                input
-            });
-        } else {
-            self.eof_buffer.clear();
-            self.eof_buffer.push_str(input.trim());
-            self.buffer.push('\n');
-            self.buffer.push_str(input);
-        }
-    }
-
-    pub fn new(input: String) -> Terminator {
+    pub fn new(inner: I) -> Terminator<I> {
         Terminator {
-            buffer:     input,
+            inner:      RearPeekable { iter: inner.peekable(), now: None, last: None },
             eof:        None,
-            eof_buffer: String::new(),
             array:      0,
-            read:       0,
-            flags:      Flags::empty(),
+            skip_next:  false,
+            quotes:     Quotes::None,
+            terminated: false,
+            and_or:     false,
+            whitespace: false,
         }
     }
 }

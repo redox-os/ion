@@ -30,7 +30,7 @@ pub(crate) fn duplicate_streams() -> io::Result<(Option<File>, File, File)> {
         })
 }
 
-pub(crate) fn redirect_streams(inp: Option<File>, out: File, err: File) {
+pub(crate) fn redirect_streams(inp: &Option<File>, out: &File, err: &File) {
     if let Some(inp) = inp {
         redir(inp.as_raw_fd(), sys::STDIN_FILENO);
     }

@@ -33,13 +33,12 @@ use std::{
 };
 
 use crate::{
-    parser::Terminator,
     shell::{
         self,
         fork_function::fork_function,
         job_control::{JobControl, ProcessState},
         status::*,
-        FlowLogic, Shell, ShellHistory,
+        Shell, ShellHistory,
     },
     sys, types,
 };
@@ -318,16 +317,12 @@ fn builtin_eq(args: &[small::String], shell: &mut Shell) -> i32 {
 
 fn builtin_eval(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_EVAL) {
-        return SUCCESS;
-    }
-    let evaluated_command = args[1..].join(" ");
-    let mut buffer = Terminator::new(evaluated_command);
-    if buffer.is_terminated() {
-        shell.on_command(&buffer.consume());
-        shell.previous_status
+        SUCCESS
     } else {
-        eprintln!("ion: supplied eval expression was not terminted");
-        FAILURE
+        shell.execute_command(&args[1..].join(" ")).unwrap_or_else(|_| {
+            eprintln!("ion: supplied eval expression was not terminated");
+            FAILURE
+        })
     }
 }
 

@@ -50,9 +50,7 @@ pub(crate) trait Expander: Sized {
         Value::Str(types::Str::from(expand_string(value, self, false).join(" ")))
     }
     /// Get an array that exists in the shell.
-    fn get_array(&self, value: &str) -> Value {
-        Value::Array(expand_string(value, self, false))
-    }
+    fn get_array(&self, value: &str) -> Value { Value::Array(expand_string(value, self, false)) }
 }
 
 fn expand_process<E: Expander>(

@@ -7,12 +7,12 @@ mod terminate;
 use self::{
     prompt::{prompt, prompt_fn},
     readln::readln,
-    terminate::{terminate_quotes, terminate_script_quotes},
+    terminate::terminate_script_quotes,
 };
-use super::{status::*, FlowLogic, Shell, ShellHistory};
-use crate::types;
+use super::{flags::UNTERMINATED, status::*, FlowLogic, Shell, ShellHistory};
+use crate::{parser::Terminator, types};
 use liner::{Buffer, Context};
-use std::{env, iter, path::Path};
+use std::path::Path;
 
 pub const MAN_ION: &str = "NAME
     Ion - The Ion shell
@@ -35,9 +35,7 @@ pub trait Binary {
     /// Liner.
     fn execute_interactive(self);
     /// Ensures that read statements from a script are terminated.
-    fn terminate_script_quotes<T: AsRef<str> + ToString, I: Iterator<Item = T>>(&mut self, lines: I) -> i32;
-    /// Ensures that read statements from the interactive prompt is terminated.
-    fn terminate_quotes(&mut self, command: String) -> Result<String, ()>;
+    fn terminate_script_quotes<I: Iterator<Item = u8>>(&mut self, lines: I) -> i32;
     /// Ion's interface to Liner's `read_line` method, which handles everything related to
     /// rendering, controlling, and getting input from the prompt.
     fn readln(&mut self) -> Option<String>;
@@ -92,22 +90,21 @@ impl Binary for Shell {
 
         self.evaluate_init_file();
 
-        self.variables
-            .set("args", iter::once(env::args().next().unwrap().into()).collect::<types::Array>());
-
         loop {
-            match self.readln().and_then(|command| {
-                if command.is_empty() {
-                    None
-                } else {
-                    self.terminate_quotes(command.replace("\\\n", "")).ok()
-                }
-            }) {
+            let mut lines = itertools::repeat_call(|| {
+                let line = self.readln();
+                self.flags |= UNTERMINATED;
+                line
+            })
+            .filter_map(|cmd| cmd)
+            .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
+            match Terminator::new(&mut lines).terminate().ok() {
                 Some(command) => {
+                    self.flags &= !UNTERMINATED;
                     let cmd: &str = &designators::expand_designators(&self, command.trim_end());
                     self.on_command(&cmd);
                     self.save_command(&cmd);
-                },
+                }
                 None => self.reset_flow(),
             }
         }
@@ -128,11 +125,7 @@ impl Binary for Shell {
         }
     }
 
-    fn terminate_quotes(&mut self, command: String) -> Result<String, ()> {
-        terminate_quotes(self, command)
-    }
-
-    fn terminate_script_quotes<T: AsRef<str> + ToString, I: Iterator<Item = T>>(&mut self, lines: I) -> i32 {
+    fn terminate_script_quotes<I: Iterator<Item = u8>>(&mut self, lines: I) -> i32 {
         terminate_script_quotes(self, lines)
     }
 
