@@ -1,30 +1,29 @@
 #[macro_use]
 extern crate criterion;
 
-use criterion::Criterion;
+use criterion::*;
 use ion_shell::parser::Terminator;
 
 const TEXT: &str = include_str!("test.ion");
 const EOF: &str = include_str!("herestring.ion");
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("terminator", |b| {
-        b.iter(|| {
-            let mut bytes = TEXT.bytes().peekable();
-            while bytes.peek().is_some() {
-                let stmt = Terminator::new(&mut bytes).terminate();
-            }
-        })
-    });
-
-    c.bench_function("terminator EOF", |b| {
-        b.iter(|| {
-            let mut bytes = EOF.bytes().peekable();
-            while bytes.peek().is_some() {
-                let stmt = Terminator::new(&mut bytes).terminate();
-            }
-        })
-    });
+    c.bench(
+        "terminator-throughput",
+        ParameterizedBenchmark::new(
+            "terminator",
+            |b, script| {
+                b.iter(|| {
+                    let mut bytes = script.bytes().peekable();
+                    while bytes.peek().is_some() {
+                        let stmt = Terminator::new(&mut bytes).terminate();
+                    }
+                })
+            },
+            vec![TEXT, EOF],
+        )
+        .throughput(|script| Throughput::Bytes(script.len() as u32)),
+    );
 }
 
 criterion_group!(benches, criterion_benchmark);
