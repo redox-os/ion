@@ -234,7 +234,7 @@ impl Shell {
     where
         T: 'a + AsRef<str> + std::clone::Clone + std::convert::From<&'a str>,
     {
-        let terminator: Terminator<_> = command.as_ref().into();
+        let mut terminator: Terminator<_> = command.as_ref().into();
         if let Ok(stmt) = terminator.terminate() {
             self.on_command(&stmt);
             Ok(self.previous_status)

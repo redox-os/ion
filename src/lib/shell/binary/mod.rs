@@ -98,7 +98,7 @@ impl Binary for Shell {
             })
             .filter_map(|cmd| cmd)
             .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
-            match Terminator::new(&mut lines).terminate().map(|stmt| stmt.to_string()).ok() {
+            match Terminator::new(&mut lines).terminate().ok() {
                 Some(command) => {
                     self.flags &= !UNTERMINATED;
                     let cmd: &str = &designators::expand_designators(&self, command.trim_end());
