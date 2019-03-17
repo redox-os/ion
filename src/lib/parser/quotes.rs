@@ -109,9 +109,10 @@ impl<I: Iterator<Item = u8>> Iterator for Terminator<I> {
             && !self.and_or
         {
             self.terminated = true;
+            None
+        } else {
+            out
         }
-
-        out
     }
 }
 
@@ -122,7 +123,7 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
         let stmt = self.collect::<Vec<_>>();
         let stmt = unsafe { String::from_utf8_unchecked(stmt) };
 
-        if self.terminated && !stmt.is_empty() {
+        if self.terminated {
             Ok(stmt)
         } else {
             Err(())
@@ -130,85 +131,93 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
     }
 
     fn handle_char(&mut self, character: Option<u8>) -> Option<u8> {
-        character
-            .and_then(|character| {
-                let prev_whitespace = self.whitespace;
-                self.whitespace = false;
+        character.and_then(|character| {
+            let prev_whitespace = self.whitespace;
+            self.whitespace = false;
 
-                if let Some(matcher) = self.eof.as_mut() {
-                    if matcher.next(character) {
-                        self.eof = None;
+            if let Some(matcher) = self.eof.as_mut() {
+                if matcher.next(character) {
+                    self.eof = None;
+                }
+                Some(character)
+            } else if self.skip_next {
+                self.skip_next = false;
+                Some(character)
+            } else if self.quotes != Quotes::None && character != b'\\' {
+                match (character, &self.quotes) {
+                    (b'\'', Quotes::Single) | (b'"', Quotes::Double) => {
+                        self.quotes = Quotes::None;
                     }
-                } else if self.skip_next {
-                    self.skip_next = false;
-                } else if self.quotes != Quotes::None && character != b'\\' {
-                    match (character, &self.quotes) {
-                        (b'\'', Quotes::Single) | (b'"', Quotes::Double) => {
-                            self.quotes = Quotes::None;
-                        }
-                        _ => (),
+                    _ => (),
+                }
+                Some(character)
+            } else {
+                match character {
+                    b'\'' => {
+                        self.quotes = Quotes::Single;
+                        Some(b'\'')
                     }
-                } else {
-                    match character {
-                        b'\'' => {
-                            self.quotes = Quotes::Single;
+                    b'"' => {
+                        self.quotes = Quotes::Double;
+                        Some(b'"')
+                    }
+                    b'<' if self.inner.prev() == Some(&b'<') => {
+                        if let Some(&b'<') = self.inner.peek() {
+                            self.skip_next = true; // avoid falling in the else at the next pass
+                        } else {
+                            self.eof = Some(EofMatcher::new());
                         }
-                        b'"' => {
-                            self.quotes = Quotes::Double;
+                        Some(b'<')
+                    }
+                    b'[' => {
+                        self.array += 1;
+                        Some(b'[')
+                    }
+                    b']' => {
+                        if self.array > 0 {
+                            self.array -= 1;
                         }
-                        b'<' if self.inner.prev() == Some(&b'<') => {
-                            if let Some(&b'<') = self.inner.peek() {
-                                self.skip_next = true; // avoid falling in the else at the next pass
-                            } else {
-                                self.eof = Some(EofMatcher::new());
-                            }
+                        Some(b']')
+                    }
+                    b'#' if self.inner.prev().filter(|&c| ![b' ', b'\n'].contains(c)).is_none() => {
+                        self.whitespace = prev_whitespace;
+                        let next = self.inner.find(|&c| c == b'\n');
+                        self.handle_char(next)
+                    }
+                    b'\\' => {
+                        if self.inner.peek() == Some(&b'\n') {
+                            let next = self.inner.find(|&c| !(c as char).is_whitespace());
+                            self.handle_char(next)
+                        } else {
+                            self.skip_next = true;
+                            Some(character)
                         }
-                        b'[' => {
-                            self.array += 1;
-                        }
-                        b']' => {
-                            if self.array > 0 {
-                                self.array -= 1;
-                            }
-                        }
-                        b'#' if self
-                            .inner
-                            .prev()
-                            .filter(|&c| ![b' ', b'\n'].contains(c))
-                            .is_none() =>
-                        {
-                            return self.inner.find(|&c| c == b'\n');
-                        }
-                        b'\\' => {
-                            if self.inner.peek() == Some(&b'\n') {
-                                let next = self.inner.find(|&c| !(c as char).is_whitespace());
-                                return self.handle_char(next);
-                            } else {
-                                self.skip_next = true;
-                            }
-                        }
-                        b'&' | b'|' if self.inner.prev() == Some(&character) => {
-                            self.and_or = true;
-                        }
-                        b'\n' if self.array == 0 && !self.and_or => {
-                            self.terminated = true;
-                        }
-                        _ if (character as char).is_whitespace() => {
-                            if prev_whitespace {
-                                let next = self.inner.find(|&c| !(c as char).is_whitespace());
-                                return self.handle_char(next);
-                            }
+                    }
+                    b'&' | b'|' if self.inner.prev() == Some(&character) => {
+                        self.and_or = true;
+                        Some(character)
+                    }
+                    b'\n' if self.array == 0 && !self.and_or => {
+                        self.terminated = true;
+                        None
+                    }
+                    _ if (character as char).is_whitespace() => {
+                        if prev_whitespace {
+                            let next =
+                                self.inner.find(|&c| c == b'\n' || !(c as char).is_whitespace());
+                            self.handle_char(next)
+                        } else {
                             self.whitespace = true;
+                            Some(b' ')
                         }
-                        _ => {
-                            self.and_or = false;
-                        }
+                    }
+                    _ => {
+                        self.and_or = false;
+                        Some(character)
                     }
                 }
-
-                Some(character)
-            })
-            .map(|c| if c == b'\n' && self.array > 0 { b' ' } else { c })
+            }
+        })
     }
 
     pub fn new(inner: I) -> Terminator<I> {
@@ -220,7 +229,7 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
             quotes:     Quotes::None,
             terminated: false,
             and_or:     false,
-            whitespace: false,
+            whitespace: true,
         }
     }
 }
