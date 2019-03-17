@@ -97,8 +97,13 @@ fn count_minimum_digits(a: &str) -> usize {
     0
 }
 
-fn finish(inclusive: bool, start_str: &str, end_str: &str, step: isize) -> Option<Box<Iterator<Item = small::String>>> {
-    if let (Ok(start), Ok(end)) = (start_str.parse::<isize>(), end_str.parse::<isize>())  {
+fn finish(
+    inclusive: bool,
+    start_str: &str,
+    end_str: &str,
+    step: isize,
+) -> Option<Box<Iterator<Item = small::String>>> {
+    if let (Ok(start), Ok(end)) = (start_str.parse::<isize>(), end_str.parse::<isize>()) {
         let step = if step == 1 && start >= end { -step } else { step };
         let nb_digits = usize::max(count_minimum_digits(start_str), count_minimum_digits(end_str));
         numeric_range(start, end, step, inclusive, nb_digits)

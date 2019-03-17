@@ -40,6 +40,9 @@ clean:
 distclean: clean
 	rm -rf vendor vendor.tar.xz .cargo git_revision.txt
 
+format:
+	cargo +nightly fmt --all
+
 tests:
 	cargo +$(TOOLCHAIN) test $(ARGSV)
 	TOOLCHAIN=$(TOOLCHAIN) bash examples/run_examples.sh
