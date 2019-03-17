@@ -1,24 +1,20 @@
 fn execute_bf program
-    let program_counter: int = 0
+    let program_len:int program_counter:int \
+        memory:hmap[int] memory_pointer:int \
+        stack:hmap[int] stack_pointer:int \
+        jumps:hmap[int] jumps_program_counter:int \
+        = $len(program) 0 [] 0 [] 0 [] 0
 
-    let memory: hmap[int] = []
-    let memory_pointer: int = 0
-
-    let stack: hmap[int] = []
-    let stack_pointer: int = 0
-
-    let jumps: hmap[int] = []
-
-    let jumps_program_counter: int = 0
-    while test $jumps_program_counter -lt $len($program)
-        if test $program[$jumps_program_counter] = "["
+    let program: [str] = [ @chars(program) ]
+    while test $jumps_program_counter -lt $program_len
+        if test @program[$jumps_program_counter] = "["
             let search_depth: int = 0
             let jump_target: int = $jumps_program_counter
             while test $search_depth -ge 0
                 let jump_target += 1
-                test $jump_target -ge $len($program) && exit
+                test $jump_target -ge $program_len && exit
 
-                match $program[$jump_target]
+                match @program[$jump_target]
                     case "["; let search_depth += 1
                     case "]"; let search_depth -= 1
                 end
@@ -29,24 +25,20 @@ fn execute_bf program
     end
 
     let memory[0] = 0
-    while test $program_counter -lt $len($program)
-        match $program[$program_counter]
+    while test $program_counter -lt $program_len
+        match @program[$program_counter]
+            case "+" if test @memory[$memory_pointer] -eq 255
+                let memory[$memory_pointer] = 0
             case "+"
-                if test @memory[$memory_pointer] -eq 255
-                    let memory[$memory_pointer] = 0
-                else
-                    let memory_value = @memory[$memory_pointer]
-                    let memory[$memory_pointer] = $((1 + memory_value))
-                    # TODO: let memory[$memory_pointer] += 1
-                end
+                let memory_value = @memory[$memory_pointer]
+                let memory[$memory_pointer] = $((1 + memory_value))
+                # TODO: let memory[$memory_pointer] += 1
+            case "-" if test @memory[$memory_pointer] -eq 0
+                let memory[$memory_pointer] = 255
             case "-"
-                if test @memory[$memory_pointer] -eq 0
-                    let memory[$memory_pointer] = 255
-                else
-                    let memory_value = @memory[$memory_pointer]
-                    let memory[$memory_pointer] = $((-1 + memory_value))
-                    # TODO: let memory[$memory_pointer] -= 1
-                end
+                let memory_value = @memory[$memory_pointer]
+                let memory[$memory_pointer] = $((-1 + memory_value))
+                # TODO: let memory[$memory_pointer] -= 1
             case ">"
                 let memory_pointer += 1
                 if test @memory[$memory_pointer] = ""
@@ -136,26 +128,22 @@ else
 end
 
 fn execute_bf program
-    let program_counter: int = 0
+    let program_len:int program_counter:int \
+        memory:hmap[int] memory_pointer:int \
+        stack:hmap[int] stack_pointer:int \
+        jumps:hmap[int] jumps_program_counter:int \
+        = $len(program) 0 [] 0 [] 0 [] 0
 
-    let memory: hmap[int] = []
-    let memory_pointer: int = 0
-
-    let stack: hmap[int] = []
-    let stack_pointer: int = 0
-
-    let jumps: hmap[int] = []
-
-    let jumps_program_counter: int = 0
-    while test $jumps_program_counter -lt $len($program)
-        if test $program[$jumps_program_counter] = "["
+    let program: [str] = [ @chars(program) ]
+    while test $jumps_program_counter -lt $program_len
+        if test @program[$jumps_program_counter] = "["
             let search_depth: int = 0
             let jump_target: int = $jumps_program_counter
             while test $search_depth -ge 0
                 let jump_target += 1
-                test $jump_target -ge $len($program) && exit
+                test $jump_target -ge $program_len && exit
 
-                match $program[$jump_target]
+                match @program[$jump_target]
                     case "["; let search_depth += 1
                     case "]"; let search_depth -= 1
                 end
@@ -166,24 +154,20 @@ fn execute_bf program
     end
 
     let memory[0] = 0
-    while test $program_counter -lt $len($program)
-        match $program[$program_counter]
+    while test $program_counter -lt $program_len
+        match @program[$program_counter]
+            case "+" if test @memory[$memory_pointer] -eq 255
+                let memory[$memory_pointer] = 0
             case "+"
-                if test @memory[$memory_pointer] -eq 255
-                    let memory[$memory_pointer] = 0
-                else
-                    let memory_value = @memory[$memory_pointer]
-                    let memory[$memory_pointer] = $((1 + memory_value))
-                    # TODO: let memory[$memory_pointer] += 1
-                end
+                let memory_value = @memory[$memory_pointer]
+                let memory[$memory_pointer] = $((1 + memory_value))
+                # TODO: let memory[$memory_pointer] += 1
+            case "-" if test @memory[$memory_pointer] -eq 0
+                let memory[$memory_pointer] = 255
             case "-"
-                if test @memory[$memory_pointer] -eq 0
-                    let memory[$memory_pointer] = 255
-                else
-                    let memory_value = @memory[$memory_pointer]
-                    let memory[$memory_pointer] = $((-1 + memory_value))
-                    # TODO: let memory[$memory_pointer] -= 1
-                end
+                let memory_value = @memory[$memory_pointer]
+                let memory[$memory_pointer] = $((-1 + memory_value))
+                # TODO: let memory[$memory_pointer] -= 1
             case ">"
                 let memory_pointer += 1
                 if test @memory[$memory_pointer] = ""
@@ -273,26 +257,22 @@ else
 end
 
 fn execute_bf program
-    let program_counter: int = 0
+    let program_len:int program_counter:int \
+        memory:hmap[int] memory_pointer:int \
+        stack:hmap[int] stack_pointer:int \
+        jumps:hmap[int] jumps_program_counter:int \
+        = $len(program) 0 [] 0 [] 0 [] 0
 
-    let memory: hmap[int] = []
-    let memory_pointer: int = 0
-
-    let stack: hmap[int] = []
-    let stack_pointer: int = 0
-
-    let jumps: hmap[int] = []
-
-    let jumps_program_counter: int = 0
-    while test $jumps_program_counter -lt $len($program)
-        if test $program[$jumps_program_counter] = "["
+    let program: [str] = [ @chars(program) ]
+    while test $jumps_program_counter -lt $program_len
+        if test @program[$jumps_program_counter] = "["
             let search_depth: int = 0
             let jump_target: int = $jumps_program_counter
             while test $search_depth -ge 0
                 let jump_target += 1
-                test $jump_target -ge $len($program) && exit
+                test $jump_target -ge $program_len && exit
 
-                match $program[$jump_target]
+                match @program[$jump_target]
                     case "["; let search_depth += 1
                     case "]"; let search_depth -= 1
                 end
@@ -303,24 +283,20 @@ fn execute_bf program
     end
 
     let memory[0] = 0
-    while test $program_counter -lt $len($program)
-        match $program[$program_counter]
+    while test $program_counter -lt $program_len
+        match @program[$program_counter]
+            case "+" if test @memory[$memory_pointer] -eq 255
+                let memory[$memory_pointer] = 0
             case "+"
-                if test @memory[$memory_pointer] -eq 255
-                    let memory[$memory_pointer] = 0
-                else
-                    let memory_value = @memory[$memory_pointer]
-                    let memory[$memory_pointer] = $((1 + memory_value))
-                    # TODO: let memory[$memory_pointer] += 1
-                end
+                let memory_value = @memory[$memory_pointer]
+                let memory[$memory_pointer] = $((1 + memory_value))
+                # TODO: let memory[$memory_pointer] += 1
+            case "-" if test @memory[$memory_pointer] -eq 0
+                let memory[$memory_pointer] = 255
             case "-"
-                if test @memory[$memory_pointer] -eq 0
-                    let memory[$memory_pointer] = 255
-                else
-                    let memory_value = @memory[$memory_pointer]
-                    let memory[$memory_pointer] = $((-1 + memory_value))
-                    # TODO: let memory[$memory_pointer] -= 1
-                end
+                let memory_value = @memory[$memory_pointer]
+                let memory[$memory_pointer] = $((-1 + memory_value))
+                # TODO: let memory[$memory_pointer] -= 1
             case ">"
                 let memory_pointer += 1
                 if test @memory[$memory_pointer] = ""
