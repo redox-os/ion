@@ -4,6 +4,7 @@ RELEASE = debug
 DEBUG ?= 0
 VENDORED = 0
 REDOX ?= 0
+RUSTUP ?= 1
 TOOLCHAIN ?= 1.31.0
 
 GIT_REVISION=git_revision.txt
@@ -25,6 +26,10 @@ ifeq (1,$(REDOX))
 	TOOLCHAIN = nightly
 endif
 
+ifeq (1,$(RUSTUP))
+	TOOLCHAIN_ARG = +$(TOOLCHAIN)
+endif
+
 .PHONY: all clean distclean install uninstall
 
 all: $(SRC) $(GIT_REVISION)
@@ -32,7 +37,7 @@ ifeq (1,$(REDOX))
 	mkdir -p .cargo
 	grep redox .cargo/config || cat redox_linker >> .cargo/config
 endif
-	cargo +$(TOOLCHAIN) build $(ARGS) $(ARGSV)
+	cargo $(TOOLCHAIN_ARG) build $(ARGS) $(ARGSV)
 
 clean:
 	cargo clean
@@ -44,10 +49,10 @@ format:
 	cargo +nightly fmt --all
 
 tests:
-	cargo +$(TOOLCHAIN) test $(ARGSV)
+	cargo $(TOOLCHAIN_ARG) test $(ARGSV)
 	TOOLCHAIN=$(TOOLCHAIN) bash examples/run_examples.sh
 	for crate in members/*; do \
-		cargo +$(TOOLCHAIN) test $(ARGSV) --manifest-path $$crate/Cargo.toml || exit 1; \
+		cargo $(TOOLCHAIN_ARG) test $(ARGSV) --manifest-path $$crate/Cargo.toml || exit 1; \
 	done
 
 install:
@@ -65,7 +70,7 @@ $(GIT_REVISION):
 
 $(VENDOR):
 	mkdir -p .cargo
-	cargo +$(TOOLCHAIN) vendor | head -n -1 > .cargo/config
+	cargo $(TOOLCHAIN_ARG) vendor | head -n -1 > .cargo/config
 	echo 'directory = "vendor"' >> .cargo/config
 	tar pcfJ vendor.tar.xz vendor
 	rm -rf vendor

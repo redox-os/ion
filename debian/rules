@@ -1,5 +1,7 @@
 #!/usr/bin/make -f
 
+export RUSTUP = 0
+
 %:
 	dh $@
 
