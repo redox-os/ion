@@ -177,7 +177,7 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
                             .filter(|&c| ![b' ', b'\n'].contains(c))
                             .is_none() =>
                         {
-                            return self.inner.find(|&c| c == b'\n')
+                            return self.inner.find(|&c| c == b'\n');
                         }
                         b'\\' => {
                             if self.inner.peek() == Some(&b'\n') {

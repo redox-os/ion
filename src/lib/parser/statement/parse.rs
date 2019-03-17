@@ -38,16 +38,18 @@ pub(crate) fn parse(code: &str) -> Statement {
             eprintln!("ion: syntax error: incomplete control flow statement");
             Statement::Error(FAILURE)
         }
-        "let" => {
-            Statement::Let(LocalAction::List)
-        }
+        "let" => Statement::Let(LocalAction::List),
         _ if cmd.starts_with("let ") => {
             // Split the let expression and ensure that the statement is valid.
             let (keys, op, vals) = assignment_lexer(cmd[4..].trim_start());
             match vals {
                 Some(vals) => {
                     // If the values exist, then the keys and operator also exists.
-                    Statement::Let(LocalAction::Assign(keys.unwrap().into(), op.unwrap(), vals.into()))
+                    Statement::Let(LocalAction::Assign(
+                        keys.unwrap().into(),
+                        op.unwrap(),
+                        vals.into(),
+                    ))
                 }
                 None => {
                     if op.is_none() {
@@ -59,16 +61,18 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             }
         }
-        "export" => {
-            Statement::Export(ExportAction::List)
-        }
+        "export" => Statement::Export(ExportAction::List),
         _ if cmd.starts_with("export ") => {
             // Split the let expression and ensure that the statement is valid.
             let (keys, op, vals) = assignment_lexer(cmd[7..].trim_start());
             match vals {
                 Some(vals) => {
                     // If the values exist, then the keys and operator also exists.
-                    Statement::Export(ExportAction::Assign(keys.unwrap().into(), op.unwrap(), vals.into()))
+                    Statement::Export(ExportAction::Assign(
+                        keys.unwrap().into(),
+                        op.unwrap(),
+                        vals.into(),
+                    ))
                 }
                 None => {
                     if keys.is_none() {
@@ -82,19 +86,17 @@ pub(crate) fn parse(code: &str) -> Statement {
                 }
             }
         }
-        _ if cmd.starts_with("if ") => {
-            Statement::If {
-                expression: vec![parse(cmd[3..].trim_start())],
-                success:    Vec::new(),
-                else_if:    Vec::new(),
-                failure:    Vec::new(),
-                mode:       0,
-            }
-        }
+        _ if cmd.starts_with("if ") => Statement::If {
+            expression: vec![parse(cmd[3..].trim_start())],
+            success:    Vec::new(),
+            else_if:    Vec::new(),
+            failure:    Vec::new(),
+            mode:       0,
+        },
         "else" => Statement::Else,
         _ if cmd.starts_with("else") => {
             let cmd = cmd[4..].trim_start();
-            if !cmd.is_empty() && cmd.starts_with("if ")  {
+            if !cmd.is_empty() && cmd.starts_with("if ") {
                 Statement::ElseIf(ElseIf {
                     expression: vec![parse(cmd[3..].trim_start())],
                     success:    Vec::new(),
@@ -161,10 +163,7 @@ pub(crate) fn parse(code: &str) -> Statement {
             Statement::Case(Case { value, binding, conditional, statements: Vec::new() })
         }
         _ if cmd.starts_with("match ") => {
-            Statement::Match {
-                expression: cmd[6..].trim_start().into(),
-                cases:      Vec::new(),
-            }
+            Statement::Match { expression: cmd[6..].trim_start().into(), cases: Vec::new() }
         }
         _ if cmd.starts_with("fn ") => {
             let cmd = cmd[3..].trim_start();
@@ -181,14 +180,12 @@ pub(crate) fn parse(code: &str) -> Statement {
 
             let (args, description) = parse_function(&cmd[pos..]);
             match collect_arguments(args) {
-                Ok(args) => {
-                    Statement::Function {
-                        description: description.map(small::String::from),
-                        name: name.into(),
-                        args,
-                        statements: Vec::new(),
-                    }
-                }
+                Ok(args) => Statement::Function {
+                    description: description.map(small::String::from),
+                    name: name.into(),
+                    args,
+                    statements: Vec::new(),
+                },
                 Err(why) => {
                     eprintln!("ion: function argument error: {}", why);
                     Statement::Error(FAILURE)

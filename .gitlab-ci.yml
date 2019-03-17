@@ -10,6 +10,12 @@ cache:
     - cargo/
     - target/
 
+format:
+  script:
+    - rustup default nightly
+    - rustup component add rustfmt
+    - cargo +nightly fmt --all -- --check
+
 linux:
   image: 'rust:1.31.0'
   script:
