@@ -88,6 +88,7 @@ impl VariableStore for Shell {
                 let Action(key, operator, expression) = act;
                 value_check(self, &expression, &key.kind)
                     .map_err(|e| format!("{}: {}", key.name, e))
+                    // TODO: handle operators here in the same way as local
                     .and_then(|rhs| match &rhs {
                         Value::Array(values) if operator == Operator::Equal => {
                             env::set_var(key.name, values.join(" "));
@@ -97,23 +98,8 @@ impl VariableStore for Shell {
                                                 supported yet."
                             .to_string()),
                         Value::Str(rhs) => {
-                            let key_name: &str = &key.name;
-                            let lhs = self
-                                .variables
-                                .get::<types::Str>(key_name)
-                                .unwrap_or_else(|| "0".into());
-
-                            math(&key.kind, operator, &rhs)
-                                .and_then(|action| parse(&lhs, &*action))
-                                .map(|mut value| {
-                                    if key_name == "PATH" {
-                                        if let Ok(home) = &env::var("HOME") {
-                                            value = value.replace('~', home);
-                                        }
-                                    }
-                                    env::set_var(key_name, &OsString::from(value))
-                                })
-                                .map_err(|why| why.to_string())
+                            env::set_var(&key.name, rhs.as_str());
+                            Ok(())
                         }
                         _ => Err(format!(
                             "{}: export of type '{}' is not supported",
@@ -365,6 +351,9 @@ fn math<'a>(
     operator: Operator,
     value: &'a str,
 ) -> Result<Box<Fn(f64) -> Option<f64>>, MathError> {
+    // TODO: We should not assume or parse f64 by default.
+    //       Decimal precision should be preferred.
+    //       128-bit decimal precision should be supported again.
     value.parse::<f64>().map_err(|_| MathError::RHS).and_then(
         |rhs| -> Result<Box<Fn(f64) -> Option<f64>>, MathError> {
             match key {
