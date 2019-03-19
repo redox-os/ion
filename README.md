@@ -41,7 +41,7 @@ sudo add-apt-repository ppa:mmstick76/ion-shell
 # Build dependencies
 
 Those who are developing software with Rust should install the [Rustup toolchain manager](https://rustup.rs/).
-After installing rustup, run `rustup override 1.31.0` to set your Rust toolchain to the version that Ion is
+After installing rustup, run `rustup override set 1.31.0` to set your Rust toolchain to the version that Ion is
 targeting at the moment. To build for Redox OS, `rustup override set nightly` is required to build the Redox
 dependencies.
 
