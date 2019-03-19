@@ -30,12 +30,12 @@ impl Primitive {
             _ => {
                 let open_bracket = data.find('[')?;
                 let close_bracket = data.rfind(']')?;
-                let kind = &data[..open_bracket].trim_start();
+                let kind = &data[..open_bracket];
                 let inner = &data[open_bracket + 1..close_bracket];
 
-                if *kind == "hmap" {
+                if kind == "hmap" {
                     Some(Primitive::HashMap(Box::new(Primitive::parse(inner)?)))
-                } else if *kind == "bmap" {
+                } else if kind == "bmap" {
                     Some(Primitive::BTreeMap(Box::new(Primitive::parse(inner)?)))
                 } else {
                     None
