@@ -91,13 +91,9 @@ impl Binary for Shell {
         self.evaluate_init_file();
 
         loop {
-            let mut lines = itertools::repeat_call(|| {
-                let line = self.readln();
-                self.flags |= UNTERMINATED;
-                line
-            })
-            .filter_map(|cmd| cmd)
-            .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
+            let mut lines = itertools::repeat_call(|| self.readln())
+                .filter_map(|cmd| cmd)
+                .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
             match Terminator::new(&mut lines).terminate().ok() {
                 Some(command) => {
                     self.flags &= !UNTERMINATED;

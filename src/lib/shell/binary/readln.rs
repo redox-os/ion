@@ -1,4 +1,4 @@
-use super::super::{completer::*, Binary, DirectoryStack, Shell, Variables};
+use super::super::{completer::*, flags, Binary, DirectoryStack, Shell, Variables};
 use crate::{sys, types};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use std::{env, io::ErrorKind, mem, path::PathBuf};
@@ -110,7 +110,10 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
     );
 
     match line {
-        Ok(line) => Some(line),
+        Ok(line) => {
+            shell.flags |= flags::UNTERMINATED;
+            Some(line)
+        }
         // Handles Ctrl + C
         Err(ref err) if err.kind() == ErrorKind::Interrupted => None,
         // Handles Ctrl + D
