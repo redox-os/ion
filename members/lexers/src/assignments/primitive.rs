@@ -27,17 +27,16 @@ impl Primitive {
             "[int]" => Some(Primitive::IntegerArray),
             "float" => Some(Primitive::Float),
             "[float]" => Some(Primitive::FloatArray),
-            kind => {
-                let mut parts = kind.splitn(2, '[');
-                let collection = parts.next()?;
-                let inner = parts.next()?;
-                if let (inner, "]") = inner.split_at(inner.len() - 1) {
-                    let inner = Box::new(Primitive::parse(inner)?);
-                    match collection {
-                        "hmap" => Some(Primitive::HashMap(inner)),
-                        "bmap" => Some(Primitive::BTreeMap(inner)),
-                        _ => None,
-                    }
+            _ => {
+                let open_bracket = data.find('[')?;
+                let close_bracket = data.rfind(']')?;
+                let kind = &data[..open_bracket].trim_start();
+                let inner = &data[open_bracket + 1..close_bracket];
+
+                if *kind == "hmap" {
+                    Some(Primitive::HashMap(Box::new(Primitive::parse(inner)?)))
+                } else if *kind == "bmap" {
+                    Some(Primitive::BTreeMap(Box::new(Primitive::parse(inner)?)))
                 } else {
                     None
                 }
