@@ -38,23 +38,24 @@ The following PPA supports the 18.04 (bionic) and 18.10 (cosmic) releases. Bioni
 sudo add-apt-repository ppa:mmstick76/ion-shell
 ```
 
-# Build dependencies
+# Developer set up
 
 Those who are developing software with Rust should install the [Rustup toolchain manager](https://rustup.rs/).
 After installing rustup, run `rustup override set 1.31.0` to set your Rust toolchain to the version that Ion is
 targeting at the moment. To build for Redox OS, `rustup override set nightly` is required to build the Redox
 dependencies.
 
-> Distribution packagers must ensure that their distribution has packaged both cargo and rustc 1.31.0.
-> Distribution packagers should also currently build Ion from git. Release tarballs have not been made yet
-> due to the shell being incomplete in a few remaining areas.
+# Build dependencies
 
-# Compile instructions
+Please ensure that both cargo and rustc 1.31.0 or higher is installed for your system.
+Release tarballs have not been made yet due to Ion being incomplete in a few remaining areas.
+
+# Compile instructions for distribution
 
 ```sh
 git clone https://gitlab.redox-os.org/redox-os/ion/
 cd ion
-make
+RUSTUP=0 make # By default RUSTUP equals 1, which is for developmental purposes
 sudo make install prefix=/usr
 sudo make update-shells prefix=/usr
 ```
