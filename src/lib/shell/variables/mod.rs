@@ -336,36 +336,12 @@ impl Variables {
                 }
             }
             _ => {
-                let neg;
-                let tilde_num;
-
-                if tilde_prefix.starts_with('+') {
-                    tilde_num = &tilde_prefix[1..];
-                    neg = false;
-                } else if tilde_prefix.starts_with('-') {
-                    tilde_num = &tilde_prefix[1..];
-                    neg = true;
-                } else {
-                    tilde_num = tilde_prefix;
-                    neg = false;
-                }
-
-                match tilde_num.parse() {
-                    Ok(num) => {
-                        let res = if neg {
-                            dir_stack.dir_from_top(num)
-                        } else {
-                            dir_stack.dir_from_bottom(num)
-                        };
-
-                        if let Some(path) = res {
-                            return Some(path.to_str().unwrap().to_string());
-                        }
+                match tilde_prefix.parse() {
+                    Ok(num) => if let Some(path) = dir_stack.dir_from_top(num) {
+                        return Some(path.to_str().unwrap().to_string());
                     }
-                    Err(_) => {
-                        if let Some(home) = self_sys::get_user_home(tilde_prefix) {
-                            return Some(home + remainder);
-                        }
+                    Err(_) => if let Some(home) = self_sys::get_user_home(tilde_prefix) {
+                        return Some(home + remainder);
                     }
                 }
             }
