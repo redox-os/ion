@@ -540,11 +540,7 @@ impl Variables {
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
     fn get_simplified_directory(&self) -> types::Str {
-        let home = match self.get::<types::Str>("HOME") {
-            Some(string) => string,
-            None => "?".into(),
-        };
-
+        let home = self.get::<types::Str>("HOME").unwrap_or_else(|| "?".into());
         env::var("PWD").unwrap().replace(&*home, "~").into()
     }
 
