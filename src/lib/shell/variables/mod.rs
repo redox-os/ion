@@ -335,16 +335,18 @@ impl Variables {
                     return Some(oldpwd.to_string() + remainder);
                 }
             }
-            _ => {
-                match tilde_prefix.parse() {
-                    Ok(num) => if let Some(path) = dir_stack.dir_from_top(num) {
+            _ => match tilde_prefix.parse() {
+                Ok(num) => {
+                    if let Some(path) = dir_stack.dir_from_top(num) {
                         return Some(path.to_str().unwrap().to_string());
                     }
-                    Err(_) => if let Some(home) = self_sys::get_user_home(tilde_prefix) {
+                }
+                Err(_) => {
+                    if let Some(home) = self_sys::get_user_home(tilde_prefix) {
                         return Some(home + remainder);
                     }
                 }
-            }
+            },
         }
         None
     }
