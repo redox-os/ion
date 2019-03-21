@@ -50,3 +50,16 @@ pages:
     - public
   only:
   - master
+
+compare-benchmarks:
+  image: rustlang/rust:nightly
+  stage: test
+  allow_failure: true
+  except: [master]
+  script:
+    - apt-get update && apt-get install -y build-essential libboost-dev jq bc
+    - sh ./ci/run_benchmark.sh
+  artifacts:
+    reports:
+      junit: target/report.xml
+    paths: [target/criterion]

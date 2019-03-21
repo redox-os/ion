@@ -1,8 +1,6 @@
-#[macro_use]
-extern crate criterion;
-
 use criterion::*;
 use ion_shell::parser::Terminator;
+use std::time::Duration;
 
 const TEXT: &str = include_str!("test.ion");
 const EOF: &str = include_str!("herestring.ion");
@@ -22,6 +20,8 @@ fn criterion_benchmark(c: &mut Criterion) {
             },
             vec![TEXT, EOF],
         )
+        .warm_up_time(Duration::from_secs(10))
+        .measurement_time(Duration::from_secs(300))
         .throughput(|script| Throughput::Bytes(script.len() as u32)),
     );
 }
