@@ -1,10 +1,13 @@
 #!/bin/sh
 
-git checkout origin/master
+git remote add upstream https://gitlab.redox-os.org/redox-os/ion.git
+git fetch upstream
+git checkout upstream/master
 cargo bench
 cargo build --release
 PREV_SIZE=$(ls -al target/release/ion | cut -d' ' -f5)
-git reset --hard HEAD
+
+git stash push
 git checkout -
 cargo bench
 cargo build --release
@@ -68,4 +71,4 @@ $result
 
 echo $result > target/report.xml
 
-exit $(test "$total_worse" -eq "0"; echo $?)
+test "$total_worse" -eq "0"
