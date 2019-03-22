@@ -40,6 +40,7 @@ pub(crate) use self::{
 };
 
 use self::{
+    assignments::{math, parse},
     directory_stack::DirectoryStack,
     flags::*,
     flow_control::{FlowControl, Function, FunctionError},
@@ -51,7 +52,11 @@ use self::{
 };
 use crate::{
     builtins::{BuiltinMap, BUILTINS},
-    parser::{pipelines::Pipeline, Expander, MapKeyIter, MapValueIter, Select, Terminator},
+    lexers::{Key, Operator, Primitive},
+    parser::{
+        assignments::value_check, pipelines::Pipeline, Expander, MapKeyIter, MapValueIter, Select,
+        Terminator,
+    },
     sys,
     types::{self, Array},
 };
@@ -404,6 +409,123 @@ impl Shell {
         let ignore_patterns = shell.variables.get("HISTORY_IGNORE").unwrap();
         shell.update_ignore_patterns(&ignore_patterns);
         shell
+    }
+
+    pub fn assign(&mut self, key: Key, value: Value) -> Result<(), String> {
+        match (&key.kind, &value) {
+            (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
+                let index = value_check(self, index_name, index_kind)
+                    .map_err(|why| format!("{}: {}", key.name, why))?;
+
+                match index {
+                    Value::Str(ref index) => {
+                        let lhs = self
+                            .variables
+                            .get_mut(key.name)
+                            .ok_or_else(|| "index value does not exist".to_string())?;
+
+                        match lhs {
+                            Value::HashMap(hmap) => {
+                                let _ = hmap.insert(index.clone(), value);
+                                Ok(())
+                            }
+                            Value::BTreeMap(bmap) => {
+                                let _ = bmap.insert(index.clone(), value);
+                                Ok(())
+                            }
+                            Value::Array(array) => {
+                                let index_num = index.parse::<usize>().map_err(|_| {
+                                    format!("index variable is not a numeric value: `{}`", index)
+                                })?;
+
+                                if let (Some(var), Value::Str(val)) =
+                                    (array.get_mut(index_num), value)
+                                {
+                                    *var = val;
+                                }
+                                Ok(())
+                            }
+                            _ => Ok(()),
+                        }
+                    }
+                    Value::Array(_) => Err("index variable cannot be an array".into()),
+                    Value::HashMap(_) => Err("index variable cannot be a hmap".into()),
+                    Value::BTreeMap(_) => Err("index variable cannot be a bmap".into()),
+                    _ => Ok(()),
+                }
+            }
+            (_, Value::Str(_))
+            | (_, Value::Array(_))
+            | (Primitive::HashMap(_), Value::HashMap(_))
+            | (Primitive::BTreeMap(_), Value::BTreeMap(_)) => {
+                self.variables.set(key.name, value);
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    pub fn overwrite(&mut self, key: Key, operator: Operator, rhs: Value) -> Result<(), String> {
+        let lhs = self
+            .variables
+            .get_mut(key.name)
+            .ok_or_else(|| format!("cannot update non existing variable `{}`", key.name))?;
+
+        match lhs {
+            Value::Str(lhs) => {
+                if let Value::Str(rhs) = rhs {
+                    let action = math(&key.kind, operator, &rhs).map_err(|why| why.to_string())?;
+                    let value = parse(&lhs, &*action).map_err(|why| why.to_string())?;
+                    *lhs = value.into();
+                }
+                Ok(())
+            }
+            Value::Array(array) => match rhs {
+                Value::Str(rhs) => match operator {
+                    Operator::Concatenate => {
+                        array.push(rhs.clone());
+                        Ok(())
+                    }
+                    Operator::ConcatenateHead => {
+                        array.insert(0, rhs.clone());
+                        Ok(())
+                    }
+                    Operator::Filter => {
+                        array.retain(|item| item != &rhs);
+                        Ok(())
+                    }
+                    _ => math(&Primitive::Float, operator, &rhs)
+                        .and_then(|action| {
+                            array
+                                .iter_mut()
+                                .map(|el| parse(el, &*action).map(|result| *el = result.into()))
+                                .find(|e| e.is_err())
+                                .unwrap_or(Ok(()))
+                        })
+                        .map_err(|why| why.to_string()),
+                },
+                Value::Array(values) => {
+                    match operator {
+                        Operator::Concatenate => array.extend(values.clone()),
+                        Operator::ConcatenateHead => values
+                            .into_iter()
+                            .rev()
+                            .for_each(|value| array.insert(0, value.clone())),
+                        Operator::Filter => array.retain(|item| !values.contains(item)),
+                        _ => {}
+                    }
+                    Ok(())
+                }
+                _ => Ok(()),
+            },
+            _ => {
+                if let Value::Str(_) = rhs {
+                    Err("type does not support this operator".to_string())
+                } else {
+                    Ok(())
+                }
+            }
+        }
     }
 }
 
