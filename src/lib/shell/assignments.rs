@@ -9,11 +9,8 @@ use crate::{
     shell::{history::ShellHistory, variables::Value},
     types,
 };
-use hashbrown::HashMap;
-
 use std::{
     env,
-    ffi::OsString,
     fmt::{self, Display},
     io::{self, BufWriter, Write},
     result::Result,
@@ -52,11 +49,10 @@ pub(crate) trait VariableStore {
     /// Export a variable to the process environment given a binding
     fn export(&mut self, action: ExportAction) -> i32;
     /// Collect all updates to perform on variables for a given assignement action
-    fn create_patch<'a>(
+    fn calculate<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
-    ) -> Result<HashMap<Key<'a>, Value>, String>;
-    fn patch(&mut self, patch: HashMap<Key, Value>) -> Result<(), String>;
+    ) -> Result<Vec<(Key<'a>, Value)>, String>;
 }
 
 impl VariableStore for Shell {
@@ -117,185 +113,62 @@ impl VariableStore for Shell {
         SUCCESS
     }
 
-    fn create_patch<'a>(
+    fn calculate<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
-    ) -> Result<HashMap<Key<'a>, Value>, String> {
-        let mut patch = HashMap::new();
-        actions
-            .map(|act| act.map_err(|e| e.to_string()))
-            .map(|action| {
-                action
-                    .and_then(|act| {
-                        // sanitize variable names
-                        if ["HOME", "HOST", "PWD", "MWD", "SWD", "?"].contains(&act.0.name) {
-                            Err(format!("not allowed to set `{}`", act.0.name))
-                        } else {
-                            Ok(act)
-                        }
-                    })
-                    .and_then(|Action(key, operator, expression)| {
-                        value_check(self, &expression, &key.kind)
-                            .map_err(|why| format!("{}: {}", key.name, why))
-                            .map(|rhs| (rhs, key, operator))
-                    })
-                    .and_then(|(rhs, key, operator)| {
-                        if operator == Operator::OptionalEqual
-                            && self.variables.get_ref(key.name).is_some()
-                        {
-                            return Ok(());
-                        }
-                        if [Operator::Equal, Operator::OptionalEqual].contains(&operator) {
-                            // When we changed the HISTORY_IGNORE variable, update the
-                            // ignore patterns. This happens first because `set_array`
-                            // consumes 'values'
-                            if key.name == "HISTORY_IGNORE" {
-                                if let Value::Array(array) = &rhs {
-                                    self.update_ignore_patterns(array);
-                                }
+    ) -> Result<Vec<(Key<'a>, Value)>, String> {
+        let mut backup: Vec<_> = Vec::new();
+        for action in actions.map(|act| act.map_err(|e| e.to_string())) {
+            action
+                .and_then(|Action(key, operator, expression)| {
+                    // sanitize variable names
+                    if ["HOME", "HOST", "PWD", "MWD", "SWD", "?"].contains(&key.name) {
+                        Err(format!("not allowed to set `{}`", key.name))
+                    } else {
+                        Ok((key, operator, expression))
+                    }
+                })
+                .and_then(|(key, operator, expression)| {
+                    value_check(self, &expression, &key.kind)
+                        .map_err(|why| format!("{}: {}", key.name, why))
+                        .map(|rhs| (key, operator, rhs))
+                })
+                .and_then(|(key, operator, rhs)| {
+                    if operator == Operator::OptionalEqual
+                        && self.variables.get_ref(key.name).is_some()
+                    {
+                        Ok(())
+                    } else if [Operator::Equal, Operator::OptionalEqual].contains(&operator) {
+                        // When we changed the HISTORY_IGNORE variable, update the
+                        // ignore patterns. This happens first because `set_array`
+                        // consumes 'values'
+                        if key.name == "HISTORY_IGNORE" {
+                            if let Value::Array(array) = &rhs {
+                                self.update_ignore_patterns(array);
                             }
-
-                            return match (&rhs, &key.kind) {
-                                (Value::HashMap(_), Primitive::Indexed(..)) => {
-                                    Err("cannot insert hmap into index".to_string())
-                                }
-                                (Value::BTreeMap(_), Primitive::Indexed(..)) => {
-                                    Err("cannot insert bmap into index".to_string())
-                                }
-                                (Value::Array(_), Primitive::Indexed(..)) => {
-                                    Err("multi-dimensional arrays are not yet supported"
-                                        .to_string())
-                                }
-                                _ => {
-                                    patch.insert(key, rhs);
-                                    Ok(())
-                                }
-                            };
                         }
 
-                        self.variables
-                            .get_mut(key.name)
-                            .ok_or_else(|| {
-                                format!("cannot update non existing variable `{}`", key.name)
-                            })
-                            .and_then(|lhs| match rhs {
-                                Value::Str(rhs) => match lhs {
-                                    Value::Str(lhs) => math(&key.kind, operator, &rhs)
-                                        .and_then(|action| parse(&lhs, &*action))
-                                        .map(|value| {
-                                            patch.insert(key, Value::Str(value.into()));
-                                        })
-                                        .map_err(|why| why.to_string()),
-                                    Value::Array(ref mut array) => match operator {
-                                        Operator::Concatenate => {
-                                            array.push(rhs);
-                                            Ok(())
-                                        }
-                                        Operator::ConcatenateHead => {
-                                            array.insert(0, rhs);
-                                            Ok(())
-                                        }
-                                        Operator::Filter => {
-                                            array.retain(|item| item != &rhs);
-                                            Ok(())
-                                        }
-                                        _ => math(&Primitive::Float, operator, &rhs)
-                                            .and_then(|action| {
-                                                array
-                                                    .iter_mut()
-                                                    .map(|el| {
-                                                        parse(el, &*action)
-                                                            .map(|result| *el = result.into())
-                                                    })
-                                                    .find(|e| e.is_err())
-                                                    .unwrap_or(Ok(()))
-                                            })
-                                            .map_err(|why| why.to_string()),
-                                    },
-                                    _ => Err("type does not support this operator".to_string()),
-                                },
-                                Value::Array(values) => {
-                                    if let Value::Array(ref mut array) = lhs {
-                                        match operator {
-                                            Operator::Concatenate => array.extend(values),
-                                            Operator::ConcatenateHead => values
-                                                .into_iter()
-                                                .rev()
-                                                .for_each(|value| array.insert(0, value)),
-                                            Operator::Filter => {
-                                                array.retain(|item| !values.contains(item))
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-                                    Ok(())
-                                }
-                                _ => unreachable!(),
-                            })
-                    })
-            })
-            .find(|e| e.is_err())
-            .unwrap_or_else(|| Ok(()))
-            .map(|_| patch)
-    }
-
-    fn patch(&mut self, patch: HashMap<Key, Value>) -> Result<(), String> {
-        patch
-            .into_iter()
-            .map(|(key, val)| match (&val, &key.kind) {
-                (Value::Str(_), Primitive::Indexed(ref index_name, ref index_kind)) => {
-                    value_check(self, index_name, index_kind)
-                        .map_err(|why| format!("assignment error: {}: {}", key.name, why))
-                        .and_then(|index| match index {
-                            Value::Array(_) => Err("index variable cannot be an array".to_string()),
-                            Value::HashMap(_) => Err("index variable cannot be a hmap".to_string()),
-                            Value::BTreeMap(_) => {
-                                Err("index variable cannot be a bmap".to_string())
+                        match (&rhs, &key.kind) {
+                            (Value::HashMap(_), Primitive::Indexed(..)) => {
+                                Err("cannot insert hmap into index".to_string())
                             }
-                            Value::Str(ref index) => self
-                                .variables
-                                .get_mut(key.name)
-                                .map(|lhs| match lhs {
-                                    Value::HashMap(hmap) => {
-                                        hmap.insert(index.clone(), val);
-                                        Ok(())
-                                    }
-                                    Value::BTreeMap(bmap) => {
-                                        bmap.insert(index.clone(), val);
-                                        Ok(())
-                                    }
-                                    Value::Array(array) => index
-                                        .parse::<usize>()
-                                        .map_err(|_| {
-                                            format!(
-                                                "index variable is not a numeric value: `{}`",
-                                                index
-                                            )
-                                        })
-                                        .map(|index_num| {
-                                            if let (Some(var), Value::Str(value)) =
-                                                (array.get_mut(index_num), val)
-                                            {
-                                                *var = value;
-                                            }
-                                        }),
-                                    _ => Ok(()),
-                                })
-                                .unwrap_or(Ok(())),
-                            _ => Ok(()),
-                        })
-                }
-                (Value::Str(_), _)
-                | (Value::HashMap(_), Primitive::HashMap(_))
-                | (Value::BTreeMap(_), Primitive::BTreeMap(_))
-                | (Value::Array(_), _) => {
-                    self.variables.set(key.name, val);
-                    Ok(())
-                }
-                _ => Ok(()),
-            })
-            .find(|e| e.is_err())
-            .unwrap_or_else(|| Ok(()))
+                            (Value::BTreeMap(_), Primitive::Indexed(..)) => {
+                                Err("cannot insert bmap into index".to_string())
+                            }
+                            (Value::Array(_), Primitive::Indexed(..)) => {
+                                Err("multi-dimensional arrays are not yet supported".to_string())
+                            }
+                            _ => {
+                                backup.push((key, rhs));
+                                Ok(())
+                            }
+                        }
+                    } else {
+                        self.overwrite(key, operator, rhs)
+                    }
+                })?;
+        }
+        Ok(backup)
     }
 
     fn local(&mut self, action: LocalAction) -> i32 {
@@ -306,7 +179,12 @@ impl VariableStore for Shell {
             }
             LocalAction::Assign(ref keys, op, ref vals) => {
                 let actions = AssignmentActions::new(keys, op, vals);
-                if let Err(why) = self.create_patch(actions).and_then(|patch| self.patch(patch)) {
+                if let Err(why) = self.calculate(actions).and_then(|apply| {
+                    for (key, value) in apply {
+                        self.assign(key, value)?
+                    }
+                    Ok(())
+                }) {
                     eprintln!("ion: assignment error: {}", why);
                     FAILURE
                 } else {
@@ -318,7 +196,7 @@ impl VariableStore for Shell {
 }
 
 #[derive(Debug)]
-enum MathError {
+pub enum MathError {
     RHS,
     LHS,
     Unsupported,
@@ -336,7 +214,7 @@ impl Display for MathError {
     }
 }
 
-fn parse<T: str::FromStr, F: Fn(T) -> Option<f64>>(
+pub fn parse<T: str::FromStr, F: Fn(T) -> Option<f64>>(
     lhs: &str,
     operation: F,
 ) -> Result<String, MathError> {
@@ -346,7 +224,7 @@ fn parse<T: str::FromStr, F: Fn(T) -> Option<f64>>(
         .map(|x| x.to_string())
 }
 
-fn math<'a>(
+pub fn math<'a>(
     key: &Primitive,
     operator: Operator,
     value: &'a str,
