@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     lexers::assignments::{Key, Operator, Primitive},
-    parser::assignments::*,
+    parser::{assignments::*, statement::parse::is_valid_name},
     shell::{history::ShellHistory, variables::Value},
     types,
 };
@@ -124,6 +124,10 @@ impl VariableStore for Shell {
                     // sanitize variable names
                     if ["HOME", "HOST", "PWD", "MWD", "SWD", "?"].contains(&key.name) {
                         Err(format!("not allowed to set `{}`", key.name))
+                    } else if !is_valid_name(key.name) {
+                        Err("invalid variable name\nVariable names may only have A-Z, a-z, 0-9 \
+                             and _\nThe first character cannot be a digit"
+                            .into())
                     } else {
                         Ok((key, operator, expression))
                     }

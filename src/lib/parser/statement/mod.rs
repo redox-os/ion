@@ -1,7 +1,7 @@
 mod case;
 mod functions;
 #[cfg(not(fuzzing))]
-mod parse;
+pub mod parse;
 #[cfg(fuzzing)]
 pub mod parse;
 mod splitter;
