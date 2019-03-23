@@ -26,7 +26,13 @@ where
     }
 }
 
-fn is_valid_name(name: &str) -> bool { !name.chars().any(|c| !(c.is_alphanumeric() || c == '_')) }
+pub fn is_valid_name(name: &str) -> bool {
+    if !(name.as_bytes()[0] as char).is_numeric() {
+        !name.chars().any(|c| !(c.is_alphanumeric() || c == '_'))
+    } else {
+        false
+    }
+}
 
 pub(crate) fn parse(code: &str) -> Statement {
     let cmd = code.trim();

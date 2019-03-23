@@ -3,7 +3,7 @@ mod loops;
 pub(crate) mod pipelines;
 mod quotes;
 pub(crate) mod shell_expand;
-mod statement;
+pub(crate) mod statement;
 
 pub use self::quotes::Terminator;
 pub(crate) use self::{
