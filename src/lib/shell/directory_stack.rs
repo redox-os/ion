@@ -1,6 +1,6 @@
 use super::{
     status::{FAILURE, SUCCESS},
-    variables::Variables,
+    variables::{Value, Variables},
 };
 use crate::sys::env as sys_env;
 use std::{
@@ -239,13 +239,30 @@ impl DirectoryStack {
     {
         match args.into_iter().nth(1) {
             Some(dir) => {
-                let dir = dir.as_ref();
-                if dir == "-" {
-                    self.switch_to_previous_directory(variables)
+                if let Some(Value::Array(cdpath)) = variables.get_ref("CDPATH") {
+                    let dir = dir.as_ref();
+                    if dir == "-" {
+                        self.switch_to_previous_directory(variables)
+                    } else {
+                        if !cdpath.is_empty() {
+                            for path in cdpath {
+                                let mut path = path.to_string();
+                                path.push('/');
+                                path.push_str(dir);
+                                let res = self.change_and_push_dir(&path, variables);
+                                if res.is_ok() {
+                                    self.dirs.remove(1);
+                                    return res;
+                                }
+                            }
+                        }
+
+                        let res = self.change_and_push_dir(dir, variables);
+                        self.dirs.remove(1);
+                        res
+                    }
                 } else {
-                    let res = self.change_and_push_dir(dir, variables);
-                    self.dirs.remove(1);
-                    res
+                    unreachable!();
                 }
             }
             None => self.switch_to_home_directory(variables),

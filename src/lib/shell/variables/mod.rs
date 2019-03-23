@@ -176,6 +176,8 @@ impl Default for Variables {
             Value::Array(array!["no_such_command", "whitespace", "duplicates"]),
         );
 
+        map.insert("CDPATH".into(), Value::Array(array![]));
+
         // Initialize the HOME variable
         sys_env::home_dir().map_or_else(
             || env::set_var("HOME", "?"),
