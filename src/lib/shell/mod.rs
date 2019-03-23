@@ -474,9 +474,18 @@ impl Shell {
         match lhs {
             Value::Str(lhs) => {
                 if let Value::Str(rhs) = rhs {
-                    let action = math(&key.kind, operator, &rhs).map_err(|why| why.to_string())?;
-                    let value = parse(&lhs, &*action).map_err(|why| why.to_string())?;
-                    *lhs = value.into();
+                    match operator {
+                        Operator::Concatenate => lhs.push_str(&rhs),
+                        Operator::ConcatenateHead => {
+                            *lhs = rhs + lhs;
+                        }
+                        _ => {
+                            let action =
+                                math(&key.kind, operator, &rhs).map_err(|why| why.to_string())?;
+                            let value = parse(&lhs, &*action).map_err(|why| why.to_string())?;
+                            *lhs = value.into();
+                        }
+                    }
                 }
                 Ok(())
             }
