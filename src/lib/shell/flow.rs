@@ -215,7 +215,9 @@ impl FlowLogic for Shell {
             }
             Statement::Pipeline(pipeline) => match expand_pipeline(&self, &pipeline) {
                 Ok((mut pipeline, statements)) => {
-                    self.run_pipeline(&mut pipeline);
+                    if !pipeline.items.is_empty() {
+                        self.run_pipeline(&mut pipeline);
+                    }
                     if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
                         let status = self.previous_status;
                         self.exit(status);
@@ -512,14 +514,8 @@ fn expand_pipeline(
                     }
                 }
                 items.append(&mut pline.items);
-            } else {
-                return Err(format!(
-                    "unable to pipe inputs to alias: '{} = {}'",
-                    item.job.command.as_str(),
-                    alias.0.as_str()
-                ));
+                statements.remove(0);
             }
-            statements.remove(0);
 
             // Handle pipeline being broken half by i.e.: '&&' or '||'
             if !statements.is_empty() {
@@ -547,7 +543,7 @@ fn expand_pipeline(
                             true
                         }
                     }
-                    _ => true,
+                    _ => false,
                 };
                 if err {
                     return Err(format!(
