@@ -27,11 +27,9 @@ where
 }
 
 pub fn is_valid_name(name: &str) -> bool {
-    if !(name.as_bytes()[0] as char).is_numeric() {
-        !name.chars().any(|c| !(c.is_alphanumeric() || c == '_'))
-    } else {
-        false
-    }
+    let mut bytes = name.bytes();
+    bytes.next().map_or(false, |b| b.is_ascii_alphabetic())
+        && bytes.all(|b| b.is_ascii_alphanumeric() || b == b'_')
 }
 
 pub(crate) fn parse(code: &str) -> Statement {
