@@ -229,37 +229,28 @@ impl DirectoryStack {
         )
     }
 
-    pub(crate) fn cd<I: IntoIterator>(
+    pub(crate) fn cd(
         &mut self,
-        args: I,
+        args: &[small::String],
         variables: &Variables,
-    ) -> Result<(), Cow<'static, str>>
-    where
-        I::Item: AsRef<str>,
-    {
-        match args.into_iter().nth(1) {
+    ) -> Result<(), Cow<'static, str>> {
+        match args.get(1) {
             Some(dir) => {
                 if let Some(Value::Array(cdpath)) = variables.get_ref("CDPATH") {
                     let dir = dir.as_ref();
                     if dir == "-" {
                         self.switch_to_previous_directory(variables)
                     } else {
-                        if !cdpath.is_empty() {
-                            for path in cdpath {
-                                let mut path = path.to_string();
-                                path.push('/');
-                                path.push_str(dir);
-                                let res = self.change_and_push_dir(&path, variables);
-                                if res.is_ok() {
-                                    self.dirs.remove(1);
-                                    return res;
-                                }
-                            }
-                        }
-
-                        let res = self.change_and_push_dir(dir, variables);
+                        let check_cdpath_first = cdpath
+                            .iter()
+                            .map(|path| {
+                                let path_dir = [path, "/", dir].concat();
+                                self.change_and_push_dir(&path_dir, variables)
+                            })
+                            .find(Result::is_ok)
+                            .unwrap_or_else(|| self.change_and_push_dir(dir, variables));
                         self.dirs.remove(1);
-                        res
+                        check_cdpath_first
                     }
                 } else {
                     unreachable!();
