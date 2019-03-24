@@ -27,13 +27,17 @@ echo $foo[7..]
 echo $foo[2..9]
 ```
 
-## Dropping String Variables
+## String concatenation
 
-The `drop` command may be used to drop string variables.
+The `++=` and `::=` operators can be used to efficiently concatenate a string in-place.
 
 ```sh
-let variable = "testing"
-echo $variable
-drop variable
-echo $variable
+let string = "ello"
+let string ::= H
+let string ++= ", world!"
+echo $string
+```
+
+```
+Hello, world!
 ```

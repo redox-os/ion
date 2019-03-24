@@ -48,17 +48,31 @@ This will join each element of the array into a string, adding spaces between ea
 
 ```sh
 let array = [ hello world ]
+let other_array = [ this is the ion ]
+let array = [ @array @other_array shell ]
 let as_string = @array
+echo @array
+echo $array
+```
+
+```
+hello world this is the ion shell
+hello world this is the ion shell
 ```
 
 ## Array concatenation
 
-The `++=` and `::=` operators can be used to efficient concatenate an array in-place.
+The `++=` and `::=` operators can be used to efficiently concatenate an array in-place.
 
 ```sh
 let array = [1 2 3]
 let array ++= [5 6 7]
 let array ::= 0
+echo @array
+```
+
+```
+0 1 2 3 4 5 6 7
 ```
 
 ## Expand array as arguments to a command
@@ -69,15 +83,4 @@ individual argument, if any arguments exist.
 ```sh
 let args = [-l -a --color]
 ls @args
-```
-
-## Dropping Array Variables
-
-The `drop -a` command will drop array variables from the shell.
-
-```sh
-let array = [one two three]
-echo @array
-drop -a array
-echo @array
 ```

@@ -47,7 +47,7 @@ let c:bool = n
 echo $a $b $c
 
 
-let a:str b[] c:int d:float[] = one [two three] 4 [5.1 6.2 7.3]
+let a:str b[str] c:int d:float[] = one [two three] 4 [5.1 6.2 7.3]
 echo $a
 echo @b
 echo $c
@@ -66,16 +66,19 @@ two three
 5.1 6.2 7.3
 ```
 
-## Supported Types
+## Supported Primitive Types
 
-- []
-- bool
-- bool[]
-- float
-- float[]
-- int
-- int[]
-- str
-- str[]
-- hmap[]
-- bmap[]
+- `str`: A string, the essential primitive of a shell.
+- `bool`: A value which is either `true` or `false`.
+- `int`: An integer is any whole number.
+- `float`: A float is a rational number (fractions represented as a decimal).
+
+## Arrays
+
+The `[T]` type, where `T` is a primitive, is an array of that primitive type.
+
+## Maps
+
+Likewise, `hmap[T]` and `bmap[T]` work in a similar fashion, but are a collection
+of key/value pairs, where the key is always a `str`, and the value is defined by the
+`T`.

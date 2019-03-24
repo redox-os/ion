@@ -48,3 +48,11 @@ echo @values(hashmap)
 ```
 echo @hashmap
 ```
+
+## Iterate key/value paris in a loop
+
+```
+for key value in @hashmap
+    echo $key: $value
+end
+```
