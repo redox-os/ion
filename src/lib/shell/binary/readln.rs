@@ -111,7 +111,9 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
 
     match line {
         Ok(line) => {
-            shell.flags |= flags::UNTERMINATED;
+            if !line.is_empty() {
+                shell.flags |= flags::UNTERMINATED;
+            }
             Some(line)
         }
         // Handles Ctrl + C

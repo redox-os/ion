@@ -2,11 +2,11 @@ use crate::{
     parser::Terminator,
     shell::{status::*, FlowLogic, Shell},
 };
+use itertools::Itertools;
 
 pub(crate) fn terminate_script_quotes<I: Iterator<Item = u8>>(shell: &mut Shell, lines: I) -> i32 {
-    let mut lines = lines.peekable();
-    while lines.peek().is_some() {
-        match Terminator::new(&mut lines).terminate() {
+    for cmd in lines.batching(|lines| Terminator::new(lines).terminate()) {
+        match cmd {
             Ok(stmt) => shell.on_command(&stmt),
             Err(_) => {
                 eprintln!("ion: unterminated quote in script");

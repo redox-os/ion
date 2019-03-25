@@ -7,7 +7,7 @@ cargo bench
 cargo build --release
 PREV_SIZE=$(ls -al target/release/ion | cut -d' ' -f5)
 
-git stash push
+git stash
 git checkout -
 cargo bench
 cargo build --release
@@ -31,7 +31,8 @@ for suite in ./target/criterion/*; do
     for test in $suite/*/*/change/estimates.json; do
         estimate=$(cat "$test" | jq -r "$JQ_FILTER" -c)
         case "$estimate" in
-            -*)
+            -*);;
+            *)
                 inner="<failure message=\"Performance Regressed\" type=\"WARNING\">\
                     Performance regressed by $estimate in $test\
                 </failure>"

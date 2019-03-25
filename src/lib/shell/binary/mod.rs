@@ -51,21 +51,12 @@ pub trait Binary {
 
 impl Binary for Shell {
     fn save_command(&mut self, cmd: &str) {
-        if cmd.starts_with('~') {
-            if !cmd.ends_with('/')
-                && self
-                    .variables
-                    .tilde_expansion(cmd, &self.directory_stack)
-                    .map_or(false, |path| Path::new(&path).is_dir())
-            {
-                self.save_command_in_history(&[cmd, "/"].concat());
-            } else {
-                self.save_command_in_history(cmd);
-            }
-            return;
-        }
-
-        if Path::new(cmd).is_dir() & !cmd.ends_with('/') {
+        if !cmd.ends_with('/')
+            && self
+                .variables
+                .tilde_expansion(cmd, &self.directory_stack)
+                .map_or(false, |path| Path::new(&path).is_dir())
+        {
             self.save_command_in_history(&[cmd, "/"].concat());
         } else {
             self.save_command_in_history(cmd);
@@ -91,17 +82,20 @@ impl Binary for Shell {
         self.evaluate_init_file();
 
         loop {
-            let mut lines = itertools::repeat_call(|| self.readln())
+            let mut lines = std::iter::repeat_with(|| self.readln())
                 .filter_map(|cmd| cmd)
                 .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
-            match Terminator::new(&mut lines).terminate().ok() {
-                Some(command) => {
+            match Terminator::new(&mut lines).terminate() {
+                Some(Ok(command)) => {
                     self.flags &= !UNTERMINATED;
                     let cmd: &str = &designators::expand_designators(&self, command.trim_end());
                     self.on_command(&cmd);
                     self.save_command(&cmd);
                 }
-                None => self.reset_flow(),
+                Some(Err(_)) => self.reset_flow(),
+                None => {
+                    self.flags &= !UNTERMINATED;
+                }
             }
         }
     }

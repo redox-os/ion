@@ -301,78 +301,46 @@ impl Variables {
     }
 
     pub(crate) fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> Option<String> {
-        let mut chars = word.char_indices();
-
-        let tilde_prefix;
-        let remainder;
-
-        loop {
-            if let Some((ind, c)) = chars.next() {
-                if c == '/' || c == '$' {
-                    tilde_prefix = &word[1..ind];
-                    remainder = &word[ind..];
-                    break;
-                }
-            } else {
-                tilde_prefix = &word[1..];
-                remainder = "";
-                break;
-            }
+        // Only if the first character is a tilde character will we perform expansions
+        if !word.starts_with('~') {
+            return None;
         }
 
-        match tilde_prefix {
-            "" => {
-                if let Some(home) = sys_env::home_dir() {
-                    return Some(home.to_string_lossy().to_string() + remainder);
-                }
-            }
-            "+" => {
-                return Some(match env::var("PWD") {
-                    Ok(var) => var + remainder,
-                    _ => ["?", remainder].concat(),
-                });
-            }
-            "-" => {
-                if let Some(oldpwd) = self.get::<types::Str>("OLDPWD") {
-                    return Some(oldpwd.to_string() + remainder);
-                }
-            }
-            _ => {
-                let neg;
-                let tilde_num;
+        let mut parts = word[1..].splitn(2, |c| c == '/' || c == '$');
 
-                if tilde_prefix.starts_with('+') {
-                    tilde_num = &tilde_prefix[1..];
-                    neg = false;
+        match parts.next().unwrap() {
+            "" => sys_env::home_dir()
+                .map(|home| home.to_string_lossy().to_string() + parts.next().unwrap_or("")),
+
+            "+" => Some(
+                env::var("PWD").unwrap_or_else(|_| "?".to_string()) + parts.next().unwrap_or(""),
+            ),
+
+            "-" => self
+                .get::<types::Str>("OLDPWD")
+                .map(|oldpwd| oldpwd.to_string() + parts.next().unwrap_or("")),
+
+            tilde_prefix => {
+                let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
+                    (false, &tilde_prefix[1..])
                 } else if tilde_prefix.starts_with('-') {
-                    tilde_num = &tilde_prefix[1..];
-                    neg = true;
+                    (true, &tilde_prefix[1..])
                 } else {
-                    tilde_num = tilde_prefix;
-                    neg = false;
-                }
+                    (false, tilde_prefix)
+                };
 
                 match tilde_num.parse() {
-                    Ok(num) => {
-                        let res = if neg {
-                            dir_stack.dir_from_top(num)
-                        } else {
-                            dir_stack.dir_from_bottom(num)
-                        };
-
-                        if let Some(path) = res {
-                            return Some(path.to_str().unwrap().to_string());
-                        }
+                    Ok(num) => if neg {
+                        dir_stack.dir_from_top(num)
+                    } else {
+                        dir_stack.dir_from_bottom(num)
                     }
-                    Err(_) => {
-                        if let Some(home) = self_sys::get_user_home(tilde_prefix) {
-                            return Some(home + remainder);
-                        }
-                    }
+                    .map(|path| path.to_str().unwrap().to_string()),
+                    Err(_) => self_sys::get_user_home(tilde_prefix)
+                        .map(|home| home + parts.next().unwrap_or("")),
                 }
             }
         }
-        None
     }
 
     pub(crate) fn is_valid_variable_name(name: &str) -> bool {
