@@ -52,9 +52,9 @@ impl Completer for IonFileCompleter {
             // We can do that by obtaining the index position where the tilde character
             // ends. We don't search with `~` because we also want to
             // handle other tilde variants.
-            let t_index = start.bytes().find(|&c| c == b'/').unwrap_or(1);
+            let t_index = start.find('/').unwrap_or(1);
             // `tilde` is the tilde pattern, and `search` is the pattern that follows.
-            let (tilde, search) = start.split_at(t_index as usize);
+            let (tilde, search) = start.split_at(t_index);
 
             if search.len() < 2 {
                 // If the length of the search pattern is less than 2, the search pattern is
