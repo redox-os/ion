@@ -53,10 +53,7 @@ use self::{
 use crate::{
     builtins::{BuiltinMap, BUILTINS},
     lexers::{Key, Operator, Primitive},
-    parser::{
-        assignments::value_check, pipelines::Pipeline, Expander, MapKeyIter, MapValueIter, Select,
-        Terminator,
-    },
+    parser::{assignments::value_check, pipelines::Pipeline, Expander, Select, Terminator},
     sys,
     types::{self, Array},
 };
@@ -678,36 +675,31 @@ impl<'a> Expander for Shell {
         None
     }
 
-    fn map_keys<'b>(&'b self, name: &str, select: Select) -> Option<MapKeyIter<'b>> {
+    fn map_keys(&self, name: &str, select: Select) -> Option<Array> {
         let nvalues;
-        let map: Box<dyn Iterator<Item = &'b types::Str>> = match self.variables.get_ref(name) {
+        let map: Box<dyn Iterator<Item = types::Str>> = match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
                 nvalues = map.len();
-                Box::new(map.keys())
+                Box::new(map.keys().cloned())
             }
             Some(&Value::BTreeMap(ref map)) => {
                 nvalues = map.len();
-                Box::new(map.keys())
+                Box::new(map.keys().cloned())
             }
             _ => return None,
         };
 
         match select {
-            Select::All => return Some(map),
-            Select::Range(range) => {
-                if let Some((start, length)) = range.bounds(nvalues) {
-                    if nvalues > start {
-                        return Some(Box::new(map.skip(start).take(length)));
-                    }
-                }
-            }
-            _ => (),
+            Select::All => Some(map.collect()),
+            Select::Range(range) => range
+                .bounds(nvalues)
+                .filter(|&(start, _)| nvalues > start)
+                .map(|(start, length)| map.skip(start).take(length).collect()),
+            _ => None,
         }
-
-        None
     }
 
-    fn map_values<'b>(&'b self, name: &str, select: Select) -> Option<MapValueIter<'b>> {
+    fn map_values(&self, name: &str, select: Select) -> Option<Array> {
         let nvalues;
         let map: Box<dyn Iterator<Item = types::Str>> = match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
@@ -722,18 +714,13 @@ impl<'a> Expander for Shell {
         };
 
         match select {
-            Select::All => return Some(map),
-            Select::Range(range) => {
-                if let Some((start, length)) = range.bounds(nvalues) {
-                    if nvalues > start {
-                        return Some(Box::new(map.skip(start).take(length)));
-                    }
-                }
-            }
-            _ => (),
+            Select::All => Some(map.collect()),
+            Select::Range(range) => range
+                .bounds(nvalues)
+                .filter(|&(start, _)| nvalues > start)
+                .map(|(start, length)| map.skip(start).take(length).collect()),
+            _ => None,
         }
-
-        None
     }
 
     fn tilde(&self, input: &str) -> Option<String> {

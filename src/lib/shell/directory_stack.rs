@@ -95,72 +95,67 @@ impl DirectoryStack {
 
     pub(crate) fn dir_from_top(&self, num: usize) -> Option<&PathBuf> { self.dirs.get(num) }
 
-    pub(crate) fn dirs<I: IntoIterator>(&mut self, args: I) -> i32
-    where
-        I::Item: AsRef<str>,
-    {
-        const CLEAR: u8 = 1; // -c
-        const ABS_PATHNAMES: u8 = 2; // -l
-        const MULTILINE: u8 = 4; // -p | -v
-        const INDEX: u8 = 8; // -v
+    pub(crate) fn dirs<'a, I: Iterator<Item = &'a T>, T: 'a + AsRef<str>>(
+        &mut self,
+        args: I,
+    ) -> i32 {
+        let mut clear = false; // -c
+        let mut abs_pathnames = false; // -l
+        let mut multiline = false; // -p | -v
+        let mut index = false; // -v
 
-        let mut dirs_args: u8 = 0;
-        let mut num_arg: Option<usize> = None;
+        let mut num_arg = None;
 
-        for arg in args.into_iter().skip(1) {
-            let arg = arg.as_ref();
+        for arg in args.skip(1).map(AsRef::as_ref) {
             match arg {
-                "-c" => dirs_args |= CLEAR,
-                "-l" => dirs_args |= ABS_PATHNAMES,
-                "-p" => dirs_args |= MULTILINE,
-                "-v" => dirs_args |= INDEX | MULTILINE,
-                arg => {
-                    num_arg = match parse_numeric_arg(arg) {
-                        Some((true, num)) => Some(num),
-                        Some((false, num)) if self.dirs.len() > num => {
-                            Some(self.dirs.len() - num - 1)
-                        }
-                        _ => return FAILURE, /* Err(Cow::Owned(format!("ion: dirs: {}: invalid
-                                              * argument\n", arg))) */
-                    };
+                "-c" => clear = true,
+                "-l" => abs_pathnames = true,
+                "-p" => multiline = true,
+                "-v" => {
+                    index = true;
+                    multiline = true;
                 }
+                arg => num_arg = Some(arg),
             }
         }
 
-        if dirs_args & CLEAR > 0 {
+        if clear {
             self.dirs.truncate(1);
         }
 
-        let mapper: fn((usize, &PathBuf)) -> Cow<str> =
-            match (dirs_args & ABS_PATHNAMES > 0, dirs_args & INDEX > 0) {
-                // ABS, INDEX
-                (true, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, try_abs_path(x))),
-                (true, false) => |(_, x)| try_abs_path(x),
-                (false, true) => {
-                    |(num, x)| Cow::Owned(format!(" {}  {}", num, x.to_string_lossy()))
-                }
-                (false, false) => |(_, x)| x.to_string_lossy(),
-            };
+        let mapper: fn((usize, &PathBuf)) -> Cow<str> = match (abs_pathnames, index) {
+            // ABS, INDEX
+            (true, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, try_abs_path(x))),
+            (true, false) => |(_, x)| try_abs_path(x),
+            (false, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, x.to_string_lossy())),
+            (false, false) => |(_, x)| x.to_string_lossy(),
+        };
 
         let mut iter = self.dirs.iter().enumerate().map(mapper);
 
-        if let Some(num) = num_arg {
-            match iter.nth(num) {
-                Some(x) => println!("{}", x),
-                None => return FAILURE,
+        if let Some(arg) = num_arg {
+            let num = match parse_numeric_arg(arg) {
+                Some((true, num)) => num,
+                Some((false, num)) if self.dirs.len() > num => self.dirs.len() - num - 1,
+                _ => return FAILURE, /* Err(Cow::Owned(format!("ion: dirs: {}: invalid
+                                      * argument\n", arg))) */
             };
+            match iter.nth(num) {
+                Some(x) => {
+                    println!("{}", x);
+                    SUCCESS
+                }
+                None => FAILURE,
+            }
         } else {
             let folder: fn(String, Cow<str>) -> String =
-                if dirs_args & MULTILINE > 0 { |x, y| x + "\n" + &y } else { |x, y| x + " " + &y };
+                if multiline { |x, y| x + "\n" + &y } else { |x, y| x + " " + &y };
 
-            let first = match iter.next() {
-                Some(x) => x.to_string(),
-                None => return SUCCESS,
-            };
-
-            println!("{}", iter.fold(first, folder));
+            if let Some(x) = iter.next() {
+                println!("{}", iter.fold(x.to_string(), folder));
+            }
+            SUCCESS
         }
-        SUCCESS
     }
 
     fn insert_dir(&mut self, index: usize, path: PathBuf, variables: &Variables) {
@@ -194,27 +189,20 @@ impl DirectoryStack {
     }
 
     fn get_previous_dir(&self) -> Option<String> {
-        env::var("OLDPWD").ok().and_then(|pwd| {
-            if pwd.is_empty() || pwd == "?" {
-                None
-            } else {
-                Some(pwd)
-            }
-        })
+        env::var("OLDPWD").ok().filter(|pwd| !pwd.is_empty() && pwd != &"?")
     }
 
     fn switch_to_previous_directory(
         &mut self,
         variables: &Variables,
     ) -> Result<(), Cow<'static, str>> {
-        match self.get_previous_dir() {
-            Some(prev) => {
+        self.get_previous_dir()
+            .ok_or(Cow::Borrowed("ion: no previous directory to switch to"))
+            .and_then(|prev| {
                 self.dirs.remove(0);
                 println!("{}", prev);
                 self.change_and_push_dir(&prev, variables)
-            }
-            None => Err(Cow::Borrowed("ion: no previous directory to switch to")),
-        }
+            })
     }
 
     fn switch_to_home_directory(&mut self, variables: &Variables) -> Result<(), Cow<'static, str>> {
@@ -260,13 +248,13 @@ impl DirectoryStack {
         }
     }
 
-    pub(crate) fn pushd<I: IntoIterator>(
+    pub(crate) fn pushd<T>(
         &mut self,
-        args: I,
+        args: &[T],
         variables: &mut Variables,
     ) -> Result<(), Cow<'static, str>>
     where
-        I::Item: AsRef<str>,
+        T: AsRef<str>,
     {
         enum Action {
             Switch,          // <no arguments>
@@ -276,10 +264,9 @@ impl DirectoryStack {
         }
 
         let mut keep_front = false; // whether the -n option is present
-        let mut action: Action = Action::Switch;
+        let mut action = Action::Switch;
 
-        for arg in args.into_iter().skip(1) {
-            let arg = arg.as_ref();
+        for arg in args.iter().skip(1).map(AsRef::as_ref) {
             if arg == "-n" {
                 keep_front = true;
             } else if let Action::Switch = action {
@@ -331,64 +318,50 @@ impl DirectoryStack {
 
     /// Attempts to set the current directory to the directory stack's previous directory,
     /// and then removes the front directory from the stack.
-    pub(crate) fn popd<I: IntoIterator>(&mut self, args: I) -> Result<(), Cow<'static, str>>
-    where
-        I::Item: AsRef<str>,
-    {
-        let mut keep_front = false; // whether the -n option is present
-        let mut count_from_front = true; // <=> input number is positive
-        let mut num: usize = 0;
-
-        for arg in args.into_iter().skip(1) {
-            let arg = arg.as_ref();
-            if arg == "-n" {
-                keep_front = true;
-            } else {
-                match parse_numeric_arg(arg) {
-                    Some((x, y)) => {
-                        count_from_front = x;
-                        num = y;
-                    }
-                    None => {
-                        return Err(Cow::Owned(format!("ion: popd: {}: invalid argument", arg)))
-                    }
-                };
-            }
-        }
-
-        let len: usize = self.dirs.len();
+    pub(crate) fn popd<T: AsRef<str>>(&mut self, args: &[T]) -> Result<(), Cow<'static, str>> {
+        let len = self.dirs.len();
         if len <= 1 {
             return Err(Cow::Borrowed("ion: popd: directory stack empty"));
         }
 
-        let mut index: usize = if count_from_front {
-            num
-        } else {
-            (len - 1).checked_sub(num).ok_or_else(|| {
-                Cow::Owned("ion: popd: negative directory stack index out of range".to_owned())
-            })?
-        };
+        let mut keep_front = false; // whether the -n option is present
+        let mut index: usize = 0;
+
+        for arg in args.iter().skip(1).map(AsRef::as_ref) {
+            if arg == "-n" {
+                keep_front = true;
+            } else {
+                let (count_from_front, num) = parse_numeric_arg(arg)
+                    .ok_or(Cow::Owned(format!("ion: popd: {}: invalid argument", arg)))?;
+
+                index = if count_from_front {
+                    // <=> input number is positive
+                    num
+                } else {
+                    (len - 1).checked_sub(num).ok_or_else(|| {
+                        Cow::Owned(
+                            "ion: popd: negative directory stack index out of range".to_owned(),
+                        )
+                    })?
+                };
+            }
+        }
 
         // apply -n
         if index == 0 && keep_front {
             index = 1;
-        }
-
-        // change to new directory, return if not possible
-        if index == 0 {
+        } else if index == 0 {
+            // change to new directory, return if not possible
             self.set_current_dir_by_index(1, "popd")?;
         }
 
         // pop element
-        if self.dirs.remove(index).is_none() {
-            return Err(Cow::Owned(format!(
-                "ion: popd: {}: directory stack index out of range",
-                index
-            )));
+        if self.dirs.remove(index).is_some() {
+            self.print_dirs();
+            Ok(())
+        } else {
+            Err(Cow::Owned(format!("ion: popd: {}: directory stack index out of range", index)))
         }
-
-        self.print_dirs();
-        Ok(())
     }
 
     /// This function will take a map of variables as input and attempt to parse the value of
@@ -408,14 +381,13 @@ impl DirectoryStack {
             Ok(curr_dir) => {
                 env::set_var("PWD", curr_dir.to_str().unwrap_or_else(|| "?"));
                 dirs.push_front(curr_dir);
-                DirectoryStack { dirs }
             }
             Err(_) => {
                 eprintln!("ion: failed to get current directory when building directory stack");
                 env::set_var("PWD", "?");
-                DirectoryStack { dirs }
             }
         }
+        DirectoryStack { dirs }
     }
 }
 
