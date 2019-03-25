@@ -60,7 +60,7 @@ $ echo {d...a}
 
 It's also important to note that, as brace expansions return arrays, they may be used in for loops.
 
-```ion
+```sh
 for num in {1..10}
     echo $num
 end

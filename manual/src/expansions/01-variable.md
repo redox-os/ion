@@ -14,7 +14,7 @@ follow will be collected until either a non-accepted ASCII character is found, o
 have been read. Then the characters that were collected will be used as the name of the string
 variable to substitute with.
 
-```ion
+```sh
 $ let string = "example string"
 $ echo $string
 > example string
@@ -33,7 +33,7 @@ sigil. The rules for these are identical, but instead of returning a single stri
 return an array of strings. This means that it's possible to use an array variable as arguments
 in a command, as each element in the array will be treated as a separate shell word.
 
-```ion
+```sh
 $ let array = [one two three]
 $ echo @array
 > one two three
@@ -49,7 +49,7 @@ double quotes is therefore equivalent to folding the elements into a single stri
 Braces can also be used when you need to integrate a variable expansion along accepted ASCII
 characters.
 
-```ion
+```sh
 echo ${hello}world
 echo @{hello}world
 ```
@@ -59,6 +59,6 @@ echo @{hello}world
 Ion also supports aliasing commands, which can be defined using the `alias` builtin. Aliases
 are often used as shortcuts to repetitive command invocations.
 
-```ion
+```sh
 alias ls = "ls --color"
 ```

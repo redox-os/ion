@@ -7,7 +7,7 @@
 - The histories\' behavior can be changed via various local variables (see section
   **Variables**)
 - Unlike other shells, `ion` saves repeated commands only once:
-```ion
+```sh
 # echo "Hello, world!"
 Hello, world!
 # true
@@ -51,7 +51,7 @@ ions init file.
 - The `let HISTORY_IGNORE = [ .. ]` command itself is **not effected** except if the assignment
 command starts with a whitespace and the **whitespace** element is specified in this assignment.
 See the following example:
-```ion
+```sh
 # echo @HISTORY_IGNORE
 
 # let HISTORY_IGNORE = [ all ] # saved
@@ -67,7 +67,7 @@ let HISTORY_IGNORE = [ whitespace ] # saved
 ```
 
 **Examples**
-```ion
+```sh
 # let HISTORY_IGNORE = [ no_such_command ]
 # true # saved
 #  true # saved
@@ -75,7 +75,7 @@ let HISTORY_IGNORE = [ whitespace ] # saved
 # trulse # ignored
 ```
 
-```ion
+```sh
 # let HISTORY_IGNORE = [ 'regex:.*' ] # behaves like 'all'
 # true # ignored
 #  true # ignored

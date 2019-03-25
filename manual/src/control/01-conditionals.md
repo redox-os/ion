@@ -47,11 +47,12 @@ reason for a shell language to have multiple different keywords to end different
 ## Complete List of Conditional Builtins
 
 - [x] and
-- [ ] contains
+- [z] contains
 - [x] exists
+- [x] eq
 - [ ] intersects
 - [x] is
-- [ ] isatty
+- [x] isatty
 - [x] matches
 - [x] not
 - [x] or
@@ -71,7 +72,7 @@ operator is therefore the exact opposite. These can be chained together so that 
 can be skipped over and conditionally-executed based on return status. This enables succintly
 expressing some patterns better than could be done with an if statement.
 
-```ion
+```sh
 if test $foo = "foo" && test $bar = "bar"
     echo "foobar was found"
 else
@@ -79,7 +80,7 @@ else
 end
 ```
 
-```ion
+```sh
 test $foo = "foo" && test $bar = "bar" &&
     echo "foobar was found" ||
     echo "either foo or bar was not found"

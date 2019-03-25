@@ -17,7 +17,7 @@ Operators currently supported are:
 The following examples are a demonstration of applying a mathematical operation to an individual
 variable -- first assigning `0` to the variable, then applying arithmetic operations to it.
 
-```ion
+```sh
 let value = 0
 let value += 5
 let value -= 2
@@ -33,7 +33,7 @@ let value /= 2
 It's also possible to perform a mathematical operation to multiple variables. Each variable will be
 designated with a paired value.
 
-```ion
+```sh
 let a b = 5 5
 let a b += 3 2
 let a b -= 1 1

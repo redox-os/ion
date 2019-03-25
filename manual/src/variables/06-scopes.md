@@ -10,7 +10,7 @@ so the first invokation of `let` gets to "own" the variable.
 
 *This is an early implementation and will be improved upon with time*
 
-```ion
+```sh
 let x = 5 # defines x
 
 # This will always execute.
@@ -33,7 +33,7 @@ Functions have the scope they were defined in.
 This ensures they don't use any unintended local variables that only work in some cases.
 Once again, this matches the behavior of most other languages, apart from perhaps LOLCODE.
 
-```ion
+```sh
 let x = 5 # defines x
 
 fn print_vars

@@ -4,7 +4,7 @@ If a comment needs to contain newlines, you may do so by having an open quote, a
 begin parsing supplied commands that are terminated. Either double or single quotes may be used
 for this purpose, depending on which quoting rules that you need.
 
-```ion
+```sh
 echo "This is the first line
     this is the second line
     this is the third line"

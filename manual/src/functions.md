@@ -4,7 +4,7 @@ Functions help scripts to reduce the amount of code duplication and increase rea
 
 The basic syntax of functions is as follos:
 
-```ion
+```sh
 fn square
     let x = "5"
     echo $(( x * x ))
@@ -18,7 +18,7 @@ Every statement between the `fn` and the `end` keyword is part of the function. 
 
 If you want the square of something that isn't five, you can add arguments to the function.
 
-```ion
+```sh
 fn square x
     echo $(( x * x ))
 end
@@ -30,7 +30,7 @@ square 3
 
 Optionally, you can add type hints into the arguments to make ion check the types of the arguments:
 
-```ion
+```sh
 fn square x:int
     echo $(( x * x ))
 end
@@ -68,7 +68,7 @@ hello John 25 [ coding eating sleeping ]
 
 As with any other statement, you can pipe functions using `read`.
 
-```ion
+```sh
 fn format_with pat
     read input
     echo $join(@split(input), $pat)

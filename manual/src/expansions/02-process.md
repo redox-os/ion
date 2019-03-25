@@ -6,7 +6,7 @@ from the Oil shell. Where a string-based process expansion will execute a comman
 string of that command's standard output, an array-based process expansion will split the output
 into an array delimited by whitespaces.
 
-```ion
+```sh
 let string = $(cmd args...)
 let array = @(cmd args...)
 ```

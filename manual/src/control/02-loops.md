@@ -9,7 +9,7 @@ For loops take an array of elements as the input; looping through each statement
 with each element in the array. If the input is a string, however, that string will automatically
 coerce into a newline-delimited array.
 
-```ion
+```sh
 for element in @array
     echo $element
 end
@@ -20,7 +20,7 @@ end
 Sometimes you may need to exit from the loop before the looping is finished. This is achievable
 using the `break` keyword.
 
-```ion
+```sh
 for element in {1...10}
     echo $element
     if test $element -eq 5
@@ -29,12 +29,19 @@ for element in {1...10}
 end
 ```
 
+```
+1
+2
+3
+4
+```
+
 ## Continuing Loops
 
 In other times, if you need to abort further execution of the current loop and skip to the next
 loop, the `continue` keyword serves that purpose.
 
-```ion
+```sh
 for elem in {1...10}
     if test $((elem % 2)) -eq 1
         continue
@@ -43,16 +50,50 @@ for elem in {1...10}
 end
 ```
 
+```
+2
+4
+6
+8
+10
+```
+
 ## While Loops
 
 While loops are useful when you need to repeat a block of statements endlessly until certain
 conditions are met. It works similarly to if statements, as it also executes a command and
 compares the exit status before executing each loop.
 
-```ion
+```sh
 let value = 0
 while test $value -lt 6
     echo $value
     let value += 1
 end
+```
+
+```
+0
+1
+2
+3
+4
+5
+```
+
+## Chunked Iterations
+
+Chunked iterations allow fetching multiple values at a time.
+
+```sh
+for foo bar bazz in {1..=10}
+    echo $foo $bar $bazz
+end
+```
+
+```
+1 2 3
+4 5 6
+7 8 9
+10
 ```

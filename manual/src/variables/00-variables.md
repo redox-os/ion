@@ -5,7 +5,7 @@ to variables. The `export` keyword may be used to do the same for the creation o
 variables. Variables cannot be created the POSIX way, as the POSIX way is awkard to read/write
 and parse.
 
-```ion
+```sh
 let string_variable = "hello string"
 let array_variable = [ hello array ]
 ```
@@ -14,7 +14,7 @@ let array_variable = [ hello array ]
 
 Ion also supports setting multiple values at the same time
 
-```ion
+```sh
 let a b = one two
 echo $a
 echo $b
@@ -40,7 +40,7 @@ Boolean type assignments will also normalize inputs into either `true` or `false
 invalid value is supplied, the assignment operation will fail and an error message will be
 printed. All assignments after the failed assignment will be ignored.
 
-```ion
+```sh
 let a:bool = 1
 let b:bool = true
 let c:bool = n
@@ -64,6 +64,19 @@ one
 two three
 4
 5.1 6.2 7.3
+```
+
+## Dropping Variables
+
+Variables may be dropped from a scope with the `drop` keyword. Considering that a variable
+can only be assigned to one type at a time, this will drop whichever value is assigned to
+that type.
+
+```
+let string = "hello"
+drop string
+let array = [ hello world ]
+drop array
 ```
 
 ## Supported Primitive Types

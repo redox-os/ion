@@ -6,7 +6,7 @@ is made between the two by the sigil that is invoked when calling a method. For 
 method is denoted by the `$` sigil, then it is a string method. Otherwise, if it is denoted by the
 `@` sigil, then it is an array method. Example as follows:
 
-```ion
+```sh
 echo $method_name(variable)
 for elem in @method_name(variable); echo $elem; end
 ```
@@ -24,7 +24,7 @@ So we heard that you like methods, so we put methods in your methods. Ion method
 expressions as their arguments -- both for the input parameter, and any supplied arguments to
 control the behavior of the method.
 
-```ion
+```sh
 echo $method($(cmd...) arg)
 
 let string_var = "value in variable"
@@ -41,7 +41,7 @@ an array. Ion is able to determine which of the two were provided based on the f
 in the expression. Quoted expressions, and expressions with start with `$`, are strings; whereas
 expressions that start with either `[` or `@` are treated as arrays.
 
-```ion
+```sh
 echo $len("a string")
 echo $len([1 2 3 4 5])
 ```
@@ -53,7 +53,7 @@ method, for example, may be optionally supplied a pattern for splitting. At the 
 is used to specify that arguments are to follow the input, but each argument supplied after that
 is space-delimited.
 
-```ion
+```sh
 for elem in @split("some space-delimited values"); echo $elem; end
 for elem in @split("some, comma-separated, values" ", "); echo $elem; end
 ```
@@ -90,7 +90,7 @@ ends with it. Zero otherwise.
 
 #### Examples
 
-```ion
+```sh
 echo $ends_with("FOOBAR" "BAR")
 echo $ends_with("FOOBAR" "FOO")
 ```
@@ -109,7 +109,7 @@ contains with it. Zero otherwise.
 
 #### Examples
 
-```ion
+```sh
 echo $contains("FOOBAR" "OOB")
 echo $contains("FOOBAR" "foo")
 ```
@@ -128,7 +128,7 @@ starts with it. Zero otherwise.
 
 #### Examples
 
-```ion
+```sh
 echo $starts_with("FOOBAR" "FOO")
 echo $starts_with("FOOBAR" "BAR")
 ```
@@ -147,7 +147,7 @@ basename (complete filename, extension included). IE: `/parent/filename.ext` -> 
 
 #### Examples
 
-```ion
+```sh
 echo $basename("/parent/filename.ext")
 ```
 
@@ -164,7 +164,7 @@ extension of the complete filename. IE: `/parent/filename.ext` -> `ext`.
 
 #### Examples
 
-```ion
+```sh
 echo $extension("/parent/filename.ext")
 ```
 
@@ -181,7 +181,7 @@ file name portion of the complete filename. IE: `/parent/filename.ext` -> `filen
 
 #### Examples
 
-```ion
+```sh
 echo $filename("/parent/filename.ext")
 ```
 
@@ -199,7 +199,7 @@ be joined by a single space. Otherwise, each element will be joined with a given
 
 #### Examples
 
-```ion
+```sh
 let array = [1 2 3 4 5]
 echo $join(array)
 echo $join(array ", ")
@@ -219,7 +219,7 @@ string appears. It returns `-1` if it isn't contained.
 
 #### Examples
 
-```ion
+```sh
 echo $find("FOOBAR" "OB")
 echo $find("FOOBAR" "ob")
 ```
@@ -239,7 +239,7 @@ is supplied, it will print the number of elements in the array.
 
 #### Examples
 
-```ion
+```sh
 echo $len("foobar")
 echo $len("❤️")
 echo $len([one two three four])
@@ -260,7 +260,7 @@ in the output, not the number of graphemes.
 
 #### Examples
 
-```ion
+```sh
 echo $len_bytes("foobar")
 echo $len_bytes("❤️")
 ```
@@ -279,7 +279,7 @@ parent directory's name. IE: `/root/parent/filename.ext` -> `/root/parent`
 
 #### Examples
 
-```ion
+```sh
 echo $parent("/root/parent/filename.ext")
 ```
 
@@ -296,14 +296,14 @@ amount of times, where N is the supplied number.
 
 #### Examples
 
-```ion
+```sh
 echo $repeat("abc, " 3)
 ```
 
 #### Output
 
 ```
-abc, abc, abc, 
+abc, abc, abc,
 ```
 
 ### replace
@@ -313,7 +313,7 @@ with, a new string will be returned with all matches replaced.
 
 #### Examples
 
-```ion
+```sh
 let input = "one two one two"
 echo $replace(input, one 1)
 echo $replace($replace(input one 1) two 2)
@@ -333,7 +333,7 @@ of matches.
 
 #### Examples
 
-```ion
+```sh
 let input = "one two one two"
 echo $replacen(input "one" "three" 1)
 echo $replacen(input "two" "three" 2)
@@ -353,7 +353,7 @@ as a regex.
 
 #### Examples
 
-```ion
+```sh
 echo $regex_replace("FOOBAR" "^F" "f")
 echo $regex_replace("FOOBAR" "^f" "F")
 ```
@@ -372,7 +372,7 @@ in reverse order.
 
 #### Examples
 
-```ion
+```sh
 echo $reverse("foobar")
 ```
 
@@ -389,7 +389,7 @@ lowercase equivalent, if an lowercase equivalent exists.
 
 #### Examples
 
-```ion
+```sh
 echo $to_lowercase("FOOBAR")
 ```
 
@@ -406,7 +406,7 @@ uppercase equivalent, if an uppercase equivalent exists.
 
 #### Examples
 
-```ion
+```sh
 echo $to_uppercase("foobar")
 ```
 
@@ -422,7 +422,7 @@ Defaults to string variables. Escapes the content of the string.
 
 #### Example
 
-```ion
+```sh
 let line = " Mary   had\ta little  \n\t lamb\t"
 echo $escape($line)
 ```
@@ -447,7 +447,7 @@ echo $unescape($line)
 #### Output
 
 ```
- Mary   had	a little  
+ Mary   had	a little
 	 lamb
 ```
 
@@ -469,7 +469,7 @@ Defaults to string variables. The supplied string will be split into one string 
 
 #### Examples
 
-```ion
+```sh
 for line in @lines($unescape("first\nsecond\nthird")
     echo $line
 end
@@ -491,7 +491,7 @@ whitespace characters. Useful for splitting simple tabular data.
 
 #### Examples
 
-```ion
+```sh
 for data in @split("person, age, some data" ", ")
     echo $data
 end
@@ -541,7 +541,7 @@ each byte is displayed as their actual 8-bit number.
 
 #### Examples
 
-```ion
+```sh
 echo @bytes("foobar")
 ```
 
@@ -557,7 +557,7 @@ Defaults to string variables. Returns an array where the given input string is s
 
 #### Examples
 
-```ion
+```sh
 for char in @chars("foobar")
     echo $char
 end
@@ -580,7 +580,7 @@ Defaults to string variables. Returns an array where the given input string is s
 
 #### Examples
 
-```ion
+```sh
 for grapheme in @graphemes("foobar")
     echo $grapheme
 end
@@ -603,7 +603,7 @@ Defaults to array variables. Returns a reversed copy of the input array.
 
 #### Examples
 
-```ion
+```sh
 echo @reverse([1 2 3])
 ```
 
