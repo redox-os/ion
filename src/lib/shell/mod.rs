@@ -60,6 +60,7 @@ use crate::{
     sys,
     types::{self, Array},
 };
+use itertools::Itertools;
 use liner::Context;
 use std::{
     fs,
@@ -239,13 +240,13 @@ impl Shell {
     where
         T: 'a + AsRef<str> + std::clone::Clone + std::convert::From<&'a str>,
     {
-        let mut terminator: Terminator<_> = command.as_ref().into();
-        if let Ok(stmt) = terminator.terminate() {
-            self.on_command(&stmt);
-            Ok(self.previous_status)
-        } else {
-            Err(IonError::Unterminated)
+        for cmd in command.as_ref().bytes().batching(|bytes| Terminator::new(bytes).terminate()) {
+            match cmd {
+                Ok(stmt) => self.on_command(&stmt),
+                Err(_) => return Err(IonError::Unterminated),
+            }
         }
+        Ok(self.previous_status)
     }
 
     /// Obtains a variable, returning an empty string if it does not exist.
