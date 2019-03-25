@@ -306,21 +306,14 @@ impl Variables {
             return None;
         }
 
-        let mut parts = word[1..].splitn(2, |c| c == '/' || c == '$');
+        let separator = word[1..].find(|c| c == '/' || c == '$');
+        let (tilde_prefix, rest) = word[1..].split_at(separator.unwrap_or(word.len() - 1));
 
-        match parts.next().unwrap() {
-            "" => sys_env::home_dir()
-                .map(|home| home.to_string_lossy().to_string() + parts.next().unwrap_or("")),
-
-            "+" => Some(
-                env::var("PWD").unwrap_or_else(|_| "?".to_string()) + parts.next().unwrap_or(""),
-            ),
-
-            "-" => self
-                .get::<types::Str>("OLDPWD")
-                .map(|oldpwd| oldpwd.to_string() + parts.next().unwrap_or("")),
-
-            tilde_prefix => {
+        match tilde_prefix {
+            "" => sys_env::home_dir().map(|home| home.to_string_lossy().to_string() + rest),
+            "+" => Some(env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest),
+            "-" => self.get::<types::Str>("OLDPWD").map(|oldpwd| oldpwd.to_string() + rest),
+            _ => {
                 let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
                     (false, &tilde_prefix[1..])
                 } else if tilde_prefix.starts_with('-') {
@@ -336,8 +329,7 @@ impl Variables {
                         dir_stack.dir_from_bottom(num)
                     }
                     .map(|path| path.to_str().unwrap().to_string()),
-                    Err(_) => self_sys::get_user_home(tilde_prefix)
-                        .map(|home| home + parts.next().unwrap_or("")),
+                    Err(_) => self_sys::get_user_home(tilde_prefix).map(|home| home + rest),
                 }
             }
         }
