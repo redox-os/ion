@@ -121,14 +121,7 @@ impl TeeItem {
                     return Ok(());
                 }
                 for file in sinks.iter_mut() {
-                    let mut total = 0;
-                    loop {
-                        let wrote = file.write(&buf[total..len])?;
-                        total += wrote;
-                        if total == len {
-                            break;
-                        }
-                    }
+                    file.write_all(&buf[..len])?;
                 }
             }
         }

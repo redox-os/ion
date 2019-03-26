@@ -498,27 +498,10 @@ impl PipelineExecution for Shell {
             redir(file.as_raw_fd(), sys::STDOUT_FILENO)
         }
 
-        fn read_and_write<R: io::Read>(src: &mut R, stdout: &mut io::StdoutLock) -> io::Result<()> {
-            let mut buf = [0; 4096];
-            loop {
-                let len = src.read(&mut buf)?;
-                if len == 0 {
-                    return Ok(());
-                };
-                let mut total = 0;
-                loop {
-                    let wrote = stdout.write(&buf[total..len])?;
-                    total += wrote;
-                    if total == len {
-                        break;
-                    }
-                }
-            }
-        };
         let stdout = io::stdout();
         let mut stdout = stdout.lock();
         for file in stdin.iter_mut().chain(sources) {
-            if let Err(why) = read_and_write(file, &mut stdout) {
+            if let Err(why) = std::io::copy(file, &mut stdout) {
                 eprintln!("ion: error in multiple input redirect process: {:?}", why);
                 return FAILURE;
             }
@@ -981,13 +964,11 @@ fn set_process_group(pgid: &mut u32, pid: u32) -> bool {
 }
 
 pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
-    let mut status;
-
     loop {
-        status = 0;
+        let mut status = 0;
         match sys::waitpid(pid as i32, &mut status, sys::WUNTRACED) {
             Ok(_) => break Ok(()),
-            Err(errno) if errno == sys::EINTR => continue,
+            Err(sys::EINTR) => continue,
             Err(errno) => break Err(io::Error::from_raw_os_error(errno)),
         }
     }

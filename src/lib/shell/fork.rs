@@ -7,10 +7,8 @@ use std::{
 };
 
 pub fn wait_for_child(pid: u32) -> io::Result<u8> {
-    let mut status;
-
     loop {
-        status = 0;
+        let mut status = 0;
         if let Err(errno) = sys::waitpid(pid as i32, &mut status, sys::WUNTRACED) {
             break if errno == sys::ECHILD {
                 Ok(sys::wexitstatus(status) as u8)

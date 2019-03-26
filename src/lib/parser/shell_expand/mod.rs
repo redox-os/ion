@@ -266,22 +266,15 @@ fn expand_string_no_glob<E: Expander>(
 ) -> types::Array {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
-    let mut word_iterator = WordIterator::new(original, expand_func, false);
 
-    loop {
-        match word_iterator.next() {
-            Some(word) => {
-                if let WordToken::Brace(_) = word {
-                    contains_brace = true;
-                }
-                token_buffer.push(word);
-            }
-            None if original.is_empty() => {
-                token_buffer.push(WordToken::Normal("".into(), true, false));
-                break;
-            }
-            None => break,
+    for word in WordIterator::new(original, expand_func, false) {
+        if let WordToken::Brace(_) = word {
+            contains_brace = true;
         }
+        token_buffer.push(word);
+    }
+    if original.is_empty() {
+        token_buffer.push(WordToken::Normal("".into(), true, false));
     }
     expand_tokens(&token_buffer, expand_func, reverse_quoting, contains_brace)
 }
