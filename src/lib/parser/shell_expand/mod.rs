@@ -46,6 +46,17 @@ pub(crate) trait Expander: Sized {
     fn get_string(&self, value: &str) -> Value {
         Value::Str(types::Str::from(expand_string(value, self, false).join(" ")))
     }
+    /// Select the proper values from an iterator
+    fn select<I: Iterator<Item = types::Str>>(vals: I, select: Select, n: usize) -> Option<Array> {
+        match select {
+            Select::All => Some(vals.collect()),
+            Select::Range(range) => range
+                .bounds(n)
+                .filter(|&(start, _)| n > start)
+                .map(|(start, length)| vals.skip(start).take(length).collect()),
+            _ => None,
+        }
+    }
     /// Get an array that exists in the shell.
     fn get_array(&self, value: &str) -> Value { Value::Array(expand_string(value, self, false)) }
 }

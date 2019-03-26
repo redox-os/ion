@@ -675,50 +675,26 @@ impl<'a> Expander for Shell {
         None
     }
 
-    fn map_keys(&self, name: &str, select: Select) -> Option<Array> {
-        let nvalues;
-        let map: Box<dyn Iterator<Item = types::Str>> = match self.variables.get_ref(name) {
+    fn map_keys(&self, name: &str, sel: Select) -> Option<Array> {
+        match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
-                nvalues = map.len();
-                Box::new(map.keys().cloned())
+                Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
             }
             Some(&Value::BTreeMap(ref map)) => {
-                nvalues = map.len();
-                Box::new(map.keys().cloned())
+                Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
             }
-            _ => return None,
-        };
-
-        match select {
-            Select::All => Some(map.collect()),
-            Select::Range(range) => range
-                .bounds(nvalues)
-                .filter(|&(start, _)| nvalues > start)
-                .map(|(start, length)| map.skip(start).take(length).collect()),
             _ => None,
         }
     }
 
-    fn map_values(&self, name: &str, select: Select) -> Option<Array> {
-        let nvalues;
-        let map: Box<dyn Iterator<Item = types::Str>> = match self.variables.get_ref(name) {
+    fn map_values(&self, name: &str, sel: Select) -> Option<Array> {
+        match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
-                nvalues = map.len();
-                Box::new(map.values().map(|x| format!("{}", x).into()))
+                Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
             }
             Some(&Value::BTreeMap(ref map)) => {
-                nvalues = map.len();
-                Box::new(map.values().map(|x| format!("{}", x).into()))
+                Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
             }
-            _ => return None,
-        };
-
-        match select {
-            Select::All => Some(map.collect()),
-            Select::Range(range) => range
-                .bounds(nvalues)
-                .filter(|&(start, _)| nvalues > start)
-                .map(|(start, length)| map.skip(start).take(length).collect()),
             _ => None,
         }
     }
