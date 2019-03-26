@@ -50,6 +50,7 @@ pub struct Terminator<I: Iterator<Item = u8>> {
     whitespace: bool,
     lt_count:   u8,
     empty:      bool,
+    subshell:   usize,
 }
 
 impl<'a> From<&'a str> for Terminator<std::str::Bytes<'a>> {
@@ -130,7 +131,7 @@ impl<I: Iterator<Item = u8>> Iterator for Terminator<I> {
         } else if let Some(character) = next {
             next = self.handle_char(character, prev_whitespace);
             self.empty &= character.is_ascii_whitespace();
-        } else if self.array == 0 && !self.and_or && !self.empty {
+        } else if self.subshell == 0 && self.array == 0 && !self.and_or && !self.empty {
             self.terminated = true;
         }
 
@@ -164,6 +165,14 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
                 self.quotes = Quotes::Double;
                 Some(b'"')
             }
+            b'(' if self.inner.prev() == Some(&b'$') || self.inner.prev() == Some(&b'@') => {
+                self.subshell += 1;
+                Some(b'(')
+            }
+            b')' if self.subshell > 0 => {
+                self.subshell -= 1;
+                Some(b')')
+            }
             b'<' => {
                 if let Some(&b'<') = self.inner.peek() {
                     self.lt_count += 1;
@@ -179,15 +188,13 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
                 self.array += 1;
                 Some(b'[')
             }
-            b']' => {
-                if self.array > 0 {
-                    self.array -= 1;
-                }
+            b']' if self.array > 0 => {
+                self.array -= 1;
                 Some(b']')
             }
             b'#' if prev_whitespace => {
                 self.inner.find(|&c| c == b'\n');
-                if self.array == 0 && !self.and_or && !self.empty {
+                if self.array == 0 && self.subshell == 0 && !self.and_or && !self.empty {
                     self.terminated = true;
                     None
                 } else {
@@ -209,7 +216,9 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
                 self.and_or = true;
                 Some(character)
             }
-            b'\n' if self.array == 0 && !self.and_or && !self.empty => {
+            b'\n' | b';'
+                if self.array == 0 && self.subshell == 0 && !self.and_or && !self.empty =>
+            {
                 self.terminated = true;
                 None
             }
@@ -236,6 +245,7 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
             whitespace: true,
             lt_count:   0,
             empty:      true,
+            subshell:   0,
         }
     }
 }
