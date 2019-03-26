@@ -30,15 +30,12 @@ for suite in ./target/criterion/*; do
 
     for test in $suite/*/*/change/estimates.json; do
         estimate=$(cat "$test" | jq -r "$JQ_FILTER" -c)
-        case "$estimate" in
-            -*);;
-            *)
-                inner="<failure message=\"Performance Regressed\" type=\"WARNING\">\
-                    Performance regressed by $estimate in $test\
-                </failure>"
-                worse=$((worse+1))
-            ;;
-        esac
+        if echo "$estimate" | grep -Eq '^[0-9]+\.?[0-9]*$'; then
+            inner="<failure message=\"Performance Regressed\" type=\"WARNING\">\
+                Performance regressed by $estimate in $test\
+            </failure>"
+            worse=$((worse+1))
+        fi
         testcases="$testcases<testcase id=\"$(echo "$test" | cut -d'/' -f 6)\" name=\"$(echo "$test" | cut -d'/' -f 6)\">$inner</testcase>"
         tests=$((tests+1))
     done
