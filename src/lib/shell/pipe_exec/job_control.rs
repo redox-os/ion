@@ -203,27 +203,12 @@ impl JobControl for Shell {
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
     fn wait_for_background(&mut self) {
-        loop {
-            if self
-                .background
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|p| p.state == ProcessState::Running)
-                .next()
-                .is_some()
-            {
-                while let Some(signal) = self.next_signal() {
-                    if signal != sys::SIGTSTP {
-                        self.background_send(signal);
-                        self.exit(get_signal_code(signal));
-                    }
-                }
-                sleep(Duration::from_millis(100));
-                continue;
-            } else {
-                return;
+        while self.background.lock().unwrap().iter().any(|p| p.state == ProcessState::Running) {
+            if let Some(signal) = signals::SignalHandler.find(|&s| s != sys::SIGTSTP) {
+                self.background_send(signal);
+                self.exit(get_signal_code(signal));
             }
+            sleep(Duration::from_millis(100));
         }
     }
 

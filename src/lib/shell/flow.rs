@@ -2,6 +2,7 @@ use super::{
     flags::*,
     flow_control::{insert_statement, Case, ElseIf, Function, Statement},
     job_control::JobControl,
+    signals,
     status::*,
     Shell,
 };
@@ -306,7 +307,7 @@ impl FlowLogic for Shell {
             },
             _ => {}
         }
-        if let Some(signal) = self.next_signal() {
+        if let Some(signal) = signals::SignalHandler.next() {
             if self.handle_signal(signal) {
                 self.exit(get_signal_code(signal));
             }

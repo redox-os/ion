@@ -380,16 +380,6 @@ impl Shell {
         }
     }
 
-    pub(crate) fn next_signal(&self) -> Option<i32> {
-        match signals::PENDING.swap(0, Ordering::SeqCst) as u8 {
-            0 => None,
-            signals::SIGINT => Some(sys::SIGINT),
-            signals::SIGHUP => Some(sys::SIGHUP),
-            signals::SIGTERM => Some(sys::SIGTERM),
-            _ => unreachable!(),
-        }
-    }
-
     pub(crate) fn new(is_library: bool) -> Shell {
         let mut shell = Shell {
             builtins: BUILTINS,
