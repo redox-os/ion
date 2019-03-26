@@ -4,7 +4,7 @@
 //! children of the shell.
 
 // use std::sync::atomic::{ATOMIC_U8_INIT, AtomicU8};
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::sys;
 
@@ -34,4 +34,18 @@ impl SignalHandler {
 
 impl Drop for SignalHandler {
     fn drop(&mut self) { unblock(); }
+}
+
+impl Iterator for SignalHandler {
+    type Item = i32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match PENDING.swap(0, Ordering::SeqCst) as u8 {
+            0 => None,
+            SIGINT => Some(sys::SIGINT),
+            SIGHUP => Some(sys::SIGHUP),
+            SIGTERM => Some(sys::SIGTERM),
+            _ => unreachable!(),
+        }
+    }
 }

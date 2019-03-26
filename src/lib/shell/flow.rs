@@ -2,6 +2,7 @@ use super::{
     flags::*,
     flow_control::{insert_statement, Case, ElseIf, Function, Statement},
     job_control::JobControl,
+    signals,
     status::*,
     Shell,
 };
@@ -158,22 +159,18 @@ impl FlowLogic for Shell {
         statements: Vec<Statement>,
     ) -> Condition {
         loop {
-            let expression = {
-                self.execute_statements(expression.clone());
-                self.previous_status == 0
-            };
-            if expression {
-                // Cloning is needed so the statement can be re-iterated again if needed.
-                match self.execute_statements(statements.clone()) {
-                    Condition::Break => break,
-                    Condition::SigInt => return Condition::SigInt,
-                    _ => (),
-                }
-            } else {
-                break;
+            self.execute_statements(expression.clone());
+            if self.previous_status != 0 {
+                return Condition::NoOp;
+            }
+
+            // Cloning is needed so the statement can be re-iterated again if needed.
+            match self.execute_statements(statements.clone()) {
+                Condition::Break => return Condition::NoOp,
+                Condition::SigInt => return Condition::SigInt,
+                _ => (),
             }
         }
-        Condition::NoOp
     }
 
     fn execute_statement(&mut self, statement: Statement) -> Condition {
@@ -310,7 +307,7 @@ impl FlowLogic for Shell {
             },
             _ => {}
         }
-        if let Some(signal) = self.next_signal() {
+        if let Some(signal) = signals::SignalHandler.next() {
             if self.handle_signal(signal) {
                 self.exit(get_signal_code(signal));
             }

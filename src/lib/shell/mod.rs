@@ -380,16 +380,6 @@ impl Shell {
         }
     }
 
-    pub(crate) fn next_signal(&self) -> Option<i32> {
-        match signals::PENDING.swap(0, Ordering::SeqCst) as u8 {
-            0 => None,
-            signals::SIGINT => Some(sys::SIGINT),
-            signals::SIGHUP => Some(sys::SIGHUP),
-            signals::SIGTERM => Some(sys::SIGTERM),
-            _ => unreachable!(),
-        }
-    }
-
     pub(crate) fn new(is_library: bool) -> Shell {
         let mut shell = Shell {
             builtins: BUILTINS,
@@ -412,7 +402,7 @@ impl Shell {
         shell
     }
 
-    pub fn assign(&mut self, key: Key, value: Value) -> Result<(), String> {
+    pub fn assign(&mut self, key: &Key, value: Value) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)
@@ -466,7 +456,7 @@ impl Shell {
         }
     }
 
-    pub fn overwrite(&mut self, key: Key, operator: Operator, rhs: Value) -> Result<(), String> {
+    pub fn overwrite(&mut self, key: &Key, operator: Operator, rhs: Value) -> Result<(), String> {
         let lhs = self
             .variables
             .get_mut(key.name)

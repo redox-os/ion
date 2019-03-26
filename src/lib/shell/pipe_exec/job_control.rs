@@ -151,10 +151,9 @@ impl JobControl for Shell {
     fn watch_foreground(&mut self, pid: i32, command: &str) -> i32 {
         let mut signaled = 0;
         let mut exit_status = 0;
-        let mut status;
 
         loop {
-            status = 0;
+            let mut status = 0;
             match waitpid(pid, &mut status, WUNTRACED) {
                 Err(errno) => match errno {
                     ECHILD if signaled == 0 => break exit_status,
@@ -204,24 +203,13 @@ impl JobControl for Shell {
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
     fn wait_for_background(&mut self) {
-        let sigcode;
-        'event: loop {
-            for process in self.background.lock().unwrap().iter() {
-                if let ProcessState::Running = process.state {
-                    while let Some(signal) = self.next_signal() {
-                        if signal != sys::SIGTSTP {
-                            self.background_send(signal);
-                            sigcode = get_signal_code(signal);
-                            break 'event;
-                        }
-                    }
-                    sleep(Duration::from_millis(100));
-                    continue 'event;
-                }
+        while self.background.lock().unwrap().iter().any(|p| p.state == ProcessState::Running) {
+            if let Some(signal) = signals::SignalHandler.find(|&s| s != sys::SIGTSTP) {
+                self.background_send(signal);
+                self.exit(get_signal_code(signal));
             }
-            return;
+            sleep(Duration::from_millis(100));
         }
-        self.exit(sigcode);
     }
 
     fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32 {

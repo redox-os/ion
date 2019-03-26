@@ -228,12 +228,12 @@ impl<'a> StringMethod<'a> {
             "join" => {
                 let pattern = pattern.join(" ");
                 if let Some(array) = expand.array(variable, Select::All) {
-                    slice(output, array.join(&pattern), self.selection.clone());
+                    slice(output, array.join(&pattern), &self.selection);
                 } else if is_expression(variable) {
                     slice(
                         output,
                         expand_string(variable, expand, false).join(&pattern),
-                        self.selection.clone(),
+                        &self.selection,
                     );
                 }
             }

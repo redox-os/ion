@@ -199,12 +199,8 @@ pub(crate) fn parse(code: &str) -> Statement {
         _ if cmd.starts_with("time ") => {
             // Ignore embedded time calls
             let mut timed = cmd[4..].trim_start();
-            loop {
-                if timed.starts_with("time ") {
-                    timed = timed[4..].trim_start();
-                    continue;
-                }
-                break;
+            while timed.starts_with("time ") {
+                timed = timed[4..].trim_start();
             }
             Statement::Time(Box::new(parse(timed)))
         }

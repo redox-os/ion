@@ -678,115 +678,113 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
         let mut tilde = false;
 
         loop {
-            if let Some(character) = iterator.next() {
-                match character {
-                    _ if self.flags.contains(Flags::BACKSL) => {
-                        self.read += 1;
-                        self.flags ^= Flags::BACKSL;
-                        break;
-                    }
-                    b'\\' => {
-                        if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) {
-                            start += 1;
-                        }
-                        self.read += 1;
-                        self.flags ^= Flags::BACKSL;
-                        break;
-                    }
-                    b'\'' if !self.flags.contains(Flags::DQUOTE) => {
+            match iterator.next()? {
+                _ if self.flags.contains(Flags::BACKSL) => {
+                    self.read += 1;
+                    self.flags ^= Flags::BACKSL;
+                    break;
+                }
+                b'\\' => {
+                    if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) {
                         start += 1;
-                        self.read += 1;
-                        self.flags ^= Flags::SQUOTE;
-                        break;
                     }
-                    b'"' if !self.flags.contains(Flags::SQUOTE) => {
-                        start += 1;
-                        self.read += 1;
-                        if self.flags.contains(Flags::DQUOTE) {
-                            self.flags -= Flags::DQUOTE;
-                            return self.next();
-                        }
-                        self.flags |= Flags::DQUOTE;
-                        break;
+                    self.read += 1;
+                    self.flags ^= Flags::BACKSL;
+                    break;
+                }
+                b'\'' if !self.flags.contains(Flags::DQUOTE) => {
+                    start += 1;
+                    self.read += 1;
+                    self.flags ^= Flags::SQUOTE;
+                    break;
+                }
+                b'"' if !self.flags.contains(Flags::SQUOTE) => {
+                    start += 1;
+                    self.read += 1;
+                    if self.flags.contains(Flags::DQUOTE) {
+                        self.flags -= Flags::DQUOTE;
+                        return self.next();
                     }
-                    b' ' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
-                        return Some(self.whitespaces(&mut iterator));
+                    self.flags |= Flags::DQUOTE;
+                    break;
+                }
+                b' ' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
+                    return Some(self.whitespaces(&mut iterator));
+                }
+                b'~' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
+                    tilde = true;
+                    self.read += 1;
+                    break;
+                }
+                b'{' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
+                    self.read += 1;
+                    return Some(self.braces(&mut iterator));
+                }
+                b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
+                    if self.glob_check(&mut iterator) {
+                        glob = self.do_glob;
+                    } else {
+                        return Some(self.array(&mut iterator));
                     }
-                    b'~' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
-                        tilde = true;
-                        self.read += 1;
-                        break;
-                    }
-                    b'{' if !self.flags.intersects(Flags::DQUOTE | Flags::SQUOTE) => {
-                        self.read += 1;
-                        return Some(self.braces(&mut iterator));
-                    }
-                    b'[' if !self.flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
-                        if self.glob_check(&mut iterator) {
-                            glob = self.do_glob;
-                        } else {
-                            return Some(self.array(&mut iterator));
-                        }
-                    }
-                    b'@' if !self.flags.contains(Flags::SQUOTE) => match iterator.next() {
+                }
+                b'@' if !self.flags.contains(Flags::SQUOTE) => {
+                    return match iterator.next() {
                         Some(b'(') => {
                             self.read += 2;
-                            return Some(self.array_process(&mut iterator));
+                            Some(self.array_process(&mut iterator))
                         }
                         Some(b'{') => {
                             self.read += 2;
-                            return Some(self.braced_array_variable(&mut iterator));
+                            Some(self.braced_array_variable(&mut iterator))
                         }
                         Some(b' ') | None => {
                             self.read += 1;
                             let output = &self.data[start..self.read];
-                            return Some(WordToken::Normal(output.into(), glob, tilde));
+                            Some(WordToken::Normal(output.into(), glob, tilde))
                         }
                         _ => {
                             self.read += 1;
-                            return Some(self.array_variable(&mut iterator));
+                            Some(self.array_variable(&mut iterator))
                         }
-                    },
-                    b'$' if !self.flags.contains(Flags::SQUOTE) => {
-                        match iterator.next() {
-                            Some(b'(') => {
-                                self.read += 2;
-                                return if self.data.as_bytes()[self.read] == b'(' {
-                                    // Pop the incoming left paren
-                                    let _ = iterator.next();
-                                    self.read += 1;
-                                    Some(self.arithmetic_expression(&mut iterator))
-                                } else {
-                                    Some(self.process(&mut iterator))
-                                };
-                            }
-                            Some(b'{') => {
-                                self.read += 2;
-                                return Some(self.braced_variable(&mut iterator));
-                            }
-                            Some(b' ') | None => {
-                                self.read += 1;
-                                let output = &self.data[start..self.read];
-                                return Some(WordToken::Normal(output.into(), glob, tilde));
-                            }
-                            _ => {
-                                self.read += 1;
-                                return Some(self.variable(&mut iterator));
-                            }
-                        }
-                    }
-                    b'*' | b'?' => {
-                        self.read += 1;
-                        glob = self.do_glob;
-                        break;
-                    }
-                    _ => {
-                        self.read += 1;
-                        break;
                     }
                 }
-            } else {
-                return None;
+                b'$' if !self.flags.contains(Flags::SQUOTE) => {
+                    return match iterator.next() {
+                        Some(b'(') => {
+                            self.read += 2;
+                            if self.data.as_bytes()[self.read] == b'(' {
+                                // Pop the incoming left paren
+                                let _ = iterator.next();
+                                self.read += 1;
+                                Some(self.arithmetic_expression(&mut iterator))
+                            } else {
+                                Some(self.process(&mut iterator))
+                            }
+                        }
+                        Some(b'{') => {
+                            self.read += 2;
+                            Some(self.braced_variable(&mut iterator))
+                        }
+                        Some(b' ') | None => {
+                            self.read += 1;
+                            let output = &self.data[start..self.read];
+                            Some(WordToken::Normal(output.into(), glob, tilde))
+                        }
+                        _ => {
+                            self.read += 1;
+                            Some(self.variable(&mut iterator))
+                        }
+                    };
+                }
+                b'*' | b'?' => {
+                    self.read += 1;
+                    glob = self.do_glob;
+                    break;
+                }
+                _ => {
+                    self.read += 1;
+                    break;
+                }
             }
         }
         while let Some(character) = iterator.next() {
@@ -849,8 +847,8 @@ impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
                             return Some(WordToken::Normal(output.into(), glob, tilde));
                         }
                     }
-                    let output = &self.data[start..self.read];
-                    if output != "" {
+                    if self.read != start {
+                        let output = &self.data[start..self.read];
                         return Some(WordToken::Normal(unescape(output), glob, tilde));
                     } else {
                         return self.next();

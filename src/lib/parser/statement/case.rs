@@ -67,20 +67,15 @@ pub(crate) fn parse_case(
                 }
                 conditional = Some(string);
             }
-            Some(inner) => {
-                if argument.is_none() {
-                    argument = Some(inner);
-                    continue;
-                } else {
-                    return Err(CaseError::ExtraVar(inner));
-                }
+            Some(inner) if argument.is_none() => {
+                argument = Some(inner);
+                continue;
             }
+            Some(inner) => return Err(CaseError::ExtraVar(inner)),
             None => (),
         }
-        break;
+        return Ok((argument, binding, conditional));
     }
-
-    Ok((argument, binding, conditional))
 }
 
 #[cfg(test)]
