@@ -20,8 +20,6 @@ fn criterion_benchmark(c: &mut Criterion) {
             },
             vec![TEXT, EOF],
         )
-        .warm_up_time(Duration::from_secs(10))
-        .measurement_time(Duration::from_secs(300))
         .throughput(|script| Throughput::Bytes(script.len() as u32)),
     );
 }
