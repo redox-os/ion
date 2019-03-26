@@ -412,7 +412,7 @@ impl Shell {
         shell
     }
 
-    pub fn assign(&mut self, key: Key, value: Value) -> Result<(), String> {
+    pub fn assign(&mut self, key: &Key, value: Value) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)
@@ -466,7 +466,7 @@ impl Shell {
         }
     }
 
-    pub fn overwrite(&mut self, key: Key, operator: Operator, rhs: Value) -> Result<(), String> {
+    pub fn overwrite(&mut self, key: &Key, operator: Operator, rhs: Value) -> Result<(), String> {
         let lhs = self
             .variables
             .get_mut(key.name)

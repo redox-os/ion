@@ -168,7 +168,7 @@ impl VariableStore for Shell {
                             }
                         }
                     } else {
-                        self.overwrite(key, operator, rhs)
+                        self.overwrite(&key, operator, rhs)
                     }
                 })?;
         }
@@ -185,7 +185,7 @@ impl VariableStore for Shell {
                 let actions = AssignmentActions::new(keys, op, vals);
                 if let Err(why) = self.calculate(actions).and_then(|apply| {
                     for (key, value) in apply {
-                        self.assign(key, value)?
+                        self.assign(&key, value)?
                     }
                     Ok(())
                 }) {
