@@ -158,6 +158,9 @@ impl FlowControl {
     /// On error reset FlowControl fields.
     pub(crate) fn reset(&mut self) { self.block.clear() }
 
+    /// Discard one block.
+    pub(crate) fn pop(&mut self) { self.block.pop(); }
+
     /// Check if there isn't an unfinished block.
     pub(crate) fn unclosed_block(&self) -> bool { !self.block.is_empty() }
 }

@@ -120,8 +120,12 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
         Err(ref err) if err.kind() == ErrorKind::Interrupted => None,
         // Handles Ctrl + D
         Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
-            let previous_status = shell.previous_status;
-            shell.exit(previous_status);
+            if shell.flow_control.unclosed_block() {
+                shell.flow_control.pop();
+                Some("".to_string())
+            } else {
+                shell.exit(shell.previous_status);
+            }
         }
         Err(err) => {
             eprintln!("ion: liner: {}", err);
