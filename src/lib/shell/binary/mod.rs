@@ -104,13 +104,10 @@ impl Binary for Shell {
         self.on_command(script);
 
         if self.flow_control.unclosed_block() {
-            {
-                let open_block = self.flow_control.block.last().unwrap();
-                eprintln!(
-                    "ion: unexpected end of arguments: expected end block for `{}`",
-                    open_block.short()
-                );
-            }
+            eprintln!(
+                "ion: unexpected end of arguments: expected end block for `{}`",
+                self.flow_control.block.last().unwrap().short()
+            );
             self.exit(FAILURE);
         }
     }
