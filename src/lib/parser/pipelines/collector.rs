@@ -439,7 +439,6 @@ mod tests {
             statement::parse,
         },
         shell::{flow_control::Statement, Job, JobKind},
-        types::Array,
     };
 
     #[test]

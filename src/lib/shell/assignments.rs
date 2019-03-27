@@ -218,7 +218,7 @@ impl Display for MathError {
     }
 }
 
-pub fn parse<T: str::FromStr, F: Fn(T) -> Option<f64>>(
+pub fn parse<T: str::FromStr, O: std::string::ToString, F: Fn(T) -> Option<O>>(
     lhs: &str,
     operation: F,
 ) -> Result<String, MathError> {

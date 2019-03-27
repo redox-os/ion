@@ -3,7 +3,7 @@ use crate::{
     builtins::{BuiltinFunction, BUILTINS},
     parser::{expand_string, pipelines::RedirectFrom},
     shell::pipe_exec::PipelineExecution,
-    types::{self, Array},
+    types,
 };
 use std::{fmt, fs::File, str};
 
