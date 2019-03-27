@@ -1,3 +1,5 @@
+mod add;
+
 use super::{
     colors::Colors,
     directory_stack::DirectoryStack,

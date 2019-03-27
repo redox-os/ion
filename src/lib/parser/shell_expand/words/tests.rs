@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     ranges::{Index, Range},
-    types::{self, Array},
+    types,
 };
 
 struct Empty;
