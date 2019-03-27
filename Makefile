@@ -1,41 +1,44 @@
-prefix ?= usr/local
-BINARY = $(prefix)/bin/ion
+PREFIX ?= usr/local
+BINARY = $(PREFIX)/bin/ion
 RELEASE = debug
-DEBUG ?= 0
-VENDORED = 0
-REDOX ?= 0
-RUSTUP ?= 1
 TOOLCHAIN ?= 1.31.0
 
 GIT_REVISION=git_revision.txt
-SRC=Cargo.toml src/* src/*/* members/* members/*/*
+SRC=Cargo.toml Cargo.lock $(shell find src members -type f -wholename '*src/*.rs')
 VENDOR=.cargo/config vendor.tar.xz
 
-ifeq (0,$(DEBUG))
+DEBUG ?= 0
+ifeq ($(DEBUG),0)
 	ARGS += --release
 	RELEASE = release
 endif
 
-ifneq ($(wildcard vendor.tar.xz),)
+VENDORED ?= 0
+ifeq ($(VENDORED),1)
 	ARGSV += --frozen
 endif
 
-ifeq (1,$(REDOX))
+REDOX ?= 0
+ifeq ($(REDOX),1)
 	undefine ARGSV
 	ARGS += --target x86_64-unknown-redox
 	TOOLCHAIN = nightly
 endif
 
-ifeq (1,$(RUSTUP))
+RUSTUP ?= 1
+ifeq ($(RUSTUP),1)
 	TOOLCHAIN_ARG = +$(TOOLCHAIN)
 endif
 
 .PHONY: all clean distclean install uninstall
 
 all: $(SRC) $(GIT_REVISION)
-ifeq (1,$(REDOX))
+ifeq ($(REDOX),1)
 	mkdir -p .cargo
 	grep redox .cargo/config || cat redox_linker >> .cargo/config
+endif
+ifeq ($(VENDORED),1)
+	tar pxf vendor.tar.xz
 endif
 	cargo $(TOOLCHAIN_ARG) build $(ARGS) $(ARGSV)
 
@@ -69,8 +72,9 @@ $(GIT_REVISION):
 	git rev-parse master > git_revision.txt
 
 $(VENDOR):
+	rm -rf .cargo vendor vendor.tar.xz
 	mkdir -p .cargo
-	cargo $(TOOLCHAIN_ARG) vendor | head -n -1 > .cargo/config
+	cargo vendor | head -n -1 > .cargo/config
 	echo 'directory = "vendor"' >> .cargo/config
 	tar pcfJ vendor.tar.xz vendor
 	rm -rf vendor

@@ -1,20 +1,29 @@
 #!/usr/bin/make -f
 
 export RUSTUP = 0
+export PREFIX = /usr
+
+# When building packages locally, `env VENDORED=0 CLEAN=0 debuild`
+# will build a package using non-vendored dependencies, and
+# re-using build artifacts from the last build. Use this in
+# local testing.
+
+export VENDORED ?= 1
+CLEAN ?= 1
 
 %:
-	dh $@
+	dh $@ --with=systemd
 
 override_dh_auto_clean:
+ifeq ($(CLEAN),1)
 	make clean
+endif
 	make version
+ifeq ($(VENDORED),1)
 	if ! ischroot; then \
 		make vendor; \
 	fi
+endif
 
 override_dh_auto_build:
-	tar pxf vendor.tar.xz
-	make all
-
-override_dh_auto_install:
-	dh_auto_install -- prefix=/usr
+	dh_auto_build
