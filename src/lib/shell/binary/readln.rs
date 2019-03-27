@@ -111,7 +111,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
 
     match line {
         Ok(line) => {
-            if !line.is_empty() {
+            if line.bytes().any(|c| !c.is_ascii_whitespace()) {
                 shell.flags |= flags::UNTERMINATED;
             }
             Some(line)

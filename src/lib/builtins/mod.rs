@@ -228,7 +228,7 @@ fn builtin_dirs(args: &[small::String], shell: &mut Shell) -> i32 {
         return SUCCESS;
     }
 
-    shell.directory_stack.dirs(args)
+    shell.directory_stack.dirs(args.iter())
 }
 
 fn builtin_pushd(args: &[small::String], shell: &mut Shell) -> i32 {

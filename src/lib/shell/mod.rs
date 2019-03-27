@@ -53,10 +53,7 @@ use self::{
 use crate::{
     builtins::{BuiltinMap, BUILTINS},
     lexers::{Key, Operator, Primitive},
-    parser::{
-        assignments::value_check, pipelines::Pipeline, Expander, MapKeyIter, MapValueIter, Select,
-        Terminator,
-    },
+    parser::{assignments::value_check, pipelines::Pipeline, Expander, Select, Terminator},
     sys,
     types::{self, Array},
 };
@@ -678,62 +675,28 @@ impl<'a> Expander for Shell {
         None
     }
 
-    fn map_keys<'b>(&'b self, name: &str, select: Select) -> Option<MapKeyIter<'b>> {
-        let nvalues;
-        let map: Box<dyn Iterator<Item = &'b types::Str>> = match self.variables.get_ref(name) {
+    fn map_keys(&self, name: &str, sel: Select) -> Option<Array> {
+        match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
-                nvalues = map.len();
-                Box::new(map.keys())
+                Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
             }
             Some(&Value::BTreeMap(ref map)) => {
-                nvalues = map.len();
-                Box::new(map.keys())
+                Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
             }
-            _ => return None,
-        };
-
-        match select {
-            Select::All => return Some(map),
-            Select::Range(range) => {
-                if let Some((start, length)) = range.bounds(nvalues) {
-                    if nvalues > start {
-                        return Some(Box::new(map.skip(start).take(length)));
-                    }
-                }
-            }
-            _ => (),
+            _ => None,
         }
-
-        None
     }
 
-    fn map_values<'b>(&'b self, name: &str, select: Select) -> Option<MapValueIter<'b>> {
-        let nvalues;
-        let map: Box<dyn Iterator<Item = types::Str>> = match self.variables.get_ref(name) {
+    fn map_values(&self, name: &str, sel: Select) -> Option<Array> {
+        match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
-                nvalues = map.len();
-                Box::new(map.values().map(|x| format!("{}", x).into()))
+                Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
             }
             Some(&Value::BTreeMap(ref map)) => {
-                nvalues = map.len();
-                Box::new(map.values().map(|x| format!("{}", x).into()))
+                Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
             }
-            _ => return None,
-        };
-
-        match select {
-            Select::All => return Some(map),
-            Select::Range(range) => {
-                if let Some((start, length)) = range.bounds(nvalues) {
-                    if nvalues > start {
-                        return Some(Box::new(map.skip(start).take(length)));
-                    }
-                }
-            }
-            _ => (),
+            _ => None,
         }
-
-        None
     }
 
     fn tilde(&self, input: &str) -> Option<String> {

@@ -26,9 +26,6 @@ pub(crate) fn is_expression(s: &str) -> bool {
         || s.starts_with('\'')
 }
 
-pub type MapKeyIter<'a> = Box<dyn Iterator<Item = &'a types::Str> + 'a>;
-pub type MapValueIter<'a> = Box<dyn Iterator<Item = types::Str> + 'a>;
-
 // TODO: Make array expansions iterators instead of arrays.
 // TODO: Use Cow<'a, types::Str> for hashmap values.
 /// Trait representing different elements of string expansion
@@ -42,12 +39,23 @@ pub(crate) trait Expander: Sized {
     /// Expand a subshell expression.
     fn command(&self, _command: &str) -> Option<types::Str> { None }
     /// Iterating upon key-value maps.
-    fn map_keys<'a>(&'a self, _name: &str, _select: Select) -> Option<MapKeyIter> { None }
+    fn map_keys<'a>(&'a self, _name: &str, _select: Select) -> Option<Array> { None }
     /// Iterating upon key-value maps.
-    fn map_values<'a>(&'a self, _name: &str, _select: Select) -> Option<MapValueIter> { None }
+    fn map_values<'a>(&'a self, _name: &str, _select: Select) -> Option<Array> { None }
     /// Get a string that exists in the shell.
     fn get_string(&self, value: &str) -> Value {
         Value::Str(types::Str::from(expand_string(value, self, false).join(" ")))
+    }
+    /// Select the proper values from an iterator
+    fn select<I: Iterator<Item = types::Str>>(vals: I, select: Select, n: usize) -> Option<Array> {
+        match select {
+            Select::All => Some(vals.collect()),
+            Select::Range(range) => range
+                .bounds(n)
+                .filter(|&(start, _)| n > start)
+                .map(|(start, length)| vals.skip(start).take(length).collect()),
+            _ => None,
+        }
     }
     /// Get an array that exists in the shell.
     fn get_array(&self, value: &str) -> Value { Value::Array(expand_string(value, self, false)) }

@@ -30,8 +30,7 @@ impl<'a> ArrayMethod<'a> {
     }
 
     fn lines<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
-        let variable = self.resolve_var(expand_func);
-        Ok(variable.lines().map(types::Str::from).collect())
+        Ok(self.resolve_var(expand_func).lines().map(types::Str::from).collect())
     }
 
     fn chars<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
@@ -45,7 +44,7 @@ impl<'a> ArrayMethod<'a> {
 
     fn bytes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
-        let len = variable.as_bytes().len();
+        let len = variable.len();
         Ok(variable
             .bytes()
             .map(|b| types::Str::from(b.to_string()))
@@ -53,17 +52,11 @@ impl<'a> ArrayMethod<'a> {
     }
 
     fn map_keys<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Array, &'static str> {
-        expand_func
-            .map_keys(self.variable, self.selection.clone())
-            .ok_or("no map found")
-            .map(|x| x.cloned().collect())
+        expand_func.map_keys(self.variable, self.selection.clone()).ok_or("no map found")
     }
 
     fn map_values<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Array, &'static str> {
-        expand_func
-            .map_values(self.variable, self.selection.clone())
-            .ok_or("no map found")
-            .map(|x| x.collect())
+        expand_func.map_values(self.variable, self.selection.clone()).ok_or("no map found")
     }
 
     fn graphemes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
