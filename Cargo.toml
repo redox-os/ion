@@ -54,7 +54,7 @@ regex = "1.0"
 small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }
 smallvec = "0.6"
 unicode-segmentation = "1.2"
-xdg = { git = "https://github.com/whitequark/rust-xdg" }
+xdg = "2.2.0"
 ion_braces = { path = "members/braces" }
 ion_builtins = { path = "members/builtins" }
 ion_lexers = { path = "members/lexers" }
