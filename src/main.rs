@@ -1,8 +1,4 @@
-extern crate getopts;
-extern crate ion_shell;
 extern crate ion_sys as sys;
-extern crate small;
-extern crate smallvec;
 
 use getopts::Options;
 use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};

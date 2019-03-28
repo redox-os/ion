@@ -1,5 +1,5 @@
-PREFIX ?= usr/local
-BINARY = $(PREFIX)/bin/ion
+prefix ?= usr/local
+BINARY = $(prefix)/bin/ion
 RELEASE = debug
 TOOLCHAIN ?= 1.31.0
 

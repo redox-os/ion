@@ -71,15 +71,15 @@ use std::{
 };
 use xdg::BaseDirectories;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum IonError {
-    #[fail(display = "failed to fork: {}", why)]
+    #[error(display = "failed to fork: {}", why)]
     Fork { why: io::Error },
-    #[fail(display = "element does not exist")]
+    #[error(display = "element does not exist")]
     DoesNotExist,
-    #[fail(display = "input was not terminated")]
+    #[error(display = "input was not terminated")]
     Unterminated,
-    #[fail(display = "function error: {}", why)]
+    #[error(display = "function error: {}", why)]
     Function { why: FunctionError },
 }
 
