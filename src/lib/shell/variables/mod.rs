@@ -1,4 +1,4 @@
-mod add;
+mod math;
 
 use super::{
     colors::Colors,
@@ -640,6 +640,9 @@ get_var!(types::Array, Array(array) => array);
 get_var!(types::HashMap, HashMap(hmap) => hmap);
 get_var!(types::BTreeMap, BTreeMap(bmap) => bmap);
 get_var!(Function, Function(func) => func);
+
+#[cfg(test)]
+mod trait_test;
 
 #[cfg(test)]
 mod tests {
