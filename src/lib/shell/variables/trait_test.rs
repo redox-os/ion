@@ -1,4 +1,4 @@
-use super::{super::types, Value};
+use super::{super::types, math::Pow, Value};
 
 // ***************************
 //          Addition         *
@@ -206,7 +206,6 @@ fn mul_var_var_array() {
 #[test]
 fn div_integer_integer() {
     let a = Value::Str("1".into());
-    println!("{}", 1. / 2.);
     assert_eq!(&a / 2, Ok(Value::Str("0.5".into())));
     assert_eq!(&a / -2, Ok(Value::Str("-0.5".into())));
     assert_eq!(&a / 1, Ok(Value::Str("1".into())));
@@ -264,5 +263,73 @@ fn div_var_var_array() {
     assert_eq!(
         &a / &Value::Str("-2.5".into()),
         Ok(Value::Array(array![types::Str::from("-0.48"), types::Str::from("-0.4")]))
+    );
+}
+
+// ***************************
+//          Exponents        *
+// ***************************
+
+#[test]
+fn exp_integer_integer() {
+    let a = Value::Str("2".into());
+    assert_eq!(a.pow(2), Ok(Value::Str("4".into())));
+    assert_eq!(a.pow(-2), Ok(Value::Str("0.25".into())));
+    assert_eq!(a.pow(0), Ok(Value::Str("1".into())));
+}
+
+#[test]
+fn exp_float_integer() {
+    let a = Value::Str(".16".into());
+    assert_eq!(a.pow(2), Ok(Value::Str("0.0256".into())));
+    assert_eq!(a.pow(-2), Ok(Value::Str("39.0625".into())));
+    assert_eq!(a.pow(0), Ok(Value::Str("1".into())));
+}
+
+#[test]
+fn exp_integer_float() {
+    let a = Value::Str("1".into());
+    assert_eq!(a.pow(2.5), Ok(Value::Str("1".into())));
+    assert_eq!(a.pow(-2.5), Ok(Value::Str("1".into())));
+    assert_eq!(a.pow(1.), Ok(Value::Str("1".into())));
+}
+
+#[test]
+fn exp_float_float() {
+    let a = Value::Str(".16".into());
+    assert_eq!(a.pow(1.5), Ok(Value::Str("0.064".into())));
+    assert_eq!(a.pow(-1.5), Ok(Value::Str("15.625".into())));
+    assert_eq!(a.pow(1.), Ok(Value::Str("0.16".into())));
+}
+
+#[test]
+fn exp_array_integer() {
+    let a = Value::Array(array![types::Str::from("1.2"), types::Str::from("1")]);
+    assert_eq!(a.pow(2), Ok(Value::Array(array![types::Str::from("1.44"), types::Str::from("1")])));
+}
+
+#[test]
+fn exp_array_float() {
+    let a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
+    assert_eq!(
+        a.pow(-2.5),
+        Ok(Value::Array(array![types::Str::from("97.65625"), types::Str::from("1")]))
+    );
+}
+
+#[test]
+fn exp_var_var_str() {
+    println!("{:?}", 12_f64.powi(-2));
+    let a = Value::Str("12".into());
+    assert_eq!(a.pow(&Value::Str("-2".into())), Ok(Value::Str("0.006944444444444444".into())));
+    assert_eq!(a.pow(&Value::Str("2".into())), Ok(Value::Str("144".into())));
+}
+
+#[test]
+fn exp_var_var_array() {
+    let a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
+    assert_eq!(
+        a.pow(&Value::Str("-1.5".into())),
+        Ok(Value::Array(array![types::Str::from("15.625"), types::Str::from("1")]))
     );
 }
