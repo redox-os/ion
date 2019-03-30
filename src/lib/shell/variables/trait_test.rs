@@ -319,7 +319,6 @@ fn exp_array_float() {
 
 #[test]
 fn exp_var_var_str() {
-    println!("{:?}", 12_f64.powi(-2));
     let a = Value::Str("12".into());
     assert_eq!(a.pow(&Value::Str("-2".into())), Ok(Value::Str("0.006944444444444444".into())));
     assert_eq!(a.pow(&Value::Str("2".into())), Ok(Value::Str("144".into())));
