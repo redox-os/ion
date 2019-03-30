@@ -15,6 +15,12 @@ pub trait Pow<RHS = Self> {
     fn pow(self, power: RHS) -> Self::Output;
 }
 
+pub trait EuclDiv<RHS = Self> {
+    type Output;
+
+    fn eucl_div(self, rhs: RHS) -> Self::Output;
+}
+
 macro_rules! math {
     ($trait:ident, $fn:ident, $op_f_f:expr, $op_i_i:expr) => {
         math!($trait, $fn, $op_f_f, $op_i_i, false);
@@ -131,6 +137,9 @@ math!(
     |lhs: i128, rhs: i128| { lhs.checked_div(rhs) },
     true
 );
+math!(EuclDiv, eucl_div, |lhs: f64, rhs: f64| { (lhs / rhs).trunc() }, |lhs: i128, rhs: i128| {
+    lhs.checked_div(rhs)
+});
 // checked pow will only be available with version 1.34, so for now, only perform operation
 math!(
     Pow,

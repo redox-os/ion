@@ -1,4 +1,8 @@
-use super::{super::types, math::Pow, Value};
+use super::{
+    super::types,
+    math::{EuclDiv, Pow},
+    Value,
+};
 
 // ***************************
 //          Addition         *
@@ -330,5 +334,75 @@ fn exp_var_var_array() {
     assert_eq!(
         a.pow(&Value::Str("-1.5".into())),
         Ok(Value::Array(array![types::Str::from("15.625"), types::Str::from("1")]))
+    );
+}
+
+// ***************************
+//     Euclidian division    *
+// ***************************
+
+#[test]
+fn euc_integer_integer() {
+    let a = Value::Str("2".into());
+    assert_eq!(a.eucl_div(2), Ok(Value::Str("1".into())));
+    assert_eq!(a.eucl_div(-2), Ok(Value::Str("-1".into())));
+    assert_eq!(a.eucl_div(3), Ok(Value::Str("0".into())));
+}
+
+#[test]
+fn euc_float_integer() {
+    let a = Value::Str("2.16".into());
+    assert_eq!(a.eucl_div(2), Ok(Value::Str("1".into())));
+    assert_eq!(a.eucl_div(-2), Ok(Value::Str("-1".into())));
+    assert_eq!(a.eucl_div(1), Ok(Value::Str("2".into())));
+}
+
+#[test]
+fn euc_integer_float() {
+    let a = Value::Str("2".into());
+    assert_eq!(a.eucl_div(1.5), Ok(Value::Str("1".into())));
+    assert_eq!(a.eucl_div(-1.5), Ok(Value::Str("-1".into())));
+    assert_eq!(a.eucl_div(1.), Ok(Value::Str("2".into())));
+}
+
+#[test]
+fn euc_float_float() {
+    let a = Value::Str("-1.6".into());
+    assert_eq!(a.eucl_div(1.5), Ok(Value::Str("-1".into())));
+    assert_eq!(a.eucl_div(-1.5), Ok(Value::Str("1".into())));
+    assert_eq!(a.eucl_div(1.), Ok(Value::Str("-1".into())));
+}
+
+#[test]
+fn euc_array_integer() {
+    let a = Value::Array(array![types::Str::from("1.2"), types::Str::from("1")]);
+    assert_eq!(
+        a.eucl_div(1),
+        Ok(Value::Array(array![types::Str::from("1"), types::Str::from("1")]))
+    );
+}
+
+#[test]
+fn euc_array_float() {
+    let a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
+    assert_eq!(
+        a.eucl_div(0.04),
+        Ok(Value::Array(array![types::Str::from("4"), types::Str::from("25")]))
+    );
+}
+
+#[test]
+fn euc_var_var_str() {
+    let a = Value::Str("12".into());
+    assert_eq!(a.eucl_div(&Value::Str("-2".into())), Ok(Value::Str("-6".into())));
+    assert_eq!(a.eucl_div(&Value::Str("2".into())), Ok(Value::Str("6".into())));
+}
+
+#[test]
+fn euc_var_var_array() {
+    let a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
+    assert_eq!(
+        a.eucl_div(&Value::Str("-.04".into())),
+        Ok(Value::Array(array![types::Str::from("-4"), types::Str::from("-25")]))
     );
 }
