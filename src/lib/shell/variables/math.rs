@@ -6,7 +6,7 @@ use std::ops::{Add, Div, Mul, Sub};
 pub enum OpError {
     TypeError,
     CalculationError,
-    ParseError(std::num::ParseFloatError),
+    ParseError(lexical::Error),
 }
 
 pub trait Pow<RHS = Self> {
@@ -32,14 +32,14 @@ macro_rules! math {
             fn $fn(self, rhs: Self) -> Self::Output {
                 if let Value::Str(rhs) = rhs {
                     if $allfloat {
-                        rhs.parse::<f64>()
+                        lexical::try_parse::<f64, _>(rhs)
                             .map_err(OpError::ParseError)
                             .and_then(|rhs| self.$fn(rhs))
                     } else {
-                        if let Ok(rhs) = rhs.parse::<i128>() {
+                        if let Ok(rhs) = lexical::try_parse::<i128, _>(rhs) {
                             self.$fn(rhs)
                         } else {
-                            rhs.parse::<f64>()
+                            lexical::try_parse::<f64, _>(rhs)
                                 .map_err(OpError::ParseError)
                                 .and_then(|rhs| self.$fn(rhs))
                         }
@@ -56,18 +56,18 @@ macro_rules! math {
             fn $fn(self, rhs: i128) -> Self::Output {
                 match self {
                     Value::Str(lhs) => if $allfloat {
-                        lhs.parse::<f64>()
+                        lexical::try_parse::<f64, _>(lhs)
                             .map_err(OpError::ParseError)
-                            .map(|lhs| $op_f_f(lhs, rhs as f64).to_string())
+                            .map(|lhs| lexical::to_string($op_f_f(lhs, rhs as f64)))
                     } else {
-                        if let Ok(lhs) = lhs.parse::<i128>() {
+                        if let Ok(lhs) = lexical::try_parse::<i128, _>(lhs) {
                             $op_i_i(lhs, rhs)
                                 .ok_or(OpError::CalculationError)
-                                .map(|result| result.to_string())
+                                .map(|result| lexical::to_string(result))
                         } else {
-                            lhs.parse::<f64>()
+                            lexical::try_parse::<f64, _>(lhs)
                                 .map_err(OpError::ParseError)
-                                .map(|lhs| $op_f_f(lhs, rhs as f64).to_string())
+                                .map(|lhs| lexical::to_string($op_f_f(lhs, rhs as f64)))
                         }
                     }
                     .map(|v| Value::Str(v.into())),
@@ -95,10 +95,9 @@ macro_rules! math {
 
             fn $fn(self, rhs: f64) -> Self::Output {
                 match self {
-                    Value::Str(lhs) => lhs
-                        .parse::<f64>()
+                    Value::Str(lhs) => lexical::try_parse::<f64, _>(lhs)
                         .map_err(OpError::ParseError)
-                        .map(|lhs| $op_f_f(lhs, rhs).to_string())
+                        .map(|lhs| lexical::to_string($op_f_f(lhs, rhs)))
                         .map(|v| Value::Str(v.into())),
                     Value::Array(lhs) => lhs
                         .iter()
@@ -137,7 +136,7 @@ math!(
     |lhs: i128, rhs: i128| { lhs.checked_div(rhs) },
     true
 );
-math!(EuclDiv, eucl_div, |lhs: f64, rhs: f64| { (lhs / rhs).trunc() }, |lhs: i128, rhs: i128| {
+math!(EuclDiv, eucl_div, |lhs: f64, rhs: f64| { (lhs / rhs) as i128 }, |lhs: i128, rhs: i128| {
     lhs.checked_div(rhs)
 });
 // checked pow will only be available with version 1.34, so for now, only perform operation

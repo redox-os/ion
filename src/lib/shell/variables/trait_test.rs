@@ -30,13 +30,13 @@ fn add_integer_float() {
     assert_eq!(&a + 2.3, Ok(Value::Str("3.3".into())));
     // Floating point artifacts
     assert_eq!(&a + -2.3, Ok(Value::Str("-1.2999999999999998".into())));
-    assert_eq!(&a + 0., Ok(Value::Str("1".into())));
+    assert_eq!(&a + 0., Ok(Value::Str("1.0".into())));
 }
 
 #[test]
 fn add_float_float() {
     let a = Value::Str("1.2".into());
-    assert_eq!(&a + 2.8, Ok(Value::Str("4".into())));
+    assert_eq!(&a + 2.8, Ok(Value::Str("4.0".into())));
     // Floating point artifacts
     assert_eq!(&a + -2.2, Ok(Value::Str("-1.0000000000000002".into())));
     assert_eq!(&a + 0, Ok(Value::Str("1.2".into())));
@@ -51,14 +51,17 @@ fn add_array_integer() {
 #[test]
 fn add_array_float() {
     let a = Value::Array(array![types::Str::from("1.2"), types::Str::from("1")]);
-    assert_eq!(&a + 2.8, Ok(Value::Array(array![types::Str::from("4"), types::Str::from("3.8")])));
+    assert_eq!(
+        &a + 2.8,
+        Ok(Value::Array(array![types::Str::from("4.0"), types::Str::from("3.8")]))
+    );
 }
 
 #[test]
 fn add_var_var_str() {
     let a = Value::Str("1.2".into());
-    assert_eq!(&a + &Value::Str("2.8".into()), Ok(Value::Str("4".into())));
-    assert_eq!(&a + &Value::Str("2".into()), Ok(Value::Str("3.2".into())));
+    assert_eq!(&a + &Value::Str("2.8".into()), Ok(Value::Str("4.0".into())));
+    assert_eq!(&a + &Value::Str("2.0".into()), Ok(Value::Str("3.2".into())));
 }
 
 #[test]
@@ -66,7 +69,7 @@ fn add_var_var_array() {
     let a = Value::Array(array![types::Str::from("1.2"), types::Str::from("1")]);
     assert_eq!(
         &a + &Value::Str("2.8".into()),
-        Ok(Value::Array(array![types::Str::from("4"), types::Str::from("3.8")]))
+        Ok(Value::Array(array![types::Str::from("4.0"), types::Str::from("3.8")]))
     );
 }
 
@@ -96,7 +99,7 @@ fn sub_integer_float() {
     // Floating point artifacts
     assert_eq!(&a - 2.3, Ok(Value::Str("-1.2999999999999998".into())));
     assert_eq!(&a - -2.3, Ok(Value::Str("3.3".into())));
-    assert_eq!(&a - 0., Ok(Value::Str("1".into())));
+    assert_eq!(&a - 0., Ok(Value::Str("1.0".into())));
 }
 
 #[test]
@@ -117,13 +120,16 @@ fn sub_array_integer() {
 #[test]
 fn sub_array_float() {
     let a = Value::Array(array![types::Str::from("1.2"), types::Str::from("1")]);
-    assert_eq!(&a - -2.8, Ok(Value::Array(array![types::Str::from("4"), types::Str::from("3.8")])));
+    assert_eq!(
+        &a - -2.8,
+        Ok(Value::Array(array![types::Str::from("4.0"), types::Str::from("3.8")]))
+    );
 }
 
 #[test]
 fn sub_var_var_str() {
     let a = Value::Str("1.2".into());
-    assert_eq!(&a - &Value::Str("-2.8".into()), Ok(Value::Str("4".into())));
+    assert_eq!(&a - &Value::Str("-2.8".into()), Ok(Value::Str("4.0".into())));
     assert_eq!(&a - &Value::Str("2".into()), Ok(Value::Str("-0.8".into())));
 }
 
@@ -132,7 +138,7 @@ fn sub_var_var_array() {
     let a = Value::Array(array![types::Str::from("1.2"), types::Str::from("1")]);
     assert_eq!(
         &a - &Value::Str("-2.8".into()),
-        Ok(Value::Array(array![types::Str::from("4"), types::Str::from("3.8")]))
+        Ok(Value::Array(array![types::Str::from("4.0"), types::Str::from("3.8")]))
     );
 }
 
@@ -153,7 +159,7 @@ fn mul_float_integer() {
     let a = Value::Str("1.2".into());
     assert_eq!(&a * 2, Ok(Value::Str("2.4".into())));
     assert_eq!(&a * -2, Ok(Value::Str("-2.4".into())));
-    assert_eq!(&a * 0, Ok(Value::Str("0".into())));
+    assert_eq!(&a * 0, Ok(Value::Str("0.0".into())));
 }
 
 #[test]
@@ -161,7 +167,7 @@ fn mul_integer_float() {
     let a = Value::Str("1".into());
     assert_eq!(&a * 2.3, Ok(Value::Str("2.3".into())));
     assert_eq!(&a * -2.3, Ok(Value::Str("-2.3".into())));
-    assert_eq!(&a * 0., Ok(Value::Str("0".into())));
+    assert_eq!(&a * 0., Ok(Value::Str("0.0".into())));
 }
 
 #[test]
@@ -169,7 +175,7 @@ fn mul_float_float() {
     let a = Value::Str("1.2".into());
     assert_eq!(&a * 2.8, Ok(Value::Str("3.36".into())));
     assert_eq!(&a * -2.2, Ok(Value::Str("-2.64".into())));
-    assert_eq!(&a * 0, Ok(Value::Str("0".into())));
+    assert_eq!(&a * 0, Ok(Value::Str("0.0".into())));
 }
 
 #[test]
@@ -212,7 +218,7 @@ fn div_integer_integer() {
     let a = Value::Str("1".into());
     assert_eq!(&a / 2, Ok(Value::Str("0.5".into())));
     assert_eq!(&a / -2, Ok(Value::Str("-0.5".into())));
-    assert_eq!(&a / 1, Ok(Value::Str("1".into())));
+    assert_eq!(&a / 1, Ok(Value::Str("1.0".into())));
 }
 
 #[test]
@@ -228,7 +234,7 @@ fn div_integer_float() {
     let a = Value::Str("1".into());
     assert_eq!(&a / 2.5, Ok(Value::Str("0.4".into())));
     assert_eq!(&a / -2.5, Ok(Value::Str("-0.4".into())));
-    assert_eq!(&a / 1., Ok(Value::Str("1".into())));
+    assert_eq!(&a / 1., Ok(Value::Str("1.0".into())));
 }
 
 #[test]
@@ -277,9 +283,9 @@ fn div_var_var_array() {
 #[test]
 fn exp_integer_integer() {
     let a = Value::Str("2".into());
-    assert_eq!(a.pow(2), Ok(Value::Str("4".into())));
+    assert_eq!(a.pow(2), Ok(Value::Str("4.0".into())));
     assert_eq!(a.pow(-2), Ok(Value::Str("0.25".into())));
-    assert_eq!(a.pow(0), Ok(Value::Str("1".into())));
+    assert_eq!(a.pow(0), Ok(Value::Str("1.0".into())));
 }
 
 #[test]
@@ -287,15 +293,15 @@ fn exp_float_integer() {
     let a = Value::Str(".16".into());
     assert_eq!(a.pow(2), Ok(Value::Str("0.0256".into())));
     assert_eq!(a.pow(-2), Ok(Value::Str("39.0625".into())));
-    assert_eq!(a.pow(0), Ok(Value::Str("1".into())));
+    assert_eq!(a.pow(0), Ok(Value::Str("1.0".into())));
 }
 
 #[test]
 fn exp_integer_float() {
     let a = Value::Str("1".into());
-    assert_eq!(a.pow(2.5), Ok(Value::Str("1".into())));
-    assert_eq!(a.pow(-2.5), Ok(Value::Str("1".into())));
-    assert_eq!(a.pow(1.), Ok(Value::Str("1".into())));
+    assert_eq!(a.pow(2.5), Ok(Value::Str("1.0".into())));
+    assert_eq!(a.pow(-2.5), Ok(Value::Str("1.0".into())));
+    assert_eq!(a.pow(1.), Ok(Value::Str("1.0".into())));
 }
 
 #[test]
@@ -309,7 +315,10 @@ fn exp_float_float() {
 #[test]
 fn exp_array_integer() {
     let a = Value::Array(array![types::Str::from("1.2"), types::Str::from("1")]);
-    assert_eq!(a.pow(2), Ok(Value::Array(array![types::Str::from("1.44"), types::Str::from("1")])));
+    assert_eq!(
+        a.pow(2),
+        Ok(Value::Array(array![types::Str::from("1.44"), types::Str::from("1.0")]))
+    );
 }
 
 #[test]
@@ -317,7 +326,7 @@ fn exp_array_float() {
     let a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
     assert_eq!(
         a.pow(-2.5),
-        Ok(Value::Array(array![types::Str::from("97.65625"), types::Str::from("1")]))
+        Ok(Value::Array(array![types::Str::from("97.65625"), types::Str::from("1.0")]))
     );
 }
 
@@ -325,7 +334,7 @@ fn exp_array_float() {
 fn exp_var_var_str() {
     let a = Value::Str("12".into());
     assert_eq!(a.pow(&Value::Str("-2".into())), Ok(Value::Str("0.006944444444444444".into())));
-    assert_eq!(a.pow(&Value::Str("2".into())), Ok(Value::Str("144".into())));
+    assert_eq!(a.pow(&Value::Str("2".into())), Ok(Value::Str("144.0".into())));
 }
 
 #[test]
@@ -333,7 +342,7 @@ fn exp_var_var_array() {
     let a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
     assert_eq!(
         a.pow(&Value::Str("-1.5".into())),
-        Ok(Value::Array(array![types::Str::from("15.625"), types::Str::from("1")]))
+        Ok(Value::Array(array![types::Str::from("15.625"), types::Str::from("1.0")]))
     );
 }
 
