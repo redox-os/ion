@@ -1,0 +1,10 @@
+#Test that an empty loop does not crash ion.
+
+fn looper stf:[str]
+	for item in @stf
+		echo "$item"
+	end
+end
+
+looper [one two three]
+looper []
