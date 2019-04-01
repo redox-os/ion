@@ -189,7 +189,7 @@ impl DirectoryStack {
     }
 
     fn get_previous_dir(&self) -> Option<String> {
-        env::var("OLDPWD").ok().filter(|pwd| !pwd.is_empty() && pwd != &"?")
+        env::var("OLDPWD").ok().filter(|pwd| !pwd.is_empty() && pwd != "?")
     }
 
     fn switch_to_previous_directory(
@@ -332,7 +332,7 @@ impl DirectoryStack {
                 keep_front = true;
             } else {
                 let (count_from_front, num) = parse_numeric_arg(arg)
-                    .ok_or(Cow::Owned(format!("ion: popd: {}: invalid argument", arg)))?;
+                    .ok_or_else(|| Cow::Owned(format!("ion: popd: {}: invalid argument", arg)))?;
 
                 index = if count_from_front {
                     // <=> input number is positive

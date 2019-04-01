@@ -63,14 +63,14 @@ macro_rules! math {
                         if let Ok(lhs) = lexical::try_parse::<i128, _>(lhs) {
                             $op_i_i(lhs, rhs)
                                 .ok_or(OpError::CalculationError)
-                                .map(|result| lexical::to_string(result))
+                                .map(lexical::to_string)
                         } else {
                             lexical::try_parse::<f64, _>(lhs)
                                 .map_err(OpError::ParseError)
                                 .map(|lhs| lexical::to_string($op_f_f(lhs, rhs as f64)))
                         }
                     }
-                    .map(|v| Value::Str(v.into())),
+                    .map(Value::from),
                     Value::Array(lhs) => lhs
                         .iter()
                         // When array will contain values insted of strings, clone will no longer be
@@ -98,7 +98,7 @@ macro_rules! math {
                     Value::Str(lhs) => lexical::try_parse::<f64, _>(lhs)
                         .map_err(OpError::ParseError)
                         .map(|lhs| lexical::to_string($op_f_f(lhs, rhs)))
-                        .map(|v| Value::Str(v.into())),
+                        .map(Value::from),
                     Value::Array(lhs) => lhs
                         .iter()
                         // When array will contain values insted of strings, clone will no longer be
