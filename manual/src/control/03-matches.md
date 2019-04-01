@@ -39,6 +39,8 @@ match [ five foo bar ]
 end
 ```
 
+## Match guards
+
 Match guards can be added to a match to employ an additional test
 
 ```sh

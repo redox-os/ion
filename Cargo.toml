@@ -44,8 +44,7 @@ version_check = "0.1.3"
 [dependencies]
 bitflags = "1.0"
 calculate = "0.5"
-failure = "0.1"
-failure_derive = "0.1"
+err-derive = "0.1"
 glob = "0.2"
 itoa = "0.4"
 lazy_static = "1.0"
@@ -55,7 +54,7 @@ regex = "1.0"
 small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }
 smallvec = "0.6"
 unicode-segmentation = "1.2"
-xdg = { git = "https://github.com/whitequark/rust-xdg" }
+xdg = "2.2.0"
 ion_braces = { path = "members/braces" }
 ion_builtins = { path = "members/builtins" }
 ion_lexers = { path = "members/lexers" }

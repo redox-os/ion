@@ -216,9 +216,7 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
                 self.and_or = true;
                 Some(character)
             }
-            b'\n' | b';'
-                if self.array == 0 && self.subshell == 0 && !self.and_or && !self.empty =>
-            {
+            b'\n' if self.array == 0 && self.subshell == 0 && !self.and_or && !self.empty => {
                 self.terminated = true;
                 None
             }
