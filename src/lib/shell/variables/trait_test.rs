@@ -1,6 +1,7 @@
 use super::{
     super::types,
     math::{EuclDiv, Pow},
+    modification::Modifications,
     Value,
 };
 
@@ -414,4 +415,92 @@ fn euc_var_var_array() {
         a.eucl_div(&Value::Str("-.04".into())),
         Ok(Value::Array(array![types::Str::from("-4"), types::Str::from("-25")]))
     );
+}
+
+// ***************************
+//       Array filtering     *
+// ***************************
+
+#[test]
+fn filter_var() {
+    let mut a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
+    let b = Value::Str("1".into());
+    Option::<&mut types::Array>::from(&mut a).unwrap().retain(|c| c != &b);
+    assert_eq!(a, Value::Array(array![types::Str::from(".16")]));
+}
+
+#[test]
+fn filter_var_float() {
+    let mut a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
+    let b = Value::Str("0.16".into());
+    Option::<&mut types::Array>::from(&mut a).unwrap().retain(|c| c != &b);
+    assert_eq!(a, Value::Array(array![types::Str::from(".16"), types::Str::from("1")]));
+}
+
+// ***************************
+//          Appending        *
+// ***************************
+
+#[test]
+fn append_str() {
+    let mut a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
+    let b = Value::Str("1".into());
+    assert!(a.append(b));
+    assert_eq!(
+        a,
+        Value::Array(array![types::Str::from(".16"), types::Str::from("1"), types::Str::from("1")])
+    );
+}
+
+#[test]
+fn append_array() {
+    let mut a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
+    let b = Value::Array(array![types::Str::from("1")]);
+    assert!(a.append(b));
+    assert_eq!(
+        a,
+        Value::Array(array![types::Str::from(".16"), types::Str::from("1"), types::Str::from("1")])
+    );
+}
+
+#[test]
+fn append_str_str() {
+    let mut a = Value::Str(".16".into());
+    let b = Value::Str("1".into());
+    assert!(a.append(b));
+    assert_eq!(a, Value::Str(".161".into()));
+}
+
+// ***************************
+//         Prepending        *
+// ***************************
+
+#[test]
+fn prepend_str() {
+    let mut a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
+    let b = Value::Str("1".into());
+    assert!(a.prepend(b));
+    assert_eq!(
+        a,
+        Value::Array(array![types::Str::from("1"), types::Str::from(".16"), types::Str::from("1")])
+    );
+}
+
+#[test]
+fn prepend_array() {
+    let mut a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
+    let b = Value::Array(array![types::Str::from("1")]);
+    assert!(a.prepend(b));
+    assert_eq!(
+        a,
+        Value::Array(array![types::Str::from("1"), types::Str::from(".16"), types::Str::from("1")])
+    );
+}
+
+#[test]
+fn prepend_str_str() {
+    let mut a = Value::Str(".16".into());
+    let b = Value::Str("1".into());
+    assert!(a.prepend(b));
+    assert_eq!(a, Value::Str("1.16".into()));
 }
