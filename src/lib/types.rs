@@ -57,7 +57,7 @@ impl Into<Str> for Alias {
 #[macro_export]
 macro_rules! array [
     ( $($x:expr), *) => ({
-        let mut _arr = Array::new();
+        let mut _arr = crate::types::Array::new();
         $(_arr.push($x.into());)*
         _arr
     })

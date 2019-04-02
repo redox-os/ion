@@ -1,3 +1,6 @@
+mod math;
+mod modification;
+
 use super::{
     colors::Colors,
     directory_stack::DirectoryStack,
@@ -40,6 +43,33 @@ macro_rules! type_from_value {
                 }
             }
         }
+
+        impl From<Value> for Option<$to> {
+            fn from(var: Value) -> Self {
+                match var {
+                    Value::$variant(inner) => Some(inner),
+                    _ => None,
+                }
+            }
+        }
+
+        impl<'a> From<&'a Value> for Option<&'a $to> {
+            fn from(var: &'a Value) -> Self {
+                match *var {
+                    Value::$variant(ref inner) => Some(inner),
+                    _ => None,
+                }
+            }
+        }
+
+        impl<'a> From<&'a mut Value> for Option<&'a mut $to> {
+            fn from(var: &'a mut Value) -> Self {
+                match *var {
+                    Value::$variant(ref mut inner) => Some(inner),
+                    _ => None,
+                }
+            }
+        }
     }
 }
 
@@ -56,6 +86,28 @@ type_from_value!(Function : Function else
         Default::default()
     )
 );
+
+macro_rules! eq {
+    ($lhs:ty : $variant:ident) => {
+        impl PartialEq<Value> for $lhs {
+            fn eq(&self, other: &Value) -> bool {
+                match other {
+                    Value::$variant(ref inner) => inner == self,
+                    _ => false,
+                }
+            }
+        }
+    };
+}
+
+eq!(types::Str: Str);
+eq!(types::Alias: Alias);
+eq!(types::Array: Array);
+eq!(types::HashMap: HashMap);
+eq!(types::BTreeMap: BTreeMap);
+eq!(Function: Function);
+
+impl Eq for Value {}
 
 // this one’s only special because of the lifetime parameter
 impl<'a> From<&'a str> for Value {
@@ -638,6 +690,9 @@ get_var!(types::Array, Array(array) => array);
 get_var!(types::HashMap, HashMap(hmap) => hmap);
 get_var!(types::BTreeMap, BTreeMap(bmap) => bmap);
 get_var!(Function, Function(func) => func);
+
+#[cfg(test)]
+mod trait_test;
 
 #[cfg(test)]
 mod tests {

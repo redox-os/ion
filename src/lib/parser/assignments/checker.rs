@@ -148,7 +148,6 @@ pub(crate) fn value_check<E: Expander>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::types::Array;
     use lexers::TypeError;
 
     #[test]

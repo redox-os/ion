@@ -54,8 +54,7 @@ use crate::{
     builtins::{BuiltinMap, BUILTINS},
     lexers::{Key, Operator, Primitive},
     parser::{assignments::value_check, pipelines::Pipeline, Expander, Select, Terminator},
-    sys,
-    types::{self, Array},
+    sys, types,
 };
 use itertools::Itertools;
 use liner::Context;
@@ -658,7 +657,7 @@ impl<'a> Expander for Shell {
         None
     }
 
-    fn map_keys(&self, name: &str, sel: Select) -> Option<Array> {
+    fn map_keys(&self, name: &str, sel: Select) -> Option<types::Array> {
         match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
@@ -670,7 +669,7 @@ impl<'a> Expander for Shell {
         }
     }
 
-    fn map_values(&self, name: &str, sel: Select) -> Option<Array> {
+    fn map_values(&self, name: &str, sel: Select) -> Option<types::Array> {
         match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())

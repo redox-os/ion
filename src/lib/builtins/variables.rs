@@ -146,7 +146,6 @@ mod test {
     use crate::{
         parser::{expand_string, Expander},
         shell::status::{FAILURE, SUCCESS},
-        types::Array,
     };
 
     struct VariableExpander(pub Variables);
