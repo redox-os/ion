@@ -6,15 +6,16 @@ use super::{
 use crate::{
     lexers::assignments::{Key, Operator, Primitive},
     parser::{assignments::*, statement::parse::is_valid_name},
-    shell::{history::ShellHistory, variables::Value},
+    shell::{
+        history::ShellHistory,
+        variables::{EuclDiv, Modifications, OpError, Pow, Value},
+    },
     types,
 };
 use std::{
     env,
-    fmt::{self, Display},
     io::{self, BufWriter, Write},
     result::Result,
-    str,
 };
 
 fn list_vars(shell: &Shell) -> Result<(), io::Error> {
@@ -119,66 +120,63 @@ impl VariableStore for Shell {
         &mut self,
         actions: AssignmentActions<'a>,
     ) -> Result<Vec<(Key<'a>, Value)>, String> {
-        let mut backup: Vec<_> = Vec::new();
+        let mut backup: Vec<_> = Vec::with_capacity(4);
         for action in actions {
-            action
-                .map_err(|e| e.to_string())
-                .and_then(|Action(key, operator, expression)| {
-                    // sanitize variable names
-                    if ["HOME", "HOST", "PWD", "MWD", "SWD", "?"].contains(&key.name) {
-                        Err(format!("not allowed to set `{}`", key.name))
-                    } else if !is_valid_name(key.name) {
-                        Err("invalid variable name\nVariable names may only have A-Z, a-z, 0-9 \
-                             and _\nThe first character cannot be a digit"
-                            .into())
-                    } else {
-                        Ok(Action(key, operator, expression))
-                    }
-                })
-                .and_then(|Action(key, operator, expression)| {
-                    value_check(self, &expression, &key.kind)
-                        .map_err(|why| format!("{}: {}", key.name, why))
-                        .map(|rhs| (key, operator, rhs))
-                })
-                .and_then(|(key, operator, rhs)| {
-                    if operator == Operator::OptionalEqual
-                        && self.variables.get_ref(key.name).is_some()
-                    {
-                        Ok(())
-                    } else {
-                        // When we changed the HISTORY_IGNORE variable, update the
-                        // ignore patterns. This happens first because `set_array`
-                        // consumes 'values'
-                        if key.name == "HISTORY_IGNORE" {
-                            if let Value::Array(array) = &rhs {
-                                self.update_ignore_patterns(array);
-                            }
-                        }
+            let Action(key, operator, expression) = action.map_err(|e| e.to_string())?;
 
-                        match (&rhs, &key.kind) {
-                            (Value::HashMap(_), Primitive::Indexed(..)) => {
-                                Err("cannot insert hmap into index".to_string())
-                            }
-                            (Value::BTreeMap(_), Primitive::Indexed(..)) => {
-                                Err("cannot insert bmap into index".to_string())
-                            }
-                            (Value::Array(_), Primitive::Indexed(..)) => {
-                                Err("multi-dimensional arrays are not yet supported".to_string())
-                            }
-                            _ => {
-                                let val = if [Operator::Equal, Operator::OptionalEqual]
-                                    .contains(&operator)
-                                {
-                                    rhs
-                                } else {
-                                    self.overwrite(&key, operator, &rhs)?
-                                };
-                                backup.push((key, val));
-                                Ok(())
-                            }
-                        }
-                    }
-                })?;
+            // sanitize variable names
+            if ["HOME", "HOST", "PWD", "MWD", "SWD", "?"].contains(&key.name) {
+                return Err(format!("not allowed to set `{}`", key.name));
+            }
+
+            if !is_valid_name(key.name) {
+                return Err("invalid variable name\nVariable names may only have A-Z, a-z, 0-9 \
+                            and _\nThe first character cannot be a digit"
+                    .to_string());
+            }
+
+            if operator == Operator::OptionalEqual && self.variables.get_ref(key.name).is_some() {
+                continue;
+            }
+
+            let rhs = value_check(self, &expression, &key.kind)
+                .map_err(|why| format!("{}: {}", key.name, why))?;
+
+            // When we changed the HISTORY_IGNORE variable, update the
+            // ignore patterns. This happens first because `set_array`
+            // consumes 'values'
+            if key.name == "HISTORY_IGNORE" {
+                if let Value::Array(array) = &rhs {
+                    self.update_ignore_patterns(array);
+                }
+            }
+
+            match (&rhs, &key.kind) {
+                (Value::HashMap(_), Primitive::Indexed(..)) => {
+                    Err("cannot insert hmap into index".to_string())?
+                }
+                (Value::BTreeMap(_), Primitive::Indexed(..)) => {
+                    Err("cannot insert bmap into index".to_string())?
+                }
+                (Value::Array(_), Primitive::Indexed(..)) => {
+                    Err("multi-dimensional arrays are not yet supported".to_string())?
+                }
+                _ if [Operator::Equal, Operator::OptionalEqual].contains(&operator) => {
+                    backup.push((key, rhs))
+                }
+                _ => {
+                    let lhs = self.variables.get_ref(key.name).ok_or_else(|| {
+                        format!("cannot update non existing variable `{}`", key.name)
+                    })?;
+                    let val = apply(operator, &lhs, rhs).map_err(|_| {
+                        format!(
+                            "type error: variable `{}` of type `{}` does not support operator",
+                            key.name, key.kind
+                        )
+                    })?;
+                    backup.push((key, val));
+                }
+            }
         }
         Ok(backup)
     }
@@ -207,59 +205,38 @@ impl VariableStore for Shell {
     }
 }
 
-#[derive(Debug)]
-pub enum MathError {
-    RHS,
-    LHS,
-    Unsupported,
-    CalculationError,
-}
-
-impl Display for MathError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            MathError::RHS => write!(fmt, "right hand side has invalid type"),
-            MathError::LHS => write!(fmt, "left hand side has invalid type"),
-            MathError::Unsupported => write!(fmt, "type does not support operation"),
-            MathError::CalculationError => write!(fmt, "cannot calculate given operation"),
+// This should logically be a method over iterator, but Value is only accessible in the main repo
+// TODO: too much allocations occur over here. We need to expand variables before they get
+// parsed
+fn apply(op: Operator, lhs: &Value, rhs: Value) -> Result<Value, OpError> {
+    match op {
+        Operator::Add => lhs + rhs,
+        Operator::Divide => lhs / rhs,
+        Operator::IntegerDivide => lhs.eucl_div(rhs),
+        Operator::Subtract => lhs - rhs,
+        Operator::Multiply => lhs * rhs,
+        Operator::Exponent => lhs.pow(rhs),
+        Operator::Concatenate => {
+            let mut lhs = lhs.clone();
+            lhs.append(rhs);
+            Ok(lhs)
         }
-    }
-}
-
-pub fn parse<T: str::FromStr, O: std::string::ToString, F: Fn(T) -> Option<O>>(
-    lhs: &str,
-    operation: F,
-) -> Result<String, MathError> {
-    lhs.parse::<T>()
-        .map_err(|_| MathError::LHS)
-        .and_then(|lhs| operation(lhs).ok_or(MathError::CalculationError))
-        .map(|x| x.to_string())
-}
-
-pub fn math<'a>(
-    key: &Primitive,
-    operator: Operator,
-    value: &'a str,
-) -> Result<Box<Fn(f64) -> Option<f64>>, MathError> {
-    // TODO: We should not assume or parse f64 by default.
-    //       Decimal precision should be preferred.
-    //       128-bit decimal precision should be supported again.
-    value.parse::<f64>().map_err(|_| MathError::RHS).and_then(
-        |rhs| -> Result<Box<Fn(f64) -> Option<f64>>, MathError> {
-            match key {
-                Primitive::Str | Primitive::Float | Primitive::Integer => match operator {
-                    Operator::Add => Ok(Box::new(move |lhs| Some(lhs + rhs))),
-                    Operator::Divide => Ok(Box::new(move |lhs| Some(lhs / rhs))),
-                    Operator::IntegerDivide => Ok(Box::new(move |lhs| {
-                        (lhs as i64).checked_div(rhs as i64).map(|x| x as f64)
-                    })),
-                    Operator::Subtract => Ok(Box::new(move |lhs| Some(lhs - rhs))),
-                    Operator::Multiply => Ok(Box::new(move |lhs| Some(lhs * rhs))),
-                    Operator::Exponent => Ok(Box::new(move |lhs| Some(lhs.powf(rhs)))),
-                    _ => Err(MathError::Unsupported),
-                },
-                _ => Err(MathError::Unsupported),
+        Operator::ConcatenateHead => {
+            let mut lhs = lhs.clone();
+            lhs.prepend(rhs);
+            Ok(lhs)
+        }
+        Operator::Filter => match (lhs.clone(), rhs) {
+            (Value::Array(mut array), Value::Str(rhs)) => {
+                array.retain(|item| item != &rhs);
+                Ok(Value::Array(array))
             }
+            (Value::Array(mut array), Value::Array(values)) => {
+                array.retain(|item| !values.contains(item));
+                Ok(Value::Array(array))
+            }
+            _ => Err(OpError::TypeError),
         },
-    )
+        _ => unreachable!(),
+    }
 }

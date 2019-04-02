@@ -1,6 +1,10 @@
 mod math;
 mod modification;
 
+pub use self::{
+    math::{EuclDiv, OpError, Pow},
+    modification::Modifications,
+};
 use super::{
     colors::Colors,
     directory_stack::DirectoryStack,

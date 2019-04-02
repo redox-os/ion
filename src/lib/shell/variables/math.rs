@@ -50,6 +50,12 @@ macro_rules! math {
             }
         }
 
+        impl<'a> $trait<Value> for &'a Value {
+            type Output = Result<Value, OpError>;
+
+            fn $fn(self, rhs: Value) -> Self::Output { self.$fn(&rhs) }
+        }
+
         impl<'a> $trait<i128> for &'a Value {
             type Output = Result<Value, OpError>;
 

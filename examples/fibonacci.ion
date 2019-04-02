@@ -5,9 +5,9 @@ fn fib n
        let output += $previous
        let previous = $temp
     end
-    echo $output
+    echo $n $output
 end
 
-for i in 0..200
+for i in 0..184
     fib $i
 end
