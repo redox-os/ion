@@ -18,7 +18,6 @@ readme = "README.md"
 repository = "https://gitlab.redox-os.org/redox-os/ion"
 version = "1.0.0-alpha"
 edition = "2018"
-cargo-features = ["rename-dependency"]
 
 [workspace]
 members = [
