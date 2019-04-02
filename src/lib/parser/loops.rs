@@ -17,7 +17,7 @@ impl ForValueExpression {
             .flat_map(|expression| expand_string(expression, expanders, true))
             .collect();
 
-        if output.len() == 0 {
+        if output.is_empty() {
             ForValueExpression::Multiple(output)
         } else if let (Some(range), true) =
             (crate::ranges::parse_range(&output[0]), output.len() == 1)
