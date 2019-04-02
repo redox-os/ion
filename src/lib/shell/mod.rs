@@ -452,44 +452,35 @@ impl Shell {
         }
     }
 
-    pub fn overwrite(&mut self, key: &Key, operator: Operator, rhs: Value) -> Result<(), String> {
+    // TODO: too much allocations occur over here. We need to expand variables before they get
+    // parsed
+    pub fn overwrite(
+        &mut self,
+        key: &Key,
+        operator: Operator,
+        rhs: &Value,
+    ) -> Result<Value, String> {
         let lhs = self
             .variables
-            .get_mut(key.name)
+            .get_ref(key.name)
             .ok_or_else(|| format!("cannot update non existing variable `{}`", key.name))?;
 
-        match lhs {
-            Value::Str(lhs) => {
-                if let Value::Str(rhs) = rhs {
-                    match operator {
-                        Operator::Concatenate => lhs.push_str(&rhs),
-                        Operator::ConcatenateHead => {
-                            *lhs = rhs + lhs;
-                        }
-                        _ => {
-                            let action =
-                                math(&key.kind, operator, &rhs).map_err(|why| why.to_string())?;
-                            let value = parse(&lhs, &*action).map_err(|why| why.to_string())?;
-                            *lhs = value.into();
-                        }
-                    }
+        match (lhs, rhs) {
+            (Value::Str(lhs), Value::Str(rhs)) => match operator {
+                Operator::Concatenate => Ok(Value::Str(format!("{}{}", lhs, rhs).into())),
+                Operator::ConcatenateHead => Ok(Value::Str(format!("{}{}", rhs, lhs).into())),
+                _ => {
+                    let action = math(&key.kind, operator, &rhs).map_err(|why| why.to_string())?;
+                    let value = parse(&lhs, &*action).map_err(|why| why.to_string())?;
+                    Ok(Value::Str(value.into()))
                 }
-                Ok(())
-            }
-            Value::Array(array) => match rhs {
-                Value::Str(rhs) => match operator {
-                    Operator::Concatenate => {
-                        array.push(rhs.clone());
-                        Ok(())
-                    }
-                    Operator::ConcatenateHead => {
-                        array.insert(0, rhs.clone());
-                        Ok(())
-                    }
-                    Operator::Filter => {
-                        array.retain(|item| item != &rhs);
-                        Ok(())
-                    }
+            },
+            (Value::Array(array), Value::Str(rhs)) => {
+                let mut array = array.clone();
+                match operator {
+                    Operator::Concatenate => array.push(rhs.clone()),
+                    Operator::ConcatenateHead => array.insert(0, rhs.clone()),
+                    Operator::Filter => array.retain(|item| item != rhs),
                     _ => math(&Primitive::Float, operator, &rhs)
                         .and_then(|action| {
                             array
@@ -498,29 +489,21 @@ impl Shell {
                                 .find(|e| e.is_err())
                                 .unwrap_or(Ok(()))
                         })
-                        .map_err(|why| why.to_string()),
-                },
-                Value::Array(values) => {
-                    match operator {
-                        Operator::Concatenate => array.extend(values.clone()),
-                        Operator::ConcatenateHead => values
-                            .into_iter()
-                            .rev()
-                            .for_each(|value| array.insert(0, value.clone())),
-                        Operator::Filter => array.retain(|item| !values.contains(item)),
-                        _ => {}
-                    }
-                    Ok(())
+                        .map_err(|why| why.to_string())?,
                 }
-                _ => Ok(()),
-            },
-            _ => {
-                if let Value::Str(_) = rhs {
-                    Err("type does not support this operator".to_string())
-                } else {
-                    Ok(())
-                }
+                Ok(Value::Array(array))
             }
+            (Value::Array(array), Value::Array(values)) => {
+                let mut array = array.clone();
+                match operator {
+                    Operator::Concatenate => array.extend(values.clone()),
+                    Operator::ConcatenateHead => array.insert_many(0, values.clone()),
+                    Operator::Filter => array.retain(|item| !values.contains(item)),
+                    _ => {}
+                }
+                Ok(Value::Array(array))
+            }
+            _ => Err("type does not support this operator".to_string()),
         }
     }
 }
