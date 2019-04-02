@@ -57,16 +57,51 @@ pub(crate) trait VariableStore {
 
 impl VariableStore for Shell {
     fn export(&mut self, action: ExportAction) -> i32 {
-        let actions = match action {
-            ExportAction::Assign(ref keys, op, ref vals) => AssignmentActions::new(keys, op, vals),
+        match action {
+            ExportAction::Assign(ref keys, op, ref vals) => {
+                let actions = AssignmentActions::new(keys, op, vals);
+
+                for action in actions {
+                    let err = action.map_err(|e| e.to_string()).and_then(|act| {
+                        let Action(key, operator, expression) = act;
+                        value_check(self, &expression, &key.kind)
+                            .map_err(|e| format!("{}: {}", key.name, e))
+                            // TODO: handle operators here in the same way as local
+                            .and_then(|rhs| match &rhs {
+                                Value::Array(values) if operator == Operator::Equal => {
+                                    env::set_var(key.name, values.join(" "));
+                                    Ok(())
+                                }
+                                Value::Array(_) => Err("arithmetic operators on array \
+                                                        expressions aren't supported yet."
+                                    .to_string()),
+                                Value::Str(rhs) => {
+                                    env::set_var(&key.name, rhs.as_str());
+                                    Ok(())
+                                }
+                                _ => Err(format!(
+                                    "{}: export of type '{}' is not supported",
+                                    key.name, key.kind
+                                )),
+                            })
+                    });
+
+                    if let Err(why) = err {
+                        eprintln!("ion: assignment error: {}", why);
+                        return FAILURE;
+                    }
+                }
+
+                SUCCESS
+            }
             ExportAction::LocalExport(ref key) => match self.get::<types::Str>(key) {
                 Some(var) => {
                     env::set_var(key, &*var);
-                    return SUCCESS;
+                    SUCCESS
                 }
                 None => {
                     eprintln!("ion: cannot export {} because it does not exist.", key);
-                    return FAILURE;
+                    FAILURE
                 }
             },
             ExportAction::List => {
@@ -75,42 +110,9 @@ impl VariableStore for Shell {
                 for (key, val) in env::vars() {
                     let _ = writeln!(stdout, "{} = \"{}\"", key, val);
                 }
-                return SUCCESS;
-            }
-        };
-
-        for action in actions {
-            let err = action.map_err(|e| e.to_string()).and_then(|act| {
-                let Action(key, operator, expression) = act;
-                value_check(self, &expression, &key.kind)
-                    .map_err(|e| format!("{}: {}", key.name, e))
-                    // TODO: handle operators here in the same way as local
-                    .and_then(|rhs| match &rhs {
-                        Value::Array(values) if operator == Operator::Equal => {
-                            env::set_var(key.name, values.join(" "));
-                            Ok(())
-                        }
-                        Value::Array(_) => Err("arithmetic operators on array expressions aren't \
-                                                supported yet."
-                            .to_string()),
-                        Value::Str(rhs) => {
-                            env::set_var(&key.name, rhs.as_str());
-                            Ok(())
-                        }
-                        _ => Err(format!(
-                            "{}: export of type '{}' is not supported",
-                            key.name, key.kind
-                        )),
-                    })
-            });
-
-            if let Err(why) = err {
-                eprintln!("ion: assignment error: {}", why);
-                return FAILURE;
+                SUCCESS
             }
         }
-
-        SUCCESS
     }
 
     fn calculate<'a>(
@@ -118,8 +120,9 @@ impl VariableStore for Shell {
         actions: AssignmentActions<'a>,
     ) -> Result<Vec<(Key<'a>, Value)>, String> {
         let mut backup: Vec<_> = Vec::new();
-        for action in actions.map(|act| act.map_err(|e| e.to_string())) {
+        for action in actions {
             action
+                .map_err(|e| e.to_string())
                 .and_then(|Action(key, operator, expression)| {
                     // sanitize variable names
                     if ["HOME", "HOST", "PWD", "MWD", "SWD", "?"].contains(&key.name) {
@@ -129,10 +132,10 @@ impl VariableStore for Shell {
                              and _\nThe first character cannot be a digit"
                             .into())
                     } else {
-                        Ok((key, operator, expression))
+                        Ok(Action(key, operator, expression))
                     }
                 })
-                .and_then(|(key, operator, expression)| {
+                .and_then(|Action(key, operator, expression)| {
                     value_check(self, &expression, &key.kind)
                         .map_err(|why| format!("{}: {}", key.name, why))
                         .map(|rhs| (key, operator, rhs))
@@ -142,7 +145,7 @@ impl VariableStore for Shell {
                         && self.variables.get_ref(key.name).is_some()
                     {
                         Ok(())
-                    } else if [Operator::Equal, Operator::OptionalEqual].contains(&operator) {
+                    } else {
                         // When we changed the HISTORY_IGNORE variable, update the
                         // ignore patterns. This happens first because `set_array`
                         // consumes 'values'
@@ -163,12 +166,17 @@ impl VariableStore for Shell {
                                 Err("multi-dimensional arrays are not yet supported".to_string())
                             }
                             _ => {
-                                backup.push((key, rhs));
+                                let val = if [Operator::Equal, Operator::OptionalEqual]
+                                    .contains(&operator)
+                                {
+                                    rhs
+                                } else {
+                                    self.overwrite(&key, operator, &rhs)?
+                                };
+                                backup.push((key, val));
                                 Ok(())
                             }
                         }
-                    } else {
-                        self.overwrite(&key, operator, rhs)
                     }
                 })?;
         }

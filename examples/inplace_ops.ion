@@ -1,0 +1,9 @@
+let a = [ 0 1 ]
+let b = [ 0 1 ]
+let a b \\= 0 @a[0]
+echo @b[0]
+
+let a b = 1 2
+let a b ::= $b $a
+echo $a
+echo $b
