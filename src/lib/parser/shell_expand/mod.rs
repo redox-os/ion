@@ -684,7 +684,7 @@ pub(crate) fn expand_tokens<E: Expander>(
 /// if `x=5` and `y=7`
 fn expand_arithmetic<E: Expander>(output: &mut small::String, input: &str, expander: &E) {
     // small::String cannot be created with a capacity of 0 without causing a panic
-    let len = if input.as_bytes().is_empty() { input.as_bytes().len() } else { 1 };
+    let len = if !input.is_empty() { input.len() } else { 1 };
     let mut intermediate = small::String::with_capacity(len);
     let mut varbuf = small::String::new();
     let flush = |var: &mut small::String, out: &mut small::String| {

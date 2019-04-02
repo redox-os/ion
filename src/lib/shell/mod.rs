@@ -40,7 +40,6 @@ pub(crate) use self::{
 };
 
 use self::{
-    assignments::{math, parse},
     directory_stack::DirectoryStack,
     flags::*,
     flow_control::{FlowControl, Function, FunctionError},
@@ -52,7 +51,7 @@ use self::{
 };
 use crate::{
     builtins::{BuiltinMap, BUILTINS},
-    lexers::{Key, Operator, Primitive},
+    lexers::{Key, Primitive},
     parser::{assignments::value_check, pipelines::Pipeline, Expander, Select, Terminator},
     sys, types,
 };
@@ -449,61 +448,6 @@ impl Shell {
                 Ok(())
             }
             _ => Ok(()),
-        }
-    }
-
-    // TODO: too much allocations occur over here. We need to expand variables before they get
-    // parsed
-    pub fn overwrite(
-        &mut self,
-        key: &Key,
-        operator: Operator,
-        rhs: &Value,
-    ) -> Result<Value, String> {
-        let lhs = self
-            .variables
-            .get_ref(key.name)
-            .ok_or_else(|| format!("cannot update non existing variable `{}`", key.name))?;
-
-        match (lhs, rhs) {
-            (Value::Str(lhs), Value::Str(rhs)) => match operator {
-                Operator::Concatenate => Ok(Value::Str(format!("{}{}", lhs, rhs).into())),
-                Operator::ConcatenateHead => Ok(Value::Str(format!("{}{}", rhs, lhs).into())),
-                _ => {
-                    let action = math(&key.kind, operator, &rhs).map_err(|why| why.to_string())?;
-                    let value = parse(&lhs, &*action).map_err(|why| why.to_string())?;
-                    Ok(Value::Str(value.into()))
-                }
-            },
-            (Value::Array(array), Value::Str(rhs)) => {
-                let mut array = array.clone();
-                match operator {
-                    Operator::Concatenate => array.push(rhs.clone()),
-                    Operator::ConcatenateHead => array.insert(0, rhs.clone()),
-                    Operator::Filter => array.retain(|item| item != rhs),
-                    _ => math(&Primitive::Float, operator, &rhs)
-                        .and_then(|action| {
-                            array
-                                .iter_mut()
-                                .map(|el| parse(el, &*action).map(|result| *el = result.into()))
-                                .find(|e| e.is_err())
-                                .unwrap_or(Ok(()))
-                        })
-                        .map_err(|why| why.to_string())?,
-                }
-                Ok(Value::Array(array))
-            }
-            (Value::Array(array), Value::Array(values)) => {
-                let mut array = array.clone();
-                match operator {
-                    Operator::Concatenate => array.extend(values.clone()),
-                    Operator::ConcatenateHead => array.insert_many(0, values.clone()),
-                    Operator::Filter => array.retain(|item| !values.contains(item)),
-                    _ => {}
-                }
-                Ok(Value::Array(array))
-            }
-            _ => Err("type does not support this operator".to_string()),
         }
     }
 }

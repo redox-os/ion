@@ -107,12 +107,10 @@ fn finish(
         let step = if step == 1 && start >= end { -step } else { step };
         let nb_digits = usize::max(count_minimum_digits(start_str), count_minimum_digits(end_str));
         numeric_range(start, end, step, inclusive, nb_digits)
+    } else if start_str.len() != 1 || end_str.len() != 1 {
+        None
     } else {
-        if start_str.len() != 1 || end_str.len() != 1 {
-            None
-        } else {
-            char_range(start_str.as_bytes()[0], end_str.as_bytes()[0], step, inclusive)
-        }
+        char_range(start_str.as_bytes()[0], end_str.as_bytes()[0], step, inclusive)
     }
 }
 
