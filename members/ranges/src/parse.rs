@@ -40,61 +40,40 @@ fn numeric_range<'a>(
     }
 }
 
-#[inline]
-fn byte_is_valid_range(b: u8) -> bool { (b >= b'a' && b <= b'z') || (b >= b'A' && b <= b'Z') }
-
 fn char_range<'a>(
     start: u8,
-    end: u8,
+    mut end: u8,
     step: isize,
     inclusive: bool,
 ) -> Option<Box<Iterator<Item = small::String> + 'a>> {
-    let char_step = step.checked_abs()?;
-    if !byte_is_valid_range(start)
-        || !byte_is_valid_range(end)
+    if !start.is_ascii_alphabetic()
+        || !end.is_ascii_alphabetic()
         || step == 0
-        || char_step > u8::MAX as isize
+        || step.checked_abs()? > u8::MAX as isize
     {
         return None;
     }
 
-    let end = if start < end && inclusive {
-        end + 1
-    } else if start > end && inclusive {
-        end - 1
+    if (start < end && inclusive) || (start > end && !inclusive) {
+        end += 1;
+    }
+
+    if start < end {
+        Some(Box::new((start..end).step_by(step as usize).map(|x| (x as char).to_string().into())))
     } else {
-        end
-    };
-    let (x, y, ordering) =
-        if start < end { (start, end, Ordering::Greater) } else { (end, start, Ordering::Less) };
-
-    let iter = (x..y).scan(start, move |index, _| {
-        if end.cmp(index) == ordering {
-            let index_holder = *index;
-            *index = match ordering {
-                Ordering::Greater => index.wrapping_add(char_step as u8),
-                Ordering::Less => index.wrapping_sub(char_step as u8),
-                _ => unreachable!(),
-            };
-            Some((index_holder as char).to_string().into())
-        } else {
-            None
-        }
-    });
-
-    Some(Box::new(iter))
+        Some(Box::new(
+            (end..=start).rev().step_by(step as usize).map(|x| (x as char).to_string().into()),
+        ))
+    }
 }
 
 fn count_minimum_digits(a: &str) -> usize {
-    for c in a.chars() {
-        match c {
-            '-' => (),
-            '0' => return a.len(),
-            '1'...'9' => break,
-            _ => panic!("count_minimum_digits should only be called for a valid number."),
-        }
+    match a.bytes().find(|&c| c != b'-') {
+        Some(b'0') => a.len(),
+        Some(b'1'...b'9') => 0,
+        Some(_) => panic!("count_minimum_digits should only be called for a valid number."),
+        None => 0,
     }
-    0
 }
 
 fn finish(
@@ -141,54 +120,26 @@ pub fn parse_range(input: &str) -> Option<Box<Iterator<Item = small::String>>> {
 }
 
 pub fn parse_index_range(input: &str) -> Option<Range> {
-    let mut bytes_iterator = input.bytes().enumerate();
-    while let Some((id, byte)) = bytes_iterator.next() {
-        match byte {
-            b'0'...b'9' | b'-' => continue,
-            b'.' => {
-                let first = &input[..id];
+    let mut parts = input.splitn(2, "..");
+    let first = parts.next()?;
+    let mut end = parts.next()?;
 
-                let mut dots = 1;
-                let mut last_byte = 0;
-
-                for (_, byte) in bytes_iterator {
-                    last_byte = byte;
-                    if byte == b'.' {
-                        dots += 1
-                    } else {
-                        break;
-                    }
-                }
-
-                if dots < 2 || dots > 3 {
-                    break;
-                }
-
-                let inclusive = dots == 3 || (dots == 2 && last_byte == b'=');
-
-                let end = &input[id + if inclusive { 3 } else { 2 }..];
-
-                return if first.is_empty() && !end.is_empty() {
-                    end.parse::<isize>().map(|end| Range::to(Index::new(end))).ok()
-                } else if end.is_empty() {
-                    first.parse::<isize>().map(|start| Range::from(Index::new(start))).ok()
-                } else {
-                    first
-                        .parse::<isize>()
-                        .and_then(|start| end.parse::<isize>().map(|end| (start, end)))
-                        .map(|(start, end)| {
-                            if inclusive {
-                                Range::inclusive(Index::new(start), Index::new(end))
-                            } else {
-                                Range::exclusive(Index::new(start), Index::new(end))
-                            }
-                        })
-                        .ok()
-                };
-            }
-            _ => break,
+    if first.is_empty() && !end.is_empty() {
+        end.parse::<isize>().map(|end| Range::to(Index::new(end))).ok()
+    } else if !end.is_empty() {
+        let inclusive = end.starts_with('.') || end.starts_with('=');
+        if inclusive {
+            end = &end[1..];
         }
-    }
 
-    None
+        let start = first.parse::<isize>().ok()?;
+        let end = end.parse::<isize>().ok()?;
+        if inclusive {
+            Some(Range::inclusive(Index::new(start), Index::new(end)))
+        } else {
+            Some(Range::exclusive(Index::new(start), Index::new(end)))
+        }
+    } else {
+        first.parse::<isize>().map(|start| Range::from(Index::new(start))).ok()
+    }
 }
