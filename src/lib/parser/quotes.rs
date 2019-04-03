@@ -240,7 +240,7 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
             quotes:     Quotes::None,
             terminated: false,
             and_or:     false,
-            whitespace: true,
+            whitespace: false,
             lt_count:   0,
             empty:      true,
             subshell:   0,
