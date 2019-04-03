@@ -25,7 +25,7 @@ bitflags! {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum StatementError {
+pub enum StatementError {
     IllegalCommandName(String),
     InvalidCharacter(char, usize),
     UnterminatedSubshell,
@@ -75,14 +75,14 @@ fn is_invalid(byte: u8) -> bool {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum StatementVariant<'a> {
+pub enum StatementVariant<'a> {
     And(&'a str),
     Or(&'a str),
     Default(&'a str),
 }
 
 #[derive(Debug)]
-pub(crate) struct StatementSplitter<'a> {
+pub struct StatementSplitter<'a> {
     data:             &'a str,
     read:             usize,
     start:            usize,
@@ -107,7 +107,7 @@ impl<'a> StatementSplitter<'a> {
         read
     }
 
-    pub(crate) fn new(data: &'a str) -> Self {
+    pub fn new(data: &'a str) -> Self {
         StatementSplitter {
             data,
             read: 0,
