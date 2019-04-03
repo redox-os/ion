@@ -46,11 +46,7 @@ fn char_range<'a>(
     step: isize,
     inclusive: bool,
 ) -> Option<Box<Iterator<Item = small::String> + 'a>> {
-    if !start.is_ascii_alphabetic()
-        || !end.is_ascii_alphabetic()
-        || step == 0
-        || step.checked_abs()? > u8::MAX as isize
-    {
+    if !start.is_ascii_alphabetic() || !end.is_ascii_alphabetic() || step == 0 {
         return None;
     }
 
@@ -58,11 +54,12 @@ fn char_range<'a>(
         end += 1;
     }
 
+    let char_step = step.checked_abs()? as usize;
     if start < end {
-        Some(Box::new((start..end).step_by(step as usize).map(|x| (x as char).to_string().into())))
+        Some(Box::new((start..end).step_by(char_step).map(|x| (x as char).to_string().into())))
     } else {
         Some(Box::new(
-            (end..=start).rev().step_by(step as usize).map(|x| (x as char).to_string().into()),
+            (end..=start).rev().step_by(char_step).map(|x| (x as char).to_string().into()),
         ))
     }
 }
