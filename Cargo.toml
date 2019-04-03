@@ -32,6 +32,10 @@ criterion = "0.2"
 name = "terminator"
 harness = false
 
+[[bench]]
+name = "statement"
+harness = false
+
 [[bin]]
 name = "ion"
 path = "src/main.rs"

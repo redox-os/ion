@@ -1,6 +1,5 @@
 use criterion::*;
 use ion_shell::parser::Terminator;
-use std::time::Duration;
 
 const TEXT: &str = include_str!("test.ion");
 const EOF: &str = include_str!("herestring.ion");

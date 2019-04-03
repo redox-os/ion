@@ -6,10 +6,8 @@ pub mod parse;
 pub mod parse;
 mod splitter;
 
-pub(crate) use self::{
-    parse::parse,
-    splitter::{StatementError, StatementSplitter, StatementVariant},
-};
+pub(crate) use self::parse::parse;
+pub use self::splitter::{StatementError, StatementSplitter, StatementVariant};
 use crate::shell::flow_control::Statement;
 
 /// Parses a given statement string and return's the corresponding mapped
