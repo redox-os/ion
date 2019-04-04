@@ -24,9 +24,18 @@ DESCRIPTION
     Ion is a commandline shell created to be a faster and easier to use alternative to the
     currently available shells. It is not POSIX compliant.
 
-Args:
-    Script arguments (@args). If the -c option is not specified, the first parameter
-    is taken as a filename to execute";
+OPTIONS:
+    -c <command>        evaluates given commands instead of reading from the commandline.
+
+    -n or --no-execute
+        do not execute any commands, just do syntax checking.
+
+    -v or --version
+        prints the version, platform and revision of ion then exits.
+
+ARGS:
+    <args>...    Script arguments (@args). If the -c option is not specified, the first
+                 parameter is taken as a filename to execute";
 
 pub trait Binary {
     /// Parses and executes the arguments that were supplied to the shell.
