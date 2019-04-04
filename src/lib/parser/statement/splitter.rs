@@ -115,10 +115,8 @@ impl<'a> StatementSplitter<'a> {
 
     fn get_statement_from(&mut self, input: &'a str) -> StatementVariant<'a> {
         if self.logical == LogicalOp::And {
-            self.logical = LogicalOp::None;
             StatementVariant::And(input)
         } else if self.logical == LogicalOp::Or {
-            self.logical = LogicalOp::None;
             StatementVariant::Or(input)
         } else {
             StatementVariant::Default(input)
@@ -133,13 +131,12 @@ impl<'a> Iterator for StatementSplitter<'a> {
         let start = self.read;
         let mut first_arg_found = false;
         let mut error = None;
-        let mut bytes = self.data.bytes().skip(self.read).peekable();
+        let mut bytes = self.data.bytes().enumerate().skip(self.read).peekable();
         let mut last = None;
 
         bytes.peek()?;
 
-        while let Some(character) = bytes.next() {
-            self.read += 1;
+        while let Some((i, character)) = bytes.next() {
             match character {
                 _ if self.skip => {
                     self.skip = false;
@@ -162,7 +159,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 {
                     // If we are just ending the braced section continue as normal
                     if error.is_none() {
-                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                        error = Some(StatementError::InvalidCharacter(character as char, i + 1))
                     }
                 }
                 // Toggle quotes and stop matching variables.
@@ -179,8 +176,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'}' if self.quotes == Quotes::None => {
                     if self.brace_level == 0 {
                         if error.is_none() {
-                            error =
-                                Some(StatementError::InvalidCharacter(character as char, self.read))
+                            error = Some(StatementError::InvalidCharacter(character as char, i + 1))
                         }
                     } else {
                         self.brace_level -= 1;
@@ -189,7 +185,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b'(' if self.math_expr => self.math_paren_level += 1,
                 b'(' if self.method || last == Some(b'$') => {
                     self.variable = false;
-                    if bytes.peek() == Some(&b'(') {
+                    if let Some(&(_, b'(')) = bytes.peek() {
                         self.math_expr = true;
                         // The next character will always be a left paren in this branch;
                         self.math_paren_level = -1;
@@ -203,20 +199,17 @@ impl<'a> Iterator for StatementSplitter<'a> {
                     self.variable = false;
                 }
                 b'(' if error.is_none() && self.quotes == Quotes::None => {
-                    error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                    error = Some(StatementError::InvalidCharacter(character as char, i + 1))
                 }
                 b')' if self.math_expr => {
                     if self.math_paren_level == 0 {
                         match bytes.peek() {
-                            Some(&b')') => {
+                            Some(&(_, b')')) => {
                                 self.math_expr = false;
                                 self.skip = true;
                             }
-                            Some(&next_character) if error.is_none() => {
-                                error = Some(StatementError::InvalidCharacter(
-                                    next_character as char,
-                                    self.read,
-                                ));
+                            Some(&(_, next)) if error.is_none() => {
+                                error = Some(StatementError::InvalidCharacter(next as char, i + 1));
                             }
                             None if error.is_none() => {
                                 error = Some(StatementError::UnterminatedArithmetic)
@@ -232,14 +225,15 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b')' if self.paren_level == 0 => {
                     if error.is_none() && self.quotes == Quotes::None {
-                        error = Some(StatementError::InvalidCharacter(character as char, self.read))
+                        error = Some(StatementError::InvalidCharacter(character as char, i + 1))
                     }
                 }
                 b')' => self.paren_level -= 1,
                 b';' if self.quotes == Quotes::None && self.paren_level == 0 => {
-                    let statement = self.get_statement(start, self.read - 1);
+                    let statement = self.get_statement(start, i);
                     self.logical = LogicalOp::None;
 
+                    self.read = i + 1;
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(statement)),
@@ -251,19 +245,19 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         && last == Some(character) =>
                 {
                     // Detecting if there is a 2nd `&` character
-                    let statement = self.get_statement(start, self.read - 2);
+                    let statement = self.get_statement(start, i - 1);
                     self.logical = if character == b'&' { LogicalOp::And } else { LogicalOp::Or };
+                    self.read = i + 1;
                     return match error {
                         Some(error) => Some(Err(error)),
                         None => Some(Ok(statement)),
                     };
                 }
-                b' ' if !first_arg_found => match self.data[start..self.read - 1].trim() {
+                b' ' if !first_arg_found => match self.data[start..i].trim() {
                     "else" => {
-                        if self.data.len() < self.read + 2
-                            || &self.data[self.read..self.read + 2] != "if"
-                        {
+                        if self.data.len() < i + 2 || &self.data[i + 1..=i + 2] != "if" {
                             self.logical = LogicalOp::None;
+                            self.read = i + 1;
                             return Some(Ok(StatementVariant::Default("else")));
                         }
                     }
@@ -277,6 +271,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
             last = Some(character);
         }
 
+        self.read = self.data.len();
         match error {
             Some(error) => Some(Err(error)),
             None if self.paren_level != 0 => Some(Err(StatementError::UnterminatedSubshell)),
@@ -286,19 +281,19 @@ impl<'a> Iterator for StatementSplitter<'a> {
             None if self.math_expr => Some(Err(StatementError::UnterminatedArithmetic)),
             None => {
                 let output = self.data[start..].trim();
-                if output.is_empty() {
-                    Some(Ok(self.get_statement_from(output)))
-                } else {
-                    match output.as_bytes()[0] {
-                        b'>' | b'<' | b'^' => {
-                            Some(Err(StatementError::ExpectedCommandButFound("redirection")))
-                        }
-                        b'|' => Some(Err(StatementError::ExpectedCommandButFound("pipe"))),
-                        b'&' => Some(Err(StatementError::ExpectedCommandButFound("&"))),
-                        b'*' | b'%' | b'?' | b'{' | b'}' => {
-                            Some(Err(StatementError::IllegalCommandName(String::from(output))))
-                        }
-                        _ => Some(Ok(self.get_statement_from(output))),
+                match output.as_bytes().get(0) {
+                    Some(b'>') | Some(b'<') | Some(b'^') => {
+                        Some(Err(StatementError::ExpectedCommandButFound("redirection")))
+                    }
+                    Some(b'|') => Some(Err(StatementError::ExpectedCommandButFound("pipe"))),
+                    Some(b'&') => Some(Err(StatementError::ExpectedCommandButFound("&"))),
+                    Some(b'*') | Some(b'%') | Some(b'?') | Some(b'{') | Some(b'}') => {
+                        Some(Err(StatementError::IllegalCommandName(String::from(output))))
+                    }
+                    _ => {
+                        let stmt = self.get_statement_from(output);
+                        self.logical = LogicalOp::None;
+                        Some(Ok(stmt))
                     }
                 }
             }
