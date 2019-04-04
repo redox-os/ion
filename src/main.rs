@@ -1,12 +1,12 @@
 extern crate ion_sys as sys;
 
-use getopts::Options;
 use ion_shell::{flags::NO_EXEC, Binary, JobControl, ShellBuilder, MAN_ION};
 use smallvec::SmallVec;
 use std::{
     alloc::System,
     env,
     io::{stdin, BufReader, Read},
+    iter::FromIterator,
 };
 
 #[global_allocator]
@@ -22,46 +22,41 @@ fn main() {
 
     let mut shell = shell.as_binary();
 
-    let args: Vec<String> = env::args().collect();
+    let mut command = None;
+    let mut args = env::args().skip(1);
+    let mut script_path = None;
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "-n" | "--no-execute" => {
+                shell.flags |= NO_EXEC;
+            }
+            "-c" => command = args.next(),
+            "-v" | "--version" => {
+                println!("{}", ion_shell::version());
+                return;
+            }
+            "-h" | "--help" => {
+                println!("{}", MAN_ION);
+                return;
+            }
+            _ => {
+                script_path = Some(arg);
+                break;
+            }
+        }
+    }
 
-    let mut opts = Options::new();
-    opts.optopt(
-        "c",
-        "command",
-        "evaluates given commands instead of reading from the commandline",
-        "COMMAND",
+    shell.variables.set(
+        "args",
+        SmallVec::from_iter(
+            script_path
+                .clone()
+                .or(env::args().next())
+                .into_iter()
+                .chain(args)
+                .map(|arg| arg.into()),
+        ),
     );
-    opts.optflag("n", "no-execute", "do not execute any commands, just do syntax checking.");
-    opts.optflag("h", "help", "print this help menu");
-    opts.optflag("v", "version", "print the version");
-    let matches = opts
-        .parse(&args[1..])
-        .map_err(|e| {
-            eprintln!("Error: {}", e);
-            std::process::exit(64);
-        })
-        .unwrap();
-
-    if matches.opt_present("h") {
-        println!("{}", opts.usage(MAN_ION));
-        return;
-    }
-
-    if matches.opt_present("v") {
-        println!("{}", ion_shell::version());
-        return;
-    }
-
-    if matches.opt_present("n") {
-        shell.flags |= NO_EXEC;
-    }
-
-    let command = matches.opt_str("c");
-    let parameters = matches.free.into_iter().map(small::String::from).collect::<SmallVec<_>>();
-    let script_path = parameters.get(0).cloned();
-    if !parameters.is_empty() {
-        shell.variables.set("args", parameters);
-    }
 
     let status = if let Some(command) = command {
         shell.execute_script(&command);

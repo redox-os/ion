@@ -65,7 +65,6 @@ ion_sys = { path = "members/sys" }
 ion-ranges = { path = "members/ranges" }
 hashbrown = "0.1.2"
 itertools = "0.8"
-getopts = "0.2"
 lexical = "2.0"
 
 [lib]
