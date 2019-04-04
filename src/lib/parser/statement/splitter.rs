@@ -68,20 +68,17 @@ pub enum StatementVariant<'a> {
 
 #[derive(Debug)]
 pub struct StatementSplitter<'a> {
-    data: &'a str,
-    read: usize,
-    start: usize,
-    paren_level: u8,
-    brace_level: u8,
+    data:             &'a str,
+    read:             usize,
+    start:            usize,
+    paren_level:      u8,
+    brace_level:      u8,
     math_paren_level: i8,
-    logical: LogicalOp,
-    /// Set while parsing through an inline arithmetic expression, e.g. $((foo * bar / baz))
-    math_expr: bool,
-    skip: bool,
-    vbrace: bool,
-    method: bool,
-    variable: bool,
-    quotes: Quotes,
+    logical:          LogicalOp,
+    skip:             bool,
+    vbrace:           bool,
+    variable:         bool,
+    quotes:           Quotes,
 }
 
 impl<'a> StatementSplitter<'a> {
@@ -94,10 +91,8 @@ impl<'a> StatementSplitter<'a> {
             brace_level: 0,
             math_paren_level: 0,
             logical: LogicalOp::None,
-            math_expr: false,
             skip: false,
             vbrace: false,
-            method: false,
             variable: false,
             quotes: Quotes::None,
         }
@@ -129,7 +124,6 @@ impl<'a> Iterator for StatementSplitter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.read;
-        let mut first_arg_found = false;
         let mut error = None;
         let mut bytes = self.data.bytes().enumerate().skip(self.read).peekable();
         let mut last = None;
@@ -182,30 +176,27 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         self.brace_level -= 1;
                     }
                 }
-                b'(' if self.math_expr => self.math_paren_level += 1,
-                b'(' if self.method || last == Some(b'$') => {
+                b'(' if self.math_paren_level > 0 => self.math_paren_level += 1,
+                b'(' if last == Some(b'$') => {
                     self.variable = false;
                     if let Some(&(_, b'(')) = bytes.peek() {
-                        self.math_expr = true;
+                        bytes.next();
+                        self.read += 1;
                         // The next character will always be a left paren in this branch;
-                        self.math_paren_level = -1;
+                        self.math_paren_level = 1;
                     } else {
                         self.paren_level += 1;
                     }
                 }
-                b'(' if last == Some(b'@') => self.paren_level += 1,
-                b'(' if self.variable => {
-                    self.method = true;
-                    self.variable = false;
-                }
+                b'(' if self.variable => self.paren_level += 1,
                 b'(' if error.is_none() && self.quotes == Quotes::None => {
                     error = Some(StatementError::InvalidCharacter(character as char, i + 1))
                 }
-                b')' if self.math_expr => {
-                    if self.math_paren_level == 0 {
+                b')' if self.math_paren_level != 0 => {
+                    if self.math_paren_level == 1 {
                         match bytes.peek() {
                             Some(&(_, b')')) => {
-                                self.math_expr = false;
+                                self.math_paren_level = 0;
                                 self.skip = true;
                             }
                             Some(&(_, next)) if error.is_none() => {
@@ -220,8 +211,8 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         self.math_paren_level -= 1;
                     }
                 }
-                b')' if self.method && self.paren_level == 0 => {
-                    self.method = false;
+                b')' if self.variable && self.paren_level == 0 => {
+                    self.variable = false;
                 }
                 b')' if self.paren_level == 0 => {
                     if error.is_none() && self.quotes == Quotes::None {
@@ -253,17 +244,6 @@ impl<'a> Iterator for StatementSplitter<'a> {
                         None => Some(Ok(statement)),
                     };
                 }
-                b' ' if !first_arg_found => match self.data[start..i].trim() {
-                    "else" => {
-                        if self.data.len() < i + 2 || &self.data[i + 1..=i + 2] != "if" {
-                            self.logical = LogicalOp::None;
-                            self.read = i + 1;
-                            return Some(Ok(StatementVariant::Default("else")));
-                        }
-                    }
-                    "" => {}
-                    _ => first_arg_found = true,
-                },
                 // [^A-Za-z0-9_]
                 0...47 | 58...64 | 91...94 | 96 | 123...127 => self.variable = false,
                 _ => {}
@@ -273,15 +253,15 @@ impl<'a> Iterator for StatementSplitter<'a> {
 
         self.read = self.data.len();
         error.map(Err).or_else(|| {
-            if self.paren_level != 0 {
-                Some(Err(StatementError::UnterminatedSubshell))
-            } else if self.method {
+            if self.paren_level != 0 && self.variable {
                 Some(Err(StatementError::UnterminatedMethod))
+            } else if self.paren_level != 0 {
+                Some(Err(StatementError::UnterminatedSubshell))
             } else if self.vbrace {
                 Some(Err(StatementError::UnterminatedBracedVar))
             } else if self.brace_level != 0 {
                 Some(Err(StatementError::UnterminatedBrace))
-            } else if self.math_expr {
+            } else if self.math_paren_level != 0 {
                 Some(Err(StatementError::UnterminatedArithmetic))
             } else {
                 let output = self.data[start..].trim();
