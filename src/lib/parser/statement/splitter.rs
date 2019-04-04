@@ -272,39 +272,36 @@ impl<'a> Iterator for StatementSplitter<'a> {
         }
 
         self.read = self.data.len();
-        match error {
-            Some(error) => Some(Err(error)),
-            None => {
-                if self.paren_level != 0 {
-                    Some(Err(StatementError::UnterminatedSubshell))
-                } else if self.method {
-                    Some(Err(StatementError::UnterminatedMethod))
-                } else if self.vbrace {
-                    Some(Err(StatementError::UnterminatedBracedVar))
-                } else if self.brace_level != 0 {
-                    Some(Err(StatementError::UnterminatedBrace))
-                } else if self.math_expr {
-                    Some(Err(StatementError::UnterminatedArithmetic))
-                } else {
-                    let output = self.data[start..].trim();
-                    match output.as_bytes().get(0) {
-                        Some(b'>') | Some(b'<') | Some(b'^') => {
-                            Some(Err(StatementError::ExpectedCommandButFound("redirection")))
-                        }
-                        Some(b'|') => Some(Err(StatementError::ExpectedCommandButFound("pipe"))),
-                        Some(b'&') => Some(Err(StatementError::ExpectedCommandButFound("&"))),
-                        Some(b'*') | Some(b'%') | Some(b'?') | Some(b'{') | Some(b'}') => {
-                            Some(Err(StatementError::IllegalCommandName(String::from(output))))
-                        }
-                        _ => {
-                            let stmt = self.get_statement_from(output);
-                            self.logical = LogicalOp::None;
-                            Some(Ok(stmt))
-                        }
+        error.map(Err).or_else(|| {
+            if self.paren_level != 0 {
+                Some(Err(StatementError::UnterminatedSubshell))
+            } else if self.method {
+                Some(Err(StatementError::UnterminatedMethod))
+            } else if self.vbrace {
+                Some(Err(StatementError::UnterminatedBracedVar))
+            } else if self.brace_level != 0 {
+                Some(Err(StatementError::UnterminatedBrace))
+            } else if self.math_expr {
+                Some(Err(StatementError::UnterminatedArithmetic))
+            } else {
+                let output = self.data[start..].trim();
+                output.as_bytes().get(0).map(|c| match c {
+                    b'>' | b'<' | b'^' => {
+                        Err(StatementError::ExpectedCommandButFound("redirection"))
                     }
-                }
+                    b'|' => Err(StatementError::ExpectedCommandButFound("pipe")),
+                    b'&' => Err(StatementError::ExpectedCommandButFound("&")),
+                    b'*' | b'%' | b'?' | b'{' | b'}' => {
+                        Err(StatementError::IllegalCommandName(String::from(output)))
+                    }
+                    _ => {
+                        let stmt = self.get_statement_from(output);
+                        self.logical = LogicalOp::None;
+                        Ok(stmt)
+                    }
+                })
             }
-        }
+        })
     }
 }
 
