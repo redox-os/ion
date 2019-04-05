@@ -9,8 +9,8 @@ handles larger numbers.
 ## String Variables
 
 Like POSIX shells, the **$** sigil denotes that the following expression will be a string
-expansion. If the character that follows is an accepted ASCII character, all characters that
-follow will be collected until either a non-accepted ASCII character is found, or all characters
+expansion. If the character that follows is an accepted Unicode character, all characters that
+follow will be collected until either a non-accepted Unicode character is found, or all characters
 have been read. Then the characters that were collected will be used as the name of the string
 variable to substitute with.
 
@@ -23,7 +23,7 @@ $ echo $string:$string
 ```
 
 **NOTE:**
-- Accepted characters are characters ranging from **A-Z**, **a-z**, **0-9**, and **_**.
+- Accepted characters are **unicode** alphanumeric characters and **_**.
 - If not double quoted, newlines will be replaced with spaces.
 
 ## Array Variables
@@ -46,7 +46,7 @@ double quotes is therefore equivalent to folding the elements into a single stri
 
 ## Braced Variables
 
-Braces can also be used when you need to integrate a variable expansion along accepted ASCII
+Braces can also be used when you need to integrate a variable expansion along accepted Unicode
 characters.
 
 ```sh

@@ -130,8 +130,8 @@ impl VariableStore for Shell {
             }
 
             if !is_valid_name(key.name) {
-                return Err("invalid variable name\nVariable names may only have A-Z, a-z, 0-9 \
-                            and _\nThe first character cannot be a digit"
+                return Err("invalid variable name\nVariable names may only be (unicode) \
+                            alphanumeric or `_`\nThe first character must be alphabetic"
                     .to_string());
             }
 
