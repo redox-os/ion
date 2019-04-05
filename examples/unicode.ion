@@ -1,0 +1,10 @@
+fn Җ Ҕ:int
+  echo $Ҕ
+end
+
+echo Ҥ
+Җ 1
+let Ҳ = ӌ
+echo $Ҳ
+let 1Ҳ = ӌ
+echo $1Ҳ

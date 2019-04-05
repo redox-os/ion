@@ -2,7 +2,7 @@
 
 Functions help scripts to reduce the amount of code duplication and increase readability. Ion supports the creation of functions with a similar syntax to other languages.
 
-The basic syntax of functions is as follos:
+The basic syntax of functions is as follows:
 
 ```sh
 fn square
@@ -53,7 +53,7 @@ You can use any of the [supported types](ch04-00-variables.md#Supported Types).
 As another example:
 
 ```
-fn hello name age:int hobbies[]
+fn hello name age:int hobbies:[str]
     echo $name ($age) has the following hobbies:
     for hobby in @hobbies
         echo "  $hobby"

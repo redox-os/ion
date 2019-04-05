@@ -26,7 +26,7 @@ function test {
     EXPECTED_OUTPUT_FILE=$(echo $1 | sed 's/\..\+/\.out/')
 
     # Run script and redirect stdout into tmp file
-    $PROJECT_DIR/target/debug/ion "${@:2}" > $EXAMPLES_DIR/tmp.out 2> /dev/null
+    $PROJECT_DIR/target/debug/ion "${@:2}" > $EXAMPLES_DIR/tmp.out 2>&1
 
     # Compare real and expected output
     diff "$EXAMPLES_DIR"/tmp.out "$EXPECTED_OUTPUT_FILE" > "$EXAMPLES_DIR"/diff_tmp
