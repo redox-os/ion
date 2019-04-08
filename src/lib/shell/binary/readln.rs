@@ -101,7 +101,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
 
     match line {
         Ok(line) => {
-            if line.bytes().any(|c| !c.is_ascii_whitespace()) {
+            if line.bytes().next() != Some(b'#') && line.bytes().any(|c| !c.is_ascii_whitespace()) {
                 shell.flags |= flags::UNTERMINATED;
             }
             Some(line)
