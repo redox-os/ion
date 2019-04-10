@@ -422,7 +422,7 @@ impl Function {
             shell.variables.shadow(&type_.name, value);
         }
 
-        shell.execute_statements(self.statements);
+        shell.execute_statements(&self.statements);
 
         shell.variables.pop_scope();
         shell.variables.append_scopes(temporary);

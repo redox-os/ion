@@ -44,11 +44,7 @@ pub(crate) trait FlowLogic {
 
     /// Executes all of the statements within a while block until a certain
     /// condition is met.
-    fn execute_while(
-        &mut self,
-        expression: Vec<Statement>,
-        statements: Vec<Statement>,
-    ) -> Condition;
+    fn execute_while(&mut self, expression: &[Statement], statements: &[Statement]) -> Condition;
 
     /// Executes all of the statements within a for block for each value
     /// specified in the range.
@@ -56,65 +52,65 @@ pub(crate) trait FlowLogic {
         &mut self,
         variables: &[types::Str],
         values: &[small::String],
-        statements: Vec<Statement>,
+        statements: &[Statement],
     ) -> Condition;
 
     /// Conditionally executes branches of statements according to evaluated
     /// expressions
     fn execute_if(
         &mut self,
-        expression: Vec<Statement>,
-        success: Vec<Statement>,
-        else_if: Vec<ElseIf>,
-        failure: Vec<Statement>,
+        expression: &[Statement],
+        success: &[Statement],
+        else_if: &[ElseIf],
+        failure: &[Statement],
     ) -> Condition;
 
     /// Simply executes all supplied statements.
-    fn execute_statements(&mut self, statements: Vec<Statement>) -> Condition;
+    fn execute_statements(&mut self, statements: &[Statement]) -> Condition;
 
     /// Executes a single statement
-    fn execute_statement(&mut self, statement: Statement) -> Condition;
+    fn execute_statement(&mut self, statement: &Statement) -> Condition;
 
     /// Expand an expression and run a branch based on the value of the
     /// expanded expression
-    fn execute_match(&mut self, expression: small::String, cases: Vec<Case>) -> Condition;
+    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case]) -> Condition;
 }
 
 impl FlowLogic for Shell {
     fn execute_if(
         &mut self,
-        expression: Vec<Statement>,
-        success: Vec<Statement>,
-        else_if: Vec<ElseIf>,
-        failure: Vec<Statement>,
+        expression: &[Statement],
+        success: &[Statement],
+        else_if: &[ElseIf],
+        failure: &[Statement],
     ) -> Condition {
         // Try execute success branch
-        if let Condition::SigInt = self.execute_statements(expression) {
+        if let Condition::SigInt = self.execute_statements(&expression) {
             return Condition::SigInt;
         }
         if self.previous_status == 0 {
-            return self.execute_statements(success);
+            return self.execute_statements(&success);
         }
 
         // Try to execute else_if branches
         for ElseIf { expression, success } in else_if {
-            if let Condition::SigInt = self.execute_statements(expression) {
+            if let Condition::SigInt = self.execute_statements(&expression) {
                 return Condition::SigInt;
             }
 
             if self.previous_status == 0 {
-                return self.execute_statements(success);
+                return self.execute_statements(&success);
             }
         }
 
-        self.execute_statements(failure)
+        self.execute_statements(&failure)
     }
 
     fn execute_for(
         &mut self,
         variables: &[types::Str],
         values: &[small::String],
-        statements: Vec<Statement>,
+        statements: &[Statement],
     ) -> Condition {
         macro_rules! set_vars_then_exec {
             ($chunk:expr, $def:expr) => {
@@ -124,7 +120,7 @@ impl FlowLogic for Shell {
                     }
                 }
 
-                handle_signal!(self.execute_statements(statements.clone()));
+                handle_signal!(self.execute_statements(statements));
             };
         }
 
@@ -151,19 +147,15 @@ impl FlowLogic for Shell {
         Condition::NoOp
     }
 
-    fn execute_while(
-        &mut self,
-        expression: Vec<Statement>,
-        statements: Vec<Statement>,
-    ) -> Condition {
+    fn execute_while(&mut self, expression: &[Statement], statements: &[Statement]) -> Condition {
         loop {
-            self.execute_statements(expression.clone());
+            self.execute_statements(&expression);
             if self.previous_status != 0 {
                 return Condition::NoOp;
             }
 
             // Cloning is needed so the statement can be re-iterated again if needed.
-            match self.execute_statements(statements.clone()) {
+            match self.execute_statements(&statements) {
                 Condition::Break => return Condition::NoOp,
                 Condition::SigInt => return Condition::SigInt,
                 _ => (),
@@ -171,10 +163,10 @@ impl FlowLogic for Shell {
         }
     }
 
-    fn execute_statement(&mut self, statement: Statement) -> Condition {
+    fn execute_statement(&mut self, statement: &Statement) -> Condition {
         match statement {
             Statement::Error(number) => {
-                self.previous_status = number;
+                self.previous_status = *number;
                 self.variables.set("?", self.previous_status.to_string());
                 self.flow_control.reset();
             }
@@ -187,17 +179,17 @@ impl FlowLogic for Shell {
                 self.variables.set("?", self.previous_status.to_string());
             }
             Statement::While { expression, statements } => {
-                if let Condition::SigInt = self.execute_while(expression, statements) {
+                if let Condition::SigInt = self.execute_while(&expression, &statements) {
                     return Condition::SigInt;
                 }
             }
             Statement::For { variables, values, statements } => {
-                if let Condition::SigInt = self.execute_for(&variables, &values, statements) {
+                if let Condition::SigInt = self.execute_for(&variables, &values, &statements) {
                     return Condition::SigInt;
                 }
             }
             Statement::If { expression, success, else_if, failure, .. } => {
-                match self.execute_if(expression, success, else_if, failure) {
+                match self.execute_if(&expression, &success, &else_if, &failure) {
                     Condition::Break => return Condition::Break,
                     Condition::Continue => return Condition::Continue,
                     Condition::NoOp => (),
@@ -205,8 +197,15 @@ impl FlowLogic for Shell {
                 }
             }
             Statement::Function { name, args, statements, description } => {
-                self.variables
-                    .set(&name, Function::new(description, name.clone(), args, statements));
+                self.variables.set(
+                    &name,
+                    Function::new(
+                        description.clone(),
+                        name.clone(),
+                        args.to_vec(),
+                        statements.to_vec(),
+                    ),
+                );
             }
             Statement::Pipeline(pipeline) => match expand_pipeline(&self, &pipeline) {
                 Ok((mut pipeline, statements)) => {
@@ -218,7 +217,7 @@ impl FlowLogic for Shell {
                         self.exit(status);
                     }
                     if !statements.is_empty() {
-                        self.execute_statements(statements);
+                        self.execute_statements(&statements);
                     }
                 }
                 Err(e) => {
@@ -232,7 +231,7 @@ impl FlowLogic for Shell {
             Statement::Time(box_statement) => {
                 let time = ::std::time::Instant::now();
 
-                let condition = self.execute_statement(*box_statement);
+                let condition = self.execute_statement(box_statement);
 
                 let duration = time.elapsed();
                 let seconds = duration.as_secs();
@@ -260,7 +259,7 @@ impl FlowLogic for Shell {
             }
             Statement::And(box_statement) => {
                 let condition = match self.previous_status {
-                    SUCCESS => self.execute_statement(*box_statement),
+                    SUCCESS => self.execute_statement(box_statement),
                     _ => Condition::NoOp,
                 };
 
@@ -273,7 +272,7 @@ impl FlowLogic for Shell {
             }
             Statement::Or(box_statement) => {
                 let condition = match self.previous_status {
-                    FAILURE => self.execute_statement(*box_statement),
+                    FAILURE => self.execute_statement(box_statement),
                     _ => Condition::NoOp,
                 };
 
@@ -286,7 +285,7 @@ impl FlowLogic for Shell {
             }
             Statement::Not(box_statement) => {
                 // NOTE: Should the condition be used?
-                let _condition = self.execute_statement(*box_statement);
+                let _condition = self.execute_statement(box_statement);
                 match self.previous_status {
                     FAILURE => self.previous_status = SUCCESS,
                     SUCCESS => self.previous_status = FAILURE,
@@ -297,12 +296,14 @@ impl FlowLogic for Shell {
             }
             Statement::Break => return Condition::Break,
             Statement::Continue => return Condition::Continue,
-            Statement::Match { expression, cases } => match self.execute_match(expression, cases) {
-                Condition::Break => return Condition::Break,
-                Condition::Continue => return Condition::Continue,
-                Condition::NoOp => (),
-                Condition::SigInt => return Condition::SigInt,
-            },
+            Statement::Match { expression, cases } => {
+                match self.execute_match(expression, &cases) {
+                    Condition::Break => return Condition::Break,
+                    Condition::Continue => return Condition::Continue,
+                    Condition::NoOp => (),
+                    Condition::SigInt => return Condition::SigInt,
+                }
+            }
             _ => {}
         }
         if let Some(signal) = signals::SignalHandler.next() {
@@ -318,7 +319,7 @@ impl FlowLogic for Shell {
         }
     }
 
-    fn execute_statements(&mut self, statements: Vec<Statement>) -> Condition {
+    fn execute_statements(&mut self, statements: &[Statement]) -> Condition {
         self.variables.new_scope(false);
 
         let mut condition = None;
@@ -337,7 +338,7 @@ impl FlowLogic for Shell {
         condition.unwrap_or(Condition::NoOp)
     }
 
-    fn execute_match(&mut self, expression: small::String, cases: Vec<Case>) -> Condition {
+    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case]) -> Condition {
         // Logic for determining if the LHS of a match-case construct (the value we are
         // matching against) matches the RHS of a match-case construct (a value
         // in a case statement). For example, checking to see if the value
@@ -345,11 +346,12 @@ impl FlowLogic for Shell {
         // ```ignore
         // matches("foo", "bar")
         // ```
-        let is_array = is_array(&expression);
-        let value = expand_string(&expression, self, false);
-        for case in cases.into_iter() {
+        let is_array = is_array(expression.as_ref());
+        let value = expand_string(expression.as_ref(), self, false);
+        for case in cases.iter() {
             if case
                 .value
+                .as_ref()
                 .map(|v| expand_string(&v, self, false))
                 .filter(|v| v.iter().all(|v| !value.contains(v)))
                 .is_none()
@@ -367,14 +369,14 @@ impl FlowLogic for Shell {
                     }
                 });
 
-                if let Some(statement) = case.conditional {
-                    self.on_command(&statement);
+                if let Some(statement) = case.conditional.as_ref() {
+                    self.on_command(statement);
                     if self.previous_status != SUCCESS {
                         continue;
                     }
                 }
 
-                let condition = self.execute_statements(case.statements);
+                let condition = self.execute_statements(&case.statements);
 
                 if let Some(ref bind) = case.binding {
                     if let Some(value) = previous_bind {
@@ -407,7 +409,7 @@ impl FlowLogic for Shell {
                     return;
                 }
                 Ok(Some(stm)) => {
-                    let _ = self.execute_statement(stm);
+                    let _ = self.execute_statement(&stm);
                 }
                 Ok(None) => {}
             }
