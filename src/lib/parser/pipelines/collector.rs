@@ -1,4 +1,4 @@
-use std::{collections::HashSet, iter::Peekable};
+use std::iter::Peekable;
 
 use super::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use crate::{
@@ -38,11 +38,6 @@ impl AddItem for Pipeline {
 #[derive(Debug)]
 pub(crate) struct Collector<'a> {
     data: &'a str,
-}
-
-lazy_static! {
-    /// The set of bytes that will always indicate an end of an arg
-    static ref FOLLOW_ARGS: HashSet<u8> = b"&|<> \t".iter().cloned().collect();
 }
 
 impl<'a> Collector<'a> {
@@ -352,7 +347,7 @@ impl<'a> Collector<'a> {
                 }
                 // If we see a byte from the follow set, we've definitely reached the end of
                 // the arguments
-                c if FOLLOW_ARGS.contains(&c) && levels.are_rooted() => {
+                b'&' | b'|' | b'<' | b'>' | b' ' | b'\t' if levels.are_rooted() => {
                     end = Some(i);
                     break;
                 }

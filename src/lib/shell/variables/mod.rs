@@ -702,6 +702,7 @@ mod trait_test;
 mod tests {
     use super::*;
     use crate::parser::{expand_string, Expander};
+    use serial_test_derive::serial;
 
     struct VariableExpander(pub Variables);
 
@@ -724,38 +725,25 @@ mod tests {
         assert_eq!("BAR", &expanded);
     }
 
-    use std::sync::Mutex;
-    lazy_static! {
-        static ref ENVLOCK: Mutex<()> = Mutex::new(());
-    }
-
     #[test]
+    #[serial]
     fn minimal_directory_var_should_compact_path() {
-        // Make sure we dont read the other tests writes to env
-        let _guard = ENVLOCK.lock().unwrap();
         let variables = Variables::default();
         env::set_var("PWD", "/var/log/nix");
         assert_eq!(
             types::Str::from("v/l/nix"),
-            match variables.get::<types::Str>("MWD") {
-                Some(string) => string,
-                None => panic!("no value returned"),
-            }
+            variables.get::<types::Str>("MWD").expect("no value returned"),
         );
     }
 
     #[test]
+    #[serial]
     fn minimal_directory_var_shouldnt_compact_path() {
-        // Make sure we dont read the other tests writes to env
-        let _guard = ENVLOCK.lock().unwrap();
         let variables = Variables::default();
         env::set_var("PWD", "/var/log");
         assert_eq!(
             types::Str::from("/var/log"),
-            match variables.get::<types::Str>("MWD") {
-                Some(string) => string,
-                None => panic!("no value returned"),
-            }
+            variables.get::<types::Str>("MWD").expect("no value returned"),
         );
     }
 }
