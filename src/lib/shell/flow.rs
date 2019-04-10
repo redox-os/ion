@@ -97,15 +97,13 @@ impl FlowLogic for Shell {
         }
 
         // Try to execute else_if branches
-        let else_if_conditions = else_if.into_iter().map(|cond| (cond.expression, cond.success));
-
-        for (condition, statements) in else_if_conditions {
-            if let Condition::SigInt = self.execute_statements(condition) {
+        for ElseIf { expression, success } in else_if {
+            if let Condition::SigInt = self.execute_statements(expression) {
                 return Condition::SigInt;
             }
 
             if self.previous_status == 0 {
-                return self.execute_statements(statements);
+                return self.execute_statements(success);
             }
         }
 
@@ -347,108 +345,52 @@ impl FlowLogic for Shell {
         // ```ignore
         // matches("foo", "bar")
         // ```
-        fn matches(lhs: &types::Array, rhs: &types::Array) -> bool {
-            for v in lhs {
-                if rhs.contains(&v) {
-                    return true;
-                }
-            }
-            false
-        }
-
         let is_array = is_array(&expression);
         let value = expand_string(&expression, self, false);
-        let mut condition = Condition::NoOp;
-        for case in cases {
-            // let pattern_is_array = is_array(&value);
-            let pattern = case.value.map(|v| expand_string(&v, self, false));
-            match pattern {
-                None => {
-                    let mut previous_bind = None;
-                    if let Some(ref bind) = case.binding {
-                        if is_array {
-                            previous_bind =
-                                self.variables.get::<types::Array>(bind).map(Value::Array);
-                            self.variables.set(&bind, value.clone());
-                        } else {
-                            previous_bind = self.variables.get::<types::Str>(bind).map(Value::Str);
-                            self.set(&bind, value.join(" "));
-                        }
+        for case in cases.into_iter() {
+            if case
+                .value
+                .map(|v| expand_string(&v, self, false))
+                .filter(|v| v.iter().all(|v| !value.contains(v)))
+                .is_none()
+            {
+                // let pattern_is_array = is_array(&value);
+                let previous_bind = case.binding.as_ref().and_then(|bind| {
+                    if is_array {
+                        let out = self.variables.get::<types::Array>(bind).map(Value::Array);
+                        self.set(&bind, value.clone());
+                        out
+                    } else {
+                        let out = self.variables.get::<types::Str>(bind).map(Value::Str);
+                        self.set(&bind, value.join(" "));
+                        out
                     }
+                });
 
-                    if let Some(statement) = case.conditional {
-                        self.on_command(&statement);
-                        if self.previous_status != SUCCESS {
-                            continue;
-                        }
+                if let Some(statement) = case.conditional {
+                    self.on_command(&statement);
+                    if self.previous_status != SUCCESS {
+                        continue;
                     }
-
-                    condition = self.execute_statements(case.statements);
-
-                    if let Some(ref bind) = case.binding {
-                        if let Some(value) = previous_bind {
-                            match value {
-                                str_ @ Value::Str(_) => {
-                                    self.set(bind, str_);
-                                }
-                                array @ Value::Array(_) => {
-                                    self.variables.set(bind, array);
-                                }
-                                map @ Value::HashMap(_) => {
-                                    self.variables.set(bind, map);
-                                }
-                                _ => (),
-                            }
-                        }
-                    }
-
-                    break;
                 }
-                Some(ref v) if matches(v, &value) => {
-                    let mut previous_bind = None;
-                    if let Some(ref bind) = case.binding {
-                        if is_array {
-                            previous_bind =
-                                self.variables.get::<types::Array>(bind).map(Value::Array);
-                            self.variables.set(&bind, value.clone());
-                        } else {
-                            previous_bind = self.variables.get::<types::Str>(bind).map(Value::Str);
-                            self.set(&bind, value.join(" "));
-                        }
-                    }
 
-                    if let Some(statement) = case.conditional {
-                        self.on_command(&statement);
-                        if self.previous_status != SUCCESS {
-                            continue;
-                        }
-                    }
+                let condition = self.execute_statements(case.statements);
 
-                    condition = self.execute_statements(case.statements);
-
-                    if let Some(ref bind) = case.binding {
-                        if let Some(value) = previous_bind {
-                            match value {
-                                str_ @ Value::Str(_) => {
-                                    self.set(bind, str_);
-                                }
-                                array @ Value::Array(_) => {
-                                    self.set(bind, array);
-                                }
-                                map @ Value::HashMap(_) => {
-                                    self.set(bind, map);
-                                }
-                                _ => (),
+                if let Some(ref bind) = case.binding {
+                    if let Some(value) = previous_bind {
+                        match value {
+                            Value::HashMap(_) | Value::Array(_) | Value::Str(_) => {
+                                self.set(bind, value);
                             }
+                            _ => (),
                         }
                     }
-
-                    break;
                 }
-                Some(_) => (),
+
+                return condition;
             }
         }
-        condition
+        return Condition::NoOp;
     }
 
     fn on_command(&mut self, command_string: &str) {
