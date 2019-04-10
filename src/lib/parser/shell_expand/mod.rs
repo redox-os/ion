@@ -1,6 +1,4 @@
 // TODO: Handle Runtime Errors
-extern crate calc;
-
 mod words;
 
 pub(crate) use self::words::{Select, WordIterator, WordToken};

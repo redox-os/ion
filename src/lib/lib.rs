@@ -4,8 +4,6 @@
 extern crate bitflags;
 #[macro_use]
 extern crate err_derive;
-#[macro_use]
-extern crate lazy_static;
 extern crate ion_braces as braces;
 extern crate ion_lexers as lexers;
 extern crate ion_ranges as ranges;
