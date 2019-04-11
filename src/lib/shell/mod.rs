@@ -180,6 +180,9 @@ impl ShellBuilder {
 }
 
 impl Shell {
+    // Resets the flow control fields to their default values.
+    fn reset_flow(&mut self) { self.flow_control.reset(); }
+
     /// A method for capturing the output of the shell, and performing actions without modifying
     /// the state of the original shell. This performs a fork, taking a closure that controls
     /// the shell in the child of the fork.

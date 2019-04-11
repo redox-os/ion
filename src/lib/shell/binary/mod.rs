@@ -50,8 +50,6 @@ pub trait Binary {
     fn prompt_fn(&mut self) -> Option<String>;
     // Handles commands given by the REPL, and saves them to history.
     fn save_command(&mut self, command: &str);
-    // Resets the flow control fields to their default values.
-    fn reset_flow(&mut self);
 }
 
 impl Binary for Shell {
@@ -67,8 +65,6 @@ impl Binary for Shell {
             self.save_command_in_history(cmd);
         }
     }
-
-    fn reset_flow(&mut self) { self.flow_control.reset(); }
 
     fn execute_interactive(mut self) {
         self.context = Some({
