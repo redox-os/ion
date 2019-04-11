@@ -179,177 +179,173 @@ pub(crate) fn insert_statement(
         | Statement::While { .. }
         | Statement::Match { .. }
         | Statement::If { .. }
-        | Statement::Function { .. } => flow_control.block.push(statement),
+        | Statement::Function { .. } => {
+            flow_control.block.push(statement);
+            Ok(None)
+        }
         // Case is special as it should pop back previous Case
         Statement::Case(_) => {
-            let mut top_is_case = false;
             match flow_control.block.last() {
-                Some(Statement::Case(_)) => top_is_case = true,
+                Some(Statement::Case(_)) => {
+                    let case = flow_control.block.pop().unwrap();
+                    let _ = insert_into_block(&mut flow_control.block, case);
+                }
                 Some(Statement::Match { .. }) => (),
                 _ => return Err("ion: error: Case { .. } found outside of Match { .. } block"),
             }
 
-            if top_is_case {
-                let case = flow_control.block.pop().unwrap();
-                let _ = insert_into_block(&mut flow_control.block, case);
-            }
             flow_control.block.push(statement);
+            Ok(None)
         }
         Statement::End => {
             match flow_control.block.len() {
-                0 => return Err("ion: error: keyword End found but no block to close"),
+                0 => Err("ion: error: keyword End found but no block to close"),
                 // Ready to return the complete block
-                1 => return Ok(flow_control.block.pop()),
+                1 => Ok(flow_control.block.pop()),
                 // Merge back the top block into the previous one
                 _ => {
                     let block = flow_control.block.pop().unwrap();
-                    match block {
-                        Statement::Case(_) => {
-                            // Merge last Case back and pop off Match too
-                            insert_into_block(&mut flow_control.block, block)?;
-                            let match_stm = flow_control.block.pop().unwrap();
-                            if !flow_control.block.is_empty() {
-                                insert_into_block(&mut flow_control.block, match_stm)?;
-                            } else {
-                                return Ok(Some(match_stm));
-                            }
+                    let mut case = false;
+                    if let Statement::Case(_) = block {
+                        case = true;
+                    }
+                    insert_into_block(&mut flow_control.block, block)?;
+                    if case {
+                        // Merge last Case back and pop off Match too
+                        let match_stm = flow_control.block.pop().unwrap();
+                        if !flow_control.block.is_empty() {
+                            insert_into_block(&mut flow_control.block, match_stm)?;
+
+                            Ok(None)
+                        } else {
+                            Ok(Some(match_stm))
                         }
-                        _ => insert_into_block(&mut flow_control.block, block)?,
+                    } else {
+                        Ok(None)
                     }
                 }
             }
         }
         Statement::And(_) | Statement::Or(_) if !flow_control.block.is_empty() => {
             let mut pushed = true;
-            if let Some(top) = flow_control.block.last_mut() {
-                match top {
-                    Statement::If {
-                        ref mut expression,
-                        ref mode,
-                        ref success,
-                        ref mut else_if,
-                        ..
-                    } => match *mode {
-                        0 if success.is_empty() => {
-                            // Insert into If expression if there's no previous statement.
-                            expression.push(statement.clone());
-                        }
-                        1 => {
-                            // Try to insert into last ElseIf expression if there's no previous
-                            // statement.
-                            if let Some(eif) = else_if.last_mut() {
-                                if eif.success.is_empty() {
-                                    eif.expression.push(statement.clone());
-                                } else {
-                                    pushed = false;
-                                }
+            match flow_control.block.last_mut().unwrap() {
+                Statement::If {
+                    ref mut expression,
+                    ref mode,
+                    ref success,
+                    ref mut else_if,
+                    ..
+                } => match *mode {
+                    0 if success.is_empty() => {
+                        // Insert into If expression if there's no previous statement.
+                        expression.push(statement.clone());
+                    }
+                    1 => {
+                        // Try to insert into last ElseIf expression if there's no previous
+                        // statement.
+                        if let Some(eif) = else_if.last_mut() {
+                            if eif.success.is_empty() {
+                                eif.expression.push(statement.clone());
                             } else {
-                                // should not be reached...
-                                unreachable!("Missmatch in 'If' mode!")
+                                pushed = false;
                             }
-                        }
-                        _ => pushed = false,
-                    },
-                    Statement::While { ref mut expression, ref statements } => {
-                        if statements.is_empty() {
-                            expression.push(statement.clone());
                         } else {
-                            pushed = false;
+                            // should not be reached...
+                            unreachable!("Missmatch in 'If' mode!")
                         }
                     }
                     _ => pushed = false,
+                },
+                Statement::While { ref mut expression, ref statements } => {
+                    if statements.is_empty() {
+                        expression.push(statement.clone());
+                    } else {
+                        pushed = false;
+                    }
                 }
-            } else {
-                unreachable!()
+                _ => pushed = false,
             }
             if !pushed {
                 insert_into_block(&mut flow_control.block, statement)?;
             }
+
+            Ok(None)
         }
         Statement::Time(inner) => {
             if inner.is_block() {
                 flow_control.block.push(Statement::Time(inner));
+                Ok(None)
             } else {
-                return Ok(Some(Statement::Time(inner)));
+                Ok(Some(Statement::Time(inner)))
             }
         }
         _ => {
             if !flow_control.block.is_empty() {
                 insert_into_block(&mut flow_control.block, statement)?;
+                Ok(None)
             } else {
                 // Filter out toplevel statements that should produce an error
                 // otherwise return the statement for immediat execution
                 match statement {
                     Statement::ElseIf(_) => {
-                        return Err("ion: error: found ElseIf { .. } without If { .. } block");
+                        Err("ion: error: found ElseIf { .. } without If { .. } block")
                     }
-                    Statement::Else => return Err("ion: error: found Else without If { .. } block"),
-                    Statement::Break => return Err("ion: error: found Break without loop body"),
-                    Statement::Continue => {
-                        return Err("ion: error: found Continue without loop body");
-                    }
+                    Statement::Else => Err("ion: error: found Else without If { .. } block"),
+                    Statement::Break => Err("ion: error: found Break without loop body"),
+                    Statement::Continue => Err("ion: error: found Continue without loop body"),
                     // Toplevel statement, return to execute immediately
-                    _ => return Ok(Some(statement)),
+                    _ => Ok(Some(statement)),
                 }
             }
         }
     }
-    Ok(None)
 }
 
 fn insert_into_block(block: &mut Vec<Statement>, statement: Statement) -> Result<(), &'static str> {
-    if let Some(top_block) = block.last_mut() {
-        let block = match top_block {
-            Statement::Time(inner) => inner,
-            _ => top_block,
-        };
+    let block = match block.last_mut().expect("Should not insert statement if stack is empty!") {
+        Statement::Time(inner) => inner,
+        top_block @ _ => top_block,
+    };
 
-        match block {
-            Statement::Function { ref mut statements, .. } => statements.push(statement),
-            Statement::For { ref mut statements, .. } => statements.push(statement),
-            Statement::While { ref mut statements, .. } => statements.push(statement),
-            Statement::Match { ref mut cases, .. } => match statement {
-                Statement::Case(case) => cases.push(case),
-                _ => {
-                    return Err(
-                        "ion: error: statement found outside of Case { .. } block in Match { .. }"
-                    );
+    match block {
+        Statement::Function { ref mut statements, .. } => statements.push(statement),
+        Statement::For { ref mut statements, .. } => statements.push(statement),
+        Statement::While { ref mut statements, .. } => statements.push(statement),
+        Statement::Match { ref mut cases, .. } => match statement {
+            Statement::Case(case) => cases.push(case),
+            _ => {
+                return Err(
+                    "ion: error: statement found outside of Case { .. } block in Match { .. }"
+                );
+            }
+        },
+        Statement::Case(ref mut case) => case.statements.push(statement),
+        Statement::If {
+            ref mut success, ref mut else_if, ref mut failure, ref mut mode, ..
+        } => match statement {
+            Statement::ElseIf(eif) => {
+                if *mode > 1 {
+                    return Err("ion: error: ElseIf { .. } found after Else");
+                } else {
+                    *mode = 1;
+                    else_if.push(eif);
                 }
+            }
+            Statement::Else => {
+                if *mode == 2 {
+                    return Err("ion: error: Else block already exists");
+                } else {
+                    *mode = 2;
+                }
+            }
+            _ => match *mode {
+                0 => success.push(statement),
+                1 => else_if.last_mut().unwrap().success.push(statement),
+                2 => failure.push(statement),
+                _ => unreachable!(),
             },
-            Statement::Case(ref mut case) => case.statements.push(statement),
-            Statement::If {
-                ref mut success,
-                ref mut else_if,
-                ref mut failure,
-                ref mut mode,
-                ..
-            } => match statement {
-                Statement::ElseIf(eif) => {
-                    if *mode > 1 {
-                        return Err("ion: error: ElseIf { .. } found after Else");
-                    } else {
-                        *mode = 1;
-                        else_if.push(eif);
-                    }
-                }
-                Statement::Else => {
-                    if *mode == 2 {
-                        return Err("ion: error: Else block already exists");
-                    } else {
-                        *mode = 2;
-                    }
-                }
-                _ => match *mode {
-                    0 => success.push(statement),
-                    1 => else_if.last_mut().unwrap().success.push(statement),
-                    2 => failure.push(statement),
-                    _ => unreachable!(),
-                },
-            },
-            _ => unreachable!("Not block-like statement pushed to stack!"),
-        }
-    } else {
-        unreachable!("Should not insert statement if stack is empty!")
+        },
+        _ => unreachable!("Not block-like statement pushed to stack!"),
     }
     Ok(())
 }
@@ -390,27 +386,25 @@ impl Function {
             return Err(FunctionError::InvalidArgumentCount);
         }
 
-        let name = self.name.clone();
-
-        let mut values: SmallVec<[_; 8]> = SmallVec::new();
-
-        for (type_, value) in self.args.iter().zip(args.iter().skip(1)) {
-            let value = match value_check(shell, value.as_ref(), &type_.kind) {
-                Ok(value) => value,
-                Err(_) => {
-                    return Err(FunctionError::InvalidArgumentType(
+        let values = self
+            .args
+            .iter()
+            .zip(args.iter().skip(1))
+            .map(|(type_, value)| {
+                if let Ok(value) = value_check(shell, value.as_ref(), &type_.kind) {
+                    Ok((type_.clone(), value))
+                } else {
+                    Err(FunctionError::InvalidArgumentType(
                         type_.kind.clone(),
                         value.as_ref().into(),
-                    ));
+                    ))
                 }
-            };
-
-            values.push((type_.clone(), value));
-        }
+            })
+            .collect::<Result<SmallVec<[_; 8]>, _>>()?;
 
         let index = shell
             .variables
-            .index_scope_for_var(&name)
+            .index_scope_for_var(&self.name)
             .expect("execute called with invalid function");
 
         // Pop off all scopes since function temporarily
