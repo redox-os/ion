@@ -1,5 +1,5 @@
 use super::{
-    super::pipelines::{self, Pipeline},
+    super::pipelines,
     case,
     functions::{collect_arguments, parse_function},
 };
@@ -12,19 +12,6 @@ use crate::{
 };
 use small;
 use std::char;
-
-fn collect<F>(arguments: &str, statement: F) -> Statement
-where
-    F: Fn(Pipeline) -> Statement,
-{
-    match pipelines::Collector::run(arguments) {
-        Ok(pipeline) => statement(pipeline),
-        Err(err) => {
-            eprintln!("ion: syntax error: {}", err);
-            Statement::Default
-        }
-    }
-}
 
 pub fn is_valid_name(name: &str) -> bool {
     let mut chars = name.chars();
@@ -109,12 +96,16 @@ pub(crate) fn parse(code: &str) -> Statement {
                 Statement::Else
             }
         }
-        _ if cmd.starts_with("while ") => {
-            collect(cmd[6..].trim_start(), |pipeline| Statement::While {
+        _ if cmd.starts_with("while ") => match pipelines::Collector::run(cmd[6..].trim_start()) {
+            Ok(pipeline) => Statement::While {
                 expression: vec![Statement::Pipeline(pipeline)],
                 statements: Vec::new(),
-            })
-        }
+            },
+            Err(err) => {
+                eprintln!("ion: syntax error: {}", err);
+                Statement::Default
+            }
+        },
         _ if cmd.starts_with("for ") => {
             let mut cmd = cmd[4..].trim_start();
             let mut variables = None;
@@ -213,7 +204,13 @@ pub(crate) fn parse(code: &str) -> Statement {
         _ if cmd.starts_with("! ") => Statement::Not(Box::new(parse(cmd[1..].trim_start()))),
         _ if cmd.eq("not") | cmd.eq("!") => Statement::Not(Box::new(Statement::Default)),
         _ if cmd.is_empty() || cmd.starts_with('#') => Statement::Default,
-        _ => collect(cmd, Statement::Pipeline),
+        _ => match pipelines::Collector::run(cmd) {
+            Ok(pipeline) => Statement::Pipeline(pipeline),
+            Err(err) => {
+                eprintln!("ion: syntax error: {}", err);
+                Statement::Default
+            }
+        },
     }
 }
 
