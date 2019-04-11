@@ -214,12 +214,8 @@ impl Shell {
     /// method will attempt to execute that file as a script, and then returns the final exit
     /// status of the evaluated script.
     pub fn execute_file<P: AsRef<Path>>(&mut self, script: P) {
-        match fs::read_to_string(script.as_ref()) {
-            Ok(script) => {
-                if self.terminate_script_quotes(script.bytes()) == FAILURE {
-                    self.previous_status = FAILURE;
-                }
-            }
+        match fs::File::open(script.as_ref()) {
+            Ok(script) => self.execute_script(std::io::BufReader::new(script)),
             Err(err) => eprintln!("ion: {}", err),
         }
     }
@@ -231,11 +227,12 @@ impl Shell {
     /// the command(s) in the command line REPL interface for Ion. If the supplied command is
     /// not
     /// terminated, then an error will be returned.
-    pub fn execute_command<'a, T>(&mut self, command: &T) -> Result<i32, IonError>
-    where
-        T: 'a + AsRef<str> + std::clone::Clone + std::convert::From<&'a str>,
-    {
-        for cmd in command.as_ref().bytes().batching(|bytes| Terminator::new(bytes).terminate()) {
+    pub fn execute_command<T: std::io::Read>(&mut self, command: T) -> Result<i32, IonError> {
+        for cmd in command
+            .bytes()
+            .filter_map(Result::ok)
+            .batching(|bytes| Terminator::new(bytes).terminate())
+        {
             match cmd {
                 Ok(stmt) => self.on_command(&stmt),
                 Err(_) => return Err(IonError::Unterminated),

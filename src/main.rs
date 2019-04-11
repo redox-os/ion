@@ -5,7 +5,7 @@ use smallvec::SmallVec;
 use std::{
     alloc::System,
     env,
-    io::{stdin, BufReader, Read},
+    io::{stdin, BufReader},
     iter::FromIterator,
 };
 
@@ -58,19 +58,16 @@ fn main() {
         ),
     );
 
-    let status = if let Some(command) = command {
-        shell.execute_script(&command);
-        shell.wait_for_background();
-        shell.previous_status
+    if let Some(command) = command {
+        shell.execute_script(command.as_bytes());
     } else if let Some(path) = script_path {
         shell.execute_file(&path.as_str());
-        shell.wait_for_background();
-        shell.previous_status
     } else if stdin_is_a_tty {
         shell.execute_interactive();
         unreachable!();
     } else {
-        shell.terminate_script_quotes(BufReader::new(stdin()).bytes().filter_map(|b| b.ok()))
-    };
-    shell.exit(status);
+        shell.execute_script(BufReader::new(stdin()));
+    }
+    shell.wait_for_background();
+    shell.exit(shell.previous_status);
 }
