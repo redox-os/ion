@@ -1,33 +1,16 @@
-use super::super::{completer::*, flags, Binary, DirectoryStack, Shell, Variables};
-use crate::{sys, types};
+use super::super::{completer::*, flags, Binary, Shell};
+use crate::sys;
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use std::{env, io::ErrorKind, mem, path::PathBuf};
 
 pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
-    let vars_ptr = &shell.variables as *const Variables;
-    let dirs_ptr = &shell.directory_stack as *const DirectoryStack;
-
-    // Collects the current list of values from history for completion.
-    let history = shell
-        .context
-        .as_ref()
-        .unwrap()
-        .history
-        .buffers
-        .iter()
-        // Map each underlying `liner::Buffer` into a `String`.
-        .map(|x| x.chars().cloned().collect())
-        // Collect each result into a vector to avoid borrowing issues.
-        .collect::<Vec<types::Str>>();
-
     let prompt = shell.prompt();
     let vars = &shell.variables;
     let builtins = &shell.builtins;
+    let dirs = &shell.directory_stack;
 
-    let line = shell.context.as_mut().unwrap().read_line(
-        prompt,
-        None,
-        &mut move |Event { editor, kind }| {
+    let line =
+        shell.context.as_mut().unwrap().read_line(prompt, None, &mut |Event { editor, kind }| {
             if let EventKind::BeforeComplete = kind {
                 let (words, pos) = editor.get_words_and_cursor_position();
 
@@ -36,22 +19,22 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                     CursorPosition::InSpace(Some(_), _) => true,
                     CursorPosition::InSpace(None, _) => false,
                     CursorPosition::OnWordLeftEdge(index) => index >= 1,
-                    CursorPosition::OnWordRightEdge(index) => {
-                        match (words.into_iter().nth(index), env::current_dir()) {
-                            (Some((start, end)), Ok(file)) => {
-                                let filename = editor.current_buffer().range(start, end);
-                                complete_as_file(&file, &filename, index)
-                            }
-                            _ => false,
-                        }
-                    }
+                    CursorPosition::OnWordRightEdge(index) => words
+                        .into_iter()
+                        .nth(index)
+                        .map(|(start, end)| editor.current_buffer().range(start, end))
+                        .and_then(|filename| {
+                            Some(complete_as_file(&env::current_dir().ok()?, &filename, index))
+                        })
+                        .filter(|&x| x)
+                        .is_some(),
                 };
 
                 let dir_completer = env::current_dir()
                     .ok()
                     .as_ref()
                     .and_then(|dir| dir.to_str())
-                    .map(|dir| IonFileCompleter::new(Some(dir), dirs_ptr, vars_ptr));
+                    .map(|dir| IonFileCompleter::new(Some(dir), dirs, vars));
 
                 if filename {
                     if let Some(completer) = dir_completer {
@@ -67,7 +50,8 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                         // Add built-in commands to the completer's definitions.
                         .map(|&s| s.to_string())
                         // Add the history list to the completer's definitions.
-                        .chain(history.iter().map(|s| s.to_string()))
+                        // Map each underlying `liner::Buffer` into a `String`.
+                        .chain(editor.context().history.buffers.iter().map(|x| x.into()))
                         // Add the aliases to the completer's definitions.
                         .chain(vars.aliases().map(|(key, _)| key.to_string()))
                         // Add the list of available functions to the completer's
@@ -89,7 +73,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                     let mut file_completers: Vec<_> = env::var("PATH")
                         .unwrap_or_else(|_| "/bin/".to_string())
                         .split(sys::PATH_SEPARATOR)
-                        .map(|s| IonFileCompleter::new(Some(s), dirs_ptr, vars_ptr))
+                        .map(|s| IonFileCompleter::new(Some(s), dirs, vars))
                         .collect();
 
                     // Also add files/directories in the current directory to the
@@ -106,8 +90,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                     mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                 }
             }
-        },
-    );
+        });
 
     match line {
         Ok(line) => {
