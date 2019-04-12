@@ -2,12 +2,10 @@
 mod designators;
 mod prompt;
 mod readln;
-mod terminate;
 
 use self::{
     prompt::{prompt, prompt_fn},
     readln::readln,
-    terminate::terminate_script_quotes,
 };
 use super::{flags::UNTERMINATED, status::*, FlowLogic, Shell, ShellHistory};
 use crate::{parser::Terminator, types};
@@ -39,12 +37,10 @@ ARGS:
 
 pub trait Binary {
     /// Parses and executes the arguments that were supplied to the shell.
-    fn execute_script(&mut self, script: &str);
+    fn execute_script<T: std::io::Read>(&mut self, lines: T);
     /// Creates an interactive session that reads from a prompt provided by
     /// Liner.
     fn execute_interactive(self);
-    /// Ensures that read statements from a script are terminated.
-    fn terminate_script_quotes<I: Iterator<Item = u8>>(&mut self, lines: I) -> i32;
     /// Ion's interface to Liner's `read_line` method, which handles everything related to
     /// rendering, controlling, and getting input from the prompt.
     fn readln(&mut self) -> Option<String>;
@@ -54,8 +50,6 @@ pub trait Binary {
     fn prompt_fn(&mut self) -> Option<String>;
     // Handles commands given by the REPL, and saves them to history.
     fn save_command(&mut self, command: &str);
-    // Resets the flow control fields to their default values.
-    fn reset_flow(&mut self);
 }
 
 impl Binary for Shell {
@@ -71,8 +65,6 @@ impl Binary for Shell {
             self.save_command_in_history(cmd);
         }
     }
-
-    fn reset_flow(&mut self) { self.flow_control.reset(); }
 
     fn execute_interactive(mut self) {
         self.context = Some({
@@ -109,20 +101,17 @@ impl Binary for Shell {
         }
     }
 
-    fn execute_script(&mut self, script: &str) {
-        self.on_command(script);
-
-        if self.flow_control.unclosed_block() {
+    fn execute_script<T: std::io::Read>(&mut self, lines: T) {
+        if self.execute_command(lines).is_err() {
+            eprintln!("ion: unterminated quote in script");
+            self.previous_status = FAILURE;
+        } else if self.flow_control.unclosed_block() {
             eprintln!(
-                "ion: unexpected end of arguments: expected end block for `{}`",
-                self.flow_control.block.last().unwrap().short()
+                "ion: unexpected end of script: expected end block for `{}`",
+                self.flow_control.block.last().unwrap().short(),
             );
-            self.exit(FAILURE);
+            self.previous_status = FAILURE;
         }
-    }
-
-    fn terminate_script_quotes<I: Iterator<Item = u8>>(&mut self, lines: I) -> i32 {
-        terminate_script_quotes(self, lines)
     }
 
     fn readln(&mut self) -> Option<String> { readln(self) }
