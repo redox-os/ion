@@ -51,7 +51,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                         .map(|&s| s.to_string())
                         // Add the history list to the completer's definitions.
                         // Map each underlying `liner::Buffer` into a `String`.
-                        .chain(editor.context().history.buffers.iter().map(|x| x.into()))
+                        .chain(editor.context().history.buffers.iter().map(|x| x.to_string()))
                         // Add the aliases to the completer's definitions.
                         .chain(vars.aliases().map(|(key, _)| key.to_string()))
                         // Add the list of available functions to the completer's
