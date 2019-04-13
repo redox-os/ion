@@ -31,21 +31,21 @@ pub(crate) trait Expander: Sized {
     /// Expand a tilde form to the correct directory.
     fn tilde(&self, _input: &str) -> Option<String> { None }
     /// Expand an array variable with some selection.
-    fn array(&self, _name: &str, _selection: Select) -> Option<types::Array> { None }
+    fn array(&self, _name: &str, _selection: &Select) -> Option<types::Array> { None }
     /// Expand a string variable given if it's quoted / unquoted
     fn string(&self, _name: &str, _quoted: bool) -> Option<types::Str> { None }
     /// Expand a subshell expression.
     fn command(&self, _command: &str) -> Option<types::Str> { None }
     /// Iterating upon key-value maps.
-    fn map_keys<'a>(&'a self, _name: &str, _select: Select) -> Option<Array> { None }
+    fn map_keys<'a>(&'a self, _name: &str, _select: &Select) -> Option<Array> { None }
     /// Iterating upon key-value maps.
-    fn map_values<'a>(&'a self, _name: &str, _select: Select) -> Option<Array> { None }
+    fn map_values<'a>(&'a self, _name: &str, _select: &Select) -> Option<Array> { None }
     /// Get a string that exists in the shell.
     fn get_string(&self, value: &str) -> Value {
         Value::Str(types::Str::from(expand_string(value, self, false).join(" ")))
     }
     /// Select the proper values from an iterator
-    fn select<I: Iterator<Item = types::Str>>(vals: I, select: Select, n: usize) -> Option<Array> {
+    fn select<I: Iterator<Item = types::Str>>(vals: I, select: &Select, n: usize) -> Option<Array> {
         match select {
             Select::All => Some(vals.collect()),
             Select::Range(range) => range
@@ -301,7 +301,7 @@ fn expand_braces<E: Expander>(
                 output.push_str(&array_expand(elements, expand_func, &index).join(" "));
             }
             WordToken::ArrayVariable(array, _, ref index) => {
-                if let Some(array) = expand_func.array(array, index.clone()) {
+                if let Some(array) = expand_func.array(array, index) {
                     output.push_str(&array.join(" "));
                 }
             }
@@ -407,7 +407,7 @@ fn expand_single_array_token<E: Expander>(
             Some(array_expand(elements, expand_func, &index))
         }
         WordToken::ArrayVariable(array, quoted, ref index) => {
-            match expand_func.array(array, index.clone()) {
+            match expand_func.array(array, index) {
                 Some(ref array) if quoted => Some(array![small::String::from(array.join(" "))]),
                 Some(array) => Some(array),
                 None => Some(types::Array::new()),
@@ -565,11 +565,11 @@ pub(crate) fn expand_tokens<E: Expander>(
                     output.push_str(&array_expand(elements, expand_func, &index).join(" "));
                 }
                 WordToken::ArrayVariable(array, _, ref index) => {
-                    if let Some(array) = expand_func.array(array, index.clone()) {
+                    if let Some(array) = expand_func.array(array, index) {
                         output.push_str(&array.join(" "));
                     }
                 }
-                WordToken::ArrayProcess(command, _, ref index) => match index.clone() {
+                WordToken::ArrayProcess(command, _, ref index) => match index {
                     Select::All => {
                         let mut temp = small::String::new();
                         expand_process(&mut temp, command, &Select::All, expand_func, false);
@@ -578,12 +578,12 @@ pub(crate) fn expand_tokens<E: Expander>(
                     Select::Index(Index::Forward(id)) => {
                         let mut temp = small::String::new();
                         expand_process(&mut temp, command, &Select::All, expand_func, false);
-                        output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
+                        output.push_str(temp.split_whitespace().nth(*id).unwrap_or_default());
                     }
                     Select::Index(Index::Backward(id)) => {
                         let mut temp = small::String::new();
                         expand_process(&mut temp, command, &Select::All, expand_func, false);
-                        output.push_str(temp.split_whitespace().rev().nth(id).unwrap_or_default());
+                        output.push_str(temp.split_whitespace().rev().nth(*id).unwrap_or_default());
                     }
                     Select::Range(range) => {
                         let mut temp = small::String::new();
