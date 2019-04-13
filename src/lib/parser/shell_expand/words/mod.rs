@@ -87,7 +87,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         let mut moves = 0;
         let mut glob = false;
         let mut square_bracket = 0;
-        let mut iter = iterator.clone();
+        let mut iter = iterator.clone().peekable();
         while let Some(character) = iter.next() {
             moves += 1;
             match character {
@@ -98,9 +98,9 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 b']' => {
                     // If the glob is less than three bytes in width, then it's empty and thus
                     // invalid. If it's not adjacent to text, it's not a glob.
-                    let next_char = iter.clone().next();
+                    let next_char = iter.peek();
                     if !(moves <= 3 && square_bracket == 1)
-                        && (next_char != None && next_char != Some(b' '))
+                        && (next_char != None && next_char != Some(&b' '))
                     {
                         glob = true;
                         break;

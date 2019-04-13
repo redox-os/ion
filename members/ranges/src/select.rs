@@ -22,7 +22,7 @@ pub enum Select {
 
 pub trait SelectWithSize {
     type Item;
-    fn select<O>(&mut self, Select, usize) -> O
+    fn select<O>(&mut self, &Select, usize) -> O
     where
         O: FromIterator<Self::Item>;
 }
@@ -33,7 +33,7 @@ where
 {
     type Item = T;
 
-    fn select<O>(&mut self, s: Select, size: usize) -> O
+    fn select<O>(&mut self, s: &Select, size: usize) -> O
     where
         O: FromIterator<Self::Item>,
     {
