@@ -374,7 +374,6 @@ impl FlowLogic for Shell {
             // Go through all of the statements and build up the block stack
             // When block is done return statement for execution.
             for statement in StatementSplitter::new(&stmt).map(parse_and_validate) {
-                println!("A: {:?}", statement);
                 match insert_statement(&mut self.flow_control, statement) {
                     Err(why) => {
                         eprintln!("{}", why);
