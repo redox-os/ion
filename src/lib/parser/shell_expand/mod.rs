@@ -67,13 +67,11 @@ fn expand_process<E: Expander>(
     quoted: bool,
 ) {
     if let Some(mut output) = expander.command(command) {
-        if output.is_empty() {
-            return;
-        } else if quoted {
+        if !output.is_empty() && quoted {
             let output: &str =
                 if let Some(pos) = output.rfind(|x| x != '\n') { &output[..=pos] } else { &output };
             slice(current, output, &selection)
-        } else {
+        } else if !output.is_empty() {
             // The following code should produce the same result as
             // slice(current,
             //       &output.split_whitespace().collect::<Vec<_>>().join(" "),
@@ -234,7 +232,9 @@ pub(crate) fn expand_string<E: Expander>(
             WordToken::ArrayVariable(data, contains_quote, selection) => {
                 if let Select::Key(key) = selection {
                     if key.contains(' ') {
-                        for index in key.split(' ') {
+                        let keys = key.split(' ');
+                        token_buffer.reserve(2 * keys.size_hint().0);
+                        for index in keys {
                             let select = index.parse::<Select>().unwrap_or(Select::None);
                             token_buffer.push(WordToken::ArrayVariable(
                                 data,
@@ -309,8 +309,7 @@ fn expand_braces<E: Expander>(
                 Select::All => {
                     let mut temp = small::String::new();
                     expand_process(&mut temp, command, &Select::All, expand_func, false);
-                    let temp = temp.split_whitespace().collect::<Vec<&str>>();
-                    output.push_str(&temp.join(" "));
+                    output.push_str(&temp);
                 }
                 Select::Index(Index::Forward(id)) => {
                     let mut temp = small::String::new();
@@ -350,17 +349,12 @@ fn expand_braces<E: Expander>(
             ),
             WordToken::Whitespace(whitespace) => output.push_str(whitespace),
             WordToken::Process(command, quoted, ref index) => {
-                let quoted = if reverse_quoting { !quoted } else { quoted };
-                expand_process(&mut output, command, &index, expand_func, quoted);
+                expand_process(&mut output, command, &index, expand_func, quoted ^ reverse_quoting);
             }
             WordToken::Variable(text, quoted, ref index) => {
-                let quoted = if reverse_quoting { !quoted } else { quoted };
-                let expanded = match expand_func.string(text, quoted) {
-                    Some(var) => var,
-                    None => continue,
+                if let Some(expanded) = expand_func.string(text, quoted ^ reverse_quoting) {
+                    slice(&mut output, expanded, &index);
                 };
-
-                slice(&mut output, expanded, &index);
             }
             WordToken::Normal(ref text, _, tilde) => {
                 expand(&mut output, &mut expanded_words, expand_func, text.as_ref(), false, tilde);
@@ -368,6 +362,7 @@ fn expand_braces<E: Expander>(
             WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
         }
     }
+
     if expanders.is_empty() {
         expanded_words.push(output);
     } else {
@@ -379,36 +374,26 @@ fn expand_braces<E: Expander>(
             .map(|list| list.iter().map(AsRef::as_ref).collect::<Vec<&str>>())
             .collect();
         let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
-        for word in braces::expand(&tokens, &*vector_of_arrays) {
-            expanded_words.push(word);
-        }
+        expanded_words.extend(braces::expand(&tokens, &*vector_of_arrays));
     }
 
     expanded_words.into_iter().fold(types::Array::new(), |mut array, word| {
         if word.find('*').is_some() {
-            if let Ok(mut paths) = glob(&word) {
-                if let Some(path) = paths.next() {
+            if let Ok(paths) = glob(&word) {
+                array.extend(paths.map(|path| {
                     if let Ok(path_buf) = path {
-                        array.push((*path_buf.to_string_lossy()).into());
+                        (*path_buf.to_string_lossy()).into()
                     } else {
-                        array.push("".into());
+                        "".into()
                     }
-                }
-                for path in paths {
-                    if let Ok(path_buf) = path {
-                        array.push((*path_buf.to_string_lossy()).into());
-                    } else {
-                        array.push("".into());
-                    }
-                }
+                }))
             } else {
                 array.push(word);
             }
-            array
         } else {
             array.push(word);
-            array
         }
+        array
     })
 }
 
@@ -423,9 +408,7 @@ fn expand_single_array_token<E: Expander>(
         }
         WordToken::ArrayVariable(array, quoted, ref index) => {
             match expand_func.array(array, index.clone()) {
-                Some(ref array) if quoted => {
-                    ::std::iter::once(Some(small::String::from(array.join(" ")))).collect()
-                }
+                Some(ref array) if quoted => Some(array![small::String::from(array.join(" "))]),
                 Some(array) => Some(array),
                 None => Some(types::Array::new()),
             }
@@ -480,28 +463,18 @@ fn expand_single_string_token<E: Expander>(
         }
         WordToken::Whitespace(text) => output.push_str(text),
         WordToken::Process(command, quoted, ref index) => {
-            let quoted = if reverse_quoting { !quoted } else { quoted };
-            expand_process(&mut output, command, &index, expand_func, quoted);
+            expand_process(&mut output, command, &index, expand_func, quoted ^ reverse_quoting);
         }
         WordToken::Variable(text, quoted, ref index) => {
-            let quoted = if reverse_quoting { !quoted } else { quoted };
-            let expanded = match expand_func.string(text, quoted) {
-                Some(var) => var,
-                None => {
-                    if output.as_str() != "" {
-                        expanded_words.push(output);
-                    }
-                    return expanded_words;
-                }
-            };
-
-            slice(&mut output, expanded, &index);
+            if let Some(expanded) = expand_func.string(text, quoted ^ reverse_quoting) {
+                slice(&mut output, expanded, &index);
+            }
         }
         WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
         _ => unreachable!(),
     }
 
-    if output.as_str() != "" {
+    if !output.is_empty() {
         expanded_words.push(output);
     }
     expanded_words
@@ -551,12 +524,11 @@ fn expand<E: Expander>(
     if do_glob {
         match glob(&expanded) {
             Ok(var) => {
-                let mut globs_found = false;
-                for path in var.filter_map(Result::ok) {
-                    globs_found = true;
-                    expanded_words.push(path.to_string_lossy().as_ref().into());
-                }
-                if !globs_found {
+                let prev_size = expanded_words.len();
+                expanded_words.extend(
+                    var.filter_map(Result::ok).map(|path| path.to_string_lossy().as_ref().into()),
+                );
+                if expanded_words.len() == prev_size {
                     expanded_words.push(expanded);
                 }
             }
@@ -601,8 +573,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                     Select::All => {
                         let mut temp = small::String::new();
                         expand_process(&mut temp, command, &Select::All, expand_func, false);
-                        let temp = temp.split_whitespace().collect::<Vec<&str>>();
-                        output.push_str(&temp.join(" "));
+                        output.push_str(&temp);
                     }
                     Select::Index(Index::Forward(id)) => {
                         let mut temp = small::String::new();
@@ -654,19 +625,15 @@ pub(crate) fn expand_tokens<E: Expander>(
                     expand_process(&mut output, command, &index, expand_func, quoted);
                 }
                 WordToken::Variable(text, quoted, ref index) => {
-                    let quoted = if reverse_quoting { !quoted } else { quoted };
-                    let expanded = match expand_func.string(text, quoted) {
-                        Some(var) => var,
-                        None => continue,
-                    };
-
-                    slice(&mut output, expanded, &index);
+                    if let Some(expanded) = expand_func.string(text, quoted ^ reverse_quoting) {
+                        slice(&mut output, expanded, &index);
+                    }
                 }
                 WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
             }
         }
 
-        if output.as_str() != "" {
+        if !output.is_empty() {
             expanded_words.insert(0, output);
         }
         expanded_words
@@ -689,12 +656,7 @@ fn expand_arithmetic<E: Expander>(output: &mut small::String, input: &str, expan
         if !var.is_empty() {
             // We have reached the end of a potential variable, so we expand it and push
             // it onto the result
-            let res = expander.string(&var, false);
-            match res {
-                Some(v) => out.push_str(&v),
-                None => out.push_str(&var),
-            }
-            var.clear();
+            out.push_str(expander.string(&var, false).as_ref().unwrap_or(var));
         }
     };
     for c in input.bytes() {
@@ -704,18 +666,16 @@ fn expand_arithmetic<E: Expander>(output: &mut small::String, input: &str, expan
             }
             _ => {
                 flush(&mut varbuf, &mut intermediate);
+                varbuf.clear();
                 intermediate.push(c as char);
             }
         }
     }
     flush(&mut varbuf, &mut intermediate);
-    match calc::eval(&intermediate) {
-        Ok(s) => output.push_str(&(s.to_string())),
-        Err(e) => {
-            let err_string: String = e.into();
-            output.push_str(&err_string);
-        }
-    }
+    output.push_str(&match calc::eval(&intermediate) {
+        Ok(s) => s.to_string(),
+        Err(e) => e.to_string(),
+    });
 }
 
 // TODO: Write Nested Brace Tests

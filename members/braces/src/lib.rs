@@ -16,29 +16,29 @@ pub fn expand<'a>(
     tokens: &'a [BraceToken],
     expanders: &'a [&'a [&'a str]],
 ) -> Box<Iterator<Item = small::String> + 'a> {
-    if expanders.len() > 1 {
-        let multiple_brace_expand = MultipleBraceExpand::new(tokens, expanders);
-        Box::new(multiple_brace_expand)
-    } else if expanders.len() == 1 {
-        let single_brace_expand =
-            SingleBraceExpand { elements: expanders[0].iter().cloned(), tokens, loop_count: 0 };
-        Box::new(single_brace_expand)
-    } else {
-        Box::new(::std::iter::empty())
+    match expanders.len() {
+        0 => Box::new(::std::iter::empty()),
+        1 => {
+            let single_brace_expand =
+                SingleBraceExpand { elements: expanders[0].iter().cloned(), tokens, loop_count: 0 };
+            Box::new(single_brace_expand)
+        }
+        _ => {
+            let multiple_brace_expand = MultipleBraceExpand::new(tokens, expanders);
+            Box::new(multiple_brace_expand)
+        }
     }
 }
 
 fn escape_string(output: &mut SmallVec<[u8; 64]>, input: &str) {
+    output.reserve(input.len());
     let mut backslash = false;
     for character in input.bytes() {
         if backslash {
-            match character {
-                b'{' | b'}' | b',' => output.push(character),
-                _ => {
-                    output.push(b'\\');
-                    output.push(character);
-                }
+            if ![b'{', b'}', b','].contains(&character) {
+                output.push(b'\\');
             }
+            output.push(character);
             backslash = false;
         } else if character == b'\\' {
             backslash = true;
