@@ -46,9 +46,9 @@ fn list_vars(shell: &Shell) -> Result<(), io::Error> {
 /// exporting variables to some global environment
 pub(crate) trait VariableStore {
     /// Set a local variable given a binding
-    fn local(&mut self, action: LocalAction) -> i32;
+    fn local(&mut self, action: &LocalAction) -> i32;
     /// Export a variable to the process environment given a binding
-    fn export(&mut self, action: ExportAction) -> i32;
+    fn export(&mut self, action: &ExportAction) -> i32;
     /// Collect all updates to perform on variables for a given assignement action
     fn calculate<'a>(
         &mut self,
@@ -57,10 +57,10 @@ pub(crate) trait VariableStore {
 }
 
 impl VariableStore for Shell {
-    fn export(&mut self, action: ExportAction) -> i32 {
+    fn export(&mut self, action: &ExportAction) -> i32 {
         match action {
             ExportAction::Assign(ref keys, op, ref vals) => {
-                let actions = AssignmentActions::new(keys, op, vals);
+                let actions = AssignmentActions::new(keys, *op, vals);
 
                 for action in actions {
                     let err = action.map_err(|e| e.to_string()).and_then(|act| {
@@ -181,14 +181,14 @@ impl VariableStore for Shell {
         Ok(backup)
     }
 
-    fn local(&mut self, action: LocalAction) -> i32 {
+    fn local(&mut self, action: &LocalAction) -> i32 {
         match action {
             LocalAction::List => {
                 let _ = list_vars(&self);
                 SUCCESS
             }
             LocalAction::Assign(ref keys, op, ref vals) => {
-                let actions = AssignmentActions::new(keys, op, vals);
+                let actions = AssignmentActions::new(keys, *op, vals);
                 if let Err(why) = self.calculate(actions).and_then(|apply| {
                     for (key, value) in apply {
                         self.assign(&key, value)?

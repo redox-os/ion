@@ -18,19 +18,8 @@ use crate::{
 };
 use itertools::Itertools;
 use small;
-use std::io::{stdout, Write};
 
-macro_rules! handle_signal {
-    ($signal:expr) => {
-        match $signal {
-            Condition::Break => break,
-            Condition::SigInt => return Condition::SigInt,
-            _ => (),
-        }
-    };
-}
-
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub(crate) enum Condition {
     Continue,
     Break,
@@ -44,11 +33,7 @@ pub(crate) trait FlowLogic {
 
     /// Executes all of the statements within a while block until a certain
     /// condition is met.
-    fn execute_while(
-        &mut self,
-        expression: Vec<Statement>,
-        statements: Vec<Statement>,
-    ) -> Condition;
+    fn execute_while(&mut self, expression: &[Statement], statements: &[Statement]) -> Condition;
 
     /// Executes all of the statements within a for block for each value
     /// specified in the range.
@@ -56,67 +41,65 @@ pub(crate) trait FlowLogic {
         &mut self,
         variables: &[types::Str],
         values: &[small::String],
-        statements: Vec<Statement>,
+        statements: &[Statement],
     ) -> Condition;
 
     /// Conditionally executes branches of statements according to evaluated
     /// expressions
     fn execute_if(
         &mut self,
-        expression: Vec<Statement>,
-        success: Vec<Statement>,
-        else_if: Vec<ElseIf>,
-        failure: Vec<Statement>,
+        expression: &[Statement],
+        success: &[Statement],
+        else_if: &[ElseIf],
+        failure: &[Statement],
     ) -> Condition;
 
     /// Simply executes all supplied statements.
-    fn execute_statements(&mut self, statements: Vec<Statement>) -> Condition;
+    fn execute_statements(&mut self, statements: &[Statement]) -> Condition;
 
     /// Executes a single statement
-    fn execute_statement(&mut self, statement: Statement) -> Condition;
+    fn execute_statement(&mut self, statement: &Statement) -> Condition;
 
     /// Expand an expression and run a branch based on the value of the
     /// expanded expression
-    fn execute_match(&mut self, expression: small::String, cases: Vec<Case>) -> Condition;
+    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case]) -> Condition;
 }
 
 impl FlowLogic for Shell {
     fn execute_if(
         &mut self,
-        expression: Vec<Statement>,
-        success: Vec<Statement>,
-        else_if: Vec<ElseIf>,
-        failure: Vec<Statement>,
+        expression: &[Statement],
+        success: &[Statement],
+        else_if: &[ElseIf],
+        failure: &[Statement],
     ) -> Condition {
         // Try execute success branch
-        if let Condition::SigInt = self.execute_statements(expression) {
+        if let Condition::SigInt = self.execute_statements(&expression) {
             return Condition::SigInt;
         }
         if self.previous_status == 0 {
-            return self.execute_statements(success);
+            return self.execute_statements(&success);
         }
 
         // Try to execute else_if branches
-        let else_if_conditions = else_if.into_iter().map(|cond| (cond.expression, cond.success));
-
-        for (condition, statements) in else_if_conditions {
-            if let Condition::SigInt = self.execute_statements(condition) {
+        for ElseIf { expression, success } in else_if {
+            if let Condition::SigInt = self.execute_statements(&expression) {
                 return Condition::SigInt;
             }
 
             if self.previous_status == 0 {
-                return self.execute_statements(statements);
+                return self.execute_statements(&success);
             }
         }
 
-        self.execute_statements(failure)
+        self.execute_statements(&failure)
     }
 
     fn execute_for(
         &mut self,
         variables: &[types::Str],
         values: &[small::String],
-        statements: Vec<Statement>,
+        statements: &[Statement],
     ) -> Condition {
         macro_rules! set_vars_then_exec {
             ($chunk:expr, $def:expr) => {
@@ -126,7 +109,11 @@ impl FlowLogic for Shell {
                     }
                 }
 
-                handle_signal!(self.execute_statements(statements.clone()));
+                match self.execute_statements(statements) {
+                    Condition::Break => break,
+                    Condition::SigInt => return Condition::SigInt,
+                    Condition::Continue | Condition::NoOp => (),
+                }
             };
         }
 
@@ -153,19 +140,15 @@ impl FlowLogic for Shell {
         Condition::NoOp
     }
 
-    fn execute_while(
-        &mut self,
-        expression: Vec<Statement>,
-        statements: Vec<Statement>,
-    ) -> Condition {
+    fn execute_while(&mut self, expression: &[Statement], statements: &[Statement]) -> Condition {
         loop {
-            self.execute_statements(expression.clone());
+            self.execute_statements(expression);
             if self.previous_status != 0 {
                 return Condition::NoOp;
             }
 
             // Cloning is needed so the statement can be re-iterated again if needed.
-            match self.execute_statements(statements.clone()) {
+            match self.execute_statements(statements) {
                 Condition::Break => return Condition::NoOp,
                 Condition::SigInt => return Condition::SigInt,
                 _ => (),
@@ -173,10 +156,10 @@ impl FlowLogic for Shell {
         }
     }
 
-    fn execute_statement(&mut self, statement: Statement) -> Condition {
+    fn execute_statement(&mut self, statement: &Statement) -> Condition {
         match statement {
             Statement::Error(number) => {
-                self.previous_status = number;
+                self.previous_status = *number;
                 self.variables.set("?", self.previous_status.to_string());
                 self.flow_control.reset();
             }
@@ -189,26 +172,32 @@ impl FlowLogic for Shell {
                 self.variables.set("?", self.previous_status.to_string());
             }
             Statement::While { expression, statements } => {
-                if let Condition::SigInt = self.execute_while(expression, statements) {
+                if self.execute_while(&expression, &statements) == Condition::SigInt {
                     return Condition::SigInt;
                 }
             }
             Statement::For { variables, values, statements } => {
-                if let Condition::SigInt = self.execute_for(&variables, &values, statements) {
+                if self.execute_for(&variables, &values, &statements) == Condition::SigInt {
                     return Condition::SigInt;
                 }
             }
             Statement::If { expression, success, else_if, failure, .. } => {
-                match self.execute_if(expression, success, else_if, failure) {
-                    Condition::Break => return Condition::Break,
-                    Condition::Continue => return Condition::Continue,
-                    Condition::NoOp => (),
-                    Condition::SigInt => return Condition::SigInt,
+                let condition = self.execute_if(&expression, &success, &else_if, &failure);
+
+                if condition != Condition::NoOp {
+                    return condition;
                 }
             }
             Statement::Function { name, args, statements, description } => {
-                self.variables
-                    .set(&name, Function::new(description, name.clone(), args, statements));
+                self.variables.set(
+                    &name,
+                    Function::new(
+                        description.clone(),
+                        name.clone(),
+                        args.to_vec(),
+                        statements.to_vec(),
+                    ),
+                );
             }
             Statement::Pipeline(pipeline) => match expand_pipeline(&self, &pipeline) {
                 Ok((mut pipeline, statements)) => {
@@ -220,7 +209,7 @@ impl FlowLogic for Shell {
                         self.exit(status);
                     }
                     if !statements.is_empty() {
-                        self.execute_statements(statements);
+                        self.execute_statements(&statements);
                     }
                 }
                 Err(e) => {
@@ -232,63 +221,46 @@ impl FlowLogic for Shell {
                 }
             },
             Statement::Time(box_statement) => {
-                let time = ::std::time::Instant::now();
+                let time = std::time::Instant::now();
 
-                let condition = self.execute_statement(*box_statement);
+                let condition = self.execute_statement(box_statement);
 
                 let duration = time.elapsed();
                 let seconds = duration.as_secs();
                 let nanoseconds = duration.subsec_nanos();
 
-                let stdout = stdout();
-                let mut stdout = stdout.lock();
-                let _ = if seconds > 60 {
-                    writeln!(
-                        stdout,
-                        "real    {}m{:02}.{:09}s",
-                        seconds / 60,
-                        seconds % 60,
-                        nanoseconds
-                    )
+                if seconds > 60 {
+                    println!("real    {}m{:02}.{:09}s", seconds / 60, seconds % 60, nanoseconds);
                 } else {
-                    writeln!(stdout, "real    {}.{:09}s", seconds, nanoseconds)
-                };
-                match condition {
-                    Condition::Break => return Condition::Break,
-                    Condition::Continue => return Condition::Continue,
-                    Condition::NoOp => (),
-                    Condition::SigInt => return Condition::SigInt,
+                    println!("real    {}.{:09}s", seconds, nanoseconds);
+                }
+                if condition != Condition::NoOp {
+                    return condition;
                 }
             }
             Statement::And(box_statement) => {
                 let condition = match self.previous_status {
-                    SUCCESS => self.execute_statement(*box_statement),
+                    SUCCESS => self.execute_statement(box_statement),
                     _ => Condition::NoOp,
                 };
 
-                match condition {
-                    Condition::Break => return Condition::Break,
-                    Condition::Continue => return Condition::Continue,
-                    Condition::NoOp => (),
-                    Condition::SigInt => return Condition::SigInt,
+                if condition != Condition::NoOp {
+                    return condition;
                 }
             }
             Statement::Or(box_statement) => {
                 let condition = match self.previous_status {
-                    FAILURE => self.execute_statement(*box_statement),
+                    FAILURE => self.execute_statement(box_statement),
                     _ => Condition::NoOp,
                 };
 
-                match condition {
-                    Condition::Break => return Condition::Break,
-                    Condition::Continue => return Condition::Continue,
-                    Condition::NoOp => (),
-                    Condition::SigInt => return Condition::SigInt,
+                if condition != Condition::NoOp {
+                    return condition;
                 }
             }
             Statement::Not(box_statement) => {
                 // NOTE: Should the condition be used?
-                let _condition = self.execute_statement(*box_statement);
+                let _condition = self.execute_statement(box_statement);
                 match self.previous_status {
                     FAILURE => self.previous_status = SUCCESS,
                     SUCCESS => self.previous_status = FAILURE,
@@ -299,12 +271,13 @@ impl FlowLogic for Shell {
             }
             Statement::Break => return Condition::Break,
             Statement::Continue => return Condition::Continue,
-            Statement::Match { expression, cases } => match self.execute_match(expression, cases) {
-                Condition::Break => return Condition::Break,
-                Condition::Continue => return Condition::Continue,
-                Condition::NoOp => (),
-                Condition::SigInt => return Condition::SigInt,
-            },
+            Statement::Match { expression, cases } => {
+                let condition = self.execute_match(expression, &cases);
+
+                if condition != Condition::NoOp {
+                    return condition;
+                }
+            }
             _ => {}
         }
         if let Some(signal) = signals::SignalHandler.next() {
@@ -320,26 +293,21 @@ impl FlowLogic for Shell {
         }
     }
 
-    fn execute_statements(&mut self, statements: Vec<Statement>) -> Condition {
+    fn execute_statements(&mut self, statements: &[Statement]) -> Condition {
         self.variables.new_scope(false);
 
-        let mut condition = None;
-        for statement in statements {
-            match self.execute_statement(statement) {
-                Condition::NoOp => {}
-                cond => {
-                    condition = Some(cond);
-                    break;
-                }
-            }
-        }
+        let condition = statements
+            .iter()
+            .map(|statement| self.execute_statement(statement))
+            .find(|&condition| condition != Condition::NoOp)
+            .unwrap_or(Condition::NoOp);
 
         self.variables.pop_scope();
 
-        condition.unwrap_or(Condition::NoOp)
+        condition
     }
 
-    fn execute_match(&mut self, expression: small::String, cases: Vec<Case>) -> Condition {
+    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case]) -> Condition {
         // Logic for determining if the LHS of a match-case construct (the value we are
         // matching against) matches the RHS of a match-case construct (a value
         // in a case statement). For example, checking to see if the value
@@ -347,108 +315,53 @@ impl FlowLogic for Shell {
         // ```ignore
         // matches("foo", "bar")
         // ```
-        fn matches(lhs: &types::Array, rhs: &types::Array) -> bool {
-            for v in lhs {
-                if rhs.contains(&v) {
-                    return true;
+        let is_array = is_array(expression.as_ref());
+        let value = expand_string(expression.as_ref(), self, false);
+        for case in cases.iter() {
+            if case
+                .value
+                .as_ref()
+                .map(|v| expand_string(&v, self, false))
+                .filter(|v| v.iter().all(|v| !value.contains(v)))
+                .is_none()
+            {
+                // let pattern_is_array = is_array(&value);
+                let previous_bind = case.binding.as_ref().and_then(|bind| {
+                    if is_array {
+                        let out = self.variables.get::<types::Array>(bind).map(Value::Array);
+                        self.set(&bind, value.clone());
+                        out
+                    } else {
+                        let out = self.variables.get::<types::Str>(bind).map(Value::Str);
+                        self.set(&bind, value.join(" "));
+                        out
+                    }
+                });
+
+                if let Some(statement) = case.conditional.as_ref() {
+                    self.on_command(statement);
+                    if self.previous_status != SUCCESS {
+                        continue;
+                    }
                 }
-            }
-            false
-        }
 
-        let is_array = is_array(&expression);
-        let value = expand_string(&expression, self, false);
-        let mut condition = Condition::NoOp;
-        for case in cases {
-            // let pattern_is_array = is_array(&value);
-            let pattern = case.value.map(|v| expand_string(&v, self, false));
-            match pattern {
-                None => {
-                    let mut previous_bind = None;
-                    if let Some(ref bind) = case.binding {
-                        if is_array {
-                            previous_bind =
-                                self.variables.get::<types::Array>(bind).map(Value::Array);
-                            self.variables.set(&bind, value.clone());
-                        } else {
-                            previous_bind = self.variables.get::<types::Str>(bind).map(Value::Str);
-                            self.set(&bind, value.join(" "));
-                        }
-                    }
+                let condition = self.execute_statements(&case.statements);
 
-                    if let Some(statement) = case.conditional {
-                        self.on_command(&statement);
-                        if self.previous_status != SUCCESS {
-                            continue;
-                        }
-                    }
-
-                    condition = self.execute_statements(case.statements);
-
-                    if let Some(ref bind) = case.binding {
-                        if let Some(value) = previous_bind {
-                            match value {
-                                str_ @ Value::Str(_) => {
-                                    self.set(bind, str_);
-                                }
-                                array @ Value::Array(_) => {
-                                    self.variables.set(bind, array);
-                                }
-                                map @ Value::HashMap(_) => {
-                                    self.variables.set(bind, map);
-                                }
-                                _ => (),
+                if let Some(ref bind) = case.binding {
+                    if let Some(value) = previous_bind {
+                        match value {
+                            Value::HashMap(_) | Value::Array(_) | Value::Str(_) => {
+                                self.set(bind, value);
                             }
+                            _ => (),
                         }
                     }
-
-                    break;
                 }
-                Some(ref v) if matches(v, &value) => {
-                    let mut previous_bind = None;
-                    if let Some(ref bind) = case.binding {
-                        if is_array {
-                            previous_bind =
-                                self.variables.get::<types::Array>(bind).map(Value::Array);
-                            self.variables.set(&bind, value.clone());
-                        } else {
-                            previous_bind = self.variables.get::<types::Str>(bind).map(Value::Str);
-                            self.set(&bind, value.join(" "));
-                        }
-                    }
 
-                    if let Some(statement) = case.conditional {
-                        self.on_command(&statement);
-                        if self.previous_status != SUCCESS {
-                            continue;
-                        }
-                    }
-
-                    condition = self.execute_statements(case.statements);
-
-                    if let Some(ref bind) = case.binding {
-                        if let Some(value) = previous_bind {
-                            match value {
-                                str_ @ Value::Str(_) => {
-                                    self.set(bind, str_);
-                                }
-                                array @ Value::Array(_) => {
-                                    self.set(bind, array);
-                                }
-                                map @ Value::HashMap(_) => {
-                                    self.set(bind, map);
-                                }
-                                _ => (),
-                            }
-                        }
-                    }
-
-                    break;
-                }
-                Some(_) => (),
+                return condition;
             }
         }
-        condition
+        return Condition::NoOp;
     }
 
     fn on_command(&mut self, command_string: &str) {
@@ -465,7 +378,7 @@ impl FlowLogic for Shell {
                     return;
                 }
                 Ok(Some(stm)) => {
-                    let _ = self.execute_statement(stm);
+                    let _ = self.execute_statement(&stm);
                 }
                 Ok(None) => {}
             }
@@ -480,13 +393,12 @@ fn expand_pipeline(
     shell: &Shell,
     pipeline: &Pipeline,
 ) -> Result<(Pipeline, Vec<Statement>), String> {
-    let mut item_iter = pipeline.items.iter();
-    let mut items: Vec<PipeItem> = Vec::new();
+    let mut item_iter = pipeline.items.iter().cloned();
+    let mut items: Vec<PipeItem> = Vec::with_capacity(item_iter.size_hint().0);
     let mut statements = Vec::new();
 
     while let Some(item) = item_iter.next() {
-        let possible_alias = shell.variables.get::<types::Alias>(item.job.command.as_ref());
-        if let Some(alias) = possible_alias {
+        if let Some(alias) = shell.variables.get::<types::Alias>(item.job.command.as_ref()) {
             statements = StatementSplitter::new(alias.0.as_str()).map(parse_and_validate).collect();
 
             // First item in the alias should be a pipeline item, otherwise it cannot
@@ -498,14 +410,10 @@ fn expand_pipeline(
                     first.inputs = item.inputs.clone();
 
                     // Add alias arguments to expanded args if there's any.
-                    if item.job.args.len() > 1 {
-                        for arg in &item.job.args[1..] {
-                            first.job.args.push(arg.clone());
-                        }
-                    }
+                    first.job.args.extend(item.job.args.iter().skip(1).cloned());
                 }
                 if len == 1 {
-                    if let Some(last) = pline.items.last_mut() {
+                    if let Some(mut last) = pline.items.last_mut() {
                         last.outputs = item.outputs.clone();
                         last.job.kind = item.job.kind;
                     }
@@ -516,13 +424,12 @@ fn expand_pipeline(
 
             // Handle pipeline being broken half by i.e.: '&&' or '||'
             if !statements.is_empty() {
-                let err = match statements.last_mut().unwrap() {
+                match statements.last_mut().unwrap() {
                     Statement::And(ref mut boxed_stm)
                     | Statement::Or(ref mut boxed_stm)
                     | Statement::Not(ref mut boxed_stm)
                     | Statement::Time(ref mut boxed_stm) => {
-                        let stm = &mut **boxed_stm;
-                        if let Statement::Pipeline(ref mut pline) = stm {
+                        if let Statement::Pipeline(ref mut pline) = &mut **boxed_stm {
                             // Set output of alias to be the output of last pipeline.
                             if let Some(last) = pline.items.last_mut() {
                                 last.outputs = item.outputs.clone();
@@ -530,24 +437,17 @@ fn expand_pipeline(
                             }
                             // Append rest of the pipeline to the last pipeline in the
                             // alias.
-                            for item in item_iter {
-                                pline.items.push(item.clone());
-                            }
-                            // No error
-                            false
+                            pline.items.extend(item_iter);
                         } else {
                             // Error in expansion
-                            true
+                            return Err(format!(
+                                "unable to pipe outputs of alias: '{} = {}'",
+                                item.job.command.as_str(),
+                                alias.0.as_str()
+                            ));
                         }
                     }
-                    _ => false,
-                };
-                if err {
-                    return Err(format!(
-                        "unable to pipe outputs of alias: '{} = {}'",
-                        item.job.command.as_str(),
-                        alias.0.as_str()
-                    ));
+                    _ => (),
                 }
                 break;
             }
