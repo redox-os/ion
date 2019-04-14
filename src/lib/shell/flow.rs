@@ -316,12 +316,12 @@ impl FlowLogic for Shell {
         // matches("foo", "bar")
         // ```
         let is_array = is_array(expression.as_ref());
-        let value = expand_string(expression.as_ref(), self, false);
+        let value = expand_string(expression.as_ref(), self);
         for case in cases.iter() {
             if case
                 .value
                 .as_ref()
-                .map(|v| expand_string(&v, self, false))
+                .map(|v| expand_string(&v, self))
                 .filter(|v| v.iter().all(|v| !value.contains(v)))
                 .is_none()
             {

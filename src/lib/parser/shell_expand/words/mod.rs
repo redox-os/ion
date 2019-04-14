@@ -35,10 +35,10 @@ pub(crate) enum WordToken<'a> {
     Whitespace(&'a str),
     Brace(Vec<&'a str>),
     Array(Vec<&'a str>, Select),
-    Variable(&'a str, bool, Select),
+    Variable(&'a str, Select),
     ArrayVariable(&'a str, bool, Select),
     ArrayProcess(&'a str, bool, Select),
-    Process(&'a str, bool, Select),
+    Process(&'a str, Select),
     StringMethod(StringMethod<'a>),
     ArrayMethod(ArrayMethod<'a>),
     Arithmetic(&'a str),
@@ -284,13 +284,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                             let _ = iterator.next();
                             WordToken::Process(
                                 output,
-                                self.flags.contains(Flags::DQUOTE),
                                 self.read_selection(iterator),
                             )
                         } else {
                             WordToken::Process(
                                 output,
-                                self.flags.contains(Flags::DQUOTE),
                                 Select::All,
                             )
                         };
@@ -482,7 +480,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         for character in iterator {
             if let b']' = character {
                 let value =
-                    expand_string(&self.data[start..self.read], self.expanders, false).join(" ");
+                    expand_string(&self.data[start..self.read], self.expanders).join(" ");
                 let selection = match value.parse::<Select>() {
                     Ok(selection) => selection,
                     Err(_) => Select::None,
@@ -600,13 +598,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     return if character == b'[' {
                         WordToken::Variable(
                             variable,
-                            self.flags.contains(Flags::DQUOTE),
                             self.read_selection(iterator),
                         )
                     } else {
                         WordToken::Variable(
                             variable,
-                            self.flags.contains(Flags::DQUOTE),
                             Select::All,
                         )
                     };
@@ -616,7 +612,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             self.read += 1;
         }
 
-        WordToken::Variable(&self.data[start..], self.flags.contains(Flags::DQUOTE), Select::All)
+        WordToken::Variable(&self.data[start..], Select::All)
     }
 
     // Contains the logic for parsing braced variables
@@ -631,7 +627,6 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 self.read += 1;
                 return WordToken::Variable(
                     output,
-                    self.flags.contains(Flags::DQUOTE),
                     Select::All,
                 );
             }

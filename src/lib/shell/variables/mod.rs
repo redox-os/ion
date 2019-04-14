@@ -707,13 +707,13 @@ mod tests {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn string(&self, var: &str, _: bool) -> Option<types::Str> { self.0.get::<types::Str>(var) }
+        fn string(&self, var: &str) -> Option<types::Str> { self.0.get::<types::Str>(var) }
     }
 
     #[test]
     fn undefined_variable_expands_to_empty_string() {
         let variables = Variables::default();
-        let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
+        let expanded = expand_string("$FOO", &VariableExpander(variables)).join("");
         assert_eq!("", &expanded);
     }
 
@@ -721,7 +721,7 @@ mod tests {
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.set("FOO", "BAR");
-        let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
+        let expanded = expand_string("$FOO", &VariableExpander(variables)).join("");
         assert_eq!("BAR", &expanded);
     }
 

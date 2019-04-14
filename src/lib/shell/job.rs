@@ -58,7 +58,7 @@ impl fmt::Debug for Job {
 
 /// Expands a given argument and returns it as an `Array`.
 fn expand_arg(arg: &str, shell: &Shell) -> types::Array {
-    let res = expand_string(&arg, shell, false);
+    let res = expand_string(&arg, shell);
     if res.is_empty() {
         array![""]
     } else {

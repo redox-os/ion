@@ -11,7 +11,7 @@ pub(crate) fn prompt(shell: &mut Shell) -> String {
 
     if blocks == 0 {
         prompt_fn(shell).unwrap_or_else(|| {
-            expand_string(&shell.get_str_or_empty("PROMPT"), shell, false).join(" ")
+            expand_string(&shell.get_str_or_empty("PROMPT"), shell).join(" ")
         })
     } else {
         "    ".repeat(blocks)

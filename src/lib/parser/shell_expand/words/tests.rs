@@ -95,7 +95,6 @@ fn array_process_within_string_process() {
             WordToken::Whitespace(" "),
             WordToken::Process(
                 "let free=[@(free -h)]; echo @free[6]@free[8]/@free[7]",
-                false,
                 Select::All,
             ),
         ],
@@ -146,9 +145,9 @@ fn nested_processes() {
     let expected = vec![
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Process("echo $(echo one)", false, Select::All),
+        WordToken::Process("echo $(echo one)", Select::All),
         WordToken::Whitespace(" "),
-        WordToken::Process("echo one $(echo two) three", false, Select::All),
+        WordToken::Process("echo one $(echo two) three", Select::All),
     ];
     compare(input, expected);
 }
@@ -159,7 +158,7 @@ fn words_process_with_quotes() {
     let expected = vec![
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", false, Select::All),
+        WordToken::Process("git branch | rg '[*]' | awk '{print $2}'", Select::All),
     ];
     compare(input, expected);
 
@@ -167,7 +166,7 @@ fn words_process_with_quotes() {
     let expected = vec![
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", false, Select::All),
+        WordToken::Process("git branch | rg \"[*]\" | awk '{print $2}'", Select::All),
     ];
     compare(input, expected);
 }
@@ -178,18 +177,18 @@ fn test_words() {
     let expected = vec![
         WordToken::Normal("echo".into(), false, false),
         WordToken::Whitespace(" "),
-        WordToken::Variable("ABC", false, Select::All),
+        WordToken::Variable("ABC", Select::All),
         WordToken::Whitespace(" "),
-        WordToken::Variable("ABC", true, Select::All),
+        WordToken::Variable("ABC", Select::All),
         WordToken::Whitespace(" "),
         WordToken::Normal("one".into(), false, false),
         WordToken::Brace(vec!["$ABC", "$ABC"]),
         WordToken::Whitespace(" "),
         WordToken::Normal("~".into(), false, true),
         WordToken::Whitespace(" "),
-        WordToken::Process("echo foo", false, Select::All),
+        WordToken::Process("echo foo", Select::All),
         WordToken::Whitespace(" "),
-        WordToken::Process("seq 1 100", true, Select::All),
+        WordToken::Process("seq 1 100", Select::All),
     ];
     compare(input, expected);
 }
@@ -258,7 +257,7 @@ fn test_braces() {
 struct WithVars;
 
 impl Expander for WithVars {
-    fn string(&self, var: &str, _: bool) -> Option<types::Str> {
+    fn string(&self, var: &str) -> Option<types::Str> {
         match var {
             "pkmn1" => Some("Pokémon".into()),
             "pkmn2" => Some("Poke\u{0301}mon".into()),

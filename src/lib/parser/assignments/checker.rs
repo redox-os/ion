@@ -79,7 +79,7 @@ fn get_map_of<E: Expander>(
     shell: &E,
     expression: &str,
 ) -> Result<Value, TypeError> {
-    let array = expand_string(expression, shell, false);
+    let array = expand_string(expression, shell);
 
     let inner_kind = match primitive_type {
         Primitive::HashMap(ref inner) => inner,

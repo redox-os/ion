@@ -151,7 +151,7 @@ mod test {
     struct VariableExpander(pub Variables);
 
     impl Expander for VariableExpander {
-        fn string(&self, var: &str, _: bool) -> Option<types::Str> { self.0.get::<types::Str>(var) }
+        fn string(&self, var: &str) -> Option<types::Str> { self.0.get::<types::Str>(var) }
     }
 
     // TODO: Rewrite tests now that let is part of the grammar.
@@ -184,7 +184,7 @@ mod test {
         variables.set("FOO", "BAR");
         let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = expand_string("$FOO", &VariableExpander(variables), false).join("");
+        let expanded = expand_string("$FOO", &VariableExpander(variables)).join("");
         assert_eq!("", expanded);
     }
 
@@ -208,7 +208,7 @@ mod test {
         variables.set("FOO", array!["BAR"]);
         let return_status = drop_array(&mut variables, &["drop", "-a", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = expand_string("@FOO", &VariableExpander(variables), false).join("");
+        let expanded = expand_string("@FOO", &VariableExpander(variables)).join("");
         assert_eq!("", expanded);
     }
 
