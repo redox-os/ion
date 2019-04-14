@@ -1,3 +1,10 @@
 auc
 a<<bc
 a<<< b
+b c
+c
+one two three
+two
+1 2 3
+b d
+@(echo "b  c")

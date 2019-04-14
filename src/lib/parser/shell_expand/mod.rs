@@ -8,9 +8,11 @@ use crate::{
     shell::variables::Value,
     types::{self, Array},
 };
+use auto_enums::auto_enum;
 use glob::glob;
+use itertools::Itertools;
 use small;
-use std::str;
+use std::{iter, str};
 use unicode_segmentation::UnicodeSegmentation;
 
 /// Determines whether an input string is expression-like as compared to a
@@ -273,7 +275,7 @@ fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> typ
                         }
                         Select::Key(_) | Select::None => (),
                     },
-                    WordToken::ArrayMethod(ref method) => {
+                    WordToken::ArrayMethod(ref method, _) => {
                         method.handle(output, expand_func);
                     }
                     WordToken::StringMethod(ref method) => {
@@ -343,11 +345,11 @@ fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> typ
     })
 }
 
+#[auto_enum]
 fn expand_single_array_token<E: Expander>(
     token: &WordToken,
     expand_func: &E,
 ) -> Option<types::Array> {
-    let mut output = small::String::new();
     match *token {
         WordToken::Array(ref elements, ref index) => {
             Some(array_expand(elements, expand_func, &index))
@@ -359,37 +361,49 @@ fn expand_single_array_token<E: Expander>(
                 None => Some(types::Array::new()),
             }
         }
-        WordToken::ArrayProcess(command, _, ref index) => match *index {
-            Select::All => {
-                expand_process(&mut output, command, &Select::All, expand_func);
-                Some(output.split_whitespace().map(From::from).collect::<types::Array>())
-            }
-            Select::Index(Index::Forward(id)) => {
-                expand_process(&mut output, command, &Select::All, expand_func);
-                Some(output.split_whitespace().nth(id).map(Into::into).into_iter().collect())
-            }
-            Select::Index(Index::Backward(id)) => {
-                expand_process(&mut output, command, &Select::All, expand_func);
-                Some(output.split_whitespace().rev().nth(id).map(Into::into).into_iter().collect())
-            }
-            Select::Range(range) => {
-                expand_process(&mut output, command, &Select::All, expand_func);
-                if let Some((start, length)) = range.bounds(output.split_whitespace().count()) {
-                    Some(
-                        output
-                            .split_whitespace()
-                            .skip(start)
-                            .take(length)
-                            .map(From::from)
-                            .collect(),
-                    )
-                } else {
-                    Some(types::Array::new())
+        WordToken::ArrayProcess(command, quoted, ref index) => crate::IonPool::string(|output| {
+            let array: types::Array = match *index {
+                Select::Key(_) | Select::None => types::Array::new(),
+                _ => {
+                    expand_process(output, command, &Select::All, expand_func);
+
+                    #[auto_enum(Iterator)]
+                    let mut iterator = match *index {
+                        Select::All => output.split_whitespace().map(From::from),
+                        Select::Index(Index::Forward(id)) => {
+                            output.split_whitespace().nth(id).map(Into::into).into_iter()
+                        }
+                        Select::Index(Index::Backward(id)) => {
+                            output.split_whitespace().rev().nth(id).map(Into::into).into_iter()
+                        }
+                        Select::Range(range) => {
+                            #[auto_enum(Iterator)]
+                            match range.bounds(output.split_whitespace().count()) {
+                                None => iter::empty(),
+                                Some((start, length)) => output
+                                    .split_whitespace()
+                                    .skip(start)
+                                    .take(length)
+                                    .map(From::from),
+                            }
+                        }
+                        Select::Key(_) | Select::None => unreachable!(),
+                    };
+
+                    if quoted {
+                        array!(iterator.join(" "))
+                    } else {
+                        iterator.collect()
+                    }
                 }
-            }
-            Select::Key(_) | Select::None => Some(types::Array::new()),
-        },
-        WordToken::ArrayMethod(ref array_method) => Some(array_method.handle_as_array(expand_func)),
+            };
+
+            Some(array)
+        }),
+        WordToken::ArrayMethod(ref array_method, quoted) => {
+            let result = array_method.handle_as_array(expand_func);
+            Some(if quoted { array!(result.join(" ")) } else { result })
+        }
         _ => None,
     }
 }
@@ -544,7 +558,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                             }
                             Select::Key(_) | Select::None => (),
                         },
-                        WordToken::ArrayMethod(ref method) => {
+                        WordToken::ArrayMethod(ref method, _) => {
                             method.handle(output, expand_func);
                         }
                         WordToken::StringMethod(ref method) => {
