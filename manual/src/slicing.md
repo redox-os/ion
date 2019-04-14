@@ -2,7 +2,7 @@
 
 Ion supports a universal syntax for slicing strings and arrays. For maximum language support,
 strings are sliced and indexed by graphemes. Arrays are sliced and indexed by their elements.
-Slicing uses the same **[]** characters as arrays, but the shell can differentation between
+Slicing uses the same **[]** characters as arrays, but the shell can differentiation between
 a slice and an array based on the placement of the characters (immediately after an expansion).
 
 **NOTE:** It's important to note that indexes count from 0, as in most other languages.

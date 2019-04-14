@@ -24,7 +24,6 @@ $ echo $string:$string
 
 **NOTE:**
 - Accepted characters are **unicode** alphanumeric characters and **_**.
-- If not double quoted, newlines will be replaced with spaces.
 
 ## Array Variables
 
