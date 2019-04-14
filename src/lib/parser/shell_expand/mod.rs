@@ -295,72 +295,95 @@ fn expand_braces<E: Expander>(
     let tokens: &mut Vec<BraceToken> = &mut Vec::new();
     let mut expanders: Vec<Vec<small::String>> = Vec::new();
 
-    for word in word_tokens {
-        match *word {
-            WordToken::Array(ref elements, ref index) => {
-                output.push_str(&array_expand(elements, expand_func, &index).join(" "));
-            }
-            WordToken::ArrayVariable(array, _, ref index) => {
-                if let Some(array) = expand_func.array(array, index) {
-                    output.push_str(&array.join(" "));
-                }
-            }
-            WordToken::ArrayProcess(command, _, ref index) => match *index {
-                Select::All => {
-                    let mut temp = small::String::new();
-                    expand_process(&mut temp, command, &Select::All, expand_func, false);
-                    output.push_str(&temp);
-                }
-                Select::Index(Index::Forward(id)) => {
-                    let mut temp = small::String::new();
-                    expand_process(&mut temp, command, &Select::All, expand_func, false);
-                    output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
-                }
-                Select::Index(Index::Backward(id)) => {
-                    let mut temp = small::String::new();
-                    expand_process(&mut temp, command, &Select::All, expand_func, false);
-                    output.push_str(temp.split_whitespace().rev().nth(id).unwrap_or_default());
-                }
-                Select::Range(range) => {
-                    let mut temp = small::String::new();
-                    expand_process(&mut temp, command, &Select::All, expand_func, false);
-                    let len = temp.split_whitespace().count();
-                    if let Some((start, length)) = range.bounds(len) {
-                        let res =
-                            temp.split_whitespace().skip(start).take(length).collect::<Vec<&str>>();
-                        output.push_str(&res.join(" "));
+    {
+        let output = &mut output;
+        crate::IonPool::string(|temp| {
+            for word in word_tokens {
+                match *word {
+                    WordToken::Array(ref elements, ref index) => {
+                        output.push_str(&array_expand(elements, expand_func, &index).join(" "));
                     }
+                    WordToken::ArrayVariable(array, _, ref index) => {
+                        if let Some(array) = expand_func.array(array, index) {
+                            output.push_str(&array.join(" "));
+                        }
+                    }
+                    WordToken::ArrayProcess(command, _, ref index) => match *index {
+                        Select::All => {
+                            expand_process(temp, command, &Select::All, expand_func, false);
+                            output.push_str(&temp);
+                        }
+                        Select::Index(Index::Forward(id)) => {
+                            expand_process(temp, command, &Select::All, expand_func, false);
+                            output.push_str(temp.split_whitespace().nth(id).unwrap_or_default());
+                        }
+                        Select::Index(Index::Backward(id)) => {
+                            expand_process(temp, command, &Select::All, expand_func, false);
+                            output.push_str(
+                                temp.split_whitespace().rev().nth(id).unwrap_or_default(),
+                            );
+                        }
+                        Select::Range(range) => {
+                            expand_process(temp, command, &Select::All, expand_func, false);
+                            let len = temp.split_whitespace().count();
+                            if let Some((start, length)) = range.bounds(len) {
+                                let mut iter = temp.split_whitespace().skip(start).take(length);
+                                if let Some(str) = iter.next() {
+                                    output.push_str(str);
+                                    iter.for_each(|str| {
+                                        output.push(' ');
+                                        output.push_str(str);
+                                    });
+                                }
+                            }
+                        }
+                        Select::Key(_) | Select::None => (),
+                    },
+                    WordToken::ArrayMethod(ref method) => {
+                        method.handle(output, expand_func);
+                    }
+                    WordToken::StringMethod(ref method) => {
+                        method.handle(output, expand_func);
+                    }
+                    WordToken::Brace(ref nodes) => expand_brace(
+                        output,
+                        &mut expanders,
+                        tokens,
+                        nodes,
+                        expand_func,
+                        reverse_quoting,
+                    ),
+                    WordToken::Whitespace(whitespace) => output.push_str(whitespace),
+                    WordToken::Process(command, quoted, ref index) => {
+                        expand_process(
+                            output,
+                            command,
+                            &index,
+                            expand_func,
+                            quoted ^ reverse_quoting,
+                        );
+                    }
+                    WordToken::Variable(text, quoted, ref index) => {
+                        if let Some(expanded) = expand_func.string(text, quoted ^ reverse_quoting) {
+                            slice(output, expanded, &index);
+                        };
+                    }
+                    WordToken::Normal(ref text, _, tilde) => {
+                        expand(
+                            output,
+                            &mut expanded_words,
+                            expand_func,
+                            text.as_ref(),
+                            false,
+                            tilde,
+                        );
+                    }
+                    WordToken::Arithmetic(s) => expand_arithmetic(output, s, expand_func),
                 }
-                Select::Key(_) | Select::None => (),
-            },
-            WordToken::ArrayMethod(ref method) => {
-                method.handle(&mut output, expand_func);
+
+                temp.clear();
             }
-            WordToken::StringMethod(ref method) => {
-                method.handle(&mut output, expand_func);
-            }
-            WordToken::Brace(ref nodes) => expand_brace(
-                &mut output,
-                &mut expanders,
-                tokens,
-                nodes,
-                expand_func,
-                reverse_quoting,
-            ),
-            WordToken::Whitespace(whitespace) => output.push_str(whitespace),
-            WordToken::Process(command, quoted, ref index) => {
-                expand_process(&mut output, command, &index, expand_func, quoted ^ reverse_quoting);
-            }
-            WordToken::Variable(text, quoted, ref index) => {
-                if let Some(expanded) = expand_func.string(text, quoted ^ reverse_quoting) {
-                    slice(&mut output, expanded, &index);
-                };
-            }
-            WordToken::Normal(ref text, _, tilde) => {
-                expand(&mut output, &mut expanded_words, expand_func, text.as_ref(), false, tilde);
-            }
-            WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
-        }
+        });
     }
 
     if expanders.is_empty() {
@@ -559,78 +582,87 @@ pub(crate) fn expand_tokens<E: Expander>(
         let mut output = small::String::new();
         let mut expanded_words = types::Array::new();
 
-        for word in token_buffer {
-            match *word {
-                WordToken::Array(ref elements, ref index) => {
-                    output.push_str(&array_expand(elements, expand_func, &index).join(" "));
-                }
-                WordToken::ArrayVariable(array, _, ref index) => {
-                    if let Some(array) = expand_func.array(array, index) {
-                        output.push_str(&array.join(" "));
-                    }
-                }
-                WordToken::ArrayProcess(command, _, ref index) => match index {
-                    Select::All => {
-                        let mut temp = small::String::new();
-                        expand_process(&mut temp, command, &Select::All, expand_func, false);
-                        output.push_str(&temp);
-                    }
-                    Select::Index(Index::Forward(id)) => {
-                        let mut temp = small::String::new();
-                        expand_process(&mut temp, command, &Select::All, expand_func, false);
-                        output.push_str(temp.split_whitespace().nth(*id).unwrap_or_default());
-                    }
-                    Select::Index(Index::Backward(id)) => {
-                        let mut temp = small::String::new();
-                        expand_process(&mut temp, command, &Select::All, expand_func, false);
-                        output.push_str(temp.split_whitespace().rev().nth(*id).unwrap_or_default());
-                    }
-                    Select::Range(range) => {
-                        let mut temp = small::String::new();
-                        expand_process(&mut temp, command, &Select::All, expand_func, false);
-                        if let Some((start, length)) = range.bounds(temp.split_whitespace().count())
-                        {
-                            let temp = temp
-                                .split_whitespace()
-                                .skip(start)
-                                .take(length)
-                                .collect::<Vec<_>>();
-                            output.push_str(&temp.join(" "))
+        {
+            let output = &mut output;
+            crate::IonPool::string(|temp| {
+                for word in token_buffer {
+                    match *word {
+                        WordToken::Array(ref elements, ref index) => {
+                            output.push_str(&array_expand(elements, expand_func, &index).join(" "));
                         }
+                        WordToken::ArrayVariable(array, _, ref index) => {
+                            if let Some(array) = expand_func.array(array, index) {
+                                output.push_str(&array.join(" "));
+                            }
+                        }
+                        WordToken::ArrayProcess(command, _, ref index) => match index {
+                            Select::All => {
+                                expand_process(temp, command, &Select::All, expand_func, false);
+                                output.push_str(&temp);
+                            }
+                            Select::Index(Index::Forward(id)) => {
+                                expand_process(temp, command, &Select::All, expand_func, false);
+                                output
+                                    .push_str(temp.split_whitespace().nth(*id).unwrap_or_default());
+                            }
+                            Select::Index(Index::Backward(id)) => {
+                                expand_process(temp, command, &Select::All, expand_func, false);
+                                output.push_str(
+                                    temp.split_whitespace().rev().nth(*id).unwrap_or_default(),
+                                );
+                            }
+                            Select::Range(range) => {
+                                expand_process(temp, command, &Select::All, expand_func, false);
+                                if let Some((start, length)) =
+                                    range.bounds(temp.split_whitespace().count())
+                                {
+                                    let temp = temp
+                                        .split_whitespace()
+                                        .skip(start)
+                                        .take(length)
+                                        .collect::<Vec<_>>();
+                                    output.push_str(&temp.join(" "))
+                                }
+                            }
+                            Select::Key(_) | Select::None => (),
+                        },
+                        WordToken::ArrayMethod(ref method) => {
+                            method.handle(output, expand_func);
+                        }
+                        WordToken::StringMethod(ref method) => {
+                            method.handle(output, expand_func);
+                        }
+                        WordToken::Brace(_) => unreachable!(),
+                        WordToken::Normal(ref text, do_glob, tilde) => {
+                            expand(
+                                output,
+                                &mut expanded_words,
+                                expand_func,
+                                text.as_ref(),
+                                do_glob,
+                                tilde,
+                            );
+                        }
+                        WordToken::Whitespace(text) => {
+                            output.push_str(text);
+                        }
+                        WordToken::Process(command, quoted, ref index) => {
+                            let quoted = if reverse_quoting { !quoted } else { quoted };
+                            expand_process(output, command, &index, expand_func, quoted);
+                        }
+                        WordToken::Variable(text, quoted, ref index) => {
+                            if let Some(expanded) =
+                                expand_func.string(text, quoted ^ reverse_quoting)
+                            {
+                                slice(output, expanded, &index);
+                            }
+                        }
+                        WordToken::Arithmetic(s) => expand_arithmetic(output, s, expand_func),
                     }
-                    Select::Key(_) | Select::None => (),
-                },
-                WordToken::ArrayMethod(ref method) => {
-                    method.handle(&mut output, expand_func);
+
+                    temp.clear();
                 }
-                WordToken::StringMethod(ref method) => {
-                    method.handle(&mut output, expand_func);
-                }
-                WordToken::Brace(_) => unreachable!(),
-                WordToken::Normal(ref text, do_glob, tilde) => {
-                    expand(
-                        &mut output,
-                        &mut expanded_words,
-                        expand_func,
-                        text.as_ref(),
-                        do_glob,
-                        tilde,
-                    );
-                }
-                WordToken::Whitespace(text) => {
-                    output.push_str(text);
-                }
-                WordToken::Process(command, quoted, ref index) => {
-                    let quoted = if reverse_quoting { !quoted } else { quoted };
-                    expand_process(&mut output, command, &index, expand_func, quoted);
-                }
-                WordToken::Variable(text, quoted, ref index) => {
-                    if let Some(expanded) = expand_func.string(text, quoted ^ reverse_quoting) {
-                        slice(&mut output, expanded, &index);
-                    }
-                }
-                WordToken::Arithmetic(s) => expand_arithmetic(&mut output, s, expand_func),
-            }
+            });
         }
 
         if !output.is_empty() {
@@ -648,33 +680,36 @@ pub(crate) fn expand_tokens<E: Expander>(
 /// ```
 /// if `x=5` and `y=7`
 fn expand_arithmetic<E: Expander>(output: &mut small::String, input: &str, expander: &E) {
-    // small::String cannot be created with a capacity of 0 without causing a panic
-    let len = if !input.is_empty() { input.len() } else { 1 };
-    let mut intermediate = small::String::with_capacity(len);
-    let mut varbuf = small::String::new();
-    let flush = |var: &mut small::String, out: &mut small::String| {
-        if !var.is_empty() {
-            // We have reached the end of a potential variable, so we expand it and push
-            // it onto the result
-            out.push_str(expander.string(&var, false).as_ref().unwrap_or(var));
-        }
-    };
-    for c in input.bytes() {
-        match c {
-            48...57 | 65...90 | 95 | 97...122 => {
-                varbuf.push(c as char);
+    crate::IonPool::string(|intermediate| {
+        crate::IonPool::string(|varbuf| {
+            let flush = |var: &mut small::String, out: &mut small::String| {
+                if !var.is_empty() {
+                    // We have reached the end of a potential variable, so we expand it and push
+                    // it onto the result
+                    out.push_str(expander.string(&var, false).as_ref().unwrap_or(var));
+                }
+            };
+
+            for c in input.bytes() {
+                match c {
+                    48...57 | 65...90 | 95 | 97...122 => {
+                        varbuf.push(c as char);
+                    }
+                    _ => {
+                        flush(varbuf, intermediate);
+                        varbuf.clear();
+                        intermediate.push(c as char);
+                    }
+                }
             }
-            _ => {
-                flush(&mut varbuf, &mut intermediate);
-                varbuf.clear();
-                intermediate.push(c as char);
-            }
-        }
-    }
-    flush(&mut varbuf, &mut intermediate);
-    output.push_str(&match calc::eval(&intermediate) {
-        Ok(s) => s.to_string(),
-        Err(e) => e.to_string(),
+
+            flush(varbuf, intermediate);
+
+            output.push_str(&match calc::eval(&intermediate) {
+                Ok(s) => s.to_string(),
+                Err(e) => e.to_string(),
+            });
+        });
     });
 }
 

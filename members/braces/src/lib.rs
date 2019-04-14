@@ -1,7 +1,4 @@
-extern crate permutate;
-extern crate small;
-extern crate smallvec;
-
+use auto_enums::auto_enum;
 use permutate::Permutator;
 use smallvec::SmallVec;
 
@@ -12,21 +9,16 @@ pub enum BraceToken {
     Expander,
 }
 
+#[auto_enum]
 pub fn expand<'a>(
     tokens: &'a [BraceToken],
     expanders: &'a [&'a [&'a str]],
-) -> Box<Iterator<Item = small::String> + 'a> {
+) -> impl Iterator<Item = small::String> + 'a {
+    #[auto_enum(Iterator)]
     match expanders.len() {
-        0 => Box::new(::std::iter::empty()),
-        1 => {
-            let single_brace_expand =
-                SingleBraceExpand { elements: expanders[0].iter().cloned(), tokens, loop_count: 0 };
-            Box::new(single_brace_expand)
-        }
-        _ => {
-            let multiple_brace_expand = MultipleBraceExpand::new(tokens, expanders);
-            Box::new(multiple_brace_expand)
-        }
+        0 => ::std::iter::empty(),
+        1 => SingleBraceExpand { elements: expanders[0].iter().cloned(), tokens, loop_count: 0 },
+        _ => MultipleBraceExpand::new(tokens, expanders),
     }
 }
 

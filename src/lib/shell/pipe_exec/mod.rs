@@ -582,15 +582,21 @@ impl PipelineExecution for Shell {
     }
 
     fn wait(&mut self, pgid: u32, commands: SmallVec<[RefinedJob; 16]>) -> i32 {
-        let as_string = if commands.is_empty() {
-            // This doesn't allocate
-            String::new()
-        } else {
-            commands.iter().map(RefinedJob::long).collect::<Vec<String>>().join(" | ")
-        };
+        crate::IonPool::string(|as_string| {
+            if !commands.is_empty() {
+                let mut iter = commands.iter().map(RefinedJob::long);
+                if let Some(str) = iter.next() {
+                    as_string.push_str(&str);
+                    iter.for_each(|str| {
+                        as_string.push_str(" | ");
+                        as_string.push_str(&str);
+                    })
+                }
+            }
 
-        // Watch the foreground group, dropping all commands that exit as they exit.
-        self.watch_foreground(-(pgid as i32), &as_string)
+            // Watch the foreground group, dropping all commands that exit as they exit.
+            self.watch_foreground(-(pgid as i32), &as_string)
+        })
     }
 
     fn generate_commands(

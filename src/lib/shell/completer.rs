@@ -3,6 +3,7 @@ use super::{
     escape::{escape, unescape},
     variables::Variables,
 };
+use auto_enums::auto_enum;
 use glob::glob;
 use liner::{Completer, FilenameCompleter};
 use smallvec::SmallVec;
@@ -86,6 +87,7 @@ impl Completer for IonFileCompleter {
     }
 }
 
+#[auto_enum]
 fn filename_completion<'a, LC>(
     start: &'a str,
     liner_complete: LC,
@@ -131,9 +133,10 @@ where
         }
     });
 
-    let iter_inner_glob: Box<Iterator<Item = String>> = match globs {
-        Some(iter) => Box::new(iter),
-        None => Box::new(iter::once(escape(start))),
+    #[auto_enum(Iterator)]
+    let iter_inner_glob = match globs {
+        Some(iter) => iter,
+        None => iter::once(escape(start)),
     };
 
     // Use Liner::Completer as well, to preserve the previous behaviour
