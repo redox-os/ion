@@ -11,7 +11,7 @@ use crate::{
         assignments::is_array,
         expand_string, parse_and_validate,
         pipelines::{PipeItem, Pipeline},
-        ForValueExpression, StatementSplitter,
+        ForValueExpression, StatementSplitter, Terminator,
     },
     shell::{assignments::VariableStore, variables::Value},
     types,
@@ -366,21 +366,25 @@ impl FlowLogic for Shell {
 
     fn on_command(&mut self, command_string: &str) {
         self.break_flow = false;
-        let iterator = StatementSplitter::new(command_string).map(parse_and_validate);
-
-        // Go through all of the statements and build up the block stack
-        // When block is done return statement for execution.
-        for statement in iterator {
-            match insert_statement(&mut self.flow_control, statement) {
-                Err(why) => {
-                    eprintln!("{}", why);
-                    self.flow_control.reset();
-                    return;
+        for stmt in command_string
+            .bytes()
+            .batching(|cmd| Terminator::new(cmd).terminate())
+            .filter_map(Result::ok)
+        {
+            // Go through all of the statements and build up the block stack
+            // When block is done return statement for execution.
+            for statement in StatementSplitter::new(&stmt).map(parse_and_validate) {
+                match insert_statement(&mut self.flow_control, statement) {
+                    Err(why) => {
+                        eprintln!("{}", why);
+                        self.flow_control.reset();
+                        return;
+                    }
+                    Ok(Some(stm)) => {
+                        let _ = self.execute_statement(&stm);
+                    }
+                    Ok(None) => {}
                 }
-                Ok(Some(stm)) => {
-                    let _ = self.execute_statement(&stm);
-                }
-                Ok(None) => {}
             }
         }
     }

@@ -192,7 +192,7 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
                 self.array -= 1;
                 Some(b']')
             }
-            b'#' if prev_whitespace => {
+            b'#' if prev_whitespace || self.inner.prev().is_none() => {
                 self.inner.find(|&c| c == b'\n');
                 if self.array == 0 && self.subshell == 0 && !self.and_or && !self.empty {
                     self.terminated = true;

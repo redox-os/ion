@@ -5,9 +5,9 @@ use std::{env, io::ErrorKind, mem, path::PathBuf};
 
 pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
     let prompt = shell.prompt();
+    let dirs = &shell.directory_stack;
     let vars = &shell.variables;
     let builtins = &shell.builtins;
-    let dirs = &shell.directory_stack;
 
     let line =
         shell.context.as_mut().unwrap().read_line(prompt, None, &mut |Event { editor, kind }| {
@@ -94,7 +94,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
 
     match line {
         Ok(line) => {
-            if line.bytes().any(|c| !c.is_ascii_whitespace()) {
+            if line.bytes().next() != Some(b'#') && line.bytes().any(|c| !c.is_ascii_whitespace()) {
                 shell.flags |= flags::UNTERMINATED;
             }
             Some(line)
