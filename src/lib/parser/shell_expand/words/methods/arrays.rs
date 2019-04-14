@@ -36,27 +36,21 @@ impl<'a> ArrayMethod<'a> {
     fn chars<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
         let len = variable.chars().count();
-        Ok(variable
-            .chars()
-            .map(|c| types::Str::from(c.to_string()))
-            .select(self.selection.clone(), len))
+        Ok(variable.chars().map(|c| types::Str::from(c.to_string())).select(&self.selection, len))
     }
 
     fn bytes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
         let len = variable.len();
-        Ok(variable
-            .bytes()
-            .map(|b| types::Str::from(b.to_string()))
-            .select(self.selection.clone(), len))
+        Ok(variable.bytes().map(|b| types::Str::from(b.to_string())).select(&self.selection, len))
     }
 
     fn map_keys<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Array, &'static str> {
-        expand_func.map_keys(self.variable, self.selection.clone()).ok_or("no map found")
+        expand_func.map_keys(self.variable, &self.selection).ok_or("no map found")
     }
 
     fn map_values<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Array, &'static str> {
-        expand_func.map_values(self.variable, self.selection.clone()).ok_or("no map found")
+        expand_func.map_values(self.variable, &self.selection).ok_or("no map found")
     }
 
     fn graphemes<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
@@ -64,7 +58,7 @@ impl<'a> ArrayMethod<'a> {
         let graphemes: Vec<types::Str> =
             UnicodeSegmentation::graphemes(variable.as_str(), true).map(From::from).collect();
         let len = graphemes.len();
-        Ok(graphemes.into_iter().select(self.selection.clone(), len))
+        Ok(graphemes.into_iter().select(&self.selection, len))
     }
 
     fn split_at<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
@@ -90,7 +84,7 @@ impl<'a> ArrayMethod<'a> {
 
     fn split<E: Expander>(&self, expand_func: &E) -> Result<Array, &'static str> {
         let variable = self.resolve_var(expand_func);
-        let res = match (&self.pattern, self.selection.clone()) {
+        let res = match (&self.pattern, &self.selection) {
             (_, Select::None) => Some("".into()).into_iter().collect(),
             (&Pattern::StringPattern(pattern), Select::All) => variable
                 .split(unescape(&expand_string(pattern, expand_func, false).join(" "))?.as_str())
@@ -103,27 +97,27 @@ impl<'a> ArrayMethod<'a> {
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => variable
                 .split(&unescape(&expand_string(pattern, expand_func, false).join(" "))?.as_str())
-                .nth(id)
+                .nth(*id)
                 .map(From::from)
                 .into_iter()
                 .collect(),
             (&Pattern::Whitespace, Select::Index(Index::Forward(id))) => variable
                 .split(char::is_whitespace)
                 .filter(|x| !x.is_empty())
-                .nth(id)
+                .nth(*id)
                 .map(From::from)
                 .into_iter()
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => variable
                 .rsplit(&unescape(&expand_string(pattern, expand_func, false).join(" "))?.as_str())
-                .nth(id)
+                .nth(*id)
                 .map(From::from)
                 .into_iter()
                 .collect(),
             (&Pattern::Whitespace, Select::Index(Index::Backward(id))) => variable
                 .rsplit(char::is_whitespace)
                 .filter(|x| !x.is_empty())
-                .nth(id)
+                .nth(*id)
                 .map(From::from)
                 .into_iter()
                 .collect(),
@@ -157,8 +151,8 @@ impl<'a> ArrayMethod<'a> {
 
     #[inline]
     fn resolve_array<E: Expander>(&self, expand_func: &E) -> Array {
-        if let Some(array) = expand_func.array(self.variable, Select::All) {
-            array.clone()
+        if let Some(array) = expand_func.array(self.variable, &Select::All) {
+            array
         } else if is_expression(self.variable) {
             expand_string(self.variable, expand_func, false)
         } else {
@@ -217,7 +211,7 @@ mod test {
     struct VariableExpander;
 
     impl Expander for VariableExpander {
-        fn array(&self, variable: &str, _: Select) -> Option<types::Array> {
+        fn array(&self, variable: &str, _: &Select) -> Option<types::Array> {
             match variable {
                 "ARRAY" => Some(array!["a", "b", "c"].to_owned()),
                 _ => None,

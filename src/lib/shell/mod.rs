@@ -489,17 +489,17 @@ impl<'a> Expander for Shell {
     }
 
     /// Expand an array variable with some selection
-    fn array(&self, name: &str, selection: Select) -> Option<types::Array> {
+    fn array(&self, name: &str, selection: &Select) -> Option<types::Array> {
         if let Some(array) = self.variables.get::<types::Array>(name) {
             match selection {
                 Select::All => return Some(array.clone()),
-                Select::Index(id) => {
+                Select::Index(ref id) => {
                     return id
                         .resolve(array.len())
                         .and_then(|n| array.get(n))
                         .map(|x| types::Array::from_iter(Some(x.to_owned())));
                 }
-                Select::Range(range) => {
+                Select::Range(ref range) => {
                     if let Some((start, length)) = range.bounds(array.len()) {
                         if array.len() > start {
                             return Some(
@@ -546,8 +546,8 @@ impl<'a> Expander for Shell {
                         "{}",
                         hmap.get(&types::Str::from(
                             match index {
-                                Index::Forward(n) => n as isize,
-                                Index::Backward(n) => -((n + 1) as isize),
+                                Index::Forward(n) => *n as isize,
+                                Index::Backward(n) => -((*n + 1) as isize),
                             }
                             .to_string()
                         ))
@@ -587,8 +587,8 @@ impl<'a> Expander for Shell {
                         "{}",
                         bmap.get(&types::Str::from(
                             match index {
-                                Index::Forward(n) => n as isize,
-                                Index::Backward(n) => -((n + 1) as isize),
+                                Index::Forward(n) => *n as isize,
+                                Index::Backward(n) => -((*n + 1) as isize),
                             }
                             .to_string()
                         ))
@@ -601,7 +601,7 @@ impl<'a> Expander for Shell {
         None
     }
 
-    fn map_keys(&self, name: &str, sel: Select) -> Option<types::Array> {
+    fn map_keys(&self, name: &str, sel: &Select) -> Option<types::Array> {
         match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
@@ -613,7 +613,7 @@ impl<'a> Expander for Shell {
         }
     }
 
-    fn map_values(&self, name: &str, sel: Select) -> Option<types::Array> {
+    fn map_values(&self, name: &str, sel: &Select) -> Option<types::Array> {
         match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())

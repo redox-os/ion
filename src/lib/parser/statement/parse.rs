@@ -216,7 +216,7 @@ pub(crate) fn parse(code: &str) -> Statement {
 
 #[cfg(test)]
 mod tests {
-    use self::pipelines::PipeItem;
+    use self::pipelines::{PipeItem, Pipeline};
     use super::*;
     use crate::{
         lexers::assignments::{KeyBuf, Primitive},

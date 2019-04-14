@@ -9,10 +9,8 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
     let vars = &shell.variables;
     let builtins = &shell.builtins;
 
-    let line = shell.context.as_mut().unwrap().read_line(
-        prompt,
-        None,
-        &mut move |Event { editor, kind }| {
+    let line =
+        shell.context.as_mut().unwrap().read_line(prompt, None, &mut |Event { editor, kind }| {
             if let EventKind::BeforeComplete = kind {
                 let (words, pos) = editor.get_words_and_cursor_position();
 
@@ -21,12 +19,15 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                     CursorPosition::InSpace(Some(_), _) => true,
                     CursorPosition::InSpace(None, _) => false,
                     CursorPosition::OnWordLeftEdge(index) => index >= 1,
-                    CursorPosition::OnWordRightEdge(index) => {
-                        words.into_iter().nth(index).and_then(|(start, end)| {
-                            let filename = editor.current_buffer().range(start, end);
+                    CursorPosition::OnWordRightEdge(index) => words
+                        .into_iter()
+                        .nth(index)
+                        .map(|(start, end)| editor.current_buffer().range(start, end))
+                        .and_then(|filename| {
                             Some(complete_as_file(&env::current_dir().ok()?, &filename, index))
-                        }) == Some(true)
-                    }
+                        })
+                        .filter(|&x| x)
+                        .is_some(),
                 };
 
                 let dir_completer = env::current_dir()
@@ -40,14 +41,6 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                         mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                     }
                 } else {
-                    // Collects the current list of values from history for completion.
-                    let history = editor
-                        .context()
-                        .history
-                        .buffers
-                        .iter()
-                        // Map each underlying `liner::Buffer` into a `String`.
-                        .map(|x| x.chars().cloned().collect());
                     // Creates a list of definitions from the shell environment that
                     // will be used
                     // in the creation of a custom completer.
@@ -57,7 +50,8 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                         // Add built-in commands to the completer's definitions.
                         .map(|&s| s.to_string())
                         // Add the history list to the completer's definitions.
-                        .chain(history)
+                        // Map each underlying `liner::Buffer` into a `String`.
+                        .chain(editor.context().history.buffers.iter().map(|x| x.to_string()))
                         // Add the aliases to the completer's definitions.
                         .chain(vars.aliases().map(|(key, _)| key.to_string()))
                         // Add the list of available functions to the completer's
@@ -96,8 +90,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                     mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                 }
             }
-        },
-    );
+        });
 
     match line {
         Ok(line) => {

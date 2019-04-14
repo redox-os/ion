@@ -381,7 +381,7 @@ impl FlowLogic for Shell {
                         return;
                     }
                     Ok(Some(stm)) => {
-                        let _ = self.execute_statement(stm);
+                        let _ = self.execute_statement(&stm);
                     }
                     Ok(None) => {}
                 }
