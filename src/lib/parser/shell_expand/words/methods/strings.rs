@@ -230,11 +230,7 @@ impl<'a> StringMethod<'a> {
                 if let Some(array) = expand.array(variable, &Select::All) {
                     slice(output, array.join(&pattern), &self.selection);
                 } else if is_expression(variable) {
-                    slice(
-                        output,
-                        expand_string(variable, expand).join(&pattern),
-                        &self.selection,
-                    );
+                    slice(output, expand_string(variable, expand).join(&pattern), &self.selection);
                 }
             }
             "len" => {
@@ -272,9 +268,7 @@ impl<'a> StringMethod<'a> {
                 let out = if let Some(value) = expand.string(variable) {
                     value.find(pattern.join(" ").as_str())
                 } else if is_expression(variable) {
-                    expand_string(variable, expand)
-                        .join(" ")
-                        .find(pattern.join(" ").as_str())
+                    expand_string(variable, expand).join(" ").find(pattern.join(" ").as_str())
                 } else {
                     None
                 };

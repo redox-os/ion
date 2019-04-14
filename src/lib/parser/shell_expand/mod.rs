@@ -65,12 +65,10 @@ fn expand_process<E: Expander>(
     selection: &Select,
     expander: &E,
 ) {
-    if let Some(output) = expander.command(command) {
-        if !output.is_empty() {
-            let output: &str =
-                if let Some(pos) = output.rfind(|x| x != '\n') { &output[..=pos] } else { &output };
-            slice(current, output, &selection);
-        }
+    if let Some(ref output) = expander.command(command).filter(|out| !out.is_empty()) {
+        // Get the pos of the last newline character, then slice them off.
+        let pos = output.len() - output.bytes().rev().take_while(|&byte| byte == b'\n').count();
+        slice(current, &output[..pos], &selection);
     }
 }
 
@@ -82,9 +80,7 @@ fn expand_brace<E: Expander>(
     expand_func: &E,
 ) {
     let mut temp = Vec::new();
-    for word in
-        nodes.iter().flat_map(|node| expand_string_no_glob(node, expand_func))
-    {
+    for word in nodes.iter().flat_map(|node| expand_string_no_glob(node, expand_func)) {
         match parse_range(&word) {
             Some(elements) => temp.extend(elements),
             None => temp.push(word),
@@ -125,10 +121,8 @@ fn array_nth<E: Expander>(elements: &[&str], expand_func: &E, index: Index) -> O
 }
 
 fn array_range<E: Expander>(elements: &[&str], expand_func: &E, range: Range) -> types::Array {
-    let expanded = elements
-        .iter()
-        .flat_map(|e| expand_string(e, expand_func))
-        .collect::<types::Array>();
+    let expanded =
+        elements.iter().flat_map(|e| expand_string(e, expand_func)).collect::<types::Array>();
     if let Some((start, length)) = range.bounds(expanded.len()) {
         expanded.into_iter().skip(start).take(length).collect()
     } else {
@@ -167,10 +161,7 @@ fn slice<S: AsRef<str>>(output: &mut small::String, expanded: S, selection: &Sel
 /// Performs shell expansions to an input string, efficiently returning the final
 /// expanded form. Shells must provide their own batteries for expanding tilde
 /// and variable words.
-pub(crate) fn expand_string<E: Expander>(
-    original: &str,
-    expand_func: &E,
-) -> types::Array {
+pub(crate) fn expand_string<E: Expander>(original: &str, expand_func: &E) -> types::Array {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
 
@@ -216,10 +207,7 @@ pub(crate) fn expand_string<E: Expander>(
     expand_tokens(&token_buffer, expand_func, contains_brace)
 }
 
-fn expand_string_no_glob<E: Expander>(
-    original: &str,
-    expand_func: &E,
-) -> types::Array {
+fn expand_string_no_glob<E: Expander>(original: &str, expand_func: &E) -> types::Array {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
 
@@ -235,10 +223,7 @@ fn expand_string_no_glob<E: Expander>(
     expand_tokens(&token_buffer, expand_func, contains_brace)
 }
 
-fn expand_braces<E: Expander>(
-    word_tokens: &[WordToken],
-    expand_func: &E,
-) -> types::Array {
+fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> types::Array {
     let mut expanded_words = types::Array::new();
     let mut output = small::String::new();
     let tokens: &mut Vec<BraceToken> = &mut Vec::new();
@@ -294,21 +279,12 @@ fn expand_braces<E: Expander>(
                     WordToken::StringMethod(ref method) => {
                         method.handle(output, expand_func);
                     }
-                    WordToken::Brace(ref nodes) => expand_brace(
-                        output,
-                        &mut expanders,
-                        tokens,
-                        nodes,
-                        expand_func,
-                    ),
+                    WordToken::Brace(ref nodes) => {
+                        expand_brace(output, &mut expanders, tokens, nodes, expand_func)
+                    }
                     WordToken::Whitespace(whitespace) => output.push_str(whitespace),
                     WordToken::Process(command, ref index) => {
-                        expand_process(
-                            output,
-                            command,
-                            &index,
-                            expand_func,
-                        );
+                        expand_process(output, command, &index, expand_func);
                     }
                     WordToken::Variable(text, ref index) => {
                         if let Some(expanded) = expand_func.string(text) {
@@ -418,10 +394,7 @@ fn expand_single_array_token<E: Expander>(
     }
 }
 
-fn expand_single_string_token<E: Expander>(
-    token: &WordToken,
-    expand_func: &E,
-) -> types::Array {
+fn expand_single_string_token<E: Expander>(token: &WordToken, expand_func: &E) -> types::Array {
     let mut output = small::String::new();
     let mut expanded_words = types::Array::new();
 
@@ -595,8 +568,7 @@ pub(crate) fn expand_tokens<E: Expander>(
                             expand_process(output, command, &index, expand_func);
                         }
                         WordToken::Variable(text, ref index) => {
-                            if let Some(expanded) = expand_func.string(text)
-                            {
+                            if let Some(expanded) = expand_func.string(text) {
                                 slice(output, expanded, &index);
                             }
                         }
@@ -687,9 +659,15 @@ mod test {
     #[test]
     fn expand_process_test() {
         let mut output = small::String::new();
-        let line = " Mary   had\ta little  \n\t lamb\t";
+
+        let line = " Mary   had\ta little  \n\t lamb😉😉\t";
         expand_process(&mut output, line, &Select::All, &CommandExpander);
         assert_eq!(output.as_str(), line);
+
+        output.clear();
+        let line = "foo not bar😉😉\n\n";
+        expand_process(&mut output, line, &Select::All, &CommandExpander);
+        assert_eq!(output.as_str(), "foo not bar😉😉");
     }
 
     #[test]

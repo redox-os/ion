@@ -65,9 +65,7 @@ impl<'a> ArrayMethod<'a> {
         let variable = self.resolve_var(expand_func);
         match self.pattern {
             Pattern::StringPattern(string) => {
-                if let Ok(value) =
-                    expand_string(string, expand_func).join(" ").parse::<usize>()
-                {
+                if let Ok(value) = expand_string(string, expand_func).join(" ").parse::<usize>() {
                     if value < variable.len() {
                         let (l, r) = variable.split_at(value);
                         Ok(array![types::Str::from(l), types::Str::from(r)])

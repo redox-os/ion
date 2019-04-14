@@ -282,15 +282,9 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                         self.read += 1;
                         return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                             let _ = iterator.next();
-                            WordToken::Process(
-                                output,
-                                self.read_selection(iterator),
-                            )
+                            WordToken::Process(output, self.read_selection(iterator))
                         } else {
-                            WordToken::Process(
-                                output,
-                                Select::All,
-                            )
+                            WordToken::Process(output, Select::All)
                         };
                     } else {
                         level -= 1;
@@ -479,8 +473,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         let start = self.read;
         for character in iterator {
             if let b']' = character {
-                let value =
-                    expand_string(&self.data[start..self.read], self.expanders).join(" ");
+                let value = expand_string(&self.data[start..self.read], self.expanders).join(" ");
                 let selection = match value.parse::<Select>() {
                     Ok(selection) => selection,
                     Err(_) => Select::None,
@@ -596,15 +589,9 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     let variable = &self.data[start..self.read];
 
                     return if character == b'[' {
-                        WordToken::Variable(
-                            variable,
-                            self.read_selection(iterator),
-                        )
+                        WordToken::Variable(variable, self.read_selection(iterator))
                     } else {
-                        WordToken::Variable(
-                            variable,
-                            Select::All,
-                        )
+                        WordToken::Variable(variable, Select::All)
                     };
                 }
                 _ => (),
@@ -625,10 +612,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             if character == b'}' {
                 let output = &self.data[start..self.read];
                 self.read += 1;
-                return WordToken::Variable(
-                    output,
-                    Select::All,
-                );
+                return WordToken::Variable(output, Select::All);
             }
             self.read += 1;
         }
