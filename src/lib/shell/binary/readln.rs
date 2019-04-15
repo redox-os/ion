@@ -30,16 +30,10 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                         .is_some(),
                 };
 
-                let dir_completer = env::current_dir()
-                    .ok()
-                    .as_ref()
-                    .and_then(|dir| dir.to_str())
-                    .map(|dir| IonFileCompleter::new(Some(dir), dirs, vars));
+                let dir_completer = IonFileCompleter::new(None, dirs, vars);
 
                 if filename {
-                    if let Some(completer) = dir_completer {
-                        mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
-                    }
+                    mem::replace(&mut editor.context().completer, Some(Box::new(dir_completer)));
                 } else {
                     // Creates a list of definitions from the shell environment that
                     // will be used
@@ -78,9 +72,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
 
                     // Also add files/directories in the current directory to the
                     // completion list.
-                    if let Some(completer) = dir_completer {
-                        file_completers.push(completer);
-                    }
+                    file_completers.push(dir_completer);
 
                     // Merge the collected definitions with the file path definitions.
                     let completer = MultiCompleter::new(file_completers, custom_completer);
