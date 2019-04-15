@@ -27,7 +27,11 @@ impl IonFileCompleter {
         dir_stack: *const DirectoryStack,
         vars: *const Variables,
     ) -> IonFileCompleter {
-        IonFileCompleter { dir_stack, vars, path: path.unwrap_or(".").to_string() }
+        let mut path = path.unwrap_or(".").to_string();
+        if !path.ends_with('/') {
+            path.push('/');
+        }
+        IonFileCompleter { dir_stack, vars, path }
     }
 }
 
@@ -95,10 +99,10 @@ fn filename_completion<'a, 'b>(start: &'a str, path: &'a str) -> impl Iterator<I
     // So we skip the first element and add "/" to the start of the string
     if unescaped_start.starts_with('/') {
         split_start.next();
+        string.push(b'/');
     } else {
         string.extend_from_slice(path.as_bytes());
     }
-    string.push(b'/');
 
     for element in split_start {
         string.extend_from_slice(element.as_bytes());
@@ -121,7 +125,7 @@ fn filename_completion<'a, 'b>(start: &'a str, path: &'a str) -> impl Iterator<I
         let mut completions = completions
             .filter_map(Result::ok)
             .map(move |file| {
-                let mut out = file.to_string_lossy().to_string();
+                let mut out = file.to_string_lossy().trim_start_matches(&path).to_string();
                 if file.is_dir() {
                     out.push('/');
                 }
