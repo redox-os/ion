@@ -127,7 +127,7 @@ fn filename_completion<'a, 'b>(start: &'a str, path: &'a str) -> impl Iterator<I
     .and_then(|completions| {
         let mut completions = completions
             .filter_map(Result::ok)
-            .map(move |file| {
+            .filter_map(move |file| {
                 let out = file.to_str()?.trim_start_matches(&path);
                 let mut joined = String::with_capacity(out.len() + 3); // worst case senario
                 if unescaped_start.starts_with("./") {
@@ -139,7 +139,6 @@ fn filename_completion<'a, 'b>(start: &'a str, path: &'a str) -> impl Iterator<I
                 }
                 Some(joined)
             })
-            .filter_map(|x| x)
             .peekable();
 
         if completions.peek().is_some() {

@@ -54,6 +54,7 @@ pages:
 compare-benchmarks:
   image: rustlang/rust:nightly
   stage: test
+  when: manual
   allow_failure: true
   except: [master]
   script:
