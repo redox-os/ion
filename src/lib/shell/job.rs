@@ -161,20 +161,6 @@ impl RefinedJob {
         }
     }
 
-    /// Returns a short description of this job: often just the command
-    /// or builtin name
-    pub(crate) fn short(&self) -> String {
-        match self.var {
-            JobVariant::Builtin { .. } => String::from("Shell Builtin"),
-            JobVariant::Function { ref name, .. } | JobVariant::External { ref name, .. } => {
-                name.to_string()
-            }
-            // TODO: Print for real
-            JobVariant::Cat { .. } => "multi-input".into(),
-            JobVariant::Tee { .. } => "multi-output".into(),
-        }
-    }
-
     pub(crate) fn exec<S: PipelineExecution>(&self, shell: &mut S) -> i32 {
         let stdin = &self.stdin;
         let stdout = &self.stdout;

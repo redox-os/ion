@@ -304,7 +304,7 @@ pub(crate) fn insert_statement(
 fn insert_into_block(block: &mut Vec<Statement>, statement: Statement) -> Result<(), &'static str> {
     let block = match block.last_mut().expect("Should not insert statement if stack is empty!") {
         Statement::Time(inner) => inner,
-        top_block @ _ => top_block,
+        top_block => top_block,
     };
 
     match block {

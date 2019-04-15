@@ -18,7 +18,6 @@ use crate::{
 };
 use itertools::Itertools;
 use small;
-use std::iter;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub(crate) enum Condition {
@@ -367,7 +366,8 @@ impl FlowLogic for Shell {
                 return condition;
             }
         }
-        return Condition::NoOp;
+
+        Condition::NoOp
     }
 
     fn on_command(&mut self, command_string: &str) {

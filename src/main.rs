@@ -51,7 +51,7 @@ fn main() {
         SmallVec::from_iter(
             script_path
                 .clone()
-                .or(env::args().next())
+                .or_else(|| env::args().next())
                 .into_iter()
                 .chain(args)
                 .map(|arg| arg.into()),
