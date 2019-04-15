@@ -27,8 +27,8 @@ impl IonFileCompleter {
         dir_stack: *const DirectoryStack,
         vars: *const Variables,
     ) -> IonFileCompleter {
-        let mut path = path.unwrap_or(".").to_string();
-        if !path.ends_with('/') {
+        let mut path = path.unwrap_or("").to_string();
+        if !path.is_empty() && !path.ends_with('/') {
             path.push('/');
         }
         IonFileCompleter { dir_stack, vars, path }
@@ -106,7 +106,10 @@ fn filename_completion<'a, 'b>(start: &'a str, path: &'a str) -> impl Iterator<I
 
     for element in split_start {
         string.extend_from_slice(element.as_bytes());
-        string.extend_from_slice(b"*/");
+        if element != "." && element != ".." {
+            string.push(b'*');
+        }
+        string.push(b'/');
     }
 
     string.pop(); // pop out the last '/' character
@@ -125,12 +128,18 @@ fn filename_completion<'a, 'b>(start: &'a str, path: &'a str) -> impl Iterator<I
         let mut completions = completions
             .filter_map(Result::ok)
             .map(move |file| {
-                let mut out = file.to_string_lossy().trim_start_matches(&path).to_string();
-                if file.is_dir() {
-                    out.push('/');
+                let out = file.to_str()?.trim_start_matches(&path);
+                let mut joined = String::with_capacity(out.len() + 3); // worst case senario
+                if unescaped_start.starts_with("./") {
+                    joined.push_str("./");
                 }
-                out
+                joined.push_str(out);
+                if file.is_dir() {
+                    joined.push('/');
+                }
+                Some(joined)
             })
+            .filter_map(|x| x)
             .peekable();
 
         if completions.peek().is_some() {
