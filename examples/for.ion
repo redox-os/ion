@@ -31,6 +31,14 @@ for i in @array
     echo $i
 end
 
+let multi_line_input = "one
+two
+three"
+
+for word in $multi_line_input
+    echo "; $word"
+end
+
 mkdir for_test
 cd for_test
 touch "a b c"

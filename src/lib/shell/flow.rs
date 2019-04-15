@@ -18,6 +18,7 @@ use crate::{
 };
 use itertools::Itertools;
 use small;
+use std::iter;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub(crate) enum Condition {
@@ -125,9 +126,14 @@ impl FlowLogic for Shell {
                     set_vars_then_exec!(chunk, &default);
                 }
             }
-            ForValueExpression::Normal(values) => {
-                for chunk in &values.lines().chunks(variables.len()) {
-                    set_vars_then_exec!(chunk, "");
+            ForValueExpression::Normal(value) => {
+                if &variables[0] != "_" {
+                    self.set(&variables[0], value.clone());
+                }
+
+                match self.execute_statements(statements) {
+                    Condition::SigInt => return Condition::SigInt,
+                    Condition::Break | Condition::Continue | Condition::NoOp => (),
                 }
             }
             ForValueExpression::Range(range) => {
