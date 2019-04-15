@@ -372,18 +372,14 @@ impl FlowLogic for Shell {
 
     fn on_command(&mut self, command_string: &str) {
         self.break_flow = false;
-        for stmt in command_string
-            .bytes()
-            .batching(|cmd| Terminator::new(cmd).terminate())
-            .filter_map(Result::ok)
-        {
+        for stmt in command_string.bytes().batching(|cmd| Terminator::new(cmd).terminate()) {
             // Go through all of the statements and build up the block stack
             // When block is done return statement for execution.
             for statement in StatementSplitter::new(&stmt).map(parse_and_validate) {
                 match insert_statement(&mut self.flow_control, statement) {
                     Err(why) => {
                         eprintln!("{}", why);
-                        self.flow_control.reset();
+                        self.reset_flow();
                         return;
                     }
                     Ok(Some(stm)) => {

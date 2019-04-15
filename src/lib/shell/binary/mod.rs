@@ -87,13 +87,12 @@ impl Binary for Shell {
                 .filter_map(|cmd| cmd)
                 .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
             match Terminator::new(&mut lines).terminate() {
-                Some(Ok(command)) => {
+                Some(command) => {
                     self.flags &= !UNTERMINATED;
                     let cmd: &str = &designators::expand_designators(&self, command.trim_end());
                     self.on_command(&cmd);
                     self.save_command(&cmd);
                 }
-                Some(Err(_)) => self.reset_flow(),
                 None => {
                     self.flags &= !UNTERMINATED;
                 }
