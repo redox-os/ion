@@ -21,7 +21,7 @@ pub(crate) fn escape(input: &str) -> String {
 pub(crate) fn unescape(input: &str) -> Cow<str> {
     let mut input: Cow<str> = input.into();
     while let Some(found) = input.find('\\') {
-        if input.as_ref().chars().nth(found + 1).is_some() {
+        if input.as_ref().len() > found + 1 {
             input.to_mut().remove(found);
         } else {
             break;

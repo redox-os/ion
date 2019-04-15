@@ -105,7 +105,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
         Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
             if shell.flow_control.unclosed_block() {
                 shell.flow_control.pop();
-                Some("".to_string())
+                None
             } else {
                 shell.exit(shell.previous_status);
             }
