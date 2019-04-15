@@ -5,7 +5,7 @@ use super::{
 };
 use auto_enums::auto_enum;
 use glob::{glob_with, MatchOptions};
-use liner::{Completer, FilenameCompleter};
+use liner::Completer;
 use smallvec::SmallVec;
 use std::{iter, str};
 
@@ -13,12 +13,12 @@ use std::{iter, str};
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
 /// when a special character is contained within an expanded filename.
 pub(crate) struct IonFileCompleter {
-    /// The completer that this completer is  handling.
-    inner: FilenameCompleter,
     /// A pointer to the directory stack in the shell.
     dir_stack: *const DirectoryStack,
     /// A pointer to the variables map in the shell.
     vars: *const Variables,
+    /// The directory the expansion takes place in
+    path: String,
 }
 
 impl IonFileCompleter {
@@ -27,7 +27,7 @@ impl IonFileCompleter {
         dir_stack: *const DirectoryStack,
         vars: *const Variables,
     ) -> IonFileCompleter {
-        IonFileCompleter { inner: FilenameCompleter::new(path), dir_stack, vars }
+        IonFileCompleter { dir_stack, vars, path: path.unwrap_or(".").to_string() }
     }
 }
 
@@ -48,7 +48,7 @@ impl Completer for IonFileCompleter {
         // completions.
         if let Some(expanded) = unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) } {
             // Now we obtain completions for the `expanded` form of the `start` value.
-            let iterator = filename_completion(&expanded, |x| self.inner.completions(x));
+            let iterator = filename_completion(&expanded, &self.path);
 
             // We can do that by obtaining the index position where the tilde character
             // ends. We don't search with `~` because we also want to
@@ -78,23 +78,14 @@ impl Completer for IonFileCompleter {
             } else {
                 Vec::new()
             }
-        } else if start.starts_with("./") && unescape(start).split('/').count() == 2 {
-            // Special case for ./scripts, the globbing code removes the ./
-            self.inner.completions(&start)
         } else {
-            filename_completion(&start, |x| self.inner.completions(x)).collect()
+            filename_completion(&start, &self.path).collect()
         }
     }
 }
 
 #[auto_enum]
-fn filename_completion<'a, LC>(
-    start: &'a str,
-    liner_complete: LC,
-) -> impl Iterator<Item = String> + 'a
-where
-    LC: Fn(&str) -> Vec<String> + 'a,
-{
+fn filename_completion<'a, 'b>(start: &'a str, path: &'a str) -> impl Iterator<Item = String> + 'a {
     let unescaped_start = unescape(start);
 
     let mut split_start = unescaped_start.split('/');
@@ -103,9 +94,11 @@ where
     // When 'start' is an absolute path, "/..." gets split to ["", "..."]
     // So we skip the first element and add "/" to the start of the string
     if unescaped_start.starts_with('/') {
-        string.push(b'/');
         split_start.next();
+    } else {
+        string.extend_from_slice(path.as_bytes());
     }
+    string.push(b'/');
 
     for element in split_start {
         string.extend_from_slice(element.as_bytes());
@@ -125,8 +118,16 @@ where
     )
     .ok()
     .and_then(|completions| {
-        let mut completions =
-            completions.filter_map(Result::ok).map(|x| x.to_string_lossy().into_owned()).peekable();
+        let mut completions = completions
+            .filter_map(Result::ok)
+            .map(move |file| {
+                let mut out = file.to_string_lossy().to_string();
+                if file.is_dir() {
+                    out.push('/');
+                }
+                out
+            })
+            .peekable();
 
         if completions.peek().is_some() {
             Some(completions)
@@ -136,15 +137,10 @@ where
     });
 
     #[auto_enum(Iterator)]
-    let iter_inner_glob = match globs {
+    match globs {
         Some(iter) => iter,
         None => iter::once(escape(start)),
-    };
-
-    // Use Liner::Completer as well, to preserve the previous behaviour
-    // around single-directory completions
-    iter_inner_glob
-        .flat_map(move |path| liner_complete(&path).into_iter().map(|x| escape(x.as_str())))
+    }
 }
 
 /// A completer that combines suggestions from multiple completers.
@@ -183,17 +179,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
 
     #[test]
     fn filename_completion() {
-        let current_dir = env::current_dir().expect("Unable to get current directory");
-
-        let completer = IonFileCompleter::new(
-            current_dir.to_str(),
-            &DirectoryStack::new(),
-            &Variables::default(),
-        );
+        let completer = IonFileCompleter::new(None, &DirectoryStack::new(), &Variables::default());
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
         assert_eq!(completer.completions("testing/file"), vec!["testing/file_with_text"]);
 
