@@ -477,14 +477,11 @@ impl<'a> Expander for Shell {
     }
 
     /// Expand a string variable given if its quoted / unquoted
-    fn string(&self, name: &str, quoted: bool) -> Option<types::Str> {
-        use crate::ascii_helpers::AsciiReplace;
+    fn string(&self, name: &str) -> Option<types::Str> {
         if name == "?" {
             Some(types::Str::from(self.previous_status.to_string()))
-        } else if quoted {
-            self.get::<types::Str>(name)
         } else {
-            self.get::<types::Str>(name).map(|x| x.ascii_replace('\n', ' '))
+            self.get::<types::Str>(name)
         }
     }
 

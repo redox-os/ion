@@ -15,13 +15,43 @@ for element in @array
 end
 ```
 
+## Splitting Arguments
+
+When working with strings that you would like to splice into multiple elements for iteration, see
+the splicing method, `@split`:
+
+```sh
+let value = "one two three four"
+for element in @split(value)
+    echo $element
+end
+```
+
+By default, this will split a string by whitespace. Custom patterns may also be provided:
+
+```sh
+let value = "one,two,three,four"
+for element in @split(value ',')
+    echo $element
+end
+```
+
+A convenience method is also provided for `@split(value '\n')`: `@lines`
+
+```sh
+let file = $(cat file)
+for line in @lines(file)
+    echo = $line =
+end
+```
+
 ## Breaking From Loops
 
 Sometimes you may need to exit from the loop before the looping is finished. This is achievable
 using the `break` keyword.
 
 ```sh
-for element in {1...10}
+for element in {1..=10}
     echo $element
     if test $element -eq 5
         break
@@ -42,7 +72,7 @@ In other times, if you need to abort further execution of the current loop and s
 loop, the `continue` keyword serves that purpose.
 
 ```sh
-for elem in {1...10}
+for elem in {1..=10}
     if test $((elem % 2)) -eq 1
         continue
     end

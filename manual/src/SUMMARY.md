@@ -2,8 +2,6 @@
 
 - [Introduction](introduction.md)
 
-- [Feature Overview](features.md)
-
 - [Miscellaneous](misc/index.md)
 
     - [Implicit `cd`](misc/01-implicitcd.md)

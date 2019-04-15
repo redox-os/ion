@@ -58,7 +58,7 @@ impl fmt::Debug for Job {
 
 /// Expands a given argument and returns it as an `Array`.
 fn expand_arg(arg: &str, shell: &Shell) -> types::Array {
-    let res = expand_string(&arg, shell, false);
+    let res = expand_string(&arg, shell);
     if res.is_empty() {
         array![""]
     } else {
@@ -158,20 +158,6 @@ impl RefinedJob {
             | JobVariant::Function { ref args, .. } => args.join(" ").to_owned(),
             // TODO: Figure out real printing
             JobVariant::Cat { .. } | JobVariant::Tee { .. } => "".into(),
-        }
-    }
-
-    /// Returns a short description of this job: often just the command
-    /// or builtin name
-    pub(crate) fn short(&self) -> String {
-        match self.var {
-            JobVariant::Builtin { .. } => String::from("Shell Builtin"),
-            JobVariant::Function { ref name, .. } | JobVariant::External { ref name, .. } => {
-                name.to_string()
-            }
-            // TODO: Print for real
-            JobVariant::Cat { .. } => "multi-input".into(),
-            JobVariant::Tee { .. } => "multi-output".into(),
         }
     }
 

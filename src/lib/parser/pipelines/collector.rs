@@ -581,7 +581,7 @@ mod tests {
     #[test]
     fn parse_empty_string() {
         if let Statement::Default = parse("") {
-            ()
+            return;
         } else {
             assert!(false);
         }
@@ -656,7 +656,7 @@ mod tests {
     #[test]
     fn all_whitespace() {
         if let Statement::Default = parse("  \t ") {
-            ()
+            return;
         } else {
             assert!(false);
         }
@@ -702,7 +702,7 @@ mod tests {
     #[test]
     fn lone_comment() {
         if let Statement::Default = parse("# ; \t as!!+dfa") {
-            ()
+            return;
         } else {
             assert!(false);
         }
@@ -748,7 +748,7 @@ mod tests {
     #[test]
     fn several_blank_lines() {
         if let Statement::Default = parse("\n\n\n") {
-            ()
+            return;
         } else {
             assert!(false);
         }

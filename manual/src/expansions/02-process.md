@@ -13,4 +13,3 @@ let array = @(cmd args...)
 **NOTES:**
 - To split outputs by line, see `@lines($(cmd))`.
 - `@(cmd)` is equivalent to `@split($(cmd))`
-- If not double quoted, newlines will be replaced with spaces

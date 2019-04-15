@@ -13,7 +13,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 b.iter(|| {
                     let mut bytes = script.bytes().peekable();
                     while bytes.peek().is_some() {
-                        let stmt = Terminator::new(&mut bytes).terminate();
+                        let _ = Terminator::new(&mut bytes).terminate();
                     }
                 })
             },

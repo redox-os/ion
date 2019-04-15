@@ -7,3 +7,27 @@ echo 'a<<b\
 echo 'a\
 <<< b\
 '
+
+for word in "@(echo 'b  c')"
+    echo $word
+end
+
+for word in "@(echo 'b  c')[1]"
+    echo $word
+end
+
+for word in "@split('one two three')"
+    echo $word
+end
+
+for word in "@split('one two three')[1]"
+    echo $word
+end
+
+let array = [1 2 3]
+for word in "@array"
+    echo $word
+end
+
+echo "@(echo 'b  d')"
+echo '@(echo "b  c")'

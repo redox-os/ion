@@ -125,9 +125,14 @@ impl FlowLogic for Shell {
                     set_vars_then_exec!(chunk, &default);
                 }
             }
-            ForValueExpression::Normal(values) => {
-                for chunk in &values.lines().chunks(variables.len()) {
-                    set_vars_then_exec!(chunk, "");
+            ForValueExpression::Normal(value) => {
+                if &variables[0] != "_" {
+                    self.set(&variables[0], value.clone());
+                }
+
+                match self.execute_statements(statements) {
+                    Condition::SigInt => return Condition::SigInt,
+                    Condition::Break | Condition::Continue | Condition::NoOp => (),
                 }
             }
             ForValueExpression::Range(range) => {
@@ -316,12 +321,12 @@ impl FlowLogic for Shell {
         // matches("foo", "bar")
         // ```
         let is_array = is_array(expression.as_ref());
-        let value = expand_string(expression.as_ref(), self, false);
+        let value = expand_string(expression.as_ref(), self);
         for case in cases.iter() {
             if case
                 .value
                 .as_ref()
-                .map(|v| expand_string(&v, self, false))
+                .map(|v| expand_string(&v, self))
                 .filter(|v| v.iter().all(|v| !value.contains(v)))
                 .is_none()
             {
@@ -361,7 +366,8 @@ impl FlowLogic for Shell {
                 return condition;
             }
         }
-        return Condition::NoOp;
+
+        Condition::NoOp
     }
 
     fn on_command(&mut self, command_string: &str) {

@@ -12,10 +12,8 @@ pub(crate) enum ForValueExpression {
 
 impl ForValueExpression {
     pub(crate) fn new<E: Expander>(expression: &[types::Str], expanders: &E) -> ForValueExpression {
-        let output: Vec<_> = expression
-            .iter()
-            .flat_map(|expression| expand_string(expression, expanders, true))
-            .collect();
+        let output: Vec<_> =
+            expression.iter().flat_map(|expression| expand_string(expression, expanders)).collect();
 
         if output.is_empty() {
             ForValueExpression::Multiple(output)

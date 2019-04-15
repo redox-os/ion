@@ -103,10 +103,10 @@ impl<'a> StringMethod<'a> {
         macro_rules! string_eval {
             ($variable:ident $method:tt) => {{
                 let pattern = pattern.join(" ");
-                let is_true = if let Some(value) = expand.string($variable, false) {
+                let is_true = if let Some(value) = expand.string($variable) {
                     value.$method(pattern.as_str())
                 } else if is_expression($variable) {
-                    expand_string($variable, expand, false).join(" ").$method(pattern.as_str())
+                    expand_string($variable, expand).join(" ").$method(pattern.as_str())
                 } else {
                     false
                 };
@@ -116,7 +116,7 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! path_eval {
             ($method:tt) => {{
-                if let Some(value) = expand.string(variable, false) {
+                if let Some(value) = expand.string(variable) {
                     output.push_str(
                         Path::new(&*value)
                             .$method()
@@ -124,7 +124,7 @@ impl<'a> StringMethod<'a> {
                             .unwrap_or(value.as_str()),
                     );
                 } else if is_expression(variable) {
-                    let word = expand_string(variable, expand, false).join(" ");
+                    let word = expand_string(variable, expand).join(" ");
                     output.push_str(
                         Path::new(&word)
                             .$method()
@@ -137,10 +137,10 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! string_case {
             ($method:tt) => {{
-                if let Some(value) = expand.string(variable, false) {
+                if let Some(value) = expand.string(variable) {
                     output.push_str(value.$method().as_str());
                 } else if is_expression(variable) {
-                    let word = expand_string(variable, expand, false).join(" ");
+                    let word = expand_string(variable, expand).join(" ");
                     output.push_str(word.$method().as_str());
                 }
             }};
@@ -148,10 +148,10 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! get_var {
             () => {{
-                if let Some(value) = expand.string(variable, false) {
+                if let Some(value) = expand.string(variable) {
                     value
                 } else {
-                    small::String::from(expand_string(variable, expand, false).join(" "))
+                    small::String::from(expand_string(variable, expand).join(" "))
                 }
             }};
         }
@@ -230,61 +230,55 @@ impl<'a> StringMethod<'a> {
                 if let Some(array) = expand.array(variable, &Select::All) {
                     slice(output, array.join(&pattern), &self.selection);
                 } else if is_expression(variable) {
-                    slice(
-                        output,
-                        expand_string(variable, expand, false).join(&pattern),
-                        &self.selection,
-                    );
+                    slice(output, expand_string(variable, expand).join(&pattern), &self.selection);
                 }
             }
             "len" => {
                 if variable.starts_with('@') || is_array(variable) {
-                    let expanded = expand_string(variable, expand, false);
+                    let expanded = expand_string(variable, expand);
                     output.push_str(&expanded.len().to_string());
-                } else if let Some(value) = expand.string(variable, false) {
+                } else if let Some(value) = expand.string(variable) {
                     let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
                     output.push_str(&count.to_string());
                 } else if is_expression(variable) {
-                    let word = expand_string(variable, expand, false).join(" ");
+                    let word = expand_string(variable, expand).join(" ");
                     let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
                     output.push_str(&count.to_string());
                 }
             }
             "len_bytes" => {
-                if let Some(value) = expand.string(variable, false) {
+                if let Some(value) = expand.string(variable) {
                     output.push_str(&value.as_bytes().len().to_string());
                 } else if is_expression(variable) {
-                    let word = expand_string(variable, expand, false).join(" ");
+                    let word = expand_string(variable, expand).join(" ");
                     output.push_str(&word.as_bytes().len().to_string());
                 }
             }
             "reverse" => {
-                if let Some(value) = expand.string(variable, false) {
+                if let Some(value) = expand.string(variable) {
                     let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
                 } else if is_expression(variable) {
-                    let word = expand_string(variable, expand, false).join(" ");
+                    let word = expand_string(variable, expand).join(" ");
                     let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
                 }
             }
             "find" => {
-                let out = if let Some(value) = expand.string(variable, false) {
+                let out = if let Some(value) = expand.string(variable) {
                     value.find(pattern.join(" ").as_str())
                 } else if is_expression(variable) {
-                    expand_string(variable, expand, false)
-                        .join(" ")
-                        .find(pattern.join(" ").as_str())
+                    expand_string(variable, expand).join(" ").find(pattern.join(" ").as_str())
                 } else {
                     None
                 };
                 output.push_str(&out.map(|i| i as isize).unwrap_or(-1).to_string());
             }
             "unescape" => {
-                let out = if let Some(value) = expand.string(variable, false) {
+                let out = if let Some(value) = expand.string(variable) {
                     value
                 } else if is_expression(variable) {
-                    expand_string(variable, expand, false).join(" ").into()
+                    expand_string(variable, expand).join(" ").into()
                 } else {
                     return;
                 };
@@ -294,10 +288,10 @@ impl<'a> StringMethod<'a> {
                 };
             }
             "escape" => {
-                let word = if let Some(value) = expand.string(variable, false) {
+                let word = if let Some(value) = expand.string(variable) {
                     value
                 } else if is_expression(variable) {
-                    expand_string(variable, expand, false).join(" ").into()
+                    expand_string(variable, expand).join(" ").into()
                 } else {
                     return;
                 };
@@ -307,10 +301,10 @@ impl<'a> StringMethod<'a> {
                 };
             }
             "or" => {
-                let first_str = if let Some(value) = expand.string(variable, false) {
+                let first_str = if let Some(value) = expand.string(variable) {
                     value
                 } else if is_expression(variable) {
-                    expand_string(variable, expand, false).join(" ").into()
+                    expand_string(variable, expand).join(" ").into()
                 } else {
                     small::String::new()
                 };
@@ -365,7 +359,7 @@ mod test {
     struct VariableExpander;
 
     impl Expander for VariableExpander {
-        fn string(&self, variable: &str, _: bool) -> Option<types::Str> {
+        fn string(&self, variable: &str) -> Option<types::Str> {
             match variable {
                 "FOO" => Some("FOOBAR".into()),
                 "BAZ" => Some("  BARBAZ   ".into()),

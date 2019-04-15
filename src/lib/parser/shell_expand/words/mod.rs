@@ -35,12 +35,12 @@ pub(crate) enum WordToken<'a> {
     Whitespace(&'a str),
     Brace(Vec<&'a str>),
     Array(Vec<&'a str>, Select),
-    Variable(&'a str, bool, Select),
+    Variable(&'a str, Select),
     ArrayVariable(&'a str, bool, Select),
     ArrayProcess(&'a str, bool, Select),
-    Process(&'a str, bool, Select),
+    Process(&'a str, Select),
     StringMethod(StringMethod<'a>),
-    ArrayMethod(ArrayMethod<'a>),
+    ArrayMethod(ArrayMethod<'a>, bool),
     Arithmetic(&'a str),
 }
 
@@ -282,17 +282,9 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                         self.read += 1;
                         return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                             let _ = iterator.next();
-                            WordToken::Process(
-                                output,
-                                self.flags.contains(Flags::DQUOTE),
-                                self.read_selection(iterator),
-                            )
+                            WordToken::Process(output, self.read_selection(iterator))
                         } else {
-                            WordToken::Process(
-                                output,
-                                self.flags.contains(Flags::DQUOTE),
-                                Select::All,
-                            )
+                            WordToken::Process(output, Select::All)
                         };
                     } else {
                         level -= 1;
@@ -383,9 +375,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                             b']' if !method_flags.intersects(Flags::SQUOTE | Flags::DQUOTE) => {
                                 depth -= 1
                             }
-                            b' ' if depth == 0
-                                && !method_flags.intersects(Flags::SQUOTE | Flags::DQUOTE) =>
-                            {
+                            b' ' if depth == 0 && !method_flags.intersects(Flags::SQUOTE) => {
                                 let variable = &self.data[start..self.read];
                                 self.read += 1;
                                 start = self.read;
@@ -397,19 +387,25 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                             self.data.as_bytes().get(self.read)
                                         {
                                             let _ = iterator.next();
-                                            WordToken::ArrayMethod(ArrayMethod {
-                                                method,
-                                                variable: variable.trim(),
-                                                pattern: Pattern::StringPattern(pattern),
-                                                selection: self.read_selection(iterator),
-                                            })
+                                            WordToken::ArrayMethod(
+                                                ArrayMethod {
+                                                    method,
+                                                    variable: variable.trim(),
+                                                    pattern: Pattern::StringPattern(pattern),
+                                                    selection: self.read_selection(iterator),
+                                                },
+                                                self.flags.contains(Flags::DQUOTE),
+                                            )
                                         } else {
-                                            WordToken::ArrayMethod(ArrayMethod {
-                                                method,
-                                                variable: variable.trim(),
-                                                pattern: Pattern::StringPattern(pattern),
-                                                selection: Select::All,
-                                            })
+                                            WordToken::ArrayMethod(
+                                                ArrayMethod {
+                                                    method,
+                                                    variable: variable.trim(),
+                                                    pattern: Pattern::StringPattern(pattern),
+                                                    selection: Select::All,
+                                                },
+                                                self.flags.contains(Flags::DQUOTE),
+                                            )
                                         };
                                     }
                                     self.read += 1;
@@ -422,19 +418,25 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
 
                                 return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                     let _ = iterator.next();
-                                    WordToken::ArrayMethod(ArrayMethod {
-                                        method,
-                                        variable: variable.trim(),
-                                        pattern: Pattern::Whitespace,
-                                        selection: self.read_selection(iterator),
-                                    })
+                                    WordToken::ArrayMethod(
+                                        ArrayMethod {
+                                            method,
+                                            variable: variable.trim(),
+                                            pattern: Pattern::Whitespace,
+                                            selection: self.read_selection(iterator),
+                                        },
+                                        self.flags.contains(Flags::DQUOTE),
+                                    )
                                 } else {
-                                    WordToken::ArrayMethod(ArrayMethod {
-                                        method,
-                                        variable: variable.trim(),
-                                        pattern: Pattern::Whitespace,
-                                        selection: Select::All,
-                                    })
+                                    WordToken::ArrayMethod(
+                                        ArrayMethod {
+                                            method,
+                                            variable: variable.trim(),
+                                            pattern: Pattern::Whitespace,
+                                            selection: Select::All,
+                                        },
+                                        self.flags.contains(Flags::DQUOTE),
+                                    )
                                 };
                             }
                             b')' => depth -= 1,
@@ -481,8 +483,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         let start = self.read;
         for character in iterator {
             if let b']' = character {
-                let value =
-                    expand_string(&self.data[start..self.read], self.expanders, false).join(" ");
+                let value = expand_string(&self.data[start..self.read], self.expanders).join(" ");
                 let selection = match value.parse::<Select>() {
                     Ok(selection) => selection,
                     Err(_) => Select::None,
@@ -598,17 +599,9 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     let variable = &self.data[start..self.read];
 
                     return if character == b'[' {
-                        WordToken::Variable(
-                            variable,
-                            self.flags.contains(Flags::DQUOTE),
-                            self.read_selection(iterator),
-                        )
+                        WordToken::Variable(variable, self.read_selection(iterator))
                     } else {
-                        WordToken::Variable(
-                            variable,
-                            self.flags.contains(Flags::DQUOTE),
-                            Select::All,
-                        )
+                        WordToken::Variable(variable, Select::All)
                     };
                 }
                 _ => (),
@@ -616,7 +609,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             self.read += 1;
         }
 
-        WordToken::Variable(&self.data[start..], self.flags.contains(Flags::DQUOTE), Select::All)
+        WordToken::Variable(&self.data[start..], Select::All)
     }
 
     // Contains the logic for parsing braced variables
@@ -629,11 +622,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             if character == b'}' {
                 let output = &self.data[start..self.read];
                 self.read += 1;
-                return WordToken::Variable(
-                    output,
-                    self.flags.contains(Flags::DQUOTE),
-                    Select::All,
-                );
+                return WordToken::Variable(output, Select::All);
             }
             self.read += 1;
         }
