@@ -4,7 +4,7 @@ use super::{
     variables::Variables,
 };
 use auto_enums::auto_enum;
-use glob::glob;
+use glob::{glob_with, MatchOptions};
 use liner::{Completer, FilenameCompleter};
 use smallvec::SmallVec;
 use std::{iter, str};
@@ -97,32 +97,34 @@ where
 {
     let unescaped_start = unescape(start);
 
-    let split_start = unescaped_start.split('/');
+    let mut split_start = unescaped_start.split('/');
     let mut string: SmallVec<[u8; 128]> = SmallVec::with_capacity(128);
 
     // When 'start' is an absolute path, "/..." gets split to ["", "..."]
     // So we skip the first element and add "/" to the start of the string
-    let skip = if unescaped_start.starts_with('/') {
+    if unescaped_start.starts_with('/') {
         string.push(b'/');
-        1
-    } else {
-        0
-    };
+        split_start.next();
+    }
 
-    for element in split_start.skip(skip) {
-        if element != ".." && element != "." {
-            string.extend_from_slice(element.as_bytes());
-            string.extend_from_slice(b"*/");
-        } else {
-            string.extend_from_slice(element.as_bytes());
-            string.push(b'/');
-        }
+    for element in split_start {
+        string.extend_from_slice(element.as_bytes());
+        string.extend_from_slice(b"*/");
     }
 
     string.pop(); // pop out the last '/' character
     let string = unsafe { &str::from_utf8_unchecked(&string) };
 
-    let globs = glob(string).ok().and_then(|completions| {
+    let globs = glob_with(
+        string,
+        MatchOptions {
+            case_sensitive:              true,
+            require_literal_separator:   true,
+            require_literal_leading_dot: false,
+        },
+    )
+    .ok()
+    .and_then(|completions| {
         let mut completions =
             completions.filter_map(Result::ok).map(|x| x.to_string_lossy().into_owned()).peekable();
 
