@@ -124,28 +124,19 @@ fn filename_completion<'a, 'b>(start: &'a str, path: &'a str) -> impl Iterator<I
         },
     )
     .ok()
-    .and_then(|completions| {
-        let mut completions = completions
-            .filter_map(Result::ok)
-            .filter_map(move |file| {
-                let out = file.to_str()?.trim_start_matches(&path);
-                let mut joined = String::with_capacity(out.len() + 3); // worst case senario
-                if unescaped_start.starts_with("./") {
-                    joined.push_str("./");
-                }
-                joined.push_str(out);
-                if file.is_dir() {
-                    joined.push('/');
-                }
-                Some(joined)
-            })
-            .peekable();
-
-        if completions.peek().is_some() {
-            Some(completions)
-        } else {
-            None
-        }
+    .map(|completions| {
+        completions.filter_map(Result::ok).filter_map(move |file| {
+            let out = file.to_str()?.trim_start_matches(&path);
+            let mut joined = String::with_capacity(out.len() + 3); // worst case senario
+            if unescaped_start.starts_with("./") {
+                joined.push_str("./");
+            }
+            joined.push_str(out);
+            if file.is_dir() {
+                joined.push('/');
+            }
+            Some(joined)
+        })
     });
 
     #[auto_enum(Iterator)]
