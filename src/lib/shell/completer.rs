@@ -113,6 +113,9 @@ fn filename_completion<'a, 'b>(start: &'a str, path: &'a str) -> impl Iterator<I
     }
 
     string.pop(); // pop out the last '/' character
+    if string.last() == Some(&b'.') {
+        string.push(b'*')
+    }
     let string = unsafe { &str::from_utf8_unchecked(&string) };
 
     let globs = glob_with(
