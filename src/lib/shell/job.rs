@@ -35,7 +35,7 @@ impl Job {
 
     pub(crate) fn new(args: types::Array, kind: JobKind) -> Self {
         let command = args[0].clone();
-        let builtin = BUILTINS.get(command.as_ref()).map(|b| b.main);
+        let builtin = BUILTINS.get(command.as_ref());
         Job { command, args, kind, builtin }
     }
 }
