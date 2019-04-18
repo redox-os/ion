@@ -25,3 +25,26 @@ pub use crate::shell::{
 };
 
 pub fn version() -> &'static str { include!(concat!(env!("OUT_DIR"), "/version_string")) }
+
+pub fn join_with<S: AsRef<str>>(
+    input: &mut small::String,
+    with: char,
+    mut iter: impl Iterator<Item = S>,
+) {
+    if let Some(str) = iter.next() {
+        input.push_str(str.as_ref());
+        iter.for_each(|str| {
+            input.push(with);
+            input.push_str(str.as_ref());
+        });
+    }
+}
+
+pub fn join<S: AsRef<str>>(input: &mut small::String, mut iter: impl Iterator<Item = S>) {
+    if let Some(str) = iter.next() {
+        input.push_str(str.as_ref());
+        iter.for_each(|str| {
+            input.push_str(str.as_ref());
+        });
+    }
+}

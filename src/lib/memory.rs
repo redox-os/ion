@@ -1,12 +1,23 @@
-// TODO: Shrink values that grow too large, after use.
-
-// use crate::types::Array;
 use object_pool::Pool;
 use small::String;
 
+const MAX_SIZE: usize = 64;
+
+macro_rules! call_and_shrink {
+    ($value:ident, $callback:ident) => {{
+        let result = $callback($value);
+        if $value.len() > MAX_SIZE {
+            $value.truncate(MAX_SIZE);
+            $value.shrink_to_fit();
+        }
+
+        $value.clear();
+        result
+    }};
+}
+
 thread_local! {
-    static STRINGS: Pool<String> = Pool::new(256, String::new);
-    // static STRING_VECS: Pool<Array> = Pool::new(1024, Array::new?);
+    static STRINGS: Pool<String> = Pool::new(256, || String::with_capacity(MAX_SIZE));
 }
 
 pub struct IonPool;
@@ -14,23 +25,8 @@ pub struct IonPool;
 impl IonPool {
     pub fn string<T, F: FnMut(&mut String) -> T>(mut callback: F) -> T {
         STRINGS.with(|pool| match pool.pull() {
-            Some(ref mut string) => {
-                string.clear();
-                callback(string)
-            }
+            Some(ref mut string) => call_and_shrink!(string, callback),
             None => callback(&mut String::new()),
         })
     }
-
-    // pub fn vec_of_string<T, F: FnMut(&mut Array) -> T>(mut callback: F) -> T {
-    //     STRING_VECS.with(|pool| {
-    //         match pool.pull() {
-    //             Some(ref mut vector) => {
-    //                 vector.clear();
-    //                 callback(vector)
-    //             }
-    //             None => callback(&mut Array::new())
-    //         }
-    //     })
-    // }
 }

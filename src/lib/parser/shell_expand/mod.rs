@@ -152,8 +152,8 @@ fn slice<S: AsRef<str>>(output: &mut small::String, expanded: S, selection: &Sel
         Select::Range(range) => {
             let graphemes = UnicodeSegmentation::graphemes(expanded.as_ref(), true);
             if let Some((start, length)) = range.bounds(graphemes.clone().count()) {
-                let substring = graphemes.skip(start).take(length).collect::<Vec<&str>>().join("");
-                output.push_str(&substring);
+                let substring = graphemes.skip(start).take(length);
+                crate::join(output, substring);
             }
         }
         Select::Key(_) | Select::None => (),
@@ -237,11 +237,15 @@ fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> typ
             for word in word_tokens {
                 match *word {
                     WordToken::Array(ref elements, ref index) => {
-                        output.push_str(&array_expand(elements, expand_func, &index).join(" "));
+                        crate::join_with(
+                            output,
+                            ' ',
+                            array_expand(elements, expand_func, &index).iter(),
+                        );
                     }
                     WordToken::ArrayVariable(array, _, ref index) => {
                         if let Some(array) = expand_func.array(array, index) {
-                            output.push_str(&array.join(" "));
+                            crate::join_with(output, ' ', array.iter());
                         }
                     }
                     WordToken::ArrayProcess(command, _, ref index) => match *index {
@@ -263,14 +267,11 @@ fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> typ
                             expand_process(temp, command, &Select::All, expand_func);
                             let len = temp.split_whitespace().count();
                             if let Some((start, length)) = range.bounds(len) {
-                                let mut iter = temp.split_whitespace().skip(start).take(length);
-                                if let Some(str) = iter.next() {
-                                    output.push_str(str);
-                                    iter.for_each(|str| {
-                                        output.push(' ');
-                                        output.push_str(str);
-                                    });
-                                }
+                                crate::join_with(
+                                    output,
+                                    ' ',
+                                    temp.split_whitespace().skip(start).take(length),
+                                );
                             }
                         }
                         Select::Key(_) | Select::None => (),
@@ -350,19 +351,17 @@ fn expand_single_array_token<E: Expander>(
     token: &WordToken,
     expand_func: &E,
 ) -> Option<types::Array> {
-    match *token {
-        WordToken::Array(ref elements, ref index) => {
-            Some(array_expand(elements, expand_func, &index))
-        }
+    let array = match *token {
+        WordToken::Array(ref elements, ref index) => array_expand(elements, expand_func, &index),
         WordToken::ArrayVariable(array, quoted, ref index) => {
             match expand_func.array(array, index) {
-                Some(ref array) if quoted => Some(array![small::String::from(array.join(" "))]),
-                Some(array) => Some(array),
-                None => Some(types::Array::new()),
+                Some(ref array) if quoted => array![small::String::from(array.join(" "))],
+                Some(array) => array,
+                None => types::Array::new(),
             }
         }
-        WordToken::ArrayProcess(command, quoted, ref index) => crate::IonPool::string(|output| {
-            let array: types::Array = match *index {
+        WordToken::ArrayProcess(command, quoted, ref index) => {
+            crate::IonPool::string(|output| match *index {
                 Select::Key(_) | Select::None => types::Array::new(),
                 _ => {
                     expand_process(output, command, &Select::All, expand_func);
@@ -396,16 +395,20 @@ fn expand_single_array_token<E: Expander>(
                         iterator.collect()
                     }
                 }
-            };
-
-            Some(array)
-        }),
+            })
+        }
         WordToken::ArrayMethod(ref array_method, quoted) => {
             let result = array_method.handle_as_array(expand_func);
-            Some(if quoted { array!(result.join(" ")) } else { result })
+            if quoted {
+                array!(result.join(" "))
+            } else {
+                result
+            }
         }
-        _ => None,
-    }
+        _ => return None,
+    };
+
+    Some(array)
 }
 
 fn expand_single_string_token<E: Expander>(token: &WordToken, expand_func: &E) -> types::Array {
@@ -520,11 +523,15 @@ pub(crate) fn expand_tokens<E: Expander>(
                 for word in token_buffer {
                     match *word {
                         WordToken::Array(ref elements, ref index) => {
-                            output.push_str(&array_expand(elements, expand_func, &index).join(" "));
+                            crate::join_with(
+                                output,
+                                ' ',
+                                array_expand(elements, expand_func, &index).iter(),
+                            );
                         }
                         WordToken::ArrayVariable(array, _, ref index) => {
                             if let Some(array) = expand_func.array(array, index) {
-                                output.push_str(&array.join(" "));
+                                crate::join_with(output, ' ', array.iter());
                             }
                         }
                         WordToken::ArrayProcess(command, _, ref index) => match index {
@@ -548,12 +555,9 @@ pub(crate) fn expand_tokens<E: Expander>(
                                 if let Some((start, length)) =
                                     range.bounds(temp.split_whitespace().count())
                                 {
-                                    let temp = temp
-                                        .split_whitespace()
-                                        .skip(start)
-                                        .take(length)
-                                        .collect::<Vec<_>>();
-                                    output.push_str(&temp.join(" "))
+                                    let temp = temp.split_whitespace().skip(start).take(length);
+
+                                    crate::join_with(output, ' ', temp);
                                 }
                             }
                             Select::Key(_) | Select::None => (),
