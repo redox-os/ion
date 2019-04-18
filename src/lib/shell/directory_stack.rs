@@ -241,7 +241,7 @@ impl DirectoryStack {
                         check_cdpath_first
                     }
                 } else {
-                    unreachable!();
+                    self.change_and_push_dir(dir, variables)
                 }
             }
             None => self.switch_to_home_directory(variables),
