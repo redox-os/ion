@@ -52,6 +52,7 @@ const SOURCE_DESC: &str = "Evaluate the file following the command or re-initial
 const DISOWN_DESC: &str =
     "Disowning a process removes that process from the shell's background process table.";
 
+/// The type for builtin functions. Builtins have direct access to the shell
 pub type BuiltinFunction = fn(&[small::String], &mut Shell) -> i32;
 
 macro_rules! map {
@@ -114,15 +115,6 @@ pub const BUILTINS: &BuiltinMap = &map!(
     "which" => builtin_which : "Shows the full path of commands"
 );
 
-/// Structure which represents a Terminal's command.
-/// This command structure contains a name, and the code which run the
-/// functionnality associated to this one, with zero, one or several argument(s).
-pub struct Builtin {
-    pub name: &'static str,
-    pub help: &'static str,
-    pub main: BuiltinFunction,
-}
-
 pub struct BuiltinMap {
     pub(crate) name:      &'static [&'static str],
     pub(crate) help:      &'static [&'static str],
@@ -130,18 +122,16 @@ pub struct BuiltinMap {
 }
 
 impl BuiltinMap {
-    pub fn contains_key(&self, func: &str) -> bool { self.name.iter().any(|&name| name == func) }
+    pub fn contains_key(&self, func: &str) -> bool { self.name.binary_search(&func).is_ok() }
 
     pub fn keys(&self) -> &'static [&'static str] { self.name }
 
-    pub fn get(&self, func: &str) -> Option<Builtin> {
-        self.name.binary_search(&func).ok().map(|pos| unsafe {
-            Builtin {
-                name: *self.name.get_unchecked(pos),
-                help: *self.help.get_unchecked(pos),
-                main: *self.functions.get_unchecked(pos),
-            }
-        })
+    pub fn get_help<'a>(&self, func: &'a str) -> Option<&'static str> {
+        self.name.binary_search(&func).ok().map(|pos| unsafe { *self.help.get_unchecked(pos) })
+    }
+
+    pub fn get<'a>(&self, func: &'a str) -> Option<BuiltinFunction> {
+        self.name.binary_search(&func).ok().map(|pos| unsafe { *self.functions.get_unchecked(pos) })
     }
 }
 
@@ -467,11 +457,9 @@ fn builtin_help(args: &[small::String], shell: &mut Shell) -> i32 {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     if let Some(command) = args.get(1) {
-        if builtins.contains_key(command) {
-            if let Some(bltin) = builtins.get(command) {
-                let _ = stdout.write_all(bltin.help.as_bytes());
-                let _ = stdout.write_all(b"\n");
-            }
+        if let Some(help) = builtins.get_help(command) {
+            let _ = stdout.write_all(help.as_bytes());
+            let _ = stdout.write_all(b"\n");
         } else {
             let _ = stdout.write_all(b"Command helper not found [run 'help']...");
             let _ = stdout.write_all(b"\n");
