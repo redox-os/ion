@@ -142,16 +142,14 @@ impl<I: Iterator<Item = u8>> Iterator for Terminator<I> {
 impl<I: Iterator<Item = u8>> Terminator<I> {
     /// Consumes lines until a statement is formed or the iterator runs dry, and returns the
     /// underlying `String`.
-    pub fn terminate(&mut self) -> Option<Result<String, ()>> {
+    pub fn terminate(&mut self) -> Option<String> {
         let stmt = self.collect::<Vec<_>>();
         let stmt = unsafe { String::from_utf8_unchecked(stmt) };
 
-        if self.terminated {
-            Some(Ok(stmt))
-        } else if self.empty {
+        if self.empty {
             None
         } else {
-            Some(Err(()))
+            Some(stmt)
         }
     }
 

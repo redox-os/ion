@@ -236,10 +236,7 @@ impl Shell {
             .filter_map(Result::ok)
             .batching(|bytes| Terminator::new(bytes).terminate())
         {
-            match cmd {
-                Ok(stmt) => self.on_command(&stmt),
-                Err(_) => return Err(IonError::Unterminated),
-            }
+            self.on_command(&cmd)
         }
         Ok(self.previous_status)
     }
