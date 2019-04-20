@@ -1,6 +1,6 @@
 use crate::{
     parser::shell_expand::expand_string,
-    shell::{flags::UNTERMINATED, Capture, Function, Shell},
+    shell::{flags::UNTERMINATED, variables::Value, Capture, Shell},
     sys,
 };
 use std::{io::Read, process};
@@ -18,29 +18,30 @@ pub(crate) fn prompt(shell: &mut Shell) -> String {
 }
 
 pub(crate) fn prompt_fn(shell: &mut Shell) -> Option<String> {
-    let function = shell.variables.get::<Function>("PROMPT")?;
-    let function = &function as *const Function;
-
-    let mut output = None;
-
-    match shell.fork(Capture::StdoutThenIgnoreStderr, |child| {
-        let _ = unsafe { function.read() }.execute(child, &["ion"]);
-    }) {
-        Ok(result) => {
-            let mut string = String::with_capacity(1024);
-            match result.stdout.unwrap().read_to_string(&mut string) {
-                Ok(_) => output = Some(string),
-                Err(why) => {
-                    eprintln!("ion: error reading stdout of child: {}", why);
+    if let Some(Value::Function(function)) = shell.variables.get_ref("PROMPT") {
+        let output = match shell.fork(Capture::StdoutThenIgnoreStderr, |child| {
+            let _ = function.execute(child, &["ion"]);
+        }) {
+            Ok(result) => {
+                let mut string = String::with_capacity(1024);
+                match result.stdout?.read_to_string(&mut string) {
+                    Ok(_) => Some(string),
+                    Err(why) => {
+                        eprintln!("ion: error reading stdout of child: {}", why);
+                        None
+                    }
                 }
             }
-        }
-        Err(why) => {
-            eprintln!("ion: fork error: {}", why);
-        }
-    }
+            Err(why) => {
+                eprintln!("ion: fork error: {}", why);
+                None
+            }
+        };
 
-    // Ensure that the parent retains ownership of the terminal before exiting.
-    let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
-    output
+        // Ensure that the parent retains ownership of the terminal before exiting.
+        let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
+        output
+    } else {
+        None
+    }
 }
