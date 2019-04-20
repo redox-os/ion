@@ -399,7 +399,7 @@ fn expand_pipeline(
     shell: &Shell,
     pipeline: &Pipeline,
 ) -> Result<(Pipeline, Vec<Statement>), String> {
-    let mut item_iter = pipeline.items.iter().cloned();
+    let mut item_iter = pipeline.items.iter();
     let mut items: Vec<PipeItem> = Vec::with_capacity(item_iter.size_hint().0);
     let mut statements = Vec::new();
 
@@ -443,7 +443,7 @@ fn expand_pipeline(
                             }
                             // Append rest of the pipeline to the last pipeline in the
                             // alias.
-                            pline.items.extend(item_iter);
+                            pline.items.extend(item_iter.cloned());
                         } else {
                             // Error in expansion
                             return Err(format!(

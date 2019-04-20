@@ -378,7 +378,7 @@ impl Function {
     pub fn is_empty(&self) -> bool { self.statements.is_empty() }
 
     pub(crate) fn execute<S: AsRef<str>>(
-        self,
+        &self,
         shell: &mut Shell,
         args: &[S],
     ) -> Result<(), FunctionError> {

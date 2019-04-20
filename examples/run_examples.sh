@@ -21,6 +21,12 @@ EXIT_VAL=0
 # and it never hurts to force consistency regardless
 cd $PROJECT_DIR
 
+# Create expected output for fn-root-vars
+echo $HOME > examples/fn-root-vars.out # Overwrite previous file
+echo '${x::1B}]0;${USER}: ${PWD}${x::07}${c::0x55,bold}${USER}${c::default}:${c::0x4B}${SWD}${c::default}# ${c::reset}' >> examples/fn-root-vars.out
+echo $UID >> examples/fn-root-vars.out
+echo >> examples/fn-root-vars.out
+
 function test {
     # Replace .ion with .out in file name
     EXPECTED_OUTPUT_FILE=$(echo $1 | sed 's/\..\+/\.out/')

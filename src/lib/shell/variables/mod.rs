@@ -273,7 +273,7 @@ impl Variables {
         self.scopes.extend(scopes);
     }
 
-    pub fn scopes(&self) -> impl Iterator<Item = &Scope> {
+    pub fn scopes(&self) -> impl DoubleEndedIterator<Item = &Scope> {
         let amount = self.scopes.len() - self.current - 1;
         self.scopes.iter().rev().skip(amount)
     }
@@ -301,33 +301,38 @@ impl Variables {
         const GLOBAL_NS: &str = "global::";
         const SUPER_NS: &str = "super::";
 
-        let mut up_namespace: isize = if name.starts_with(GLOBAL_NS) {
+        if name.starts_with(GLOBAL_NS) {
             name = &name[GLOBAL_NS.len()..];
             // Go up as many namespaces as possible
-            self.scopes().filter(|scope| scope.namespace).count() as isize
-        } else {
+            self.scopes()
+                .rev()
+                .take_while(|scope| !scope.namespace)
+                .filter_map(|scope| scope.get(name))
+                .last()
+        } else if name.starts_with(SUPER_NS) {
             let mut up = 0;
             while name.starts_with(SUPER_NS) {
                 name = &name[SUPER_NS.len()..];
                 up += 1;
             }
 
-            up
-        };
-
-        for scope in self.scopes() {
-            match scope.get(name) {
-                val @ Some(Value::Function(_)) => return val,
-                val @ Some(_) if up_namespace == 0 => return val,
-                _ => (),
+            for scope in self.scopes() {
+                if up == 0 {
+                    let val = scope.get(name);
+                    if val.is_some() {
+                        return val;
+                    } else if scope.namespace {
+                        break;
+                    }
+                } else if scope.namespace {
+                    up -= 1;
+                }
             }
 
-            if scope.namespace {
-                up_namespace -= 1;
-            }
+            None
+        } else {
+            self.scopes().filter_map(|scope| scope.get(name)).next()
         }
-
-        None
     }
 
     pub fn get_mut(&mut self, name: &str) -> Option<&mut Value> {
@@ -348,9 +353,17 @@ impl Variables {
     }
 
     pub fn remove_variable(&mut self, name: &str) -> Option<Value> {
+        if name.starts_with("super::") || name.starts_with("global::") {
+            // Cannot mutate outer namespace
+            return None;
+        }
         for scope in self.scopes_mut() {
+            let exit = scope.namespace;
             if let val @ Some(_) = scope.remove(name) {
                 return val;
+            }
+            if exit {
+                break;
             }
         }
         None
