@@ -30,6 +30,7 @@ linux:stable:
 redox:
   variables:
     CC: "x86_64-unknown-redox-gcc"
+  allow_failure: true
   before_script:
     - apt-get update -qq
     - apt-get install -qq tar
