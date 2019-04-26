@@ -8,7 +8,10 @@ use self::{
     readln::readln,
 };
 use super::{flags::UNTERMINATED, status::*, FlowLogic, Shell, ShellHistory};
-use crate::{parser::Terminator, types};
+use crate::{
+    parser::{shell_expand::Expander, Terminator},
+    types,
+};
 use liner::{Buffer, Context};
 use std::path::Path;
 
@@ -52,14 +55,9 @@ pub trait Binary {
     fn save_command(&mut self, command: &str);
 }
 
-impl Binary for Shell {
+impl<'a> Binary for Shell<'a> {
     fn save_command(&mut self, cmd: &str) {
-        if !cmd.ends_with('/')
-            && self
-                .variables
-                .tilde_expansion(cmd, &self.directory_stack)
-                .map_or(false, |path| Path::new(&path).is_dir())
-        {
+        if !cmd.ends_with('/') && self.tilde(cmd).map_or(false, |path| Path::new(&path).is_dir()) {
             self.save_command_in_history(&[cmd, "/"].concat());
         } else {
             self.save_command_in_history(cmd);

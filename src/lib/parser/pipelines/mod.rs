@@ -62,19 +62,19 @@ impl Input {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Pipeline {
-    pub items: Vec<PipeItem>,
+pub(crate) struct Pipeline<'a> {
+    pub items: Vec<PipeItem<'a>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct PipeItem {
-    pub job:     Job,
+pub(crate) struct PipeItem<'a> {
+    pub job:     Job<'a>,
     pub outputs: Vec<Redirection>,
     pub inputs:  Vec<Input>,
 }
 
-impl PipeItem {
-    pub(crate) fn expand(&mut self, shell: &Shell) {
+impl<'a> PipeItem<'a> {
+    pub(crate) fn expand(&mut self, shell: &Shell<'a>) {
         self.job.expand(shell);
 
         for input in &mut self.inputs {
@@ -91,12 +91,12 @@ impl PipeItem {
         }
     }
 
-    pub(crate) fn new(job: Job, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
+    pub(crate) fn new(job: Job<'a>, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
         PipeItem { job, outputs, inputs }
     }
 }
 
-impl Pipeline {
+impl<'a> Pipeline<'a> {
     pub(crate) fn requires_piping(&self) -> bool {
         self.items.len() > 1
             || self.items.iter().any(|it| !it.outputs.is_empty())
@@ -105,14 +105,14 @@ impl Pipeline {
             || self.items.last().unwrap().job.kind == JobKind::Disown
     }
 
-    pub(crate) fn expand(&mut self, shell: &Shell) {
+    pub(crate) fn expand(&mut self, shell: &Shell<'a>) {
         self.items.iter_mut().for_each(|i| i.expand(shell));
     }
 
     pub(crate) fn new() -> Self { Pipeline { items: Vec::new() } }
 }
 
-impl fmt::Display for Pipeline {
+impl<'a> fmt::Display for Pipeline<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut tokens: Vec<small::String> = Vec::with_capacity(self.items.len());
         for item in &self.items {

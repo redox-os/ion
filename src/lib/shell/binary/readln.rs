@@ -1,16 +1,19 @@
 use super::super::{completer::*, flags, Binary, Shell};
-use crate::sys;
+use crate::{sys, types};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use std::{env, io::ErrorKind, mem, path::PathBuf};
 
 pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
     let prompt = shell.prompt();
     let dirs = &shell.directory_stack;
-    let vars = &shell.variables;
+    let prev = shell.variables.get::<types::Str>("OLDPWD");
     let builtins = &shell.builtins;
+    let vars = &shell.variables;
 
-    let line =
-        shell.context.as_mut().unwrap().read_line(prompt, None, &mut |Event { editor, kind }| {
+    let line = shell.context.as_mut().unwrap().read_line(
+        prompt,
+        None,
+        &mut move |Event { editor, kind }| {
             if let EventKind::BeforeComplete = kind {
                 let (words, pos) = editor.get_words_and_cursor_position();
 
@@ -30,36 +33,36 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                         .is_some(),
                 };
 
-                let dir_completer = IonFileCompleter::new(None, dirs, vars);
+                let dir_completer =
+                    IonFileCompleter::new(None, dirs, prev.as_ref().map(|x| x.as_str()));
 
                 if filename {
                     mem::replace(&mut editor.context().completer, Some(Box::new(dir_completer)));
                 } else {
+                    // Initialize a new completer from the definitions collected.
                     // Creates a list of definitions from the shell environment that
                     // will be used
                     // in the creation of a custom completer.
-                    let words = builtins
-                        .keys()
-                        .iter()
-                        // Add built-in commands to the completer's definitions.
-                        .map(|&s| s.to_string())
-                        // Add the history list to the completer's definitions.
-                        // Map each underlying `liner::Buffer` into a `String`.
-                        .chain(editor.context().history.buffers.iter().map(|x| x.to_string()))
-                        // Add the aliases to the completer's definitions.
-                        .chain(vars.aliases().map(|(key, _)| key.to_string()))
-                        // Add the list of available functions to the completer's
-                        // definitions.
-                        .chain(vars.functions().map(|(key, _)| key.to_string()))
-                        // Add the list of available variables to the completer's
-                        // definitions. TODO: We should make
-                        // it free to do String->SmallString
-                        //       and mostly free to go back (free if allocated)
-                        .chain(vars.string_vars().map(|(s, _)| ["$", &s].concat()))
-                        .collect();
-
-                    // Initialize a new completer from the definitions collected.
-                    let custom_completer = BasicCompleter::new(words);
+                    let custom_completer = BasicCompleter::new(
+                        builtins
+                            .keys()
+                            // Add built-in commands to the completer's definitions.
+                            .map(|s| s.to_string())
+                            // Add the history list to the completer's definitions.
+                            // Map each underlying `liner::Buffer` into a `String`.
+                            .chain(editor.context().history.buffers.iter().map(|x| x.to_string()))
+                            // Add the aliases to the completer's definitions.
+                            .chain(vars.aliases().map(|(key, _)| key.to_string()))
+                            // Add the list of available functions to the completer's
+                            // definitions.
+                            .chain(vars.functions().map(|(key, _)| key.to_string()))
+                            // Add the list of available variables to the completer's
+                            // definitions. TODO: We should make
+                            // it free to do String->SmallString
+                            //       and mostly free to go back (free if allocated)
+                            .chain(vars.string_vars().map(|(s, _)| ["$", &s].concat()))
+                            .collect::<Vec<String>>(),
+                    );
 
                     // Creates completers containing definitions from all directories
                     // listed
@@ -67,7 +70,9 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                     let mut file_completers: Vec<_> = env::var("PATH")
                         .unwrap_or_else(|_| "/bin/".to_string())
                         .split(sys::PATH_SEPARATOR)
-                        .map(|s| IonFileCompleter::new(Some(s), dirs, vars))
+                        .map(|s| {
+                            IonFileCompleter::new(Some(s), dirs, prev.as_ref().map(|x| x.as_str()))
+                        })
                         .collect();
 
                     // Also add files/directories in the current directory to the
@@ -82,7 +87,8 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                     mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                 }
             }
-        });
+        },
+    );
 
     match line {
         Ok(line) => {

@@ -8,8 +8,8 @@ use std::{
 };
 
 pub type Array = SmallVec<[Str; 4]>;
-pub type HashMap = HashbrownMap<Str, Value>;
-pub type BTreeMap = StdBTreeMap<Str, Value>;
+pub type HashMap<'a> = HashbrownMap<Str, Value<'a>>;
+pub type BTreeMap<'a> = StdBTreeMap<Str, Value<'a>>;
 pub type Str = small::String;
 
 #[derive(Clone, Debug, PartialEq)]

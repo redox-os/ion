@@ -9,8 +9,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         .iter()
         .cloned()
         .batching(|lines| Terminator::new(lines).terminate())
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+        .collect::<Vec<_>>();
     c.bench(
         "statement-splitter-throughput",
         ParameterizedBenchmark::new(

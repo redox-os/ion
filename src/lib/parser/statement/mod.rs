@@ -8,15 +8,20 @@ mod splitter;
 
 pub(crate) use self::parse::parse;
 pub use self::splitter::{StatementError, StatementSplitter, StatementVariant};
-use crate::shell::flow_control::Statement;
+use crate::{builtins::BuiltinMap, shell::flow_control::Statement};
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
-pub(crate) fn parse_and_validate(statement: Result<StatementVariant, StatementError>) -> Statement {
+pub(crate) fn parse_and_validate<'b>(
+    statement: Result<StatementVariant, StatementError>,
+    builtins: &BuiltinMap<'b>,
+) -> Statement<'b> {
     match statement {
-        Ok(StatementVariant::And(statement)) => Statement::And(Box::new(parse(statement))),
-        Ok(StatementVariant::Or(statement)) => Statement::Or(Box::new(parse(statement))),
-        Ok(StatementVariant::Default(statement)) => parse(statement),
+        Ok(StatementVariant::And(statement)) => {
+            Statement::And(Box::new(parse(statement, builtins)))
+        }
+        Ok(StatementVariant::Or(statement)) => Statement::Or(Box::new(parse(statement, builtins))),
+        Ok(StatementVariant::Default(statement)) => parse(statement, builtins),
         Err(err) => {
             eprintln!("ion: {}", err);
             Statement::Error(-1)

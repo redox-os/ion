@@ -9,9 +9,9 @@ use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct ElseIf {
-    pub expression: Vec<Statement>,
-    pub success:    Vec<Statement>,
+pub(crate) struct ElseIf<'a> {
+    pub expression: Vec<Statement<'a>>,
+    pub success:    Vec<Statement<'a>>,
 }
 
 /// Represents a single branch in a match statement. For example, in the expression
@@ -42,11 +42,11 @@ pub(crate) struct ElseIf {
 /// Case { value: None, ... }
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Case {
+pub(crate) struct Case<'a> {
     pub value:       Option<String>,
     pub binding:     Option<String>,
     pub conditional: Option<String>,
-    pub statements:  Vec<Statement>,
+    pub statements:  Vec<Statement<'a>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -64,51 +64,51 @@ pub(crate) enum ExportAction {
 
 // TODO: Enable statements and expressions to contain &str values.
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Statement {
+pub(crate) enum Statement<'a> {
     Let(LocalAction),
-    Case(Case),
+    Case(Case<'a>),
     Export(ExportAction),
     If {
-        expression: Vec<Statement>,
-        success:    Vec<Statement>,
-        else_if:    Vec<ElseIf>,
-        failure:    Vec<Statement>,
+        expression: Vec<Statement<'a>>,
+        success:    Vec<Statement<'a>>,
+        else_if:    Vec<ElseIf<'a>>,
+        failure:    Vec<Statement<'a>>,
         mode:       u8, // {0 = success, 1 = else_if, 2 = failure}
     },
-    ElseIf(ElseIf),
+    ElseIf(ElseIf<'a>),
     Function {
         name:        types::Str,
         description: Option<small::String>,
         args:        Vec<KeyBuf>,
-        statements:  Vec<Statement>,
+        statements:  Vec<Statement<'a>>,
     },
     For {
         variables:  SmallVec<[types::Str; 4]>,
         values:     Vec<small::String>,
-        statements: Vec<Statement>,
+        statements: Vec<Statement<'a>>,
     },
     While {
-        expression: Vec<Statement>,
-        statements: Vec<Statement>,
+        expression: Vec<Statement<'a>>,
+        statements: Vec<Statement<'a>>,
     },
     Match {
         expression: small::String,
-        cases:      Vec<Case>,
+        cases:      Vec<Case<'a>>,
     },
     Else,
     End,
     Error(i32),
     Break,
     Continue,
-    Pipeline(Pipeline),
-    Time(Box<Statement>),
-    And(Box<Statement>),
-    Or(Box<Statement>),
-    Not(Box<Statement>),
+    Pipeline(Pipeline<'a>),
+    Time(Box<Statement<'a>>),
+    And(Box<Statement<'a>>),
+    Or(Box<Statement<'a>>),
+    Not(Box<Statement<'a>>),
     Default,
 }
 
-impl Statement {
+impl<'a> Statement<'a> {
     pub(crate) fn short(&self) -> &'static str {
         match *self {
             Statement::Let { .. } => "Let { .. }",
@@ -150,11 +150,11 @@ impl Statement {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct FlowControl {
-    pub block: Vec<Statement>,
+pub(crate) struct FlowControl<'a> {
+    pub block: Vec<Statement<'a>>,
 }
 
-impl FlowControl {
+impl<'a> FlowControl<'a> {
     /// On error reset FlowControl fields.
     pub(crate) fn reset(&mut self) { self.block.clear() }
 
@@ -165,14 +165,14 @@ impl FlowControl {
     pub(crate) fn unclosed_block(&self) -> bool { !self.block.is_empty() }
 }
 
-impl Default for FlowControl {
-    fn default() -> FlowControl { FlowControl { block: Vec::with_capacity(5) } }
+impl<'a> Default for FlowControl<'a> {
+    fn default() -> FlowControl<'static> { FlowControl { block: Vec::with_capacity(5) } }
 }
 
-pub(crate) fn insert_statement(
-    flow_control: &mut FlowControl,
-    statement: Statement,
-) -> Result<Option<Statement>, &'static str> {
+pub(crate) fn insert_statement<'a>(
+    flow_control: &mut FlowControl<'a>,
+    statement: Statement<'a>,
+) -> Result<Option<Statement<'a>>, &'static str> {
     match statement {
         // Push new block to stack
         Statement::For { .. }
@@ -301,7 +301,10 @@ pub(crate) fn insert_statement(
     }
 }
 
-fn insert_into_block(block: &mut Vec<Statement>, statement: Statement) -> Result<(), &'static str> {
+fn insert_into_block<'a>(
+    block: &mut Vec<Statement<'a>>,
+    statement: Statement<'a>,
+) -> Result<(), &'static str> {
     let block = match block.last_mut().expect("Should not insert statement if stack is empty!") {
         Statement::Time(inner) => inner,
         top_block => top_block,
@@ -351,11 +354,11 @@ fn insert_into_block(block: &mut Vec<Statement>, statement: Statement) -> Result
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Function {
+pub struct Function<'a> {
     description: Option<small::String>,
     name:        types::Str,
     args:        Vec<KeyBuf>,
-    statements:  Vec<Statement>,
+    statements:  Vec<Statement<'a>>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -374,12 +377,12 @@ impl Display for FunctionError {
     }
 }
 
-impl Function {
+impl<'a> Function<'a> {
     pub fn is_empty(&self) -> bool { self.statements.is_empty() }
 
     pub(crate) fn execute<S: AsRef<str>>(
         &self,
-        shell: &mut Shell,
+        shell: &mut Shell<'a>,
         args: &[S],
     ) -> Result<(), FunctionError> {
         if args.len() - 1 != self.args.len() {
@@ -439,10 +442,10 @@ impl Function {
 mod tests {
     use super::*;
 
-    fn new_match() -> Statement {
+    fn new_match() -> Statement<'static> {
         Statement::Match { expression: small::String::from(""), cases: Vec::new() }
     }
-    fn new_if() -> Statement {
+    fn new_if() -> Statement<'static> {
         Statement::If {
             expression: vec![Statement::Default],
             success:    Vec::new(),
@@ -451,7 +454,7 @@ mod tests {
             mode:       0,
         }
     }
-    fn new_case() -> Statement {
+    fn new_case() -> Statement<'static> {
         Statement::Case(Case {
             value:       None,
             binding:     None,

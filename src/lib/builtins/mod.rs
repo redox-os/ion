@@ -32,6 +32,8 @@ use std::{
     io::{self, Write},
 };
 
+use hashbrown::HashMap;
+
 use crate::{
     shell::{
         self,
@@ -53,17 +55,19 @@ const DISOWN_DESC: &str =
     "Disowning a process removes that process from the shell's background process table.";
 
 /// The type for builtin functions. Builtins have direct access to the shell
-pub type BuiltinFunction = fn(&[small::String], &mut Shell) -> i32;
+pub type BuiltinFunction<'a> = &'a Fn(&[small::String], &mut Shell) -> i32;
 
 macro_rules! map {
     ($($name:expr => $func:ident: $help:expr),+) => {{
-        BuiltinMap {
-            name: &[$($name),+],
-            help: &[$($help),+],
-            functions: &[$($func),+],
-        }
-    }
-}}
+        let mut help = HashMap::<&'static str, &'static str>::new();
+        let mut fcts = HashMap::<&'static str, BuiltinFunction<'a>>::new();
+        $(
+            help.insert($name, $help);
+            fcts.insert($name, &$func);
+        )+
+        BuiltinMap { help, fcts }
+    }};
+}
 
 /// If you are implementing a builtin add it to the table below, create a well named manpage in
 /// man_pages and check for help flags by adding to the start of your builtin the following
@@ -72,67 +76,69 @@ macro_rules! map {
 /// }
 
 /// Builtins are in A-Z order.
-pub const BUILTINS: &BuiltinMap = &map!(
-    "alias" => builtin_alias : "View, set or unset aliases",
-    "bg" => builtin_bg : "Resumes a stopped background process",
-    "bool" => builtin_bool : "If the value is '1' or 'true', return 0 exit status",
-    "calc" => builtin_calc : "Calculate a mathematical expression",
-    "cd" => builtin_cd : "Change the current directory\n    cd <path>",
-    "contains" => contains : "Evaluates if the supplied argument contains a given string",
-    "dirs" => builtin_dirs : "Display the current directory stack",
-    "disown" => builtin_disown : DISOWN_DESC,
-    "drop" => builtin_drop : "Delete a variable",
-    "echo" => builtin_echo : "Display a line of text",
-    "ends-with" => ends_with : "Evaluates if the supplied argument ends with a given string",
-    "eq" => builtin_eq : "Simple alternative to == and !=",
-    "eval" => builtin_eval : "Evaluates the evaluated expression",
-    "exec" => builtin_exec : "Replace the shell with the given command.",
-    "exists" => builtin_exists : "Performs tests on files and text",
-    "exit" => builtin_exit : "Exits the current session",
-    "false" => builtin_false : "Do nothing, unsuccessfully",
-    "fg" => builtin_fg : "Resumes and sets a background process as the active process",
-    "fn" => builtin_fn : "Print list of functions",
-    "help" => builtin_help : HELP_DESC,
-    "history" => builtin_history : "Display a log of all commands previously executed",
-    "is" => builtin_is : "Simple alternative to == and !=",
-    "isatty" => builtin_isatty : "Returns 0 exit status if the supplied FD is a tty",
-    "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
-    "matches" => builtin_matches : "Checks if a string matches a given regex",
-    "popd" => builtin_popd : "Pop a directory from the stack",
-    "pushd" => builtin_pushd : "Push a directory to the stack",
-    "random" => builtin_random : "Outputs a random u64",
-    "read" => builtin_read : "Read some variables\n    read <variable>",
-    "set" => builtin_set : "Set or unset values of shell options and positional parameters.",
-    "source" => builtin_source : SOURCE_DESC,
-    "starts-with" => starts_with : "Evaluates if the supplied argument starts with a given string",
-    "status" => builtin_status : "Evaluates the current runtime status",
-    "suspend" => builtin_suspend : "Suspends the shell with a SIGTSTOP signal",
-    "test" => builtin_test : "Performs tests on files and text",
-    "true" => builtin_true : "Do nothing, successfully",
-    "type" => builtin_type : "indicates how a command would be interpreted",
-    "unalias" => builtin_unalias : "Delete an alias",
-    "wait" => builtin_wait : "Waits until all running background processes have completed",
-    "which" => builtin_which : "Shows the full path of commands"
-);
 
-pub struct BuiltinMap {
-    pub(crate) name:      &'static [&'static str],
-    pub(crate) help:      &'static [&'static str],
-    pub(crate) functions: &'static [BuiltinFunction],
+pub struct BuiltinMap<'a> {
+    fcts: HashMap<&'static str, BuiltinFunction<'a>>,
+    help: HashMap<&'static str, &'static str>,
 }
 
-impl BuiltinMap {
-    pub fn contains_key(&self, func: &str) -> bool { self.name.binary_search(&func).is_ok() }
-
-    pub fn keys(&self) -> &'static [&'static str] { self.name }
-
-    pub fn get_help<'a>(&self, func: &'a str) -> Option<&'static str> {
-        self.name.binary_search(&func).ok().map(|pos| unsafe { *self.help.get_unchecked(pos) })
+impl<'a> Default for BuiltinMap<'a> {
+    fn default() -> Self {
+        map!(
+            "alias" => builtin_alias : "View, set or unset aliases",
+            "bg" => builtin_bg : "Resumes a stopped background process",
+            "bool" => builtin_bool : "If the value is '1' or 'true', return 0 exit status",
+            "calc" => builtin_calc : "Calculate a mathematical expression",
+            "cd" => builtin_cd : "Change the current directory\n    cd <path>",
+            "contains" => contains : "Evaluates if the supplied argument contains a given string",
+            "dirs" => builtin_dirs : "Display the current directory stack",
+            "disown" => builtin_disown : DISOWN_DESC,
+            "drop" => builtin_drop : "Delete a variable",
+            "echo" => builtin_echo : "Display a line of text",
+            "ends-with" => ends_with : "Evaluates if the supplied argument ends with a given string",
+            "eq" => builtin_eq : "Simple alternative to == and !=",
+            "eval" => builtin_eval : "Evaluates the evaluated expression",
+            "exec" => builtin_exec : "Replace the shell with the given command.",
+            "exists" => builtin_exists : "Performs tests on files and text",
+            "exit" => builtin_exit : "Exits the current session",
+            "false" => builtin_false : "Do nothing, unsuccessfully",
+            "fg" => builtin_fg : "Resumes and sets a background process as the active process",
+            "fn" => builtin_fn : "Print list of functions",
+            "help" => builtin_help : HELP_DESC,
+            "history" => builtin_history : "Display a log of all commands previously executed",
+            "is" => builtin_is : "Simple alternative to == and !=",
+            "isatty" => builtin_isatty : "Returns 0 exit status if the supplied FD is a tty",
+            "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
+            "matches" => builtin_matches : "Checks if a string matches a given regex",
+            "popd" => builtin_popd : "Pop a directory from the stack",
+            "pushd" => builtin_pushd : "Push a directory to the stack",
+            "random" => builtin_random : "Outputs a random u64",
+            "read" => builtin_read : "Read some variables\n    read <variable>",
+            "set" => builtin_set : "Set or unset values of shell options and positional parameters.",
+            "source" => builtin_source : SOURCE_DESC,
+            "starts-with" => starts_with : "Evaluates if the supplied argument starts with a given string",
+            "status" => builtin_status : "Evaluates the current runtime status",
+            "suspend" => builtin_suspend : "Suspends the shell with a SIGTSTOP signal",
+            "test" => builtin_test : "Performs tests on files and text",
+            "true" => builtin_true : "Do nothing, successfully",
+            "type" => builtin_type : "indicates how a command would be interpreted",
+            "unalias" => builtin_unalias : "Delete an alias",
+            "wait" => builtin_wait : "Waits until all running background processes have completed",
+            "which" => builtin_which : "Shows the full path of commands"
+        )
     }
+}
 
-    pub fn get<'a>(&self, func: &'a str) -> Option<BuiltinFunction> {
-        self.name.binary_search(&func).ok().map(|pos| unsafe { *self.functions.get_unchecked(pos) })
-    }
+impl<'a> BuiltinMap<'a> {
+    pub fn new() -> Self { BuiltinMap { fcts: HashMap::new(), help: HashMap::new() } }
+
+    pub fn contains_key(&self, func: &str) -> bool { self.fcts.get(&func).is_some() }
+
+    pub fn keys(&self) -> impl Iterator<Item = &str> { self.fcts.keys().cloned() }
+
+    pub fn get_help(&self, func: &str) -> Option<&str> { self.help.get(func).cloned() }
+
+    pub fn get(&self, func: &str) -> Option<BuiltinFunction<'a>> { self.fcts.get(func).cloned() }
 }
 
 fn starts_with(args: &[small::String], _: &mut Shell) -> i32 { conditionals::starts_with(args) }
@@ -453,7 +459,7 @@ fn builtin_disown(args: &[small::String], shell: &mut Shell) -> i32 {
 }
 
 fn builtin_help(args: &[small::String], shell: &mut Shell) -> i32 {
-    let builtins = shell.builtins;
+    let builtins = &shell.builtins;
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     if let Some(command) = args.get(1) {

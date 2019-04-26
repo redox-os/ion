@@ -39,6 +39,10 @@ harness = false
 name = "statement"
 harness = false
 
+[[bench]]
+name = "builtins"
+harness = false
+
 [[bin]]
 name = "ion"
 path = "src/main.rs"

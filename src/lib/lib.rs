@@ -14,7 +14,7 @@ pub mod types;
 #[macro_use]
 pub mod parser;
 mod ascii_helpers;
-mod builtins;
+pub mod builtins;
 mod memory;
 pub mod shell;
 

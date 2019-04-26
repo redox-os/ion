@@ -43,7 +43,7 @@ pub(crate) trait Expander: Sized {
     /// Iterating upon key-value maps.
     fn map_values<'a>(&'a self, _name: &str, _select: &Select) -> Option<Array> { None }
     /// Get a string that exists in the shell.
-    fn get_string(&self, value: &str) -> Value {
+    fn get_string(&self, value: &str) -> Value<'static> {
         Value::Str(types::Str::from(expand_string(value, self).join(" ")))
     }
     /// Select the proper values from an iterator
@@ -58,7 +58,7 @@ pub(crate) trait Expander: Sized {
         }
     }
     /// Get an array that exists in the shell.
-    fn get_array(&self, value: &str) -> Value { Value::Array(expand_string(value, self)) }
+    fn get_array(&self, value: &str) -> Value<'static> { Value::Array(expand_string(value, self)) }
 }
 
 fn expand_process<E: Expander>(

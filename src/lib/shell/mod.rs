@@ -41,6 +41,7 @@ pub(crate) use self::{
 
 use self::{
     directory_stack::DirectoryStack,
+    escape::tilde,
     flags::*,
     flow_control::{FlowControl, Function, FunctionError},
     foreground::ForegroundSignals,
@@ -50,7 +51,7 @@ use self::{
     variables::{GetVariable, Value, Variables},
 };
 use crate::{
-    builtins::{BuiltinMap, BUILTINS},
+    builtins::BuiltinMap,
     lexers::{Key, Primitive},
     parser::{assignments::value_check, pipelines::Pipeline, Expander, Select, Terminator},
     sys, types,
@@ -85,17 +86,17 @@ pub enum IonError {
 /// the entirety of the
 /// program. It is initialized at the beginning of the program, and lives until the end of the
 /// program.
-pub struct Shell {
+pub struct Shell<'a> {
     /// Contains a list of built-in commands that were created when the program
     /// started.
-    pub(crate) builtins: &'static BuiltinMap,
+    pub(crate) builtins: BuiltinMap<'a>,
     /// Contains the history, completions, and manages writes to the history file.
     /// Note that the context is only available in an interactive session.
     pub(crate) context: Option<Context>,
     /// Contains the aliases, strings, and array variable maps.
-    pub variables: Variables,
+    pub variables: Variables<'a>,
     /// Contains the current state of flow control parameters.
-    flow_control: FlowControl,
+    flow_control: FlowControl<'a>,
     /// Contains the directory stack parameters.
     pub(crate) directory_stack: DirectoryStack,
     /// When a command is executed, the final result of that command is stored
@@ -127,9 +128,9 @@ pub struct Shell {
 pub struct ShellBuilder;
 
 impl ShellBuilder {
-    pub fn as_binary(&self) -> Shell { Shell::new(false) }
+    pub fn as_binary<'a>(&self) -> Shell<'a> { Shell::new(false) }
 
-    pub fn as_library(&self) -> Shell { Shell::new(true) }
+    pub fn as_library<'a>(&self) -> Shell<'a> { Shell::new(true) }
 
     pub fn set_unique_pid(self) -> ShellBuilder {
         if let Ok(pid) = sys::getpid() {
@@ -179,7 +180,7 @@ impl ShellBuilder {
     pub fn new() -> ShellBuilder { ShellBuilder }
 }
 
-impl Shell {
+impl<'a> Shell<'a> {
     // Resets the flow control fields to their default values.
     fn reset_flow(&mut self) { self.flow_control.reset(); }
 
@@ -190,7 +191,7 @@ impl Shell {
     /// The method is non-blocking, and therefore will immediately return file handles to the
     /// stdout and stderr of the child. The PID of the child is returned, which may be used to
     /// wait for and obtain the exit status.
-    pub fn fork<F: FnMut(&mut Shell)>(
+    pub fn fork<F: FnMut(&mut Shell<'a>)>(
         &self,
         capture: Capture,
         child_func: F,
@@ -249,20 +250,22 @@ impl Shell {
     /// Gets any variable, if it exists within the shell's variable map.
     pub fn get<T>(&self, name: &str) -> Option<T>
     where
-        Variables: GetVariable<T>,
+        Variables<'a>: GetVariable<T>,
     {
         self.variables.get::<T>(name)
     }
 
     /// Sets a variable of `name` with the given `value` in the shell's variable map.
-    pub fn set<T: Into<Value>>(&mut self, name: &str, value: T) { self.variables.set(name, value); }
+    pub fn set<T: Into<Value<'a>>>(&mut self, name: &str, value: T) {
+        self.variables.set(name, value);
+    }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub(crate) fn run_pipeline(&mut self, pipeline: &mut Pipeline) -> Option<i32> {
+    pub(crate) fn run_pipeline(&mut self, pipeline: &mut Pipeline<'a>) -> Option<i32> {
         let command_start_time = SystemTime::now();
 
         // Branch if -> input == shell command i.e. echo
-        let exit_status = if let Some(main) = pipeline.items[0].job.builtin {
+        let exit_status = if let Some(main) = self.builtins.get(&pipeline.items[0].job.command) {
             pipeline.expand(self);
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
@@ -372,9 +375,9 @@ impl Shell {
         }
     }
 
-    pub(crate) fn new(is_library: bool) -> Shell {
+    pub(crate) fn new(is_library: bool) -> Self {
         let mut shell = Shell {
-            builtins: BUILTINS,
+            builtins: BuiltinMap::default(),
             context: None,
             variables: Variables::default(),
             flow_control: FlowControl::default(),
@@ -394,7 +397,7 @@ impl Shell {
         shell
     }
 
-    pub fn assign(&mut self, key: &Key, value: Value) -> Result<(), String> {
+    pub fn assign(&mut self, key: &Key, value: Value<'a>) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)
@@ -449,7 +452,7 @@ impl Shell {
     }
 }
 
-impl<'a> Expander for Shell {
+impl<'a> Expander for Shell<'a> {
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<types::Str> {
         let mut output = None;
@@ -620,6 +623,10 @@ impl<'a> Expander for Shell {
     }
 
     fn tilde(&self, input: &str) -> Option<String> {
-        self.variables.tilde_expansion(input, &self.directory_stack)
+        tilde(
+            input,
+            &self.directory_stack,
+            self.variables.get::<types::Str>("OLDPWD").as_ref().map(|x| x.as_str()),
+        )
     }
 }

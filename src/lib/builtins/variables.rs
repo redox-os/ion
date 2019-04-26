@@ -148,9 +148,9 @@ mod test {
         shell::status::{FAILURE, SUCCESS},
     };
 
-    struct VariableExpander(pub Variables);
+    struct VariableExpander<'a>(pub Variables<'a>);
 
-    impl Expander for VariableExpander {
+    impl<'a> Expander for VariableExpander<'a> {
         fn string(&self, var: &str) -> Option<types::Str> { self.0.get::<types::Str>(var) }
     }
 

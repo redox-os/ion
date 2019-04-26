@@ -78,7 +78,7 @@ fn get_map_of<E: Expander>(
     primitive_type: &Primitive,
     shell: &E,
     expression: &str,
-) -> Result<Value, TypeError> {
+) -> Result<Value<'static>, TypeError> {
     let array = expand_string(expression, shell);
 
     let inner_kind = match primitive_type {
@@ -126,7 +126,7 @@ pub(crate) fn value_check<E: Expander>(
     shell: &E,
     value: &str,
     expected: &Primitive,
-) -> Result<Value, TypeError> {
+) -> Result<Value<'static>, TypeError> {
     let mut extracted =
         if is_array(value) { shell.get_array(value) } else { shell.get_string(value) };
     match expected {
