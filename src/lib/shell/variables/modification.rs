@@ -5,7 +5,7 @@ pub trait Modifications {
     fn prepend(&mut self, val: Value) -> bool;
 }
 
-impl Modifications for Value {
+impl<'a> Modifications for Value<'a> {
     fn append(&mut self, val: Value) -> bool {
         match self {
             Value::Array(ref mut lhs) => match val {

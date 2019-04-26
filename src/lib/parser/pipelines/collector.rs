@@ -2,31 +2,34 @@ use std::iter::Peekable;
 
 use super::{Input, PipeItem, Pipeline, RedirectFrom, Redirection};
 use crate::{
+    builtins::{BuiltinFunction, BuiltinMap},
     lexers::arguments::{Field, Levels},
     shell::{Job, JobKind},
     types::*,
 };
 
-trait AddItem {
+trait AddItem<'a> {
     fn add_item(
         &mut self,
         job_kind: JobKind,
         args: &mut Array,
         outputs: &mut Option<Vec<Redirection>>,
         inputs: &mut Option<Vec<Input>>,
+        builtin: Option<BuiltinFunction<'a>>,
     );
 }
 
-impl AddItem for Pipeline {
+impl<'a> AddItem<'a> for Pipeline<'a> {
     fn add_item(
         &mut self,
         job_kind: JobKind,
         args: &mut Array,
         outputs: &mut Option<Vec<Redirection>>,
         inputs: &mut Option<Vec<Input>>,
+        builtin: Option<BuiltinFunction<'a>>,
     ) {
         if !args.is_empty() {
-            let job = Job::new(args.clone(), job_kind);
+            let job = Job::new(args.clone(), job_kind, builtin);
             args.clear();
             let item_out = outputs.take().unwrap_or_default();
             let item_in = inputs.take().unwrap_or_default();
@@ -90,7 +93,10 @@ impl<'a> Collector<'a> {
         }
     }
 
-    pub(crate) fn parse(&self) -> Result<Pipeline, &'static str> {
+    pub(crate) fn parse<'builtins>(
+        &self,
+        builtins: &BuiltinMap<'builtins>,
+    ) -> Result<Pipeline<'builtins>, &'static str> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Array::new();
         let mut pipeline = Pipeline::new();
@@ -115,28 +121,34 @@ impl<'a> Collector<'a> {
                         }
                         Some(&(_, b'|')) => {
                             bytes.next();
+                            let builtin = builtins.get(&args[0]);
                             pipeline.add_item(
                                 JobKind::Pipe(RedirectFrom::Both),
                                 &mut args,
                                 &mut outputs,
                                 &mut inputs,
+                                builtin,
                             );
                         }
                         Some(&(_, b'!')) => {
                             bytes.next();
+                            let builtin = builtins.get(&args[0]);
                             pipeline.add_item(
                                 JobKind::Disown,
                                 &mut args,
                                 &mut outputs,
                                 &mut inputs,
+                                builtin,
                             );
                         }
                         Some(_) | None => {
+                            let builtin = builtins.get(&args[0]);
                             pipeline.add_item(
                                 JobKind::Background,
                                 &mut args,
                                 &mut outputs,
                                 &mut inputs,
+                                builtin,
                             );
                         }
                     }
@@ -157,11 +169,13 @@ impl<'a> Collector<'a> {
                         Some(b'|') => {
                             bytes.next();
                             bytes.next();
+                            let builtin = builtins.get(&args[0]);
                             pipeline.add_item(
                                 JobKind::Pipe(RedirectFrom::Stderr),
                                 &mut args,
                                 &mut outputs,
                                 &mut inputs,
+                                builtin,
                             );
                         }
                         Some(_) | None => self.push_arg(&mut args, &mut bytes)?,
@@ -169,11 +183,13 @@ impl<'a> Collector<'a> {
                 }
                 b'|' => {
                     bytes.next();
+                    let builtin = builtins.get(&args[0]);
                     pipeline.add_item(
                         JobKind::Pipe(RedirectFrom::Stdout),
                         &mut args,
                         &mut outputs,
                         &mut inputs,
+                        builtin,
                     );
                 }
                 b'>' => {
@@ -240,7 +256,8 @@ impl<'a> Collector<'a> {
         }
 
         if !args.is_empty() {
-            pipeline.add_item(JobKind::Last, &mut args, &mut outputs, &mut inputs);
+            let builtin = builtins.get(&args[0]);
+            pipeline.add_item(JobKind::Last, &mut args, &mut outputs, &mut inputs, builtin);
         }
 
         Ok(pipeline)
@@ -419,8 +436,11 @@ impl<'a> Collector<'a> {
         }
     }
 
-    pub(crate) fn run(data: &'a str) -> Result<Pipeline, &'static str> {
-        Collector::new(data).parse()
+    pub(crate) fn run<'builtins>(
+        data: &'a str,
+        builtins: &BuiltinMap<'builtins>,
+    ) -> Result<Pipeline<'builtins>, &'static str> {
+        Collector::new(data).parse(builtins)
     }
 
     pub(crate) fn new(data: &'a str) -> Self { Collector { data } }
@@ -429,6 +449,7 @@ impl<'a> Collector<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
+        builtins::BuiltinMap,
         parser::{
             pipelines::{Input, PipeItem, Pipeline, RedirectFrom, Redirection},
             statement::parse,
@@ -438,7 +459,8 @@ mod tests {
 
     #[test]
     fn stderr_redirection() {
-        if let Statement::Pipeline(pipeline) = parse("git rev-parse --abbrev-ref HEAD ^> /dev/null")
+        if let Statement::Pipeline(pipeline) =
+            parse("git rev-parse --abbrev-ref HEAD ^> /dev/null", &BuiltinMap::new())
         {
             assert_eq!("git", pipeline.items[0].job.args[0].as_str());
             assert_eq!("rev-parse", pipeline.items[0].job.args[1].as_str());
@@ -459,7 +481,7 @@ mod tests {
 
     #[test]
     fn braces() {
-        if let Statement::Pipeline(pipeline) = parse("echo {a b} {a {b c}}") {
+        if let Statement::Pipeline(pipeline) = parse("echo {a b} {a {b c}}", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!("{a b}", items[0].job.args[1].as_str());
             assert_eq!("{a {b c}}", items[0].job.args[2].as_str());
@@ -470,7 +492,9 @@ mod tests {
 
     #[test]
     fn methods() {
-        if let Statement::Pipeline(pipeline) = parse("echo @split(var, ', ') $join(array, ',')") {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo @split(var, ', ') $join(array, ',')", &BuiltinMap::new())
+        {
             let items = pipeline.items;
             assert_eq!("echo", items[0].job.args[0].as_str());
             assert_eq!("@split(var, ', ')", items[0].job.args[1].as_str());
@@ -482,7 +506,9 @@ mod tests {
 
     #[test]
     fn nested_process() {
-        if let Statement::Pipeline(pipeline) = parse("echo $(echo one $(echo two) three)") {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo $(echo one $(echo two) three)", &BuiltinMap::new())
+        {
             let items = pipeline.items;
             assert_eq!("echo", items[0].job.args[0].as_str());
             assert_eq!("$(echo one $(echo two) three)", items[0].job.args[1].as_str());
@@ -493,7 +519,9 @@ mod tests {
 
     #[test]
     fn nested_array_process() {
-        if let Statement::Pipeline(pipeline) = parse("echo @(echo one @(echo two) three)") {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo @(echo one @(echo two) three)", &BuiltinMap::new())
+        {
             let items = pipeline.items;
             assert_eq!("echo", items[0].job.args[0].as_str());
             assert_eq!("@(echo one @(echo two) three)", items[0].job.args[1].as_str());
@@ -504,7 +532,7 @@ mod tests {
 
     #[test]
     fn quoted_process() {
-        if let Statement::Pipeline(pipeline) = parse("echo \"$(seq 1 10)\"") {
+        if let Statement::Pipeline(pipeline) = parse("echo \"$(seq 1 10)\"", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!("echo", items[0].job.args[0].as_str());
             assert_eq!("\"$(seq 1 10)\"", items[0].job.args[1].as_str());
@@ -516,7 +544,9 @@ mod tests {
 
     #[test]
     fn process() {
-        if let Statement::Pipeline(pipeline) = parse("echo $(seq 1 10 | head -1)") {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo $(seq 1 10 | head -1)", &BuiltinMap::new())
+        {
             let items = pipeline.items;
             assert_eq!("echo", items[0].job.args[0].as_str());
             assert_eq!("$(seq 1 10 | head -1)", items[0].job.args[1].as_str());
@@ -528,7 +558,9 @@ mod tests {
 
     #[test]
     fn array_process() {
-        if let Statement::Pipeline(pipeline) = parse("echo @(seq 1 10 | head -1)") {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo @(seq 1 10 | head -1)", &BuiltinMap::new())
+        {
             let items = pipeline.items;
             assert_eq!("echo", items[0].job.args[0].as_str());
             assert_eq!("@(seq 1 10 | head -1)", items[0].job.args[1].as_str());
@@ -540,7 +572,7 @@ mod tests {
 
     #[test]
     fn single_job_no_args() {
-        if let Statement::Pipeline(pipeline) = parse("cat") {
+        if let Statement::Pipeline(pipeline) = parse("cat", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!(1, items.len());
             assert_eq!("cat", items[0].job.command.as_str());
@@ -552,7 +584,7 @@ mod tests {
 
     #[test]
     fn single_job_with_single_character_arguments() {
-        if let Statement::Pipeline(pipeline) = parse("echo a b c") {
+        if let Statement::Pipeline(pipeline) = parse("echo a b c", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!(1, items.len());
             assert_eq!("echo", items[0].job.args[0].as_str());
@@ -567,7 +599,7 @@ mod tests {
 
     #[test]
     fn job_with_args() {
-        if let Statement::Pipeline(pipeline) = parse("ls -al dir") {
+        if let Statement::Pipeline(pipeline) = parse("ls -al dir", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!(1, items.len());
             assert_eq!("ls", items[0].job.command.as_str());
@@ -580,7 +612,7 @@ mod tests {
 
     #[test]
     fn parse_empty_string() {
-        if let Statement::Default = parse("") {
+        if let Statement::Default = parse("", &BuiltinMap::new()) {
             return;
         } else {
             assert!(false);
@@ -589,7 +621,7 @@ mod tests {
 
     #[test]
     fn multiple_white_space_between_words() {
-        if let Statement::Pipeline(pipeline) = parse("ls \t -al\t\tdir") {
+        if let Statement::Pipeline(pipeline) = parse("ls \t -al\t\tdir", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!(1, items.len());
             assert_eq!("ls", items[0].job.command.as_str());
@@ -602,7 +634,7 @@ mod tests {
 
     #[test]
     fn trailing_whitespace() {
-        if let Statement::Pipeline(pipeline) = parse("ls -al\t ") {
+        if let Statement::Pipeline(pipeline) = parse("ls -al\t ", &BuiltinMap::new()) {
             assert_eq!(1, pipeline.items.len());
             assert_eq!("ls", pipeline.items[0].job.command.as_str());
             assert_eq!("-al", pipeline.items[0].job.args[1].as_str());
@@ -613,7 +645,9 @@ mod tests {
 
     #[test]
     fn double_quoting() {
-        if let Statement::Pipeline(pipeline) = parse("echo \"a > 10\" \"a < 10\"") {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo \"a > 10\" \"a < 10\"", &BuiltinMap::new())
+        {
             let items = pipeline.items;
             assert_eq!("\"a > 10\"", items[0].job.args[1].as_str());
             assert_eq!("\"a < 10\"", items[0].job.args[2].as_str());
@@ -625,7 +659,9 @@ mod tests {
 
     #[test]
     fn double_quoting_contains_single() {
-        if let Statement::Pipeline(pipeline) = parse("echo \"Hello 'Rusty' World\"") {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo \"Hello 'Rusty' World\"", &BuiltinMap::new())
+        {
             let items = pipeline.items;
             assert_eq!(2, items[0].job.args.len());
             assert_eq!("\"Hello \'Rusty\' World\"", items[0].job.args[1].as_str());
@@ -636,7 +672,9 @@ mod tests {
 
     #[test]
     fn multi_quotes() {
-        if let Statement::Pipeline(pipeline) = parse("echo \"Hello \"Rusty\" World\"") {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo \"Hello \"Rusty\" World\"", &BuiltinMap::new())
+        {
             let items = pipeline.items;
             assert_eq!(2, items[0].job.args.len());
             assert_eq!("\"Hello \"Rusty\" World\"", items[0].job.args[1].as_str());
@@ -644,7 +682,9 @@ mod tests {
             assert!(false)
         }
 
-        if let Statement::Pipeline(pipeline) = parse("echo \'Hello \'Rusty\' World\'") {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo \'Hello \'Rusty\' World\'", &BuiltinMap::new())
+        {
             let items = pipeline.items;
             assert_eq!(2, items[0].job.args.len());
             assert_eq!("\'Hello \'Rusty\' World\'", items[0].job.args[1].as_str());
@@ -655,7 +695,7 @@ mod tests {
 
     #[test]
     fn all_whitespace() {
-        if let Statement::Default = parse("  \t ") {
+        if let Statement::Default = parse("  \t ", &BuiltinMap::new()) {
             return;
         } else {
             assert!(false);
@@ -664,7 +704,7 @@ mod tests {
 
     #[test]
     fn not_background_job() {
-        if let Statement::Pipeline(pipeline) = parse("echo hello world") {
+        if let Statement::Pipeline(pipeline) = parse("echo hello world", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!(JobKind::Last, items[0].job.kind);
         } else {
@@ -674,14 +714,14 @@ mod tests {
 
     #[test]
     fn background_job() {
-        if let Statement::Pipeline(pipeline) = parse("echo hello world&") {
+        if let Statement::Pipeline(pipeline) = parse("echo hello world&", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!(JobKind::Background, items[0].job.kind);
         } else {
             assert!(false);
         }
 
-        if let Statement::Pipeline(pipeline) = parse("echo hello world &") {
+        if let Statement::Pipeline(pipeline) = parse("echo hello world &", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!(JobKind::Background, items[0].job.kind);
         } else {
@@ -691,7 +731,7 @@ mod tests {
 
     #[test]
     fn disown_job() {
-        if let Statement::Pipeline(pipeline) = parse("echo hello world&!") {
+        if let Statement::Pipeline(pipeline) = parse("echo hello world&!", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!(JobKind::Disown, items[0].job.kind);
         } else {
@@ -701,7 +741,7 @@ mod tests {
 
     #[test]
     fn lone_comment() {
-        if let Statement::Default = parse("# ; \t as!!+dfa") {
+        if let Statement::Default = parse("# ; \t as!!+dfa", &BuiltinMap::new()) {
             return;
         } else {
             assert!(false);
@@ -710,7 +750,7 @@ mod tests {
 
     #[test]
     fn leading_whitespace() {
-        if let Statement::Pipeline(pipeline) = parse("    \techo") {
+        if let Statement::Pipeline(pipeline) = parse("    \techo", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!(1, items.len());
             assert_eq!("echo", items[0].job.command.as_str());
@@ -721,7 +761,7 @@ mod tests {
 
     #[test]
     fn single_quoting() {
-        if let Statement::Pipeline(pipeline) = parse("echo '#!!;\"\\'") {
+        if let Statement::Pipeline(pipeline) = parse("echo '#!!;\"\\'", &BuiltinMap::new()) {
             let items = pipeline.items;
             assert_eq!("'#!!;\"\\'", items[0].job.args[1].as_str());
         } else {
@@ -732,7 +772,7 @@ mod tests {
     #[test]
     fn mixed_quoted_and_unquoted() {
         if let Statement::Pipeline(pipeline) =
-            parse("echo 123 456 \"ABC 'DEF' GHI\" 789 one'  'two")
+            parse("echo 123 456 \"ABC 'DEF' GHI\" 789 one'  'two", &BuiltinMap::new())
         {
             let items = pipeline.items;
             assert_eq!("123", items[0].job.args[1].as_str());
@@ -747,7 +787,7 @@ mod tests {
 
     #[test]
     fn several_blank_lines() {
-        if let Statement::Default = parse("\n\n\n") {
+        if let Statement::Default = parse("\n\n\n", &BuiltinMap::new()) {
             return;
         } else {
             assert!(false);
@@ -759,7 +799,7 @@ mod tests {
     // the input redirection shoud be associated with.
     fn pipeline_with_redirection() {
         let input = "cat | echo hello | cat < stuff > other";
-        if let Statement::Pipeline(pipeline) = parse(input) {
+        if let Statement::Pipeline(pipeline) = parse(input, &BuiltinMap::new()) {
             assert_eq!(3, pipeline.items.len());
             assert_eq!("cat", pipeline.clone().items[0].job.args[0].as_str());
             assert_eq!("echo", pipeline.clone().items[1].job.args[0].as_str());
@@ -778,7 +818,9 @@ mod tests {
     // FIXME: May need updating after resolution of which part of the pipe
     // the input redirection shoud be associated with.
     fn pipeline_with_redirection_append() {
-        if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat < stuff >> other") {
+        if let Statement::Pipeline(pipeline) =
+            parse("cat | echo hello | cat < stuff >> other", &BuiltinMap::new())
+        {
             assert_eq!(3, pipeline.items.len());
             assert_eq!(Input::File("stuff".into()), pipeline.items[2].inputs[0]);
             assert_eq!("other", pipeline.items[2].outputs[0].file.as_str());
@@ -792,7 +834,7 @@ mod tests {
     // Ensures no regression for infinite loop when args() hits
     // '^' while not in the top level
     fn args_loop_terminates() {
-        if let Statement::Pipeline(pipeline) = parse("$(^) '$(^)'") {
+        if let Statement::Pipeline(pipeline) = parse("$(^) '$(^)'", &BuiltinMap::new()) {
             assert_eq!("$(^)", pipeline.items[0].job.args[0].as_str());
             assert_eq!("\'$(^)\'", pipeline.items[0].job.args[1].as_str());
         } else {
@@ -808,7 +850,7 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout), None),
                     inputs:  vec![
                         Input::File("file1".into()),
                         Input::HereString("\"herestring\"".into()),
@@ -816,7 +858,7 @@ mod tests {
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["tr", "'x'", "'y'"], JobKind::Last),
+                    job:     Job::new(array!["tr", "'x'", "'y'"], JobKind::Last, None),
                     inputs:  Vec::new(),
                     outputs: vec![
                         Redirection {
@@ -838,7 +880,7 @@ mod tests {
                 },
             ],
         };
-        assert_eq!(parse(input), Statement::Pipeline(expected));
+        assert_eq!(parse(input, &BuiltinMap::new()), Statement::Pipeline(expected));
     }
 
     #[test]
@@ -849,17 +891,21 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout), None),
                     inputs:  Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    job:     Job::new(
+                        array!["echo", "hello"],
+                        JobKind::Pipe(RedirectFrom::Stdout),
+                        None,
+                    ),
                     inputs:  Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Last),
+                    job:     Job::new(array!["cat"], JobKind::Last, None),
                     inputs:  vec![Input::File("stuff".into())],
                     outputs: vec![Redirection {
                         from:   RedirectFrom::Stderr,
@@ -869,7 +915,7 @@ mod tests {
                 },
             ],
         };
-        assert_eq!(parse(input), Statement::Pipeline(expected));
+        assert_eq!(parse(input, &BuiltinMap::new()), Statement::Pipeline(expected));
     }
 
     #[test]
@@ -880,17 +926,21 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout), None),
                     inputs:  Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["echo", "hello"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    job:     Job::new(
+                        array!["echo", "hello"],
+                        JobKind::Pipe(RedirectFrom::Stdout),
+                        None,
+                    ),
                     inputs:  Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Last),
+                    job:     Job::new(array!["cat"], JobKind::Last, None),
                     inputs:  vec![Input::File("stuff".into())],
                     outputs: vec![Redirection {
                         from:   RedirectFrom::Both,
@@ -900,14 +950,16 @@ mod tests {
                 },
             ],
         };
-        assert_eq!(parse(input), Statement::Pipeline(expected));
+        assert_eq!(parse(input, &BuiltinMap::new()), Statement::Pipeline(expected));
     }
 
     #[test]
     // FIXME: May need updating after resolution of which part of the pipe
     // the input redirection shoud be associated with.
     fn pipeline_with_redirection_reverse_order() {
-        if let Statement::Pipeline(pipeline) = parse("cat | echo hello | cat > stuff < other") {
+        if let Statement::Pipeline(pipeline) =
+            parse("cat | echo hello | cat > stuff < other", &BuiltinMap::new())
+        {
             assert_eq!(3, pipeline.items.len());
             assert_eq!(vec![Input::File("other".into())], pipeline.items[2].inputs);
             assert_eq!("stuff", pipeline.items[2].outputs[0].file.as_str());
@@ -918,7 +970,7 @@ mod tests {
 
     #[test]
     fn var_meets_quote() {
-        if let Statement::Pipeline(pipeline) = parse("echo $x '{()}' test") {
+        if let Statement::Pipeline(pipeline) = parse("echo $x '{()}' test", &BuiltinMap::new()) {
             assert_eq!(1, pipeline.items.len());
             assert_eq!("echo", pipeline.clone().items[0].job.args[0].as_str());
             assert_eq!("$x", pipeline.clone().items[0].job.args[1].as_str());
@@ -928,7 +980,7 @@ mod tests {
             assert!(false);
         }
 
-        if let Statement::Pipeline(pipeline) = parse("echo $x'{()}' test") {
+        if let Statement::Pipeline(pipeline) = parse("echo $x'{()}' test", &BuiltinMap::new()) {
             assert_eq!(1, pipeline.items.len());
             assert_eq!("echo", pipeline.clone().items[0].job.args[0].as_str());
             assert_eq!("$x'{()}'", pipeline.clone().items[0].job.args[1].as_str());
@@ -943,12 +995,12 @@ mod tests {
         let input = "calc <<< $(cat math.txt)";
         let expected = Pipeline {
             items: vec![PipeItem {
-                job:     Job::new(array!["calc"], JobKind::Last),
+                job:     Job::new(array!["calc"], JobKind::Last, None),
                 inputs:  vec![Input::HereString("$(cat math.txt)".into())],
                 outputs: vec![],
             }],
         };
-        assert_eq!(Statement::Pipeline(expected), parse(input));
+        assert_eq!(Statement::Pipeline(expected), parse(input, &BuiltinMap::new()));
     }
 
     #[test]
@@ -956,12 +1008,12 @@ mod tests {
         let input = "calc << EOF\n1 + 2\n3 + 4\nEOF";
         let expected = Pipeline {
             items: vec![PipeItem {
-                job:     Job::new(array!["calc"], JobKind::Last),
+                job:     Job::new(array!["calc"], JobKind::Last, None),
                 inputs:  vec![Input::HereString("1 + 2\n3 + 4".into())],
                 outputs: vec![],
             }],
         };
-        assert_eq!(Statement::Pipeline(expected), parse(input));
+        assert_eq!(Statement::Pipeline(expected), parse(input, &BuiltinMap::new()));
     }
 
     #[test]
@@ -972,12 +1024,12 @@ mod tests {
         let expected = Pipeline {
             items: vec![
                 PipeItem {
-                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout)),
+                    job:     Job::new(array!["cat"], JobKind::Pipe(RedirectFrom::Stdout), None),
                     inputs:  Vec::new(),
                     outputs: Vec::new(),
                 },
                 PipeItem {
-                    job:     Job::new(array!["tr", "'o'", "'x'"], JobKind::Last),
+                    job:     Job::new(array!["tr", "'o'", "'x'"], JobKind::Last, None),
                     inputs:  vec![Input::HereString("$VAR".into())],
                     outputs: vec![Redirection {
                         from:   RedirectFrom::Stdout,
@@ -987,12 +1039,14 @@ mod tests {
                 },
             ],
         };
-        assert_eq!(Statement::Pipeline(expected), parse(input));
+        assert_eq!(Statement::Pipeline(expected), parse(input, &BuiltinMap::new()));
     }
 
     #[test]
     fn awk_tests() {
-        if let Statement::Pipeline(pipeline) = parse("awk -v x=$x '{ if (1) print $1 }' myfile") {
+        if let Statement::Pipeline(pipeline) =
+            parse("awk -v x=$x '{ if (1) print $1 }' myfile", &BuiltinMap::new())
+        {
             assert_eq!(1, pipeline.items.len());
             assert_eq!("awk", pipeline.clone().items[0].job.args[0].as_str());
             assert_eq!("-v", pipeline.clone().items[0].job.args[1].as_str());
@@ -1009,7 +1063,7 @@ mod tests {
         let input = "echo zardoz >> foo\\'bar";
         let expected = Pipeline {
             items: vec![PipeItem {
-                job:     Job::new(array!["echo", "zardoz"], JobKind::Last),
+                job:     Job::new(array!["echo", "zardoz"], JobKind::Last, None),
                 inputs:  Vec::new(),
                 outputs: vec![Redirection {
                     from:   RedirectFrom::Stdout,
@@ -1018,11 +1072,11 @@ mod tests {
                 }],
             }],
         };
-        assert_eq!(parse(input), Statement::Pipeline(expected));
+        assert_eq!(parse(input, &BuiltinMap::new()), Statement::Pipeline(expected));
     }
 
     fn assert_parse_error(s: &str) {
-        assert!(super::Collector::new(s).parse().is_err());
+        assert!(super::Collector::new(s).parse(&BuiltinMap::new()).is_err());
     }
 
     #[test]

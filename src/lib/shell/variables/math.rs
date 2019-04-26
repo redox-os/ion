@@ -26,8 +26,8 @@ macro_rules! math {
         math!($trait, $fn, $op_f_f, $op_i_i, false);
     };
     ($trait:ident, $fn:ident, $op_f_f:expr, $op_i_i:expr, $allfloat:expr) => {
-        impl<'a> $trait for &'a Value {
-            type Output = Result<Value, OpError>;
+        impl<'a, 'b> $trait for &'b Value<'a> {
+            type Output = Result<Value<'static>, OpError>;
 
             fn $fn(self, rhs: Self) -> Self::Output {
                 if let Value::Str(rhs) = rhs {
@@ -50,14 +50,14 @@ macro_rules! math {
             }
         }
 
-        impl<'a> $trait<Value> for &'a Value {
-            type Output = Result<Value, OpError>;
+        impl<'a, 'b> $trait<Value<'a>> for &'b Value<'a> {
+            type Output = Result<Value<'static>, OpError>;
 
             fn $fn(self, rhs: Value) -> Self::Output { self.$fn(&rhs) }
         }
 
-        impl<'a> $trait<i128> for &'a Value {
-            type Output = Result<Value, OpError>;
+        impl<'a, 'b> $trait<i128> for &'b Value<'a> {
+            type Output = Result<Value<'static>, OpError>;
 
             fn $fn(self, rhs: i128) -> Self::Output {
                 match self {
@@ -96,8 +96,8 @@ macro_rules! math {
             }
         }
 
-        impl<'a> $trait<f64> for &'a Value {
-            type Output = Result<Value, OpError>;
+        impl<'a, 'b> $trait<f64> for &'b Value<'a> {
+            type Output = Result<Value<'static>, OpError>;
 
             fn $fn(self, rhs: f64) -> Self::Output {
                 match self {

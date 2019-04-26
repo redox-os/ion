@@ -1,25 +1,21 @@
 use crate::sys;
-use smallvec::SmallVec;
 
 /// Ensures that the forked child is given a unique process ID.
 pub(crate) fn create_process_group(pgid: u32) { let _ = sys::setpgid(0, pgid); }
 
 use super::{
-    super::{
-        job::{JobKind, RefinedJob},
-        status::*,
-        Shell,
-    },
+    super::{status::*, Shell},
     job_control::{JobControl, ProcessState},
     pipe,
 };
+use crate::parser::pipelines::Pipeline;
 use std::process::exit;
 
 /// Forks the shell, adding the child to the parent's background list, and executing
 /// the given commands in the child fork.
-pub(crate) fn fork_pipe(
-    shell: &mut Shell,
-    commands: SmallVec<[(RefinedJob, JobKind); 16]>,
+pub(crate) fn fork_pipe<'a>(
+    shell: &mut Shell<'a>,
+    pipeline: &mut Pipeline<'a>,
     command_name: String,
     state: ProcessState,
 ) -> i32 {
@@ -35,7 +31,7 @@ pub(crate) fn fork_pipe(
             create_process_group(0);
 
             // After execution of it's commands, exit with the last command's status.
-            sys::fork_exit(pipe(shell, commands, false));
+            sys::fork_exit(pipe(shell, pipeline, false));
         }
         Ok(pid) => {
             if state != ProcessState::Empty {

@@ -27,13 +27,17 @@ pub(crate) enum Condition {
     SigInt,
 }
 
-pub(crate) trait FlowLogic {
+pub(crate) trait FlowLogic<'a> {
     /// Receives a command and attempts to execute the contents.
     fn on_command(&mut self, command_string: &str);
 
     /// Executes all of the statements within a while block until a certain
     /// condition is met.
-    fn execute_while(&mut self, expression: &[Statement], statements: &[Statement]) -> Condition;
+    fn execute_while(
+        &mut self,
+        expression: &[Statement<'a>],
+        statements: &[Statement<'a>],
+    ) -> Condition;
 
     /// Executes all of the statements within a for block for each value
     /// specified in the range.
@@ -41,37 +45,37 @@ pub(crate) trait FlowLogic {
         &mut self,
         variables: &[types::Str],
         values: &[small::String],
-        statements: &[Statement],
+        statements: &[Statement<'a>],
     ) -> Condition;
 
     /// Conditionally executes branches of statements according to evaluated
     /// expressions
     fn execute_if(
         &mut self,
-        expression: &[Statement],
-        success: &[Statement],
-        else_if: &[ElseIf],
-        failure: &[Statement],
+        expression: &[Statement<'a>],
+        success: &[Statement<'a>],
+        else_if: &[ElseIf<'a>],
+        failure: &[Statement<'a>],
     ) -> Condition;
 
     /// Simply executes all supplied statements.
-    fn execute_statements(&mut self, statements: &[Statement]) -> Condition;
+    fn execute_statements(&mut self, statements: &[Statement<'a>]) -> Condition;
 
     /// Executes a single statement
-    fn execute_statement(&mut self, statement: &Statement) -> Condition;
+    fn execute_statement(&mut self, statement: &Statement<'a>) -> Condition;
 
     /// Expand an expression and run a branch based on the value of the
     /// expanded expression
-    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case]) -> Condition;
+    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case<'a>]) -> Condition;
 }
 
-impl FlowLogic for Shell {
+impl<'a> FlowLogic<'a> for Shell<'a> {
     fn execute_if(
         &mut self,
-        expression: &[Statement],
-        success: &[Statement],
-        else_if: &[ElseIf],
-        failure: &[Statement],
+        expression: &[Statement<'a>],
+        success: &[Statement<'a>],
+        else_if: &[ElseIf<'a>],
+        failure: &[Statement<'a>],
     ) -> Condition {
         // Try execute success branch
         if let Condition::SigInt = self.execute_statements(&expression) {
@@ -99,7 +103,7 @@ impl FlowLogic for Shell {
         &mut self,
         variables: &[types::Str],
         values: &[small::String],
-        statements: &[Statement],
+        statements: &[Statement<'a>],
     ) -> Condition {
         macro_rules! set_vars_then_exec {
             ($chunk:expr, $def:expr) => {
@@ -145,7 +149,11 @@ impl FlowLogic for Shell {
         Condition::NoOp
     }
 
-    fn execute_while(&mut self, expression: &[Statement], statements: &[Statement]) -> Condition {
+    fn execute_while(
+        &mut self,
+        expression: &[Statement<'a>],
+        statements: &[Statement<'a>],
+    ) -> Condition {
         loop {
             self.execute_statements(expression);
             if self.previous_status != 0 {
@@ -161,7 +169,7 @@ impl FlowLogic for Shell {
         }
     }
 
-    fn execute_statement(&mut self, statement: &Statement) -> Condition {
+    fn execute_statement(&mut self, statement: &Statement<'a>) -> Condition {
         match statement {
             Statement::Error(number) => {
                 self.previous_status = *number;
@@ -298,7 +306,7 @@ impl FlowLogic for Shell {
         }
     }
 
-    fn execute_statements(&mut self, statements: &[Statement]) -> Condition {
+    fn execute_statements(&mut self, statements: &[Statement<'a>]) -> Condition {
         self.variables.new_scope(false);
 
         let condition = statements
@@ -312,7 +320,7 @@ impl FlowLogic for Shell {
         condition
     }
 
-    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case]) -> Condition {
+    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case<'a>]) -> Condition {
         // Logic for determining if the LHS of a match-case construct (the value we are
         // matching against) matches the RHS of a match-case construct (a value
         // in a case statement). For example, checking to see if the value
@@ -375,7 +383,8 @@ impl FlowLogic for Shell {
         for stmt in command_string.bytes().batching(|cmd| Terminator::new(cmd).terminate()) {
             // Go through all of the statements and build up the block stack
             // When block is done return statement for execution.
-            for statement in StatementSplitter::new(&stmt).map(parse_and_validate) {
+            for statement in StatementSplitter::new(&stmt) {
+                let statement = parse_and_validate(statement, &self.builtins);
                 match insert_statement(&mut self.flow_control, statement) {
                     Err(why) => {
                         eprintln!("{}", why);
@@ -395,17 +404,19 @@ impl FlowLogic for Shell {
 /// Expand a pipeline containing aliases. As aliases can split the pipeline by having logical
 /// operators in them, the function returns the first half of the pipeline and the rest of the
 /// statements, where the last statement has the other half of the pipeline merged.
-fn expand_pipeline(
-    shell: &Shell,
-    pipeline: &Pipeline,
-) -> Result<(Pipeline, Vec<Statement>), String> {
+fn expand_pipeline<'a>(
+    shell: &Shell<'a>,
+    pipeline: &Pipeline<'a>,
+) -> Result<(Pipeline<'a>, Vec<Statement<'a>>), String> {
     let mut item_iter = pipeline.items.iter();
     let mut items: Vec<PipeItem> = Vec::with_capacity(item_iter.size_hint().0);
     let mut statements = Vec::new();
 
     while let Some(item) = item_iter.next() {
         if let Some(alias) = shell.variables.get::<types::Alias>(item.job.command.as_ref()) {
-            statements = StatementSplitter::new(alias.0.as_str()).map(parse_and_validate).collect();
+            statements = StatementSplitter::new(alias.0.as_str())
+                .map(|stmt| parse_and_validate(stmt, &shell.builtins))
+                .collect();
 
             // First item in the alias should be a pipeline item, otherwise it cannot
             // be placed into a pipeline!

@@ -58,7 +58,7 @@ trait ShellHistoryPrivate {
     fn should_save_command(&mut self, command: &str) -> bool;
 }
 
-impl ShellHistory for Shell {
+impl<'a> ShellHistory for Shell<'a> {
     fn update_ignore_patterns(&mut self, patterns: &types::Array) {
         let mut flags = IgnoreFlags::empty();
         let mut regexes = Vec::new();
@@ -124,7 +124,7 @@ impl ShellHistory for Shell {
     }
 }
 
-impl ShellHistoryPrivate for Shell {
+impl<'a> ShellHistoryPrivate for Shell<'a> {
     fn should_save_command(&mut self, command: &str) -> bool {
         // just for convenience and to make the code look a bit cleaner
         let ignore = &self.ignore_setting.flags;

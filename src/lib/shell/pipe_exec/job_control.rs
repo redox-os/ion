@@ -90,7 +90,7 @@ pub struct BackgroundProcess {
     pub name:          String,
 }
 
-impl JobControl for Shell {
+impl<'a> JobControl for Shell<'a> {
     /// If a SIGTERM is received, a SIGTERM will be sent to all background processes
     /// before the shell terminates itself.
     fn handle_signal(&self, signal: i32) -> bool {

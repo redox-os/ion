@@ -42,7 +42,7 @@ use std::{
     process::{self, exit},
 };
 
-type RefinedItem = (RefinedJob, JobKind, Vec<Redirection>, Vec<Input>);
+type RefinedItem<'a> = (RefinedJob<'a>, JobKind, Vec<Redirection>, Vec<Input>);
 
 /// Create an OS pipe and write the contents of a byte slice to one end
 /// such that reading from this pipe will produce the byte slice. Return
@@ -93,9 +93,9 @@ fn is_implicit_cd(argument: &str) -> bool {
 
 /// Insert the multiple redirects as pipelines if necessary. Handle both input and output
 /// redirection if necessary.
-fn do_redirection(
-    piped_commands: SmallVec<[RefinedItem; 16]>,
-) -> Option<SmallVec<[(RefinedJob, JobKind); 16]>> {
+fn do_redirection<'a>(
+    piped_commands: SmallVec<[RefinedItem<'a>; 16]>,
+) -> Option<SmallVec<[(RefinedJob<'a>, JobKind); 16]>> {
     let need_tee = |outs: &[_], kind| {
         let (mut stdout_count, mut stderr_count) = (0, 0);
         match kind {
@@ -248,66 +248,69 @@ fn do_redirection(
         prev_kind = kind;
         if outputs.is_empty() {
             new_commands.push((job, kind));
-            continue;
-        }
-        match need_tee(&outputs, kind) {
-            // No tees
-            (false, false) => {
-                set_no_tee!(outputs, job);
-                new_commands.push((job, kind));
-            }
-            // tee stderr
-            (false, true) => set_one_tee!(new_commands, outputs, job, kind, Stderr, Stdout),
-            // tee stdout
-            (true, false) => set_one_tee!(new_commands, outputs, job, kind, Stdout, Stderr),
-            // tee both
-            (true, true) => {
-                let mut tee_out = TeeItem { sinks: Vec::new(), source: None };
-                let mut tee_err = TeeItem { sinks: Vec::new(), source: None };
-                for output in outputs {
-                    match if output.append {
-                        OpenOptions::new()
-                            .create(true)
-                            .write(true)
-                            .append(true)
-                            .open(output.file.as_str())
-                    } else {
-                        File::create(output.file.as_str())
-                    } {
-                        Ok(f) => match output.from {
-                            RedirectFrom::Stdout => tee_out.sinks.push(f),
-                            RedirectFrom::Stderr => tee_err.sinks.push(f),
-                            RedirectFrom::Both => match f.try_clone() {
-                                Ok(f_copy) => {
-                                    tee_out.sinks.push(f);
-                                    tee_err.sinks.push(f_copy);
-                                }
-                                Err(e) => {
-                                    eprintln!(
-                                        "ion: failed to redirect both stdout and stderr to file \
-                                         '{:?}': {}",
-                                        f, e
-                                    );
-                                    return None;
-                                }
+        } else {
+            match need_tee(&outputs, kind) {
+                // No tees
+                (false, false) => {
+                    set_no_tee!(outputs, job);
+                    new_commands.push((job, kind));
+                }
+                // tee stderr
+                (false, true) => set_one_tee!(new_commands, outputs, job, kind, Stderr, Stdout),
+                // tee stdout
+                (true, false) => set_one_tee!(new_commands, outputs, job, kind, Stdout, Stderr),
+                // tee both
+                (true, true) => {
+                    let mut tee_out = TeeItem { sinks: Vec::new(), source: None };
+                    let mut tee_err = TeeItem { sinks: Vec::new(), source: None };
+                    for output in outputs {
+                        match if output.append {
+                            OpenOptions::new()
+                                .create(true)
+                                .write(true)
+                                .append(true)
+                                .open(output.file.as_str())
+                        } else {
+                            File::create(output.file.as_str())
+                        } {
+                            Ok(f) => match output.from {
+                                RedirectFrom::Stdout => tee_out.sinks.push(f),
+                                RedirectFrom::Stderr => tee_err.sinks.push(f),
+                                RedirectFrom::Both => match f.try_clone() {
+                                    Ok(f_copy) => {
+                                        tee_out.sinks.push(f);
+                                        tee_err.sinks.push(f_copy);
+                                    }
+                                    Err(e) => {
+                                        eprintln!(
+                                            "ion: failed to redirect both stdout and stderr to \
+                                             file '{:?}': {}",
+                                            f, e
+                                        );
+                                        return None;
+                                    }
+                                },
                             },
-                        },
-                        Err(e) => {
-                            eprintln!("ion: failed to redirect output into {}: {}", output.file, e);
-                            return None;
+                            Err(e) => {
+                                eprintln!(
+                                    "ion: failed to redirect output into {}: {}",
+                                    output.file, e
+                                );
+                                return None;
+                            }
                         }
                     }
+                    let tee = RefinedJob::tee(Some(tee_out), Some(tee_err));
+                    new_commands.push((job, JobKind::Pipe(RedirectFrom::Stdout)));
+                    new_commands.push((tee, kind));
                 }
-                let tee = RefinedJob::tee(Some(tee_out), Some(tee_err));
-                new_commands.push((job, JobKind::Pipe(RedirectFrom::Stdout)));
-                new_commands.push((tee, kind));
             }
         }
     }
     Some(new_commands)
 }
 
-pub(crate) trait PipelineExecution {
+pub(crate) trait PipelineExecution<'builtins> {
     /// Given a pipeline, generates commands and executes them.
     ///
     /// The `Pipeline` structure contains a vector of `Job`s, and redirections to perform on the
@@ -324,7 +327,7 @@ pub(crate) trait PipelineExecution {
     /// If a job is stopped, the shell will add that job to a list of background jobs and
     /// continue to watch the job in the background, printing notifications on status changes
     /// of that job over time.
-    fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32;
+    fn execute_pipeline(&mut self, pipeline: &mut Pipeline<'builtins>) -> i32;
 
     /// Generates a vector of commands from a given `Pipeline`.
     ///
@@ -332,18 +335,18 @@ pub(crate) trait PipelineExecution {
     /// associated will be marked as an `&&`, `||`, `|`, or final job.
     fn generate_commands(
         &self,
-        pipeline: &mut Pipeline,
-    ) -> Result<SmallVec<[RefinedItem; 16]>, i32>;
+        pipeline: &mut Pipeline<'builtins>,
+    ) -> SmallVec<[RefinedItem<'builtins>; 16]>;
 
     /// Waits for all of the children of the assigned pgid to finish executing, returning the
     /// exit status of the last process in the queue.
-    fn wait(&mut self, pgid: u32, commands: SmallVec<[RefinedJob; 16]>) -> i32;
+    fn wait(&mut self, pgid: u32, commands: SmallVec<[RefinedJob<'builtins>; 16]>) -> i32;
 
     /// Executes a `RefinedJob` that was created in the `generate_commands` method.
     ///
     /// The aforementioned `RefinedJob` may be either a builtin or external command.
     /// The purpose of this function is therefore to execute both types accordingly.
-    fn exec_job(&mut self, job: &mut RefinedJob, foreground: bool) -> i32;
+    fn exec_job(&mut self, job: &mut RefinedJob<'builtins>, foreground: bool) -> i32;
 
     /// Execute a builtin in the current process.
     /// # Args
@@ -399,7 +402,7 @@ pub(crate) trait PipelineExecution {
     ) -> i32;
 }
 
-impl PipelineExecution for Shell {
+impl<'b> PipelineExecution<'b> for Shell<'b> {
     fn exec_external<'a, S: AsRef<str>>(
         &mut self,
         name: &'a str,
@@ -544,9 +547,9 @@ impl PipelineExecution for Shell {
         }
     }
 
-    fn exec_builtin(
+    fn exec_builtin<'a>(
         &mut self,
-        main: BuiltinFunction,
+        main: BuiltinFunction<'a>,
         args: &[small::String],
         stdout: &Option<File>,
         stderr: &Option<File>,
@@ -565,7 +568,7 @@ impl PipelineExecution for Shell {
         main(args, self)
     }
 
-    fn exec_job(&mut self, job: &mut RefinedJob, _foreground: bool) -> i32 {
+    fn exec_job(&mut self, job: &mut RefinedJob<'b>, _foreground: bool) -> i32 {
         // Duplicate file descriptors, execute command, and redirect back.
         if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
             let code = job.exec(self);
@@ -581,7 +584,7 @@ impl PipelineExecution for Shell {
         }
     }
 
-    fn wait(&mut self, pgid: u32, commands: SmallVec<[RefinedJob; 16]>) -> i32 {
+    fn wait(&mut self, pgid: u32, commands: SmallVec<[RefinedJob<'b>; 16]>) -> i32 {
         crate::IonPool::string(|as_string| {
             if !commands.is_empty() {
                 let mut iter = commands.iter().map(RefinedJob::long);
@@ -599,60 +602,46 @@ impl PipelineExecution for Shell {
         })
     }
 
-    fn generate_commands(
-        &self,
-        pipeline: &mut Pipeline,
-    ) -> Result<SmallVec<[RefinedItem; 16]>, i32> {
+    fn generate_commands(&self, pipeline: &mut Pipeline<'b>) -> SmallVec<[RefinedItem<'b>; 16]> {
         let mut results: SmallVec<[RefinedItem; 16]> = SmallVec::new();
         for item in pipeline.items.drain(..) {
             let PipeItem { mut job, outputs, inputs } = item;
             let refined = {
                 if is_implicit_cd(&job.args[0]) {
                     RefinedJob::builtin(
-                        builtins::builtin_cd,
+                        &builtins::builtin_cd,
                         iter::once("cd".into()).chain(job.args.drain()).collect(),
                     )
-                } else if self.variables.get::<Function>(job.args[0].as_str()).is_some() {
-                    RefinedJob::function(job.args[0].clone(), job.args.drain().collect())
-                } else if let Some(builtin) = job.builtin {
+                } else if self.variables.get::<Function>(&job.command).is_some() {
+                    RefinedJob::function(job.command.clone(), job.args.drain().collect())
+                } else if let Some(builtin) = self.builtins.get(&job.command) {
                     RefinedJob::builtin(builtin, job.args.drain().collect())
                 } else {
-                    RefinedJob::external(job.args[0].clone(), job.args.drain().collect())
+                    RefinedJob::external(job.command.clone(), job.args.drain().collect())
                 }
             };
             results.push((refined, job.kind, outputs, inputs));
         }
 
-        Ok(results)
+        results
     }
 
-    fn execute_pipeline(&mut self, pipeline: &mut Pipeline) -> i32 {
-        // If the supplied pipeline is a background, a string representing the command
-        // and a boolean representing whether it should be disowned is stored here.
-        let possible_background_name =
-            gen_background_string(&pipeline, self.flags & PRINT_COMMS != 0);
-        // Generates commands for execution, differentiating between external and
-        // builtin commands.
-        let piped_commands = match self.generate_commands(pipeline) {
-            Ok(commands) => commands,
-            Err(error) => return error,
-        };
-
+    fn execute_pipeline(&mut self, pipeline: &mut Pipeline<'b>) -> i32 {
         // Don't execute commands when the `-n` flag is passed.
         if self.flags & NO_EXEC != 0 {
             return SUCCESS;
         }
 
-        let piped_commands = match do_redirection(piped_commands) {
-            Some(c) => c,
-            None => return COULD_NOT_EXEC,
-        };
+        // If the supplied pipeline is a background, a string representing the command
+        // and a boolean representing whether it should be disowned is stored here.
+        let possible_background_name =
+            gen_background_string(&pipeline, self.flags & PRINT_COMMS != 0);
 
         // If the given pipeline is a background task, fork the shell.
         match possible_background_name {
             Some((command_name, disown)) => fork_pipe(
                 self,
-                piped_commands,
+                pipeline,
                 command_name,
                 if disown { ProcessState::Empty } else { ProcessState::Running },
             ),
@@ -661,7 +650,7 @@ impl PipelineExecution for Shell {
                 let _sig_ignore = SignalHandler::new();
                 let foreground = !self.is_background_shell;
                 // Execute each command in the pipeline, giving each command the foreground.
-                let exit_status = pipe(self, piped_commands, foreground);
+                let exit_status = pipe(self, pipeline, foreground);
                 // Set the shell as the foreground process again to regain the TTY.
                 if foreground && !self.is_library {
                     let _ = sys::tcsetpgrp(0, process::id());
@@ -675,13 +664,16 @@ impl PipelineExecution for Shell {
 /// Executes a piped job `job1 | job2 | job3`
 ///
 /// This function will panic if called with an empty slice
-pub(crate) fn pipe(
-    shell: &mut Shell,
-    commands: SmallVec<[(RefinedJob, JobKind); 16]>,
+pub(crate) fn pipe<'a>(
+    shell: &mut Shell<'a>,
+    pipeline: &mut Pipeline<'a>,
     foreground: bool,
 ) -> i32 {
+    let mut commands = match do_redirection(shell.generate_commands(pipeline)) {
+        Some(c) => c.into_iter().peekable(),
+        None => return COULD_NOT_EXEC,
+    };
     let mut previous_status = SUCCESS;
-    let mut commands = commands.into_iter().peekable();
     let mut ext_stdio_pipes: Option<Vec<File>> = None;
 
     while let Some((mut parent, mut kind)) = commands.next() {

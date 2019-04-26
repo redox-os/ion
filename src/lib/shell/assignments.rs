@@ -44,7 +44,7 @@ fn list_vars(shell: &Shell) -> Result<(), io::Error> {
 
 /// Represents: A variable store capable of setting local variables or
 /// exporting variables to some global environment
-pub(crate) trait VariableStore {
+pub(crate) trait VariableStore<'b> {
     /// Set a local variable given a binding
     fn local(&mut self, action: &LocalAction) -> i32;
     /// Export a variable to the process environment given a binding
@@ -53,10 +53,10 @@ pub(crate) trait VariableStore {
     fn calculate<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
-    ) -> Result<Vec<(Key<'a>, Value)>, String>;
+    ) -> Result<Vec<(Key<'a>, Value<'b>)>, String>;
 }
 
-impl VariableStore for Shell {
+impl<'b> VariableStore<'b> for Shell<'b> {
     fn export(&mut self, action: &ExportAction) -> i32 {
         match action {
             ExportAction::Assign(ref keys, op, ref vals) => {
@@ -119,7 +119,7 @@ impl VariableStore for Shell {
     fn calculate<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
-    ) -> Result<Vec<(Key<'a>, Value)>, String> {
+    ) -> Result<Vec<(Key<'a>, Value<'b>)>, String> {
         let mut backup: Vec<_> = Vec::with_capacity(4);
         for action in actions {
             let Action(key, operator, expression) = action.map_err(|e| e.to_string())?;
@@ -208,7 +208,7 @@ impl VariableStore for Shell {
 // This should logically be a method over iterator, but Value is only accessible in the main repo
 // TODO: too much allocations occur over here. We need to expand variables before they get
 // parsed
-fn apply(op: Operator, lhs: &Value, rhs: Value) -> Result<Value, OpError> {
+fn apply<'b>(op: Operator, lhs: &Value<'b>, rhs: Value) -> Result<Value<'b>, OpError> {
     match op {
         Operator::Add => lhs + rhs,
         Operator::Divide => lhs / rhs,

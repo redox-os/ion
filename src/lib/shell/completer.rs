@@ -1,7 +1,6 @@
 use super::{
     directory_stack::DirectoryStack,
-    escape::{escape, unescape},
-    variables::Variables,
+    escape::{escape, tilde, unescape},
 };
 use auto_enums::auto_enum;
 use glob::{glob_with, MatchOptions};
@@ -16,7 +15,7 @@ pub(crate) struct IonFileCompleter {
     /// A pointer to the directory stack in the shell.
     dir_stack: *const DirectoryStack,
     /// A pointer to the variables map in the shell.
-    vars: *const Variables,
+    prev: Option<String>,
     /// The directory the expansion takes place in
     path: String,
 }
@@ -25,13 +24,13 @@ impl IonFileCompleter {
     pub(crate) fn new(
         path: Option<&str>,
         dir_stack: *const DirectoryStack,
-        vars: *const Variables,
-    ) -> IonFileCompleter {
+        prev: Option<&str>,
+    ) -> Self {
         let mut path = path.unwrap_or("").to_string();
         if !path.is_empty() && !path.ends_with('/') {
             path.push('/');
         }
-        IonFileCompleter { dir_stack, vars, path }
+        IonFileCompleter { dir_stack, prev: prev.map(ToString::to_string), path }
     }
 }
 
@@ -50,7 +49,9 @@ impl Completer for IonFileCompleter {
         // because no changes will occur to either of the underlying references in the
         // duration between creation of the completers and execution of their
         // completions.
-        if let Some(expanded) = unsafe { (*self.vars).tilde_expansion(start, &*self.dir_stack) } {
+        if let Some(expanded) =
+            tilde(start, unsafe { &*self.dir_stack }, self.prev.as_ref().map(String::as_str))
+        {
             // Now we obtain completions for the `expanded` form of the `start` value.
             let iterator = filename_completion(&expanded, &self.path);
 
@@ -188,7 +189,7 @@ mod tests {
 
     #[test]
     fn filename_completion() {
-        let completer = IonFileCompleter::new(None, &DirectoryStack::new(), &Variables::default());
+        let completer = IonFileCompleter::new(None, &DirectoryStack::new(), None);
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
         assert_eq!(completer.completions("testing/file"), vec!["testing/file_with_text"]);
 

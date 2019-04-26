@@ -19,7 +19,7 @@ pub(crate) fn prompt(shell: &mut Shell) -> String {
 
 pub(crate) fn prompt_fn(shell: &mut Shell) -> Option<String> {
     if let Some(Value::Function(function)) = shell.variables.get_ref("PROMPT") {
-        let output = match shell.fork(Capture::StdoutThenIgnoreStderr, |child| {
+        let output = match shell.fork(Capture::StdoutThenIgnoreStderr, move |child| {
             let _ = function.execute(child, &["ion"]);
         }) {
             Ok(result) => {

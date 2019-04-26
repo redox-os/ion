@@ -48,8 +48,8 @@ pub enum Capture {
 /// Utilized by the shell for performing forks and capturing streams.
 ///
 /// Using this structure directly is equivalent to using `Shell`'s fork method.
-pub struct Fork<'a> {
-    shell:   &'a Shell,
+pub struct Fork<'a, 'b> {
+    shell:   &'a Shell<'b>,
     capture: Capture,
 }
 
@@ -65,10 +65,10 @@ pub struct IonResult {
     pub status: u8,
 }
 
-impl<'a> Fork<'a> {
+impl<'a, 'b: 'a> Fork<'a, 'b> {
     /// Executes a closure within the child of the fork, and returning an `IonResult` in a
     /// non-blocking fashion.
-    pub fn exec<F: FnMut(&mut Shell)>(&self, mut child_func: F) -> Result<IonResult, IonError> {
+    pub fn exec<F: FnMut(&mut Shell<'b>)>(&self, mut child_func: F) -> Result<IonResult, IonError> {
         sys::signals::block();
 
         // If we are to capture stdout, create a pipe for capturing outputs.
@@ -155,5 +155,5 @@ impl<'a> Fork<'a> {
     }
 
     /// Creates a new `Fork` state from an existing shell.
-    pub fn new(shell: &'a Shell, capture: Capture) -> Fork<'a> { Fork { shell, capture } }
+    pub fn new(shell: &'a Shell<'b>, capture: Capture) -> Fork<'a, 'b> { Fork { shell, capture } }
 }

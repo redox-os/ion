@@ -7,7 +7,6 @@ pub use self::{
 };
 use super::{
     colors::Colors,
-    directory_stack::DirectoryStack,
     flow_control::Function,
     status::{FAILURE, SUCCESS},
 };
@@ -27,20 +26,20 @@ use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Value {
+pub enum Value<'a> {
     Str(types::Str),
     Alias(types::Alias),
     Array(types::Array),
-    HashMap(types::HashMap),
-    BTreeMap(types::BTreeMap),
-    Function(Function),
+    HashMap(types::HashMap<'a>),
+    BTreeMap(types::BTreeMap<'a>),
+    Function(Function<'a>),
     None,
 }
 
 macro_rules! type_from_value {
     ($to:ty : $variant:ident else $defaultmethod:ident($($args:expr),*)) => {
-        impl From<Value> for $to {
-            fn from(var: Value) -> Self {
+        impl<'a> From<Value<'a>> for $to {
+            fn from(var: Value<'a>) -> Self {
                 match var {
                     Value::$variant(inner) => inner,
                     _ => <$to>::$defaultmethod($($args),*),
@@ -48,8 +47,8 @@ macro_rules! type_from_value {
             }
         }
 
-        impl From<Value> for Option<$to> {
-            fn from(var: Value) -> Self {
+        impl<'a> From<Value<'a>> for Option<$to> {
+            fn from(var: Value<'a>) -> Self {
                 match var {
                     Value::$variant(inner) => Some(inner),
                     _ => None,
@@ -57,8 +56,8 @@ macro_rules! type_from_value {
             }
         }
 
-        impl<'a> From<&'a Value> for Option<&'a $to> {
-            fn from(var: &'a Value) -> Self {
+        impl<'a, 'b> From<&'b Value<'a>> for Option<&'b $to> {
+            fn from(var: &'b Value<'a>) -> Self {
                 match *var {
                     Value::$variant(ref inner) => Some(inner),
                     _ => None,
@@ -66,8 +65,8 @@ macro_rules! type_from_value {
             }
         }
 
-        impl<'a> From<&'a mut Value> for Option<&'a mut $to> {
-            fn from(var: &'a mut Value) -> Self {
+        impl<'a, 'b> From<&'b mut Value<'a>> for Option<&'b mut $to> {
+            fn from(var: &'b mut Value<'a>) -> Self {
                 match *var {
                     Value::$variant(ref mut inner) => Some(inner),
                     _ => None,
@@ -80,9 +79,9 @@ macro_rules! type_from_value {
 type_from_value!(types::Str : Str else with_capacity(0));
 type_from_value!(types::Alias : Alias else empty());
 type_from_value!(types::Array : Array else with_capacity(0));
-type_from_value!(types::HashMap : HashMap else with_capacity_and_hasher(0, Default::default()));
-type_from_value!(types::BTreeMap : BTreeMap else new());
-type_from_value!(Function : Function else
+type_from_value!(types::HashMap<'a> : HashMap else with_capacity_and_hasher(0, Default::default()));
+type_from_value!(types::BTreeMap<'a> : BTreeMap else new());
+type_from_value!(Function<'a> : Function else
     new(
         Default::default(),
         Default::default(),
@@ -93,8 +92,8 @@ type_from_value!(Function : Function else
 
 macro_rules! eq {
     ($lhs:ty : $variant:ident) => {
-        impl PartialEq<Value> for $lhs {
-            fn eq(&self, other: &Value) -> bool {
+        impl<'a> PartialEq<Value<'a>> for $lhs {
+            fn eq(&self, other: &Value<'a>) -> bool {
                 match other {
                     Value::$variant(ref inner) => inner == self,
                     _ => false,
@@ -107,20 +106,20 @@ macro_rules! eq {
 eq!(types::Str: Str);
 eq!(types::Alias: Alias);
 eq!(types::Array: Array);
-eq!(types::HashMap: HashMap);
-eq!(types::BTreeMap: BTreeMap);
-eq!(Function: Function);
+eq!(types::HashMap<'a>: HashMap);
+eq!(types::BTreeMap<'a>: BTreeMap);
+eq!(Function<'a>: Function);
 
-impl Eq for Value {}
+impl<'a> Eq for Value<'a> {}
 
 // this one’s only special because of the lifetime parameter
-impl<'a> From<&'a str> for Value {
-    fn from(string: &'a str) -> Self { Value::Str(string.into()) }
+impl<'a, 'b> From<&'b str> for Value<'a> {
+    fn from(string: &'b str) -> Self { Value::Str(string.into()) }
 }
 
 macro_rules! value_from_type {
     ($arg:ident: $from:ty => $variant:ident($inner:expr)) => {
-        impl From<$from> for Value {
+        impl<'a> From<$from> for Value<'a> {
             fn from($arg: $from) -> Self { Value::$variant($inner) }
         }
     };
@@ -130,11 +129,11 @@ value_from_type!(string: types::Str => Str(string));
 value_from_type!(string: String => Str(string.into()));
 value_from_type!(alias: types::Alias => Alias(alias));
 value_from_type!(array: types::Array => Array(array));
-value_from_type!(hmap: types::HashMap => HashMap(hmap));
-value_from_type!(bmap: types::BTreeMap => BTreeMap(bmap));
-value_from_type!(function: Function => Function(function));
+value_from_type!(hmap: types::HashMap<'a> => HashMap(hmap));
+value_from_type!(bmap: types::BTreeMap<'a> => BTreeMap(bmap));
+value_from_type!(function: Function<'a> => Function(function));
 
-impl fmt::Display for Value {
+impl<'a> fmt::Display for Value<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Value::Str(ref str_) => write!(f, "{}", str_),
@@ -162,31 +161,31 @@ impl fmt::Display for Value {
 }
 
 #[derive(Clone, Debug)]
-pub struct Scope {
-    vars: HashMap<types::Str, Value>,
+pub struct Scope<'a> {
+    vars: HashMap<types::Str, Value<'a>>,
     /// This scope is on a namespace boundary.
     /// Any previous scopes need to be accessed through `super::`.
     namespace: bool,
 }
 
-impl Deref for Scope {
-    type Target = HashMap<types::Str, Value>;
+impl<'a> Deref for Scope<'a> {
+    type Target = HashMap<types::Str, Value<'a>>;
 
     fn deref(&self) -> &Self::Target { &self.vars }
 }
 
-impl DerefMut for Scope {
+impl<'a> DerefMut for Scope<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target { &mut self.vars }
 }
 
 #[derive(Clone, Debug)]
-pub struct Variables {
+pub struct Variables<'a> {
     flags:   u8,
-    scopes:  Vec<Scope>,
+    scopes:  Vec<Scope<'a>>,
     current: usize,
 }
 
-impl Default for Variables {
+impl<'a> Default for Variables<'a> {
     fn default() -> Self {
         let mut map: HashMap<types::Str, Value> = HashMap::with_capacity(64);
         map.insert("DIRECTORY_STACK_SIZE".into(), Value::Str("1000".into()));
@@ -247,7 +246,7 @@ impl Default for Variables {
     }
 }
 
-impl Variables {
+impl<'a> Variables<'a> {
     pub fn new_scope(&mut self, namespace: bool) {
         self.current += 1;
         if self.current >= self.scopes.len() {
@@ -262,23 +261,23 @@ impl Variables {
         self.current -= 1;
     }
 
-    pub fn pop_scopes<'a>(&'a mut self, index: usize) -> impl Iterator<Item = Scope> + 'a {
+    pub fn pop_scopes<'b>(&'b mut self, index: usize) -> impl Iterator<Item = Scope<'a>> + 'b {
         self.current = index;
         self.scopes.drain(index + 1..)
     }
 
-    pub fn append_scopes(&mut self, scopes: Vec<Scope>) {
+    pub fn append_scopes(&mut self, scopes: Vec<Scope<'a>>) {
         self.scopes.drain(self.current + 1..);
         self.current += scopes.len();
         self.scopes.extend(scopes);
     }
 
-    pub fn scopes(&self) -> impl DoubleEndedIterator<Item = &Scope> {
+    pub fn scopes(&self) -> impl DoubleEndedIterator<Item = &Scope<'a>> {
         let amount = self.scopes.len() - self.current - 1;
         self.scopes.iter().rev().skip(amount)
     }
 
-    pub fn scopes_mut(&mut self) -> impl Iterator<Item = &mut Scope> {
+    pub fn scopes_mut(&mut self) -> impl Iterator<Item = &mut Scope<'a>> {
         let amount = self.scopes.len() - self.current - 1;
         self.scopes.iter_mut().rev().skip(amount)
     }
@@ -293,11 +292,11 @@ impl Variables {
         None
     }
 
-    pub fn shadow(&mut self, name: &str, value: Value) -> Option<Value> {
+    pub fn shadow(&mut self, name: &str, value: Value<'a>) -> Option<Value<'a>> {
         self.scopes[self.current].insert(name.into(), value)
     }
 
-    pub fn get_ref(&self, mut name: &str) -> Option<&Value> {
+    pub fn get_ref(&self, mut name: &str) -> Option<&Value<'a>> {
         const GLOBAL_NS: &str = "global::";
         const SUPER_NS: &str = "super::";
 
@@ -335,7 +334,7 @@ impl Variables {
         }
     }
 
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut Value> {
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Value<'a>> {
         if name.starts_with("super::") || name.starts_with("global::") {
             // Cannot mutate outer namespace
             return None;
@@ -352,7 +351,7 @@ impl Variables {
         None
     }
 
-    pub fn remove_variable(&mut self, name: &str) -> Option<Value> {
+    pub fn remove_variable(&mut self, name: &str) -> Option<Value<'a>> {
         if name.starts_with("super::") || name.starts_with("global::") {
             // Cannot mutate outer namespace
             return None;
@@ -367,41 +366,6 @@ impl Variables {
             }
         }
         None
-    }
-
-    pub(crate) fn tilde_expansion(&self, word: &str, dir_stack: &DirectoryStack) -> Option<String> {
-        // Only if the first character is a tilde character will we perform expansions
-        if !word.starts_with('~') {
-            return None;
-        }
-
-        let separator = word[1..].find(|c| c == '/' || c == '$');
-        let (tilde_prefix, rest) = word[1..].split_at(separator.unwrap_or(word.len() - 1));
-
-        match tilde_prefix {
-            "" => sys_env::home_dir().map(|home| home.to_string_lossy().to_string() + rest),
-            "+" => Some(env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest),
-            "-" => self.get::<types::Str>("OLDPWD").map(|oldpwd| oldpwd.to_string() + rest),
-            _ => {
-                let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
-                    (false, &tilde_prefix[1..])
-                } else if tilde_prefix.starts_with('-') {
-                    (true, &tilde_prefix[1..])
-                } else {
-                    (false, tilde_prefix)
-                };
-
-                match tilde_num.parse() {
-                    Ok(num) => if neg {
-                        dir_stack.dir_from_top(num)
-                    } else {
-                        dir_stack.dir_from_bottom(num)
-                    }
-                    .map(|path| path.to_str().unwrap().to_string()),
-                    Err(_) => self_sys::get_user_home(tilde_prefix).map(|home| home + rest),
-                }
-            }
-        }
     }
 
     pub(crate) fn is_valid_variable_name(name: &str) -> bool {
@@ -432,12 +396,12 @@ impl Variables {
 
     pub fn get<T>(&self, name: &str) -> Option<T>
     where
-        Variables: GetVariable<T>,
+        Self: GetVariable<T>,
     {
         GetVariable::<T>::get(self, name)
     }
 
-    pub fn set<T: Into<Value>>(&mut self, name: &str, var: T) {
+    pub fn set<T: Into<Value<'a>>>(&mut self, name: &str, var: T) {
         let var = var.into();
 
         enum UpperAction {
@@ -445,18 +409,22 @@ impl Variables {
             Shadow,
         }
 
-        enum Action<'a> {
+        enum Action<'a, 'b> {
             Upper(UpperAction),
             Alias(&'a mut types::Alias),
             Str(&'a mut types::Str),
             Array(&'a mut types::Array),
-            Function(&'a mut Function),
-            HashMap(&'a mut types::HashMap),
+            Function(&'a mut Function<'b>),
+            HashMap(&'a mut types::HashMap<'b>),
         }
 
         macro_rules! handle_type {
             ($name:tt, $input:ty, $preferred:tt) => {
-                fn $name<'a>(name: &str, var: &Value, input: &'a mut $input) -> Option<Action<'a>> {
+                fn $name<'a, 'b>(
+                    name: &str,
+                    var: &Value<'a>,
+                    input: &'b mut $input,
+                ) -> Option<Action<'b, 'a>> {
                     if !name.is_empty() {
                         match var {
                             Value::$preferred(var_value) => {
@@ -478,8 +446,8 @@ impl Variables {
         handle_type!(string_action, types::Str, Str);
         handle_type!(alias_action, types::Alias, Alias);
         handle_type!(array_action, types::Array, Array);
-        handle_type!(hashmap_action, types::HashMap, HashMap);
-        handle_type!(function_action, Function, Function);
+        handle_type!(hashmap_action, types::HashMap<'a>, HashMap);
+        handle_type!(function_action, Function<'a>, Function);
 
         let upper_action = {
             let action = match self.get_mut(&name) {
@@ -645,7 +613,7 @@ pub trait GetVariable<T> {
     fn get(&self, name: &str) -> Option<T>;
 }
 
-impl GetVariable<types::Str> for Variables {
+impl<'a> GetVariable<types::Str> for Variables<'a> {
     fn get(&self, name: &str) -> Option<types::Str> {
         use crate::types::Str;
 
@@ -689,7 +657,7 @@ impl GetVariable<types::Str> for Variables {
 
 macro_rules! get_var {
     ($types:ty, $variant:ident($inner:ident) => $ret:expr) => {
-        impl GetVariable<$types> for Variables {
+        impl<'a> GetVariable<$types> for Variables<'a> {
             fn get(&self, name: &str) -> Option<$types> {
                 match self.get_ref(name) {
                     Some(Value::$variant($inner)) => {
@@ -704,9 +672,9 @@ macro_rules! get_var {
 
 get_var!(types::Alias, Alias(alias) => (*alias));
 get_var!(types::Array, Array(array) => array);
-get_var!(types::HashMap, HashMap(hmap) => hmap);
-get_var!(types::BTreeMap, BTreeMap(bmap) => bmap);
-get_var!(Function, Function(func) => func);
+get_var!(types::HashMap<'a>, HashMap(hmap) => hmap);
+get_var!(types::BTreeMap<'a>, BTreeMap(bmap) => bmap);
+get_var!(Function<'a>, Function(func) => func);
 
 #[cfg(test)]
 mod trait_test;
@@ -717,9 +685,9 @@ mod tests {
     use crate::parser::{expand_string, Expander};
     use serial_test_derive::serial;
 
-    struct VariableExpander(pub Variables);
+    struct VariableExpander<'a>(pub Variables<'a>);
 
-    impl Expander for VariableExpander {
+    impl<'a> Expander for VariableExpander<'a> {
         fn string(&self, var: &str) -> Option<types::Str> { self.0.get::<types::Str>(var) }
     }
 
