@@ -232,7 +232,7 @@ impl DirectoryStack {
                         let check_cdpath_first = cdpath
                             .iter()
                             .map(|path| {
-                                let path_dir = [path, "/", dir].concat();
+                                let path_dir = format!("{}/{}", path, dir);
                                 self.change_and_push_dir(&path_dir, variables)
                             })
                             .find(Result::is_ok)

@@ -5,8 +5,7 @@ pub(crate) use self::words::{Select, WordIterator, WordToken};
 use crate::{
     braces::{self, BraceToken},
     ranges::{parse_range, Index, Range},
-    shell::variables::Value,
-    types::{self, Array},
+    types::{self, Args},
 };
 use auto_enums::auto_enum;
 use glob::glob;
@@ -33,21 +32,19 @@ pub(crate) trait Expander: Sized {
     /// Expand a tilde form to the correct directory.
     fn tilde(&self, _input: &str) -> Option<String> { None }
     /// Expand an array variable with some selection.
-    fn array(&self, _name: &str, _selection: &Select) -> Option<types::Array> { None }
+    fn array(&self, _name: &str, _selection: &Select) -> Option<Args> { None }
     /// Expand a string variable given if it's quoted / unquoted
     fn string(&self, _name: &str) -> Option<types::Str> { None }
     /// Expand a subshell expression.
     fn command(&self, _command: &str) -> Option<types::Str> { None }
     /// Iterating upon key-value maps.
-    fn map_keys<'a>(&'a self, _name: &str, _select: &Select) -> Option<Array> { None }
+    fn map_keys<'a>(&'a self, _name: &str, _select: &Select) -> Option<Args> { None }
     /// Iterating upon key-value maps.
-    fn map_values<'a>(&'a self, _name: &str, _select: &Select) -> Option<Array> { None }
+    fn map_values<'a>(&'a self, _name: &str, _select: &Select) -> Option<Args> { None }
     /// Get a string that exists in the shell.
-    fn get_string(&self, value: &str) -> Value<'static> {
-        Value::Str(types::Str::from(expand_string(value, self).join(" ")))
-    }
+    fn get_string(&self, value: &str) -> types::Str { expand_string(value, self).join(" ").into() }
     /// Select the proper values from an iterator
-    fn select<I: Iterator<Item = types::Str>>(vals: I, select: &Select, n: usize) -> Option<Array> {
+    fn select<I: Iterator<Item = types::Str>>(vals: I, select: &Select, n: usize) -> Option<Args> {
         match select {
             Select::All => Some(vals.collect()),
             Select::Range(range) => range
@@ -58,7 +55,7 @@ pub(crate) trait Expander: Sized {
         }
     }
     /// Get an array that exists in the shell.
-    fn get_array(&self, value: &str) -> Value<'static> { Value::Array(expand_string(value, self)) }
+    fn get_array(&self, value: &str) -> Args { expand_string(value, self) }
 }
 
 fn expand_process<E: Expander>(
@@ -104,13 +101,12 @@ fn array_expand<E: Expander>(
     elements: &[&str],
     expand_func: &E,
     selection: &Select,
-) -> types::Array {
+) -> types::Args {
     match selection {
-        Select::None => types::Array::new(),
         Select::All => elements.iter().flat_map(|e| expand_string(e, expand_func)).collect(),
         Select::Index(index) => array_nth(elements, expand_func, *index).into_iter().collect(),
         Select::Range(range) => array_range(elements, expand_func, *range),
-        Select::Key(_) => types::Array::new(),
+        Select::Key(_) | Select::None => types::Args::new(),
     }
 }
 
@@ -122,13 +118,13 @@ fn array_nth<E: Expander>(elements: &[&str], expand_func: &E, index: Index) -> O
     }
 }
 
-fn array_range<E: Expander>(elements: &[&str], expand_func: &E, range: Range) -> types::Array {
+fn array_range<E: Expander>(elements: &[&str], expand_func: &E, range: Range) -> types::Args {
     let expanded =
-        elements.iter().flat_map(|e| expand_string(e, expand_func)).collect::<types::Array>();
+        elements.iter().flat_map(|e| expand_string(e, expand_func)).collect::<types::Args>();
     if let Some((start, length)) = range.bounds(expanded.len()) {
         expanded.into_iter().skip(start).take(length).collect()
     } else {
-        types::Array::new()
+        types::Args::new()
     }
 }
 
@@ -163,7 +159,7 @@ fn slice<S: AsRef<str>>(output: &mut small::String, expanded: S, selection: &Sel
 /// Performs shell expansions to an input string, efficiently returning the final
 /// expanded form. Shells must provide their own batteries for expanding tilde
 /// and variable words.
-pub(crate) fn expand_string<E: Expander>(original: &str, expand_func: &E) -> types::Array {
+pub(crate) fn expand_string<E: Expander>(original: &str, expand_func: &E) -> types::Args {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
 
@@ -209,7 +205,7 @@ pub(crate) fn expand_string<E: Expander>(original: &str, expand_func: &E) -> typ
     expand_tokens(&token_buffer, expand_func, contains_brace)
 }
 
-fn expand_string_no_glob<E: Expander>(original: &str, expand_func: &E) -> types::Array {
+fn expand_string_no_glob<E: Expander>(original: &str, expand_func: &E) -> types::Args {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
 
@@ -225,8 +221,8 @@ fn expand_string_no_glob<E: Expander>(original: &str, expand_func: &E) -> types:
     expand_tokens(&token_buffer, expand_func, contains_brace)
 }
 
-fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> types::Array {
-    let mut expanded_words = types::Array::new();
+fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> types::Args {
+    let mut expanded_words = types::Args::new();
     let mut output = small::String::new();
     let tokens: &mut Vec<BraceToken> = &mut Vec::new();
     let mut expanders: Vec<Vec<small::String>> = Vec::new();
@@ -326,7 +322,7 @@ fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> typ
         expanded_words.extend(braces::expand(&tokens, &*vector_of_arrays));
     }
 
-    expanded_words.into_iter().fold(types::Array::new(), |mut array, word| {
+    expanded_words.into_iter().fold(types::Args::new(), |mut array, word| {
         if word.find('*').is_some() {
             if let Ok(paths) = glob(&word) {
                 array.extend(paths.map(|path| {
@@ -350,19 +346,21 @@ fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> typ
 fn expand_single_array_token<E: Expander>(
     token: &WordToken,
     expand_func: &E,
-) -> Option<types::Array> {
-    let array = match *token {
-        WordToken::Array(ref elements, ref index) => array_expand(elements, expand_func, &index),
+) -> Option<types::Args> {
+    match *token {
+        WordToken::Array(ref elements, ref index) => {
+            Some(array_expand(elements, expand_func, &index))
+        }
         WordToken::ArrayVariable(array, quoted, ref index) => {
             match expand_func.array(array, index) {
-                Some(ref array) if quoted => array![small::String::from(array.join(" "))],
-                Some(array) => array,
-                None => types::Array::new(),
+                Some(ref array) if quoted => Some(args![small::String::from(array.join(" "))]),
+                Some(array) => Some(array),
+                None => Some(types::Args::new()),
             }
         }
         WordToken::ArrayProcess(command, quoted, ref index) => {
             crate::IonPool::string(|output| match *index {
-                Select::Key(_) | Select::None => types::Array::new(),
+                Select::Key(_) | Select::None => Some(types::Args::new()),
                 _ => {
                     expand_process(output, command, &Select::All, expand_func);
 
@@ -390,9 +388,9 @@ fn expand_single_array_token<E: Expander>(
                     };
 
                     if quoted {
-                        array!(iterator.join(" "))
+                        Some(args!(iterator.join(" ")))
                     } else {
-                        iterator.collect()
+                        Some(iterator.collect())
                     }
                 }
             })
@@ -400,20 +398,18 @@ fn expand_single_array_token<E: Expander>(
         WordToken::ArrayMethod(ref array_method, quoted) => {
             let result = array_method.handle_as_array(expand_func);
             if quoted {
-                array!(result.join(" "))
+                Some(args!(result.join(" ")))
             } else {
-                result
+                Some(result)
             }
         }
-        _ => return None,
-    };
-
-    Some(array)
+        _ => None,
+    }
 }
 
-fn expand_single_string_token<E: Expander>(token: &WordToken, expand_func: &E) -> types::Array {
+fn expand_single_string_token<E: Expander>(token: &WordToken, expand_func: &E) -> types::Args {
     let mut output = small::String::new();
-    let mut expanded_words = types::Array::new();
+    let mut expanded_words = types::Args::new();
 
     match *token {
         WordToken::StringMethod(ref method) => method.handle(&mut output, expand_func),
@@ -441,7 +437,7 @@ fn expand_single_string_token<E: Expander>(token: &WordToken, expand_func: &E) -
 
 fn expand<E: Expander>(
     output: &mut small::String,
-    expanded_words: &mut types::Array,
+    expanded_words: &mut types::Args,
     expand_func: &E,
     text: &str,
     do_glob: bool,
@@ -502,7 +498,7 @@ pub(crate) fn expand_tokens<E: Expander>(
     token_buffer: &[WordToken],
     expand_func: &E,
     contains_brace: bool,
-) -> types::Array {
+) -> types::Args {
     if !token_buffer.is_empty() {
         if contains_brace {
             return expand_braces(&token_buffer, expand_func);
@@ -515,7 +511,7 @@ pub(crate) fn expand_tokens<E: Expander>(
         }
 
         let mut output = small::String::new();
-        let mut expanded_words = types::Array::new();
+        let mut expanded_words = types::Args::new();
 
         {
             let output = &mut output;
@@ -603,7 +599,7 @@ pub(crate) fn expand_tokens<E: Expander>(
         }
         expanded_words
     } else {
-        Array::new()
+        Args::new()
     }
 }
 
@@ -693,7 +689,7 @@ mod test {
         let input = "$FOO:NOT:$BAR";
         let expected = "FOO:NOT:BAR";
         let expanded = expand_string(input, &VariableExpander);
-        assert_eq!(array![expected], expanded);
+        assert_eq!(args![expected], expanded);
     }
 
     #[test]
@@ -703,7 +699,7 @@ mod test {
                         prospective projections";
         let expanded = expand_string(line, &VariableExpander);
         assert_eq!(
-            expected.split_whitespace().map(|x| x.into()).collect::<types::Array>(),
+            expected.split_whitespace().map(|x| x.into()).collect::<types::Args>(),
             expanded
         );
     }
@@ -714,7 +710,7 @@ mod test {
         let expected = "Itemized Itemize Italicized Italicize Iterated Iterate";
         let expanded = expand_string(line, &VariableExpander);
         assert_eq!(
-            expected.split_whitespace().map(|x| x.into()).collect::<types::Array>(),
+            expected.split_whitespace().map(|x| x.into()).collect::<types::Args>(),
             expanded
         );
     }
@@ -722,19 +718,19 @@ mod test {
     #[test]
     fn expand_variables_with_colons() {
         let expanded = expand_string("$FOO:$BAR", &VariableExpander);
-        assert_eq!(array!["FOO:BAR"], expanded);
+        assert_eq!(args!["FOO:BAR"], expanded);
     }
 
     #[test]
     fn expand_multiple_variables() {
         let expanded = expand_string("${B}${C}...${D}", &VariableExpander);
-        assert_eq!(array!["testing...1 2 3"], expanded);
+        assert_eq!(args!["testing...1 2 3"], expanded);
     }
 
     #[test]
     fn expand_variable_alongside_braces() {
         let line = "$A{1,2}";
-        let expected = array!["11", "12"];
+        let expected = args!["11", "12"];
         let expanded = expand_string(line, &VariableExpander);
         assert_eq!(expected, expanded);
     }
@@ -742,7 +738,7 @@ mod test {
     #[test]
     fn expand_variable_within_braces() {
         let line = "1{$A,2}";
-        let expected = array!["11", "12"];
+        let expected = args!["11", "12"];
         let expanded = expand_string(line, &VariableExpander);
         assert_eq!(&expected, &expanded);
     }
@@ -752,21 +748,21 @@ mod test {
         let base = |idx: &str| format!("[1 2 3][{}]", idx);
         let expander = VariableExpander;
         {
-            let expected = array!["1"];
+            let expected = args!["1"];
             let idxs = vec!["-3", "0", "..-2"];
             for idx in idxs {
                 assert_eq!(expected, expand_string(&base(idx), &expander));
             }
         }
         {
-            let expected = array!["2", "3"];
+            let expected = args!["2", "3"];
             let idxs = vec!["1...2", "1...-1"];
             for idx in idxs {
                 assert_eq!(expected, expand_string(&base(idx), &expander));
             }
         }
         {
-            let expected = types::Array::new();
+            let expected = types::Args::new();
             let idxs = vec!["-17", "4..-4"];
             for idx in idxs {
                 assert_eq!(expected, expand_string(&base(idx), &expander));
@@ -779,10 +775,10 @@ mod test {
         let line = |idx: &str| format!("[[foo bar] [baz bat] [bing crosby]][{}]", idx);
         let expander = VariableExpander;
         let cases = vec![
-            (array!["foo"], "0"),
-            (array!["baz"], "2"),
-            (array!["bat"], "-3"),
-            (array!["bar", "baz", "bat"], "1...3"),
+            (args!["foo"], "0"),
+            (args!["baz"], "2"),
+            (args!["bat"], "-3"),
+            (args!["bar", "baz", "bat"], "1...3"),
         ];
         for (expected, idx) in cases {
             assert_eq!(expected, expand_string(&line(idx), &expander));
@@ -792,17 +788,17 @@ mod test {
     #[test]
     fn arith_expression() {
         let line = "$((A * A - (A + A)))";
-        let expected = array!["-1"];
+        let expected = args!["-1"];
         assert_eq!(expected, expand_string(line, &VariableExpander));
         let line = "$((3 * 10 - 27))";
-        let expected = array!["3"];
+        let expected = args!["3"];
         assert_eq!(expected, expand_string(line, &VariableExpander));
     }
 
     #[test]
     fn inline_expression() {
         let cases =
-            vec![(array!["5"], "$len([0 1 2 3 4])"), (array!["FxOxO"], "$join(@chars('FOO') 'x')")];
+            vec![(args!["5"], "$len([0 1 2 3 4])"), (args!["FxOxO"], "$join(@chars('FOO') 'x')")];
         for (expected, input) in cases {
             assert_eq!(expected, expand_string(input, &VariableExpander));
         }

@@ -45,7 +45,8 @@ impl<'a> ShellHistory for InteractiveBinary<'a> {
         let mut regexes = Vec::new();
         // for convenience and to avoid typos
         let regex_prefix = "regex:";
-        for pattern in patterns {
+        for pattern in patterns.into_iter() {
+            let pattern = format!("{}", pattern);
             match pattern.as_ref() {
                 "all" => settings.all = true,
                 "no_such_command" => settings.no_such_command = true,

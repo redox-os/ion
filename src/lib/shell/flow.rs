@@ -342,7 +342,10 @@ impl<'a> FlowLogic<'a> for Shell<'a> {
                 let previous_bind = case.binding.as_ref().and_then(|bind| {
                     if is_array {
                         let out = self.variables.get::<types::Array>(bind).map(Value::Array);
-                        self.set(&bind, value.clone());
+                        self.set(
+                            &bind,
+                            value.iter().cloned().map(Value::Str).collect::<types::Array>(),
+                        );
                         out
                     } else {
                         let out = self.variables.get::<types::Str>(bind).map(Value::Str);

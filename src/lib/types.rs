@@ -4,10 +4,12 @@ use small;
 use smallvec::SmallVec;
 use std::{
     collections::BTreeMap as StdBTreeMap,
+    iter::FromIterator,
     ops::{Deref, DerefMut},
 };
 
-pub type Array = SmallVec<[Str; 4]>;
+pub type Args = SmallVec<[small::String; 4]>;
+pub type Array<'a> = Vec<Value<'a>>;
 pub type HashMap<'a> = HashbrownMap<Str, Value<'a>>;
 pub type BTreeMap<'a> = StdBTreeMap<Str, Value<'a>>;
 pub type Str = small::String;
@@ -31,6 +33,12 @@ impl DerefMut for Alias {
 
 impl Into<Str> for Alias {
     fn into(self) -> Str { self.0 }
+}
+
+impl<'a> FromIterator<Value<'a>> for Value<'a> {
+    fn from_iter<I: IntoIterator<Item = Value<'a>>>(items: I) -> Self {
+        Value::Array(items.into_iter().collect())
+    }
 }
 
 /// Construct a new Array containing the given arguments
@@ -58,6 +66,15 @@ impl Into<Str> for Alias {
 macro_rules! array [
     ( $($x:expr), *) => ({
         let mut _arr = crate::types::Array::new();
+        $(_arr.push($x.into());)*
+        _arr
+    })
+];
+
+#[macro_export]
+macro_rules! args [
+    ( $($x:expr), *) => ({
+        let mut _arr = crate::types::Args::new();
         $(_arr.push($x.into());)*
         _arr
     })

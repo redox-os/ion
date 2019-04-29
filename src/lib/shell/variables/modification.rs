@@ -1,20 +1,20 @@
 use super::Value;
 
 pub trait Modifications {
-    fn append(&mut self, val: Value) -> bool;
-    fn prepend(&mut self, val: Value) -> bool;
+    fn append(&mut self, val: Self) -> bool;
+    fn prepend(&mut self, val: Self) -> bool;
 }
 
 impl<'a> Modifications for Value<'a> {
-    fn append(&mut self, val: Value) -> bool {
+    fn append(&mut self, val: Self) -> bool {
         match self {
             Value::Array(ref mut lhs) => match val {
                 Value::Array(rhs) => {
-                    lhs.extend(rhs.into_iter());
+                    lhs.extend(rhs);
                     true
                 }
-                Value::Str(rhs) => {
-                    lhs.push(rhs);
+                Value::Str(_) => {
+                    lhs.push(val);
                     true
                 }
                 _ => false,
@@ -30,15 +30,15 @@ impl<'a> Modifications for Value<'a> {
         }
     }
 
-    fn prepend(&mut self, val: Value) -> bool {
+    fn prepend(&mut self, val: Self) -> bool {
         match self {
             Value::Array(ref mut lhs) => match val {
                 Value::Array(rhs) => {
-                    lhs.insert_many(0, rhs);
+                    lhs.splice(..0, rhs);
                     true
                 }
-                Value::Str(rhs) => {
-                    lhs.insert(0, rhs);
+                Value::Str(_) => {
+                    lhs.insert(0, val);
                     true
                 }
                 _ => false,

@@ -42,38 +42,6 @@ pub(crate) fn is_boolean(value: &mut types::Str) -> bool {
     }
 }
 
-fn is_expected_with(expected_type: Primitive, value: &mut Value) -> Result<(), TypeError> {
-    let checks_out = if let Value::Array(ref mut items) = value {
-        match expected_type {
-            Primitive::BooleanArray => items.iter_mut().all(|item| {
-                is_expected_with(Primitive::Boolean, &mut Value::Str(item.to_owned())).is_ok()
-            }),
-            Primitive::IntegerArray => items.iter_mut().all(|item| {
-                is_expected_with(Primitive::Integer, &mut Value::Str(item.to_owned())).is_ok()
-            }),
-            Primitive::FloatArray => items.iter_mut().all(|item| {
-                is_expected_with(Primitive::Float, &mut Value::Str(item.to_owned())).is_ok()
-            }),
-            _ => false,
-        }
-    } else if let Value::Str(ref mut string) = value {
-        match expected_type {
-            Primitive::Boolean => is_boolean(string),
-            Primitive::Integer => string.parse::<i64>().is_ok(),
-            Primitive::Float => string.parse::<f64>().is_ok(),
-            _ => false,
-        }
-    } else {
-        false
-    };
-
-    if checks_out {
-        Ok(())
-    } else {
-        Err(TypeError::BadValue(expected_type))
-    }
-}
-
 fn get_map_of<E: Expander>(
     primitive_type: &Primitive,
     shell: &E,
@@ -90,14 +58,16 @@ fn get_map_of<E: Expander>(
     let size = array.len();
 
     let iter = array.into_iter().map(|string| {
-        match string.splitn(2, '=').collect::<Vec<_>>().as_slice() {
-            [key, value] => value_check(shell, value, inner_kind).and_then(|val| match val {
+        let mut parts = string.splitn(2, '=');
+        if let (Some(key), Some(value)) = (parts.next(), parts.next()) {
+            value_check(shell, value, inner_kind).and_then(|val| match val {
                 Value::Str(_) | Value::Array(_) | Value::HashMap(_) | Value::BTreeMap(_) => {
                     Ok(((*key).into(), val))
                 }
                 _ => Err(TypeError::BadValue((**inner_kind).clone())),
-            }),
-            _ => Err(TypeError::BadValue(*inner_kind.clone())),
+            })
+        } else {
+            Err(TypeError::BadValue(*inner_kind.clone()))
         }
     });
 
@@ -127,21 +97,49 @@ pub(crate) fn value_check<E: Expander>(
     value: &str,
     expected: &Primitive,
 ) -> Result<Value<'static>, TypeError> {
-    let mut extracted =
-        if is_array(value) { shell.get_array(value) } else { shell.get_string(value) };
-    match expected {
-        Primitive::Str | Primitive::StrArray => Ok(extracted),
-        Primitive::Boolean
-        | Primitive::Integer
-        | Primitive::Float
-        | Primitive::BooleanArray
-        | Primitive::IntegerArray
-        | Primitive::FloatArray => {
-            is_expected_with(expected.clone(), &mut extracted)?;
-            Ok(extracted)
+    if is_array(value) {
+        let extracted = shell.get_array(value);
+        match expected {
+            Primitive::StrArray | Primitive::Str => extracted
+                .iter()
+                .map(|item| value_check(shell, item, &Primitive::Str))
+                .collect::<Result<Vec<_>, _>>()
+                .map(Value::Array),
+            Primitive::BooleanArray => extracted
+                .iter()
+                .map(|item| value_check(shell, item, &Primitive::Boolean))
+                .collect::<Result<Vec<_>, _>>()
+                .map(Value::Array),
+            Primitive::IntegerArray => extracted
+                .iter()
+                .map(|item| value_check(shell, item, &Primitive::Integer))
+                .collect::<Result<Vec<_>, _>>()
+                .map(Value::Array),
+            Primitive::FloatArray => extracted
+                .iter()
+                .map(|item| value_check(shell, item, &Primitive::Float))
+                .collect::<Result<Vec<_>, _>>()
+                .map(Value::Array),
+            Primitive::HashMap(_) | Primitive::BTreeMap(_) => get_map_of(expected, shell, value),
+            Primitive::Indexed(_, ref kind) => value_check(shell, value, kind),
+            _ => Err(TypeError::BadValue(expected.clone())),
         }
-        Primitive::HashMap(_) | Primitive::BTreeMap(_) => get_map_of(expected, shell, value),
-        Primitive::Indexed(_, ref kind) => value_check(shell, value, kind),
+    } else {
+        let mut extracted = shell.get_string(value);
+        match expected {
+            Primitive::Str => Ok(Value::Str(extracted)),
+            Primitive::Boolean => {
+                if is_boolean(&mut extracted) {
+                    Ok(Value::Str(extracted))
+                } else {
+                    Err(TypeError::BadValue(expected.clone()))
+                }
+            }
+            Primitive::Integer if extracted.parse::<i64>().is_ok() => Ok(Value::Str(extracted)),
+            Primitive::Float if extracted.parse::<f64>().is_ok() => Ok(Value::Str(extracted)),
+            Primitive::Indexed(_, ref kind) => value_check(shell, value, kind),
+            _ => Err(TypeError::BadValue(expected.clone())),
+        }
     }
 }
 
@@ -149,6 +147,16 @@ pub(crate) fn value_check<E: Expander>(
 mod test {
     use super::*;
     use lexers::TypeError;
+
+    struct VariableExpander;
+
+    impl Expander for VariableExpander {
+        fn get_string(&self, variable: &str) -> types::Str { variable.into() }
+
+        fn get_array(&self, variable: &str) -> types::Args {
+            variable[1..variable.len() - 1].split(' ').map(Into::into).collect()
+        }
+    }
 
     #[test]
     fn is_array_() {
@@ -188,12 +196,16 @@ mod test {
     #[test]
     fn is_integer_array_() {
         assert_eq!(
-            is_expected_with(Primitive::IntegerArray, &mut Value::Array(array!["1", "2", "3"])),
-            Ok(())
+            value_check(&VariableExpander, "[1 2 3]", &Primitive::IntegerArray),
+            Ok(Value::Array(vec![
+                Value::Str("1".into()),
+                Value::Str("2".into()),
+                Value::Str("3".into())
+            ]))
         );
         assert_eq!(
-            is_expected_with(Primitive::IntegerArray, &mut Value::Array(array!["1", "2", "three"])),
-            Err(TypeError::BadValue(Primitive::IntegerArray))
+            value_check(&VariableExpander, "[1 2 three]", &Primitive::IntegerArray),
+            Err(TypeError::BadValue(Primitive::Integer))
         );
     }
 }
