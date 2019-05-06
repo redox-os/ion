@@ -30,7 +30,7 @@ pub trait JobControl {
     fn resume_stopped(&mut self);
     fn handle_signal(&self, signal: i32) -> bool;
     fn background_send(&self, signal: i32);
-    fn watch_foreground(&mut self, pid: i32, command: &str) -> i32;
+    fn watch_foreground<T: Into<String>>(&mut self, pid: i32, command: T) -> i32;
     fn send_to_background(&mut self, child: u32, state: ProcessState, command: String);
 }
 
@@ -148,7 +148,7 @@ impl<'a> JobControl for Shell<'a> {
         }
     }
 
-    fn watch_foreground(&mut self, pid: i32, command: &str) -> i32 {
+    fn watch_foreground<T: Into<String>>(&mut self, pid: i32, command: T) -> i32 {
         let mut signaled = 0;
         let mut exit_status = 0;
 

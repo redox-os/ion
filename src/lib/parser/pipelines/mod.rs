@@ -3,19 +3,24 @@ mod collector;
 pub(crate) use self::collector::*;
 
 use super::expand_string;
-use crate::shell::{pipe_exec::stdin_of, Job, JobKind, Shell};
+use crate::{
+    shell::{pipe_exec::stdin_of, Job, Shell},
+    types,
+};
+use itertools::Itertools;
 use small;
 use std::{fmt, fs::File, os::unix::io::FromRawFd};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub(crate) enum RedirectFrom {
+pub enum RedirectFrom {
     Stdout,
     Stderr,
     Both,
+    None,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Redirection {
+pub struct Redirection {
     pub from:   RedirectFrom,
     pub file:   small::String,
     pub append: bool,
@@ -23,7 +28,7 @@ pub(crate) struct Redirection {
 
 /// Represents input that a process could initially receive from `stdin`
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Input {
+pub enum Input {
     /// A file; the contents of said file will be written to the `stdin` of a
     /// process
     File(small::String),
@@ -33,13 +38,13 @@ pub(crate) enum Input {
 }
 
 impl Input {
-    pub fn get_infile(&mut self) -> Option<File> {
+    pub fn get_infile(&mut self) -> Result<File, ()> {
         match self {
             Input::File(ref filename) => match File::open(filename.as_str()) {
-                Ok(file) => Some(file),
+                Ok(file) => Ok(file),
                 Err(e) => {
                     eprintln!("ion: failed to redirect '{}' to stdin: {}", filename, e);
-                    None
+                    Err(())
                 }
             },
             Input::HereString(ref mut string) => {
@@ -47,13 +52,13 @@ impl Input {
                     string.push('\n');
                 }
                 match unsafe { stdin_of(&string) } {
-                    Ok(stdio) => Some(unsafe { File::from_raw_fd(stdio) }),
+                    Ok(stdio) => Ok(unsafe { File::from_raw_fd(stdio) }),
                     Err(e) => {
                         eprintln!(
                             "ion: failed to redirect herestring '{}' to stdin: {}",
                             string, e
                         );
-                        None
+                        Err(())
                     }
                 }
             }
@@ -61,13 +66,47 @@ impl Input {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Pipeline<'a> {
-    pub items: Vec<PipeItem<'a>>,
+impl<'a> fmt::Display for Input {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Input::File(ref file) => write!(f, "< {}", file),
+            Input::HereString(ref string) => write!(f, "<<< {}", string),
+        }
+    }
+}
+
+impl<'a> fmt::Display for Redirection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}>{} {}",
+            match self.from {
+                RedirectFrom::Stdout => "",
+                RedirectFrom::Stderr => "^",
+                RedirectFrom::Both => "&",
+                RedirectFrom::None => unreachable!(),
+            },
+            if self.append { ">" } else { "" },
+            self.file,
+        )
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum PipeType {
+    Normal,
+    Background,
+    Disown,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct PipeItem<'a> {
+pub struct Pipeline<'a> {
+    pub items: Vec<PipeItem<'a>>,
+    pub pipe:  PipeType,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct PipeItem<'a> {
     pub job:     Job<'a>,
     pub outputs: Vec<Redirection>,
     pub inputs:  Vec<Input>,
@@ -91,8 +130,34 @@ impl<'a> PipeItem<'a> {
         }
     }
 
+    #[inline]
+    pub fn command(&self) -> &types::Str { self.job.command() }
+
+    #[inline]
     pub(crate) fn new(job: Job<'a>, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
         PipeItem { job, outputs, inputs }
+    }
+}
+
+impl<'a> fmt::Display for PipeItem<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.job.args.iter().format(" "))?;
+        for input in &self.inputs {
+            write!(f, " {}", input)?;
+        }
+        for output in &self.outputs {
+            write!(f, " {}", output)?;
+        }
+        write!(
+            f,
+            "{}",
+            match self.job.redirection {
+                RedirectFrom::None => "",
+                RedirectFrom::Stdout => " |",
+                RedirectFrom::Stderr => " ^|",
+                RedirectFrom::Both => " &|",
+            }
+        )
     }
 }
 
@@ -101,62 +166,27 @@ impl<'a> Pipeline<'a> {
         self.items.len() > 1
             || self.items.iter().any(|it| !it.outputs.is_empty())
             || self.items.iter().any(|it| !it.inputs.is_empty())
-            || self.items.last().unwrap().job.kind == JobKind::Background
-            || self.items.last().unwrap().job.kind == JobKind::Disown
+            || self.pipe != PipeType::Normal
     }
 
     pub(crate) fn expand(&mut self, shell: &Shell<'a>) {
         self.items.iter_mut().for_each(|i| i.expand(shell));
     }
 
-    pub(crate) fn new() -> Self { Pipeline { items: Vec::new() } }
+    pub(crate) fn new() -> Self { Pipeline { items: Vec::new(), pipe: PipeType::Normal } }
 }
 
 impl<'a> fmt::Display for Pipeline<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut tokens: Vec<small::String> = Vec::with_capacity(self.items.len());
-        for item in &self.items {
-            let job = &item.job;
-            let kind = job.kind;
-            let inputs = &item.inputs;
-            let outputs = &item.outputs;
-            tokens.extend(item.job.args.clone().into_iter());
-            for input in inputs {
-                match input {
-                    Input::File(ref file) => {
-                        tokens.push("<".into());
-                        tokens.push(file.clone());
-                    }
-                    Input::HereString(ref string) => {
-                        tokens.push("<<<".into());
-                        tokens.push(string.clone());
-                    }
-                }
+        write!(
+            f,
+            "{}{}",
+            self.items.iter().format(" "),
+            match self.pipe {
+                PipeType::Normal => "",
+                PipeType::Background => " &",
+                PipeType::Disown => " &!",
             }
-            for output in outputs {
-                match output.from {
-                    RedirectFrom::Stdout => {
-                        tokens.push((if output.append { ">>" } else { ">" }).into());
-                    }
-                    RedirectFrom::Stderr => {
-                        tokens.push((if output.append { "^>>" } else { "^>" }).into());
-                    }
-                    RedirectFrom::Both => {
-                        tokens.push((if output.append { "&>>" } else { "&>" }).into());
-                    }
-                }
-                tokens.push(output.file.clone());
-            }
-            match kind {
-                JobKind::Last => (),
-                JobKind::Background => tokens.push("&".into()),
-                JobKind::Disown => tokens.push("&!".into()),
-                JobKind::Pipe(RedirectFrom::Stdout) => tokens.push("|".into()),
-                JobKind::Pipe(RedirectFrom::Stderr) => tokens.push("^|".into()),
-                JobKind::Pipe(RedirectFrom::Both) => tokens.push("&|".into()),
-            }
-        }
-
-        write!(f, "{}", tokens.join(" "))
+        )
     }
 }

@@ -35,7 +35,7 @@ pub(crate) fn readln(binary: &InteractiveBinary) -> Option<String> {
                 };
 
                 let dir_completer =
-                    IonFileCompleter::new(None, dirs, prev.as_ref().map(|x| x.as_str()));
+                    IonFileCompleter::new(None, dirs, prev.as_ref().map(types::Str::as_str));
 
                 if filename {
                     mem::replace(&mut editor.context().completer, Some(Box::new(dir_completer)));
@@ -49,10 +49,10 @@ pub(crate) fn readln(binary: &InteractiveBinary) -> Option<String> {
                             .builtins()
                             .keys()
                             // Add built-in commands to the completer's definitions.
-                            .map(|s| s.to_string())
+                            .map(ToString::to_string)
                             // Add the history list to the completer's definitions.
                             // Map each underlying `liner::Buffer` into a `String`.
-                            .chain(editor.context().history.buffers.iter().map(|x| x.to_string()))
+                            .chain(editor.context().history.buffers.iter().map(ToString::to_string))
                             // Add the aliases to the completer's definitions.
                             .chain(vars.aliases().map(|(key, _)| key.to_string()))
                             // Add the list of available functions to the completer's
@@ -73,7 +73,11 @@ pub(crate) fn readln(binary: &InteractiveBinary) -> Option<String> {
                         .unwrap_or_else(|_| "/bin/".to_string())
                         .split(sys::PATH_SEPARATOR)
                         .map(|s| {
-                            IonFileCompleter::new(Some(s), dirs, prev.as_ref().map(|x| x.as_str()))
+                            IonFileCompleter::new(
+                                Some(s),
+                                dirs,
+                                prev.as_ref().map(types::Str::as_str),
+                            )
                         })
                         .collect();
 

@@ -16,7 +16,7 @@ use std::char;
 
 pub fn is_valid_name(name: &str) -> bool {
     let mut chars = name.chars();
-    chars.next().map_or(false, |b| b.is_alphabetic())
+    chars.next().map_or(false, char::is_alphabetic)
         && chars.all(|b| b.is_alphanumeric() || b == '_')
 }
 
@@ -227,12 +227,13 @@ pub(crate) fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> 
 
 #[cfg(test)]
 mod tests {
-    use self::pipelines::{PipeItem, Pipeline};
+    use self::pipelines::{PipeItem, PipeType, Pipeline};
     use super::*;
     use crate::{
         builtins::BuiltinMap,
         lexers::assignments::{KeyBuf, Primitive},
-        shell::{flow_control::Statement, Job, JobKind},
+        parser::pipelines::RedirectFrom,
+        shell::{flow_control::Statement, Job},
     };
 
     #[test]
@@ -267,12 +268,13 @@ mod tests {
                         vec!["test".into(), "1".into(), "-eq".into(), "2".into()]
                             .into_iter()
                             .collect(),
-                        JobKind::Last,
+                        RedirectFrom::None,
                         None,
                     ),
                     outputs: Vec::new(),
                     inputs:  Vec::new(),
                 }],
+                pipe:  PipeType::Normal,
             })],
             success:    vec![],
             else_if:    vec![],

@@ -15,7 +15,7 @@ use std::process::exit;
 /// the given commands in the child fork.
 pub(crate) fn fork_pipe<'a>(
     shell: &mut Shell<'a>,
-    pipeline: &mut Pipeline<'a>,
+    pipeline: Pipeline<'a>,
     command_name: String,
     state: ProcessState,
 ) -> i32 {

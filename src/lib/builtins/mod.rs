@@ -175,7 +175,7 @@ pub fn builtin_cd(args: &[small::String], shell: &mut Shell) -> i32 {
 
     match shell.directory_stack.cd(args, &shell.variables) {
         Ok(()) => {
-            fork_function(shell, "CD_CHANGE", &["ion"]);
+            let _ = fork_function(shell, "CD_CHANGE", &["ion"]);
             SUCCESS
         }
         Err(why) => {
