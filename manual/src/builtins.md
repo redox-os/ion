@@ -141,7 +141,7 @@ exists [-a ARRAY] [-b BINARY] [-d PATH] [--fn FUNCTION] [[-s] STRING]
 
 Performs tests on files and text
 
-## exec 
+## exec
 
 ```
 exec [-ch] [--help] [command [arguments ...]]
@@ -293,7 +293,7 @@ Read some variables
 ## set
 
 ```
-set [ --help ] [-e | +e] [-x | +x] [-o [vi | emacs]] [- | --] [STRING]...
+set [ --help ] [-e | +e] [- | --] [STRING]...
 ```
 
 Set or unset values of shell options and positional parameters.
@@ -303,11 +303,6 @@ and unset using the '+' character.
 ### OPTIONS
 
 - **e**: Exit immediately if a command exits with a non-zero status.
-
-- **-o**: Specifies that an argument will follow that sets the key map.
-    - The keymap argument may be either **vi** or **emacs**.
-
-- **-x**: Specifies that commands will be printed as they are executed.
 
 - **--**: Following arguments will be set as positional arguments in the shell.
     - If no argument are supplied, arguments will be unset.
@@ -349,32 +344,32 @@ Performs tests on files and text
 
 #### Options
 
-- **-n STRING**:         the length of STRING is nonzero  
-- **STRING**:            equivalent to -n STRING  
-- **-z STRING**:         the length of STRING is zero  
-- **STRING = STRING**:   the strings are equivalent  
-- **STRING != STRING**:  the strings are not equal  
-- **INTEGER -eq INTEGER**: the integers are equal  
-- **INTEGER -ge INTEGER**: the first INTEGER is greater than or equal to the first INTEGER  
-- **INTEGER -gt INTEGER**: the first INTEGER is greater than the first INTEGER  
-- **INTEGER -le INTEGER**: the first INTEGER is less than or equal to the first INTEGER  
-- **INTEGER -lt INTEGER**: the first INTEGER is less than the first INTEGER  
-- **INTEGER -ne INTEGER**: the first INTEGER is not equal to the first INTEGER  
-- **FILE -ef FILE**:     both files have the same device and inode numbers  
-- **FILE -nt FILE**:     the first FILE is newer than the second FILE  
-- **FILE -ot FILE**:     the first file is older than the second FILE  
-- **-b FILE**:          FILE exists and is a block device  
-- **-c FILE**:           FILE exists and is a character device  
-- **-d FILE**:           FILE exists and is a directory  
-- **-e FILE**:           FILE exists  
-- **-f FILE**:           FILE exists and is a regular file  
-- **-h FILE**:           FILE exists and is a symbolic link (same as -L)  
-- **-L FILE**:           FILE exists and is a symbolic link (same as -h)  
-- **-r FILE**:           FILE exists and read permission is granted  
-- **-s FILE**:           FILE exists and has a file size greater than zero  
-- **-S FILE**:           FILE exists and is a socket  
-- **-w FILE**:           FILE exists and write permission is granted  
-- **-x FILE**:           FILE exists and execute (or search) permission is granted  
+- **-n STRING**:         the length of STRING is nonzero
+- **STRING**:            equivalent to -n STRING
+- **-z STRING**:         the length of STRING is zero
+- **STRING = STRING**:   the strings are equivalent
+- **STRING != STRING**:  the strings are not equal
+- **INTEGER -eq INTEGER**: the integers are equal
+- **INTEGER -ge INTEGER**: the first INTEGER is greater than or equal to the first INTEGER
+- **INTEGER -gt INTEGER**: the first INTEGER is greater than the first INTEGER
+- **INTEGER -le INTEGER**: the first INTEGER is less than or equal to the first INTEGER
+- **INTEGER -lt INTEGER**: the first INTEGER is less than the first INTEGER
+- **INTEGER -ne INTEGER**: the first INTEGER is not equal to the first INTEGER
+- **FILE -ef FILE**:     both files have the same device and inode numbers
+- **FILE -nt FILE**:     the first FILE is newer than the second FILE
+- **FILE -ot FILE**:     the first file is older than the second FILE
+- **-b FILE**:          FILE exists and is a block device
+- **-c FILE**:           FILE exists and is a character device
+- **-d FILE**:           FILE exists and is a directory
+- **-e FILE**:           FILE exists
+- **-f FILE**:           FILE exists and is a regular file
+- **-h FILE**:           FILE exists and is a symbolic link (same as -L)
+- **-L FILE**:           FILE exists and is a symbolic link (same as -h)
+- **-r FILE**:           FILE exists and read permission is granted
+- **-s FILE**:           FILE exists and has a file size greater than zero
+- **-S FILE**:           FILE exists and is a socket
+- **-w FILE**:           FILE exists and write permission is granted
+- **-x FILE**:           FILE exists and execute (or search) permission is granted
 
 ## true
 

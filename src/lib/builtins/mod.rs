@@ -1,4 +1,5 @@
 pub mod functions;
+pub mod man_pages;
 pub mod source;
 pub mod variables;
 
@@ -7,7 +8,6 @@ mod exec;
 mod exists;
 mod is;
 mod job_control;
-mod man_pages;
 mod set;
 mod status;
 
@@ -40,7 +40,7 @@ use crate::{
         fork_function::fork_function,
         job_control::{JobControl, ProcessState},
         status::*,
-        Shell, ShellHistory,
+        Shell,
     },
     sys, types,
 };
@@ -55,7 +55,7 @@ const DISOWN_DESC: &str =
     "Disowning a process removes that process from the shell's background process table.";
 
 /// The type for builtin functions. Builtins have direct access to the shell
-pub type BuiltinFunction<'a> = &'a Fn(&[small::String], &mut Shell) -> i32;
+pub type BuiltinFunction<'a> = &'a dyn Fn(&[small::String], &mut Shell) -> i32;
 
 macro_rules! map {
     ($($name:expr => $func:ident: $help:expr),+) => {{
@@ -105,7 +105,6 @@ impl<'a> Default for BuiltinMap<'a> {
             "fg" => builtin_fg : "Resumes and sets a background process as the active process",
             "fn" => builtin_fn : "Print list of functions",
             "help" => builtin_help : HELP_DESC,
-            "history" => builtin_history : "Display a log of all commands previously executed",
             "is" => builtin_is : "Simple alternative to == and !=",
             "isatty" => builtin_isatty : "Returns 0 exit status if the supplied FD is a tty",
             "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
@@ -130,15 +129,26 @@ impl<'a> Default for BuiltinMap<'a> {
 }
 
 impl<'a> BuiltinMap<'a> {
+    #[inline]
     pub fn new() -> Self { BuiltinMap { fcts: HashMap::new(), help: HashMap::new() } }
 
+    #[inline]
     pub fn contains_key(&self, func: &str) -> bool { self.fcts.get(&func).is_some() }
 
+    #[inline]
     pub fn keys(&self) -> impl Iterator<Item = &str> { self.fcts.keys().cloned() }
 
+    #[inline]
     pub fn get_help(&self, func: &str) -> Option<&str> { self.help.get(func).cloned() }
 
+    #[inline]
     pub fn get(&self, func: &str) -> Option<BuiltinFunction<'a>> { self.fcts.get(func).cloned() }
+
+    #[inline]
+    pub fn add(&mut self, name: &'static str, func: BuiltinFunction<'a>, help: &'static str) {
+        self.fcts.insert(name, func);
+        self.help.insert(name, help);
+    }
 }
 
 fn starts_with(args: &[small::String], _: &mut Shell) -> i32 { conditionals::starts_with(args) }
@@ -322,13 +332,6 @@ fn builtin_eval(args: &[small::String], shell: &mut Shell) -> i32 {
     }
 }
 
-fn builtin_history(args: &[small::String], shell: &mut Shell) -> i32 {
-    if check_help(args, MAN_HISTORY) {
-        return SUCCESS;
-    }
-    shell.print_history(args)
-}
-
 fn builtin_source(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_SOURCE) {
         return SUCCESS;
@@ -459,7 +462,7 @@ fn builtin_disown(args: &[small::String], shell: &mut Shell) -> i32 {
 }
 
 fn builtin_help(args: &[small::String], shell: &mut Shell) -> i32 {
-    let builtins = &shell.builtins;
+    let builtins = shell.builtins();
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
     if let Some(command) = args.get(1) {

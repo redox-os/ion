@@ -48,7 +48,7 @@ pub enum Capture {
 /// Utilized by the shell for performing forks and capturing streams.
 ///
 /// Using this structure directly is equivalent to using `Shell`'s fork method.
-pub struct Fork<'a, 'b> {
+pub struct Fork<'a, 'b: 'a> {
     shell:   &'a Shell<'b>,
     capture: Capture,
 }
@@ -65,10 +65,13 @@ pub struct IonResult {
     pub status: u8,
 }
 
-impl<'a, 'b: 'a> Fork<'a, 'b> {
+impl<'a, 'b> Fork<'a, 'b> {
     /// Executes a closure within the child of the fork, and returning an `IonResult` in a
     /// non-blocking fashion.
-    pub fn exec<F: FnMut(&mut Shell<'b>)>(&self, mut child_func: F) -> Result<IonResult, IonError> {
+    pub fn exec<F: FnMut(&mut Shell<'b>) + 'a>(
+        self,
+        mut child_func: F,
+    ) -> Result<IonResult, IonError> {
         sys::signals::block();
 
         // If we are to capture stdout, create a pipe for capturing outputs.
@@ -129,7 +132,6 @@ impl<'a, 'b: 'a> Fork<'a, 'b> {
                 // Obtain ownership of the child's copy of the shell, and then configure it.
                 let mut shell: Shell = unsafe { (self.shell as *const Shell).read() };
                 shell.set("PID", sys::getpid().unwrap_or(0).to_string());
-                let _ = shell.context.take();
 
                 // Execute the given closure within the child's shell.
                 child_func(&mut shell);

@@ -6,10 +6,7 @@ use super::{
 use crate::{
     lexers::assignments::{Key, Operator, Primitive},
     parser::{assignments::*, statement::parse::is_valid_name},
-    shell::{
-        history::ShellHistory,
-        variables::{EuclDiv, Modifications, OpError, Pow, Value},
-    },
+    shell::variables::{EuclDiv, Modifications, OpError, Pow, Value},
     types,
 };
 use std::{
@@ -141,15 +138,6 @@ impl<'b> VariableStore<'b> for Shell<'b> {
 
             let rhs = value_check(self, &expression, &key.kind)
                 .map_err(|why| format!("{}: {}", key.name, why))?;
-
-            // When we changed the HISTORY_IGNORE variable, update the
-            // ignore patterns. This happens first because `set_array`
-            // consumes 'values'
-            if key.name == "HISTORY_IGNORE" {
-                if let Value::Array(array) = &rhs {
-                    self.update_ignore_patterns(array);
-                }
-            }
 
             match (&rhs, &key.kind) {
                 (Value::HashMap(_), Primitive::Indexed(..)) => {

@@ -2,7 +2,6 @@ use crate::{
     shell::{flags::*, Shell},
     types,
 };
-use liner::KeyBindings;
 use small;
 use std::iter;
 
@@ -32,28 +31,6 @@ pub(crate) fn set(args: &[small::String], shell: &mut Shell) -> i32 {
             for flag in arg.bytes().skip(1) {
                 match flag {
                     b'e' => shell.flags |= ERR_EXIT,
-                    b'o' => match args_iter.next().map(|s| s as &str) {
-                        Some("vi") => {
-                            if let Some(context) = shell.context.as_mut() {
-                                context.key_bindings = KeyBindings::Vi;
-                            }
-                        }
-                        Some("emacs") => {
-                            if let Some(context) = shell.context.as_mut() {
-                                context.key_bindings = KeyBindings::Emacs;
-                            }
-                        }
-                        Some("huponexit") => shell.flags |= HUPONEXIT,
-                        Some(_) => {
-                            eprintln!("ion: set: invalid option");
-                            return 0;
-                        }
-                        None => {
-                            eprintln!("ion: set: no option given");
-                            return 0;
-                        }
-                    },
-                    b'x' => shell.flags |= PRINT_COMMS,
                     _ => return 0,
                 }
             }

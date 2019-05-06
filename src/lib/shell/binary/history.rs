@@ -1,12 +1,8 @@
-use crate::shell::{status::*, Shell};
+use super::InteractiveBinary;
+use crate::{shell::status::*, types};
 
-use crate::types;
 use regex::Regex;
-use small;
-use std::{
-    io::{self, Write},
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Default)]
 pub(crate) struct IgnoreSetting {
@@ -27,27 +23,24 @@ pub(crate) struct IgnoreSetting {
 
 /// Contains all history-related functionality for the `Shell`.
 pub(crate) trait ShellHistory {
-    /// Prints the commands contained within the history buffers to standard
-    /// output.
-    fn print_history(&self, _arguments: &[small::String]) -> i32;
-
     /// Saves a command in the history, depending on @HISTORY_IGNORE. Should be called
     /// immediately after `on_command()`
-    fn save_command_in_history(&mut self, command: &str);
+    fn save_command_in_history(&self, command: &str);
 
     /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
     /// is changed.
-    fn update_ignore_patterns(&mut self, patterns: &types::Array);
+    fn ignore_patterns(&self) -> IgnoreSetting;
 }
 
 trait ShellHistoryPrivate {
     /// Returns true if the given command with the given exit status should be saved in the
     /// history
-    fn should_save_command(&mut self, command: &str) -> bool;
+    fn should_save_command(&self, command: &str) -> bool;
 }
 
-impl<'a> ShellHistory for Shell<'a> {
-    fn update_ignore_patterns(&mut self, patterns: &types::Array) {
+impl<'a> ShellHistory for InteractiveBinary<'a> {
+    fn ignore_patterns(&self) -> IgnoreSetting {
+        let patterns: types::Array = self.shell.borrow().variables.get("HISTORY_IGNORE").unwrap();
         let mut settings = IgnoreSetting::default();
         let mut regexes = Vec::new();
         // for convenience and to avoid typos
@@ -72,50 +65,35 @@ impl<'a> ShellHistory for Shell<'a> {
         }
         settings.regexes = if !regexes.is_empty() { Some(regexes) } else { None };
 
-        self.ignore_setting = settings;
+        settings
     }
 
-    fn save_command_in_history(&mut self, command: &str) {
+    fn save_command_in_history(&self, command: &str) {
         if self.should_save_command(command) {
-            if self.variables.get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
+            if self.shell.borrow().variables.get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
                 // Get current time stamp
                 let since_unix_epoch =
                     SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
                 let cur_time_sys = ["#", &since_unix_epoch.to_owned().to_string()].concat();
 
                 // Push current time to history
-                if let Err(err) = self.context.as_mut().unwrap().history.push(cur_time_sys.into()) {
+                if let Err(err) = self.context.borrow_mut().history.push(cur_time_sys.into()) {
                     eprintln!("ion: {}", err)
                 }
             }
 
             // Push command itself to history
-            if let Err(err) = self.context.as_mut().unwrap().history.push(command.into()) {
+            if let Err(err) = self.context.borrow_mut().history.push(command.into()) {
                 eprintln!("ion: {}", err);
             }
         }
     }
-
-    fn print_history(&self, _arguments: &[small::String]) -> i32 {
-        if let Some(context) = self.context.as_ref() {
-            let mut buffer = Vec::with_capacity(8 * 1024);
-            for command in &context.history {
-                let _ = writeln!(buffer, "{}", command);
-            }
-            let stdout = io::stdout();
-            let mut stdout = stdout.lock();
-            let _ = stdout.write_all(&buffer);
-            SUCCESS
-        } else {
-            FAILURE
-        }
-    }
 }
 
-impl<'a> ShellHistoryPrivate for Shell<'a> {
-    fn should_save_command(&mut self, command: &str) -> bool {
+impl<'a> ShellHistoryPrivate for InteractiveBinary<'a> {
+    fn should_save_command(&self, command: &str) -> bool {
         // just for convenience and to make the code look a bit cleaner
-        let ignore = &self.ignore_setting;
+        let ignore = self.ignore_patterns();
 
         // without the second check the command which sets the local variable would
         // also be ignored. However, this behavior might not be wanted.
@@ -129,20 +107,15 @@ impl<'a> ShellHistoryPrivate for Shell<'a> {
             return false;
         }
 
-        if ignore.no_such_command && self.previous_status == NO_SUCH_COMMAND {
+        if ignore.no_such_command && self.shell.borrow().previous_status == NO_SUCH_COMMAND {
             return false;
         }
 
         if ignore.duplicates {
-            if let Some(ref mut context) = self.context {
-                context.history.remove_duplicates(command);
-                return true;
-            } else {
-                return false;
-            }
+            self.context.borrow_mut().history.remove_duplicates(command);
         }
 
-        if let Some(ref regexes) = self.ignore_setting.regexes.as_ref() {
+        if let Some(ref regexes) = ignore.regexes {
             // ignore command when regex is matched but only if it does not contain
             // "HISTORY_IGNORE", otherwise we would also ignore the command which
             // sets the variable, which could be annoying.
