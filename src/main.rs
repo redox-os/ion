@@ -1,10 +1,6 @@
 extern crate ion_sys as sys;
 
-use ion_shell::{
-    flags::{NO_EXEC, PRINT_COMMS},
-    shell::variables::Value,
-    InteractiveBinary, JobControl, ShellBuilder, MAN_ION,
-};
+use ion_shell::{shell::variables::Value, InteractiveBinary, JobControl, ShellBuilder, MAN_ION};
 use liner::KeyBindings;
 use std::{
     alloc::System,
@@ -47,9 +43,9 @@ fn main() {
                     return;
                 }
             },
-            "-x" => shell.flags |= PRINT_COMMS,
+            "-x" => shell.opts_mut().print_comms = true,
             "-n" | "--no-execute" => {
-                shell.flags |= NO_EXEC;
+                shell.opts_mut().no_exec = true;
             }
             "-c" => command = args.next(),
             "-v" | "--version" => {

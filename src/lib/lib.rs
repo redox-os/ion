@@ -18,8 +18,8 @@ pub mod shell;
 
 pub(crate) use self::memory::IonPool;
 pub use crate::shell::{
-    binary::MAN_ION, flags, pipe_exec::job_control::JobControl, status, Capture, Fork,
-    InteractiveBinary, IonError, IonResult, Shell, ShellBuilder,
+    binary::MAN_ION, pipe_exec::job_control::JobControl, status, Capture, Fork, InteractiveBinary,
+    IonError, IonResult, Shell, ShellBuilder,
 };
 
 pub fn version() -> &'static str { include!(concat!(env!("OUT_DIR"), "/version_string")) }

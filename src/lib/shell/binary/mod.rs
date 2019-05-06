@@ -5,12 +5,7 @@ mod prompt;
 mod readln;
 
 use self::{history::ShellHistory, prompt::prompt, readln::readln};
-use super::{
-    flags::{HUPONEXIT, UNTERMINATED},
-    pipe_exec::job_control::JobControl,
-    status::SUCCESS,
-    FlowLogic, Shell,
-};
+use super::{pipe_exec::job_control::JobControl, status::SUCCESS, FlowLogic, Shell};
 use crate::{
     builtins::man_pages,
     parser::{shell_expand::Expander, Terminator},
@@ -82,7 +77,7 @@ impl<'a> InteractiveBinary<'a> {
         shell.set_prep_for_exit(Some(Box::new(move |shell| {
             // context will be sent a signal to commit all changes to the history file,
             // and waiting for the history thread in the background to finish.
-            if shell.flags & HUPONEXIT != 0 {
+            if shell.opts().huponexit {
                 shell.resume_stopped();
                 shell.background_send(sys::SIGHUP);
             }
@@ -137,7 +132,7 @@ impl<'a> InteractiveBinary<'a> {
                 .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
             match Terminator::new(&mut lines).terminate() {
                 Some(command) => {
-                    this.shell.borrow_mut().flags &= !UNTERMINATED;
+                    this.shell.borrow_mut().unterminated = false;
                     let cmd: &str = &designators::expand_designators(
                         &this.context.borrow(),
                         command.trim_end(),
@@ -146,7 +141,7 @@ impl<'a> InteractiveBinary<'a> {
                     this.save_command(&cmd);
                 }
                 None => {
-                    this.shell.borrow_mut().flags &= !UNTERMINATED;
+                    this.shell.borrow_mut().unterminated = true;
                 }
             }
         }
