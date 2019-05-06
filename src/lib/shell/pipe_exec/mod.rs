@@ -18,7 +18,6 @@ use self::{
     streams::{duplicate_streams, redirect_streams},
 };
 use super::{
-    flags::*,
     flow_control::{Function, FunctionError},
     fork_function::command_not_found,
     job::{Job, JobVariant, RefinedJob, TeeItem},
@@ -382,13 +381,13 @@ impl<'b> Shell<'b> {
     /// of that job over time.
     pub fn execute_pipeline(&mut self, pipeline: Pipeline<'b>) -> i32 {
         // Don't execute commands when the `-n` flag is passed.
-        if self.flags & NO_EXEC != 0 {
+        if self.opts.no_exec {
             return SUCCESS;
         }
 
         // A string representing the command is stored here.
         let command = pipeline.to_string();
-        if self.flags & PRINT_COMMS != 0 {
+        if self.opts.print_comms {
             eprintln!("> {}", command);
         }
 
@@ -399,11 +398,11 @@ impl<'b> Shell<'b> {
             PipeType::Normal => {
                 // While active, the SIGTTOU signal will be ignored.
                 let _sig_ignore = SignalHandler::new();
-                let foreground = !self.is_background_shell;
+                let foreground = !self.opts.is_background_shell;
                 // Execute each command in the pipeline, giving each command the foreground.
                 let exit_status = pipe(self, pipeline, foreground);
                 // Set the shell as the foreground process again to regain the TTY.
-                if foreground && !self.is_library {
+                if foreground {
                     let _ = sys::tcsetpgrp(0, process::id());
                 }
                 exit_status
@@ -478,7 +477,7 @@ pub(crate) fn pipe<'a>(shell: &mut Shell<'a>, pipeline: Pipeline<'a>, foreground
                 }
 
                 spawn_proc(shell, parent, kind, true, &mut last_pid, &mut current_pid, pgid);
-                if set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library {
+                if set_process_group(&mut pgid, current_pid) && foreground {
                     let _ = sys::tcsetpgrp(0, pgid);
                 }
                 resume_prior_process(&mut last_pid, current_pid);
@@ -493,7 +492,7 @@ pub(crate) fn pipe<'a>(shell: &mut Shell<'a>, pipeline: Pipeline<'a>, foreground
             }
 
             spawn_proc(shell, parent, kind, false, &mut last_pid, &mut current_pid, pgid);
-            if set_process_group(&mut pgid, current_pid) && foreground && !shell.is_library {
+            if set_process_group(&mut pgid, current_pid) && foreground {
                 let _ = sys::tcsetpgrp(0, pgid);
             }
             resume_prior_process(&mut last_pid, current_pid);

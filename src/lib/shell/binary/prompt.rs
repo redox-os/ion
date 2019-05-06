@@ -1,13 +1,12 @@
 use crate::{
     parser::shell_expand::expand_string,
-    shell::{flags::UNTERMINATED, variables::Value, Capture, Shell},
+    shell::{variables::Value, Capture, Shell},
     sys,
 };
 use std::{io::Read, process};
 
 pub(crate) fn prompt(shell: &Shell) -> String {
-    let blocks =
-        shell.flow_control.block.len() + if shell.flags & UNTERMINATED != 0 { 1 } else { 0 };
+    let blocks = shell.flow_control.block.len() + if shell.unterminated { 1 } else { 0 };
 
     if blocks == 0 {
         prompt_fn(&shell)

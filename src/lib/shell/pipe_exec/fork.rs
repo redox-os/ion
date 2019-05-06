@@ -21,7 +21,7 @@ pub(crate) fn fork_pipe<'a>(
 ) -> i32 {
     match unsafe { sys::fork() } {
         Ok(0) => {
-            shell.is_background_shell = true;
+            shell.opts_mut().is_background_shell = true;
             let _ = sys::reset_signal(sys::SIGINT);
             let _ = sys::reset_signal(sys::SIGHUP);
             let _ = sys::reset_signal(sys::SIGTERM);

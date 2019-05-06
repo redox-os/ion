@@ -1,5 +1,4 @@
 use super::{
-    flags::*,
     flow_control::{insert_statement, Case, ElseIf, Function, Statement},
     job_control::JobControl,
     signals,
@@ -217,7 +216,7 @@ impl<'a> FlowLogic<'a> for Shell<'a> {
                     if !pipeline.items.is_empty() {
                         self.run_pipeline(pipeline);
                     }
-                    if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
+                    if self.opts.err_exit && self.previous_status != SUCCESS {
                         let status = self.previous_status;
                         self.exit(status);
                     }

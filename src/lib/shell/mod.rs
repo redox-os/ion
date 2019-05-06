@@ -14,19 +14,6 @@ pub(crate) mod signals;
 pub mod status;
 pub mod variables;
 
-pub mod flags {
-    /// Exit from the shell on the first error.
-    pub const ERR_EXIT: u8 = 1;
-    /// Print commands that are to be executed.
-    pub const PRINT_COMMS: u8 = 2;
-    /// Do not execute any commands given to the shell.
-    pub const NO_EXEC: u8 = 4;
-    /// Hangup on exiting the shell.
-    pub const HUPONEXIT: u8 = 8;
-    /// Used by an interactive session to know when the input is not terminated.
-    pub const UNTERMINATED: u8 = 16;
-}
-
 pub use self::{
     binary::InteractiveBinary,
     fork::{Capture, Fork, IonResult},
@@ -40,7 +27,6 @@ pub(crate) use self::{
 use self::{
     directory_stack::DirectoryStack,
     escape::tilde,
-    flags::*,
     flow_control::{FlowControl, Function, FunctionError},
     foreground::ForegroundSignals,
     job_control::BackgroundProcess,
@@ -80,6 +66,20 @@ pub enum IonError {
     UnclosedBlock { block: String },
 }
 
+#[derive(Debug, Clone, Hash)]
+pub struct ShellOptions {
+    /// Exit from the shell on the first error.
+    pub err_exit: bool,
+    /// Print commands that are to be executed.
+    pub print_comms: bool,
+    /// Do not execute any commands given to the shell.
+    pub no_exec: bool,
+    /// Hangup on exiting the shell.
+    pub huponexit: bool,
+    /// If set, denotes that this shell is running as a background job.
+    pub is_background_shell: bool,
+}
+
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
 /// the entirety of the
 /// program. It is initialized at the beginning of the program, and lives until the end of the
@@ -99,18 +99,16 @@ pub struct Shell<'a> {
     pub previous_status: i32,
     /// The job ID of the previous command sent to the background.
     pub(crate) previous_job: u32,
-    /// Contains all the boolean flags that control shell behavior.
-    pub flags: u8,
+    /// Contains all the options relative to the shell
+    opts: ShellOptions,
     /// Contains information on all of the active background processes that are being managed
     /// by the shell.
     pub(crate) background: Arc<Mutex<Vec<BackgroundProcess>>>,
-    /// If set, denotes that this shell is running as a background job.
-    pub(crate) is_background_shell: bool,
+    /// Used by an interactive session to know when the input is not terminated.
+    pub unterminated: bool,
     /// Set when a signal is received, this will tell the flow control logic to
     /// abort.
     pub(crate) break_flow: bool,
-    // Useful for disabling the execution of the `tcsetpgrp` call.
-    pub(crate) is_library: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,
@@ -280,10 +278,10 @@ impl<'a> Shell<'a> {
             pipeline.expand(self);
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
-                if self.flags & PRINT_COMMS != 0 {
+                if self.opts.print_comms {
                     eprintln!("> {}", pipeline.to_string());
                 }
-                if self.flags & NO_EXEC != 0 {
+                if self.opts.no_exec {
                     Some(SUCCESS)
                 } else {
                     Some(main(&pipeline.items[0].job.args, self))
@@ -388,28 +386,41 @@ impl<'a> Shell<'a> {
     #[inline]
     pub fn builtins_mut(&mut self) -> &mut BuiltinMap<'a> { &mut self.builtins }
 
+    /// Access to the shell options
+    #[inline]
+    pub fn opts(&self) -> &ShellOptions { &self.opts }
+
+    /// Mutable access to the shell options
+    #[inline]
+    pub fn opts_mut(&mut self) -> &mut ShellOptions { &mut self.opts }
+
     /// Cleanly exit ion
     pub fn exit(&mut self, status: i32) -> ! {
         self.prep_for_exit();
         process::exit(status);
     }
 
-    pub fn new(is_library: bool) -> Self {
+    pub fn new(is_background_shell: bool) -> Self {
         Shell {
-            builtins: BuiltinMap::default(),
-            variables: Variables::default(),
-            flow_control: FlowControl::default(),
-            directory_stack: DirectoryStack::new(),
-            previous_job: !0,
-            previous_status: 0,
-            flags: 0,
-            background: Arc::new(Mutex::new(Vec::new())),
-            is_background_shell: false,
-            is_library,
-            break_flow: false,
+            builtins:           BuiltinMap::default(),
+            variables:          Variables::default(),
+            flow_control:       FlowControl::default(),
+            directory_stack:    DirectoryStack::new(),
+            previous_job:       !0,
+            previous_status:    0,
+            opts:               ShellOptions {
+                err_exit: false,
+                print_comms: false,
+                no_exec: false,
+                huponexit: false,
+                is_background_shell,
+            },
+            background:         Arc::new(Mutex::new(Vec::new())),
+            break_flow:         false,
             foreground_signals: Arc::new(ForegroundSignals::new()),
-            on_command: None,
-            prep_for_exit: None,
+            on_command:         None,
+            prep_for_exit:      None,
+            unterminated:       false,
         }
     }
 

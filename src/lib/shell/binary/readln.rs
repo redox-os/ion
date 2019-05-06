@@ -1,7 +1,4 @@
-use super::{
-    super::{completer::*, flags},
-    InteractiveBinary,
-};
+use super::{super::completer::*, InteractiveBinary};
 use crate::{sys, types};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use std::{env, io::ErrorKind, mem, path::PathBuf};
@@ -98,7 +95,7 @@ pub(crate) fn readln(binary: &InteractiveBinary) -> Option<String> {
     match line {
         Ok(line) => {
             if line.bytes().next() != Some(b'#') && line.bytes().any(|c| !c.is_ascii_whitespace()) {
-                binary.shell.borrow_mut().flags |= flags::UNTERMINATED;
+                binary.shell.borrow_mut().unterminated = true;
             }
             Some(line)
         }

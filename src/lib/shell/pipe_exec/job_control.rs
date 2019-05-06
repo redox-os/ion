@@ -168,23 +168,21 @@ impl<'a> JobControl for Shell<'a> {
                 Ok(pid) if wifsignaled(status) => {
                     let signal = wtermsig(status);
                     if signal == SIGPIPE {
-                        continue;
                     } else if wcoredump(status) {
                         eprintln!("ion: process ({}) had a core dump", pid);
-                        continue;
-                    }
-
-                    eprintln!("ion: process ({}) ended by signal {}", pid, signal);
-                    match signal {
-                        SIGINT => {
-                            let _ = kill(pid as u32, signal as i32);
-                            self.break_flow = true;
+                    } else {
+                        eprintln!("ion: process ({}) ended by signal {}", pid, signal);
+                        match signal {
+                            SIGINT => {
+                                let _ = kill(pid as u32, signal as i32);
+                                self.break_flow = true;
+                            }
+                            _ => {
+                                self.handle_signal(signal);
+                            }
                         }
-                        _ => {
-                            self.handle_signal(signal);
-                        }
+                        signaled = 128 + signal as i32;
                     }
-                    signaled = 128 + signal as i32;
                 }
                 Ok(pid) if wifstopped(status) => {
                     self.send_to_background(

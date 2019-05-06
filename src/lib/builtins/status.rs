@@ -36,15 +36,15 @@ pub(crate) fn status(args: &[small::String], shell: &mut Shell) -> Result<(), St
                 return Err("".to_string());
             }
 
-            if interactive && shell.is_background_shell || shell.is_library {
+            if interactive && shell.opts().is_background_shell {
                 return Err("".to_string());
             }
 
             if filename {
                 // TODO: This will not work if ion is renamed.
+
                 let last_sa = &env::args().last().unwrap();
-                let last_3: String = last_sa[last_sa.len() - 3..last_sa.len()].to_string();
-                if last_3 == "ion" {
+                if last_sa.ends_with("ion") {
                     println!("stdio");
                 } else {
                     println!("{}", last_sa);
@@ -54,6 +54,7 @@ pub(crate) fn status(args: &[small::String], shell: &mut Shell) -> Result<(), St
             if help {
                 println!("{}", MAN_STATUS);
             }
+
             Ok(())
         }
         1 => {

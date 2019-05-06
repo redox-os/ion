@@ -148,43 +148,46 @@ pub(crate) fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
             match job.state {
                 ProcessState::Running => {
                     eprintln!("ion: bg: job {} is already running", njob);
-                    return true;
+                    false
                 }
-                ProcessState::Stopped => signals::resume(job.pid),
+                ProcessState::Stopped => {
+                    signals::resume(job.pid);
+                    true
+                }
                 ProcessState::Empty => {
                     eprintln!("ion: bg: job {} does not exist", njob);
-                    return true;
+                    false
                 }
             }
         } else {
             eprintln!("ion: bg: job {} does not exist", njob);
-            return true;
+            false
         }
-        false
     }
 
-    let mut error = false;
     if args.is_empty() {
         if shell.previous_job == !0 {
             eprintln!("ion: bg: no jobs are running in the background");
-            error = true;
+            FAILURE
         } else {
             let previous_job = shell.previous_job;
-            error = bg_job(shell, previous_job);
+            if bg_job(shell, previous_job) {
+                SUCCESS
+            } else {
+                FAILURE
+            }
         }
     } else {
         for arg in args {
-            error = if let Ok(njob) = arg.parse::<u32>() {
-                bg_job(shell, njob)
+            if let Ok(njob) = arg.parse::<u32>() {
+                if !bg_job(shell, njob) {
+                    return FAILURE;
+                }
             } else {
                 eprintln!("ion: bg: {} is not a valid job number", arg);
-                true
+                return FAILURE;
             };
         }
-    }
-    if error {
-        FAILURE
-    } else {
         SUCCESS
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    shell::{flags::*, variables::Value, Shell},
+    shell::{variables::Value, Shell},
     types,
 };
 use small;
@@ -30,17 +30,17 @@ pub(crate) fn set(args: &[small::String], shell: &mut Shell) -> i32 {
             }
             for flag in arg.bytes().skip(1) {
                 match flag {
-                    b'e' => shell.flags |= ERR_EXIT,
+                    b'e' => shell.opts_mut().err_exit = true,
                     _ => return 0,
                 }
             }
         } else if arg.starts_with('+') {
             for flag in arg.bytes().skip(1) {
                 match flag {
-                    b'e' => shell.flags &= 255 ^ ERR_EXIT,
-                    b'x' => shell.flags &= 255 ^ PRINT_COMMS,
+                    b'e' => shell.opts_mut().err_exit = false,
+                    b'x' => shell.opts_mut().print_comms = false,
                     b'o' => match args_iter.next().map(|s| s as &str) {
-                        Some("huponexit") => shell.flags &= 255 ^ HUPONEXIT,
+                        Some("huponexit") => shell.opts_mut().huponexit = false,
                         Some(_) => {
                             eprintln!("ion: set: invalid option");
                             return 0;
