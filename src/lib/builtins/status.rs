@@ -1,19 +1,13 @@
 use crate::{builtins::man_pages::MAN_STATUS, shell::Shell};
 use small;
-
 use std::env;
 
-bitflags! {
-    struct Flags : u8 {
-        const HELP = 1;
-        const LOGIN_SHELL = 2;
-        const INTERACTIVE = 4;
-        const FILENAME = 8;
-    }
-}
-
 pub(crate) fn status(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
-    let mut flags = Flags::empty();
+    let mut help = false;
+    let mut login_shell = false;
+    let mut interactive = false;
+    let mut filename = false;
+
     let shell_args: Vec<_> = env::args().collect();
 
     let is_login = shell_args[0].chars().nth(0).unwrap() == '-';
@@ -30,34 +24,33 @@ pub(crate) fn status(args: &[small::String], shell: &mut Shell) -> Result<(), St
     } else {
         for arg in args {
             match &**arg {
-                "--help" => flags |= Flags::HELP,
-                "--is-login" => flags |= Flags::LOGIN_SHELL,
-                "--is-interactive" => flags |= Flags::INTERACTIVE,
-                "--current-filename" => flags |= Flags::FILENAME,
+                "--help" => help = true,
+                "--is-login" => login_shell = true,
+                "--is-interactive" => interactive = true,
+                "--current-filename" => filename = true,
                 _ => {
                     if arg.starts_with('-') {
                         match arg.chars().nth(1).unwrap() {
-                            'h' => flags |= Flags::HELP,
-                            'l' => flags |= Flags::LOGIN_SHELL,
-                            'i' => flags |= Flags::INTERACTIVE,
-                            'f' => flags |= Flags::FILENAME,
+                            'h' => help = true,
+                            'l' => login_shell = true,
+                            'i' => interactive = true,
+                            'f' => filename = true,
                             _ => (),
                         }
                     }
                 }
             }
         }
-        let err = "".to_string();
 
-        if flags.contains(Flags::LOGIN_SHELL) && !is_login {
-            return Err(err);
+        if login_shell && !is_login {
+            return Err("".to_string());
         }
 
-        if flags.contains(Flags::INTERACTIVE) && shell.is_background_shell || shell.is_library {
-            return Err(err);
+        if interactive && shell.is_background_shell || shell.is_library {
+            return Err("".to_string());
         }
 
-        if flags.contains(Flags::FILENAME) {
+        if filename {
             // TODO: This will not work if ion is renamed.
             let sa_len = shell_args.len() - 1;
             let last_sa = &shell_args[sa_len];
@@ -70,7 +63,7 @@ pub(crate) fn status(args: &[small::String], shell: &mut Shell) -> Result<(), St
             }
         }
 
-        if flags.contains(Flags::HELP) {
+        if help {
             println!("{}", MAN_STATUS);
         }
     }

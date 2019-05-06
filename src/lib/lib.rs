@@ -1,8 +1,6 @@
 #![allow(unknown_lints)]
 
 #[macro_use]
-extern crate bitflags;
-#[macro_use]
 extern crate err_derive;
 extern crate ion_braces as braces;
 extern crate ion_lexers as lexers;
