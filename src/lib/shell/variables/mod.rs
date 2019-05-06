@@ -15,6 +15,7 @@ use crate::{
     types::{self, Array},
 };
 use hashbrown::HashMap;
+use itertools::Itertools;
 use liner::Context;
 use std::{
     env, fmt,
@@ -29,7 +30,7 @@ use xdg::BaseDirectories;
 pub enum Value<'a> {
     Str(types::Str),
     Alias(types::Alias),
-    Array(types::Array),
+    Array(types::Array<'a>),
     HashMap(types::HashMap<'a>),
     BTreeMap(types::BTreeMap<'a>),
     Function(Function<'a>),
@@ -78,7 +79,7 @@ macro_rules! type_from_value {
 
 type_from_value!(types::Str : Str else with_capacity(0));
 type_from_value!(types::Alias : Alias else empty());
-type_from_value!(types::Array : Array else with_capacity(0));
+type_from_value!(types::Array<'a> : Array else with_capacity(0));
 type_from_value!(types::HashMap<'a> : HashMap else with_capacity_and_hasher(0, Default::default()));
 type_from_value!(types::BTreeMap<'a> : BTreeMap else new());
 type_from_value!(Function<'a> : Function else
@@ -105,7 +106,7 @@ macro_rules! eq {
 
 eq!(types::Str: Str);
 eq!(types::Alias: Alias);
-eq!(types::Array: Array);
+eq!(types::Array<'a>: Array);
 eq!(types::HashMap<'a>: HashMap);
 eq!(types::BTreeMap<'a>: BTreeMap);
 eq!(Function<'a>: Function);
@@ -128,7 +129,7 @@ macro_rules! value_from_type {
 value_from_type!(string: types::Str => Str(string));
 value_from_type!(string: String => Str(string.into()));
 value_from_type!(alias: types::Alias => Alias(alias));
-value_from_type!(array: types::Array => Array(array));
+value_from_type!(array: types::Array<'a> => Array(array));
 value_from_type!(hmap: types::HashMap<'a> => HashMap(hmap));
 value_from_type!(bmap: types::BTreeMap<'a> => BTreeMap(bmap));
 value_from_type!(function: Function<'a> => Function(function));
@@ -138,23 +139,9 @@ impl<'a> fmt::Display for Value<'a> {
         match *self {
             Value::Str(ref str_) => write!(f, "{}", str_),
             Value::Alias(ref alias) => write!(f, "{}", **alias),
-            Value::Array(ref array) => write!(f, "{}", array.join(" ")),
-            Value::HashMap(ref map) => {
-                let format = map
-                    .iter()
-                    .map(|(_, var_type)| format!("{}", var_type))
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                write!(f, "{}", format)
-            }
-            Value::BTreeMap(ref map) => {
-                let format = map
-                    .iter()
-                    .map(|(_, var_type)| format!("{}", var_type))
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                write!(f, "{}", format)
-            }
+            Value::Array(ref array) => write!(f, "{}", array.iter().format(" ")),
+            Value::HashMap(ref map) => write!(f, "{}", map.values().format(" ")),
+            Value::BTreeMap(ref map) => write!(f, "{}", map.values().format(" ")),
             _ => write!(f, ""),
         }
     }
@@ -413,7 +400,7 @@ impl<'a> Variables<'a> {
             Upper(UpperAction),
             Alias(&'a mut types::Alias),
             Str(&'a mut types::Str),
-            Array(&'a mut types::Array),
+            Array(&'a mut types::Array<'b>),
             Function(&'a mut Function<'b>),
             HashMap(&'a mut types::HashMap<'b>),
         }
@@ -445,7 +432,7 @@ impl<'a> Variables<'a> {
 
         handle_type!(string_action, types::Str, Str);
         handle_type!(alias_action, types::Alias, Alias);
-        handle_type!(array_action, types::Array, Array);
+        handle_type!(array_action, types::Array<'a>, Array);
         handle_type!(hashmap_action, types::HashMap<'a>, HashMap);
         handle_type!(function_action, Function<'a>, Function);
 
@@ -671,7 +658,7 @@ macro_rules! get_var {
 }
 
 get_var!(types::Alias, Alias(alias) => (*alias));
-get_var!(types::Array, Array(array) => array);
+get_var!(types::Array<'a>, Array(array) => array);
 get_var!(types::HashMap<'a>, HashMap(hmap) => hmap);
 get_var!(types::BTreeMap<'a>, BTreeMap(bmap) => bmap);
 get_var!(Function<'a>, Function(func) => func);

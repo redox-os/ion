@@ -1,5 +1,4 @@
 use super::{super::types, Value};
-use itertools::Itertools;
 use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -79,16 +78,7 @@ macro_rules! math {
                     .map(Value::from),
                     Value::Array(lhs) => lhs
                         .iter()
-                        // When array will contain values insted of strings, clone will no longer be
-                        // needed
-                        .map(|el| Value::Str(el.clone()).$fn(rhs))
-                        .map_results(|result| {
-                            if let Value::Str(res) = result {
-                                res
-                            } else {
-                                unreachable!();
-                            }
-                        })
+                        .map(|el| el.$fn(rhs))
                         .collect::<Result<types::Array, _>>()
                         .map(Value::Array),
                     _ => Err(OpError::TypeError),
@@ -107,16 +97,7 @@ macro_rules! math {
                         .map(Value::from),
                     Value::Array(lhs) => lhs
                         .iter()
-                        // When array will contain values insted of strings, clone will no longer be
-                        // needed
-                        .map(|el| Value::Str(el.clone()).$fn(rhs))
-                        .map_results(|result| {
-                            if let Value::Str(res) = result {
-                                res
-                            } else {
-                                unreachable!();
-                            }
-                        })
+                        .map(|el| el.$fn(rhs))
                         .collect::<Result<types::Array, _>>()
                         .map(Value::Array),
                     _ => Err(OpError::TypeError),

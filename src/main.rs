@@ -2,15 +2,14 @@ extern crate ion_sys as sys;
 
 use ion_shell::{
     flags::{NO_EXEC, PRINT_COMMS},
+    shell::variables::Value,
     InteractiveBinary, JobControl, ShellBuilder, MAN_ION,
 };
 use liner::KeyBindings;
-use smallvec::SmallVec;
 use std::{
     alloc::System,
     env,
     io::{stdin, BufReader},
-    iter::FromIterator,
 };
 
 #[global_allocator]
@@ -70,13 +69,14 @@ fn main() {
 
     shell.variables.set(
         "args",
-        SmallVec::from_iter(
+        Value::Array(
             script_path
                 .clone()
                 .or_else(|| env::args().next())
                 .into_iter()
                 .chain(args)
-                .map(Into::into),
+                .map(|arg| Value::Str(arg.into()))
+                .collect(),
         ),
     );
 

@@ -440,10 +440,8 @@ impl<'a> Shell<'a> {
                                     format!("index variable is not a numeric value: `{}`", index)
                                 })?;
 
-                                if let (Some(var), Value::Str(val)) =
-                                    (array.get_mut(index_num), value)
-                                {
-                                    *var = val;
+                                if let Some(var) = array.get_mut(index_num) {
+                                    *var = value;
                                 }
                                 Ok(())
                             }
@@ -502,15 +500,19 @@ impl<'a, 'b> Expander for Shell<'b> {
     }
 
     /// Expand an array variable with some selection
-    fn array(&self, name: &str, selection: &Select) -> Option<types::Array> {
+    fn array(&self, name: &str, selection: &Select) -> Option<types::Args> {
         if let Some(array) = self.variables.get::<types::Array>(name) {
             match selection {
-                Select::All => return Some(array.clone()),
+                Select::All => {
+                    return Some(types::Args::from_iter(
+                        array.iter().map(|x| format!("{}", x).into()),
+                    ))
+                }
                 Select::Index(ref id) => {
                     return id
                         .resolve(array.len())
                         .and_then(|n| array.get(n))
-                        .map(|x| types::Array::from_iter(Some(x.to_owned())));
+                        .map(|x| types::Args::from_iter(Some(format!("{}", x).into())));
                 }
                 Select::Range(ref range) => {
                     if let Some((start, length)) = range.bounds(array.len()) {
@@ -520,8 +522,8 @@ impl<'a, 'b> Expander for Shell<'b> {
                                     .iter()
                                     .skip(start)
                                     .take(length)
-                                    .map(types::Str::to_owned)
-                                    .collect::<types::Array>(),
+                                    .map(|var| format!("{}", var).into())
+                                    .collect(),
                             );
                         }
                     }
@@ -531,7 +533,7 @@ impl<'a, 'b> Expander for Shell<'b> {
         } else if let Some(hmap) = self.variables.get::<types::HashMap>(name) {
             match selection {
                 Select::All => {
-                    let mut array = types::Array::new();
+                    let mut array = types::Args::new();
                     for (key, value) in hmap.iter() {
                         array.push(key.clone());
                         let f = format!("{}", value);
@@ -548,14 +550,14 @@ impl<'a, 'b> Expander for Shell<'b> {
                     return Some(array);
                 }
                 Select::Key(key) => {
-                    return Some(array![format!(
+                    return Some(args![format!(
                         "{}",
                         hmap.get(&*key).unwrap_or(&Value::Str("".into()))
                     )]);
                 }
                 Select::Index(index) => {
                     use crate::ranges::Index;
-                    return Some(array![format!(
+                    return Some(args![format!(
                         "{}",
                         hmap.get(&types::Str::from(
                             match index {
@@ -572,7 +574,7 @@ impl<'a, 'b> Expander for Shell<'b> {
         } else if let Some(bmap) = self.variables.get::<types::BTreeMap>(name) {
             match selection {
                 Select::All => {
-                    let mut array = types::Array::new();
+                    let mut array = types::Args::new();
                     for (key, value) in bmap.iter() {
                         array.push(key.clone());
                         let f = format!("{}", value);
@@ -589,14 +591,14 @@ impl<'a, 'b> Expander for Shell<'b> {
                     return Some(array);
                 }
                 Select::Key(key) => {
-                    return Some(array![format!(
+                    return Some(args![format!(
                         "{}",
                         bmap.get(&*key).unwrap_or(&Value::Str("".into()))
                     )]);
                 }
                 Select::Index(index) => {
                     use crate::ranges::Index;
-                    return Some(array![format!(
+                    return Some(args![format!(
                         "{}",
                         bmap.get(&types::Str::from(
                             match index {
@@ -614,7 +616,7 @@ impl<'a, 'b> Expander for Shell<'b> {
         None
     }
 
-    fn map_keys(&self, name: &str, sel: &Select) -> Option<types::Array> {
+    fn map_keys(&self, name: &str, sel: &Select) -> Option<types::Args> {
         match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
@@ -626,7 +628,7 @@ impl<'a, 'b> Expander for Shell<'b> {
         }
     }
 
-    fn map_values(&self, name: &str, sel: &Select) -> Option<types::Array> {
+    fn map_values(&self, name: &str, sel: &Select) -> Option<types::Args> {
         match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())

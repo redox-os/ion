@@ -66,15 +66,15 @@ impl<'b> VariableStore<'b> for Shell<'b> {
                             .map_err(|e| format!("{}: {}", key.name, e))
                             // TODO: handle operators here in the same way as local
                             .and_then(|rhs| match &rhs {
-                                Value::Array(values) if operator == Operator::Equal => {
-                                    env::set_var(key.name, values.join(" "));
+                                Value::Array(_) if operator == Operator::Equal => {
+                                    env::set_var(key.name, format!("{}", rhs));
                                     Ok(())
                                 }
                                 Value::Array(_) => Err("arithmetic operators on array \
                                                         expressions aren't supported yet."
                                     .to_string()),
-                                Value::Str(rhs) => {
-                                    env::set_var(&key.name, rhs.as_str());
+                                Value::Str(_) => {
+                                    env::set_var(&key.name, &format!("{}", rhs));
                                     Ok(())
                                 }
                                 _ => Err(format!(
@@ -196,7 +196,7 @@ impl<'b> VariableStore<'b> for Shell<'b> {
 // This should logically be a method over iterator, but Value is only accessible in the main repo
 // TODO: too much allocations occur over here. We need to expand variables before they get
 // parsed
-fn apply<'b>(op: Operator, lhs: &Value<'b>, rhs: Value) -> Result<Value<'b>, OpError> {
+fn apply<'b>(op: Operator, lhs: &Value<'b>, rhs: Value<'b>) -> Result<Value<'b>, OpError> {
     match op {
         Operator::Add => lhs + rhs,
         Operator::Divide => lhs / rhs,
@@ -214,12 +214,18 @@ fn apply<'b>(op: Operator, lhs: &Value<'b>, rhs: Value) -> Result<Value<'b>, OpE
             lhs.prepend(rhs);
             Ok(lhs)
         }
-        Operator::Filter => match (lhs.clone(), rhs) {
-            (Value::Array(mut array), Value::Str(rhs)) => {
+        Operator::Filter => match (&lhs, &rhs) {
+            (Value::Array(ref array), Value::Str(_)) => {
+                // TODO: this should be avoided, but for now values are expanded too late, so we
+                // must store copies of arrays to update
+                let mut array = array.clone();
                 array.retain(|item| item != &rhs);
                 Ok(Value::Array(array))
             }
-            (Value::Array(mut array), Value::Array(values)) => {
+            (Value::Array(ref array), Value::Array(values)) => {
+                // TODO: this should be avoided, but for now values are expanded too late, so we
+                // must store copies of arrays to update
+                let mut array = array.clone();
                 array.retain(|item| !values.contains(item));
                 Ok(Value::Array(array))
             }

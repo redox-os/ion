@@ -275,7 +275,7 @@ fn array_methods() {
         pattern:   Pattern::Whitespace,
         selection: Select::Index(Index::Forward(3)),
     };
-    let expected = array!["é"];
+    let expected = args!["é"];
     assert_eq!(method.handle_as_array(&expanders), expected);
     let method = ArrayMethod {
         method:    "chars",
@@ -283,7 +283,7 @@ fn array_methods() {
         pattern:   Pattern::Whitespace,
         selection: Select::Index(Index::Forward(3)),
     };
-    let expected = array!["e"];
+    let expected = args!["e"];
     assert_eq!(method.handle_as_array(&expanders), expected);
     let method = ArrayMethod {
         method:    "bytes",
@@ -291,6 +291,6 @@ fn array_methods() {
         pattern:   Pattern::Whitespace,
         selection: Select::Index(Index::Forward(1)),
     };
-    let expected = array!["111"];
+    let expected = args!["111"];
     assert_eq!(method.handle_as_array(&expanders), expected);
 }

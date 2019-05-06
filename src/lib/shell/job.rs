@@ -8,7 +8,7 @@ use std::{fmt, fs::File, str};
 
 #[derive(Clone)]
 pub struct Job<'a> {
-    pub args:        types::Array,
+    pub args:        types::Args,
     pub redirection: RedirectFrom,
     pub builtin:     Option<BuiltinFunction<'a>>,
 }
@@ -25,7 +25,7 @@ impl<'a> Job<'a> {
     }
 
     pub(crate) fn new(
-        args: types::Array,
+        args: types::Args,
         redirection: RedirectFrom,
         builtin: Option<BuiltinFunction<'a>>,
     ) -> Self {
@@ -49,11 +49,11 @@ impl<'a> fmt::Debug for Job<'a> {
     }
 }
 
-/// Expands a given argument and returns it as an `Array`.
-fn expand_arg(arg: &str, shell: &Shell) -> types::Array {
+/// Expands a given argument and returns it as an `Args`.
+fn expand_arg(arg: &str, shell: &Shell) -> types::Args {
     let res = expand_string(&arg, shell);
     if res.is_empty() {
-        array![""]
+        args![""]
     } else {
         res
     }
@@ -70,11 +70,11 @@ pub struct RefinedJob<'a> {
 
 pub enum JobVariant<'a> {
     /// An external program that is executed by this shell
-    External { args: types::Array },
+    External { args: types::Args },
     /// A procedure embedded into Ion
-    Builtin { main: BuiltinFunction<'a>, args: types::Array },
+    Builtin { main: BuiltinFunction<'a>, args: types::Args },
     /// Functions can act as commands too!
-    Function { args: types::Array },
+    Function { args: types::Args },
     /// Represents redirection into stdin from more than one source
     Cat { sources: Vec<File> },
     Tee {
@@ -186,7 +186,7 @@ impl<'a> RefinedJob<'a> {
         RefinedJob { stdin: None, stdout: None, stderr: None, var: JobVariant::Cat { sources } }
     }
 
-    pub(crate) fn function(args: types::Array) -> Self {
+    pub(crate) fn function(args: types::Args) -> Self {
         RefinedJob {
             stdin:  None,
             stdout: None,
@@ -195,7 +195,7 @@ impl<'a> RefinedJob<'a> {
         }
     }
 
-    pub(crate) fn builtin(main: BuiltinFunction<'a>, args: types::Array) -> Self {
+    pub(crate) fn builtin(main: BuiltinFunction<'a>, args: types::Args) -> Self {
         RefinedJob {
             stdin:  None,
             stdout: None,
@@ -204,7 +204,7 @@ impl<'a> RefinedJob<'a> {
         }
     }
 
-    pub(crate) fn external(args: types::Array) -> Self {
+    pub(crate) fn external(args: types::Args) -> Self {
         RefinedJob {
             stdin:  None,
             stdout: None,
