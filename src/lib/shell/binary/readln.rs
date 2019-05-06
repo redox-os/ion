@@ -1,19 +1,20 @@
-use super::super::{completer::*, flags, Binary, Shell};
+use super::{
+    super::{completer::*, flags},
+    InteractiveBinary,
+};
 use crate::{sys, types};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use std::{env, io::ErrorKind, mem, path::PathBuf};
 
-pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
-    let prompt = shell.prompt();
-    let dirs = &shell.directory_stack;
-    let prev = shell.variables.get::<types::Str>("OLDPWD");
-    let builtins = &shell.builtins;
-    let vars = &shell.variables;
+pub(crate) fn readln(binary: &InteractiveBinary) -> Option<String> {
+    let prompt = binary.prompt();
+    let line =
+        binary.context.borrow_mut().read_line(prompt, None, &mut |Event { editor, kind }| {
+            let shell = binary.shell.borrow();
+            let dirs = &shell.directory_stack;
+            let prev = &shell.variables.get::<types::Str>("OLDPWD");
+            let vars = &shell.variables;
 
-    let line = shell.context.as_mut().unwrap().read_line(
-        prompt,
-        None,
-        &mut move |Event { editor, kind }| {
             if let EventKind::BeforeComplete = kind {
                 let (words, pos) = editor.get_words_and_cursor_position();
 
@@ -44,7 +45,8 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                     // will be used
                     // in the creation of a custom completer.
                     let custom_completer = BasicCompleter::new(
-                        builtins
+                        shell
+                            .builtins()
                             .keys()
                             // Add built-in commands to the completer's definitions.
                             .map(|s| s.to_string())
@@ -61,7 +63,7 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                             // it free to do String->SmallString
                             //       and mostly free to go back (free if allocated)
                             .chain(vars.string_vars().map(|(s, _)| ["$", &s].concat()))
-                            .collect::<Vec<String>>(),
+                            .collect(),
                     );
 
                     // Creates completers containing definitions from all directories
@@ -87,13 +89,12 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
                     mem::replace(&mut editor.context().completer, Some(Box::new(completer)));
                 }
             }
-        },
-    );
+        });
 
     match line {
         Ok(line) => {
             if line.bytes().next() != Some(b'#') && line.bytes().any(|c| !c.is_ascii_whitespace()) {
-                shell.flags |= flags::UNTERMINATED;
+                binary.shell.borrow_mut().flags |= flags::UNTERMINATED;
             }
             Some(line)
         }
@@ -101,11 +102,11 @@ pub(crate) fn readln(shell: &mut Shell) -> Option<String> {
         Err(ref err) if err.kind() == ErrorKind::Interrupted => None,
         // Handles Ctrl + D
         Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
-            if shell.flow_control.unclosed_block() {
-                shell.flow_control.pop();
+            if binary.shell.borrow_mut().flow_control.pop() {
                 None
             } else {
-                shell.exit(shell.previous_status);
+                let status = binary.shell.borrow().previous_status;
+                binary.shell.borrow_mut().exit(status);
             }
         }
         Err(err) => {

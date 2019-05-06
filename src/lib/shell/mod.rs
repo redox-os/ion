@@ -8,7 +8,6 @@ mod flow;
 pub(crate) mod flow_control;
 mod fork;
 pub mod fork_function;
-mod history;
 mod job;
 pub(crate) mod pipe_exec;
 pub(crate) mod signals;
@@ -29,12 +28,11 @@ pub mod flags {
 }
 
 pub use self::{
-    binary::Binary,
+    binary::InteractiveBinary,
     fork::{Capture, Fork, IonResult},
 };
 pub(crate) use self::{
     flow::FlowLogic,
-    history::{IgnoreSetting, ShellHistory},
     job::{Job, JobKind},
     pipe_exec::{foreground, job_control},
 };
@@ -45,7 +43,7 @@ use self::{
     flags::*,
     flow_control::{FlowControl, Function, FunctionError},
     foreground::ForegroundSignals,
-    job_control::{BackgroundProcess, JobControl},
+    job_control::BackgroundProcess,
     pipe_exec::PipelineExecution,
     status::*,
     variables::{GetVariable, Value, Variables},
@@ -57,7 +55,6 @@ use crate::{
     sys, types,
 };
 use itertools::Itertools;
-use liner::Context;
 use std::{
     fs,
     io::{self, Read, Write},
@@ -80,6 +77,8 @@ pub enum IonError {
     Unterminated,
     #[error(display = "function error: {}", why)]
     Function { why: FunctionError },
+    #[error(display = "unexpected end of script: expected end block for `{}`", block)]
+    UnclosedBlock { block: String },
 }
 
 /// The shell structure is a megastructure that manages all of the state of the shell throughout
@@ -89,10 +88,7 @@ pub enum IonError {
 pub struct Shell<'a> {
     /// Contains a list of built-in commands that were created when the program
     /// started.
-    pub(crate) builtins: BuiltinMap<'a>,
-    /// Contains the history, completions, and manages writes to the history file.
-    /// Note that the context is only available in an interactive session.
-    pub(crate) context: Option<Context>,
+    builtins: BuiltinMap<'a>,
     /// Contains the aliases, strings, and array variable maps.
     pub variables: Variables<'a>,
     /// Contains the current state of flow control parameters.
@@ -119,9 +115,10 @@ pub struct Shell<'a> {
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,
-    /// Stores the patterns used to determine whether a command should be saved in the history
-    /// or not
-    ignore_setting: IgnoreSetting,
+    /// Custom callback to cleanup before exit
+    prep_for_exit: Option<Box<FnMut(&mut Shell) + 'a>>,
+    /// Custom callback for each command call
+    on_command: Option<Box<Fn(&Shell, std::time::Duration) + 'a>>,
 }
 
 #[derive(Default)]
@@ -132,7 +129,7 @@ impl ShellBuilder {
 
     pub fn as_library<'a>(&self) -> Shell<'a> { Shell::new(true) }
 
-    pub fn set_unique_pid(self) -> ShellBuilder {
+    pub fn set_unique_pid(self) -> Self {
         if let Ok(pid) = sys::getpid() {
             if sys::setpgid(0, pid).is_ok() {
                 let _ = sys::tcsetpgrp(0, pid);
@@ -142,7 +139,7 @@ impl ShellBuilder {
         self
     }
 
-    pub fn block_signals(self) -> ShellBuilder {
+    pub fn block_signals(self) -> Self {
         // This will block SIGTSTP, SIGTTOU, SIGTTIN, and SIGCHLD, which is required
         // for this shell to manage its own process group / children / etc.
         signals::block();
@@ -150,7 +147,7 @@ impl ShellBuilder {
         self
     }
 
-    pub fn install_signal_handler(self) -> ShellBuilder {
+    pub fn install_signal_handler(self) -> Self {
         extern "C" fn handler(signal: i32) {
             let signal = match signal {
                 sys::SIGINT => signals::SIGINT,
@@ -177,7 +174,7 @@ impl ShellBuilder {
         self
     }
 
-    pub fn new() -> ShellBuilder { ShellBuilder }
+    pub fn new() -> Self { ShellBuilder }
 }
 
 impl<'a> Shell<'a> {
@@ -191,7 +188,7 @@ impl<'a> Shell<'a> {
     /// The method is non-blocking, and therefore will immediately return file handles to the
     /// stdout and stderr of the child. The PID of the child is returned, which may be used to
     /// wait for and obtain the exit status.
-    pub fn fork<F: FnMut(&mut Shell<'a>)>(
+    pub fn fork<F: FnMut(&mut Self)>(
         &self,
         capture: Capture,
         child_func: F,
@@ -224,6 +221,15 @@ impl<'a> Shell<'a> {
         }
     }
 
+    /// A method for executing literal scripts. Given a read instance, the shell will process
+    /// commands as they arrive
+    pub fn execute_script<T: std::io::Read>(&mut self, lines: T) {
+        if let Err(why) = self.execute_command(lines) {
+            eprintln!("ion: {}", why);
+            self.previous_status = FAILURE;
+        }
+    }
+
     /// A method for executing commands in the Ion shell without capturing. It takes command(s)
     /// as
     /// a string argument, parses them, and executes them the same as it would if you had
@@ -239,7 +245,13 @@ impl<'a> Shell<'a> {
         {
             self.on_command(&cmd)
         }
-        Ok(self.previous_status)
+
+        if let Some(block) = self.flow_control.unclosed_block() {
+            self.previous_status = FAILURE;
+            Err(IonError::UnclosedBlock { block: block.to_string() })
+        } else {
+            Ok(self.previous_status)
+        }
     }
 
     /// Obtains a variable, returning an empty string if it does not exist.
@@ -310,21 +322,9 @@ impl<'a> Shell<'a> {
             Some(self.execute_pipeline(pipeline))
         };
 
-        // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the
-        // pipline just executed to the the file and context histories. At the
-        // moment, this means record how long it took.
-        if let Some(context) = self.context.as_mut() {
-            if "1" == &*self.variables.get_str_or_empty("RECORD_SUMMARY") {
-                if let Ok(elapsed_time) = command_start_time.elapsed() {
-                    let summary = format!(
-                        "#summary# elapsed real time: {}.{:09} seconds",
-                        elapsed_time.as_secs(),
-                        elapsed_time.subsec_nanos()
-                    );
-                    context.history.push(summary.into()).unwrap_or_else(|err| {
-                        eprintln!("ion: history append: {}", err);
-                    });
-                }
+        if let Some(ref callback) = self.on_command {
+            if let Ok(elapsed_time) = command_start_time.elapsed() {
+                callback(self, elapsed_time);
             }
         }
 
@@ -356,29 +356,49 @@ impl<'a> Shell<'a> {
         }
     }
 
+    /// Call the cleanup callback
+    pub fn prep_for_exit(&mut self) {
+        if let Some(mut callback) = self.prep_for_exit.take() {
+            callback(self);
+        }
+    }
+
+    /// Set the callback to call before exiting the shell
+    #[inline]
+    pub fn set_prep_for_exit(&mut self, callback: Option<Box<dyn FnMut(&mut Shell) + 'a>>) {
+        self.prep_for_exit = callback;
+    }
+
+    /// Set the callback to call on each command
+    #[inline]
+    pub fn set_on_command(
+        &mut self,
+        callback: Option<Box<dyn Fn(&Shell, std::time::Duration) + 'a>>,
+    ) {
+        self.on_command = callback;
+    }
+
+    /// Get access to the builtins
+    #[inline]
+    pub fn builtins(&self) -> &BuiltinMap<'a> { &self.builtins }
+
+    /// Get a mutable access to the builtins
+    ///
+    /// Warning: Previously defined functions will rely on previous versions of the builtins, even
+    /// if they are redefined. It is strongly advised to avoid mutating the builtins while the shell
+    /// is running
+    #[inline]
+    pub fn builtins_mut(&mut self) -> &mut BuiltinMap<'a> { &mut self.builtins }
+
     /// Cleanly exit ion
     pub fn exit(&mut self, status: i32) -> ! {
         self.prep_for_exit();
         process::exit(status);
     }
 
-    pub(crate) fn prep_for_exit(&mut self) {
-        // The context has two purposes: if it exists, this is an interactive shell; and the
-        // context will also be sent a signal to commit all changes to the history file,
-        // and waiting for the history thread in the background to finish.
-        if self.context.is_some() {
-            if self.flags & HUPONEXIT != 0 {
-                self.resume_stopped();
-                self.background_send(sys::SIGHUP);
-            }
-            self.context.as_mut().unwrap().history.commit_to_file();
-        }
-    }
-
-    pub(crate) fn new(is_library: bool) -> Self {
-        let mut shell = Shell {
+    pub fn new(is_library: bool) -> Self {
+        Shell {
             builtins: BuiltinMap::default(),
-            context: None,
             variables: Variables::default(),
             flow_control: FlowControl::default(),
             directory_stack: DirectoryStack::new(),
@@ -390,11 +410,9 @@ impl<'a> Shell<'a> {
             is_library,
             break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new()),
-            ignore_setting: IgnoreSetting::default(),
-        };
-        let ignore_patterns = shell.variables.get("HISTORY_IGNORE").unwrap();
-        shell.update_ignore_patterns(&ignore_patterns);
-        shell
+            on_command: None,
+            prep_for_exit: None,
+        }
     }
 
     pub fn assign(&mut self, key: &Key, value: Value<'a>) -> Result<(), String> {
@@ -452,7 +470,7 @@ impl<'a> Shell<'a> {
     }
 }
 
-impl<'a> Expander for Shell<'a> {
+impl<'a, 'b> Expander for Shell<'b> {
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<types::Str> {
         let mut output = None;

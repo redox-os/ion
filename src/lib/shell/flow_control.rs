@@ -159,14 +159,16 @@ impl<'a> FlowControl<'a> {
     pub(crate) fn reset(&mut self) { self.block.clear() }
 
     /// Discard one block.
-    pub(crate) fn pop(&mut self) { self.block.pop(); }
+    pub(crate) fn pop(&mut self) -> bool { self.block.pop().is_some() }
 
     /// Check if there isn't an unfinished block.
-    pub(crate) fn unclosed_block(&self) -> bool { !self.block.is_empty() }
+    pub(crate) fn unclosed_block(&self) -> Option<&str> {
+        self.block.last().map(|block| block.short())
+    }
 }
 
 impl<'a> Default for FlowControl<'a> {
-    fn default() -> FlowControl<'static> { FlowControl { block: Vec::with_capacity(5) } }
+    fn default() -> Self { FlowControl { block: Vec::with_capacity(5) } }
 }
 
 pub(crate) fn insert_statement<'a>(

@@ -1,33 +1,29 @@
-use crate::{
-    lexers::{ArgumentSplitter, DesignatorLexer, DesignatorToken},
-    shell::Shell,
-};
+use crate::lexers::{ArgumentSplitter, DesignatorLexer, DesignatorToken};
+use liner::Context;
 use std::{borrow::Cow, str};
 
-pub(crate) fn expand_designators<'a>(shell: &Shell, cmd: &'a str) -> Cow<'a, str> {
-    if let Some(ref context) = shell.context {
-        if let Some(buffer) = context.history.buffers.back() {
-            let buffer = buffer.as_bytes();
-            let buffer = unsafe { str::from_utf8_unchecked(&buffer) };
-            let mut output = String::with_capacity(cmd.len());
-            for token in DesignatorLexer::new(cmd.as_bytes()) {
-                match token {
-                    DesignatorToken::Text(text) => output.push_str(text),
-                    DesignatorToken::Designator(text) => match text {
-                        "!!" => output.push_str(buffer),
-                        "!$" => output.push_str(last_arg(buffer)),
-                        "!0" => output.push_str(command(buffer)),
-                        "!^" => output.push_str(first_arg(buffer)),
-                        "!*" => output.push_str(&args(buffer)),
-                        _ => output.push_str(text),
-                    },
-                }
+pub(crate) fn expand_designators<'a>(context: &Context, cmd: &'a str) -> Cow<'a, str> {
+    if let Some(buffer) = context.history.buffers.back() {
+        let buffer = buffer.as_bytes();
+        let buffer = unsafe { str::from_utf8_unchecked(&buffer) };
+        let mut output = String::with_capacity(cmd.len());
+        for token in DesignatorLexer::new(cmd.as_bytes()) {
+            match token {
+                DesignatorToken::Text(text) => output.push_str(text),
+                DesignatorToken::Designator(text) => match text {
+                    "!!" => output.push_str(buffer),
+                    "!$" => output.push_str(last_arg(buffer)),
+                    "!0" => output.push_str(command(buffer)),
+                    "!^" => output.push_str(first_arg(buffer)),
+                    "!*" => output.push_str(&args(buffer)),
+                    _ => output.push_str(text),
+                },
             }
-            return Cow::Owned(output);
         }
+        Cow::Owned(output)
+    } else {
+        Cow::Borrowed(cmd)
     }
-
-    Cow::Borrowed(cmd)
 }
 
 fn command(text: &str) -> &str { ArgumentSplitter::new(text).next().unwrap_or(text) }

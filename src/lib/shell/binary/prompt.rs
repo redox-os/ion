@@ -5,19 +5,19 @@ use crate::{
 };
 use std::{io::Read, process};
 
-pub(crate) fn prompt(shell: &mut Shell) -> String {
+pub(crate) fn prompt(shell: &Shell) -> String {
     let blocks =
         shell.flow_control.block.len() + if shell.flags & UNTERMINATED != 0 { 1 } else { 0 };
 
     if blocks == 0 {
-        prompt_fn(shell)
-            .unwrap_or_else(|| expand_string(&shell.get_str_or_empty("PROMPT"), shell).join(" "))
+        prompt_fn(&shell)
+            .unwrap_or_else(|| expand_string(&shell.get_str_or_empty("PROMPT"), &*shell).join(" "))
     } else {
         "    ".repeat(blocks)
     }
 }
 
-pub(crate) fn prompt_fn(shell: &mut Shell) -> Option<String> {
+pub(crate) fn prompt_fn(shell: &Shell) -> Option<String> {
     if let Some(Value::Function(function)) = shell.variables.get_ref("PROMPT") {
         let output = match shell.fork(Capture::StdoutThenIgnoreStderr, move |child| {
             let _ = function.execute(child, &["ion"]);

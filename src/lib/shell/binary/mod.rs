@@ -1,19 +1,24 @@
 //! Contains the binary logic of Ion.
 mod designators;
+mod history;
 mod prompt;
 mod readln;
 
-use self::{
-    prompt::{prompt, prompt_fn},
-    readln::readln,
+use self::{history::ShellHistory, prompt::prompt, readln::readln};
+use super::{
+    flags::{HUPONEXIT, UNTERMINATED},
+    pipe_exec::job_control::JobControl,
+    status::SUCCESS,
+    FlowLogic, Shell,
 };
-use super::{flags::UNTERMINATED, status::*, FlowLogic, Shell, ShellHistory};
 use crate::{
+    builtins::man_pages,
     parser::{shell_expand::Expander, Terminator},
     types,
 };
-use liner::{Buffer, Context};
-use std::path::Path;
+use itertools::Itertools;
+use liner::{Buffer, Context, KeyBindings};
+use std::{cell::RefCell, path::Path, rc::Rc};
 
 pub const MAN_ION: &str = "NAME
     Ion - The Ion shell
@@ -38,84 +43,129 @@ ARGS:
     <args>...    Script arguments (@args). If the -c option is not specified, the first
                  parameter is taken as a filename to execute";
 
-pub trait Binary {
-    /// Parses and executes the arguments that were supplied to the shell.
-    fn execute_script<T: std::io::Read>(&mut self, lines: T);
-    /// Creates an interactive session that reads from a prompt provided by
-    /// Liner.
-    fn execute_interactive(self);
-    /// Ion's interface to Liner's `read_line` method, which handles everything related to
-    /// rendering, controlling, and getting input from the prompt.
-    fn readln(&mut self) -> Option<String>;
-    /// Generates the prompt that will be used by Liner.
-    fn prompt(&mut self) -> String;
-    // Executes the PROMPT function, if it exists, and returns the output.
-    fn prompt_fn(&mut self) -> Option<String>;
-    // Handles commands given by the REPL, and saves them to history.
-    fn save_command(&mut self, command: &str);
+pub struct InteractiveBinary<'a> {
+    context: Rc<RefCell<Context>>,
+    shell:   RefCell<Shell<'a>>,
 }
 
-impl<'a> Binary for Shell<'a> {
-    fn save_command(&mut self, cmd: &str) {
-        if !cmd.ends_with('/') && self.tilde(cmd).map_or(false, |path| Path::new(&path).is_dir()) {
+impl<'a> InteractiveBinary<'a> {
+    pub fn new(shell: Shell<'a>) -> Self {
+        let mut context = Context::new();
+        context.word_divider_fn = Box::new(word_divide);
+        if shell.get_str_or_empty("HISTFILE_ENABLED") == "1" {
+            let path = shell.get::<types::Str>("HISTFILE").expect("shell didn't set HISTFILE");
+            if !Path::new(path.as_str()).exists() {
+                eprintln!("ion: creating history file at \"{}\"", path);
+            }
+            let _ = context.history.set_file_name_and_load_history(path.as_str());
+        }
+        InteractiveBinary { context: Rc::new(RefCell::new(context)), shell: RefCell::new(shell) }
+    }
+
+    /// Handles commands given by the REPL, and saves them to history.
+    pub fn save_command(&self, cmd: &str) {
+        if !cmd.ends_with('/')
+            && self.shell.borrow().tilde(cmd).map_or(false, |path| Path::new(&path).is_dir())
+        {
             self.save_command_in_history(&[cmd, "/"].concat());
         } else {
             self.save_command_in_history(cmd);
         }
     }
 
-    fn execute_interactive(mut self) {
-        self.context = Some({
-            let mut context = Context::new();
-            context.word_divider_fn = Box::new(word_divide);
-            if "1" == self.get_str_or_empty("HISTFILE_ENABLED") {
-                let path = self.get::<types::Str>("HISTFILE").expect("shell didn't set HISTFILE");
-                if !Path::new(path.as_str()).exists() {
-                    eprintln!("ion: creating history file at \"{}\"", path);
-                }
-                let _ = context.history.set_file_name_and_load_history(path.as_str());
-            }
-            context
-        });
+    #[inline]
+    pub fn init_file(&self) { self.shell.borrow_mut().evaluate_init_file(); }
 
-        self.evaluate_init_file();
+    pub fn add_callbacks(&self) {
+        let mut shell = self.shell.borrow_mut();
+        let context = self.context.clone();
+        shell.set_prep_for_exit(Some(Box::new(move |shell| {
+            // context will be sent a signal to commit all changes to the history file,
+            // and waiting for the history thread in the background to finish.
+            if shell.flags & HUPONEXIT != 0 {
+                shell.resume_stopped();
+                shell.background_send(sys::SIGHUP);
+            }
+            context.borrow_mut().history.commit_to_file();
+        })));
+
+        let context = self.context.clone();
+        shell.set_on_command(Some(Box::new(move |shell, elapsed| {
+            // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the
+            // pipline just executed to the the file and context histories. At the
+            // moment, this means record how long it took.
+            if "1" == shell.variables.get_str_or_empty("RECORD_SUMMARY") {
+                let summary = format!(
+                    "#summary# elapsed real time: {}.{:09} seconds",
+                    elapsed.as_secs(),
+                    elapsed.subsec_nanos()
+                );
+                println!("{:?}", summary);
+                context.borrow_mut().history.push(summary.into()).unwrap_or_else(|err| {
+                    eprintln!("ion: history append: {}", err);
+                });
+            }
+        })));
+    }
+
+    /// Creates an interactive session that reads from a prompt provided by
+    /// Liner.
+    pub fn execute_interactive(self) -> ! {
+        let context_bis = self.context.clone();
+        let history = &move |args: &[small::String], _shell: &mut Shell| -> i32 {
+            if man_pages::check_help(args, man_pages::MAN_HISTORY) {
+                return SUCCESS;
+            }
+
+            print!("{}", context_bis.borrow().history.buffers.iter().format("\n"));
+            SUCCESS
+        };
+
+        // change the lifetime to allow adding local builtins
+        let InteractiveBinary { context, shell } = self;
+        let this = InteractiveBinary { context, shell: RefCell::new(shell.into_inner()) };
+
+        this.shell.borrow_mut().builtins_mut().add(
+            "history",
+            history,
+            "Display a log of all commands previously executed",
+        );
 
         loop {
-            let mut lines = std::iter::repeat_with(|| self.readln())
+            let mut lines = std::iter::repeat_with(|| this.readln())
                 .filter_map(|cmd| cmd)
                 .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
             match Terminator::new(&mut lines).terminate() {
                 Some(command) => {
-                    self.flags &= !UNTERMINATED;
-                    let cmd: &str = &designators::expand_designators(&self, command.trim_end());
-                    self.on_command(&cmd);
-                    self.save_command(&cmd);
+                    this.shell.borrow_mut().flags &= !UNTERMINATED;
+                    let cmd: &str = &designators::expand_designators(
+                        &this.context.borrow(),
+                        command.trim_end(),
+                    );
+                    this.shell.borrow_mut().on_command(&cmd);
+                    this.save_command(&cmd);
                 }
                 None => {
-                    self.flags &= !UNTERMINATED;
+                    this.shell.borrow_mut().flags &= !UNTERMINATED;
                 }
             }
         }
     }
 
-    fn execute_script<T: std::io::Read>(&mut self, lines: T) {
-        if self.execute_command(lines).is_err() {
-            eprintln!("ion: unterminated quote in script");
-            self.previous_status = FAILURE;
-        } else if self.flow_control.unclosed_block() {
-            eprintln!(
-                "ion: unexpected end of script: expected end block for `{}`",
-                self.flow_control.block.last().unwrap().short(),
-            );
-            self.previous_status = FAILURE;
-        }
+    /// Set the keybindings of the underlying liner context
+    #[inline]
+    pub fn set_keybindings(&mut self, key_bindings: KeyBindings) {
+        self.context.borrow_mut().key_bindings = key_bindings;
     }
 
-    fn readln(&mut self) -> Option<String> { readln(self) }
+    /// Ion's interface to Liner's `read_line` method, which handles everything related to
+    /// rendering, controlling, and getting input from the prompt.
+    #[inline]
+    pub fn readln(&self) -> Option<String> { readln(self) }
 
-    fn prompt_fn(&mut self) -> Option<String> { prompt_fn(self) }
-
-    fn prompt(&mut self) -> String { prompt(self) }
+    /// Generates the prompt that will be used by Liner.
+    #[inline]
+    pub fn prompt(&self) -> String { prompt(&self.shell.borrow_mut()) }
 }
 
 #[derive(Debug)]
