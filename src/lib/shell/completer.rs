@@ -90,7 +90,7 @@ impl Completer for IonFileCompleter {
 }
 
 #[auto_enum]
-fn filename_completion<'a, 'b>(start: &'a str, path: &'a str) -> impl Iterator<Item = String> + 'a {
+fn filename_completion<'a>(start: &'a str, path: &'a str) -> impl Iterator<Item = String> + 'a {
     let unescaped_start = unescape(start);
 
     let mut split_start = unescaped_start.split('/');

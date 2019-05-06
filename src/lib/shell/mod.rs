@@ -33,7 +33,7 @@ pub use self::{
 };
 pub(crate) use self::{
     flow::FlowLogic,
-    job::{Job, JobKind},
+    job::Job,
     pipe_exec::{foreground, job_control},
 };
 
@@ -44,7 +44,6 @@ use self::{
     flow_control::{FlowControl, Function, FunctionError},
     foreground::ForegroundSignals,
     job_control::BackgroundProcess,
-    pipe_exec::PipelineExecution,
     status::*,
     variables::{GetVariable, Value, Variables},
 };
@@ -273,11 +272,11 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub(crate) fn run_pipeline(&mut self, pipeline: &mut Pipeline<'a>) -> Option<i32> {
+    pub(crate) fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Option<i32> {
         let command_start_time = SystemTime::now();
 
         // Branch if -> input == shell command i.e. echo
-        let exit_status = if let Some(main) = self.builtins.get(&pipeline.items[0].job.command) {
+        let exit_status = if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
             pipeline.expand(self);
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
@@ -287,15 +286,14 @@ impl<'a> Shell<'a> {
                 if self.flags & NO_EXEC != 0 {
                     Some(SUCCESS)
                 } else {
-                    let borrowed = &pipeline.items[0].job.args;
-                    Some(main(borrowed, self))
+                    Some(main(&pipeline.items[0].job.args, self))
                 }
             } else {
                 Some(self.execute_pipeline(pipeline))
             }
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(function) =
-            self.variables.get::<Function>(&pipeline.items[0].job.command)
+            self.variables.get::<Function>(&pipeline.items[0].job.args[0])
         {
             if !pipeline.requires_piping() {
                 let args = pipeline.items[0].job.args.deref();
@@ -491,7 +489,7 @@ impl<'a, 'b> Expander for Shell<'b> {
 
         // Ensure that the parent retains ownership of the terminal before exiting.
         let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
-        output.map(|s| s.into())
+        output.map(Into::into)
     }
 
     /// Expand a string variable given if its quoted / unquoted
@@ -522,7 +520,7 @@ impl<'a, 'b> Expander for Shell<'b> {
                                     .iter()
                                     .skip(start)
                                     .take(length)
-                                    .map(|x| x.to_owned())
+                                    .map(types::Str::to_owned)
                                     .collect::<types::Array>(),
                             );
                         }
@@ -644,7 +642,7 @@ impl<'a, 'b> Expander for Shell<'b> {
         tilde(
             input,
             &self.directory_stack,
-            self.variables.get::<types::Str>("OLDPWD").as_ref().map(|x| x.as_str()),
+            self.variables.get::<types::Str>("OLDPWD").as_ref().map(types::Str::as_str),
         )
     }
 }

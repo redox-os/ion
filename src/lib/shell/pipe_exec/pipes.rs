@@ -26,7 +26,7 @@ impl<'a, 'b> TeePipe<'a, 'b> {
         F: FnMut(&mut RefinedJob<'b>, File),
     {
         match sys::pipe2(sys::O_CLOEXEC) {
-            Err(e) => pipe_fail(&e),
+            Err(e) => pipe_fail(e),
             Ok((reader, writer)) => {
                 (*tee).source = Some(unsafe { File::from_raw_fd(reader) });
                 action(self.parent, unsafe { File::from_raw_fd(writer) });
@@ -38,7 +38,7 @@ impl<'a, 'b> TeePipe<'a, 'b> {
     }
 
     pub(crate) fn connect(&mut self, out: &mut TeeItem, err: &mut TeeItem) {
-        self.inner_connect(out, |parent, writer| parent.stdout(writer));
-        self.inner_connect(err, |parent, writer| parent.stderr(writer));
+        self.inner_connect(out, RefinedJob::stdout);
+        self.inner_connect(err, RefinedJob::stderr);
     }
 }

@@ -76,7 +76,7 @@ fn main() {
                 .or_else(|| env::args().next())
                 .into_iter()
                 .chain(args)
-                .map(|arg| arg.into()),
+                .map(Into::into),
         ),
     );
 

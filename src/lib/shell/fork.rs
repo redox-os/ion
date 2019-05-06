@@ -75,23 +75,17 @@ impl<'a, 'b> Fork<'a, 'b> {
         sys::signals::block();
 
         // If we are to capture stdout, create a pipe for capturing outputs.
-        let mut outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
-            Some(
-                sys::pipe2(sys::O_CLOEXEC)
-                    .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
-                    .map_err(|why| IonError::Fork { why })?,
-            )
+        let outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
+            let fds = sys::pipe2(sys::O_CLOEXEC).map_err(|why| IonError::Fork { why })?;
+            Some(unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
         } else {
             None
         };
 
         // And if we are to capture stderr, create a pipe for that as well.
-        let mut errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
-            Some(
-                sys::pipe2(sys::O_CLOEXEC)
-                    .map(|fds| unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
-                    .map_err(|why| IonError::Fork { why })?,
-            )
+        let errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
+            let fds = sys::pipe2(sys::O_CLOEXEC).map_err(|why| IonError::Fork { why })?;
+            Some(unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
         } else {
             None
         };
@@ -111,7 +105,7 @@ impl<'a, 'b> Fork<'a, 'b> {
                     if let Ok(null) = null_file.as_ref() {
                         let _ = sys::dup2(null.as_raw_fd(), sys::STDOUT_FILENO);
                     }
-                } else if let Some((_read, write)) = outs.take() {
+                } else if let Some((_, write)) = outs {
                     let _ = sys::dup2(write.as_raw_fd(), sys::STDOUT_FILENO);
                 }
 
@@ -120,14 +114,12 @@ impl<'a, 'b> Fork<'a, 'b> {
                     if let Ok(null) = null_file.as_ref() {
                         let _ = sys::dup2(null.as_raw_fd(), sys::STDERR_FILENO);
                     }
-                } else if let Some((_read, write)) = errs.take() {
+                } else if let Some((_, write)) = errs {
                     let _ = sys::dup2(write.as_raw_fd(), sys::STDERR_FILENO);
                 }
 
                 // Drop all the file descriptors that we no longer need.
                 drop(null_file);
-                drop(outs);
-                drop(errs);
 
                 // Obtain ownership of the child's copy of the shell, and then configure it.
                 let mut shell: Shell = unsafe { (self.shell as *const Shell).read() };

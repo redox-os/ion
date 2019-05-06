@@ -213,9 +213,9 @@ impl<'a> FlowLogic<'a> for Shell<'a> {
                 );
             }
             Statement::Pipeline(pipeline) => match expand_pipeline(&self, &pipeline) {
-                Ok((mut pipeline, statements)) => {
+                Ok((pipeline, statements)) => {
                     if !pipeline.items.is_empty() {
-                        self.run_pipeline(&mut pipeline);
+                        self.run_pipeline(pipeline);
                     }
                     if self.flags & ERR_EXIT != 0 && self.previous_status != SUCCESS {
                         let status = self.previous_status;
@@ -413,7 +413,7 @@ fn expand_pipeline<'a>(
     let mut statements = Vec::new();
 
     while let Some(item) = item_iter.next() {
-        if let Some(alias) = shell.variables.get::<types::Alias>(item.job.command.as_ref()) {
+        if let Some(alias) = shell.variables.get::<types::Alias>(item.command()) {
             statements = StatementSplitter::new(alias.0.as_str())
                 .map(|stmt| parse_and_validate(stmt, &shell.builtins))
                 .collect();
@@ -432,7 +432,7 @@ fn expand_pipeline<'a>(
                 if len == 1 {
                     if let Some(mut last) = pline.items.last_mut() {
                         last.outputs = item.outputs.clone();
-                        last.job.kind = item.job.kind;
+                        last.job.redirection = item.job.redirection;
                     }
                 }
                 items.append(&mut pline.items);
@@ -450,7 +450,7 @@ fn expand_pipeline<'a>(
                             // Set output of alias to be the output of last pipeline.
                             if let Some(last) = pline.items.last_mut() {
                                 last.outputs = item.outputs.clone();
-                                last.job.kind = item.job.kind;
+                                last.job.redirection = item.job.redirection;
                             }
                             // Append rest of the pipeline to the last pipeline in the
                             // alias.
@@ -459,7 +459,7 @@ fn expand_pipeline<'a>(
                             // Error in expansion
                             return Err(format!(
                                 "unable to pipe outputs of alias: '{} = {}'",
-                                item.job.command.as_str(),
+                                item.command(),
                                 alias.0.as_str()
                             ));
                         }
@@ -472,5 +472,5 @@ fn expand_pipeline<'a>(
             items.push(item.clone());
         }
     }
-    Ok((Pipeline { items }, statements))
+    Ok((Pipeline { items, pipe: pipeline.pipe }, statements))
 }

@@ -167,16 +167,13 @@ impl<'a> StringMethod<'a> {
             "to_lowercase" => string_case!(to_lowercase),
             "to_uppercase" => string_case!(to_uppercase),
             "trim" => {
-                let word = get_var!();
-                output.push_str(word.trim());
+                output.push_str(get_var!().trim());
             }
             "trim_right" => {
-                let word = get_var!();
-                output.push_str(word.trim_end());
+                output.push_str(get_var!().trim_end());
             }
             "trim_left" => {
-                let word = get_var!();
-                output.push_str(word.trim_start());
+                output.push_str(get_var!().trim_start());
             }
             "repeat" => match pattern.join(" ").parse::<usize>() {
                 Ok(repeat) => output.push_str(&get_var!().repeat(repeat)),
@@ -188,8 +185,7 @@ impl<'a> StringMethod<'a> {
                 let mut args = pattern.array();
                 match (args.next(), args.next()) {
                     (Some(replace), Some(with)) => {
-                        let res = &get_var!().replace(replace.as_str(), &with);
-                        output.push_str(res);
+                        output.push_str(&get_var!().replace(replace.as_str(), &with));
                     }
                     _ => eprintln!("ion: replace: two arguments are required"),
                 }
@@ -199,8 +195,7 @@ impl<'a> StringMethod<'a> {
                 match (args.next(), args.next(), args.next()) {
                     (Some(replace), Some(with), Some(nth)) => {
                         if let Ok(nth) = nth.parse::<usize>() {
-                            let res = &get_var!().replacen(replace.as_str(), &with, nth);
-                            output.push_str(res);
+                            output.push_str(&get_var!().replacen(replace.as_str(), &with, nth));
                         } else {
                             eprintln!("ion: replacen: third argument isn't a valid integer");
                         }
@@ -213,9 +208,7 @@ impl<'a> StringMethod<'a> {
                 match (args.next(), args.next()) {
                     (Some(replace), Some(with)) => match Regex::new(&replace) {
                         Ok(re) => {
-                            let inp = &get_var!();
-                            let res = re.replace_all(&inp, &with[..]);
-                            output.push_str(&res);
+                            output.push_str(&re.replace_all(&get_var!(), &with[..]));
                         }
                         Err(_) => eprintln!(
                             "ion: regex_replace: error in regular expression {}",
