@@ -44,7 +44,6 @@ use std::{
     fs,
     io::{self, Read, Write},
     iter::FromIterator,
-    ops::Deref,
     path::Path,
     process,
     sync::{atomic::Ordering, Arc, Mutex},
@@ -273,9 +272,9 @@ impl<'a> Shell<'a> {
     pub(crate) fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Option<i32> {
         let command_start_time = SystemTime::now();
 
+        pipeline.expand(self);
         // Branch if -> input == shell command i.e. echo
         let exit_status = if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
-            pipeline.expand(self);
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
                 if self.opts.print_comms {
@@ -294,8 +293,7 @@ impl<'a> Shell<'a> {
             self.variables.get::<Function>(&pipeline.items[0].job.args[0])
         {
             if !pipeline.requires_piping() {
-                let args = pipeline.items[0].job.args.deref();
-                match function.execute(self, args) {
+                match function.execute(self, &pipeline.items[0].job.args) {
                     Ok(()) => None,
                     Err(FunctionError::InvalidArgumentCount) => {
                         eprintln!("ion: invalid number of function arguments supplied");
@@ -314,7 +312,6 @@ impl<'a> Shell<'a> {
                 Some(self.execute_pipeline(pipeline))
             }
         } else {
-            pipeline.expand(self);
             Some(self.execute_pipeline(pipeline))
         };
 
