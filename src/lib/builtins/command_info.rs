@@ -71,7 +71,7 @@ pub(crate) fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<C
         return Ok("alias".into());
     } else if shell.variables.get::<Function>(command).is_some() {
         return Ok("function".into());
-    } else if shell.builtins().contains_key(command) {
+    } else if shell.builtins().contains(command) {
         return Ok("builtin".into());
     } else {
         for path in
