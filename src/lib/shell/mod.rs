@@ -399,7 +399,7 @@ impl<'a> Shell<'a> {
 
     pub fn new(is_background_shell: bool) -> Self {
         Shell {
-            builtins:           BuiltinMap::default(),
+            builtins:           BuiltinMap::default().with_shell_dangerous(),
             variables:          Variables::default(),
             flow_control:       FlowControl::default(),
             directory_stack:    DirectoryStack::new(),

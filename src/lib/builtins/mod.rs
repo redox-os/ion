@@ -58,25 +58,39 @@ const DISOWN_DESC: &str =
 pub type BuiltinFunction<'a> = &'a dyn Fn(&[small::String], &mut Shell) -> i32;
 
 macro_rules! map {
-    ($($name:expr => $func:ident: $help:expr),+) => {{
-        let mut help = HashMap::<&'static str, &'static str>::new();
-        let mut fcts = HashMap::<&'static str, BuiltinFunction<'a>>::new();
+    ($builtins:ident, $($name:expr => $func:ident: $help:expr),+) => {{
         $(
-            help.insert($name, $help);
-            fcts.insert($name, &$func);
+            $builtins.add($name, &$func, $help);
         )+
-        BuiltinMap { help, fcts }
+        $builtins
     }};
 }
 
-/// If you are implementing a builtin add it to the table below, create a well named manpage in
-/// man_pages and check for help flags by adding to the start of your builtin the following
-/// if check_help(args, MAN_BUILTIN_NAME) {
-///     return SUCCESS
-/// }
-
-/// Builtins are in A-Z order.
-
+/// A container for builtins and their respective help text
+///
+/// Note: To reduce allocations, function are provided as pointer rather than boxed closures
+/// ```
+/// use ion_shell::builtins::BuiltinMap;
+/// use ion_shell::shell::Shell;
+///
+/// // create a builtin
+/// let mut custom = |_args: &[small::String], _shell: &mut Shell| {
+///     println!("Hello world!");
+///     42
+/// };
+///
+/// // create a builtin map with some predefined builtins
+/// let mut builtins = BuiltinMap::new().with_basic().with_variables();
+///
+/// // add a builtin
+/// builtins.add("custom builtin", &mut custom, "Very helpful comment to display to the user");
+///
+/// // execute a builtin
+/// assert_eq!(
+///     builtins.get("custom builtin").unwrap()(&["ion".into()], &mut Shell::new(false)),
+///     42,
+/// );
+/// // >> Hello world!
 pub struct BuiltinMap<'a> {
     fcts: HashMap<&'static str, BuiltinFunction<'a>>,
     help: HashMap<&'static str, &'static str>,
@@ -84,70 +98,142 @@ pub struct BuiltinMap<'a> {
 
 impl<'a> Default for BuiltinMap<'a> {
     fn default() -> Self {
-        map!(
-            "alias" => builtin_alias : "View, set or unset aliases",
-            "bg" => builtin_bg : "Resumes a stopped background process",
-            "bool" => builtin_bool : "If the value is '1' or 'true', return 0 exit status",
-            "calc" => builtin_calc : "Calculate a mathematical expression",
-            "cd" => builtin_cd : "Change the current directory\n    cd <path>",
-            "contains" => contains : "Evaluates if the supplied argument contains a given string",
-            "dirs" => builtin_dirs : "Display the current directory stack",
-            "disown" => builtin_disown : DISOWN_DESC,
-            "drop" => builtin_drop : "Delete a variable",
-            "echo" => builtin_echo : "Display a line of text",
-            "ends-with" => ends_with : "Evaluates if the supplied argument ends with a given string",
-            "eq" => builtin_eq : "Simple alternative to == and !=",
-            "eval" => builtin_eval : "Evaluates the evaluated expression",
-            "exec" => builtin_exec : "Replace the shell with the given command.",
-            "exists" => builtin_exists : "Performs tests on files and text",
-            "exit" => builtin_exit : "Exits the current session",
-            "false" => builtin_false : "Do nothing, unsuccessfully",
-            "fg" => builtin_fg : "Resumes and sets a background process as the active process",
-            "fn" => builtin_fn : "Print list of functions",
-            "help" => builtin_help : HELP_DESC,
-            "is" => builtin_is : "Simple alternative to == and !=",
-            "isatty" => builtin_isatty : "Returns 0 exit status if the supplied FD is a tty",
-            "jobs" => builtin_jobs : "Displays all jobs that are attached to the background",
-            "matches" => builtin_matches : "Checks if a string matches a given regex",
-            "popd" => builtin_popd : "Pop a directory from the stack",
-            "pushd" => builtin_pushd : "Push a directory to the stack",
-            "random" => builtin_random : "Outputs a random u64",
-            "read" => builtin_read : "Read some variables\n    read <variable>",
-            "set" => builtin_set : "Set or unset values of shell options and positional parameters.",
-            "source" => builtin_source : SOURCE_DESC,
-            "starts-with" => starts_with : "Evaluates if the supplied argument starts with a given string",
-            "status" => builtin_status : "Evaluates the current runtime status",
-            "suspend" => builtin_suspend : "Suspends the shell with a SIGTSTOP signal",
-            "test" => builtin_test : "Performs tests on files and text",
-            "true" => builtin_true : "Do nothing, successfully",
-            "type" => builtin_type : "indicates how a command would be interpreted",
-            "unalias" => builtin_unalias : "Delete an alias",
-            "wait" => builtin_wait : "Waits until all running background processes have completed",
-            "which" => builtin_which : "Shows the full path of commands"
-        )
+        Self::with_capacity(64)
+            .with_basic()
+            .with_variables()
+            .with_process_control()
+            .with_values_tests()
+            .with_files_and_directory()
     }
 }
 
+// Note for implementers:
+// If you are implementing a builtin add it to the table below, create a well named manpage in
+// man_pages and check for help flags by adding to the start of your builtin the following
+// if check_help(args, MAN_BUILTIN_NAME) {
+//     return SUCCESS
+// }
 impl<'a> BuiltinMap<'a> {
-    #[inline]
+    /// Create a new, blank builtin map
+    ///
+    /// If you have a hint over the number of builtins, with_capacity is probably better
     pub fn new() -> Self { BuiltinMap { fcts: HashMap::new(), help: HashMap::new() } }
 
-    #[inline]
-    pub fn contains_key(&self, func: &str) -> bool { self.fcts.get(&func).is_some() }
+    /// Create a new, blank builtin map with a given capacity
+    pub fn with_capacity(cap: usize) -> Self {
+        BuiltinMap { fcts: HashMap::with_capacity(cap), help: HashMap::with_capacity(cap) }
+    }
 
-    #[inline]
+    /// Check if the given builtin exists
+    pub fn contains(&self, func: &str) -> bool { self.fcts.get(&func).is_some() }
+
+    /// Get the list of builtins included
     pub fn keys(&self) -> impl Iterator<Item = &str> { self.fcts.keys().cloned() }
 
-    #[inline]
+    /// Get the provided help for a given builtin
     pub fn get_help(&self, func: &str) -> Option<&str> { self.help.get(func).cloned() }
 
-    #[inline]
+    /// Get the function of a given builtin
     pub fn get(&self, func: &str) -> Option<BuiltinFunction<'a>> { self.fcts.get(func).cloned() }
 
-    #[inline]
+    /// Add a new builtin
     pub fn add(&mut self, name: &'static str, func: BuiltinFunction<'a>, help: &'static str) {
         self.fcts.insert(name, func);
         self.help.insert(name, help);
+    }
+
+    /// Create and control variables
+    ///
+    /// Contains `fn`, `alias`, `unalias`, `drop`, `read`
+    pub fn with_variables(mut self) -> Self {
+        map!(
+            self,
+            "fn" => builtin_fn : "Print list of functions",
+            "alias" => builtin_alias : "View, set or unset aliases",
+            "unalias" => builtin_unalias : "Delete an alias",
+            "drop" => builtin_drop : "Delete a variable",
+            "read" => builtin_read : "Read some variables\n    read <variable>"
+        )
+    }
+
+    /// Control subrpocesses states
+    ///
+    /// Contains `disown`, `bg`, `fg`, `wait`, `isatty`, `jobs`
+    pub fn with_process_control(mut self) -> Self {
+        map!(
+            self,
+            "disown" => builtin_disown : DISOWN_DESC,
+            "bg" => builtin_bg : "Resumes a stopped background process",
+            "fg" => builtin_fg : "Resumes and sets a background process as the active process",
+            "wait" => builtin_wait : "Waits until all running background processes have completed",
+            "isatty" => builtin_isatty : "Returns 0 exit status if the supplied FD is a tty",
+            "jobs" => builtin_jobs : "Displays all jobs that are attached to the background"
+        )
+    }
+
+    /// Utilities concerning the filesystem
+    ///
+    /// Contains `which`, `test`, `exists`, `popd`, `pushd`, `dirs`, `cd`
+    pub fn with_files_and_directory(mut self) -> Self {
+        map!(
+            self,
+            "which" => builtin_which : "Shows the full path of commands",
+            "test" => builtin_test : "Performs tests on files and text",
+            "exists" => builtin_exists : "Performs tests on files and text",
+            "popd" => builtin_popd : "Pop a directory from the stack",
+            "pushd" => builtin_pushd : "Push a directory to the stack",
+            "dirs" => builtin_dirs : "Display the current directory stack",
+            "cd" => builtin_cd : "Change the current directory\n    cd <path>"
+        )
+    }
+
+    /// Utilities to test values
+    ///
+    /// Contains `bool`, `calc`, `eq`, `is`, `true`, `false`, `starts-with`, `ends-with`,
+    /// `contains`, `matches`, `random`
+    pub fn with_values_tests(mut self) -> Self {
+        map!(
+            self,
+            "bool" => builtin_bool : "If the value is '1' or 'true', return 0 exit status",
+            "calc" => builtin_calc : "Calculate a mathematical expression",
+            "eq" => builtin_eq : "Simple alternative to == and !=",
+            "is" => builtin_is : "Simple alternative to == and !=",
+            "true" => builtin_true : "Do nothing, successfully",
+            "false" => builtin_false : "Do nothing, unsuccessfully",
+            "starts-with" => starts_with : "Evaluates if the supplied argument starts with a given string",
+            "ends-with" => ends_with : "Evaluates if the supplied argument ends with a given string",
+            "contains" => contains : "Evaluates if the supplied argument contains a given string",
+            "matches" => builtin_matches : "Checks if a string matches a given regex",
+            "random" => builtin_random : "Outputs a random u64"
+        )
+    }
+
+    /// Basic utilities for any ion embedded library
+    ///
+    /// Contains `help`, `source`, `status`, `echo`, `type`
+    pub fn with_basic(mut self) -> Self {
+        map!(
+            self,
+            "help" => builtin_help : HELP_DESC,
+            "source" => builtin_source : SOURCE_DESC,
+            "status" => builtin_status : "Evaluates the current runtime status",
+            "echo" => builtin_echo : "Display a line of text",
+            "type" => builtin_type : "indicates how a command would be interpreted"
+        )
+    }
+
+    /// Utilities specific for a shell, that should probably not be included in an embedded context
+    ///
+    /// Contains `eval`, `exec`, `exit`, `set`, `suspend`
+    pub fn with_shell_dangerous(mut self) -> Self {
+        map!(
+            self,
+            "eval" => builtin_eval : "Evaluates the evaluated expression",
+            "exec" => builtin_exec : "Replace the shell with the given command.",
+            "exit" => builtin_exit : "Exits the current session",
+            "set" => builtin_set : "Set or unset values of shell options and positional parameters.",
+            "suspend" => builtin_suspend : "Suspends the shell with a SIGTSTOP signal"
+        )
     }
 }
 
