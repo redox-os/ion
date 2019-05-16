@@ -121,9 +121,17 @@ pub struct Shell<'a> {
 pub struct ShellBuilder;
 
 impl ShellBuilder {
-    pub fn as_binary<'a>(&self) -> Shell<'a> { Shell::new(false) }
+    pub fn as_binary<'a>(self) -> Shell<'a> { Shell::new(false) }
 
-    pub fn as_library<'a>(&self) -> Shell<'a> { Shell::new(true) }
+    pub fn as_library<'a>(self) -> Shell<'a> { Shell::new(true) }
+
+    pub fn as_binary_with_builtins<'a>(self, builtins: BuiltinMap<'a>) -> Shell<'a> {
+        Shell::with_builtins(builtins, false)
+    }
+
+    pub fn as_library_with_builtins<'a>(self, builtins: BuiltinMap<'a>) -> Shell<'a> {
+        Shell::with_builtins(builtins, true)
+    }
 
     pub fn set_unique_pid(self) -> Self {
         if let Ok(pid) = sys::getpid() {
@@ -398,26 +406,30 @@ impl<'a> Shell<'a> {
     }
 
     pub fn new(is_background_shell: bool) -> Self {
+        Self::with_builtins(BuiltinMap::default().with_shell_dangerous(), is_background_shell)
+    }
+
+    pub fn with_builtins(builtins: BuiltinMap<'a>, is_background_shell: bool) -> Self {
         Shell {
-            builtins:           BuiltinMap::default().with_shell_dangerous(),
-            variables:          Variables::default(),
-            flow_control:       FlowControl::default(),
-            directory_stack:    DirectoryStack::new(),
-            previous_job:       !0,
-            previous_status:    0,
-            opts:               ShellOptions {
+            builtins,
+            variables: Variables::default(),
+            flow_control: FlowControl::default(),
+            directory_stack: DirectoryStack::new(),
+            previous_job: !0,
+            previous_status: SUCCESS,
+            opts: ShellOptions {
                 err_exit: false,
                 print_comms: false,
                 no_exec: false,
                 huponexit: false,
                 is_background_shell,
             },
-            background:         Arc::new(Mutex::new(Vec::new())),
-            break_flow:         false,
+            background: Arc::new(Mutex::new(Vec::new())),
+            break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new()),
-            on_command:         None,
-            prep_for_exit:      None,
-            unterminated:       false,
+            on_command: None,
+            prep_for_exit: None,
+            unterminated: false,
         }
     }
 
