@@ -11,7 +11,6 @@ extern crate ion_sys as sys;
 pub mod types;
 #[macro_use]
 pub mod parser;
-mod ascii_helpers;
 pub mod builtins;
 mod memory;
 pub mod shell;
@@ -19,30 +18,5 @@ pub mod shell;
 pub(crate) use self::memory::IonPool;
 pub use crate::shell::{
     binary::MAN_ION, pipe_exec::job_control::JobControl, status, Capture, Fork, InteractiveBinary,
-    IonError, IonResult, Shell, ShellBuilder,
+    IonError, IonResult, Shell,
 };
-
-pub fn version() -> &'static str { include!(concat!(env!("OUT_DIR"), "/version_string")) }
-
-pub fn join_with<S: AsRef<str>>(
-    input: &mut small::String,
-    with: char,
-    mut iter: impl Iterator<Item = S>,
-) {
-    if let Some(str) = iter.next() {
-        input.push_str(str.as_ref());
-        iter.for_each(|str| {
-            input.push(with);
-            input.push_str(str.as_ref());
-        });
-    }
-}
-
-pub fn join<S: AsRef<str>>(input: &mut small::String, mut iter: impl Iterator<Item = S>) {
-    if let Some(str) = iter.next() {
-        input.push_str(str.as_ref());
-        iter.for_each(|str| {
-            input.push_str(str.as_ref());
-        });
-    }
-}

@@ -385,17 +385,19 @@ impl<'b> Shell<'b> {
         let _sig_ignore = SignalHandler::new();
 
         // If the given pipeline is a background task, fork the shell.
-        let exit_status = match pipeline.pipe {
+        match pipeline.pipe {
             PipeType::Disown => self.fork_pipe(pipeline, command, ProcessState::Empty),
             PipeType::Background => self.fork_pipe(pipeline, command, ProcessState::Running),
             // Execute each command in the pipeline, giving each command the foreground.
-            PipeType::Normal => self.pipe(pipeline),
-        };
-        // Set the shell as the foreground process again to regain the TTY.
-        if !self.opts.is_background_shell {
-            let _ = sys::tcsetpgrp(0, process::id());
+            PipeType::Normal => {
+                let exit_status = self.pipe(pipeline);
+                // Set the shell as the foreground process again to regain the TTY.
+                if !self.opts.is_background_shell {
+                    let _ = sys::tcsetpgrp(0, process::id());
+                }
+                exit_status
+            }
         }
-        exit_status
     }
 
     /// Executes a piped job `job1 | job2 | job3`
@@ -464,7 +466,7 @@ impl<'b> Shell<'b> {
                     }
 
                     spawn_proc(self, parent, kind, true, &mut last_pid, &mut current_pid, pgid);
-                    set_process_group(&mut pgid, current_pid, !self.opts().is_background_shell);
+                    set_process_group(&mut pgid, current_pid, !self.opts.is_background_shell);
                     resume_prior_process(&mut last_pid, current_pid);
 
                     parent = child;
@@ -475,7 +477,7 @@ impl<'b> Shell<'b> {
                 }
 
                 spawn_proc(self, parent, kind, false, &mut last_pid, &mut current_pid, pgid);
-                set_process_group(&mut pgid, current_pid, !self.opts().is_background_shell);
+                set_process_group(&mut pgid, current_pid, !self.opts.is_background_shell);
                 resume_prior_process(&mut last_pid, current_pid);
 
                 // Waits for all of the children of the assigned pgid to finish executing,

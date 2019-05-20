@@ -117,41 +117,18 @@ pub struct Shell<'a> {
     on_command: Option<Box<Fn(&Shell, std::time::Duration) + 'a>>,
 }
 
-#[derive(Default)]
-pub struct ShellBuilder;
-
-impl ShellBuilder {
-    pub fn as_binary<'a>(self) -> Shell<'a> { Shell::new(false) }
-
-    pub fn as_library<'a>(self) -> Shell<'a> { Shell::new(true) }
-
-    pub fn as_binary_with_builtins<'a>(self, builtins: BuiltinMap<'a>) -> Shell<'a> {
-        Shell::with_builtins(builtins, false)
-    }
-
-    pub fn as_library_with_builtins<'a>(self, builtins: BuiltinMap<'a>) -> Shell<'a> {
-        Shell::with_builtins(builtins, true)
-    }
-
-    pub fn set_unique_pid(self) -> Self {
+impl<'a> Shell<'a> {
+    /// Set the shell as the terminal primary executable
+    pub fn set_unique_pid(&self) {
         if let Ok(pid) = sys::getpid() {
             if sys::setpgid(0, pid).is_ok() {
                 let _ = sys::tcsetpgrp(0, pid);
             }
         }
-
-        self
     }
 
-    pub fn block_signals(self) -> Self {
-        // This will block SIGTSTP, SIGTTOU, SIGTTIN, and SIGCHLD, which is required
-        // for this shell to manage its own process group / children / etc.
-        signals::block();
-
-        self
-    }
-
-    pub fn install_signal_handler(self) -> Self {
+    /// Install signal handlers necessary for the shell to work
+    fn install_signal_handler() {
         extern "C" fn handler(signal: i32) {
             let signal = match signal {
                 sys::SIGINT => signals::SIGINT,
@@ -174,14 +151,47 @@ impl ShellBuilder {
         }
 
         let _ = sys::signal(sys::SIGPIPE, sigpipe_handler);
-
-        self
     }
 
-    pub fn new() -> Self { ShellBuilder }
-}
+    pub fn binary() -> Self { Self::new(false) }
 
-impl<'a> Shell<'a> {
+    pub fn library() -> Self { Self::new(true) }
+
+    pub fn new(is_background_shell: bool) -> Self {
+        Self::with_builtins(BuiltinMap::default().with_shell_dangerous(), is_background_shell)
+    }
+
+    /// Create a shell with custom builtins
+    pub fn with_builtins(builtins: BuiltinMap<'a>, is_background_shell: bool) -> Self {
+        Self::install_signal_handler();
+
+        // This will block SIGTSTP, SIGTTOU, SIGTTIN, and SIGCHLD, which is required
+        // for this shell to manage its own process group / children / etc.
+        signals::block();
+
+        Shell {
+            builtins,
+            variables: Variables::default(),
+            flow_control: FlowControl::default(),
+            directory_stack: DirectoryStack::new(),
+            previous_job: !0,
+            previous_status: SUCCESS,
+            opts: ShellOptions {
+                err_exit: false,
+                print_comms: false,
+                no_exec: false,
+                huponexit: false,
+                is_background_shell,
+            },
+            background: Arc::new(Mutex::new(Vec::new())),
+            break_flow: false,
+            foreground_signals: Arc::new(ForegroundSignals::new()),
+            on_command: None,
+            prep_for_exit: None,
+            unterminated: false,
+        }
+    }
+
     // Resets the flow control fields to their default values.
     fn reset_flow(&mut self) { self.flow_control.reset(); }
 
@@ -403,34 +413,6 @@ impl<'a> Shell<'a> {
     pub fn exit(&mut self, status: i32) -> ! {
         self.prep_for_exit();
         process::exit(status);
-    }
-
-    pub fn new(is_background_shell: bool) -> Self {
-        Self::with_builtins(BuiltinMap::default().with_shell_dangerous(), is_background_shell)
-    }
-
-    pub fn with_builtins(builtins: BuiltinMap<'a>, is_background_shell: bool) -> Self {
-        Shell {
-            builtins,
-            variables: Variables::default(),
-            flow_control: FlowControl::default(),
-            directory_stack: DirectoryStack::new(),
-            previous_job: !0,
-            previous_status: SUCCESS,
-            opts: ShellOptions {
-                err_exit: false,
-                print_comms: false,
-                no_exec: false,
-                huponexit: false,
-                is_background_shell,
-            },
-            background: Arc::new(Mutex::new(Vec::new())),
-            break_flow: false,
-            foreground_signals: Arc::new(ForegroundSignals::new()),
-            on_command: None,
-            prep_for_exit: None,
-            unterminated: false,
-        }
     }
 
     pub fn assign(&mut self, key: &Key, value: Value<'a>) -> Result<(), String> {

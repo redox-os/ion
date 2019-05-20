@@ -1,11 +1,12 @@
 extern crate ion_sys as sys;
 
-use ion_shell::{shell::variables::Value, InteractiveBinary, JobControl, ShellBuilder, MAN_ION};
+use ion_shell::{shell::variables::Value, InteractiveBinary, JobControl, Shell, MAN_ION};
 use liner::KeyBindings;
 use std::{
     alloc::System,
     env,
     io::{stdin, BufReader},
+    process,
 };
 
 #[global_allocator]
@@ -13,13 +14,11 @@ static A: System = System;
 
 fn main() {
     let stdin_is_a_tty = sys::isatty(sys::STDIN_FILENO);
-    let mut shell = ShellBuilder::new().install_signal_handler().block_signals();
+    let mut shell = Shell::binary();
 
     if stdin_is_a_tty {
-        shell = shell.set_unique_pid();
+        shell.set_unique_pid();
     }
-
-    let mut shell = shell.as_binary();
 
     let mut command = None;
     let mut args = env::args().skip(1);
@@ -28,28 +27,22 @@ fn main() {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-o" => match args.next().as_ref().map(|s| s.as_str()) {
-                Some("vi") => {
-                    key_bindings = Some(KeyBindings::Vi);
-                }
-                Some("emacs") => {
-                    key_bindings = Some(KeyBindings::Emacs);
-                }
+                Some("vi") => key_bindings = Some(KeyBindings::Vi),
+                Some("emacs") => key_bindings = Some(KeyBindings::Emacs),
                 Some(_) => {
-                    eprintln!("ion: set: invalid option");
-                    return;
+                    eprintln!("ion: invalid option for option -o");
+                    process::exit(1);
                 }
                 None => {
-                    eprintln!("ion: set: no option given");
-                    return;
+                    eprintln!("ion: no option given for option -o");
+                    process::exit(1);
                 }
             },
             "-x" => shell.opts_mut().print_comms = true,
-            "-n" | "--no-execute" => {
-                shell.opts_mut().no_exec = true;
-            }
+            "-n" | "--no-execute" => shell.opts_mut().no_exec = true,
             "-c" => command = args.next(),
             "-v" | "--version" => {
-                println!("{}", ion_shell::version());
+                println!(include!(concat!(env!("OUT_DIR"), "/version_string")));
                 return;
             }
             "-h" | "--help" => {
