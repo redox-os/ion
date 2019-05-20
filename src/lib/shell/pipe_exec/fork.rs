@@ -6,43 +6,44 @@ pub(crate) fn create_process_group(pgid: u32) { let _ = sys::setpgid(0, pgid); }
 use super::{
     super::{status::*, Shell},
     job_control::{JobControl, ProcessState},
-    pipe,
 };
 use crate::parser::pipelines::Pipeline;
 use std::process::exit;
 
-/// Forks the shell, adding the child to the parent's background list, and executing
-/// the given commands in the child fork.
-pub(crate) fn fork_pipe<'a>(
-    shell: &mut Shell<'a>,
-    pipeline: Pipeline<'a>,
-    command_name: String,
-    state: ProcessState,
-) -> i32 {
-    match unsafe { sys::fork() } {
-        Ok(0) => {
-            shell.opts_mut().is_background_shell = true;
-            let _ = sys::reset_signal(sys::SIGINT);
-            let _ = sys::reset_signal(sys::SIGHUP);
-            let _ = sys::reset_signal(sys::SIGTERM);
-            let _ = sys::close(sys::STDIN_FILENO);
+impl<'a> Shell<'a> {
+    /// Forks the shell, adding the child to the parent's background list, and executing
+    /// the given commands in the child fork.
+    pub(crate) fn fork_pipe(
+        &mut self,
+        pipeline: Pipeline<'a>,
+        command_name: String,
+        state: ProcessState,
+    ) -> i32 {
+        match unsafe { sys::fork() } {
+            Ok(0) => {
+                self.opts_mut().is_background_shell = true;
+                let _ = sys::reset_signal(sys::SIGINT);
+                let _ = sys::reset_signal(sys::SIGHUP);
+                let _ = sys::reset_signal(sys::SIGTERM);
+                let _ = sys::close(sys::STDIN_FILENO);
 
-            // This ensures that the child fork has a unique PGID.
-            create_process_group(0);
+                // This ensures that the child fork has a unique PGID.
+                create_process_group(0);
 
-            // After execution of it's commands, exit with the last command's status.
-            sys::fork_exit(pipe(shell, pipeline, false));
-        }
-        Ok(pid) => {
-            if state != ProcessState::Empty {
-                // The parent process should add the child fork's PID to the background.
-                shell.send_to_background(pid, state, command_name);
+                // After execution of it's commands, exit with the last command's status.
+                sys::fork_exit(self.pipe(pipeline));
             }
-            SUCCESS
-        }
-        Err(why) => {
-            eprintln!("ion: background fork failed: {}", why);
-            exit(FAILURE);
+            Ok(pid) => {
+                if state != ProcessState::Empty {
+                    // The parent process should add the child fork's PID to the background.
+                    self.send_to_background(pid, state, command_name);
+                }
+                SUCCESS
+            }
+            Err(why) => {
+                eprintln!("ion: background fork failed: {}", why);
+                exit(FAILURE);
+            }
         }
     }
 }

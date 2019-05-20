@@ -25,6 +25,16 @@ pub(crate) fn is_expression(s: &str) -> bool {
         || s.starts_with('\'')
 }
 
+fn join_with_spaces<S: AsRef<str>>(input: &mut small::String, mut iter: impl Iterator<Item = S>) {
+    if let Some(str) = iter.next() {
+        input.push_str(str.as_ref());
+        iter.for_each(|str| {
+            input.push(' ');
+            input.push_str(str.as_ref());
+        });
+    }
+}
+
 // TODO: Make array expansions iterators instead of arrays.
 // TODO: Use Cow<'a, types::Str> for hashmap values.
 /// Trait representing different elements of string expansion
@@ -148,8 +158,9 @@ fn slice<S: AsRef<str>>(output: &mut small::String, expanded: S, selection: &Sel
         Select::Range(range) => {
             let graphemes = UnicodeSegmentation::graphemes(expanded.as_ref(), true);
             if let Some((start, length)) = range.bounds(graphemes.clone().count()) {
-                let substring = graphemes.skip(start).take(length);
-                crate::join(output, substring);
+                graphemes.skip(start).take(length).for_each(|str| {
+                    output.push_str(str.as_ref());
+                });
             }
         }
         Select::Key(_) | Select::None => (),
@@ -233,15 +244,14 @@ fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> typ
             for word in word_tokens {
                 match *word {
                     WordToken::Array(ref elements, ref index) => {
-                        crate::join_with(
+                        join_with_spaces(
                             output,
-                            ' ',
                             array_expand(elements, expand_func, &index).iter(),
                         );
                     }
                     WordToken::ArrayVariable(array, _, ref index) => {
                         if let Some(array) = expand_func.array(array, index) {
-                            crate::join_with(output, ' ', array.iter());
+                            join_with_spaces(output, array.iter());
                         }
                     }
                     WordToken::ArrayProcess(command, _, ref index) => match *index {
@@ -263,9 +273,8 @@ fn expand_braces<E: Expander>(word_tokens: &[WordToken], expand_func: &E) -> typ
                             expand_process(temp, command, &Select::All, expand_func);
                             let len = temp.split_whitespace().count();
                             if let Some((start, length)) = range.bounds(len) {
-                                crate::join_with(
+                                join_with_spaces(
                                     output,
-                                    ' ',
                                     temp.split_whitespace().skip(start).take(length),
                                 );
                             }
@@ -519,15 +528,14 @@ pub(crate) fn expand_tokens<E: Expander>(
                 for word in token_buffer {
                     match *word {
                         WordToken::Array(ref elements, ref index) => {
-                            crate::join_with(
+                            join_with_spaces(
                                 output,
-                                ' ',
                                 array_expand(elements, expand_func, &index).iter(),
                             );
                         }
                         WordToken::ArrayVariable(array, _, ref index) => {
                             if let Some(array) = expand_func.array(array, index) {
-                                crate::join_with(output, ' ', array.iter());
+                                join_with_spaces(output, array.iter());
                             }
                         }
                         WordToken::ArrayProcess(command, _, ref index) => match index {
@@ -551,9 +559,10 @@ pub(crate) fn expand_tokens<E: Expander>(
                                 if let Some((start, length)) =
                                     range.bounds(temp.split_whitespace().count())
                                 {
-                                    let temp = temp.split_whitespace().skip(start).take(length);
-
-                                    crate::join_with(output, ' ', temp);
+                                    join_with_spaces(
+                                        output,
+                                        temp.split_whitespace().skip(start).take(length),
+                                    );
                                 }
                             }
                             Select::Key(_) | Select::None => (),

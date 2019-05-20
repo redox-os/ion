@@ -44,8 +44,7 @@ fn get_var_string(name: &str, shell: &mut Shell) -> types::Str {
 #[test]
 fn test_is() {
     fn vec_string(args: &[&str]) -> Vec<small::String> { args.iter().map(|&s| s.into()).collect() }
-    use crate::shell::ShellBuilder;
-    let mut shell = ShellBuilder::new().as_library();
+    let mut shell = Shell::library();
     shell.set("x", "value");
     shell.set("y", "0");
 
