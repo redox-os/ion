@@ -464,25 +464,18 @@ impl<'b> Shell<'b> {
                     }
 
                     spawn_proc(self, parent, kind, true, &mut last_pid, &mut current_pid, pgid);
-                    if set_process_group(&mut pgid, current_pid) && !self.opts().is_background_shell
-                    {
-                        let _ = sys::tcsetpgrp(0, pgid);
-                    }
+                    set_process_group(&mut pgid, current_pid, !self.opts().is_background_shell);
                     resume_prior_process(&mut last_pid, current_pid);
 
                     parent = child;
-                    if ckind != RedirectFrom::None {
-                        kind = ckind;
-                    } else {
-                        kind = ckind;
+                    kind = ckind;
+                    if ckind == RedirectFrom::None {
                         break;
                     }
                 }
 
                 spawn_proc(self, parent, kind, false, &mut last_pid, &mut current_pid, pgid);
-                if set_process_group(&mut pgid, current_pid) && !self.opts().is_background_shell {
-                    let _ = sys::tcsetpgrp(0, pgid);
-                }
+                set_process_group(&mut pgid, current_pid, !self.opts().is_background_shell);
                 resume_prior_process(&mut last_pid, current_pid);
 
                 // Waits for all of the children of the assigned pgid to finish executing,
@@ -658,13 +651,15 @@ fn resume_prior_process(last_pid: &mut u32, current_pid: u32) {
     *last_pid = current_pid;
 }
 
-fn set_process_group(pgid: &mut u32, pid: u32) -> bool {
-    let pgid_set = *pgid == 0;
-    if pgid_set {
+fn set_process_group(pgid: &mut u32, pid: u32, set_foreground: bool) {
+    if *pgid == 0 {
         *pgid = pid;
+        if set_foreground {
+            let _ = sys::tcsetpgrp(0, *pgid);
+        }
+    } else {
+        let _ = sys::setpgid(pid, *pgid);
     }
-    let _ = sys::setpgid(pid, *pgid);
-    pgid_set
 }
 
 pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
