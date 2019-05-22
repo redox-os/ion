@@ -12,7 +12,7 @@ trait AddItem<'a> {
     fn add_item(
         &mut self,
         redirection: RedirectFrom,
-        args: &mut Args,
+        args: Args,
         outputs: Vec<Redirection>,
         inputs: Vec<Input>,
         builtin: Option<BuiltinFunction<'a>>,
@@ -23,17 +23,13 @@ impl<'a> AddItem<'a> for Pipeline<'a> {
     fn add_item(
         &mut self,
         redirection: RedirectFrom,
-        args: &mut Args,
+        args: Args,
         outputs: Vec<Redirection>,
         inputs: Vec<Input>,
         builtin: Option<BuiltinFunction<'a>>,
     ) {
         if !args.is_empty() {
-            self.items.push(PipeItem::new(
-                Job::new(args.drain().collect(), redirection, builtin),
-                outputs,
-                inputs,
-            ));
+            self.items.push(PipeItem::new(Job::new(args, redirection, builtin), outputs, inputs));
         }
     }
 }
@@ -109,9 +105,9 @@ impl<'a> Collector<'a> {
                             let builtin = builtins.get(&args[0]);
                             pipeline.add_item(
                                 RedirectFrom::Both,
-                                &mut args,
-                                outputs.drain(..).collect(),
-                                inputs.drain(..).collect(),
+                                std::mem::replace(&mut args, Args::new()),
+                                std::mem::replace(&mut outputs, Vec::new()),
+                                std::mem::replace(&mut inputs, Vec::new()),
                                 builtin,
                             );
                         }
@@ -121,9 +117,9 @@ impl<'a> Collector<'a> {
                             pipeline.pipe = PipeType::Disown;
                             pipeline.add_item(
                                 RedirectFrom::None,
-                                &mut args,
-                                outputs.drain(..).collect(),
-                                inputs.drain(..).collect(),
+                                std::mem::replace(&mut args, Args::new()),
+                                std::mem::replace(&mut outputs, Vec::new()),
+                                std::mem::replace(&mut inputs, Vec::new()),
                                 builtin,
                             );
                             break;
@@ -133,9 +129,9 @@ impl<'a> Collector<'a> {
                             pipeline.pipe = PipeType::Background;
                             pipeline.add_item(
                                 RedirectFrom::None,
-                                &mut args,
-                                outputs.drain(..).collect(),
-                                inputs.drain(..).collect(),
+                                std::mem::replace(&mut args, Args::new()),
+                                std::mem::replace(&mut outputs, Vec::new()),
+                                std::mem::replace(&mut inputs, Vec::new()),
                                 builtin,
                             );
                             break;
@@ -161,9 +157,9 @@ impl<'a> Collector<'a> {
                             let builtin = builtins.get(&args[0]);
                             pipeline.add_item(
                                 RedirectFrom::Stderr,
-                                &mut args,
-                                outputs.drain(..).collect(),
-                                inputs.drain(..).collect(),
+                                std::mem::replace(&mut args, Args::new()),
+                                std::mem::replace(&mut outputs, Vec::new()),
+                                std::mem::replace(&mut inputs, Vec::new()),
                                 builtin,
                             );
                         }
@@ -175,9 +171,9 @@ impl<'a> Collector<'a> {
                     let builtin = builtins.get(&args[0]);
                     pipeline.add_item(
                         RedirectFrom::Stdout,
-                        &mut args,
-                        outputs.drain(..).collect(),
-                        inputs.drain(..).collect(),
+                        std::mem::replace(&mut args, Args::new()),
+                        std::mem::replace(&mut outputs, Vec::new()),
+                        std::mem::replace(&mut inputs, Vec::new()),
                         builtin,
                     );
                 }
@@ -205,10 +201,7 @@ impl<'a> Collector<'a> {
                             // in order to get the EOF phrase that will be used to terminate
                             // the heredoc.
                             let heredoc = {
-                                let mut buffer = Vec::new();
-                                while let Some((_, byte)) = bytes.next() {
-                                    buffer.push(byte);
-                                }
+                                let buffer = bytes.by_ref().map(|(_, b)| b).collect();
                                 unsafe { String::from_utf8_unchecked(buffer) }
                             };
                             let heredoc = heredoc.lines().skip(1).collect::<Vec<&str>>();
@@ -237,7 +230,7 @@ impl<'a> Collector<'a> {
 
         if !args.is_empty() {
             let builtin = builtins.get(&args[0]);
-            pipeline.add_item(RedirectFrom::None, &mut args, outputs, inputs, builtin);
+            pipeline.add_item(RedirectFrom::None, args, outputs, inputs, builtin);
         }
 
         Ok(pipeline)
@@ -399,7 +392,7 @@ impl<'a> Collector<'a> {
     {
         while let Some(&(i, b)) = bytes.peek() {
             // We return an inclusive range to keep the quote type intact
-            if let b'\'' = b {
+            if b == b'\'' {
                 bytes.next();
                 return Ok(&self.data[start..=i]);
             }
