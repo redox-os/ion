@@ -41,7 +41,7 @@ use crate::{
 };
 use itertools::Itertools;
 use std::{
-    fs,
+    fs::{self, OpenOptions},
     io::{self, Read, Write},
     iter::FromIterator,
     path::Path,
@@ -118,6 +118,8 @@ pub struct Shell<'a> {
 }
 
 impl<'a> Shell<'a> {
+    const CONFIG_FILE_NAME: &'static str = "initrc";
+
     /// Set the shell as the terminal primary executable
     pub fn set_unique_pid(&self) {
         if let Ok(pid) = sys::getpid() {
@@ -357,14 +359,20 @@ impl<'a> Shell<'a> {
                 return;
             }
         };
-        match base_dirs.find_config_file("initrc") {
+        match base_dirs.find_config_file(Self::CONFIG_FILE_NAME) {
             Some(initrc) => self.execute_file(&initrc),
             None => {
-                if let Err(err) = base_dirs.place_config_file("initrc") {
-                    eprintln!("ion: could not create initrc file: {}", err);
+                if let Err(err) = Self::create_config_file(base_dirs, Self::CONFIG_FILE_NAME) {
+                    eprintln!("ion: could not create config file: {}", err);
                 }
             }
         }
+    }
+
+    fn create_config_file(base_dirs: BaseDirectories, file_name: &str) -> Result<(), io::Error> {
+        let path = base_dirs.place_config_file(file_name)?;
+        OpenOptions::new().write(true).create_new(true).open(path)?;
+        Ok(())
     }
 
     /// Call the cleanup callback
