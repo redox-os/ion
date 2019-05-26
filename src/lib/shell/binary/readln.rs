@@ -103,11 +103,14 @@ pub(crate) fn readln(binary: &InteractiveBinary) -> Option<String> {
         Err(ref err) if err.kind() == ErrorKind::Interrupted => None,
         // Handles Ctrl + D
         Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
-            if binary.shell.borrow_mut().flow_control.pop() {
+            let mut shell = binary.shell.borrow_mut();
+            if shell.unterminated {
+                None
+            } else if shell.flow_control.pop() {
                 None
             } else {
-                let status = binary.shell.borrow().previous_status;
-                binary.shell.borrow_mut().exit(status);
+                let status = shell.previous_status;
+                shell.exit(status);
             }
         }
         Err(err) => {
