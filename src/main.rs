@@ -78,7 +78,6 @@ fn main() {
         if let Some(key_bindings) = key_bindings {
             interactive.set_keybindings(key_bindings);
         }
-        interactive.init_file();
         interactive.add_callbacks();
         interactive.execute_interactive();
     } else {

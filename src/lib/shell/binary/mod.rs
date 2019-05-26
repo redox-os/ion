@@ -5,7 +5,11 @@ mod prompt;
 mod readln;
 
 use self::{history::ShellHistory, prompt::prompt, readln::readln};
-use super::{pipe_exec::job_control::JobControl, status::SUCCESS, FlowLogic, Shell};
+use super::{
+    pipe_exec::job_control::JobControl,
+    status::{FAILURE, SUCCESS},
+    FlowLogic, Shell,
+};
 use crate::{
     builtins::man_pages,
     parser::{shell_expand::Expander, Terminator},
@@ -68,9 +72,6 @@ impl<'a> InteractiveBinary<'a> {
         }
     }
 
-    #[inline]
-    pub fn init_file(&self) { self.shell.borrow_mut().evaluate_init_file(); }
-
     pub fn add_callbacks(&self) {
         let mut shell = self.shell.borrow_mut();
         let context = self.context.clone();
@@ -116,6 +117,28 @@ impl<'a> InteractiveBinary<'a> {
             SUCCESS
         };
 
+        let context_bis = self.context.clone();
+        let keybindings = &move |args: &[small::String], _shell: &mut Shell| -> i32 {
+            match args.get(1).map(|s| s.as_str()) {
+                Some("vi") => {
+                    context_bis.borrow_mut().key_bindings = KeyBindings::Vi;
+                    SUCCESS
+                }
+                Some("emacs") => {
+                    context_bis.borrow_mut().key_bindings = KeyBindings::Emacs;
+                    SUCCESS
+                }
+                Some(_) => {
+                    eprintln!("Invalid keybindings. Choices are vi and emacs");
+                    FAILURE
+                }
+                None => {
+                    eprintln!("keybindings need an argument");
+                    FAILURE
+                }
+            }
+        };
+
         // change the lifetime to allow adding local builtins
         let InteractiveBinary { context, shell } = self;
         let this = InteractiveBinary { context, shell: RefCell::new(shell.into_inner()) };
@@ -125,6 +148,12 @@ impl<'a> InteractiveBinary<'a> {
             history,
             "Display a log of all commands previously executed",
         );
+        this.shell.borrow_mut().builtins_mut().add(
+            "keybindings",
+            keybindings,
+            "Change the keybindings",
+        );
+        this.shell.borrow_mut().evaluate_init_file();
 
         loop {
             let mut lines = std::iter::repeat_with(|| this.readln())
