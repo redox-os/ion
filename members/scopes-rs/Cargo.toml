@@ -1,0 +1,9 @@
+[package]
+name = "scopes"
+version = "0.1.0"
+authors = ["Michael Murphy <mmstickman@gmail.com>", "AdminXVII <dev.xlheureux@gmail.com"]
+edition = "2018"
+publish = false
+
+[dependencies]
+hashbrown = "0.1"

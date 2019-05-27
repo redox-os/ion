@@ -29,10 +29,11 @@ use self::{
 
 use std::{
     error::Error,
-    io::{self, Write},
+    io::{self, BufRead, Write},
 };
 
 use hashbrown::HashMap;
+use liner::Context;
 
 use crate::{
     shell::{
@@ -370,7 +371,28 @@ fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_READ) {
         return SUCCESS;
     }
-    shell.variables.read(args)
+
+    if sys::isatty(sys::STDIN_FILENO) {
+        let mut con = Context::new();
+        for arg in args.iter().skip(1) {
+            match con.read_line(format!("{}=", arg.trim()), None, &mut |_| {}) {
+                Ok(buffer) => {
+                    shell.variables.set(arg.as_ref(), buffer.trim());
+                }
+                Err(_) => return FAILURE,
+            }
+        }
+    } else {
+        let stdin = io::stdin();
+        let handle = stdin.lock();
+        let mut lines = handle.lines();
+        for arg in args.iter().skip(1) {
+            if let Some(Ok(line)) = lines.next() {
+                shell.variables.set(arg.as_ref(), line.trim());
+            }
+        }
+    }
+    SUCCESS
 }
 
 fn builtin_drop(args: &[small::String], shell: &mut Shell) -> i32 {

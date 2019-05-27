@@ -23,7 +23,7 @@ edition = "2018"
 [workspace]
 members = [
     "members/braces", "members/builtins", "members/lexers", "members/sys",
-    "members/ranges"
+    "members/ranges", "members/scopes-rs"
 ]
 
 [dev-dependencies]
@@ -68,6 +68,7 @@ ion_builtins = { path = "members/builtins" }
 ion_lexers = { path = "members/lexers" }
 ion_sys = { path = "members/sys" }
 ion-ranges = { path = "members/ranges" }
+scopes = { path = "members/scopes-rs" }
 hashbrown = "0.1.2"
 itertools = "0.8"
 lexical = "2.0"
