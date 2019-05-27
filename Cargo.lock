@@ -373,6 +373,7 @@ dependencies = [
  "object-pool 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "scopes 0.1.0",
  "serial_test 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serial_test_derive 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "small 0.1.0 (git+https://gitlab.redox-os.org/redox-os/small)",
@@ -845,6 +846,13 @@ dependencies = [
 name = "scopeguard"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "scopes"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "semver"

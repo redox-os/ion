@@ -418,7 +418,7 @@ impl<'a> Function<'a> {
         shell.variables.new_scope(true);
 
         for (type_, value) in values {
-            shell.variables.shadow(&type_.name, value);
+            shell.variables.set(&type_.name, value);
         }
 
         shell.execute_statements(&self.statements);
