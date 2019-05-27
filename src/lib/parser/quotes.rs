@@ -7,31 +7,6 @@ enum Quotes {
     None,
 }
 
-#[derive(Debug)]
-struct EofMatcher {
-    eof:       Vec<u8>,
-    complete:  bool,
-    match_idx: usize,
-}
-
-impl EofMatcher {
-    fn new() -> Self { EofMatcher { eof: Vec::with_capacity(10), complete: false, match_idx: 0 } }
-
-    #[inline]
-    fn next(&mut self, c: u8) -> bool {
-        if self.complete && self.eof.get(self.match_idx) == Some(&c) {
-            self.match_idx += 1;
-        } else if self.complete {
-            self.match_idx = 0;
-        } else if c == b'\n' {
-            self.complete = true;
-        } else if !self.eof.is_empty() || !(c as char).is_whitespace() {
-            self.eof.push(c);
-        }
-        self.complete && self.match_idx == self.eof.len()
-    }
-}
-
 /// Serves as a buffer for storing a string until that string can be terminated.
 ///
 /// # Examples
@@ -41,14 +16,12 @@ impl EofMatcher {
 #[derive(Debug)]
 pub struct Terminator<I: Iterator<Item = u8>> {
     inner:      RearPeekable<I>,
-    eof:        Option<EofMatcher>,
     array:      usize,
     skip_next:  bool,
     quotes:     Quotes,
     terminated: bool,
     and_or:     bool,
     whitespace: bool,
-    lt_count:   u8,
     empty:      bool,
     subshell:   usize,
 }
@@ -115,12 +88,6 @@ impl<I: Iterator<Item = u8>> Iterator for Terminator<I> {
 
         if self.skip_next {
             self.skip_next = false;
-        } else if let Some(matcher) = self.eof.as_mut() {
-            if let Some(character) = next {
-                if matcher.next(character) {
-                    self.eof = None;
-                }
-            }
         } else if self.quotes != Quotes::None && next != Some(b'\\') {
             match (next, &self.quotes) {
                 (Some(b'\''), Quotes::Single) | (Some(b'"'), Quotes::Double) => {
@@ -170,17 +137,6 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
             b')' if self.subshell > 0 => {
                 self.subshell -= 1;
                 Some(b')')
-            }
-            b'<' => {
-                if let Some(&b'<') = self.inner.peek() {
-                    self.lt_count += 1;
-                } else if self.lt_count == 1 {
-                    self.eof = Some(EofMatcher::new());
-                    self.lt_count = 0;
-                } else {
-                    self.lt_count = 0;
-                }
-                Some(b'<')
             }
             b'[' => {
                 self.array += 1;
@@ -232,14 +188,12 @@ impl<I: Iterator<Item = u8>> Terminator<I> {
     pub fn new(inner: I) -> Terminator<I> {
         Terminator {
             inner:      RearPeekable { iter: inner.peekable(), now: None, last: None },
-            eof:        None,
             array:      0,
             skip_next:  false,
             quotes:     Quotes::None,
             terminated: false,
             and_or:     false,
             whitespace: false,
-            lt_count:   0,
             empty:      true,
             subshell:   0,
         }

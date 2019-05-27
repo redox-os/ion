@@ -70,7 +70,7 @@ impl<'a> fmt::Display for Input {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Input::File(ref file) => write!(f, "< {}", file),
-            Input::HereString(ref string) => write!(f, "<<< {}", string),
+            Input::HereString(ref string) => write!(f, "<<< '{}'", string),
         }
     }
 }
