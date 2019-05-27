@@ -2,11 +2,13 @@ use std::iter::Peekable;
 
 use super::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection};
 use crate::{
-    builtins::{BuiltinFunction, BuiltinMap},
+    builtins::BuiltinMap,
     lexers::arguments::{Field, Levels},
     shell::Job,
     types::*,
 };
+
+const ARG_DEFAULT_SIZE: usize = 10;
 
 trait AddItem<'a> {
     fn add_item(
@@ -15,7 +17,7 @@ trait AddItem<'a> {
         args: Args,
         outputs: Vec<Redirection>,
         inputs: Vec<Input>,
-        builtin: Option<BuiltinFunction<'a>>,
+        builtin: &BuiltinMap<'a>,
     );
 }
 
@@ -26,9 +28,10 @@ impl<'a> AddItem<'a> for Pipeline<'a> {
         args: Args,
         outputs: Vec<Redirection>,
         inputs: Vec<Input>,
-        builtin: Option<BuiltinFunction<'a>>,
+        builtins: &BuiltinMap<'a>,
     ) {
         if !args.is_empty() {
+            let builtin = builtins.get(&args[0]);
             self.items.push(PipeItem::new(Job::new(args, redirection, builtin), outputs, inputs));
         }
     }
@@ -79,7 +82,7 @@ impl<'a> Collector<'a> {
         builtins: &BuiltinMap<'builtins>,
     ) -> Result<Pipeline<'builtins>, &'static str> {
         let mut bytes = self.data.bytes().enumerate().peekable();
-        let mut args = Args::new();
+        let mut args = Args::with_capacity(ARG_DEFAULT_SIZE);
         let mut pipeline = Pipeline::new();
         let mut outputs: Vec<Redirection> = Vec::new();
         let mut inputs: Vec<Input> = Vec::new();
@@ -102,38 +105,21 @@ impl<'a> Collector<'a> {
                         }
                         Some(&(_, b'|')) => {
                             bytes.next();
-                            let builtin = builtins.get(&args[0]);
                             pipeline.add_item(
                                 RedirectFrom::Both,
-                                std::mem::replace(&mut args, Args::new()),
+                                std::mem::replace(&mut args, Args::with_capacity(ARG_DEFAULT_SIZE)),
                                 std::mem::replace(&mut outputs, Vec::new()),
                                 std::mem::replace(&mut inputs, Vec::new()),
-                                builtin,
+                                builtins,
                             );
                         }
                         Some(&(_, b'!')) => {
                             bytes.next();
-                            let builtin = builtins.get(&args[0]);
                             pipeline.pipe = PipeType::Disown;
-                            pipeline.add_item(
-                                RedirectFrom::None,
-                                std::mem::replace(&mut args, Args::new()),
-                                std::mem::replace(&mut outputs, Vec::new()),
-                                std::mem::replace(&mut inputs, Vec::new()),
-                                builtin,
-                            );
                             break;
                         }
                         Some(_) | None => {
-                            let builtin = builtins.get(&args[0]);
                             pipeline.pipe = PipeType::Background;
-                            pipeline.add_item(
-                                RedirectFrom::None,
-                                std::mem::replace(&mut args, Args::new()),
-                                std::mem::replace(&mut outputs, Vec::new()),
-                                std::mem::replace(&mut inputs, Vec::new()),
-                                builtin,
-                            );
                             break;
                         }
                     }
@@ -154,13 +140,12 @@ impl<'a> Collector<'a> {
                         Some(b'|') => {
                             bytes.next();
                             bytes.next();
-                            let builtin = builtins.get(&args[0]);
                             pipeline.add_item(
                                 RedirectFrom::Stderr,
-                                std::mem::replace(&mut args, Args::new()),
+                                std::mem::replace(&mut args, Args::with_capacity(ARG_DEFAULT_SIZE)),
                                 std::mem::replace(&mut outputs, Vec::new()),
                                 std::mem::replace(&mut inputs, Vec::new()),
-                                builtin,
+                                builtins,
                             );
                         }
                         Some(_) | None => self.push_arg(&mut args, &mut bytes)?,
@@ -168,13 +153,12 @@ impl<'a> Collector<'a> {
                 }
                 b'|' => {
                     bytes.next();
-                    let builtin = builtins.get(&args[0]);
                     pipeline.add_item(
                         RedirectFrom::Stdout,
-                        std::mem::replace(&mut args, Args::new()),
+                        std::mem::replace(&mut args, Args::with_capacity(ARG_DEFAULT_SIZE)),
                         std::mem::replace(&mut outputs, Vec::new()),
                         std::mem::replace(&mut inputs, Vec::new()),
-                        builtin,
+                        builtins,
                     );
                 }
                 b'>' => {
@@ -228,11 +212,7 @@ impl<'a> Collector<'a> {
             }
         }
 
-        if !args.is_empty() {
-            let builtin = builtins.get(&args[0]);
-            pipeline.add_item(RedirectFrom::None, args, outputs, inputs, builtin);
-        }
-
+        pipeline.add_item(RedirectFrom::None, args, outputs, inputs, builtins);
         Ok(pipeline)
     }
 
