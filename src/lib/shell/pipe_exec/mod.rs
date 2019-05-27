@@ -29,7 +29,6 @@ use crate::{
     parser::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
     sys,
 };
-use small;
 use smallvec::SmallVec;
 use std::{
     fs::{File, OpenOptions},
