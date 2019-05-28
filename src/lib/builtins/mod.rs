@@ -280,15 +280,12 @@ fn builtin_bool(args: &[small::String], shell: &mut Shell) -> i32 {
         return FAILURE;
     }
 
-    let opt = shell.variables.get::<types::Str>(&args[1][1..]);
-    let sh_var: &str = match opt.as_ref() {
-        Some(s) => s,
-        None => "",
-    };
+    let opt =
+        if args[1].is_empty() { None } else { shell.variables.get::<types::Str>(&args[1][1..]) };
 
-    match sh_var {
-        "1" => (),
-        "true" => (),
+    match opt.as_ref().map(types::Str::as_str) {
+        Some("1") => (),
+        Some("true") => (),
         _ => match &*args[1] {
             "1" => (),
             "true" => (),
