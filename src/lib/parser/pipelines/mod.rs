@@ -2,8 +2,8 @@ mod collector;
 
 pub use self::collector::*;
 
-use super::expand_string;
 use crate::{
+    parser::Expander,
     shell::{pipe_exec::stdin_of, Job, Shell},
     types,
 };
@@ -118,15 +118,13 @@ impl<'a> PipeItem<'a> {
 
         for input in &mut self.inputs {
             *input = match input {
-                Input::File(ref s) => Input::File(expand_string(s, shell).join(" ").into()),
-                Input::HereString(ref s) => {
-                    Input::HereString(expand_string(s, shell).join(" ").into())
-                }
+                Input::File(ref s) => Input::File(shell.get_string(s)),
+                Input::HereString(ref s) => Input::HereString(shell.get_string(s)),
             };
         }
 
         for output in &mut self.outputs {
-            output.file = expand_string(output.file.as_str(), shell).join(" ").into();
+            output.file = shell.get_string(output.file.as_str());
         }
     }
 

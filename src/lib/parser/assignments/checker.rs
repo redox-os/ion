@@ -1,4 +1,4 @@
-use super::super::{expand_string, Expander};
+use super::super::Expander;
 use crate::{
     lexers::assignments::{Primitive, TypeError},
     shell::variables::Value,
@@ -47,7 +47,7 @@ fn get_map_of<E: Expander>(
     shell: &E,
     expression: &str,
 ) -> Result<Value<'static>, TypeError> {
-    let array = expand_string(expression, shell);
+    let array = shell.expand_string(expression);
 
     let inner_kind = match primitive_type {
         Primitive::HashMap(ref inner) => inner,

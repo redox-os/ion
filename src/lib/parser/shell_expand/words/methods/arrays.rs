@@ -1,6 +1,6 @@
 use super::{
     super::{
-        super::{expand_string, is_expression, Expander},
+        super::{is_expression, Expander},
         Select, SelectWithSize,
     },
     strings::unescape,
@@ -74,7 +74,7 @@ impl<'a> ArrayMethod<'a> {
         let variable = self.resolve_var(expand_func);
         match self.pattern {
             Pattern::StringPattern(string) => {
-                if let Ok(value) = expand_string(string, expand_func).join(" ").parse::<usize>() {
+                if let Ok(value) = expand_func.expand_string(string).join(" ").parse::<usize>() {
                     if value < variable.len() {
                         let (l, r) = variable.split_at(value);
                         Ok(args![types::Str::from(l), types::Str::from(r)])
@@ -94,7 +94,7 @@ impl<'a> ArrayMethod<'a> {
         let res = match (&self.pattern, &self.selection) {
             (_, Select::None) => Some("".into()).into_iter().collect(),
             (&Pattern::StringPattern(pattern), Select::All) => variable
-                .split(unescape(&expand_string(pattern, expand_func).join(" "))?.as_str())
+                .split(unescape(&expand_func.expand_string(pattern).join(" "))?.as_str())
                 .map(From::from)
                 .collect(),
             (&Pattern::Whitespace, Select::All) => variable
@@ -103,7 +103,7 @@ impl<'a> ArrayMethod<'a> {
                 .map(From::from)
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => variable
-                .split(&unescape(&expand_string(pattern, expand_func).join(" "))?.as_str())
+                .split(&unescape(&expand_func.expand_string(pattern).join(" "))?.as_str())
                 .nth(*id)
                 .map(From::from)
                 .into_iter()
@@ -116,7 +116,7 @@ impl<'a> ArrayMethod<'a> {
                 .into_iter()
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => variable
-                .rsplit(&unescape(&expand_string(pattern, expand_func).join(" "))?.as_str())
+                .rsplit(&unescape(&expand_func.expand_string(pattern).join(" "))?.as_str())
                 .nth(*id)
                 .map(From::from)
                 .into_iter()
@@ -129,7 +129,7 @@ impl<'a> ArrayMethod<'a> {
                 .into_iter()
                 .collect(),
             (&Pattern::StringPattern(pattern), Select::Range(range)) => {
-                let expansion = unescape(&expand_string(pattern, expand_func).join(" "))?;
+                let expansion = unescape(&expand_func.expand_string(pattern).join(" "))?;
                 let iter = variable.split(expansion.as_str());
                 if let Some((start, length)) = range.bounds(iter.clone().count()) {
                     iter.skip(start).take(length).map(From::from).collect()
@@ -161,7 +161,7 @@ impl<'a> ArrayMethod<'a> {
         if let Some(array) = expand_func.array(self.variable, &Select::All) {
             array
         } else if is_expression(self.variable) {
-            expand_string(self.variable, expand_func)
+            expand_func.expand_string(self.variable)
         } else {
             Args::new()
         }
@@ -172,7 +172,7 @@ impl<'a> ArrayMethod<'a> {
         if let Some(variable) = expand_func.string(self.variable) {
             variable
         } else if is_expression(self.variable) {
-            types::Str::from_string(expand_string(self.variable, expand_func).join(" "))
+            types::Str::from_string(expand_func.expand_string(self.variable).join(" "))
         } else {
             "".into()
         }

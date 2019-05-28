@@ -8,7 +8,7 @@ mod statement;
 pub use self::{
     loops::ForValueExpression,
     quotes::Terminator,
-    shell_expand::{expand_string, Expander, Select},
+    shell_expand::{Expander, Select},
     statement::{is_valid_name, parse_and_validate, StatementSplitter},
 };
 

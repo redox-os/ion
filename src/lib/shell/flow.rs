@@ -7,9 +7,9 @@ use super::{
 use crate::{
     parser::{
         assignments::is_array,
-        expand_string, parse_and_validate,
+        parse_and_validate,
         pipelines::{PipeItem, Pipeline},
-        ForValueExpression, StatementSplitter, Terminator,
+        Expander, ForValueExpression, StatementSplitter, Terminator,
     },
     shell::Value,
     types,
@@ -294,12 +294,12 @@ impl<'a> Shell<'a> {
         // matches("foo", "bar")
         // ```
         let is_array = is_array(expression.as_ref());
-        let value = expand_string(expression.as_ref(), self);
+        let value = self.expand_string(expression.as_ref());
         for case in cases.iter() {
             if case
                 .value
                 .as_ref()
-                .map(|v| expand_string(&v, self))
+                .map(|v| self.expand_string(&v))
                 .filter(|v| v.iter().all(|v| !value.contains(v)))
                 .is_none()
             {

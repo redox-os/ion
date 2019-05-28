@@ -436,7 +436,7 @@ mod trait_test;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::{expand_string, Expander};
+    use crate::parser::Expander;
     use serial_test_derive::serial;
 
     struct VariableExpander<'a>(pub Variables<'a>);
@@ -448,7 +448,7 @@ mod tests {
     #[test]
     fn undefined_variable_expands_to_empty_string() {
         let variables = Variables::default();
-        let expanded = expand_string("$FOO", &VariableExpander(variables)).join("");
+        let expanded = VariableExpander(variables).expand_string("$FOO").join("");
         assert_eq!("", &expanded);
     }
 
@@ -456,7 +456,7 @@ mod tests {
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.set("FOO", "BAR");
-        let expanded = expand_string("$FOO", &VariableExpander(variables)).join("");
+        let expanded = VariableExpander(variables).expand_string("$FOO").join("");
         assert_eq!("BAR", &expanded);
     }
 

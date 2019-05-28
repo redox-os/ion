@@ -3,7 +3,7 @@ mod methods;
 mod tests;
 
 pub use self::methods::{ArrayMethod, Pattern, StringMethod};
-use super::{expand_string, Expander};
+use super::Expander;
 pub use crate::ranges::{Select, SelectWithSize};
 use crate::{lexers::ArgumentSplitter, shell::escape::unescape};
 use std::borrow::Cow;
@@ -470,7 +470,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         let start = self.read;
         for character in iterator {
             if let b']' = character {
-                let value = expand_string(&self.data[start..self.read], self.expanders).join(" ");
+                let value = self.expanders.expand_string(&self.data[start..self.read]).join(" ");
                 self.read += 1;
                 return value.parse::<Select>().unwrap_or(Select::None);
             }
