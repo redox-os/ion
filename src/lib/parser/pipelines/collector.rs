@@ -179,22 +179,8 @@ impl<'a> Collector<'a> {
                                 return Err("expected string argument after '<<<'");
                             }
                         } else {
-                            // Otherwise, what we have is not a herestring, but a heredoc.
-                            bytes.next();
-                            // Collect the rest of the byte iterator and then trim the result
-                            // in order to get the EOF phrase that will be used to terminate
-                            // the heredoc.
-                            let heredoc = {
-                                let buffer = bytes.by_ref().map(|(_, b)| b).collect();
-                                unsafe { String::from_utf8_unchecked(buffer) }
-                            };
-                            let heredoc = heredoc.lines().skip(1).collect::<Vec<&str>>();
-                            if heredoc.len() > 1 {
-                                let herestring = Input::HereString(
-                                    heredoc[..heredoc.len() - 1].join("\n").into(),
-                                );
-                                inputs.push(herestring);
-                            }
+                            return Err("heredocs are not a part of Ion. Use redirection and/or \
+                                        cat instead");
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
                         // Otherwise interpret it as stdin redirection
@@ -949,21 +935,6 @@ mod tests {
                 job: Job::new(args!["calc"], RedirectFrom::None, None),
 
                 inputs:  vec![Input::HereString("$(cat math.txt)".into())],
-                outputs: vec![],
-            }],
-            pipe:  PipeType::Normal,
-        };
-        assert_eq!(Statement::Pipeline(expected), parse(input, &BuiltinMap::new()));
-    }
-
-    #[test]
-    fn heredoc() {
-        let input = "calc << EOF\n1 + 2\n3 + 4\nEOF";
-        let expected = Pipeline {
-            items: vec![PipeItem {
-                job: Job::new(args!["calc"], RedirectFrom::None, None),
-
-                inputs:  vec![Input::HereString("1 + 2\n3 + 4".into())],
                 outputs: vec![],
             }],
             pipe:  PipeType::Normal,

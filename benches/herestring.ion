@@ -1,4 +1,4 @@
-cat << EOF
+cat <<< '
 aueaue
 uaei
 ui
@@ -12,9 +12,8 @@ e
 aue
 aui
 eauie
-iaue
-EOF
-cat << EOF
+iaue'
+cat <<< '
 aueaue
 uaei
 ui
@@ -28,9 +27,8 @@ e
 aue
 aui
 eauie
-iaue
-EOF
-cat << EOF
+iaue'
+cat <<< '
 aueaue
 uaei
 ui
@@ -44,9 +42,8 @@ e
 aue
 aui
 eauie
-iaue
-EOF
-cat << EOF
+iaue'
+cat <<< '
 aueaue
 uaei
 ui
@@ -60,9 +57,8 @@ e
 aue
 aui
 eauie
-iaue
-EOF
-cat << EOF
+iaue'
+cat <<< '
 aueaue
 uaei
 ui
@@ -76,9 +72,8 @@ e
 aue
 aui
 eauie
-iaue
-EOF
-cat << EOF
+iaue'
+cat <<< '
 aueaue
 uaei
 ui
@@ -92,9 +87,8 @@ e
 aue
 aui
 eauie
-iaue
-EOF
-cat << EOF
+iaue'
+cat <<< '
 aueaue
 uaei
 ui
@@ -108,9 +102,8 @@ e
 aue
 aui
 eauie
-iaue
-EOF
-cat << EOF
+iaue'
+cat <<< '
 aueaue
 uaei
 ui
@@ -124,5 +117,4 @@ e
 aue
 aui
 eauie
-iaue
-EOF
+iaue'
