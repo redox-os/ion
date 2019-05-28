@@ -22,7 +22,7 @@ pub fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
         match get_command_info(command, shell) {
             Ok(c_type) => match c_type.as_ref() {
                 "alias" => {
-                    if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
+                    if let Some(alias) = shell.variables().get::<types::Alias>(&**command) {
                         println!("{}: alias to {}", command, &*alias);
                     }
                 }
@@ -49,7 +49,7 @@ pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
             Ok(c_type) => {
                 match c_type.as_ref() {
                     "alias" => {
-                        if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
+                        if let Some(alias) = shell.variables().get::<types::Alias>(&**command) {
                             println!("{} is aliased to `{}`", command, &*alias);
                         }
                     }
@@ -67,9 +67,9 @@ pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
 }
 
 pub fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<Cow<'a, str>, ()> {
-    if shell.variables.get::<types::Alias>(command).is_some() {
+    if shell.variables().get::<types::Alias>(command).is_some() {
         return Ok("alias".into());
-    } else if shell.variables.get::<Function>(command).is_some() {
+    } else if shell.variables().get::<Function>(command).is_some() {
         return Ok("function".into());
     } else if shell.builtins().contains(command) {
         return Ok("builtin".into());

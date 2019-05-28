@@ -35,7 +35,7 @@ fn get_var_string(name: &str, shell: &mut Shell) -> types::Str {
         return "".into();
     }
 
-    match shell.variables.get::<types::Str>(&name[1..]) {
+    match shell.variables().get::<types::Str>(&name[1..]) {
         Some(s) => s,
         None => "".into(),
     }

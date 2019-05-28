@@ -113,7 +113,7 @@ fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
 
 /// Returns true if the variable is an array and the array is not empty
 fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
-    match shell.variables.get::<types::Array>(arrayvar) {
+    match shell.variables().get::<types::Array>(arrayvar) {
         Some(array) => !array.is_empty(),
         None => false,
     }
@@ -121,7 +121,7 @@ fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
 
 /// Returns true if the variable is a string and the string is not empty
 fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
-    match shell.variables.get::<types::Str>(stringvar) {
+    match shell.variables().get::<types::Str>(stringvar) {
         Some(string) => !string.is_empty(),
         None => false,
     }
@@ -129,7 +129,7 @@ fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
 
 /// Returns true if a function with the given name is defined
 fn function_is_defined(function: &str, shell: &Shell) -> bool {
-    shell.variables.get::<Function>(function).is_some()
+    shell.variables().get::<Function>(function).is_some()
 }
 
 #[test]
@@ -153,13 +153,13 @@ fn test_evaluate_arguments() {
     // check `exists -a`
     // no argument means we treat it as a string
     assert_eq!(exists(&["ion".into(), "-a".into()], &shell), Ok(true));
-    shell.variables.set("emptyarray", types::Array::new());
+    shell.variables_mut().set("emptyarray", types::Array::new());
     assert_eq!(exists(&["ion".into(), "-a".into(), "emptyarray".into()], &shell), Ok(false));
     let mut array = types::Array::new();
     array.push("element".into());
-    shell.variables.set("array", array);
+    shell.variables_mut().set("array", array);
     assert_eq!(exists(&["ion".into(), "-a".into(), "array".into()], &shell), Ok(true));
-    shell.variables.remove_variable("array");
+    shell.variables_mut().remove_variable("array");
     assert_eq!(exists(&["ion".into(), "-a".into(), "array".into()], &shell), Ok(false));
 
     // check `exists -b`
@@ -204,13 +204,13 @@ fn test_evaluate_arguments() {
     assert_eq!(exists(&["ion".into(), "-s".into(), "emptyvar".into()], &shell), Ok(false));
     shell.set("testvar", "foobar".to_string());
     assert_eq!(exists(&["ion".into(), "-s".into(), "testvar".into()], &shell), Ok(true));
-    shell.variables.remove_variable("testvar");
+    shell.variables_mut().remove_variable("testvar");
     assert_eq!(exists(&["ion".into(), "-s".into(), "testvar".into()], &shell), Ok(false));
     // also check that it doesn't trigger on arrays
     let mut array = types::Array::new();
     array.push("element".into());
-    shell.variables.remove_variable("array");
-    shell.variables.set("array", array);
+    shell.variables_mut().remove_variable("array");
+    shell.variables_mut().set("array", array);
     assert_eq!(exists(&["ion".into(), "-s".into(), "array".into()], &shell), Ok(false));
 
     // check `exists --fn`
@@ -222,10 +222,12 @@ fn test_evaluate_arguments() {
     statements.push(Statement::End);
     let description: small::String = "description".into();
 
-    shell.variables.set(&name, Function::new(Some(description), name.clone(), args, statements));
+    shell
+        .variables_mut()
+        .set(&name, Function::new(Some(description), name.clone(), args, statements));
 
     assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(true));
-    shell.variables.remove_variable(name_str);
+    shell.variables_mut().remove_variable(name_str);
     assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(false));
 
     // check invalid flags / parameters (should all be treated as strings and
@@ -309,16 +311,16 @@ fn test_string_is_nonzero() {
 fn test_array_var_is_not_empty() {
     let mut shell = shell::Shell::library();
 
-    shell.variables.set("EMPTY_ARRAY", types::Array::new());
+    shell.variables_mut().set("EMPTY_ARRAY", types::Array::new());
     assert_eq!(array_var_is_not_empty("EMPTY_ARRAY", &shell), false);
 
     let mut not_empty_array = types::Array::new();
     not_empty_array.push("array not empty".into());
-    shell.variables.set("NOT_EMPTY_ARRAY", not_empty_array);
+    shell.variables_mut().set("NOT_EMPTY_ARRAY", not_empty_array);
     assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), true);
 
     // test for array which does not even exist
-    shell.variables.remove_variable("NOT_EMPTY_ARRAY");
+    shell.variables_mut().remove_variable("NOT_EMPTY_ARRAY");
     assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), false);
 
     // array_var_is_not_empty should NOT match for non-array variables with the
@@ -340,11 +342,11 @@ fn test_string_var_is_not_empty() {
     // string_var_is_not_empty should NOT match for arrays with the same name
     let mut array = types::Array::new();
     array.push("not-empty".into());
-    shell.variables.set("ARRAY_NOT_EMPTY", array);
+    shell.variables_mut().set("ARRAY_NOT_EMPTY", array);
     assert_eq!(string_var_is_not_empty("ARRAY_NOT_EMPTY", &shell), false);
 
     // test for a variable which does not even exist
-    shell.variables.remove_variable("NOT_EMPTY");
+    shell.variables_mut().remove_variable("NOT_EMPTY");
     assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), false);
 }
 
@@ -362,9 +364,11 @@ fn test_function_is_defined() {
     statements.push(Statement::End);
     let description: small::String = "description".into();
 
-    shell.variables.set(&name, Function::new(Some(description), name.clone(), args, statements));
+    shell
+        .variables_mut()
+        .set(&name, Function::new(Some(description), name.clone(), args, statements));
 
     assert_eq!(function_is_defined(name_str, &shell), true);
-    shell.variables.remove_variable(name_str);
+    shell.variables_mut().remove_variable(name_str);
     assert_eq!(function_is_defined(name_str, &shell), false);
 }

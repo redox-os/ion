@@ -40,6 +40,7 @@ use crate::{
 };
 use itertools::Itertools;
 use std::{
+    borrow::Cow,
     fs::{self, OpenOptions},
     io::{self, Read, Write},
     iter::FromIterator,
@@ -87,11 +88,11 @@ pub struct Shell<'a> {
     /// started.
     builtins: BuiltinMap<'a>,
     /// Contains the aliases, strings, and array variable maps.
-    pub variables: Variables<'a>,
+    variables: Variables<'a>,
     /// Contains the current state of flow control parameters.
     flow_control: FlowControl<'a>,
     /// Contains the directory stack parameters.
-    pub(crate) directory_stack: DirectoryStack,
+    directory_stack: DirectoryStack,
     /// When a command is executed, the final result of that command is stored
     /// here.
     pub previous_status: i32,
@@ -191,6 +192,28 @@ impl<'a> Shell<'a> {
             prep_for_exit: None,
             unterminated: false,
         }
+    }
+
+    pub fn cd<T: AsRef<str>>(&mut self, dir: Option<T>) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.cd(dir, &mut self.variables)
+    }
+
+    pub fn pushd<T: AsRef<str>, I: IntoIterator<Item = T>>(
+        &mut self,
+        iter: I,
+    ) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.pushd(iter, &mut self.variables)
+    }
+
+    pub fn popd<T: AsRef<str>, I: IntoIterator<Item = T>>(
+        &mut self,
+        iter: I,
+    ) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.popd(iter)
+    }
+
+    pub fn dir_stack<T: AsRef<str>, I: IntoIterator<Item = T>>(&mut self, iter: I) -> i32 {
+        self.directory_stack.dirs(iter)
     }
 
     // Resets the flow control fields to their default values.
@@ -407,6 +430,12 @@ impl<'a> Shell<'a> {
 
     /// Mutable access to the shell options
     pub fn opts_mut(&mut self) -> &mut ShellOptions { &mut self.opts }
+
+    /// Access to the variables
+    pub fn variables(&self) -> &Variables<'a> { &self.variables }
+
+    /// Mutable access to the variables
+    pub fn variables_mut(&mut self) -> &mut Variables<'a> { &mut self.variables }
 
     /// Cleanly exit ion
     pub fn exit(&mut self, status: i32) -> ! {

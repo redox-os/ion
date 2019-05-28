@@ -56,7 +56,7 @@ fn main() {
         }
     }
 
-    shell.variables.set(
+    shell.variables_mut().set(
         "args",
         Value::Array(
             script_path
