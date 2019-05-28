@@ -12,13 +12,12 @@ mod pipes;
 pub mod streams;
 
 use self::{
-    job_control::{JobControl, ProcessState},
+    job_control::ProcessState,
     pipes::TeePipe,
     streams::{duplicate_streams, redirect_streams},
 };
 use super::{
     flow_control::{Function, FunctionError},
-    fork_function::command_not_found,
     job::{Job, JobVariant, RefinedJob, TeeItem},
     signals::{self, SignalHandler},
     status::*,
@@ -224,7 +223,7 @@ impl<'b> Shell<'b> {
                 self.watch_foreground(-(pid as i32), "")
             }
             Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
-                if let Err(_) = command_not_found(self, &name) {
+                if self.fork_function("COMMAND_NOT_FOUND", &["ion", &name]).is_err() {
                     eprintln!("ion: command not found: {}", name);
                 }
                 NO_SUCH_COMMAND
@@ -538,7 +537,7 @@ fn spawn_proc(
                     *current_pid = pid;
                 }
                 Err(ref mut err) if err.kind() == io::ErrorKind::NotFound => {
-                    if let Err(_) = command_not_found(shell, &name) {
+                    if shell.fork_function("COMMAND_NOT_FOUND", &["ion", &name]).is_err() {
                         eprintln!("ion: command not found: {}", name);
                     }
                 }

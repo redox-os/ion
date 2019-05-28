@@ -1,6 +1,6 @@
 extern crate ion_sys as sys;
 
-use ion_shell::{shell::variables::Value, InteractiveBinary, JobControl, Shell, MAN_ION};
+use ion_shell::{InteractiveBinary, Shell, Value, MAN_ION};
 use liner::KeyBindings;
 use std::{
     alloc::System,

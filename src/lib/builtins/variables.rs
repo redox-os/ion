@@ -69,7 +69,7 @@ fn parse_alias(args: &str) -> Binding {
 
 /// The `alias` command will define an alias for another command, and thus may be used as a
 /// command itself.
-pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
+pub fn alias(vars: &mut Variables, args: &str) -> i32 {
     match parse_alias(args) {
         Binding::InvalidKey(key) => {
             eprintln!("ion: alias name, '{}', is invalid", key);
@@ -88,7 +88,7 @@ pub(crate) fn alias(vars: &mut Variables, args: &str) -> i32 {
 }
 
 /// Dropping an alias will erase it from the shell.
-pub(crate) fn drop_alias<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
+pub fn drop_alias<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
     if args.len() <= 1 {
         eprintln!("ion: you must specify an alias name");
         return FAILURE;
@@ -103,7 +103,7 @@ pub(crate) fn drop_alias<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32
 }
 
 /// Dropping an array will erase it from the shell.
-pub(crate) fn drop_array<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
+pub fn drop_array<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
     if args.len() <= 2 {
         eprintln!("ion: you must specify an array name");
         return FAILURE;
@@ -124,7 +124,7 @@ pub(crate) fn drop_array<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32
 }
 
 /// Dropping a variable will erase it from the shell.
-pub(crate) fn drop_variable<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
+pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
     if args.len() <= 1 {
         eprintln!("ion: you must specify a variable name");
         return FAILURE;

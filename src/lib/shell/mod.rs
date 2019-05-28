@@ -1,13 +1,13 @@
 mod assignments;
 pub(crate) mod binary;
-pub(crate) mod colors;
+mod colors;
 mod completer;
 pub(crate) mod directory_stack;
 pub(crate) mod escape;
 mod flow;
 pub(crate) mod flow_control;
 mod fork;
-pub mod fork_function;
+mod fork_function;
 mod job;
 pub(crate) mod pipe_exec;
 pub(crate) mod signals;
@@ -15,13 +15,11 @@ pub mod status;
 pub mod variables;
 
 pub use self::{
-    binary::InteractiveBinary,
-    fork::{Capture, Fork, IonResult},
-};
-pub(crate) use self::{
-    flow::FlowLogic,
+    binary::{InteractiveBinary, MAN_ION},
+    fork::{Capture, IonResult},
     job::Job,
-    pipe_exec::{foreground, job_control},
+    pipe_exec::job_control::ProcessState,
+    variables::Value,
 };
 
 use self::{
@@ -29,9 +27,10 @@ use self::{
     escape::tilde,
     flow_control::{FlowControl, Function, FunctionError},
     foreground::ForegroundSignals,
-    job_control::BackgroundProcess,
+    fork::Fork,
+    pipe_exec::{foreground, job_control::BackgroundProcess},
     status::*,
-    variables::{GetVariable, Value, Variables},
+    variables::{GetVariable, Variables},
 };
 use crate::{
     builtins::BuiltinMap,

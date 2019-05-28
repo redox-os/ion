@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     lexers::assignments::{Key, Operator, Primitive},
-    parser::{assignments::*, statement::parse::is_valid_name},
+    parser::{assignments::*, is_valid_name},
     shell::variables::{EuclDiv, Modifications, OpError, Pow, Value},
     types,
 };

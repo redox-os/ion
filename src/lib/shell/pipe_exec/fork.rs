@@ -5,7 +5,7 @@ pub(crate) fn create_process_group(pgid: u32) { let _ = sys::setpgid(0, pgid); }
 
 use super::{
     super::{status::*, Shell},
-    job_control::{JobControl, ProcessState},
+    job_control::ProcessState,
 };
 use crate::parser::pipelines::Pipeline;
 use std::process::exit;

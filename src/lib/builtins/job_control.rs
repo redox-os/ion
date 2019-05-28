@@ -1,12 +1,7 @@
 //! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job
 //! control in the shell.
 
-use crate::shell::{
-    job_control::{JobControl, ProcessState},
-    signals,
-    status::*,
-    Shell,
-};
+use crate::shell::{signals, status::*, ProcessState, Shell};
 use small;
 use smallvec::SmallVec;
 
@@ -144,7 +139,7 @@ pub(crate) fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
 /// Resumes a stopped background process, if it was stopped.
 pub(crate) fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
-        if let Some(job) = shell.background.lock().unwrap().iter_mut().nth(njob as usize) {
+        if let Some(job) = shell.background.lock().unwrap().iter().nth(njob as usize) {
             match job.state {
                 ProcessState::Running => {
                     eprintln!("ion: bg: job {} is already running", njob);

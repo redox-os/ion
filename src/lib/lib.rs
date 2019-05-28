@@ -13,10 +13,7 @@ pub mod types;
 pub mod parser;
 pub mod builtins;
 mod memory;
-pub mod shell;
+mod shell;
 
 pub(crate) use self::memory::IonPool;
-pub use crate::shell::{
-    binary::MAN_ION, pipe_exec::job_control::JobControl, status, Capture, Fork, InteractiveBinary,
-    IonError, IonResult, Shell,
-};
+pub use crate::shell::*;

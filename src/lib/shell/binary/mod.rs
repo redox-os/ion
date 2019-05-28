@@ -6,9 +6,8 @@ mod readln;
 
 use self::{history::ShellHistory, prompt::prompt, readln::readln};
 use super::{
-    pipe_exec::job_control::JobControl,
     status::{FAILURE, SUCCESS},
-    FlowLogic, Shell,
+    Shell,
 };
 use crate::{
     builtins::man_pages,

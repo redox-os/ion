@@ -1,15 +1,15 @@
-pub mod functions;
 pub mod man_pages;
-pub mod source;
-pub mod variables;
 
 mod command_info;
 mod exec;
 mod exists;
+mod functions;
 mod is;
 mod job_control;
 mod set;
+mod source;
 mod status;
+mod variables;
 
 use ion_builtins::{calc, conditionals, echo, random, test};
 
@@ -18,7 +18,7 @@ use self::{
     echo::echo,
     exec::exec,
     exists::exists,
-    functions::fn_,
+    functions::print_functions,
     is::is,
     man_pages::*,
     source::source,
@@ -36,13 +36,7 @@ use hashbrown::HashMap;
 use liner::Context;
 
 use crate::{
-    shell::{
-        self,
-        fork_function::fork_function,
-        job_control::{JobControl, ProcessState},
-        status::*,
-        Shell,
-    },
+    shell::{self, status::*, ProcessState, Shell},
     sys, types,
 };
 use small;
@@ -72,7 +66,7 @@ macro_rules! map {
 /// Note: To reduce allocations, function are provided as pointer rather than boxed closures
 /// ```
 /// use ion_shell::builtins::BuiltinMap;
-/// use ion_shell::shell::Shell;
+/// use ion_shell::Shell;
 ///
 /// // create a builtin
 /// let mut custom = |_args: &[small::String], _shell: &mut Shell| {
@@ -262,7 +256,7 @@ pub fn builtin_cd(args: &[small::String], shell: &mut Shell) -> i32 {
 
     match shell.directory_stack.cd(args, &shell.variables) {
         Ok(()) => {
-            let _ = fork_function(shell, "CD_CHANGE", &["ion"]);
+            let _ = shell.fork_function("CD_CHANGE", &["ion"]);
             SUCCESS
         }
         Err(why) => {
@@ -362,7 +356,7 @@ fn builtin_unalias(args: &[small::String], shell: &mut Shell) -> i32 {
 
 // TODO There is a man page for fn however the -h and --help flags are not
 // checked for.
-fn builtin_fn(_: &[small::String], shell: &mut Shell) -> i32 { fn_(&mut shell.variables) }
+fn builtin_fn(_: &[small::String], shell: &mut Shell) -> i32 { print_functions(&shell.variables) }
 
 fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_READ) {

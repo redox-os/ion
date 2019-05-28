@@ -20,7 +20,7 @@ pub fn is_valid_name(name: &str) -> bool {
         && chars.all(|b| b.is_alphanumeric() || b == '_')
 }
 
-pub(crate) fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
+pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
     let cmd = code.trim();
     match cmd {
         "end" => Statement::End,

@@ -1,6 +1,5 @@
 use super::{
     flow_control::{insert_statement, Case, ElseIf, Function, Statement},
-    job_control::JobControl,
     signals,
     status::*,
     Shell,
@@ -19,56 +18,16 @@ use itertools::Itertools;
 use small;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub(crate) enum Condition {
+pub enum Condition {
     Continue,
     Break,
     NoOp,
     SigInt,
 }
 
-pub(crate) trait FlowLogic<'a> {
-    /// Receives a command and attempts to execute the contents.
-    fn on_command(&mut self, command_string: &str);
-
-    /// Executes all of the statements within a while block until a certain
-    /// condition is met.
-    fn execute_while(
-        &mut self,
-        expression: &[Statement<'a>],
-        statements: &[Statement<'a>],
-    ) -> Condition;
-
-    /// Executes all of the statements within a for block for each value
-    /// specified in the range.
-    fn execute_for(
-        &mut self,
-        variables: &[types::Str],
-        values: &[small::String],
-        statements: &[Statement<'a>],
-    ) -> Condition;
-
+impl<'a> Shell<'a> {
     /// Conditionally executes branches of statements according to evaluated
     /// expressions
-    fn execute_if(
-        &mut self,
-        expression: &[Statement<'a>],
-        success: &[Statement<'a>],
-        else_if: &[ElseIf<'a>],
-        failure: &[Statement<'a>],
-    ) -> Condition;
-
-    /// Simply executes all supplied statements.
-    fn execute_statements(&mut self, statements: &[Statement<'a>]) -> Condition;
-
-    /// Executes a single statement
-    fn execute_statement(&mut self, statement: &Statement<'a>) -> Condition;
-
-    /// Expand an expression and run a branch based on the value of the
-    /// expanded expression
-    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case<'a>]) -> Condition;
-}
-
-impl<'a> FlowLogic<'a> for Shell<'a> {
     fn execute_if(
         &mut self,
         expression: &[Statement<'a>],
@@ -98,6 +57,8 @@ impl<'a> FlowLogic<'a> for Shell<'a> {
         self.execute_statements(&failure)
     }
 
+    /// Executes all of the statements within a for block for each value
+    /// specified in the range.
     fn execute_for(
         &mut self,
         variables: &[types::Str],
@@ -148,6 +109,8 @@ impl<'a> FlowLogic<'a> for Shell<'a> {
         Condition::NoOp
     }
 
+    /// Executes all of the statements within a while block until a certain
+    /// condition is met.
     fn execute_while(
         &mut self,
         expression: &[Statement<'a>],
@@ -168,7 +131,8 @@ impl<'a> FlowLogic<'a> for Shell<'a> {
         }
     }
 
-    fn execute_statement(&mut self, statement: &Statement<'a>) -> Condition {
+    /// Executes a single statement
+    pub fn execute_statement(&mut self, statement: &Statement<'a>) -> Condition {
         match statement {
             Statement::Error(number) => {
                 self.previous_status = *number;
@@ -305,7 +269,8 @@ impl<'a> FlowLogic<'a> for Shell<'a> {
         }
     }
 
-    fn execute_statements(&mut self, statements: &[Statement<'a>]) -> Condition {
+    /// Simply executes all supplied statements.
+    pub fn execute_statements(&mut self, statements: &[Statement<'a>]) -> Condition {
         self.variables.new_scope(false);
 
         let condition = statements
@@ -319,6 +284,8 @@ impl<'a> FlowLogic<'a> for Shell<'a> {
         condition
     }
 
+    /// Expand an expression and run a branch based on the value of the
+    /// expanded expression
     fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case<'a>]) -> Condition {
         // Logic for determining if the LHS of a match-case construct (the value we are
         // matching against) matches the RHS of a match-case construct (a value
@@ -380,7 +347,8 @@ impl<'a> FlowLogic<'a> for Shell<'a> {
         Condition::NoOp
     }
 
-    fn on_command(&mut self, command_string: &str) {
+    /// Receives a command and attempts to execute the contents.
+    pub fn on_command(&mut self, command_string: &str) {
         self.break_flow = false;
         for stmt in command_string.bytes().batching(|cmd| Terminator::new(cmd).terminate()) {
             // Go through all of the statements and build up the block stack

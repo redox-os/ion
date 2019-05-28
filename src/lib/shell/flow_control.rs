@@ -1,7 +1,7 @@
 use crate::{
     lexers::assignments::{KeyBuf, Operator, Primitive},
     parser::{assignments::*, pipelines::Pipeline},
-    shell::{flow::FlowLogic, Shell},
+    shell::Shell,
     types,
 };
 use small;
@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct ElseIf<'a> {
+pub struct ElseIf<'a> {
     pub expression: Vec<Statement<'a>>,
     pub success:    Vec<Statement<'a>>,
 }
@@ -42,7 +42,7 @@ pub(crate) struct ElseIf<'a> {
 /// Case { value: None, ... }
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Case<'a> {
+pub struct Case<'a> {
     pub value:       Option<String>,
     pub binding:     Option<String>,
     pub conditional: Option<String>,
@@ -50,13 +50,13 @@ pub(crate) struct Case<'a> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum LocalAction {
+pub enum LocalAction {
     List,
     Assign(String, Operator, String),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum ExportAction {
+pub enum ExportAction {
     List,
     LocalExport(String),
     Assign(String, Operator, String),
@@ -64,7 +64,7 @@ pub(crate) enum ExportAction {
 
 // TODO: Enable statements and expressions to contain &str values.
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Statement<'a> {
+pub enum Statement<'a> {
     Let(LocalAction),
     Case(Case<'a>),
     Export(ExportAction),

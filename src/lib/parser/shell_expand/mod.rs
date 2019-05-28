@@ -38,7 +38,7 @@ fn join_with_spaces<S: AsRef<str>>(input: &mut small::String, mut iter: impl Ite
 // TODO: Make array expansions iterators instead of arrays.
 // TODO: Use Cow<'a, types::Str> for hashmap values.
 /// Trait representing different elements of string expansion
-pub(crate) trait Expander: Sized {
+pub trait Expander: Sized {
     /// Expand a tilde form to the correct directory.
     fn tilde(&self, _input: &str) -> Option<String> { None }
     /// Expand an array variable with some selection.

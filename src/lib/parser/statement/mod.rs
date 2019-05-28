@@ -1,18 +1,17 @@
 mod case;
 mod functions;
-#[cfg(not(fuzzing))]
-pub mod parse;
-#[cfg(fuzzing)]
-pub mod parse;
+mod parse;
 mod splitter;
 
-pub(crate) use self::parse::parse;
-pub use self::splitter::{StatementError, StatementSplitter, StatementVariant};
+pub use self::{
+    parse::{is_valid_name, parse},
+    splitter::{StatementError, StatementSplitter, StatementVariant},
+};
 use crate::{builtins::BuiltinMap, shell::flow_control::Statement};
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
-pub(crate) fn parse_and_validate<'b>(
+pub fn parse_and_validate<'b>(
     statement: Result<StatementVariant, StatementError>,
     builtins: &BuiltinMap<'b>,
 ) -> Statement<'b> {

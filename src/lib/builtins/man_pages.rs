@@ -1,6 +1,6 @@
 use small;
 
-pub(crate) fn check_help(args: &[small::String], man_page: &'static str) -> bool {
+pub fn check_help(args: &[small::String], man_page: &'static str) -> bool {
     for arg in args {
         if arg == "-h" || arg == "--help" {
             println!("{}", man_page);
@@ -10,7 +10,7 @@ pub(crate) fn check_help(args: &[small::String], man_page: &'static str) -> bool
     false
 }
 
-pub(crate) const MAN_STATUS: &str = r#"NAME
+pub const MAN_STATUS: &str = r#"NAME
     status - Evaluates the current runtime status
 
 SYNOPSIS
@@ -27,7 +27,7 @@ OPTIONS
     -f
         prints the filename of the currently running script or else stdio. Also --current-filename."#;
 
-pub(crate) const MAN_CD: &str = r#"NAME
+pub const MAN_CD: &str = r#"NAME
     cd - Change directory.
 
 SYNOPSIS
@@ -39,7 +39,7 @@ DESCRIPTION
     With arguments cd changes the working directory to the directory you provided.
 "#;
 
-pub(crate) const MAN_BOOL: &str = r#"NAME
+pub const MAN_BOOL: &str = r#"NAME
     bool - Returns true if the value given to it is equal to '1' or 'true'.
 
 SYNOPSIS
@@ -48,7 +48,7 @@ SYNOPSIS
 DESCRIPTION
     Returns true if the value given to it is equal to '1' or 'true'."#;
 
-pub(crate) const MAN_IS: &str = r#"NAME
+pub const MAN_IS: &str = r#"NAME
     is - Checks if two arguments are the same
 
 SYNOPSIS
@@ -61,7 +61,7 @@ OPTIONS
     not
         returns 0 if the two arguments are not equal."#;
 
-pub(crate) const MAN_ISATTY: &str = r#"
+pub const MAN_ISATTY: &str = r#"
     isatty - Checks if argument is a file descriptor
 
 SYNOPSIS
@@ -70,7 +70,7 @@ SYNOPSIS
 DESCRIPTION
     Returns 0 exit status if the supplied file descriptor is a tty."#;
 
-pub(crate) const MAN_DIRS: &str = r#"NAME
+pub const MAN_DIRS: &str = r#"NAME
     dirs - prints the directory stack
 
 SYNOPSIS
@@ -79,7 +79,7 @@ SYNOPSIS
 DESCRIPTION
     dirs prints the current directory stack."#;
 
-pub(crate) const MAN_PUSHD: &str = r#"NAME
+pub const MAN_PUSHD: &str = r#"NAME
     pushd - push a directory to the directory stack
 
 SYNOPSIS
@@ -88,7 +88,7 @@ SYNOPSIS
 DESCRIPTION
     pushd pushes a directory to the directory stack."#;
 
-pub(crate) const MAN_POPD: &str = r#"NAME
+pub const MAN_POPD: &str = r#"NAME
     popd - shift through the directory stack
 
 SYNOPSIS
@@ -98,7 +98,7 @@ DESCRIPTION
     popd removes the top directory from the directory stack and changes the working directory to the new top directory.
     pushd adds directories to the stack."#;
 
-// pub(crate) const MAN_FN: &str = r#"NAME
+// pub const MAN_FN: &str = r#"NAME
 // fn - print a list of all functions or create a function
 //
 // SYNOPSIS
@@ -126,7 +126,7 @@ DESCRIPTION
 // example 1
 //"#;
 
-pub(crate) const MAN_READ: &str = r#"NAME
+pub const MAN_READ: &str = r#"NAME
     read - read a line of input into some variables
 
 SYNOPSIS
@@ -135,7 +135,7 @@ SYNOPSIS
 DESCRIPTION
     For each variable reads from standard input and stores the results in the variable."#;
 
-pub(crate) const MAN_DROP: &str = r#"NAME
+pub const MAN_DROP: &str = r#"NAME
     drop - delete some variables or arrays
 
 SYNOPSIS
@@ -149,7 +149,7 @@ OPTIONS
     -a
         Instead of deleting variables deletes arrays."#;
 
-pub(crate) const MAN_SET: &str = r#"NAME
+pub const MAN_SET: &str = r#"NAME
     set - Set or unset values of shell options and positional parameters.
 
 SYNOPSIS
@@ -172,7 +172,7 @@ OPTIONS
     -   Following arguments will be set as positional arguments in the shell.
         If no arguments are suppled, arguments will not be unset."#;
 
-pub(crate) const MAN_EQ: &str = r#"NAME
+pub const MAN_EQ: &str = r#"NAME
     eq - Checks if two arguments are the same
 
 SYNOPSIS
@@ -185,7 +185,7 @@ OPTIONS
     not
         returns 0 if the two arguments are not equal."#;
 
-pub(crate) const MAN_EVAL: &str = r#"NAME
+pub const MAN_EVAL: &str = r#"NAME
     eval - evaluates the specified commands
 
 SYNOPSIS
@@ -195,7 +195,7 @@ DESCRIPTION
     eval evaluates the given arguments as a command. If more than one argument is given,
     all arguments are joined using a space as a separator."#;
 
-pub(crate) const MAN_EXEC: &str = r#"NAME
+pub const MAN_EXEC: &str = r#"NAME
     exec - Replace the shell with the given command.
 
 SYNOPSIS
@@ -209,7 +209,7 @@ DESCRIPTION
 OPTIONS
     -c  Execute command with an empty environment."#;
 
-pub(crate) const MAN_HISTORY: &str = r#"NAME
+pub const MAN_HISTORY: &str = r#"NAME
     history - print command history
 
 SYNOPSIS
@@ -218,7 +218,7 @@ SYNOPSIS
 DESCRIPTION
     Prints the command history."#;
 
-pub(crate) const MAN_SOURCE: &str = r#"NAME
+pub const MAN_SOURCE: &str = r#"NAME
     source - evaluates given file
 
 SYNOPSIS
@@ -228,7 +228,7 @@ DESCRIPTION
     Evaluates the commands in a specified file in the current shell. All changes in shell
     variables will affect the current shell because of this."#;
 
-pub(crate) const MAN_ECHO: &str = r#"NAME
+pub const MAN_ECHO: &str = r#"NAME
     echo - display a line of text
 
 SYNOPSIS
@@ -258,7 +258,7 @@ OPTIONS
         \t  horizontal tab (HT)
         \v  vertical tab (VT)"#;
 
-pub(crate) const MAN_RANDOM: &str = r#"NAME
+pub const MAN_RANDOM: &str = r#"NAME
     random - generate a random number
 
 SYNOPSIS
@@ -270,7 +270,7 @@ DESCRIPTION
     The range depends on what arguments you pass. If no arguments are given the range is [0, 32767].
     If two arguments are given the range is [START, END]."#;
 
-pub(crate) const MAN_TRUE: &str = r#"NAME
+pub const MAN_TRUE: &str = r#"NAME
     true - does nothing successfully
 
 SYNOPSIS
@@ -279,7 +279,7 @@ SYNOPSIS
 DESCRIPTION
     Sets the exit status to 0."#;
 
-pub(crate) const MAN_FALSE: &str = r#"NAME
+pub const MAN_FALSE: &str = r#"NAME
     false - does nothing unsuccessfully
 
 SYNOPSIS
@@ -288,7 +288,7 @@ SYNOPSIS
 DESCRIPTION
     Sets the exit status to 1."#;
 
-pub(crate) const MAN_JOBS: &str = r#"NAME
+pub const MAN_JOBS: &str = r#"NAME
     jobs - list all jobs running in the background
 
 SYNOPSIS
@@ -297,7 +297,7 @@ SYNOPSIS
 DESCRIPTION
     Prints a list of all jobs running in the background."#;
 
-pub(crate) const MAN_BG: &str = r#"NAME
+pub const MAN_BG: &str = r#"NAME
     bg - sends jobs to background
 
 SYNOPSIS
@@ -306,7 +306,7 @@ SYNOPSIS
 DESCRIPTION
     bg sends the job to the background resuming it if it has stopped."#;
 
-pub(crate) const MAN_FG: &str = r#"NAME
+pub const MAN_FG: &str = r#"NAME
     fg - bring job to foreground
 
 SYNOPSIS
@@ -315,7 +315,7 @@ SYNOPSIS
 DESCRIPTION
     fg brings the specified job to foreground resuming it if it has stopped."#;
 
-pub(crate) const MAN_SUSPEND: &str = r#"NAME
+pub const MAN_SUSPEND: &str = r#"NAME
     suspend - suspend the current shell
 
 SYNOPSIS
@@ -325,7 +325,7 @@ DESCRIPTION
     Suspends the current shell by sending it the SIGTSTP signal,
     returning to the parent process. It can be resumed by sending it SIGCONT."#;
 
-pub(crate) const MAN_DISOWN: &str = r#"NAME
+pub const MAN_DISOWN: &str = r#"NAME
     disown - Disown processes
 
 SYNOPSIS
@@ -339,7 +339,7 @@ OPTIONS
     -h  Specifies that each job supplied will not receive the SIGHUP signal when the shell receives a SIGHUP.
     -a  If no job IDs were supplied, remove all jobs from the background process list."#;
 
-pub(crate) const MAN_EXIT: &str = r#"NAME
+pub const MAN_EXIT: &str = r#"NAME
     exit - exit the shell
 
 SYNOPSIS
@@ -348,7 +348,7 @@ SYNOPSIS
 DESCRIPTION
     Makes ion exit. The exit status will be that of the last command executed."#;
 
-pub(crate) const MAN_MATCHES: &str = r#"NAME
+pub const MAN_MATCHES: &str = r#"NAME
     matches - checks if the second argument contains any portion of the first.
 
 SYNOPSIS
@@ -364,7 +364,7 @@ EXAMPLES
     Returns false:
         matches x xs"#;
 
-pub(crate) const MAN_EXISTS: &str = r#"NAME
+pub const MAN_EXISTS: &str = r#"NAME
     exists - check whether items exist
 
 SYNOPSIS
@@ -420,7 +420,7 @@ AUTHOR
     Written by Fabian Würfl.
     Heavily based on implementation of the test builtin, which was written by Michael Murph."#;
 
-pub(crate) const MAN_WHICH: &str = r#"NAME
+pub const MAN_WHICH: &str = r#"NAME
     which - locate a program file in the current user's path
 
 SYNOPSIS
