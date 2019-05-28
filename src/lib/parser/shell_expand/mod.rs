@@ -76,8 +76,7 @@ fn expand_process<E: Expander>(
 ) {
     if let Some(ref output) = expander.command(command).filter(|out| !out.is_empty()) {
         // Get the pos of the last newline character, then slice them off.
-        let pos = output.len() - output.bytes().rev().take_while(|&byte| byte == b'\n').count();
-        slice(current, &output[..pos], &selection);
+        slice(current, output.trim_end_matches('\n'), &selection);
     }
 }
 
