@@ -11,7 +11,7 @@ use crate::{
         pipelines::{PipeItem, Pipeline},
         ForValueExpression, StatementSplitter, Terminator,
     },
-    shell::{assignments::VariableStore, variables::Value},
+    shell::Value,
     types,
 };
 use itertools::Itertools;

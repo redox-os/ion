@@ -8,7 +8,7 @@ use std::{borrow::Cow, env};
 ///
 /// NOTE: Perhaps we should submit a PR to Liner to add a &'static [u8] field to
 /// `FilenameCompleter` so that we don't have to perform the escaping ourselves?
-pub(crate) fn escape(input: &str) -> String {
+pub fn escape(input: &str) -> String {
     let mut output = Vec::with_capacity(input.len());
     for character in input.bytes() {
         match character {
@@ -22,7 +22,7 @@ pub(crate) fn escape(input: &str) -> String {
 }
 
 /// Unescapes filenames to be passed into the completer
-pub(crate) fn unescape(input: &str) -> Cow<str> {
+pub fn unescape(input: &str) -> Cow<str> {
     let mut input: Cow<str> = input.into();
     while let Some(found) = input.find('\\') {
         if input.as_ref().len() > found + 1 {
@@ -34,7 +34,7 @@ pub(crate) fn unescape(input: &str) -> Cow<str> {
     input
 }
 
-pub(crate) fn tilde(input: &str, dir_stack: &DirectoryStack, prev: Option<&str>) -> Option<String> {
+pub fn tilde(input: &str, dir_stack: &DirectoryStack, prev: Option<&str>) -> Option<String> {
     // Only if the first character is a tilde character will we perform expansions
     if !input.starts_with('~') {
         return None;

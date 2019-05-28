@@ -1,8 +1,5 @@
 use crate::sys;
 
-/// Ensures that the forked child is given a unique process ID.
-pub(crate) fn create_process_group(pgid: u32) { let _ = sys::setpgid(0, pgid); }
-
 use super::{
     super::{status::*, Shell},
     job_control::ProcessState,
@@ -11,9 +8,12 @@ use crate::parser::pipelines::Pipeline;
 use std::process::exit;
 
 impl<'a> Shell<'a> {
+    /// Ensures that the forked child is given a unique process ID.
+    fn create_process_group(pgid: u32) { let _ = sys::setpgid(0, pgid); }
+
     /// Forks the shell, adding the child to the parent's background list, and executing
     /// the given commands in the child fork.
-    pub(crate) fn fork_pipe(
+    pub(super) fn fork_pipe(
         &mut self,
         pipeline: Pipeline<'a>,
         command_name: String,
@@ -28,7 +28,7 @@ impl<'a> Shell<'a> {
                 let _ = sys::close(sys::STDIN_FILENO);
 
                 // This ensures that the child fork has a unique PGID.
-                create_process_group(0);
+                Self::create_process_group(0);
 
                 // After execution of it's commands, exit with the last command's status.
                 sys::fork_exit(self.pipe(pipeline));

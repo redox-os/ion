@@ -270,9 +270,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Obtains a variable, returning an empty string if it does not exist.
-    pub(crate) fn get_str_or_empty(&self, name: &str) -> types::Str {
-        self.variables.get_str_or_empty(name)
-    }
+    fn get_str_or_empty(&self, name: &str) -> types::Str { self.variables.get_str_or_empty(name) }
 
     /// Gets any variable, if it exists within the shell's variable map.
     pub fn get<T>(&self, name: &str) -> Option<T>
@@ -288,7 +286,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub(crate) fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Option<i32> {
+    pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Option<i32> {
         let command_start_time = SystemTime::now();
 
         pipeline.expand(self);
@@ -382,13 +380,11 @@ impl<'a> Shell<'a> {
     }
 
     /// Set the callback to call before exiting the shell
-    #[inline]
     pub fn set_prep_for_exit(&mut self, callback: Option<Box<dyn FnMut(&mut Shell) + 'a>>) {
         self.prep_for_exit = callback;
     }
 
     /// Set the callback to call on each command
-    #[inline]
     pub fn set_on_command(
         &mut self,
         callback: Option<Box<dyn Fn(&Shell, std::time::Duration) + 'a>>,
@@ -397,7 +393,6 @@ impl<'a> Shell<'a> {
     }
 
     /// Get access to the builtins
-    #[inline]
     pub fn builtins(&self) -> &BuiltinMap<'a> { &self.builtins }
 
     /// Get a mutable access to the builtins
@@ -405,15 +400,12 @@ impl<'a> Shell<'a> {
     /// Warning: Previously defined functions will rely on previous versions of the builtins, even
     /// if they are redefined. It is strongly advised to avoid mutating the builtins while the shell
     /// is running
-    #[inline]
     pub fn builtins_mut(&mut self) -> &mut BuiltinMap<'a> { &mut self.builtins }
 
     /// Access to the shell options
-    #[inline]
     pub fn opts(&self) -> &ShellOptions { &self.opts }
 
     /// Mutable access to the shell options
-    #[inline]
     pub fn opts_mut(&mut self) -> &mut ShellOptions { &mut self.opts }
 
     /// Cleanly exit ion

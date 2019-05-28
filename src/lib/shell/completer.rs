@@ -11,7 +11,7 @@ use std::{iter, str};
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
 /// when a special character is contained within an expanded filename.
-pub(crate) struct IonFileCompleter {
+pub struct IonFileCompleter {
     /// A pointer to the directory stack in the shell.
     dir_stack: *const DirectoryStack,
     /// A pointer to the variables map in the shell.
@@ -21,11 +21,7 @@ pub(crate) struct IonFileCompleter {
 }
 
 impl IonFileCompleter {
-    pub(crate) fn new(
-        path: Option<&str>,
-        dir_stack: *const DirectoryStack,
-        prev: Option<&str>,
-    ) -> Self {
+    pub fn new(path: Option<&str>, dir_stack: *const DirectoryStack, prev: Option<&str>) -> Self {
         let mut path = path.unwrap_or("").to_string();
         if !path.is_empty() && !path.ends_with('/') {
             path.push('/');
@@ -152,7 +148,7 @@ fn filename_completion<'a>(start: &'a str, path: &'a str) -> impl Iterator<Item 
 
 /// A completer that combines suggestions from multiple completers.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct MultiCompleter<A, B>
+pub struct MultiCompleter<A, B>
 where
     A: Completer,
     B: Completer,
@@ -166,7 +162,7 @@ where
     A: Completer,
     B: Completer,
 {
-    pub(crate) fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> { MultiCompleter { a, b } }
+    pub fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> { MultiCompleter { a, b } }
 }
 
 impl<A, B> Completer for MultiCompleter<A, B>

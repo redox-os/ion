@@ -12,7 +12,7 @@ enum PositionalArgs {
 
 use self::PositionalArgs::*;
 
-pub(crate) fn set(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn set(args: &[small::String], shell: &mut Shell) -> i32 {
     let mut args_iter = args.iter();
     let mut positionals = None;
 

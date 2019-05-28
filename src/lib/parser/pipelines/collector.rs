@@ -38,13 +38,12 @@ impl<'a> AddItem<'a> for Pipeline<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Collector<'a> {
+pub struct Collector<'a> {
     data: &'a str,
 }
 
 impl<'a> Collector<'a> {
     /// Add a new argument that is re
-    #[inline(always)]
     fn push_arg<I>(&self, args: &mut Args, bytes: &mut Peekable<I>) -> Result<(), &'static str>
     where
         I: Iterator<Item = (usize, u8)>,
@@ -56,7 +55,6 @@ impl<'a> Collector<'a> {
     }
 
     /// Attempt to add a redirection
-    #[inline(always)]
     fn push_redir_to_output<I>(
         &self,
         from: RedirectFrom,
@@ -77,7 +75,7 @@ impl<'a> Collector<'a> {
             .map(|file| outputs.push(Redirection { from, file: file.into(), append }))
     }
 
-    pub(crate) fn parse<'builtins>(
+    pub fn parse<'builtins>(
         &self,
         builtins: &BuiltinMap<'builtins>,
     ) -> Result<Pipeline<'builtins>, &'static str> {
@@ -375,14 +373,14 @@ impl<'a> Collector<'a> {
         }
     }
 
-    pub(crate) fn run<'builtins>(
+    pub fn run<'builtins>(
         data: &'a str,
         builtins: &BuiltinMap<'builtins>,
     ) -> Result<Pipeline<'builtins>, &'static str> {
         Collector::new(data).parse(builtins)
     }
 
-    pub(crate) fn new(data: &'a str) -> Self { Collector { data } }
+    pub fn new(data: &'a str) -> Self { Collector { data } }
 }
 
 #[cfg(test)]

@@ -11,7 +11,7 @@ use std::iter::Iterator;
 /// - `[ 1 2 3 ]` = Array
 /// - `[ 1 2 3 ][1]` = String
 /// - `string` = String
-pub(crate) fn is_array(value: &str) -> bool {
+pub fn is_array(value: &str) -> bool {
     if value.ends_with(']') {
         let mut brackets = value.chars().scan(0, |state, c| {
             *state += match c {
@@ -28,7 +28,7 @@ pub(crate) fn is_array(value: &str) -> bool {
     }
 }
 
-pub(crate) fn is_boolean(value: &mut types::Str) -> bool {
+pub fn is_boolean(value: &mut types::Str) -> bool {
     if ["true", "1", "y"].contains(&value.as_str()) {
         value.clear();
         value.push_str("true");
@@ -92,7 +92,7 @@ fn get_map_of<E: Expander>(
     }
 }
 
-pub(crate) fn value_check<E: Expander>(
+pub fn value_check<E: Expander>(
     shell: &E,
     value: &str,
     expected: &Primitive,

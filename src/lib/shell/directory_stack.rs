@@ -89,16 +89,13 @@ impl DirectoryStack {
         println!("{}", dir.trim_start());
     }
 
-    pub(crate) fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> {
+    pub fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> {
         self.dirs.iter().rev().nth(num)
     }
 
-    pub(crate) fn dir_from_top(&self, num: usize) -> Option<&PathBuf> { self.dirs.get(num) }
+    pub fn dir_from_top(&self, num: usize) -> Option<&PathBuf> { self.dirs.get(num) }
 
-    pub(crate) fn dirs<'a, I: Iterator<Item = &'a T>, T: 'a + AsRef<str>>(
-        &mut self,
-        args: I,
-    ) -> i32 {
+    pub fn dirs<'a, I: Iterator<Item = &'a T>, T: 'a + AsRef<str>>(&mut self, args: I) -> i32 {
         let mut clear = false; // -c
         let mut abs_pathnames = false; // -l
         let mut multiline = false; // -p | -v
@@ -169,7 +166,7 @@ impl DirectoryStack {
         self.dirs.truncate(DirectoryStack::get_size(variables));
     }
 
-    pub(crate) fn change_and_push_dir(
+    pub fn change_and_push_dir(
         &mut self,
         dir: &str,
         variables: &Variables,
@@ -217,7 +214,7 @@ impl DirectoryStack {
         )
     }
 
-    pub(crate) fn cd(
+    pub fn cd(
         &mut self,
         args: &[small::String],
         variables: &Variables,
@@ -248,7 +245,7 @@ impl DirectoryStack {
         }
     }
 
-    pub(crate) fn pushd<T>(
+    pub fn pushd<T>(
         &mut self,
         args: &[T],
         variables: &mut Variables,
@@ -318,7 +315,7 @@ impl DirectoryStack {
 
     /// Attempts to set the current directory to the directory stack's previous directory,
     /// and then removes the front directory from the stack.
-    pub(crate) fn popd<T: AsRef<str>>(&mut self, args: &[T]) -> Result<(), Cow<'static, str>> {
+    pub fn popd<T: AsRef<str>>(&mut self, args: &[T]) -> Result<(), Cow<'static, str>> {
         let len = self.dirs.len();
         if len <= 1 {
             return Err(Cow::Borrowed("ion: popd: directory stack empty"));
@@ -375,7 +372,7 @@ impl DirectoryStack {
 
     /// Create a new `DirectoryStack` containing the current working directory,
     /// if available.
-    pub(crate) fn new() -> DirectoryStack {
+    pub fn new() -> DirectoryStack {
         let mut dirs: VecDeque<PathBuf> = VecDeque::new();
         match env::current_dir() {
             Ok(curr_dir) => {

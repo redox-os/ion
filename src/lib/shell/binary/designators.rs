@@ -2,7 +2,7 @@ use crate::lexers::{ArgumentSplitter, DesignatorLexer, DesignatorToken};
 use liner::Context;
 use std::{borrow::Cow, str};
 
-pub(crate) fn expand_designators<'a>(context: &Context, cmd: &'a str) -> Cow<'a, str> {
+pub fn expand_designators<'a>(context: &Context, cmd: &'a str) -> Cow<'a, str> {
     if let Some(buffer) = context.history.buffers.back() {
         let buffer = buffer.as_bytes();
         let buffer = unsafe { str::from_utf8_unchecked(&buffer) };

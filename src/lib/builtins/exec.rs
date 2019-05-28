@@ -7,7 +7,7 @@ use small;
 use std::error::Error;
 
 /// Executes the givent commmand.
-pub(crate) fn exec(shell: &mut Shell, args: &[small::String]) -> Result<(), small::String> {
+pub fn exec(shell: &mut Shell, args: &[small::String]) -> Result<(), small::String> {
     const CLEAR_ENV: u8 = 1;
 
     let mut flags = 0u8;

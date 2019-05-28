@@ -261,11 +261,11 @@ impl<'a> Variables<'a> {
         env::var("PWD").unwrap().replace(&*home, "~").into()
     }
 
-    pub(crate) fn is_valid_variable_name(name: &str) -> bool {
+    pub fn is_valid_variable_name(name: &str) -> bool {
         name.chars().all(Variables::is_valid_variable_character)
     }
 
-    pub(crate) fn is_valid_variable_character(c: char) -> bool {
+    pub fn is_valid_variable_character(c: char) -> bool {
         c.is_alphanumeric() || c == '_' || c == '?' || c == '.' || c == '-' || c == '+'
     }
 

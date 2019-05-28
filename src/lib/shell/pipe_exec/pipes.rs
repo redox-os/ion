@@ -6,14 +6,14 @@ use super::{
 use crate::sys;
 use std::{fs::File, os::unix::io::FromRawFd};
 
-pub(crate) struct TeePipe<'a, 'b> {
+pub struct TeePipe<'a, 'b> {
     parent:          &'a mut RefinedJob<'b>,
     ext_stdio_pipes: &'a mut Option<Vec<File>>,
     is_external:     bool,
 }
 
 impl<'a, 'b> TeePipe<'a, 'b> {
-    pub(crate) fn new(
+    pub fn new(
         parent: &'a mut RefinedJob<'b>,
         ext_stdio_pipes: &'a mut Option<Vec<File>>,
         is_external: bool,
@@ -37,7 +37,7 @@ impl<'a, 'b> TeePipe<'a, 'b> {
         }
     }
 
-    pub(crate) fn connect(&mut self, out: &mut TeeItem, err: &mut TeeItem) {
+    pub fn connect(&mut self, out: &mut TeeItem, err: &mut TeeItem) {
         self.inner_connect(out, RefinedJob::stdout);
         self.inner_connect(err, RefinedJob::stderr);
     }

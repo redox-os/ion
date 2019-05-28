@@ -16,18 +16,17 @@ pub struct Job<'a> {
 
 impl<'a> Job<'a> {
     /// Get the job command (its first arg)
-    #[inline]
     pub fn command(&self) -> &types::Str { &self.args[0] }
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub(crate) fn expand(&mut self, shell: &Shell) {
+    pub fn expand(&mut self, shell: &Shell) {
         if shell.variables.get::<Function>(&self.args[0]).is_none() {
             self.args = self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).collect();
         }
     }
 
-    pub(crate) fn new(
+    pub fn new(
         args: types::Args,
         redirection: RedirectFrom,
         builtin: Option<BuiltinFunction<'a>>,
@@ -95,18 +94,16 @@ pub struct TeeItem {
 }
 
 impl TeeItem {
-    #[inline]
-    pub(crate) fn new() -> Self { TeeItem { sinks: Vec::new(), source: None } }
+    pub fn new() -> Self { TeeItem { sinks: Vec::new(), source: None } }
 
-    #[inline]
-    pub(crate) fn add(&mut self, sink: File) { self.sinks.push(sink); }
+    pub fn add(&mut self, sink: File) { self.sinks.push(sink); }
 
     /// Writes out to all destinations of a Tee. Takes an extra `RedirectFrom` argument in
     /// order to
     /// handle piping. `RedirectFrom` paradoxically indicates where we are piping **to**. It
     /// should
     /// never be `RedirectFrom`::Both`
-    pub(crate) fn write_to_all(&mut self, extra: Option<RedirectFrom>) -> ::std::io::Result<()> {
+    pub fn write_to_all(&mut self, extra: Option<RedirectFrom>) -> ::std::io::Result<()> {
         use std::{
             io::{self, Read, Write},
             os::unix::io::*,
@@ -154,7 +151,7 @@ impl TeeItem {
 
 impl<'a> RefinedJob<'a> {
     /// Returns a long description of this job: the commands and arguments
-    pub(crate) fn long(&self) -> String {
+    pub fn long(&self) -> String {
         match self.var {
             JobVariant::External { ref args, .. }
             | JobVariant::Builtin { ref args, .. }
@@ -164,7 +161,7 @@ impl<'a> RefinedJob<'a> {
         }
     }
 
-    pub(crate) fn stderr(&mut self, file: File) {
+    pub fn stderr(&mut self, file: File) {
         if let JobVariant::Cat { .. } = self.var {
             return;
         }
@@ -172,11 +169,11 @@ impl<'a> RefinedJob<'a> {
         self.stderr = Some(file);
     }
 
-    pub(crate) fn stdout(&mut self, file: File) { self.stdout = Some(file); }
+    pub fn stdout(&mut self, file: File) { self.stdout = Some(file); }
 
-    pub(crate) fn stdin(&mut self, file: File) { self.stdin = Some(file); }
+    pub fn stdin(&mut self, file: File) { self.stdin = Some(file); }
 
-    pub(crate) fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
+    pub fn tee(tee_out: Option<TeeItem>, tee_err: Option<TeeItem>) -> Self {
         RefinedJob {
             stdin:  None,
             stdout: None,
@@ -185,11 +182,11 @@ impl<'a> RefinedJob<'a> {
         }
     }
 
-    pub(crate) fn cat(sources: Vec<File>) -> Self {
+    pub fn cat(sources: Vec<File>) -> Self {
         RefinedJob { stdin: None, stdout: None, stderr: None, var: JobVariant::Cat { sources } }
     }
 
-    pub(crate) fn function(args: types::Args) -> Self {
+    pub fn function(args: types::Args) -> Self {
         RefinedJob {
             stdin:  None,
             stdout: None,
@@ -198,7 +195,7 @@ impl<'a> RefinedJob<'a> {
         }
     }
 
-    pub(crate) fn builtin(main: BuiltinFunction<'a>, args: types::Args) -> Self {
+    pub fn builtin(main: BuiltinFunction<'a>, args: types::Args) -> Self {
         RefinedJob {
             stdin:  None,
             stdout: None,
@@ -207,7 +204,7 @@ impl<'a> RefinedJob<'a> {
         }
     }
 
-    pub(crate) fn external(args: types::Args) -> Self {
+    pub fn external(args: types::Args) -> Self {
         RefinedJob {
             stdin:  None,
             stdout: None,

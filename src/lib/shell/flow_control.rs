@@ -109,7 +109,7 @@ pub enum Statement<'a> {
 }
 
 impl<'a> Statement<'a> {
-    pub(crate) fn short(&self) -> &'static str {
+    pub fn short(&self) -> &'static str {
         match *self {
             Statement::Let { .. } => "Let { .. }",
             Statement::Case(_) => "Case { .. }",
@@ -150,28 +150,26 @@ impl<'a> Statement<'a> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct FlowControl<'a> {
+pub struct FlowControl<'a> {
     pub block: Vec<Statement<'a>>,
 }
 
 impl<'a> FlowControl<'a> {
     /// On error reset FlowControl fields.
-    pub(crate) fn reset(&mut self) { self.block.clear() }
+    pub fn reset(&mut self) { self.block.clear() }
 
     /// Discard one block.
-    pub(crate) fn pop(&mut self) -> bool { self.block.pop().is_some() }
+    pub fn pop(&mut self) -> bool { self.block.pop().is_some() }
 
     /// Check if there isn't an unfinished block.
-    pub(crate) fn unclosed_block(&self) -> Option<&str> {
-        self.block.last().map(|block| block.short())
-    }
+    pub fn unclosed_block(&self) -> Option<&str> { self.block.last().map(|block| block.short()) }
 }
 
 impl<'a> Default for FlowControl<'a> {
     fn default() -> Self { FlowControl { block: Vec::with_capacity(5) } }
 }
 
-pub(crate) fn insert_statement<'a>(
+pub fn insert_statement<'a>(
     flow_control: &mut FlowControl<'a>,
     statement: Statement<'a>,
 ) -> Result<Option<Statement<'a>>, &'static str> {
@@ -382,7 +380,7 @@ impl Display for FunctionError {
 impl<'a> Function<'a> {
     pub fn is_empty(&self) -> bool { self.statements.is_empty() }
 
-    pub(crate) fn execute<S: AsRef<str>>(
+    pub fn execute<S: AsRef<str>>(
         &self,
         shell: &mut Shell<'a>,
         args: &[S],
@@ -428,9 +426,9 @@ impl<'a> Function<'a> {
         Ok(())
     }
 
-    pub(crate) fn get_description(&self) -> Option<&small::String> { self.description.as_ref() }
+    pub fn get_description(&self) -> Option<&small::String> { self.description.as_ref() }
 
-    pub(crate) fn new(
+    pub fn new(
         description: Option<small::String>,
         name: types::Str,
         args: Vec<KeyBuf>,

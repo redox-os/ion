@@ -1,7 +1,7 @@
 use crate::{shell::Shell, types};
 use small;
 
-pub(crate) fn is(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
+pub fn is(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
     match args.len() {
         4 => {
             if args[1] != "not" {

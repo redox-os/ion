@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
 /// SIGHUP ignoral.
-pub(crate) fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), String> {
+pub fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), String> {
     // Specifies that a process should be set to not receive SIGHUP signals.
     const NO_SIGHUP: u8 = 1;
     // Specifies that all jobs in the process table should be manipulated.
@@ -77,7 +77,7 @@ pub(crate) fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), St
 }
 
 /// Display a list of all jobs running in the background.
-pub(crate) fn jobs(shell: &mut Shell) {
+pub fn jobs(shell: &mut Shell) {
     for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
         if process.state != ProcessState::Empty {
             eprintln!("[{}] {} {}\t{}", id, process.pid, process.state, process.name);
@@ -88,7 +88,7 @@ pub(crate) fn jobs(shell: &mut Shell) {
 /// Hands control of the foreground process to the specified jobs, recording their exit status.
 /// If the job is stopped, the job will be resumed.
 /// If multiple jobs are given, then only the last job's exit status will be returned.
-pub(crate) fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
+pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
     fn fg_job(shell: &mut Shell, njob: u32) -> i32 {
         let job = if let Some(borrowed_job) =
             shell.background.lock().unwrap().iter().nth(njob as usize)
@@ -137,7 +137,7 @@ pub(crate) fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
 }
 
 /// Resumes a stopped background process, if it was stopped.
-pub(crate) fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
+pub fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
         if let Some(job) = shell.background.lock().unwrap().iter().nth(njob as usize) {
             match job.state {

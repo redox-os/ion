@@ -31,7 +31,7 @@ pub fn parse_and_validate<'b>(
 /// Splits a string into two, based on a given pattern. We know that the first string will always
 /// exist, but if the pattern is not found, or no string follows the pattern, then the second
 /// string will not exist. Useful for splitting the function expression by the "--" pattern.
-pub(crate) fn split_pattern<'a>(arg: &'a str, pattern: &str) -> (&'a str, Option<&'a str>) {
+fn split_pattern<'a>(arg: &'a str, pattern: &str) -> (&'a str, Option<&'a str>) {
     match arg.find(pattern) {
         Some(pos) => {
             let args = &arg[..pos].trim();

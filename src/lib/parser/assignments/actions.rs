@@ -6,7 +6,7 @@ use crate::lexers::{
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum AssignmentError<'a> {
+pub enum AssignmentError<'a> {
     InvalidValue(Primitive, Primitive),
     TypeError(TypeError),
     ExtraValues(&'a str, &'a str),
@@ -50,7 +50,7 @@ impl<'a> Display for AssignmentError<'a> {
 /// Each request will tell the shell whether the assignment is asking to update an array or a
 /// string, and will contain the key/value pair to assign.
 #[derive(Debug)]
-pub(crate) struct AssignmentActions<'a> {
+pub struct AssignmentActions<'a> {
     keys:     KeyIterator<'a>,
     operator: Operator,
     values:   ArgumentSplitter<'a>,
@@ -59,7 +59,7 @@ pub(crate) struct AssignmentActions<'a> {
 }
 
 impl<'a> AssignmentActions<'a> {
-    pub(crate) fn new(keys: &'a str, operator: Operator, values: &'a str) -> AssignmentActions<'a> {
+    pub fn new(keys: &'a str, operator: Operator, values: &'a str) -> AssignmentActions<'a> {
         AssignmentActions {
             keys: KeyIterator::new(keys),
             operator,
@@ -111,7 +111,7 @@ impl<'a> Iterator for AssignmentActions<'a> {
 /// Providing the key/value pair and operator to use during assignment, this variant defines
 /// whether the assignment should set a string or array.
 #[derive(Debug, PartialEq)]
-pub(crate) struct Action<'a>(pub Key<'a>, pub Operator, pub &'a str);
+pub struct Action<'a>(pub Key<'a>, pub Operator, pub &'a str);
 
 impl<'a> Action<'a> {
     fn parse(
