@@ -1,5 +1,5 @@
 use crate::{
-    parser::expand_string,
+    parser::Expander,
     shell::{variables::Value, Capture, Shell},
     sys,
 };
@@ -10,7 +10,7 @@ pub fn prompt(shell: &Shell) -> String {
 
     if blocks == 0 {
         prompt_fn(&shell)
-            .unwrap_or_else(|| expand_string(&shell.get_str_or_empty("PROMPT"), &*shell).join(" "))
+            .unwrap_or_else(|| shell.get_string(&shell.get_str_or_empty("PROMPT")).as_str().into())
     } else {
         "    ".repeat(blocks)
     }

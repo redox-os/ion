@@ -144,7 +144,7 @@ pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
 mod test {
     use super::*;
     use crate::{
-        parser::{expand_string, Expander},
+        parser::Expander,
         shell::status::{FAILURE, SUCCESS},
     };
 
@@ -184,7 +184,7 @@ mod test {
         variables.set("FOO", "BAR");
         let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = expand_string("$FOO", &VariableExpander(variables)).join("");
+        let expanded = VariableExpander(variables).expand_string("$FOO").join("");
         assert_eq!("", expanded);
     }
 
@@ -208,7 +208,7 @@ mod test {
         variables.set("FOO", array!["BAR"]);
         let return_status = drop_array(&mut variables, &["drop", "-a", "FOO"]);
         assert_eq!(SUCCESS, return_status);
-        let expanded = expand_string("@FOO", &VariableExpander(variables)).join("");
+        let expanded = VariableExpander(variables).expand_string("@FOO").join("");
         assert_eq!("", expanded);
     }
 

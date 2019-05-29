@@ -1,7 +1,4 @@
-use crate::{
-    parser::{expand_string, Expander},
-    types,
-};
+use crate::{parser::Expander, types};
 
 /// The expression given to a for loop as the value to iterate upon.
 pub enum ForValueExpression {
@@ -13,7 +10,7 @@ pub enum ForValueExpression {
 impl ForValueExpression {
     pub fn new<E: Expander>(expression: &[types::Str], expanders: &E) -> ForValueExpression {
         let output: Vec<_> =
-            expression.iter().flat_map(|expression| expand_string(expression, expanders)).collect();
+            expression.iter().flat_map(|expression| expanders.expand_string(expression)).collect();
 
         if output.is_empty() {
             ForValueExpression::Multiple(output)

@@ -1,7 +1,7 @@
 use super::Shell;
 use crate::{
     builtins::BuiltinFunction,
-    parser::{expand_string, pipelines::RedirectFrom},
+    parser::{pipelines::RedirectFrom, Expander},
     shell::flow_control::Function,
     types,
 };
@@ -53,7 +53,7 @@ impl<'a> fmt::Debug for Job<'a> {
 
 /// Expands a given argument and returns it as an `Args`.
 fn expand_arg(arg: &str, shell: &Shell) -> types::Args {
-    let res = expand_string(&arg, shell);
+    let res = shell.expand_string(&arg);
     if res.is_empty() {
         args![""]
     } else {
