@@ -33,7 +33,7 @@ use std::{
 };
 
 use hashbrown::HashMap;
-use liner::Context;
+use liner::{Completer, Context};
 
 use crate::{
     shell::{self, status::*, ProcessState, Shell},
@@ -358,6 +358,12 @@ fn builtin_unalias(args: &[small::String], shell: &mut Shell) -> i32 {
 // checked for.
 fn builtin_fn(_: &[small::String], shell: &mut Shell) -> i32 { print_functions(shell.variables()) }
 
+struct EmptyCompleter;
+
+impl Completer for EmptyCompleter {
+    fn completions(&mut self, _start: &str) -> Vec<String> { Vec::new() }
+}
+
 fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_READ) {
         return SUCCESS;
@@ -366,7 +372,7 @@ fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
     if sys::isatty(sys::STDIN_FILENO) {
         let mut con = Context::new();
         for arg in args.iter().skip(1) {
-            match con.read_line(format!("{}=", arg.trim()), None, &mut |_| {}) {
+            match con.read_line(format!("{}=", arg.trim()), None, &mut EmptyCompleter) {
                 Ok(buffer) => {
                     shell.variables_mut().set(arg.as_ref(), buffer.trim());
                 }
