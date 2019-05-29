@@ -181,8 +181,7 @@ impl<'a> Shell<'a> {
                         self.run_pipeline(pipeline);
                     }
                     if self.opts.err_exit && self.previous_status != SUCCESS {
-                        let status = self.previous_status;
-                        self.exit(status);
+                        self.exit(None);
                     }
                     if !statements.is_empty() {
                         self.execute_statements(&statements);
@@ -258,7 +257,7 @@ impl<'a> Shell<'a> {
         }
         if let Some(signal) = signals::SignalHandler.next() {
             if self.handle_signal(signal) {
-                self.exit(get_signal_code(signal));
+                self.exit(Some(get_signal_code(signal)));
             }
             Condition::SigInt
         } else if self.break_flow {

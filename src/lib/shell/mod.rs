@@ -95,7 +95,7 @@ pub struct Shell<'a> {
     directory_stack: DirectoryStack,
     /// When a command is executed, the final result of that command is stored
     /// here.
-    pub previous_status: i32,
+    previous_status: i32,
     /// The job ID of the previous command sent to the background.
     previous_job: u32,
     /// Contains all the options relative to the shell
@@ -107,7 +107,7 @@ pub struct Shell<'a> {
     pub unterminated: bool,
     /// Set when a signal is received, this will tell the flow control logic to
     /// abort.
-    pub(crate) break_flow: bool,
+    break_flow: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,
@@ -446,9 +446,9 @@ impl<'a> Shell<'a> {
     pub fn variables_mut(&mut self) -> &mut Variables<'a> { &mut self.variables }
 
     /// Cleanly exit ion
-    pub fn exit(&mut self, status: i32) -> ! {
+    pub fn exit(&mut self, status: Option<i32>) -> ! {
         self.prep_for_exit();
-        process::exit(status);
+        process::exit(status.unwrap_or(self.previous_status));
     }
 
     pub fn assign(&mut self, key: &Key, value: Value<'a>) -> Result<(), String> {

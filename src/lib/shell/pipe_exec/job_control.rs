@@ -257,7 +257,7 @@ impl<'a> Shell<'a> {
         while self.background.lock().unwrap().iter().any(|p| p.state == ProcessState::Running) {
             if let Some(signal) = signals::SignalHandler.find(|&s| s != sys::SIGTSTP) {
                 self.background_send(signal);
-                self.exit(get_signal_code(signal));
+                self.exit(Some(get_signal_code(signal)));
             }
             sleep(Duration::from_millis(100));
         }

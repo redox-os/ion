@@ -109,8 +109,7 @@ pub fn readln(binary: &InteractiveBinary) -> Option<String> {
             } else if shell.flow_control.pop() {
                 None
             } else {
-                let status = shell.previous_status;
-                shell.exit(status);
+                shell.exit(None);
             }
         }
         Err(err) => {

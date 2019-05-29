@@ -594,8 +594,7 @@ fn builtin_exit(args: &[small::String], shell: &mut Shell) -> i32 {
             let _ = sys::kill(process.pid, sys::SIGTERM);
         }
     }
-    let previous_status = shell.previous_status;
-    shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok()).unwrap_or(previous_status))
+    shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok()))
 }
 
 fn builtin_exec(args: &[small::String], shell: &mut Shell) -> i32 {
