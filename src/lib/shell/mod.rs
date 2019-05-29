@@ -10,6 +10,7 @@ mod fork;
 mod fork_function;
 mod job;
 pub(crate) mod pipe_exec;
+mod shell_expand;
 pub(crate) mod signals;
 pub mod status;
 pub mod variables;
@@ -24,8 +25,7 @@ pub use self::{
 
 use self::{
     directory_stack::DirectoryStack,
-    escape::tilde,
-    flow_control::{FlowControl, Function, FunctionError},
+    flow_control::{Block, Function, FunctionError, Statement},
     foreground::ForegroundSignals,
     fork::Fork,
     pipe_exec::{foreground, job_control::BackgroundProcess},
@@ -35,15 +35,15 @@ use self::{
 use crate::{
     builtins::BuiltinMap,
     lexers::{Key, Primitive},
-    parser::{assignments::value_check, pipelines::Pipeline, Expander, Select, Terminator},
+    parser::{assignments::value_check, pipelines::Pipeline, Terminator},
     sys, types,
 };
 use itertools::Itertools;
 use std::{
     borrow::Cow,
+    fmt,
     fs::{self, OpenOptions},
-    io::{self, Read, Write},
-    iter::FromIterator,
+    io::{self, Write},
     path::Path,
     process,
     sync::{atomic::Ordering, Arc, Mutex},
@@ -90,7 +90,7 @@ pub struct Shell<'a> {
     /// Contains the aliases, strings, and array variable maps.
     variables: Variables<'a>,
     /// Contains the current state of flow control parameters.
-    flow_control: FlowControl<'a>,
+    flow_control: Block<'a>,
     /// Contains the directory stack parameters.
     directory_stack: DirectoryStack,
     /// When a command is executed, the final result of that command is stored
@@ -115,6 +115,21 @@ pub struct Shell<'a> {
     prep_for_exit: Option<Box<FnMut(&mut Shell) + 'a>>,
     /// Custom callback for each command call
     on_command: Option<Box<Fn(&Shell, std::time::Duration) + 'a>>,
+}
+
+pub struct EmptyBlockError;
+
+impl fmt::Display for EmptyBlockError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Could not exit the current block since it does not exist!")
+    }
+}
+
+// Implement std::fmt::Debug for AppError
+impl fmt::Debug for EmptyBlockError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "EmptyBlockError {{ file: {}, line: {} }}", file!(), line!())
+    }
 }
 
 impl<'a> Shell<'a> {
@@ -174,7 +189,7 @@ impl<'a> Shell<'a> {
         Shell {
             builtins,
             variables: Variables::default(),
-            flow_control: FlowControl::default(),
+            flow_control: Block::with_capacity(5),
             directory_stack: DirectoryStack::new(),
             previous_job: !0,
             previous_status: SUCCESS,
@@ -216,8 +231,16 @@ impl<'a> Shell<'a> {
         self.directory_stack.dirs(iter)
     }
 
-    // Resets the flow control fields to their default values.
-    fn reset_flow(&mut self) { self.flow_control.reset(); }
+    /// Resets the flow control fields to their default values.
+    pub fn reset_flow(&mut self) { self.flow_control.clear(); }
+
+    /// Exit the current block
+    pub fn exit_block(&mut self) -> Result<(), EmptyBlockError> {
+        self.flow_control.pop().map(|_| ()).ok_or(EmptyBlockError)
+    }
+
+    /// Get the depth of the current block
+    pub fn block_len(&self) -> usize { self.flow_control.len() }
 
     /// A method for capturing the output of the shell, and performing actions without modifying
     /// the state of the original shell. This performs a fork, taking a closure that controls
@@ -284,7 +307,7 @@ impl<'a> Shell<'a> {
             self.on_command(&cmd)
         }
 
-        if let Some(block) = self.flow_control.unclosed_block() {
+        if let Some(block) = self.flow_control.last().map(Statement::short) {
             self.previous_status = FAILURE;
             Err(IonError::UnclosedBlock { block: block.to_string() })
         } else {
@@ -501,188 +524,5 @@ impl<'a> Shell<'a> {
             }
             _ => Ok(()),
         }
-    }
-}
-
-impl<'a, 'b> Expander for Shell<'b> {
-    /// Uses a subshell to expand a given command.
-    fn command(&self, command: &str) -> Option<types::Str> {
-        let mut output = None;
-        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command)) {
-            Ok(result) => {
-                let mut string = String::with_capacity(1024);
-                match result.stdout.unwrap().read_to_string(&mut string) {
-                    Ok(_) => output = Some(string),
-                    Err(why) => {
-                        eprintln!("ion: error reading stdout of child: {}", why);
-                    }
-                }
-            }
-            Err(why) => {
-                eprintln!("ion: fork error: {}", why);
-            }
-        }
-
-        // Ensure that the parent retains ownership of the terminal before exiting.
-        let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
-        output.map(Into::into)
-    }
-
-    /// Expand a string variable given if its quoted / unquoted
-    fn string(&self, name: &str) -> Option<types::Str> {
-        if name == "?" {
-            Some(types::Str::from(self.previous_status.to_string()))
-        } else {
-            self.get::<types::Str>(name)
-        }
-    }
-
-    /// Expand an array variable with some selection
-    fn array(&self, name: &str, selection: &Select) -> Option<types::Args> {
-        if let Some(array) = self.variables.get::<types::Array>(name) {
-            match selection {
-                Select::All => {
-                    return Some(types::Args::from_iter(
-                        array.iter().map(|x| format!("{}", x).into()),
-                    ))
-                }
-                Select::Index(ref id) => {
-                    return id
-                        .resolve(array.len())
-                        .and_then(|n| array.get(n))
-                        .map(|x| types::Args::from_iter(Some(format!("{}", x).into())));
-                }
-                Select::Range(ref range) => {
-                    if let Some((start, length)) = range.bounds(array.len()) {
-                        if array.len() > start {
-                            return Some(
-                                array
-                                    .iter()
-                                    .skip(start)
-                                    .take(length)
-                                    .map(|var| format!("{}", var).into())
-                                    .collect(),
-                            );
-                        }
-                    }
-                }
-                _ => (),
-            }
-        } else if let Some(hmap) = self.variables.get::<types::HashMap>(name) {
-            match selection {
-                Select::All => {
-                    let mut array = types::Args::new();
-                    for (key, value) in hmap.iter() {
-                        array.push(key.clone());
-                        let f = format!("{}", value);
-                        match *value {
-                            Value::Str(_) => array.push(f.into()),
-                            Value::Array(_) | Value::HashMap(_) | Value::BTreeMap(_) => {
-                                for split in f.split_whitespace() {
-                                    array.push(split.into());
-                                }
-                            }
-                            _ => (),
-                        }
-                    }
-                    return Some(array);
-                }
-                Select::Key(key) => {
-                    return Some(args![format!(
-                        "{}",
-                        hmap.get(&*key).unwrap_or(&Value::Str("".into()))
-                    )]);
-                }
-                Select::Index(index) => {
-                    use crate::ranges::Index;
-                    return Some(args![format!(
-                        "{}",
-                        hmap.get(&types::Str::from(
-                            match index {
-                                Index::Forward(n) => *n as isize,
-                                Index::Backward(n) => -((*n + 1) as isize),
-                            }
-                            .to_string()
-                        ))
-                        .unwrap_or(&Value::Str("".into()))
-                    )]);
-                }
-                _ => (),
-            }
-        } else if let Some(bmap) = self.variables.get::<types::BTreeMap>(name) {
-            match selection {
-                Select::All => {
-                    let mut array = types::Args::new();
-                    for (key, value) in bmap.iter() {
-                        array.push(key.clone());
-                        let f = format!("{}", value);
-                        match *value {
-                            Value::Str(_) => array.push(f.into()),
-                            Value::Array(_) | Value::HashMap(_) | Value::BTreeMap(_) => {
-                                for split in f.split_whitespace() {
-                                    array.push(split.into());
-                                }
-                            }
-                            _ => (),
-                        }
-                    }
-                    return Some(array);
-                }
-                Select::Key(key) => {
-                    return Some(args![format!(
-                        "{}",
-                        bmap.get(&*key).unwrap_or(&Value::Str("".into()))
-                    )]);
-                }
-                Select::Index(index) => {
-                    use crate::ranges::Index;
-                    return Some(args![format!(
-                        "{}",
-                        bmap.get(&types::Str::from(
-                            match index {
-                                Index::Forward(n) => *n as isize,
-                                Index::Backward(n) => -((*n + 1) as isize),
-                            }
-                            .to_string()
-                        ))
-                        .unwrap_or(&Value::Str("".into()))
-                    )]);
-                }
-                _ => (),
-            }
-        }
-        None
-    }
-
-    fn map_keys(&self, name: &str, sel: &Select) -> Option<types::Args> {
-        match self.variables.get_ref(name) {
-            Some(&Value::HashMap(ref map)) => {
-                Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
-            }
-            Some(&Value::BTreeMap(ref map)) => {
-                Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
-            }
-            _ => None,
-        }
-    }
-
-    fn map_values(&self, name: &str, sel: &Select) -> Option<types::Args> {
-        match self.variables.get_ref(name) {
-            Some(&Value::HashMap(ref map)) => {
-                Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
-            }
-            Some(&Value::BTreeMap(ref map)) => {
-                Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
-            }
-            _ => None,
-        }
-    }
-
-    fn tilde(&self, input: &str) -> Option<String> {
-        tilde(
-            input,
-            &self.directory_stack,
-            self.variables.get::<types::Str>("OLDPWD").as_ref().map(types::Str::as_str),
-        )
     }
 }
