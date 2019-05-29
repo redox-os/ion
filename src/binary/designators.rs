@@ -1,4 +1,4 @@
-use crate::lexers::{ArgumentSplitter, DesignatorLexer, DesignatorToken};
+use ion_lexers::{ArgumentSplitter, DesignatorLexer, DesignatorToken};
 use liner::Context;
 use std::{borrow::Cow, str};
 

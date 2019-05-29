@@ -1,5 +1,5 @@
-use super::{super::completer::*, InteractiveBinary};
-use crate::{sys, types};
+use super::{completer::*, InteractiveBinary};
+use ion_shell::{sys, types};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use std::{env, io::ErrorKind, mem, path::PathBuf};
 
@@ -9,8 +9,8 @@ pub fn readln(binary: &InteractiveBinary) -> Option<String> {
         binary.context.borrow_mut().read_line(prompt, None, &mut |Event { editor, kind }| {
             let shell = binary.shell.borrow();
             let dirs = &shell.directory_stack;
-            let prev = &shell.variables.get::<types::Str>("OLDPWD");
-            let vars = &shell.variables;
+            let prev = &shell.variables().get::<types::Str>("OLDPWD");
+            let vars = shell.variables();
 
             if let EventKind::BeforeComplete = kind {
                 let (words, pos) = editor.get_words_and_cursor_position();

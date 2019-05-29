@@ -1,23 +1,20 @@
-use crate::{
-    parser::Expander,
-    shell::{variables::Value, Capture, Shell},
-    sys,
-};
+use ion_shell::{parser::Expander, sys, Capture, Shell, Value};
 use std::{io::Read, process};
 
 pub fn prompt(shell: &Shell) -> String {
     let blocks = shell.block_len() + if shell.unterminated { 1 } else { 0 };
 
     if blocks == 0 {
-        prompt_fn(&shell)
-            .unwrap_or_else(|| shell.get_string(&shell.get_str_or_empty("PROMPT")).as_str().into())
+        prompt_fn(&shell).unwrap_or_else(|| {
+            shell.get_string(&shell.variables().get_str_or_empty("PROMPT")).as_str().into()
+        })
     } else {
         "    ".repeat(blocks)
     }
 }
 
 pub fn prompt_fn(shell: &Shell) -> Option<String> {
-    if let Some(Value::Function(function)) = shell.variables.get_ref("PROMPT") {
+    if let Some(Value::Function(function)) = shell.variables().get_ref("PROMPT") {
         let output = match shell.fork(Capture::StdoutThenIgnoreStderr, move |child| {
             let _ = function.execute(child, &["ion"]);
         }) {

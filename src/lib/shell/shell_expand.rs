@@ -8,21 +8,24 @@ use std::{io::Read, iter::FromIterator, process};
 impl<'a, 'b> Expander for Shell<'b> {
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<types::Str> {
-        let mut output = None;
-        match self.fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command)) {
+        let output = match self
+            .fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command))
+        {
             Ok(result) => {
                 let mut string = String::with_capacity(1024);
                 match result.stdout.unwrap().read_to_string(&mut string) {
-                    Ok(_) => output = Some(string),
+                    Ok(_) => Some(string),
                     Err(why) => {
                         eprintln!("ion: error reading stdout of child: {}", why);
+                        None
                     }
                 }
             }
             Err(why) => {
                 eprintln!("ion: fork error: {}", why);
+                None
             }
-        }
+        };
 
         // Ensure that the parent retains ownership of the terminal before exiting.
         let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());

@@ -209,15 +209,6 @@ DESCRIPTION
 OPTIONS
     -c  Execute command with an empty environment."#;
 
-pub const MAN_HISTORY: &str = r#"NAME
-    history - print command history
-
-SYNOPSIS
-    history
-
-DESCRIPTION
-    Prints the command history."#;
-
 pub const MAN_SOURCE: &str = r#"NAME
     source - evaluates given file
 

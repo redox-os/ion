@@ -1,22 +1,19 @@
 mod assignments;
-pub(crate) mod binary;
 mod colors;
-mod completer;
-pub(crate) mod directory_stack;
-pub(crate) mod escape;
+pub mod directory_stack;
+pub mod escape;
 mod flow;
 pub(crate) mod flow_control;
 mod fork;
 mod fork_function;
 mod job;
-pub(crate) mod pipe_exec;
+pub mod pipe_exec;
 mod shell_expand;
 pub(crate) mod signals;
 pub mod status;
 pub mod variables;
 
 pub use self::{
-    binary::{InteractiveBinary, MAN_ION},
     fork::{Capture, IonResult},
     job::Job,
     pipe_exec::job_control::ProcessState,
@@ -92,7 +89,7 @@ pub struct Shell<'a> {
     /// Contains the current state of flow control parameters.
     flow_control: Block<'a>,
     /// Contains the directory stack parameters.
-    directory_stack: DirectoryStack,
+    pub directory_stack: DirectoryStack,
     /// When a command is executed, the final result of that command is stored
     /// here.
     previous_status: i32,
@@ -315,9 +312,6 @@ impl<'a> Shell<'a> {
         }
     }
 
-    /// Obtains a variable, returning an empty string if it does not exist.
-    fn get_str_or_empty(&self, name: &str) -> types::Str { self.variables.get_str_or_empty(name) }
-
     /// Gets any variable, if it exists within the shell's variable map.
     pub fn get<T>(&self, name: &str) -> Option<T>
     where
@@ -467,6 +461,9 @@ impl<'a> Shell<'a> {
 
     /// Mutable access to the variables
     pub fn variables_mut(&mut self) -> &mut Variables<'a> { &mut self.variables }
+
+    /// Get the last command's return code and/or the code for the error
+    pub fn previous_status(&self) -> i32 { self.previous_status }
 
     /// Cleanly exit ion
     pub fn exit(&mut self, status: Option<i32>) -> ! {

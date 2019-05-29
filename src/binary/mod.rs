@@ -1,18 +1,16 @@
 //! Contains the binary logic of Ion.
+mod completer;
 mod designators;
 mod history;
 mod prompt;
 mod readln;
 
 use self::{prompt::prompt, readln::readln};
-use super::{
-    status::{FAILURE, SUCCESS},
-    Shell,
-};
-use crate::{
+use ion_shell::{
     builtins::man_pages,
     parser::{Expander, Terminator},
-    types,
+    status::{FAILURE, SUCCESS},
+    types, Shell,
 };
 use itertools::Itertools;
 use liner::{Buffer, Context, KeyBindings};
@@ -41,6 +39,15 @@ ARGS:
     <args>...    Script arguments (@args). If the -c option is not specified, the first
                  parameter is taken as a filename to execute";
 
+pub(crate) const MAN_HISTORY: &str = r#"NAME
+    history - print command history
+
+SYNOPSIS
+    history
+
+DESCRIPTION
+    Prints the command history."#;
+
 pub struct InteractiveBinary<'a> {
     context: Rc<RefCell<Context>>,
     shell:   RefCell<Shell<'a>>,
@@ -50,7 +57,7 @@ impl<'a> InteractiveBinary<'a> {
     pub fn new(shell: Shell<'a>) -> Self {
         let mut context = Context::new();
         context.word_divider_fn = Box::new(word_divide);
-        if shell.get_str_or_empty("HISTFILE_ENABLED") == "1" {
+        if shell.variables().get_str_or_empty("HISTFILE_ENABLED") == "1" {
             let path = shell.get::<types::Str>("HISTFILE").expect("shell didn't set HISTFILE");
             if !Path::new(path.as_str()).exists() {
                 eprintln!("ion: creating history file at \"{}\"", path);
@@ -89,7 +96,7 @@ impl<'a> InteractiveBinary<'a> {
             // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the
             // pipline just executed to the the file and context histories. At the
             // moment, this means record how long it took.
-            if "1" == shell.variables.get_str_or_empty("RECORD_SUMMARY") {
+            if "1" == shell.variables().get_str_or_empty("RECORD_SUMMARY") {
                 let summary = format!(
                     "#summary# elapsed real time: {}.{:09} seconds",
                     elapsed.as_secs(),
@@ -108,7 +115,7 @@ impl<'a> InteractiveBinary<'a> {
     pub fn execute_interactive(self) -> ! {
         let context_bis = self.context.clone();
         let history = &move |args: &[small::String], _shell: &mut Shell| -> i32 {
-            if man_pages::check_help(args, man_pages::MAN_HISTORY) {
+            if man_pages::check_help(args, MAN_HISTORY) {
                 return SUCCESS;
             }
 

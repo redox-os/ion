@@ -1,6 +1,8 @@
 extern crate ion_sys as sys;
+mod binary;
 
-use ion_shell::{InteractiveBinary, Shell, Value, MAN_ION};
+use self::binary::{InteractiveBinary, MAN_ION};
+use ion_shell::{Shell, Value};
 use liner::KeyBindings;
 use std::{
     alloc::System,
