@@ -1,9 +1,9 @@
-use super::{
+use auto_enums::auto_enum;
+use glob::{glob_with, MatchOptions};
+use ion_shell::{
     directory_stack::DirectoryStack,
     escape::{escape, tilde, unescape},
 };
-use auto_enums::auto_enum;
-use glob::{glob_with, MatchOptions};
 use liner::Completer;
 use smallvec::SmallVec;
 use std::{iter, str};

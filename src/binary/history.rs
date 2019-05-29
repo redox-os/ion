@@ -1,5 +1,5 @@
 use super::InteractiveBinary;
-use crate::{shell::status::*, types};
+use ion_shell::{status::*, types};
 
 use regex::Regex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -26,7 +26,7 @@ impl<'a> InteractiveBinary<'a> {
     /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
     /// is changed.
     pub fn ignore_patterns(&self) -> IgnoreSetting {
-        let patterns: types::Array = self.shell.borrow().variables.get("HISTORY_IGNORE").unwrap();
+        let patterns: types::Array = self.shell.borrow().variables().get("HISTORY_IGNORE").unwrap();
         let mut settings = IgnoreSetting::default();
         let mut regexes = Vec::new();
         // for convenience and to avoid typos
@@ -59,7 +59,7 @@ impl<'a> InteractiveBinary<'a> {
     /// immediately after `on_command()`
     pub fn save_command_in_history(&self, command: &str) {
         if self.should_save_command(command) {
-            if self.shell.borrow().variables.get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
+            if self.shell.borrow().variables().get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
                 // Get current time stamp
                 let since_unix_epoch =
                     SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
@@ -96,7 +96,7 @@ impl<'a> InteractiveBinary<'a> {
             return false;
         }
 
-        if ignore.no_such_command && self.shell.borrow().previous_status == NO_SUCH_COMMAND {
+        if ignore.no_such_command && self.shell.borrow().previous_status() == NO_SUCH_COMMAND {
             return false;
         }
 
