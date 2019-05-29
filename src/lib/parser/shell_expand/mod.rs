@@ -1,7 +1,7 @@
 // TODO: Handle Runtime Errors
 mod words;
 
-pub use self::words::{Select, WordIterator, WordToken};
+pub use self::words::{unescape, Select, WordIterator, WordToken};
 use crate::{
     braces::{self, BraceToken},
     ranges::{parse_range, Index, Range},

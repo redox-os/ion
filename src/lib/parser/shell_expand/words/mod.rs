@@ -4,8 +4,8 @@ mod tests;
 
 pub use self::methods::{ArrayMethod, Pattern, StringMethod};
 use super::Expander;
+use crate::lexers::ArgumentSplitter;
 pub use crate::ranges::{Select, SelectWithSize};
-use crate::{lexers::ArgumentSplitter, shell::escape::unescape};
 use std::borrow::Cow;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -13,6 +13,19 @@ enum Quotes {
     None,
     Single,
     Double,
+}
+
+/// Unescapes filenames to be passed into the completer
+pub fn unescape(input: &str) -> Cow<str> {
+    let mut input: Cow<str> = input.into();
+    while let Some(found) = input.find('\\') {
+        if input.as_ref().len() > found + 1 {
+            input.to_mut().remove(found);
+        } else {
+            break;
+        }
+    }
+    input
 }
 
 #[derive(Debug, PartialEq, Clone)]

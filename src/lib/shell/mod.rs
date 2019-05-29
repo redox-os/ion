@@ -1,13 +1,12 @@
 mod assignments;
 mod colors;
-pub mod directory_stack;
-pub mod escape;
+mod directory_stack;
 mod flow;
 pub(crate) mod flow_control;
 mod fork;
 mod fork_function;
 mod job;
-pub mod pipe_exec;
+pub(crate) mod pipe_exec;
 mod shell_expand;
 pub(crate) mod signals;
 pub mod status;
@@ -89,7 +88,7 @@ pub struct Shell<'a> {
     /// Contains the current state of flow control parameters.
     flow_control: Block<'a>,
     /// Contains the directory stack parameters.
-    pub directory_stack: DirectoryStack,
+    directory_stack: DirectoryStack,
     /// When a command is executed, the final result of that command is stored
     /// here.
     previous_status: i32,

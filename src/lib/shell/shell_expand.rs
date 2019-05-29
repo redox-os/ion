@@ -1,9 +1,10 @@
-use super::{escape::tilde, fork::Capture, variables::Value, Shell};
+use super::{fork::Capture, variables::Value, Shell};
 use crate::{
     parser::{Expander, Select},
-    sys, types,
+    sys::{self, env as sys_env, variables as self_sys},
+    types,
 };
-use std::{io::Read, iter::FromIterator, process};
+use std::{env, io::Read, iter::FromIterator, process};
 
 impl<'a, 'b> Expander for Shell<'b> {
     /// Uses a subshell to expand a given command.
@@ -183,10 +184,39 @@ impl<'a, 'b> Expander for Shell<'b> {
     }
 
     fn tilde(&self, input: &str) -> Option<String> {
-        tilde(
-            input,
-            &self.directory_stack,
-            self.variables.get::<types::Str>("OLDPWD").as_ref().map(types::Str::as_str),
-        )
+        // Only if the first character is a tilde character will we perform expansions
+        if !input.starts_with('~') {
+            return None;
+        }
+
+        let separator = input[1..].find(|c| c == '/' || c == '$');
+        let (tilde_prefix, rest) = input[1..].split_at(separator.unwrap_or(input.len() - 1));
+
+        match tilde_prefix {
+            "" => sys_env::home_dir().map(|home| home.to_string_lossy().to_string() + rest),
+            "+" => Some(env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest),
+            "-" => {
+                self.variables.get::<types::Str>("OLDPWD").map(|oldpwd| oldpwd.to_string() + rest)
+            }
+            _ => {
+                let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
+                    (false, &tilde_prefix[1..])
+                } else if tilde_prefix.starts_with('-') {
+                    (true, &tilde_prefix[1..])
+                } else {
+                    (false, tilde_prefix)
+                };
+
+                match tilde_num.parse() {
+                    Ok(num) => if neg {
+                        self.directory_stack.dir_from_top(num)
+                    } else {
+                        self.directory_stack.dir_from_bottom(num)
+                    }
+                    .map(|path| path.to_str().unwrap().to_string()),
+                    Err(_) => self_sys::get_user_home(tilde_prefix).map(|home| home + rest),
+                }
+            }
+        }
     }
 }

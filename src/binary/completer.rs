@@ -1,9 +1,8 @@
 use auto_enums::auto_enum;
 use glob::{glob_with, MatchOptions};
 use ion_shell::{
-    directory_stack::DirectoryStack,
-    escape::{escape, tilde, unescape},
-    types, Shell,
+    parser::{unescape, Expander},
+    Shell,
 };
 use liner::{BasicCompleter, Completer, CursorPosition, Event, EventKind};
 use smallvec::SmallVec;
@@ -11,32 +10,36 @@ use std::{env, iter, path::PathBuf, str};
 
 pub struct IonCompleter<'a, 'b> {
     shell:             &'b Shell<'a>,
-    dir_completer:     IonFileCompleter,
     history_completer: Option<BasicCompleter>,
 }
 
-impl<'a, 'b> IonCompleter<'a, 'b> {
-    pub fn new(shell: &'b Shell<'a>) -> Self {
-        IonCompleter {
-            shell,
-            dir_completer: IonFileCompleter::new(
-                None,
-                &shell.directory_stack,
-                shell.variables().get::<types::Str>("OLDPWD").as_ref().map(types::Str::as_str),
-            ),
-            history_completer: None,
+/// Escapes filenames from the completer so that special characters will be properly escaped.
+///
+/// NOTE: Perhaps we should submit a PR to Liner to add a &'static [u8] field to
+/// `FilenameCompleter` so that we don't have to perform the escaping ourselves?
+fn escape(input: &str) -> String {
+    let mut output = Vec::with_capacity(input.len());
+    for character in input.bytes() {
+        match character {
+            b'(' | b')' | b'[' | b']' | b'&' | b'$' | b'@' | b'{' | b'}' | b'<' | b'>' | b';'
+            | b'"' | b'\'' | b'#' | b'^' | b'*' => output.push(b'\\'),
+            _ => (),
         }
+        output.push(character);
     }
+    unsafe { String::from_utf8_unchecked(output) }
+}
+
+impl<'a, 'b> IonCompleter<'a, 'b> {
+    pub fn new(shell: &'b Shell<'a>) -> Self { IonCompleter { shell, history_completer: None } }
 }
 
 impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
     fn completions(&mut self, start: &str) -> Vec<String> {
-        let mut completions = self.dir_completer.completions(start);
+        let mut completions = IonFileCompleter::new(None, &self.shell).completions(start);
 
         if let Some(ref mut history) = &mut self.history_completer {
             let vars = self.shell.variables();
-            let dirs = &self.shell.directory_stack;
-            let prev = self.shell.variables().get::<types::Str>("OLDPWD");
 
             completions.extend(history.completions(start));
             // Initialize a new completer from the definitions collected.
@@ -67,9 +70,7 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
             let file_completers: Vec<_> = env::var("PATH")
                 .unwrap_or_else(|_| "/bin/".to_string())
                 .split(sys::PATH_SEPARATOR)
-                .map(|s| {
-                    IonFileCompleter::new(Some(s), dirs, prev.as_ref().map(types::Str::as_str))
-                })
+                .map(|s| IonFileCompleter::new(Some(s), &self.shell))
                 .collect();
             // Merge the collected definitions with the file path definitions.
             completions.extend(MultiCompleter::new(file_completers).completions(start));
@@ -78,9 +79,6 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
     }
 
     fn on_event<W: std::io::Write>(&mut self, event: Event<W>) {
-        let dirs = &self.shell.directory_stack;
-        let prev = self.shell.variables().get::<types::Str>("OLDPWD");
-
         if let EventKind::BeforeComplete = event.kind {
             let (words, pos) = event.editor.get_words_and_cursor_position();
 
@@ -116,9 +114,6 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
             } else {
                 None
             };
-
-            self.dir_completer =
-                IonFileCompleter::new(None, dirs, prev.as_ref().map(types::Str::as_str));
         }
     }
 }
@@ -126,26 +121,23 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
 /// when a special character is contained within an expanded filename.
-pub struct IonFileCompleter {
-    /// A pointer to the directory stack in the shell.
-    dir_stack: *const DirectoryStack,
-    /// A pointer to the variables map in the shell.
-    prev: Option<String>,
+pub struct IonFileCompleter<'a, 'b> {
+    shell: &'b Shell<'a>,
     /// The directory the expansion takes place in
     path: String,
 }
 
-impl IonFileCompleter {
-    pub fn new(path: Option<&str>, dir_stack: *const DirectoryStack, prev: Option<&str>) -> Self {
+impl<'a, 'b> IonFileCompleter<'a, 'b> {
+    pub fn new(path: Option<&str>, shell: &'b Shell<'a>) -> Self {
         let mut path = path.unwrap_or("").to_string();
         if !path.is_empty() && !path.ends_with('/') {
             path.push('/');
         }
-        IonFileCompleter { dir_stack, prev: prev.map(ToString::to_string), path }
+        IonFileCompleter { shell, path }
     }
 }
 
-impl Completer for IonFileCompleter {
+impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
     /// When the tab key is pressed, **Liner** will use this method to perform completions of
     /// filenames. As our `IonFileCompleter` is a wrapper around **Liner**'s
     /// `FilenameCompleter`,
@@ -160,9 +152,7 @@ impl Completer for IonFileCompleter {
         // because no changes will occur to either of the underlying references in the
         // duration between creation of the completers and execution of their
         // completions.
-        if let Some(expanded) =
-            tilde(start, unsafe { &*self.dir_stack }, self.prev.as_ref().map(String::as_str))
-        {
+        if let Some(expanded) = self.shell.tilde(start) {
             // Now we obtain completions for the `expanded` form of the `start` value.
             let iterator = filename_completion(&expanded, &self.path);
 
@@ -284,7 +274,8 @@ mod tests {
 
     #[test]
     fn filename_completion() {
-        let mut completer = IonFileCompleter::new(None, &DirectoryStack::new(), None);
+        let shell = Shell::library();
+        let mut completer = IonFileCompleter::new(None, &shell);
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
         assert_eq!(completer.completions("testing/file"), vec!["testing/file_with_text"]);
         assert_eq!(completer.completions("~"), vec!["~/"]);
