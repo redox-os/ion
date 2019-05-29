@@ -137,7 +137,7 @@ impl<'a> Shell<'a> {
             Statement::Error(number) => {
                 self.previous_status = *number;
                 self.variables.set("?", self.previous_status.to_string());
-                self.flow_control.reset();
+                self.flow_control.clear();
             }
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
@@ -191,7 +191,7 @@ impl<'a> Shell<'a> {
                     eprintln!("ion: pipeline expansion error: {}", e);
                     self.previous_status = FAILURE;
                     self.variables.set("?", self.previous_status.to_string());
-                    self.flow_control.reset();
+                    self.flow_control.clear();
                     return Condition::Break;
                 }
             },

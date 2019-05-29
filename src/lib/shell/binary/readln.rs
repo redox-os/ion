@@ -104,13 +104,10 @@ pub fn readln(binary: &InteractiveBinary) -> Option<String> {
         // Handles Ctrl + D
         Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
             let mut shell = binary.shell.borrow_mut();
-            if shell.unterminated {
-                None
-            } else if shell.flow_control.pop() {
-                None
-            } else {
+            if !shell.unterminated && shell.exit_block().is_err() {
                 shell.exit(None);
             }
+            None
         }
         Err(err) => {
             eprintln!("ion: liner: {}", err);

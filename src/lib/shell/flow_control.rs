@@ -149,28 +149,10 @@ impl<'a> Statement<'a> {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct FlowControl<'a> {
-    pub block: Vec<Statement<'a>>,
-}
-
-impl<'a> FlowControl<'a> {
-    /// On error reset FlowControl fields.
-    pub fn reset(&mut self) { self.block.clear() }
-
-    /// Discard one block.
-    pub fn pop(&mut self) -> bool { self.block.pop().is_some() }
-
-    /// Check if there isn't an unfinished block.
-    pub fn unclosed_block(&self) -> Option<&str> { self.block.last().map(|block| block.short()) }
-}
-
-impl<'a> Default for FlowControl<'a> {
-    fn default() -> Self { FlowControl { block: Vec::with_capacity(5) } }
-}
+pub type Block<'a> = Vec<Statement<'a>>;
 
 pub fn insert_statement<'a>(
-    flow_control: &mut FlowControl<'a>,
+    block: &mut Block<'a>,
     statement: Statement<'a>,
 ) -> Result<Option<Statement<'a>>, &'static str> {
     match statement {
@@ -180,55 +162,52 @@ pub fn insert_statement<'a>(
         | Statement::Match { .. }
         | Statement::If { .. }
         | Statement::Function { .. } => {
-            flow_control.block.push(statement);
+            block.push(statement);
             Ok(None)
         }
         // Case is special as it should pop back previous Case
         Statement::Case(_) => {
-            match flow_control.block.last() {
+            match block.last() {
                 Some(Statement::Case(_)) => {
-                    let case = flow_control.block.pop().unwrap();
-                    let _ = insert_into_block(&mut flow_control.block, case);
+                    let case = block.pop().unwrap();
+                    let _ = insert_into_block(block, case);
                 }
                 Some(Statement::Match { .. }) => (),
                 _ => return Err("ion: error: Case { .. } found outside of Match { .. } block"),
             }
 
-            flow_control.block.push(statement);
+            block.push(statement);
             Ok(None)
         }
         Statement::End => {
-            match flow_control.block.len() {
+            match block.len() {
                 0 => Err("ion: error: keyword End found but no block to close"),
                 // Ready to return the complete block
-                1 => Ok(flow_control.block.pop()),
+                1 => Ok(block.pop()),
                 // Merge back the top block into the previous one
                 _ => {
-                    let block = flow_control.block.pop().unwrap();
-                    let mut case = false;
-                    if let Statement::Case(_) = block {
-                        case = true;
-                    }
-                    insert_into_block(&mut flow_control.block, block)?;
-                    if case {
+                    let last_statement = block.pop().unwrap();
+                    if let Statement::Case(_) = last_statement {
+                        insert_into_block(block, last_statement)?;
                         // Merge last Case back and pop off Match too
-                        let match_stm = flow_control.block.pop().unwrap();
-                        if !flow_control.block.is_empty() {
-                            insert_into_block(&mut flow_control.block, match_stm)?;
+                        let match_stm = block.pop().unwrap();
+                        if !block.is_empty() {
+                            insert_into_block(block, match_stm)?;
 
                             Ok(None)
                         } else {
                             Ok(Some(match_stm))
                         }
                     } else {
+                        insert_into_block(block, last_statement)?;
                         Ok(None)
                     }
                 }
             }
         }
-        Statement::And(_) | Statement::Or(_) if !flow_control.block.is_empty() => {
+        Statement::And(_) | Statement::Or(_) if !block.is_empty() => {
             let mut pushed = true;
-            match flow_control.block.last_mut().unwrap() {
+            match block.last_mut().unwrap() {
                 Statement::If {
                     ref mut expression,
                     ref mode,
@@ -266,22 +245,22 @@ pub fn insert_statement<'a>(
                 _ => pushed = false,
             }
             if !pushed {
-                insert_into_block(&mut flow_control.block, statement)?;
+                insert_into_block(block, statement)?;
             }
 
             Ok(None)
         }
         Statement::Time(inner) => {
             if inner.is_block() {
-                flow_control.block.push(Statement::Time(inner));
+                block.push(Statement::Time(inner));
                 Ok(None)
             } else {
                 Ok(Some(Statement::Time(inner)))
             }
         }
         _ => {
-            if !flow_control.block.is_empty() {
-                insert_into_block(&mut flow_control.block, statement)?;
+            if !block.is_empty() {
+                insert_into_block(block, statement)?;
                 Ok(None)
             } else {
                 // Filter out toplevel statements that should produce an error
@@ -302,7 +281,7 @@ pub fn insert_statement<'a>(
 }
 
 fn insert_into_block<'a>(
-    block: &mut Vec<Statement<'a>>,
+    block: &mut Block<'a>,
     statement: Statement<'a>,
 ) -> Result<(), &'static str> {
     let block = match block.last_mut().expect("Should not insert statement if stack is empty!") {
@@ -465,31 +444,31 @@ mod tests {
 
     #[test]
     fn if_inside_match() {
-        let mut flow_control = FlowControl::default();
+        let mut flow_control = Block::default();
 
         let res = insert_statement(&mut flow_control, new_match());
-        assert_eq!(flow_control.block.len(), 1);
+        assert_eq!(flow_control.len(), 1);
         assert_eq!(res, Ok(None));
 
         let res = insert_statement(&mut flow_control, new_case());
-        assert_eq!(flow_control.block.len(), 2);
+        assert_eq!(flow_control.len(), 2);
         assert_eq!(res, Ok(None));
 
         // Pops back top case, len stays 2
         let res = insert_statement(&mut flow_control, new_case());
-        assert_eq!(flow_control.block.len(), 2);
+        assert_eq!(flow_control.len(), 2);
         assert_eq!(res, Ok(None));
 
         let res = insert_statement(&mut flow_control, new_if());
-        assert_eq!(flow_control.block.len(), 3);
+        assert_eq!(flow_control.len(), 3);
         assert_eq!(res, Ok(None));
 
         let res = insert_statement(&mut flow_control, Statement::End);
-        assert_eq!(flow_control.block.len(), 2);
+        assert_eq!(flow_control.len(), 2);
         assert_eq!(res, Ok(None));
 
         let res = insert_statement(&mut flow_control, Statement::End);
-        assert_eq!(flow_control.block.len(), 0);
+        assert_eq!(flow_control.len(), 0);
         if let Ok(Some(Statement::Match { ref cases, .. })) = res {
             assert_eq!(cases.len(), 2);
             assert_eq!(cases.last().unwrap().statements.len(), 1);
@@ -500,16 +479,16 @@ mod tests {
 
     #[test]
     fn statement_outside_case() {
-        let mut flow_control = FlowControl::default();
+        let mut flow_control = Block::default();
 
         let res = insert_statement(&mut flow_control, new_match());
-        assert_eq!(flow_control.block.len(), 1);
+        assert_eq!(flow_control.len(), 1);
         assert_eq!(res, Ok(None));
 
         let res = insert_statement(&mut flow_control, Statement::Default);
         if res.is_err() {
-            flow_control.reset();
-            assert_eq!(flow_control.block.len(), 0);
+            flow_control.clear();
+            assert_eq!(flow_control.len(), 0);
         } else {
             assert!(false);
         }
@@ -517,7 +496,7 @@ mod tests {
 
     #[test]
     fn return_toplevel() {
-        let mut flow_control = FlowControl::default();
+        let mut flow_control = Block::default();
         let oks = vec![
             Statement::Error(1),
             Statement::Time(Box::new(Statement::Default)),

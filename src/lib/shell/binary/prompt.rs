@@ -6,7 +6,7 @@ use crate::{
 use std::{io::Read, process};
 
 pub fn prompt(shell: &Shell) -> String {
-    let blocks = shell.flow_control.block.len() + if shell.unterminated { 1 } else { 0 };
+    let blocks = shell.block_len() + if shell.unterminated { 1 } else { 0 };
 
     if blocks == 0 {
         prompt_fn(&shell)
