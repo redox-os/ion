@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     lexers::assignments::{Key, Operator, Primitive},
-    parser::{assignments::*, statement::parse::is_valid_name},
+    parser::{assignments::*, is_valid_name},
     shell::variables::{EuclDiv, Modifications, OpError, Pow, Value},
     types,
 };
@@ -41,20 +41,9 @@ fn list_vars(shell: &Shell) -> Result<(), io::Error> {
 
 /// Represents: A variable store capable of setting local variables or
 /// exporting variables to some global environment
-pub(crate) trait VariableStore<'b> {
-    /// Set a local variable given a binding
-    fn local(&mut self, action: &LocalAction) -> i32;
+impl<'b> Shell<'b> {
     /// Export a variable to the process environment given a binding
-    fn export(&mut self, action: &ExportAction) -> i32;
-    /// Collect all updates to perform on variables for a given assignement action
-    fn calculate<'a>(
-        &mut self,
-        actions: AssignmentActions<'a>,
-    ) -> Result<Vec<(Key<'a>, Value<'b>)>, String>;
-}
-
-impl<'b> VariableStore<'b> for Shell<'b> {
-    fn export(&mut self, action: &ExportAction) -> i32 {
+    pub fn export(&mut self, action: &ExportAction) -> i32 {
         match action {
             ExportAction::Assign(ref keys, op, ref vals) => {
                 let actions = AssignmentActions::new(keys, *op, vals);
@@ -113,7 +102,8 @@ impl<'b> VariableStore<'b> for Shell<'b> {
         }
     }
 
-    fn calculate<'a>(
+    /// Collect all updates to perform on variables for a given assignement action
+    pub(crate) fn calculate<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
     ) -> Result<Vec<(Key<'a>, Value<'b>)>, String> {
@@ -169,7 +159,8 @@ impl<'b> VariableStore<'b> for Shell<'b> {
         Ok(backup)
     }
 
-    fn local(&mut self, action: &LocalAction) -> i32 {
+    /// Set a local variable given a binding
+    pub fn local(&mut self, action: &LocalAction) -> i32 {
         match action {
             LocalAction::List => {
                 let _ = list_vars(&self);

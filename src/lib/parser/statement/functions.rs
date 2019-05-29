@@ -3,7 +3,7 @@ use crate::lexers::assignments::{KeyBuf, KeyIterator, TypeError};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum FunctionParseError {
+pub enum FunctionParseError {
     RepeatedArgument(String),
     TypeError(TypeError),
 }
@@ -22,7 +22,7 @@ impl<'a> Display for FunctionParseError {
 /// The arguments expression given to a function declaration goes into here, which will be
 /// converted into a tuple consisting of a `KeyIterator` iterator, which will collect type
 /// information, and an optional description of the function.
-pub(crate) fn parse_function(arg: &str) -> (KeyIterator, Option<&str>) {
+pub fn parse_function(arg: &str) -> (KeyIterator, Option<&str>) {
     let (args, description) = split_pattern(arg, "--");
     (KeyIterator::new(args), description)
 }
@@ -31,7 +31,7 @@ pub(crate) fn parse_function(arg: &str) -> (KeyIterator, Option<&str>) {
 /// type or argument error is detected, then that error will be returned instead. This is required
 /// because of lifetime restrictions on `KeyIterator`, which will not live for the remainder of the
 /// declared function's lifetime.
-pub(crate) fn collect_arguments(args: KeyIterator) -> Result<Vec<KeyBuf>, FunctionParseError> {
+pub fn collect_arguments(args: KeyIterator) -> Result<Vec<KeyBuf>, FunctionParseError> {
     let mut keybuf: Vec<KeyBuf> = Vec::new();
     for arg in args {
         match arg {

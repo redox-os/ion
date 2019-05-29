@@ -3,7 +3,7 @@ use crate::{sys, types};
 use liner::{BasicCompleter, CursorPosition, Event, EventKind};
 use std::{env, io::ErrorKind, mem, path::PathBuf};
 
-pub(crate) fn readln(binary: &InteractiveBinary) -> Option<String> {
+pub fn readln(binary: &InteractiveBinary) -> Option<String> {
     let prompt = binary.prompt();
     let line =
         binary.context.borrow_mut().read_line(prompt, None, &mut |Event { editor, kind }| {
@@ -109,8 +109,7 @@ pub(crate) fn readln(binary: &InteractiveBinary) -> Option<String> {
             } else if shell.flow_control.pop() {
                 None
             } else {
-                let status = shell.previous_status;
-                shell.exit(status);
+                shell.exit(None);
             }
         }
         Err(err) => {

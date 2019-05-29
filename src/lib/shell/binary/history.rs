@@ -5,7 +5,7 @@ use regex::Regex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Default)]
-pub(crate) struct IgnoreSetting {
+pub struct IgnoreSetting {
     // Macro definition fails if last flag has a comment at the end of the line.
     /// ignore all commands ("all")
     all: bool,
@@ -22,24 +22,10 @@ pub(crate) struct IgnoreSetting {
 }
 
 /// Contains all history-related functionality for the `Shell`.
-pub(crate) trait ShellHistory {
-    /// Saves a command in the history, depending on @HISTORY_IGNORE. Should be called
-    /// immediately after `on_command()`
-    fn save_command_in_history(&self, command: &str);
-
+impl<'a> InteractiveBinary<'a> {
     /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
     /// is changed.
-    fn ignore_patterns(&self) -> IgnoreSetting;
-}
-
-trait ShellHistoryPrivate {
-    /// Returns true if the given command with the given exit status should be saved in the
-    /// history
-    fn should_save_command(&self, command: &str) -> bool;
-}
-
-impl<'a> ShellHistory for InteractiveBinary<'a> {
-    fn ignore_patterns(&self) -> IgnoreSetting {
+    pub fn ignore_patterns(&self) -> IgnoreSetting {
         let patterns: types::Array = self.shell.borrow().variables.get("HISTORY_IGNORE").unwrap();
         let mut settings = IgnoreSetting::default();
         let mut regexes = Vec::new();
@@ -69,7 +55,9 @@ impl<'a> ShellHistory for InteractiveBinary<'a> {
         settings
     }
 
-    fn save_command_in_history(&self, command: &str) {
+    /// Saves a command in the history, depending on @HISTORY_IGNORE. Should be called
+    /// immediately after `on_command()`
+    pub fn save_command_in_history(&self, command: &str) {
         if self.should_save_command(command) {
             if self.shell.borrow().variables.get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
                 // Get current time stamp
@@ -89,9 +77,9 @@ impl<'a> ShellHistory for InteractiveBinary<'a> {
             }
         }
     }
-}
 
-impl<'a> ShellHistoryPrivate for InteractiveBinary<'a> {
+    /// Returns true if the given command with the given exit status should be saved in the
+    /// history
     fn should_save_command(&self, command: &str) -> bool {
         // just for convenience and to make the code look a bit cleaner
         let ignore = self.ignore_patterns();

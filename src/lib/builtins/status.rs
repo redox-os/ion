@@ -2,7 +2,7 @@ use crate::{builtins::man_pages::MAN_STATUS, shell::Shell};
 use small;
 use std::env;
 
-pub(crate) fn status(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
+pub fn status(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
     let mut help = false;
     let mut login_shell = false;
     let mut interactive = false;

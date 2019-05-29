@@ -1,13 +1,13 @@
 mod assignments;
 pub(crate) mod binary;
-pub(crate) mod colors;
+mod colors;
 mod completer;
 pub(crate) mod directory_stack;
 pub(crate) mod escape;
 mod flow;
 pub(crate) mod flow_control;
 mod fork;
-pub mod fork_function;
+mod fork_function;
 mod job;
 pub(crate) mod pipe_exec;
 pub(crate) mod signals;
@@ -15,13 +15,11 @@ pub mod status;
 pub mod variables;
 
 pub use self::{
-    binary::InteractiveBinary,
-    fork::{Capture, Fork, IonResult},
-};
-pub(crate) use self::{
-    flow::FlowLogic,
+    binary::{InteractiveBinary, MAN_ION},
+    fork::{Capture, IonResult},
     job::Job,
-    pipe_exec::{foreground, job_control},
+    pipe_exec::job_control::ProcessState,
+    variables::Value,
 };
 
 use self::{
@@ -29,9 +27,10 @@ use self::{
     escape::tilde,
     flow_control::{FlowControl, Function, FunctionError},
     foreground::ForegroundSignals,
-    job_control::BackgroundProcess,
+    fork::Fork,
+    pipe_exec::{foreground, job_control::BackgroundProcess},
     status::*,
-    variables::{GetVariable, Value, Variables},
+    variables::{GetVariable, Variables},
 };
 use crate::{
     builtins::BuiltinMap,
@@ -41,6 +40,7 @@ use crate::{
 };
 use itertools::Itertools;
 use std::{
+    borrow::Cow,
     fs::{self, OpenOptions},
     io::{self, Read, Write},
     iter::FromIterator,
@@ -88,16 +88,16 @@ pub struct Shell<'a> {
     /// started.
     builtins: BuiltinMap<'a>,
     /// Contains the aliases, strings, and array variable maps.
-    pub variables: Variables<'a>,
+    variables: Variables<'a>,
     /// Contains the current state of flow control parameters.
     flow_control: FlowControl<'a>,
     /// Contains the directory stack parameters.
-    pub(crate) directory_stack: DirectoryStack,
+    directory_stack: DirectoryStack,
     /// When a command is executed, the final result of that command is stored
     /// here.
-    pub previous_status: i32,
+    previous_status: i32,
     /// The job ID of the previous command sent to the background.
-    pub(crate) previous_job: u32,
+    previous_job: u32,
     /// Contains all the options relative to the shell
     opts: ShellOptions,
     /// Contains information on all of the active background processes that are being managed
@@ -107,7 +107,7 @@ pub struct Shell<'a> {
     pub unterminated: bool,
     /// Set when a signal is received, this will tell the flow control logic to
     /// abort.
-    pub(crate) break_flow: bool,
+    break_flow: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,
@@ -194,6 +194,28 @@ impl<'a> Shell<'a> {
         }
     }
 
+    pub fn cd<T: AsRef<str>>(&mut self, dir: Option<T>) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.cd(dir, &mut self.variables)
+    }
+
+    pub fn pushd<T: AsRef<str>, I: IntoIterator<Item = T>>(
+        &mut self,
+        iter: I,
+    ) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.pushd(iter, &mut self.variables)
+    }
+
+    pub fn popd<T: AsRef<str>, I: IntoIterator<Item = T>>(
+        &mut self,
+        iter: I,
+    ) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.popd(iter)
+    }
+
+    pub fn dir_stack<T: AsRef<str>, I: IntoIterator<Item = T>>(&mut self, iter: I) -> i32 {
+        self.directory_stack.dirs(iter)
+    }
+
     // Resets the flow control fields to their default values.
     fn reset_flow(&mut self) { self.flow_control.reset(); }
 
@@ -271,9 +293,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Obtains a variable, returning an empty string if it does not exist.
-    pub(crate) fn get_str_or_empty(&self, name: &str) -> types::Str {
-        self.variables.get_str_or_empty(name)
-    }
+    fn get_str_or_empty(&self, name: &str) -> types::Str { self.variables.get_str_or_empty(name) }
 
     /// Gets any variable, if it exists within the shell's variable map.
     pub fn get<T>(&self, name: &str) -> Option<T>
@@ -289,7 +309,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub(crate) fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Option<i32> {
+    pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Option<i32> {
         let command_start_time = SystemTime::now();
 
         pipeline.expand(self);
@@ -350,6 +370,14 @@ impl<'a> Shell<'a> {
         exit_status
     }
 
+    pub fn previous_job(&self) -> Option<u32> {
+        if self.previous_job == !0 {
+            None
+        } else {
+            Some(self.previous_job)
+        }
+    }
+
     /// Evaluates the source init file in the user's home directory.
     pub fn evaluate_init_file(&mut self) {
         let base_dirs = match BaseDirectories::with_prefix("ion") {
@@ -383,13 +411,11 @@ impl<'a> Shell<'a> {
     }
 
     /// Set the callback to call before exiting the shell
-    #[inline]
     pub fn set_prep_for_exit(&mut self, callback: Option<Box<dyn FnMut(&mut Shell) + 'a>>) {
         self.prep_for_exit = callback;
     }
 
     /// Set the callback to call on each command
-    #[inline]
     pub fn set_on_command(
         &mut self,
         callback: Option<Box<dyn Fn(&Shell, std::time::Duration) + 'a>>,
@@ -398,7 +424,6 @@ impl<'a> Shell<'a> {
     }
 
     /// Get access to the builtins
-    #[inline]
     pub fn builtins(&self) -> &BuiltinMap<'a> { &self.builtins }
 
     /// Get a mutable access to the builtins
@@ -406,21 +431,24 @@ impl<'a> Shell<'a> {
     /// Warning: Previously defined functions will rely on previous versions of the builtins, even
     /// if they are redefined. It is strongly advised to avoid mutating the builtins while the shell
     /// is running
-    #[inline]
     pub fn builtins_mut(&mut self) -> &mut BuiltinMap<'a> { &mut self.builtins }
 
     /// Access to the shell options
-    #[inline]
     pub fn opts(&self) -> &ShellOptions { &self.opts }
 
     /// Mutable access to the shell options
-    #[inline]
     pub fn opts_mut(&mut self) -> &mut ShellOptions { &mut self.opts }
 
+    /// Access to the variables
+    pub fn variables(&self) -> &Variables<'a> { &self.variables }
+
+    /// Mutable access to the variables
+    pub fn variables_mut(&mut self) -> &mut Variables<'a> { &mut self.variables }
+
     /// Cleanly exit ion
-    pub fn exit(&mut self, status: i32) -> ! {
+    pub fn exit(&mut self, status: Option<i32>) -> ! {
         self.prep_for_exit();
-        process::exit(status);
+        process::exit(status.unwrap_or(self.previous_status));
     }
 
     pub fn assign(&mut self, key: &Key, value: Value<'a>) -> Result<(), String> {

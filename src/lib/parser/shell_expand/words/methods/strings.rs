@@ -11,7 +11,7 @@ use small;
 use std::path::Path;
 use unicode_segmentation::UnicodeSegmentation;
 
-pub(crate) fn unescape(input: &str) -> Result<small::String, &'static str> {
+pub fn unescape(input: &str) -> Result<small::String, &'static str> {
     let mut check = false;
     // small::String cannot be created with a capacity of 0 without causing a panic
     let len = if !input.is_empty() { input.len() } else { 1 };
@@ -83,20 +83,20 @@ fn escape(input: &str) -> Result<String, &'static str> {
 
 /// Represents a method that operates on and returns a string
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) struct StringMethod<'a> {
+pub struct StringMethod<'a> {
     /// Name of this method
-    pub(crate) method: &'a str,
+    pub method: &'a str,
     /// Variable that this method will operator on. This is a bit of a misnomer
     /// as this can be an expression as well
-    pub(crate) variable: &'a str,
+    pub variable: &'a str,
     /// Pattern to use for certain methods
-    pub(crate) pattern: &'a str,
+    pub pattern: &'a str,
     /// Selection to use to control the output of this method
-    pub(crate) selection: Select,
+    pub selection: Select,
 }
 
 impl<'a> StringMethod<'a> {
-    pub(crate) fn handle<E: Expander>(&self, output: &mut small::String, expand: &E) {
+    pub fn handle<E: Expander>(&self, output: &mut small::String, expand: &E) {
         let variable = self.variable;
         let pattern = MethodArgs::new(self.pattern, expand);
 

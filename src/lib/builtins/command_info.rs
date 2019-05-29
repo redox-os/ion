@@ -7,7 +7,7 @@ use small;
 
 use std::{borrow::Cow, env, path::Path};
 
-pub(crate) fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
+pub fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
     if check_help(args, MAN_WHICH) {
         return Ok(SUCCESS);
     }
@@ -22,7 +22,7 @@ pub(crate) fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()
         match get_command_info(command, shell) {
             Ok(c_type) => match c_type.as_ref() {
                 "alias" => {
-                    if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
+                    if let Some(alias) = shell.variables().get::<types::Alias>(&**command) {
                         println!("{}: alias to {}", command, &*alias);
                     }
                 }
@@ -36,7 +36,7 @@ pub(crate) fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()
     Ok(result)
 }
 
-pub(crate) fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
+pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
     // Type does not accept help flags, aka "--help".
     if args.len() == 1 {
         eprintln!("type: Expected at least 1 args, got only 0");
@@ -49,7 +49,7 @@ pub(crate) fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32
             Ok(c_type) => {
                 match c_type.as_ref() {
                     "alias" => {
-                        if let Some(alias) = shell.variables.get::<types::Alias>(&**command) {
+                        if let Some(alias) = shell.variables().get::<types::Alias>(&**command) {
                             println!("{} is aliased to `{}`", command, &*alias);
                         }
                     }
@@ -66,10 +66,10 @@ pub(crate) fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32
     Ok(result)
 }
 
-pub(crate) fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<Cow<'a, str>, ()> {
-    if shell.variables.get::<types::Alias>(command).is_some() {
+pub fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<Cow<'a, str>, ()> {
+    if shell.variables().get::<types::Alias>(command).is_some() {
         return Ok("alias".into());
-    } else if shell.variables.get::<Function>(command).is_some() {
+    } else if shell.variables().get::<Function>(command).is_some() {
         return Ok("function".into());
     } else if shell.builtins().contains(command) {
         return Ok("builtin".into());

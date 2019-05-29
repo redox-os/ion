@@ -269,28 +269,20 @@ impl Expander for WithVars {
 #[test]
 fn array_methods() {
     let expanders = WithVars;
-    let method = ArrayMethod {
-        method:    "graphemes",
-        variable:  "pkmn1",
-        pattern:   Pattern::Whitespace,
-        selection: Select::Index(Index::Forward(3)),
-    };
+    let method = ArrayMethod::new(
+        "graphemes",
+        "pkmn1",
+        Pattern::Whitespace,
+        Select::Index(Index::Forward(3)),
+    );
     let expected = args!["é"];
     assert_eq!(method.handle_as_array(&expanders), expected);
-    let method = ArrayMethod {
-        method:    "chars",
-        variable:  "pkmn2",
-        pattern:   Pattern::Whitespace,
-        selection: Select::Index(Index::Forward(3)),
-    };
+    let method =
+        ArrayMethod::new("chars", "pkmn2", Pattern::Whitespace, Select::Index(Index::Forward(3)));
     let expected = args!["e"];
     assert_eq!(method.handle_as_array(&expanders), expected);
-    let method = ArrayMethod {
-        method:    "bytes",
-        variable:  "pkmn2",
-        pattern:   Pattern::Whitespace,
-        selection: Select::Index(Index::Forward(1)),
-    };
+    let method =
+        ArrayMethod::new("bytes", "pkmn2", Pattern::Whitespace, Select::Index(Index::Forward(1)));
     let expected = args!["111"];
     assert_eq!(method.handle_as_array(&expanders), expected);
 }

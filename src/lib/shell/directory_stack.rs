@@ -89,16 +89,13 @@ impl DirectoryStack {
         println!("{}", dir.trim_start());
     }
 
-    pub(crate) fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> {
+    pub fn dir_from_bottom(&self, num: usize) -> Option<&PathBuf> {
         self.dirs.iter().rev().nth(num)
     }
 
-    pub(crate) fn dir_from_top(&self, num: usize) -> Option<&PathBuf> { self.dirs.get(num) }
+    pub fn dir_from_top(&self, num: usize) -> Option<&PathBuf> { self.dirs.get(num) }
 
-    pub(crate) fn dirs<'a, I: Iterator<Item = &'a T>, T: 'a + AsRef<str>>(
-        &mut self,
-        args: I,
-    ) -> i32 {
+    pub fn dirs<I: IntoIterator<Item = T>, T: AsRef<str>>(&mut self, args: I) -> i32 {
         let mut clear = false; // -c
         let mut abs_pathnames = false; // -l
         let mut multiline = false; // -p | -v
@@ -106,8 +103,8 @@ impl DirectoryStack {
 
         let mut num_arg = None;
 
-        for arg in args.skip(1).map(AsRef::as_ref) {
-            match arg {
+        for arg in args {
+            match arg.as_ref() {
                 "-c" => clear = true,
                 "-l" => abs_pathnames = true,
                 "-p" => multiline = true,
@@ -115,7 +112,7 @@ impl DirectoryStack {
                     index = true;
                     multiline = true;
                 }
-                arg => num_arg = Some(arg),
+                _ => num_arg = Some(arg),
             }
         }
 
@@ -134,7 +131,7 @@ impl DirectoryStack {
         let mut iter = self.dirs.iter().enumerate().map(mapper);
 
         if let Some(arg) = num_arg {
-            let num = match parse_numeric_arg(arg) {
+            let num = match parse_numeric_arg(arg.as_ref()) {
                 Some((true, num)) => num,
                 Some((false, num)) if self.dirs.len() > num => self.dirs.len() - num - 1,
                 _ => return FAILURE, /* Err(Cow::Owned(format!("ion: dirs: {}: invalid
@@ -169,7 +166,7 @@ impl DirectoryStack {
         self.dirs.truncate(DirectoryStack::get_size(variables));
     }
 
-    pub(crate) fn change_and_push_dir(
+    pub fn change_and_push_dir(
         &mut self,
         dir: &str,
         variables: &Variables,
@@ -217,15 +214,15 @@ impl DirectoryStack {
         )
     }
 
-    pub(crate) fn cd(
+    pub fn cd<T: AsRef<str>>(
         &mut self,
-        args: &[small::String],
+        dir: Option<T>,
         variables: &Variables,
     ) -> Result<(), Cow<'static, str>> {
-        match args.get(1) {
+        match dir {
             Some(dir) => {
+                let dir = dir.as_ref();
                 if let Some(Value::Array(cdpath)) = variables.get_ref("CDPATH") {
-                    let dir = dir.as_ref();
                     if dir == "-" {
                         self.switch_to_previous_directory(variables)
                     } else {
@@ -248,13 +245,14 @@ impl DirectoryStack {
         }
     }
 
-    pub(crate) fn pushd<T>(
+    pub fn pushd<T, I>(
         &mut self,
-        args: &[T],
+        args: I,
         variables: &mut Variables,
     ) -> Result<(), Cow<'static, str>>
     where
         T: AsRef<str>,
+        I: IntoIterator<Item = T>,
     {
         enum Action {
             Switch,          // <no arguments>
@@ -266,7 +264,8 @@ impl DirectoryStack {
         let mut keep_front = false; // whether the -n option is present
         let mut action = Action::Switch;
 
-        for arg in args.iter().skip(1).map(AsRef::as_ref) {
+        for arg in args {
+            let arg = arg.as_ref();
             if arg == "-n" {
                 keep_front = true;
             } else if let Action::Switch = action {
@@ -318,7 +317,10 @@ impl DirectoryStack {
 
     /// Attempts to set the current directory to the directory stack's previous directory,
     /// and then removes the front directory from the stack.
-    pub(crate) fn popd<T: AsRef<str>>(&mut self, args: &[T]) -> Result<(), Cow<'static, str>> {
+    pub fn popd<T: AsRef<str>, I: IntoIterator<Item = T>>(
+        &mut self,
+        args: I,
+    ) -> Result<(), Cow<'static, str>> {
         let len = self.dirs.len();
         if len <= 1 {
             return Err(Cow::Borrowed("ion: popd: directory stack empty"));
@@ -327,7 +329,8 @@ impl DirectoryStack {
         let mut keep_front = false; // whether the -n option is present
         let mut index: usize = 0;
 
-        for arg in args.iter().skip(1).map(AsRef::as_ref) {
+        for arg in args {
+            let arg = arg.as_ref();
             if arg == "-n" {
                 keep_front = true;
             } else {
@@ -375,7 +378,7 @@ impl DirectoryStack {
 
     /// Create a new `DirectoryStack` containing the current working directory,
     /// if available.
-    pub(crate) fn new() -> DirectoryStack {
+    pub fn new() -> DirectoryStack {
         let mut dirs: VecDeque<PathBuf> = VecDeque::new();
         match env::current_dir() {
             Ok(curr_dir) => {

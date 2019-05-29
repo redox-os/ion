@@ -2,7 +2,7 @@ mod methods;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use self::methods::{ArrayMethod, Pattern, StringMethod};
+pub use self::methods::{ArrayMethod, Pattern, StringMethod};
 use super::{expand_string, Expander};
 pub use crate::ranges::{Select, SelectWithSize};
 use crate::{lexers::ArgumentSplitter, shell::escape::unescape};
@@ -16,7 +16,7 @@ enum Quotes {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum WordToken<'a> {
+pub enum WordToken<'a> {
     /// Represents a normal string who may contain a globbing character
     /// (the second element) or a tilde expression (the third element)
     Normal(Cow<'a, str>, bool, bool),
@@ -33,7 +33,7 @@ pub(crate) enum WordToken<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) struct WordIterator<'a, E: Expander + 'a> {
+pub struct WordIterator<'a, E: Expander + 'a> {
     data:      &'a str,
     read:      usize,
     quotes:    Quotes,
@@ -379,22 +379,22 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                         {
                                             let _ = iterator.next();
                                             WordToken::ArrayMethod(
-                                                ArrayMethod {
+                                                ArrayMethod::new(
                                                     method,
-                                                    variable: variable.trim(),
-                                                    pattern: Pattern::StringPattern(pattern),
-                                                    selection: self.read_selection(iterator),
-                                                },
+                                                    variable.trim(),
+                                                    Pattern::StringPattern(pattern),
+                                                    self.read_selection(iterator),
+                                                ),
                                                 self.quotes == Quotes::Double,
                                             )
                                         } else {
                                             WordToken::ArrayMethod(
-                                                ArrayMethod {
+                                                ArrayMethod::new(
                                                     method,
-                                                    variable: variable.trim(),
-                                                    pattern: Pattern::StringPattern(pattern),
-                                                    selection: Select::All,
-                                                },
+                                                    variable.trim(),
+                                                    Pattern::StringPattern(pattern),
+                                                    Select::All,
+                                                ),
                                                 self.quotes == Quotes::Double,
                                             )
                                         };
@@ -410,22 +410,22 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                                 return if let Some(&b'[') = self.data.as_bytes().get(self.read) {
                                     let _ = iterator.next();
                                     WordToken::ArrayMethod(
-                                        ArrayMethod {
+                                        ArrayMethod::new(
                                             method,
-                                            variable: variable.trim(),
-                                            pattern: Pattern::Whitespace,
-                                            selection: self.read_selection(iterator),
-                                        },
+                                            variable.trim(),
+                                            Pattern::Whitespace,
+                                            self.read_selection(iterator),
+                                        ),
                                         self.quotes == Quotes::Double,
                                     )
                                 } else {
                                     WordToken::ArrayMethod(
-                                        ArrayMethod {
+                                        ArrayMethod::new(
                                             method,
-                                            variable: variable.trim(),
-                                            pattern: Pattern::Whitespace,
-                                            selection: Select::All,
-                                        },
+                                            variable.trim(),
+                                            Pattern::Whitespace,
+                                            Select::All,
+                                        ),
                                         self.quotes == Quotes::Double,
                                     )
                                 };
@@ -627,7 +627,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         WordToken::Whitespace(&self.data[start..self.read])
     }
 
-    pub(crate) fn new(data: &'a str, expanders: &'a E, do_glob: bool) -> WordIterator<'a, E> {
+    pub fn new(data: &'a str, expanders: &'a E, do_glob: bool) -> WordIterator<'a, E> {
         WordIterator { data, backsl: false, read: 0, quotes: Quotes::None, expanders, do_glob }
     }
 }

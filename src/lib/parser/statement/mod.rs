@@ -1,18 +1,17 @@
 mod case;
 mod functions;
-#[cfg(not(fuzzing))]
-pub mod parse;
-#[cfg(fuzzing)]
-pub mod parse;
+mod parse;
 mod splitter;
 
-pub(crate) use self::parse::parse;
-pub use self::splitter::{StatementError, StatementSplitter, StatementVariant};
+pub use self::{
+    parse::{is_valid_name, parse},
+    splitter::{StatementError, StatementSplitter, StatementVariant},
+};
 use crate::{builtins::BuiltinMap, shell::flow_control::Statement};
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
-pub(crate) fn parse_and_validate<'b>(
+pub fn parse_and_validate<'b>(
     statement: Result<StatementVariant, StatementError>,
     builtins: &BuiltinMap<'b>,
 ) -> Statement<'b> {
@@ -32,7 +31,7 @@ pub(crate) fn parse_and_validate<'b>(
 /// Splits a string into two, based on a given pattern. We know that the first string will always
 /// exist, but if the pattern is not found, or no string follows the pattern, then the second
 /// string will not exist. Useful for splitting the function expression by the "--" pattern.
-pub(crate) fn split_pattern<'a>(arg: &'a str, pattern: &str) -> (&'a str, Option<&'a str>) {
+fn split_pattern<'a>(arg: &'a str, pattern: &str) -> (&'a str, Option<&'a str>) {
     match arg.find(pattern) {
         Some(pos) => {
             let args = &arg[..pos].trim();

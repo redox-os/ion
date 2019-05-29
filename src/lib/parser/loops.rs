@@ -4,14 +4,14 @@ use crate::{
 };
 
 /// The expression given to a for loop as the value to iterate upon.
-pub(crate) enum ForValueExpression {
+pub enum ForValueExpression {
     Multiple(Vec<types::Str>),
     Normal(types::Str),
     Range(Box<Iterator<Item = ::small::String> + 'static>),
 }
 
 impl ForValueExpression {
-    pub(crate) fn new<E: Expander>(expression: &[types::Str], expanders: &E) -> ForValueExpression {
+    pub fn new<E: Expander>(expression: &[types::Str], expanders: &E) -> ForValueExpression {
         let output: Vec<_> =
             expression.iter().flat_map(|expression| expand_string(expression, expanders)).collect();
 

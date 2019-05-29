@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::sys;
 
-pub(crate) use crate::sys::signals::{block, unblock};
+pub use crate::sys::signals::{block, unblock};
 
 pub static PENDING: AtomicUsize = AtomicUsize::new(0);
 pub const SIGINT: u8 = 1;
@@ -16,17 +16,17 @@ pub const SIGHUP: u8 = 2;
 pub const SIGTERM: u8 = 4;
 
 /// Suspends a given process by it's process ID.
-pub(crate) fn suspend(pid: u32) { let _ = sys::killpg(pid, sys::SIGSTOP); }
+pub fn suspend(pid: u32) { let _ = sys::killpg(pid, sys::SIGSTOP); }
 
 /// Resumes a given process by it's process ID.
-pub(crate) fn resume(pid: u32) { let _ = sys::killpg(pid, sys::SIGCONT); }
+pub fn resume(pid: u32) { let _ = sys::killpg(pid, sys::SIGCONT); }
 
 /// The purpose of the signal handler is to ignore signals when it is active, and then continue
 /// listening to signals once the handler is dropped.
-pub(crate) struct SignalHandler;
+pub struct SignalHandler;
 
 impl SignalHandler {
-    pub(crate) fn new() -> SignalHandler {
+    pub fn new() -> SignalHandler {
         block();
         SignalHandler
     }

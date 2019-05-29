@@ -1,7 +1,7 @@
 use crate::{shell::Shell, types};
 use small;
 
-pub(crate) fn is(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
+pub fn is(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
     match args.len() {
         4 => {
             if args[1] != "not" {
@@ -35,7 +35,7 @@ fn get_var_string(name: &str, shell: &mut Shell) -> types::Str {
         return "".into();
     }
 
-    match shell.variables.get::<types::Str>(&name[1..]) {
+    match shell.variables().get::<types::Str>(&name[1..]) {
         Some(s) => s,
         None => "".into(),
     }

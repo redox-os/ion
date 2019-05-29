@@ -1,6 +1,6 @@
 extern crate ion_sys as sys;
 
-use ion_shell::{shell::variables::Value, InteractiveBinary, JobControl, Shell, MAN_ION};
+use ion_shell::{InteractiveBinary, Shell, Value, MAN_ION};
 use liner::KeyBindings;
 use std::{
     alloc::System,
@@ -56,7 +56,7 @@ fn main() {
         }
     }
 
-    shell.variables.set(
+    shell.variables_mut().set(
         "args",
         Value::Array(
             script_path
@@ -84,5 +84,5 @@ fn main() {
         shell.execute_script(BufReader::new(stdin()));
     }
     shell.wait_for_background();
-    shell.exit(shell.previous_status);
+    shell.exit(None);
 }

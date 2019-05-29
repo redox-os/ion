@@ -1,7 +1,7 @@
 // TODO: Handle Runtime Errors
 mod words;
 
-pub(crate) use self::words::{Select, WordIterator, WordToken};
+pub use self::words::{Select, WordIterator, WordToken};
 use crate::{
     braces::{self, BraceToken},
     ranges::{parse_range, Index, Range},
@@ -17,7 +17,7 @@ use unicode_segmentation::UnicodeSegmentation;
 /// Determines whether an input string is expression-like as compared to a
 /// bare word. For example, strings starting with '"', '\'', '@', or '$' are
 /// all expressions
-pub(crate) fn is_expression(s: &str) -> bool {
+pub fn is_expression(s: &str) -> bool {
     s.starts_with('@')
         || s.starts_with('[')
         || s.starts_with('$')
@@ -38,7 +38,7 @@ fn join_with_spaces<S: AsRef<str>>(input: &mut small::String, mut iter: impl Ite
 // TODO: Make array expansions iterators instead of arrays.
 // TODO: Use Cow<'a, types::Str> for hashmap values.
 /// Trait representing different elements of string expansion
-pub(crate) trait Expander: Sized {
+pub trait Expander: Sized {
     /// Expand a tilde form to the correct directory.
     fn tilde(&self, _input: &str) -> Option<String> { None }
     /// Expand an array variable with some selection.
@@ -169,7 +169,7 @@ fn slice<S: AsRef<str>>(output: &mut small::String, expanded: S, selection: &Sel
 /// Performs shell expansions to an input string, efficiently returning the final
 /// expanded form. Shells must provide their own batteries for expanding tilde
 /// and variable words.
-pub(crate) fn expand_string<E: Expander>(original: &str, expand_func: &E) -> types::Args {
+pub fn expand_string<E: Expander>(original: &str, expand_func: &E) -> types::Args {
     let mut token_buffer = Vec::new();
     let mut contains_brace = false;
 
@@ -502,7 +502,7 @@ fn expand<E: Expander>(
     }
 }
 
-pub(crate) fn expand_tokens<E: Expander>(
+pub fn expand_tokens<E: Expander>(
     token_buffer: &[WordToken],
     expand_func: &E,
     contains_brace: bool,

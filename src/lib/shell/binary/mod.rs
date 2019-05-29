@@ -4,15 +4,14 @@ mod history;
 mod prompt;
 mod readln;
 
-use self::{history::ShellHistory, prompt::prompt, readln::readln};
+use self::{prompt::prompt, readln::readln};
 use super::{
-    pipe_exec::job_control::JobControl,
     status::{FAILURE, SUCCESS},
-    FlowLogic, Shell,
+    Shell,
 };
 use crate::{
     builtins::man_pages,
-    parser::{shell_expand::Expander, Terminator},
+    parser::{Expander, Terminator},
     types,
 };
 use itertools::Itertools;

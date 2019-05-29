@@ -1,17 +1,15 @@
-pub(crate) mod assignments;
+pub mod assignments;
 mod loops;
-pub(crate) mod pipelines;
+pub mod pipelines;
 mod quotes;
-pub(crate) mod shell_expand;
-pub mod statement;
+mod shell_expand;
+mod statement;
 
-pub use self::statement::StatementSplitter;
-
-pub use self::quotes::Terminator;
-pub(crate) use self::{
+pub use self::{
     loops::ForValueExpression,
+    quotes::Terminator,
     shell_expand::{expand_string, Expander, Select},
-    statement::parse_and_validate,
+    statement::{is_valid_name, parse_and_validate, StatementSplitter},
 };
 
 #[cfg(fuzzing)]

@@ -1,6 +1,6 @@
 mod collector;
 
-pub(crate) use self::collector::*;
+pub use self::collector::*;
 
 use super::expand_string;
 use crate::{
@@ -113,7 +113,7 @@ pub struct PipeItem<'a> {
 }
 
 impl<'a> PipeItem<'a> {
-    pub(crate) fn expand(&mut self, shell: &Shell<'a>) {
+    pub fn expand(&mut self, shell: &Shell<'a>) {
         self.job.expand(shell);
 
         for input in &mut self.inputs {
@@ -130,11 +130,9 @@ impl<'a> PipeItem<'a> {
         }
     }
 
-    #[inline]
     pub fn command(&self) -> &types::Str { self.job.command() }
 
-    #[inline]
-    pub(crate) fn new(job: Job<'a>, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
+    pub fn new(job: Job<'a>, outputs: Vec<Redirection>, inputs: Vec<Input>) -> Self {
         PipeItem { job, outputs, inputs }
     }
 }
@@ -162,18 +160,18 @@ impl<'a> fmt::Display for PipeItem<'a> {
 }
 
 impl<'a> Pipeline<'a> {
-    pub(crate) fn requires_piping(&self) -> bool {
+    pub fn requires_piping(&self) -> bool {
         self.items.len() > 1
             || self.items.iter().any(|it| !it.outputs.is_empty())
             || self.items.iter().any(|it| !it.inputs.is_empty())
             || self.pipe != PipeType::Normal
     }
 
-    pub(crate) fn expand(&mut self, shell: &Shell<'a>) {
+    pub fn expand(&mut self, shell: &Shell<'a>) {
         self.items.iter_mut().for_each(|i| i.expand(shell));
     }
 
-    pub(crate) fn new() -> Self { Pipeline { items: Vec::new(), pipe: PipeType::Normal } }
+    pub fn new() -> Self { Pipeline { items: Vec::new(), pipe: PipeType::Normal } }
 }
 
 impl<'a> fmt::Display for Pipeline<'a> {

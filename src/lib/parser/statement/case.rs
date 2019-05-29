@@ -2,7 +2,7 @@ use crate::lexers::ArgumentSplitter;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum CaseError<'a> {
+pub enum CaseError<'a> {
     NoBindVariable,
     NoConditional,
     ExtraBind(&'a str),
@@ -22,9 +22,7 @@ impl<'a> Display for CaseError<'a> {
     }
 }
 
-pub(crate) fn parse_case(
-    data: &str,
-) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError> {
+pub fn parse_case(data: &str) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError> {
     let mut splitter = ArgumentSplitter::new(data);
     // let argument = splitter.next().ok_or(CaseError::Empty)?;
     let mut argument = None;

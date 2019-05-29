@@ -1,7 +1,7 @@
 use crate::shell::{status::*, variables::Variables};
 use std::io::{self, Write};
 
-fn print_functions(vars: &Variables) {
+pub fn print_functions(vars: &Variables) -> i32 {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
     let _ = writeln!(stdout, "# Functions");
@@ -13,9 +13,5 @@ fn print_functions(vars: &Variables) {
             let _ = writeln!(stdout, "    {}", fn_name);
         }
     }
-}
-
-pub(crate) fn fn_(vars: &mut Variables) -> i32 {
-    print_functions(vars);
     SUCCESS
 }

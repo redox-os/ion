@@ -1,11 +1,11 @@
 use crate::{
-    parser::shell_expand::expand_string,
+    parser::expand_string,
     shell::{variables::Value, Capture, Shell},
     sys,
 };
 use std::{io::Read, process};
 
-pub(crate) fn prompt(shell: &Shell) -> String {
+pub fn prompt(shell: &Shell) -> String {
     let blocks = shell.flow_control.block.len() + if shell.unterminated { 1 } else { 0 };
 
     if blocks == 0 {
@@ -16,7 +16,7 @@ pub(crate) fn prompt(shell: &Shell) -> String {
     }
 }
 
-pub(crate) fn prompt_fn(shell: &Shell) -> Option<String> {
+pub fn prompt_fn(shell: &Shell) -> Option<String> {
     if let Some(Value::Function(function)) = shell.variables.get_ref("PROMPT") {
         let output = match shell.fork(Capture::StdoutThenIgnoreStderr, move |child| {
             let _ = function.execute(child, &["ion"]);

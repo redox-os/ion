@@ -1,19 +1,14 @@
 //! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job
 //! control in the shell.
 
-use crate::shell::{
-    job_control::{JobControl, ProcessState},
-    signals,
-    status::*,
-    Shell,
-};
+use crate::shell::{signals, status::*, ProcessState, Shell};
 use small;
 use smallvec::SmallVec;
 
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
 /// SIGHUP ignoral.
-pub(crate) fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), String> {
+pub fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), String> {
     // Specifies that a process should be set to not receive SIGHUP signals.
     const NO_SIGHUP: u8 = 1;
     // Specifies that all jobs in the process table should be manipulated.
@@ -82,7 +77,7 @@ pub(crate) fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), St
 }
 
 /// Display a list of all jobs running in the background.
-pub(crate) fn jobs(shell: &mut Shell) {
+pub fn jobs(shell: &mut Shell) {
     for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
         if process.state != ProcessState::Empty {
             eprintln!("[{}] {} {}\t{}", id, process.pid, process.state, process.name);
@@ -93,7 +88,7 @@ pub(crate) fn jobs(shell: &mut Shell) {
 /// Hands control of the foreground process to the specified jobs, recording their exit status.
 /// If the job is stopped, the job will be resumed.
 /// If multiple jobs are given, then only the last job's exit status will be returned.
-pub(crate) fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
+pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
     fn fg_job(shell: &mut Shell, njob: u32) -> i32 {
         let job = if let Some(borrowed_job) =
             shell.background.lock().unwrap().iter().nth(njob as usize)
@@ -120,13 +115,12 @@ pub(crate) fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
 
     let mut status = 0;
     if args.is_empty() {
-        if shell.previous_job == !0 {
-            eprintln!("ion: fg: no jobs are running in the background");
-            status = FAILURE;
+        status = if let Some(previous_job) = shell.previous_job() {
+            fg_job(shell, previous_job)
         } else {
-            let previous_job = shell.previous_job;
-            status = fg_job(shell, previous_job);
-        }
+            eprintln!("ion: fg: no jobs are running in the background");
+            FAILURE
+        };
     } else {
         for arg in args {
             match arg.parse::<u32>() {
@@ -142,9 +136,9 @@ pub(crate) fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
 }
 
 /// Resumes a stopped background process, if it was stopped.
-pub(crate) fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
+pub fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
-        if let Some(job) = shell.background.lock().unwrap().iter_mut().nth(njob as usize) {
+        if let Some(job) = shell.background.lock().unwrap().iter().nth(njob as usize) {
             match job.state {
                 ProcessState::Running => {
                     eprintln!("ion: bg: job {} is already running", njob);
@@ -166,16 +160,15 @@ pub(crate) fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
     }
 
     if args.is_empty() {
-        if shell.previous_job == !0 {
-            eprintln!("ion: bg: no jobs are running in the background");
-            FAILURE
-        } else {
-            let previous_job = shell.previous_job;
+        if let Some(previous_job) = shell.previous_job() {
             if bg_job(shell, previous_job) {
                 SUCCESS
             } else {
                 FAILURE
             }
+        } else {
+            eprintln!("ion: bg: no jobs are running in the background");
+            FAILURE
         }
     } else {
         for arg in args {

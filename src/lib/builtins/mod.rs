@@ -1,15 +1,15 @@
-pub mod functions;
 pub mod man_pages;
-pub mod source;
-pub mod variables;
 
 mod command_info;
 mod exec;
 mod exists;
+mod functions;
 mod is;
 mod job_control;
 mod set;
+mod source;
 mod status;
+mod variables;
 
 use ion_builtins::{calc, conditionals, echo, random, test};
 
@@ -18,7 +18,7 @@ use self::{
     echo::echo,
     exec::exec,
     exists::exists,
-    functions::fn_,
+    functions::print_functions,
     is::is,
     man_pages::*,
     source::source,
@@ -36,13 +36,7 @@ use hashbrown::HashMap;
 use liner::Context;
 
 use crate::{
-    shell::{
-        self,
-        fork_function::fork_function,
-        job_control::{JobControl, ProcessState},
-        status::*,
-        Shell,
-    },
+    shell::{self, status::*, ProcessState, Shell},
     sys, types,
 };
 use small;
@@ -72,7 +66,7 @@ macro_rules! map {
 /// Note: To reduce allocations, function are provided as pointer rather than boxed closures
 /// ```
 /// use ion_shell::builtins::BuiltinMap;
-/// use ion_shell::shell::Shell;
+/// use ion_shell::Shell;
 ///
 /// // create a builtin
 /// let mut custom = |_args: &[small::String], _shell: &mut Shell| {
@@ -260,9 +254,9 @@ pub fn builtin_cd(args: &[small::String], shell: &mut Shell) -> i32 {
         return SUCCESS;
     }
 
-    match shell.directory_stack.cd(args, &shell.variables) {
+    match shell.cd(args.get(1)) {
         Ok(()) => {
-            let _ = fork_function(shell, "CD_CHANGE", &["ion"]);
+            let _ = shell.fork_function("CD_CHANGE", &["ion"]);
             SUCCESS
         }
         Err(why) => {
@@ -281,7 +275,7 @@ fn builtin_bool(args: &[small::String], shell: &mut Shell) -> i32 {
     }
 
     let opt =
-        if args[1].is_empty() { None } else { shell.variables.get::<types::Str>(&args[1][1..]) };
+        if args[1].is_empty() { None } else { shell.variables().get::<types::Str>(&args[1][1..]) };
 
     match opt.as_ref().map(types::Str::as_str) {
         Some("1") => (),
@@ -318,14 +312,14 @@ fn builtin_dirs(args: &[small::String], shell: &mut Shell) -> i32 {
         return SUCCESS;
     }
 
-    shell.directory_stack.dirs(args.iter())
+    shell.dir_stack(args.iter().skip(1))
 }
 
 fn builtin_pushd(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_PUSHD) {
         return SUCCESS;
     }
-    match shell.directory_stack.pushd(args, &mut shell.variables) {
+    match shell.pushd(args.iter().skip(1)) {
         Ok(()) => SUCCESS,
         Err(why) => {
             let stderr = io::stderr();
@@ -340,7 +334,7 @@ fn builtin_popd(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_POPD) {
         return SUCCESS;
     }
-    match shell.directory_stack.popd(args) {
+    match shell.popd(args.iter().skip(1)) {
         Ok(()) => SUCCESS,
         Err(why) => {
             let stderr = io::stderr();
@@ -353,16 +347,16 @@ fn builtin_popd(args: &[small::String], shell: &mut Shell) -> i32 {
 
 fn builtin_alias(args: &[small::String], shell: &mut Shell) -> i32 {
     let args_str = args[1..].join(" ");
-    alias(&mut shell.variables, &args_str)
+    alias(shell.variables_mut(), &args_str)
 }
 
 fn builtin_unalias(args: &[small::String], shell: &mut Shell) -> i32 {
-    drop_alias(&mut shell.variables, args)
+    drop_alias(shell.variables_mut(), args)
 }
 
 // TODO There is a man page for fn however the -h and --help flags are not
 // checked for.
-fn builtin_fn(_: &[small::String], shell: &mut Shell) -> i32 { fn_(&mut shell.variables) }
+fn builtin_fn(_: &[small::String], shell: &mut Shell) -> i32 { print_functions(shell.variables()) }
 
 fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_READ) {
@@ -374,7 +368,7 @@ fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
         for arg in args.iter().skip(1) {
             match con.read_line(format!("{}=", arg.trim()), None, &mut |_| {}) {
                 Ok(buffer) => {
-                    shell.variables.set(arg.as_ref(), buffer.trim());
+                    shell.variables_mut().set(arg.as_ref(), buffer.trim());
                 }
                 Err(_) => return FAILURE,
             }
@@ -385,7 +379,7 @@ fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
         let mut lines = handle.lines();
         for arg in args.iter().skip(1) {
             if let Some(Ok(line)) = lines.next() {
-                shell.variables.set(arg.as_ref(), line.trim());
+                shell.variables_mut().set(arg.as_ref(), line.trim());
             }
         }
     }
@@ -397,9 +391,9 @@ fn builtin_drop(args: &[small::String], shell: &mut Shell) -> i32 {
         return SUCCESS;
     }
     if args.len() >= 2 && args[1] == "-a" {
-        drop_array(&mut shell.variables, args)
+        drop_array(shell.variables_mut(), args)
     } else {
-        drop_variable(&mut shell.variables, args)
+        drop_variable(shell.variables_mut(), args)
     }
 }
 
@@ -600,8 +594,7 @@ fn builtin_exit(args: &[small::String], shell: &mut Shell) -> i32 {
             let _ = sys::kill(process.pid, sys::SIGTERM);
         }
     }
-    let previous_status = shell.previous_status;
-    shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok()).unwrap_or(previous_status))
+    shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok()))
 }
 
 fn builtin_exec(args: &[small::String], shell: &mut Shell) -> i32 {
