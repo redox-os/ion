@@ -3,10 +3,125 @@ use glob::{glob_with, MatchOptions};
 use ion_shell::{
     directory_stack::DirectoryStack,
     escape::{escape, tilde, unescape},
+    types, Shell,
 };
-use liner::Completer;
+use liner::{BasicCompleter, Completer, CursorPosition, Event, EventKind};
 use smallvec::SmallVec;
-use std::{iter, str};
+use std::{env, iter, path::PathBuf, str};
+
+pub struct IonCompleter<'a, 'b> {
+    shell:             &'b Shell<'a>,
+    dir_completer:     IonFileCompleter,
+    history_completer: Option<BasicCompleter>,
+}
+
+impl<'a, 'b> IonCompleter<'a, 'b> {
+    pub fn new(shell: &'b Shell<'a>) -> Self {
+        IonCompleter {
+            shell,
+            dir_completer: IonFileCompleter::new(
+                None,
+                &shell.directory_stack,
+                shell.variables().get::<types::Str>("OLDPWD").as_ref().map(types::Str::as_str),
+            ),
+            history_completer: None,
+        }
+    }
+}
+
+impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
+    fn completions(&mut self, start: &str) -> Vec<String> {
+        let mut completions = self.dir_completer.completions(start);
+
+        if let Some(ref mut history) = &mut self.history_completer {
+            let vars = self.shell.variables();
+            let dirs = &self.shell.directory_stack;
+            let prev = self.shell.variables().get::<types::Str>("OLDPWD");
+
+            completions.extend(history.completions(start));
+            // Initialize a new completer from the definitions collected.
+            // Creates a list of definitions from the shell environment that
+            // will be used
+            // in the creation of a custom completer.
+            completions.extend(
+                self.shell
+                    .builtins()
+                    .keys()
+                    // Add built-in commands to the completer's definitions.
+                    .map(ToString::to_string)
+                    // Add the aliases to the completer's definitions.
+                    .chain(vars.aliases().map(|(key, _)| key.to_string()))
+                    // Add the list of available functions to the completer's
+                    // definitions.
+                    .chain(vars.functions().map(|(key, _)| key.to_string()))
+                    // Add the list of available variables to the completer's
+                    // definitions. TODO: We should make
+                    // it free to do String->SmallString
+                    //       and mostly free to go back (free if allocated)
+                    .chain(vars.string_vars().map(|(s, _)| ["$", &s].concat()))
+                    .filter(|s| s.starts_with(start)),
+            );
+            // Creates completers containing definitions from all directories
+            // listed
+            // in the environment's **$PATH** variable.
+            let file_completers: Vec<_> = env::var("PATH")
+                .unwrap_or_else(|_| "/bin/".to_string())
+                .split(sys::PATH_SEPARATOR)
+                .map(|s| {
+                    IonFileCompleter::new(Some(s), dirs, prev.as_ref().map(types::Str::as_str))
+                })
+                .collect();
+            // Merge the collected definitions with the file path definitions.
+            completions.extend(MultiCompleter::new(file_completers).completions(start));
+        }
+        completions
+    }
+
+    fn on_event<W: std::io::Write>(&mut self, event: Event<W>) {
+        let dirs = &self.shell.directory_stack;
+        let prev = self.shell.variables().get::<types::Str>("OLDPWD");
+
+        if let EventKind::BeforeComplete = event.kind {
+            let (words, pos) = event.editor.get_words_and_cursor_position();
+
+            let filename = match pos {
+                CursorPosition::InWord(index) => index > 0,
+                CursorPosition::InSpace(Some(_), _) => true,
+                CursorPosition::InSpace(None, _) => false,
+                CursorPosition::OnWordLeftEdge(index) => index >= 1,
+                CursorPosition::OnWordRightEdge(index) => words
+                    .into_iter()
+                    .nth(index)
+                    .map(|(start, end)| event.editor.current_buffer().range(start, end))
+                    .and_then(|filename| {
+                        Some(complete_as_file(&env::current_dir().ok()?, &filename, index))
+                    })
+                    .filter(|&x| x)
+                    .is_some(),
+            };
+
+            // Add the history list to the completer's definitions.
+            // Map each underlying `liner::Buffer` into a `String`.
+            self.history_completer = if filename {
+                Some(BasicCompleter::new(
+                    event
+                        .editor
+                        .context()
+                        .history
+                        .buffers
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                ))
+            } else {
+                None
+            };
+
+            self.dir_completer =
+                IonFileCompleter::new(None, dirs, prev.as_ref().map(types::Str::as_str));
+        }
+    }
+}
 
 /// Performs escaping to an inner `FilenameCompleter` to enable a handful of special cases
 /// needed by the shell, such as expanding '~' to a home directory, or adding a backslash
@@ -40,7 +155,7 @@ impl Completer for IonFileCompleter {
     /// `FilenameCompleter`,
     /// and then escape the resulting filenames, as well as remove the expanded form of the `~`
     /// character and re-add the `~` character in it's place.
-    fn completions(&self, start: &str) -> Vec<String> {
+    fn completions(&mut self, start: &str) -> Vec<String> {
         // Dereferencing the raw pointers here should be entirely safe, theoretically,
         // because no changes will occur to either of the underlying references in the
         // duration between creation of the completers and execution of their
@@ -148,34 +263,18 @@ fn filename_completion<'a>(start: &'a str, path: &'a str) -> impl Iterator<Item 
 
 /// A completer that combines suggestions from multiple completers.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MultiCompleter<A, B>
-where
-    A: Completer,
-    B: Completer,
-{
-    a: Vec<A>,
-    b: B,
+pub struct MultiCompleter<A>(Vec<A>);
+
+impl<A> MultiCompleter<A> {
+    pub fn new(completions: Vec<A>) -> Self { MultiCompleter(completions) }
 }
 
-impl<A, B> MultiCompleter<A, B>
+impl<A> Completer for MultiCompleter<A>
 where
     A: Completer,
-    B: Completer,
 {
-    pub fn new(a: Vec<A>, b: B) -> MultiCompleter<A, B> { MultiCompleter { a, b } }
-}
-
-impl<A, B> Completer for MultiCompleter<A, B>
-where
-    A: Completer,
-    B: Completer,
-{
-    fn completions(&self, start: &str) -> Vec<String> {
-        let mut completions = self.b.completions(start);
-        for x in &self.a {
-            completions.extend_from_slice(&x.completions(start));
-        }
-        completions
+    fn completions(&mut self, start: &str) -> Vec<String> {
+        self.0.iter_mut().flat_map(|comp| comp.completions(start)).collect()
     }
 }
 
@@ -185,12 +284,31 @@ mod tests {
 
     #[test]
     fn filename_completion() {
-        let completer = IonFileCompleter::new(None, &DirectoryStack::new(), None);
+        let mut completer = IonFileCompleter::new(None, &DirectoryStack::new(), None);
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
         assert_eq!(completer.completions("testing/file"), vec!["testing/file_with_text"]);
-
         assert_eq!(completer.completions("~"), vec!["~/"]);
-
         assert_eq!(completer.completions("tes/fil"), vec!["testing/file_with_text"]);
     }
+}
+
+/// Infer if the given filename is actually a partial filename
+fn complete_as_file(current_dir: &PathBuf, filename: &str, index: usize) -> bool {
+    let filename = filename.trim();
+    let mut file = current_dir.clone();
+    file.push(&filename);
+    // If the user explicitly requests a file through this syntax then complete as
+    // a file
+    filename.starts_with('.') ||
+    // If the file starts with a dollar sign, it's a variable, not a file
+    (!filename.starts_with('$') &&
+    // Once we are beyond the first string, assume its a file
+    (index > 0 ||
+    // If we are referencing a file that exists then just complete to that file
+    file.exists() ||
+    // If we have a partial file inside an existing directory, e.g. /foo/b when
+    // /foo/bar exists, then treat it as file as long as `foo` isn't the
+    // current directory, otherwise this would apply to any string `foo`
+    file.parent().filter(|parent| parent.exists() && parent != current_dir).is_some()))
+    // By default assume its not a file
 }
