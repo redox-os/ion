@@ -115,13 +115,12 @@ pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
 
     let mut status = 0;
     if args.is_empty() {
-        if shell.previous_job == !0 {
-            eprintln!("ion: fg: no jobs are running in the background");
-            status = FAILURE;
+        status = if let Some(previous_job) = shell.previous_job() {
+            fg_job(shell, previous_job)
         } else {
-            let previous_job = shell.previous_job;
-            status = fg_job(shell, previous_job);
-        }
+            eprintln!("ion: fg: no jobs are running in the background");
+            FAILURE
+        };
     } else {
         for arg in args {
             match arg.parse::<u32>() {
@@ -161,16 +160,15 @@ pub fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
     }
 
     if args.is_empty() {
-        if shell.previous_job == !0 {
-            eprintln!("ion: bg: no jobs are running in the background");
-            FAILURE
-        } else {
-            let previous_job = shell.previous_job;
+        if let Some(previous_job) = shell.previous_job() {
             if bg_job(shell, previous_job) {
                 SUCCESS
             } else {
                 FAILURE
             }
+        } else {
+            eprintln!("ion: bg: no jobs are running in the background");
+            FAILURE
         }
     } else {
         for arg in args {

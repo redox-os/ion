@@ -97,7 +97,7 @@ pub struct Shell<'a> {
     /// here.
     pub previous_status: i32,
     /// The job ID of the previous command sent to the background.
-    pub(crate) previous_job: u32,
+    previous_job: u32,
     /// Contains all the options relative to the shell
     opts: ShellOptions,
     /// Contains information on all of the active background processes that are being managed
@@ -368,6 +368,14 @@ impl<'a> Shell<'a> {
         }
 
         exit_status
+    }
+
+    pub fn previous_job(&self) -> Option<u32> {
+        if self.previous_job == !0 {
+            None
+        } else {
+            Some(self.previous_job)
+        }
     }
 
     /// Evaluates the source init file in the user's home directory.
