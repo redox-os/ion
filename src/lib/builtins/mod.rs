@@ -28,8 +28,10 @@ use self::{
 };
 
 use std::{
+    borrow::Cow,
     error::Error,
     io::{self, BufRead, Write},
+    path::PathBuf,
 };
 
 use hashbrown::HashMap;
@@ -39,6 +41,7 @@ use crate::{
     shell::{self, status::*, ProcessState, Shell},
     sys, types,
 };
+use itertools::Itertools;
 use small;
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
@@ -59,6 +62,17 @@ macro_rules! map {
         )+
         $builtins
     }};
+}
+
+// parses -N or +N patterns
+// required for popd, pushd, dirs
+fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
+    match arg.chars().nth(0) {
+        Some('+') => Some(true),
+        Some('-') => Some(false),
+        _ => None,
+    }
+    .and_then(|b| arg[1..].parse::<usize>().ok().map(|num| (b, num)))
 }
 
 /// A container for builtins and their respective help text
@@ -308,40 +322,213 @@ fn builtin_is(args: &[small::String], shell: &mut Shell) -> i32 {
 }
 
 fn builtin_dirs(args: &[small::String], shell: &mut Shell) -> i32 {
+    // converts pbuf to an absolute path if possible
+    fn try_abs_path(pbuf: &PathBuf) -> Cow<str> {
+        Cow::Owned(
+            pbuf.canonicalize().unwrap_or_else(|_| pbuf.clone()).to_string_lossy().to_string(),
+        )
+    }
+
     if check_help(args, MAN_DIRS) {
         return SUCCESS;
     }
 
-    shell.dir_stack(args.iter().skip(1))
+    let mut clear = false; // -c
+    let mut abs_pathnames = false; // -l
+    let mut multiline = false; // -p | -v
+    let mut index = false; // -v
+
+    let mut num_arg = None;
+
+    for arg in args.iter().skip(1) {
+        match arg.as_ref() {
+            "-c" => clear = true,
+            "-l" => abs_pathnames = true,
+            "-p" => multiline = true,
+            "-v" => {
+                index = true;
+                multiline = true;
+            }
+            _ => num_arg = Some(arg),
+        }
+    }
+
+    if clear {
+        shell.clear_dir_stack();
+    }
+
+    let mapper: fn((usize, &PathBuf)) -> Cow<str> = match (abs_pathnames, index) {
+        // ABS, INDEX
+        (true, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, try_abs_path(x))),
+        (true, false) => |(_, x)| try_abs_path(x),
+        (false, true) => |(num, x)| Cow::Owned(format!(" {}  {}", num, x.to_string_lossy())),
+        (false, false) => |(_, x)| x.to_string_lossy(),
+    };
+
+    let mut iter = shell.dir_stack().enumerate().map(mapper);
+
+    if let Some(arg) = num_arg {
+        let num = match parse_numeric_arg(arg.as_ref()) {
+            Some((true, num)) => num,
+            Some((false, num)) if shell.dir_stack().count() > num => {
+                shell.dir_stack().count() - num - 1
+            }
+            _ => return FAILURE, /* Err(Cow::Owned(format!("ion: dirs: {}: invalid
+                                  * argument\n", arg))) */
+        };
+        match iter.nth(num) {
+            Some(x) => {
+                println!("{}", x);
+                SUCCESS
+            }
+            None => FAILURE,
+        }
+    } else {
+        let folder: fn(String, Cow<str>) -> String =
+            if multiline { |x, y| x + "\n" + &y } else { |x, y| x + " " + &y };
+
+        if let Some(x) = iter.next() {
+            println!("{}", iter.fold(x.to_string(), folder));
+        }
+        SUCCESS
+    }
 }
 
 fn builtin_pushd(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_PUSHD) {
         return SUCCESS;
     }
-    match shell.pushd(args.iter().skip(1)) {
-        Ok(()) => SUCCESS,
-        Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
-            FAILURE
+
+    enum Action {
+        Switch,          // <no arguments>
+        RotLeft(usize),  // +[num]
+        RotRight(usize), // -[num]
+        Push(PathBuf),   // [dir]
+    }
+
+    let mut keep_front = false; // whether the -n option is present
+    let mut action = Action::Switch;
+
+    for arg in args.iter().skip(1) {
+        let arg = arg.as_ref();
+        if arg == "-n" {
+            keep_front = true;
+        } else if let Action::Switch = action {
+            // if action is not yet defined
+            action = match parse_numeric_arg(arg) {
+                Some((true, num)) => Action::RotLeft(num),
+                Some((false, num)) => Action::RotRight(num),
+                None => Action::Push(PathBuf::from(arg)), // no numeric arg => `dir`-parameter
+            };
+        } else {
+            eprintln!("ion: pushd: too many arguments");
+            return FAILURE;
         }
     }
+
+    match action {
+        Action::Switch => {
+            if !keep_front {
+                if let Err(why) = shell.swap(1) {
+                    eprintln!("ion: pushd: {}", why);
+                    return FAILURE;
+                }
+            }
+        }
+        Action::RotLeft(num) => {
+            if !keep_front {
+                if let Err(why) = shell.rotate_left(num) {
+                    eprintln!("ion: pushd: {}", why);
+                    return FAILURE;
+                }
+            }
+        }
+        Action::RotRight(num) => {
+            if !keep_front {
+                if let Err(why) = shell.rotate_right(num) {
+                    eprintln!("ion: pushd: {}", why);
+                    return FAILURE;
+                }
+            }
+        }
+        Action::Push(dir) => {
+            if let Err(why) = shell.pushd(dir, keep_front) {
+                eprintln!("ion: pushd: {}", why);
+                return FAILURE;
+            }
+        }
+    };
+
+    println!(
+        "{}",
+        shell.dir_stack().map(|dir| dir.to_str().unwrap_or("ion: no directory found")).join(" ")
+    );
+    SUCCESS
 }
 
 fn builtin_popd(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_POPD) {
         return SUCCESS;
     }
-    match shell.popd(args.iter().skip(1)) {
-        Ok(()) => SUCCESS,
-        Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
-            FAILURE
+
+    let len = shell.dir_stack().len();
+    if len <= 1 {
+        eprintln!("ion: popd: directory stack empty");
+        return FAILURE;
+    }
+
+    let mut keep_front = false; // whether the -n option is present
+    let mut index: usize = 0;
+
+    for arg in args.iter().skip(1) {
+        let arg = arg.as_ref();
+        if arg == "-n" {
+            keep_front = true;
+        } else {
+            let (count_from_front, num) = match parse_numeric_arg(arg) {
+                Some(n) => n,
+                None => {
+                    eprintln!("ion: popd: {}: invalid argument", arg);
+                    return FAILURE;
+                }
+            };
+
+            index = if count_from_front {
+                // <=> input number is positive
+                num
+            } else if let Some(n) = (len - 1).checked_sub(num) {
+                n
+            } else {
+                eprintln!("ion: popd: negative directory stack index out of range");
+                return FAILURE;
+            };
         }
+    }
+
+    // apply -n
+    if index == 0 && keep_front {
+        index = 1;
+    } else if index == 0 {
+        // change to new directory, return if not possible
+        if let Err(why) = shell.set_current_dir_by_index(1) {
+            eprintln!("ion: popd: {}", why);
+            return FAILURE;
+        }
+    }
+
+    // pop element
+    if shell.popd(index).is_some() {
+        println!(
+            "{}",
+            shell
+                .dir_stack()
+                .map(|dir| dir.to_str().unwrap_or("ion: no directory found"))
+                .join(" ")
+        );
+        SUCCESS
+    } else {
+        eprintln!("ion: popd: {}: directory stack index out of range", index);
+        FAILURE
     }
 }
 

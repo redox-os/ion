@@ -16,4 +16,7 @@ mod memory;
 mod shell;
 
 pub(crate) use self::memory::IonPool;
-pub use crate::shell::*;
+pub use crate::{
+    builtins::{BuiltinFunction, BuiltinMap},
+    shell::*,
+};
