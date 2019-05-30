@@ -151,7 +151,7 @@ mod test {
     struct VariableExpander<'a>(pub Variables<'a>);
 
     impl<'a> Expander for VariableExpander<'a> {
-        fn string(&self, var: &str) -> Option<types::Str> { self.0.get::<types::Str>(var) }
+        fn string(&self, var: &str) -> Option<types::Str> { self.0.get_str(var) }
     }
 
     // TODO: Rewrite tests now that let is part of the grammar.

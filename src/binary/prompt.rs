@@ -6,7 +6,10 @@ pub fn prompt(shell: &Shell) -> String {
 
     if blocks == 0 {
         prompt_fn(&shell).unwrap_or_else(|| {
-            shell.get_string(&shell.variables().get_str_or_empty("PROMPT")).as_str().into()
+            shell
+                .get_string(&shell.variables().get_str("PROMPT").unwrap_or_default())
+                .as_str()
+                .into()
         })
     } else {
         "    ".repeat(blocks)

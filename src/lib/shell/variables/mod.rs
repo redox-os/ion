@@ -81,26 +81,6 @@ type_from_value!(Function<'a> : Function else
     )
 );
 
-macro_rules! eq {
-    ($lhs:ty : $variant:ident) => {
-        impl<'a> PartialEq<Value<'a>> for $lhs {
-            fn eq(&self, other: &Value<'a>) -> bool {
-                match other {
-                    Value::$variant(ref inner) => inner == self,
-                    _ => false,
-                }
-            }
-        }
-    };
-}
-
-eq!(types::Str: Str);
-eq!(types::Alias: Alias);
-eq!(types::Array<'a>: Array);
-eq!(types::HashMap<'a>: HashMap);
-eq!(types::BTreeMap<'a>: BTreeMap);
-eq!(Function<'a>: Function);
-
 impl<'a> Eq for Value<'a> {}
 
 // this one’s only special because of the lifetime parameter
@@ -257,7 +237,7 @@ impl<'a> Variables<'a> {
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
     fn get_simplified_directory(&self) -> types::Str {
-        let home = self.get::<types::Str>("HOME").unwrap_or_else(|| "?".into());
+        let home = self.get_str("HOME").unwrap_or_else(|| "?".into());
         env::var("PWD").unwrap().replace(&*home, "~").into()
     }
 
@@ -267,10 +247,6 @@ impl<'a> Variables<'a> {
 
     pub fn is_valid_variable_character(c: char) -> bool {
         c.is_alphanumeric() || c == '_' || c == '?' || c == '.' || c == '-' || c == '+'
-    }
-
-    pub fn get_str_or_empty(&self, name: &str) -> types::Str {
-        self.get::<types::Str>(name).unwrap_or_default()
     }
 
     pub fn remove_variable(&mut self, name: &str) -> Option<Value<'a>> {
@@ -287,6 +263,42 @@ impl<'a> Variables<'a> {
             return None;
         }
         self.0.get_mut(name)
+    }
+
+    pub fn get_str(&self, name: &str) -> Option<types::Str> {
+        match name {
+            "MWD" => return Some(self.get_minimal_directory()),
+            "SWD" => return Some(self.get_simplified_directory()),
+            _ => (),
+        }
+        // If the parsed name contains the '::' pattern, then a namespace was
+        // designated. Find it.
+        match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
+            Some(("c", variable)) | Some(("color", variable)) => {
+                Colors::collect(variable).into_string().map(|s| s.into())
+            }
+            Some(("x", variable)) | Some(("hex", variable)) => {
+                match u8::from_str_radix(variable, 16) {
+                    Ok(c) => Some((c as char).to_string().into()),
+                    Err(why) => {
+                        eprintln!("ion: hex parse error: {}: {}", variable, why);
+                        None
+                    }
+                }
+            }
+            Some(("env", variable)) => env::var(variable).map(Into::into).ok().map(|s| s),
+            Some(("super", _)) | Some(("global", _)) | None => {
+                // Otherwise, it's just a simple variable name.
+                match self.get_ref(name) {
+                    Some(Value::Str(val)) => Some(val.clone()),
+                    _ => env::var(name).ok().map(|s| s.into()),
+                }
+            }
+            Some((..)) => {
+                eprintln!("ion: unsupported namespace: '{}'", name);
+                None
+            }
+        }
     }
 
     pub fn get_ref(&self, mut name: &str) -> Option<&Value<'a>> {
@@ -309,13 +321,6 @@ impl<'a> Variables<'a> {
             Namespace::Any
         };
         self.0.get_ref(name, namespace)
-    }
-
-    pub fn get<T>(&self, name: &str) -> Option<T>
-    where
-        Self: GetVariable<T>,
-    {
-        GetVariable::<T>::get(self, name)
     }
 }
 
@@ -365,71 +370,6 @@ impl<'a> Default for Variables<'a> {
     }
 }
 
-pub trait GetVariable<T> {
-    fn get(&self, name: &str) -> Option<T>;
-}
-
-impl<'a> GetVariable<types::Str> for Variables<'a> {
-    fn get(&self, name: &str) -> Option<types::Str> {
-        use crate::types::Str;
-
-        match name {
-            "MWD" => return Some(Str::from(Value::Str(self.get_minimal_directory()))),
-            "SWD" => return Some(Str::from(Value::Str(self.get_simplified_directory()))),
-            _ => (),
-        }
-        // If the parsed name contains the '::' pattern, then a namespace was
-        // designated. Find it.
-        match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
-            Some(("c", variable)) | Some(("color", variable)) => {
-                Colors::collect(variable).into_string().map(|s| Str::from(Value::Str(s.into())))
-            }
-            Some(("x", variable)) | Some(("hex", variable)) => {
-                match u8::from_str_radix(variable, 16) {
-                    Ok(c) => Some(Str::from(Value::Str((c as char).to_string().into()))),
-                    Err(why) => {
-                        eprintln!("ion: hex parse error: {}: {}", variable, why);
-                        None
-                    }
-                }
-            }
-            Some(("env", variable)) => {
-                env::var(variable).map(Into::into).ok().map(|s| Str::from(Value::Str(s)))
-            }
-            Some(("super", _)) | Some(("global", _)) | None => {
-                // Otherwise, it's just a simple variable name.
-                match self.get_ref(name) {
-                    Some(Value::Str(val)) => Some(Str::from(Value::Str(val.clone()))),
-                    _ => env::var(name).ok().map(|s| Str::from(Value::Str(s.into()))),
-                }
-            }
-            Some((..)) => {
-                eprintln!("ion: unsupported namespace: '{}'", name);
-                None
-            }
-        }
-    }
-}
-
-macro_rules! get_var {
-    ($types:ty, $variant:ident($inner:ident) => $ret:expr) => {
-        impl<'a> GetVariable<$types> for Variables<'a> {
-            fn get(&self, name: &str) -> Option<$types> {
-                match self.get_ref(name) {
-                    Some(Value::$variant($inner)) => Some($ret.clone()),
-                    _ => None,
-                }
-            }
-        }
-    };
-}
-
-get_var!(types::Alias, Alias(alias) => (*alias));
-get_var!(types::Array<'a>, Array(array) => array);
-get_var!(types::HashMap<'a>, HashMap(hmap) => hmap);
-get_var!(types::BTreeMap<'a>, BTreeMap(bmap) => bmap);
-get_var!(Function<'a>, Function(func) => func);
-
 #[cfg(test)]
 mod trait_test;
 
@@ -442,7 +382,7 @@ mod tests {
     struct VariableExpander<'a>(pub Variables<'a>);
 
     impl<'a> Expander for VariableExpander<'a> {
-        fn string(&self, var: &str) -> Option<types::Str> { self.0.get::<types::Str>(var) }
+        fn string(&self, var: &str) -> Option<types::Str> { self.0.get_str(var) }
     }
 
     #[test]
@@ -467,7 +407,7 @@ mod tests {
         env::set_var("PWD", "/var/log/nix");
         assert_eq!(
             types::Str::from("v/l/nix"),
-            variables.get::<types::Str>("MWD").expect("no value returned"),
+            variables.get_str("MWD").expect("no value returned"),
         );
     }
 
@@ -478,7 +418,7 @@ mod tests {
         env::set_var("PWD", "/var/log");
         assert_eq!(
             types::Str::from("/var/log"),
-            variables.get::<types::Str>("MWD").expect("no value returned"),
+            variables.get_str("MWD").expect("no value returned"),
         );
     }
 }

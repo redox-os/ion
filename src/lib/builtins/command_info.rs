@@ -1,7 +1,7 @@
 use crate::{
     builtins::man_pages::*,
-    shell::{flow_control::Function, status::*, Shell},
-    sys, types,
+    shell::{status::*, Shell, Value},
+    sys,
 };
 use small;
 
@@ -22,8 +22,8 @@ pub fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
         match get_command_info(command, shell) {
             Ok(c_type) => match c_type.as_ref() {
                 "alias" => {
-                    if let Some(alias) = shell.variables().get::<types::Alias>(&**command) {
-                        println!("{}: alias to {}", command, &*alias);
+                    if let Some(Value::Alias(ref alias)) = shell.variables().get_ref(&**command) {
+                        println!("{}: alias to {}", command, &**alias);
                     }
                 }
                 "function" => println!("{}: function", command),
@@ -49,8 +49,8 @@ pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
             Ok(c_type) => {
                 match c_type.as_ref() {
                     "alias" => {
-                        if let Some(alias) = shell.variables().get::<types::Alias>(&**command) {
-                            println!("{} is aliased to `{}`", command, &*alias);
+                        if let Some(Value::Alias(alias)) = shell.variables().get_ref(&**command) {
+                            println!("{} is aliased to `{}`", command, &**alias);
                         }
                     }
                     // TODO Make it print the function.
@@ -67,21 +67,20 @@ pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
 }
 
 pub fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<Cow<'a, str>, ()> {
-    if shell.variables().get::<types::Alias>(command).is_some() {
-        return Ok("alias".into());
-    } else if shell.variables().get::<Function>(command).is_some() {
-        return Ok("function".into());
-    } else if shell.builtins().contains(command) {
-        return Ok("builtin".into());
-    } else {
-        for path in
-            env::var("PATH").unwrap_or_else(|_| String::from("/bin")).split(sys::PATH_SEPARATOR)
-        {
-            let executable = Path::new(path).join(command);
-            if executable.is_file() {
-                return Ok(executable.display().to_string().into());
+    match shell.variables().get_ref(command) {
+        Some(Value::Alias(_)) => Ok("alias".into()),
+        Some(Value::Function(_)) => Ok("function".into()),
+        _ if shell.builtins().contains(command) => Ok("builtin".into()),
+        _ => {
+            for path in
+                env::var("PATH").unwrap_or_else(|_| String::from("/bin")).split(sys::PATH_SEPARATOR)
+            {
+                let executable = Path::new(path).join(command);
+                if executable.is_file() {
+                    return Ok(executable.display().to_string().into());
+                }
             }
+            Err(())
         }
     }
-    Err(())
 }

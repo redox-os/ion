@@ -69,7 +69,7 @@ impl<'a> Shell<'a> {
             ($chunk:expr, $def:expr) => {
                 for (key, value) in variables.iter().zip($chunk.chain(::std::iter::repeat($def))) {
                     if key != "_" {
-                        self.set(key, value.clone());
+                        self.variables_mut().set(key, value.clone());
                     }
                 }
 
@@ -91,7 +91,7 @@ impl<'a> Shell<'a> {
             }
             ForValueExpression::Normal(value) => {
                 if &variables[0] != "_" {
-                    self.set(&variables[0], value.clone());
+                    self.variables_mut().set(&variables[0], value.clone());
                 }
 
                 match self.execute_statements(statements) {
@@ -242,7 +242,7 @@ impl<'a> Shell<'a> {
                     _ => (),
                 }
                 let previous_status = self.previous_status.to_string();
-                self.set("?", previous_status);
+                self.variables_mut().set("?", previous_status);
             }
             Statement::Break => return Condition::Break,
             Statement::Continue => return Condition::Continue,
@@ -306,15 +306,21 @@ impl<'a> Shell<'a> {
                 // let pattern_is_array = is_array(&value);
                 let previous_bind = case.binding.as_ref().and_then(|bind| {
                     if is_array {
-                        let out = self.variables.get::<types::Array>(bind).map(Value::Array);
-                        self.set(
+                        let out = if let Some(Value::Array(array)) =
+                            self.variables.get_ref(bind).cloned()
+                        {
+                            Some(Value::Array(array))
+                        } else {
+                            None
+                        };
+                        self.variables_mut().set(
                             &bind,
                             value.iter().cloned().map(Value::Str).collect::<types::Array>(),
                         );
                         out
                     } else {
-                        let out = self.variables.get::<types::Str>(bind).map(Value::Str);
-                        self.set(&bind, value.join(" "));
+                        let out = self.variables.get_str(bind).map(Value::Str);
+                        self.variables_mut().set(&bind, value.join(" "));
                         out
                     }
                 });
@@ -332,7 +338,7 @@ impl<'a> Shell<'a> {
                     if let Some(value) = previous_bind {
                         match value {
                             Value::HashMap(_) | Value::Array(_) | Value::Str(_) => {
-                                self.set(bind, value);
+                                self.variables_mut().set(bind, value);
                             }
                             _ => (),
                         }
@@ -382,7 +388,7 @@ fn expand_pipeline<'a>(
     let mut statements = Vec::new();
 
     while let Some(item) = item_iter.next() {
-        if let Some(alias) = shell.variables.get::<types::Alias>(item.command()) {
+        if let Some(Value::Alias(alias)) = shell.variables.get_ref(item.command()) {
             statements = StatementSplitter::new(alias.0.as_str())
                 .map(|stmt| parse_and_validate(stmt, &shell.builtins))
                 .collect();

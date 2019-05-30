@@ -15,12 +15,12 @@ pub mod variables;
 pub(crate) use self::job::Job;
 use self::{
     directory_stack::DirectoryStack,
-    flow_control::{Block, Function, FunctionError, Statement},
+    flow_control::{Block, FunctionError, Statement},
     foreground::ForegroundSignals,
     fork::{Fork, IonResult},
     pipe_exec::{foreground, job_control::BackgroundProcess},
     status::*,
-    variables::{GetVariable, Variables},
+    variables::Variables,
 };
 pub use self::{fork::Capture, pipe_exec::job_control::ProcessState, variables::Value};
 use crate::{
@@ -265,12 +265,14 @@ impl<'a> Shell<'a> {
         name: &str,
         args: &[S],
     ) -> Result<i32, IonError> {
-        self.variables.get::<Function>(name).ok_or(IonError::DoesNotExist).and_then(|function| {
+        if let Some(Value::Function(function)) = self.variables.get_ref(name).cloned() {
             function
                 .execute(self, args)
                 .map(|_| self.previous_status)
                 .map_err(|err| IonError::Function { why: err })
-        })
+        } else {
+            Err(IonError::DoesNotExist)
+        }
     }
 
     /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
@@ -316,19 +318,6 @@ impl<'a> Shell<'a> {
         }
     }
 
-    /// Gets any variable, if it exists within the shell's variable map.
-    pub fn get<T>(&self, name: &str) -> Option<T>
-    where
-        Variables<'a>: GetVariable<T>,
-    {
-        self.variables.get::<T>(name)
-    }
-
-    /// Sets a variable of `name` with the given `value` in the shell's variable map.
-    pub fn set<T: Into<Value<'a>>>(&mut self, name: &str, value: T) {
-        self.variables.set(name, value);
-    }
-
     /// Executes a pipeline and returns the final exit status of the pipeline.
     pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Option<i32> {
         let command_start_time = SystemTime::now();
@@ -350,8 +339,8 @@ impl<'a> Shell<'a> {
                 Some(self.execute_pipeline(pipeline))
             }
         // Branch else if -> input == shell function and set the exit_status
-        } else if let Some(function) =
-            self.variables.get::<Function>(&pipeline.items[0].job.args[0])
+        } else if let Some(Value::Function(function)) =
+            self.variables.get_ref(&pipeline.items[0].job.args[0]).cloned()
         {
             if !pipeline.requires_piping() {
                 match function.execute(self, &pipeline.items[0].job.args) {
@@ -384,7 +373,7 @@ impl<'a> Shell<'a> {
 
         // Retrieve the exit_status and set the $? variable and history.previous_status
         if let Some(code) = exit_status {
-            self.set("?", code.to_string());
+            self.variables_mut().set("?", code.to_string());
             self.previous_status = code;
         }
 
