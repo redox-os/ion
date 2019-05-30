@@ -18,7 +18,7 @@ pub struct IgnoreSetting {
     /// ignore commands that are duplicates
     duplicates: bool,
     // Yes, a bad heap-based Vec, however unfortunately its not possible to store Regex'es in Array
-    regexes: Option<Vec<Regex>>,
+    regexes: Vec<Regex>,
 }
 
 /// Contains all history-related functionality for the `Shell`.
@@ -30,7 +30,6 @@ impl<'a> InteractiveBinary<'a> {
             self.shell.borrow().variables().get_ref("HISTORY_IGNORE")
         {
             let mut settings = IgnoreSetting::default();
-            let mut regexes = Vec::new();
             // for convenience and to avoid typos
             let regex_prefix = "regex:";
             for pattern in patterns.into_iter() {
@@ -48,13 +47,12 @@ impl<'a> InteractiveBinary<'a> {
                         let regex_string = &pattern[regex_prefix.len()..];
                         // We save the compiled regexes, as compiling them can be  an expensive task
                         if let Ok(regex) = Regex::new(regex_string) {
-                            regexes.push(regex);
+                            settings.regexes.push(regex);
                         }
                     }
                     _ => continue,
                 }
             }
-            settings.regexes = if !regexes.is_empty() { Some(regexes) } else { None };
 
             settings
         } else {
@@ -113,15 +111,13 @@ impl<'a> InteractiveBinary<'a> {
             self.context.borrow_mut().history.remove_duplicates(command);
         }
 
-        if let Some(ref regexes) = ignore.regexes {
-            // ignore command when regex is matched but only if it does not contain
-            // "HISTORY_IGNORE", otherwise we would also ignore the command which
-            // sets the variable, which could be annoying.
-            if regexes.iter().any(|regex| regex.is_match(command))
-                && !command.contains("HISTORY_IGNORE")
-            {
-                return false;
-            }
+        // ignore command when regex is matched but only if it does not contain
+        // "HISTORY_IGNORE", otherwise we would also ignore the command which
+        // sets the variable, which could be annoying.
+        if !command.contains("HISTORY_IGNORE")
+            && ignore.regexes.iter().any(|regex| regex.is_match(command))
+        {
+            return false;
         }
 
         // default to true, as it's more likely that we want to save a command in
