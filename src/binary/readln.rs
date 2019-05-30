@@ -2,10 +2,12 @@ use super::{completer::IonCompleter, InteractiveBinary};
 use std::io::ErrorKind;
 
 pub fn readln(binary: &InteractiveBinary) -> Option<String> {
-    let shell = binary.shell.borrow();
-    let mut completer = IonCompleter::new(&shell);
     let prompt = binary.prompt();
-    let line = binary.context.borrow_mut().read_line(prompt, None, &mut completer);
+    let line = binary.context.borrow_mut().read_line(
+        prompt,
+        None,
+        &mut IonCompleter::new(&binary.shell.borrow()),
+    );
 
     match line {
         Ok(line) => {
