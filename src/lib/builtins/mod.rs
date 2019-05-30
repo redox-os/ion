@@ -398,7 +398,7 @@ fn builtin_pushd(args: &[small::String], shell: &mut Shell) -> i32 {
     let mut keep_front = false; // whether the -n option is present
     let mut action = Action::Switch;
 
-    for arg in args {
+    for arg in args.iter().skip(1) {
         let arg = arg.as_ref();
         if arg == "-n" {
             keep_front = true;

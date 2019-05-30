@@ -98,23 +98,21 @@ impl DirectoryStack {
         self.dirs.truncate(DirectoryStack::get_size(variables));
     }
 
-    pub fn change_and_push_dir(
+    fn change_and_push_dir(
         &mut self,
         dir: &str,
         variables: &Variables,
     ) -> Result<(), Cow<'static, str>> {
         let new_dir = self.normalize_path(dir);
-        match set_current_dir_ion(&new_dir) {
-            Ok(()) => {
-                self.push_dir(new_dir, variables);
-                Ok(())
-            }
-            Err(err) => Err(Cow::Owned(format!(
+        set_current_dir_ion(&new_dir).map_err(|err| {
+            Cow::Owned(format!(
                 "ion: failed to set current dir to {}: {}",
                 new_dir.to_string_lossy(),
                 err
-            ))),
-        }
+            ))
+        })?;
+        self.push_dir(new_dir, variables);
+        Ok(())
     }
 
     fn get_previous_dir(&self) -> Option<String> {
