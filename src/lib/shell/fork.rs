@@ -123,7 +123,7 @@ impl<'a, 'b> Fork<'a, 'b> {
 
                 // Obtain ownership of the child's copy of the shell, and then configure it.
                 let mut shell: Shell = unsafe { (self.shell as *const Shell).read() };
-                shell.set("PID", sys::getpid().unwrap_or(0).to_string());
+                shell.variables_mut().set("PID", sys::getpid().unwrap_or(0).to_string());
 
                 // Execute the given closure within the child's shell.
                 child_func(&mut shell);

@@ -1,11 +1,6 @@
 use std::{fs, os::unix::fs::PermissionsExt};
 
-#[cfg(test)]
-use crate::shell::{self, flow_control::Statement};
-use crate::{
-    shell::{flow_control::Function, Shell},
-    types,
-};
+use crate::shell::{Shell, Value};
 use small;
 
 pub fn exists(args: &[small::String], shell: &Shell) -> Result<bool, small::String> {
@@ -76,7 +71,7 @@ fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
     // TODO: Right now they use an entirely different logic which means that it
     // *might* be possible TODO: that `exists` reports a binary to be in the
     // path, while the shell cannot find it or TODO: vice-versa
-    if let Some(path) = shell.get::<types::Str>("PATH") {
+    if let Some(path) = shell.variables().get_str("PATH") {
         for fname in path.split(':').map(|dir| format!("{}/{}", dir, binaryname)) {
             if let Ok(metadata) = fs::metadata(&fname) {
                 if metadata.is_file() && file_has_execute_permission(&fname) {
@@ -113,15 +108,15 @@ fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
 
 /// Returns true if the variable is an array and the array is not empty
 fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
-    match shell.variables().get::<types::Array>(arrayvar) {
-        Some(array) => !array.is_empty(),
-        None => false,
+    match shell.variables().get_ref(arrayvar) {
+        Some(Value::Array(array)) => !array.is_empty(),
+        _ => false,
     }
 }
 
 /// Returns true if the variable is a string and the string is not empty
 fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
-    match shell.variables().get::<types::Str>(stringvar) {
+    match shell.variables().get_str(stringvar) {
         Some(string) => !string.is_empty(),
         None => false,
     }
@@ -129,246 +124,278 @@ fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
 
 /// Returns true if a function with the given name is defined
 fn function_is_defined(function: &str, shell: &Shell) -> bool {
-    shell.variables().get::<Function>(function).is_some()
+    if let Some(Value::Function(_)) = shell.variables().get_ref(function) {
+        true
+    } else {
+        false
+    }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        flow_control::Function,
+        lexers::assignments::{KeyBuf, Primitive},
+        shell::flow_control::Statement,
+        types,
+    };
+    use small;
 
-#[test]
-fn test_evaluate_arguments() {
-    use crate::lexers::assignments::{KeyBuf, Primitive};
-    let mut shell = shell::Shell::library();
+    #[test]
+    fn test_evaluate_arguments() {
+        let mut shell = Shell::library();
 
-    // assert_eq!(exists(&["ion".into(), ], &mut sink, &shell), Ok(false));
-    // no parameters
-    assert_eq!(exists(&["ion".into()], &shell), Ok(false));
-    // multiple arguments
-    // ignores all but the first argument
-    assert_eq!(exists(&["ion".into(), "foo".into(), "bar".into()], &shell), Ok(true));
+        // assert_eq!(exists(&["ion".into(), ], &mut sink, &shell), Ok(false));
+        // no parameters
+        assert_eq!(exists(&["ion".into()], &shell), Ok(false));
+        // multiple arguments
+        // ignores all but the first argument
+        assert_eq!(exists(&["ion".into(), "foo".into(), "bar".into()], &shell), Ok(true));
 
-    // check `exists STRING`
-    assert_eq!(exists(&["ion".into(), "".into()], &shell), Ok(false));
-    assert_eq!(exists(&["ion".into(), "string".into()], &shell), Ok(true));
-    assert_eq!(exists(&["ion".into(), "string with space".into()], &shell), Ok(true));
-    assert_eq!(exists(&["ion".into(), "-startswithdash".into()], &shell), Ok(true));
+        // check `exists STRING`
+        assert_eq!(exists(&["ion".into(), "".into()], &shell), Ok(false));
+        assert_eq!(exists(&["ion".into(), "string".into()], &shell), Ok(true));
+        assert_eq!(exists(&["ion".into(), "string with space".into()], &shell), Ok(true));
+        assert_eq!(exists(&["ion".into(), "-startswithdash".into()], &shell), Ok(true));
 
-    // check `exists -a`
-    // no argument means we treat it as a string
-    assert_eq!(exists(&["ion".into(), "-a".into()], &shell), Ok(true));
-    shell.variables_mut().set("emptyarray", types::Array::new());
-    assert_eq!(exists(&["ion".into(), "-a".into(), "emptyarray".into()], &shell), Ok(false));
-    let mut array = types::Array::new();
-    array.push("element".into());
-    shell.variables_mut().set("array", array);
-    assert_eq!(exists(&["ion".into(), "-a".into(), "array".into()], &shell), Ok(true));
-    shell.variables_mut().remove_variable("array");
-    assert_eq!(exists(&["ion".into(), "-a".into(), "array".into()], &shell), Ok(false));
+        // check `exists -a`
+        // no argument means we treat it as a string
+        assert_eq!(exists(&["ion".into(), "-a".into()], &shell), Ok(true));
+        shell.variables_mut().set("emptyarray", types::Array::new());
+        assert_eq!(exists(&["ion".into(), "-a".into(), "emptyarray".into()], &shell), Ok(false));
+        let mut array = types::Array::new();
+        array.push("element".into());
+        shell.variables_mut().set("array", array);
+        assert_eq!(exists(&["ion".into(), "-a".into(), "array".into()], &shell), Ok(true));
+        shell.variables_mut().remove_variable("array");
+        assert_eq!(exists(&["ion".into(), "-a".into(), "array".into()], &shell), Ok(false));
 
-    // check `exists -b`
-    // TODO: see test_binary_is_in_path()
-    // no argument means we treat it as a string
-    assert_eq!(exists(&["ion".into(), "-b".into()], &shell), Ok(true));
-    let oldpath = shell.get::<types::Str>("PATH").unwrap_or_else(|| "/usr/bin".into());
-    shell.set("PATH", "testing/");
+        // check `exists -b`
+        // TODO: see test_binary_is_in_path()
+        // no argument means we treat it as a string
+        assert_eq!(exists(&["ion".into(), "-b".into()], &shell), Ok(true));
+        let oldpath = shell.variables().get_str("PATH").unwrap_or_else(|| "/usr/bin".into());
+        shell.variables_mut().set("PATH", "testing/");
 
-    assert_eq!(exists(&["ion".into(), "-b".into(), "executable_file".into()], &shell), Ok(true));
-    assert_eq!(exists(&["ion".into(), "-b".into(), "empty_file".into()], &shell), Ok(false));
-    assert_eq!(
-        exists(&["ion".into(), "-b".into(), "file_does_not_exist".into()], &shell),
-        Ok(false)
-    );
+        assert_eq!(
+            exists(&["ion".into(), "-b".into(), "executable_file".into()], &shell),
+            Ok(true)
+        );
+        assert_eq!(exists(&["ion".into(), "-b".into(), "empty_file".into()], &shell), Ok(false));
+        assert_eq!(
+            exists(&["ion".into(), "-b".into(), "file_does_not_exist".into()], &shell),
+            Ok(false)
+        );
 
-    // restore original PATH. Not necessary for the currently defined test cases
-    // but this might change in the future? Better safe than sorry!
-    shell.set("PATH", oldpath);
+        // restore original PATH. Not necessary for the currently defined test cases
+        // but this might change in the future? Better safe than sorry!
+        shell.variables_mut().set("PATH", oldpath);
 
-    // check `exists -d`
-    // no argument means we treat it as a string
-    assert_eq!(exists(&["ion".into(), "-d".into()], &shell), Ok(true));
-    assert_eq!(exists(&["ion".into(), "-d".into(), "testing/".into()], &shell), Ok(true));
-    assert_eq!(
-        exists(&["ion".into(), "-d".into(), "testing/empty_file".into()], &shell),
-        Ok(false)
-    );
-    assert_eq!(exists(&["ion".into(), "-d".into(), "does/not/exist/".into()], &shell), Ok(false));
+        // check `exists -d`
+        // no argument means we treat it as a string
+        assert_eq!(exists(&["ion".into(), "-d".into()], &shell), Ok(true));
+        assert_eq!(exists(&["ion".into(), "-d".into(), "testing/".into()], &shell), Ok(true));
+        assert_eq!(
+            exists(&["ion".into(), "-d".into(), "testing/empty_file".into()], &shell),
+            Ok(false)
+        );
+        assert_eq!(
+            exists(&["ion".into(), "-d".into(), "does/not/exist/".into()], &shell),
+            Ok(false)
+        );
 
-    // check `exists -f`
-    // no argument means we treat it as a string
-    assert_eq!(exists(&["ion".into(), "-f".into()], &shell), Ok(true));
-    assert_eq!(exists(&["ion".into(), "-f".into(), "testing/".into()], &shell), Ok(false));
-    assert_eq!(exists(&["ion".into(), "-f".into(), "testing/empty_file".into()], &shell), Ok(true));
-    assert_eq!(exists(&["ion".into(), "-f".into(), "does-not-exist".into()], &shell), Ok(false));
+        // check `exists -f`
+        // no argument means we treat it as a string
+        assert_eq!(exists(&["ion".into(), "-f".into()], &shell), Ok(true));
+        assert_eq!(exists(&["ion".into(), "-f".into(), "testing/".into()], &shell), Ok(false));
+        assert_eq!(
+            exists(&["ion".into(), "-f".into(), "testing/empty_file".into()], &shell),
+            Ok(true)
+        );
+        assert_eq!(
+            exists(&["ion".into(), "-f".into(), "does-not-exist".into()], &shell),
+            Ok(false)
+        );
 
-    // check `exists -s`
-    // no argument means we treat it as a string
-    assert_eq!(exists(&["ion".into(), "-s".into()], &shell), Ok(true));
-    shell.set("emptyvar", "".to_string());
-    assert_eq!(exists(&["ion".into(), "-s".into(), "emptyvar".into()], &shell), Ok(false));
-    shell.set("testvar", "foobar".to_string());
-    assert_eq!(exists(&["ion".into(), "-s".into(), "testvar".into()], &shell), Ok(true));
-    shell.variables_mut().remove_variable("testvar");
-    assert_eq!(exists(&["ion".into(), "-s".into(), "testvar".into()], &shell), Ok(false));
-    // also check that it doesn't trigger on arrays
-    let mut array = types::Array::new();
-    array.push("element".into());
-    shell.variables_mut().remove_variable("array");
-    shell.variables_mut().set("array", array);
-    assert_eq!(exists(&["ion".into(), "-s".into(), "array".into()], &shell), Ok(false));
+        // check `exists -s`
+        // no argument means we treat it as a string
+        assert_eq!(exists(&["ion".into(), "-s".into()], &shell), Ok(true));
+        shell.variables_mut().set("emptyvar", "".to_string());
+        assert_eq!(exists(&["ion".into(), "-s".into(), "emptyvar".into()], &shell), Ok(false));
+        shell.variables_mut().set("testvar", "foobar".to_string());
+        assert_eq!(exists(&["ion".into(), "-s".into(), "testvar".into()], &shell), Ok(true));
+        shell.variables_mut().remove_variable("testvar");
+        assert_eq!(exists(&["ion".into(), "-s".into(), "testvar".into()], &shell), Ok(false));
+        // also check that it doesn't trigger on arrays
+        let mut array = types::Array::new();
+        array.push("element".into());
+        shell.variables_mut().remove_variable("array");
+        shell.variables_mut().set("array", array);
+        assert_eq!(exists(&["ion".into(), "-s".into(), "array".into()], &shell), Ok(false));
 
-    // check `exists --fn`
-    let name_str = "test_function";
-    let name = small::String::from(name_str);
-    let mut args = Vec::new();
-    args.push(KeyBuf { name: "testy".into(), kind: Primitive::Str });
-    let mut statements = Vec::new();
-    statements.push(Statement::End);
-    let description: small::String = "description".into();
+        // check `exists --fn`
+        let name_str = "test_function";
+        let name = small::String::from(name_str);
+        let mut args = Vec::new();
+        args.push(KeyBuf { name: "testy".into(), kind: Primitive::Str });
+        let mut statements = Vec::new();
+        statements.push(Statement::End);
+        let description: small::String = "description".into();
 
-    shell
-        .variables_mut()
-        .set(&name, Function::new(Some(description), name.clone(), args, statements));
+        shell
+            .variables_mut()
+            .set(&name, Function::new(Some(description), name.clone(), args, statements));
 
-    assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(true));
-    shell.variables_mut().remove_variable(name_str);
-    assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(false));
+        assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(true));
+        shell.variables_mut().remove_variable(name_str);
+        assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(false));
 
-    // check invalid flags / parameters (should all be treated as strings and
-    // therefore succeed)
-    assert_eq!(exists(&["ion".into(), "--foo".into()], &shell), Ok(true));
-    assert_eq!(exists(&["ion".into(), "-x".into()], &shell), Ok(true));
-}
+        // check invalid flags / parameters (should all be treated as strings and
+        // therefore succeed)
+        assert_eq!(exists(&["ion".into(), "--foo".into()], &shell), Ok(true));
+        assert_eq!(exists(&["ion".into(), "-x".into()], &shell), Ok(true));
+    }
 
-#[test]
-fn test_match_flag_argument() {
-    let shell = shell::Shell::library();
+    #[test]
+    fn test_match_flag_argument() {
+        let shell = Shell::library();
 
-    // we don't really care about the passed values, as long as both sited return
-    // the same value
-    assert_eq!(match_flag_argument('a', "ARRAY", &shell), array_var_is_not_empty("ARRAY", &shell));
-    assert_eq!(match_flag_argument('b', "binary", &shell), binary_is_in_path("binary", &shell));
-    assert_eq!(match_flag_argument('d', "path", &shell), path_is_directory("path"));
-    assert_eq!(match_flag_argument('f', "file", &shell), path_is_file("file"));
-    assert_eq!(match_flag_argument('s', "STR", &shell), string_var_is_not_empty("STR", &shell));
+        // we don't really care about the passed values, as long as both sited return
+        // the same value
+        assert_eq!(
+            match_flag_argument('a', "ARRAY", &shell),
+            array_var_is_not_empty("ARRAY", &shell)
+        );
+        assert_eq!(match_flag_argument('b', "binary", &shell), binary_is_in_path("binary", &shell));
+        assert_eq!(match_flag_argument('d', "path", &shell), path_is_directory("path"));
+        assert_eq!(match_flag_argument('f', "file", &shell), path_is_file("file"));
+        assert_eq!(match_flag_argument('s', "STR", &shell), string_var_is_not_empty("STR", &shell));
 
-    // Any flag which is not implemented
-    assert_eq!(match_flag_argument('x', "ARG", &shell), false);
-}
+        // Any flag which is not implemented
+        assert_eq!(match_flag_argument('x', "ARG", &shell), false);
+    }
 
-#[test]
-fn test_match_option_argument() {
-    let shell = shell::Shell::library();
+    #[test]
+    fn test_match_option_argument() {
+        let shell = Shell::library();
 
-    // we don't really care about the passed values, as long as both sited return
-    // the same value
-    assert_eq!(match_option_argument("fn", "FUN", &shell), array_var_is_not_empty("FUN", &shell));
+        // we don't really care about the passed values, as long as both sited return
+        // the same value
+        assert_eq!(
+            match_option_argument("fn", "FUN", &shell),
+            array_var_is_not_empty("FUN", &shell)
+        );
 
-    // Any option which is not implemented
-    assert_eq!(match_option_argument("foo", "ARG", &shell), false);
-}
+        // Any option which is not implemented
+        assert_eq!(match_option_argument("foo", "ARG", &shell), false);
+    }
 
-#[test]
-fn test_path_is_file() {
-    assert_eq!(path_is_file("testing/empty_file"), true);
-    assert_eq!(path_is_file("this-does-not-exist"), false);
-}
+    #[test]
+    fn test_path_is_file() {
+        assert_eq!(path_is_file("testing/empty_file"), true);
+        assert_eq!(path_is_file("this-does-not-exist"), false);
+    }
 
-#[test]
-fn test_path_is_directory() {
-    assert_eq!(path_is_directory("testing"), true);
-    assert_eq!(path_is_directory("testing/empty_file"), false);
-}
+    #[test]
+    fn test_path_is_directory() {
+        assert_eq!(path_is_directory("testing"), true);
+        assert_eq!(path_is_directory("testing/empty_file"), false);
+    }
 
-#[test]
-fn test_binary_is_in_path() {
-    let mut shell = shell::Shell::library();
+    #[test]
+    fn test_binary_is_in_path() {
+        let mut shell = Shell::library();
 
-    // TODO: We should probably also test with more complex PATH-variables:
-    // TODO: multiple/:directories/
-    // TODO: PATH containing directories which do not exist
-    // TODO: PATH containing directories without read permission (for user)
-    // TODO: PATH containing directories without execute ("enter") permission (for
-    // user) TODO: empty PATH?
-    shell.set("PATH", "testing/".to_string());
+        // TODO: We should probably also test with more complex PATH-variables:
+        // TODO: multiple/:directories/
+        // TODO: PATH containing directories which do not exist
+        // TODO: PATH containing directories without read permission (for user)
+        // TODO: PATH containing directories without execute ("enter") permission (for
+        // user) TODO: empty PATH?
+        shell.variables_mut().set("PATH", "testing/".to_string());
 
-    assert_eq!(binary_is_in_path("executable_file", &shell), true);
-    assert_eq!(binary_is_in_path("empty_file", &shell), false);
-    assert_eq!(binary_is_in_path("file_does_not_exist", &shell), false);
-}
+        assert_eq!(binary_is_in_path("executable_file", &shell), true);
+        assert_eq!(binary_is_in_path("empty_file", &shell), false);
+        assert_eq!(binary_is_in_path("file_does_not_exist", &shell), false);
+    }
 
-#[test]
-fn test_file_has_execute_permission() {
-    assert_eq!(file_has_execute_permission("testing/executable_file"), true);
-    assert_eq!(file_has_execute_permission("testing"), true);
-    assert_eq!(file_has_execute_permission("testing/empty_file"), false);
-    assert_eq!(file_has_execute_permission("this-does-not-exist"), false);
-}
+    #[test]
+    fn test_file_has_execute_permission() {
+        assert_eq!(file_has_execute_permission("testing/executable_file"), true);
+        assert_eq!(file_has_execute_permission("testing"), true);
+        assert_eq!(file_has_execute_permission("testing/empty_file"), false);
+        assert_eq!(file_has_execute_permission("this-does-not-exist"), false);
+    }
 
-#[test]
-fn test_string_is_nonzero() {
-    assert_eq!(string_is_nonzero("NOT ZERO"), true);
-    assert_eq!(string_is_nonzero(""), false);
-}
+    #[test]
+    fn test_string_is_nonzero() {
+        assert_eq!(string_is_nonzero("NOT ZERO"), true);
+        assert_eq!(string_is_nonzero(""), false);
+    }
 
-#[test]
-fn test_array_var_is_not_empty() {
-    let mut shell = shell::Shell::library();
+    #[test]
+    fn test_array_var_is_not_empty() {
+        let mut shell = Shell::library();
 
-    shell.variables_mut().set("EMPTY_ARRAY", types::Array::new());
-    assert_eq!(array_var_is_not_empty("EMPTY_ARRAY", &shell), false);
+        shell.variables_mut().set("EMPTY_ARRAY", types::Array::new());
+        assert_eq!(array_var_is_not_empty("EMPTY_ARRAY", &shell), false);
 
-    let mut not_empty_array = types::Array::new();
-    not_empty_array.push("array not empty".into());
-    shell.variables_mut().set("NOT_EMPTY_ARRAY", not_empty_array);
-    assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), true);
+        let mut not_empty_array = types::Array::new();
+        not_empty_array.push("array not empty".into());
+        shell.variables_mut().set("NOT_EMPTY_ARRAY", not_empty_array);
+        assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), true);
 
-    // test for array which does not even exist
-    shell.variables_mut().remove_variable("NOT_EMPTY_ARRAY");
-    assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), false);
+        // test for array which does not even exist
+        shell.variables_mut().remove_variable("NOT_EMPTY_ARRAY");
+        assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), false);
 
-    // array_var_is_not_empty should NOT match for non-array variables with the
-    // same name
-    shell.set("VARIABLE", "notempty-variable");
-    assert_eq!(array_var_is_not_empty("VARIABLE", &shell), false);
-}
+        // array_var_is_not_empty should NOT match for non-array variables with the
+        // same name
+        shell.variables_mut().set("VARIABLE", "notempty-variable");
+        assert_eq!(array_var_is_not_empty("VARIABLE", &shell), false);
+    }
 
-#[test]
-fn test_string_var_is_not_empty() {
-    let mut shell = shell::Shell::library();
+    #[test]
+    fn test_string_var_is_not_empty() {
+        let mut shell = Shell::library();
 
-    shell.set("EMPTY", "");
-    assert_eq!(string_var_is_not_empty("EMPTY", &shell), false);
+        shell.variables_mut().set("EMPTY", "");
+        assert_eq!(string_var_is_not_empty("EMPTY", &shell), false);
 
-    shell.set("NOT_EMPTY", "notempty");
-    assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), true);
+        shell.variables_mut().set("NOT_EMPTY", "notempty");
+        assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), true);
 
-    // string_var_is_not_empty should NOT match for arrays with the same name
-    let mut array = types::Array::new();
-    array.push("not-empty".into());
-    shell.variables_mut().set("ARRAY_NOT_EMPTY", array);
-    assert_eq!(string_var_is_not_empty("ARRAY_NOT_EMPTY", &shell), false);
+        // string_var_is_not_empty should NOT match for arrays with the same name
+        let mut array = types::Array::new();
+        array.push("not-empty".into());
+        shell.variables_mut().set("ARRAY_NOT_EMPTY", array);
+        assert_eq!(string_var_is_not_empty("ARRAY_NOT_EMPTY", &shell), false);
 
-    // test for a variable which does not even exist
-    shell.variables_mut().remove_variable("NOT_EMPTY");
-    assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), false);
-}
+        // test for a variable which does not even exist
+        shell.variables_mut().remove_variable("NOT_EMPTY");
+        assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), false);
+    }
 
-#[test]
-fn test_function_is_defined() {
-    use crate::lexers::assignments::{KeyBuf, Primitive};
-    let mut shell = shell::Shell::library();
+    #[test]
+    fn test_function_is_defined() {
+        use crate::lexers::assignments::{KeyBuf, Primitive};
+        let mut shell = Shell::library();
 
-    // create a simple dummy function
-    let name_str = "test_function";
-    let name: small::String = name_str.into();
-    let mut args = Vec::new();
-    args.push(KeyBuf { name: "testy".into(), kind: Primitive::Str });
-    let mut statements = Vec::new();
-    statements.push(Statement::End);
-    let description: small::String = "description".into();
+        // create a simple dummy function
+        let name_str = "test_function";
+        let name: small::String = name_str.into();
+        let mut args = Vec::new();
+        args.push(KeyBuf { name: "testy".into(), kind: Primitive::Str });
+        let mut statements = Vec::new();
+        statements.push(Statement::End);
+        let description: small::String = "description".into();
 
-    shell
-        .variables_mut()
-        .set(&name, Function::new(Some(description), name.clone(), args, statements));
+        shell
+            .variables_mut()
+            .set(&name, Function::new(Some(description), name.clone(), args, statements));
 
-    assert_eq!(function_is_defined(name_str, &shell), true);
-    shell.variables_mut().remove_variable(name_str);
-    assert_eq!(function_is_defined(name_str, &shell), false);
+        assert_eq!(function_is_defined(name_str, &shell), true);
+        shell.variables_mut().remove_variable(name_str);
+        assert_eq!(function_is_defined(name_str, &shell), false);
+    }
 }

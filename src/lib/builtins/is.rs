@@ -35,7 +35,7 @@ fn get_var_string(name: &str, shell: &mut Shell) -> types::Str {
         return "".into();
     }
 
-    match shell.variables().get::<types::Str>(&name[1..]) {
+    match shell.variables().get_str(&name[1..]) {
         Some(s) => s,
         None => "".into(),
     }
@@ -45,8 +45,8 @@ fn get_var_string(name: &str, shell: &mut Shell) -> types::Str {
 fn test_is() {
     fn vec_string(args: &[&str]) -> Vec<small::String> { args.iter().map(|&s| s.into()).collect() }
     let mut shell = Shell::library();
-    shell.set("x", "value");
-    shell.set("y", "0");
+    shell.variables_mut().set("x", "value");
+    shell.variables_mut().set("y", "0");
 
     // Four arguments
     assert_eq!(

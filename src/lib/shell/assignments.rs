@@ -7,7 +7,6 @@ use crate::{
     lexers::assignments::{Key, Operator, Primitive},
     parser::{assignments::*, is_valid_name},
     shell::variables::{EuclDiv, Modifications, OpError, Pow, Value},
-    types,
 };
 use std::{
     env,
@@ -81,7 +80,7 @@ impl<'b> Shell<'b> {
 
                 SUCCESS
             }
-            ExportAction::LocalExport(ref key) => match self.get::<types::Str>(key) {
+            ExportAction::LocalExport(ref key) => match self.variables.get_str(key) {
                 Some(var) => {
                     env::set_var(key, &*var);
                     SUCCESS

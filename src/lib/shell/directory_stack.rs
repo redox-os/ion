@@ -207,7 +207,11 @@ impl DirectoryStack {
     /// variable,
     /// else it will return a default value of 1000.
     fn get_size(variables: &Variables) -> usize {
-        variables.get_str_or_empty("DIRECTORY_STACK_SIZE").parse::<usize>().unwrap_or(1000)
+        variables
+            .get_str("DIRECTORY_STACK_SIZE")
+            .unwrap_or_default()
+            .parse::<usize>()
+            .unwrap_or(1000)
     }
 
     /// Create a new `DirectoryStack` containing the current working directory,

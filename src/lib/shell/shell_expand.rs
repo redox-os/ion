@@ -38,43 +38,40 @@ impl<'a, 'b> Expander for Shell<'b> {
         if name == "?" {
             Some(types::Str::from(self.previous_status.to_string()))
         } else {
-            self.get::<types::Str>(name)
+            self.variables().get_str(name)
         }
     }
 
     /// Expand an array variable with some selection
     fn array(&self, name: &str, selection: &Select) -> Option<types::Args> {
-        if let Some(array) = self.variables.get::<types::Array>(name) {
-            match selection {
+        match self.variables.get_ref(name) {
+            Some(Value::Array(array)) => match selection {
                 Select::All => {
-                    return Some(types::Args::from_iter(
-                        array.iter().map(|x| format!("{}", x).into()),
-                    ))
+                    Some(types::Args::from_iter(array.iter().map(|x| format!("{}", x).into())))
                 }
-                Select::Index(ref id) => {
-                    return id
-                        .resolve(array.len())
-                        .and_then(|n| array.get(n))
-                        .map(|x| types::Args::from_iter(Some(format!("{}", x).into())));
-                }
+                Select::Index(ref id) => id
+                    .resolve(array.len())
+                    .and_then(|n| array.get(n))
+                    .map(|x| args![types::Str::from(format!("{}", x))]),
                 Select::Range(ref range) => {
-                    if let Some((start, length)) = range.bounds(array.len()) {
+                    range.bounds(array.len()).and_then(|(start, length)| {
                         if array.len() > start {
-                            return Some(
+                            Some(
                                 array
                                     .iter()
                                     .skip(start)
                                     .take(length)
                                     .map(|var| format!("{}", var).into())
                                     .collect(),
-                            );
+                            )
+                        } else {
+                            None
                         }
-                    }
+                    })
                 }
-                _ => (),
-            }
-        } else if let Some(hmap) = self.variables.get::<types::HashMap>(name) {
-            match selection {
+                _ => None,
+            },
+            Some(Value::HashMap(hmap)) => match selection {
                 Select::All => {
                     let mut array = types::Args::new();
                     for (key, value) in hmap.iter() {
@@ -90,17 +87,14 @@ impl<'a, 'b> Expander for Shell<'b> {
                             _ => (),
                         }
                     }
-                    return Some(array);
+                    Some(array)
                 }
                 Select::Key(key) => {
-                    return Some(args![format!(
-                        "{}",
-                        hmap.get(&*key).unwrap_or(&Value::Str("".into()))
-                    )]);
+                    Some(args![format!("{}", hmap.get(&*key).unwrap_or(&Value::Str("".into())))])
                 }
                 Select::Index(index) => {
                     use crate::ranges::Index;
-                    return Some(args![format!(
+                    Some(args![format!(
                         "{}",
                         hmap.get(&types::Str::from(
                             match index {
@@ -110,12 +104,11 @@ impl<'a, 'b> Expander for Shell<'b> {
                             .to_string()
                         ))
                         .unwrap_or(&Value::Str("".into()))
-                    )]);
+                    )])
                 }
-                _ => (),
-            }
-        } else if let Some(bmap) = self.variables.get::<types::BTreeMap>(name) {
-            match selection {
+                _ => None,
+            },
+            Some(Value::BTreeMap(bmap)) => match selection {
                 Select::All => {
                     let mut array = types::Args::new();
                     for (key, value) in bmap.iter() {
@@ -131,17 +124,14 @@ impl<'a, 'b> Expander for Shell<'b> {
                             _ => (),
                         }
                     }
-                    return Some(array);
+                    Some(array)
                 }
                 Select::Key(key) => {
-                    return Some(args![format!(
-                        "{}",
-                        bmap.get(&*key).unwrap_or(&Value::Str("".into()))
-                    )]);
+                    Some(args![format!("{}", bmap.get(&*key).unwrap_or(&Value::Str("".into())))])
                 }
                 Select::Index(index) => {
                     use crate::ranges::Index;
-                    return Some(args![format!(
+                    Some(args![format!(
                         "{}",
                         bmap.get(&types::Str::from(
                             match index {
@@ -151,12 +141,12 @@ impl<'a, 'b> Expander for Shell<'b> {
                             .to_string()
                         ))
                         .unwrap_or(&Value::Str("".into()))
-                    )]);
+                    )])
                 }
-                _ => (),
-            }
+                _ => None,
+            },
+            _ => None,
         }
-        None
     }
 
     fn map_keys(&self, name: &str, sel: &Select) -> Option<types::Args> {
@@ -195,9 +185,7 @@ impl<'a, 'b> Expander for Shell<'b> {
         match tilde_prefix {
             "" => sys_env::home_dir().map(|home| home.to_string_lossy().to_string() + rest),
             "+" => Some(env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest),
-            "-" => {
-                self.variables.get::<types::Str>("OLDPWD").map(|oldpwd| oldpwd.to_string() + rest)
-            }
+            "-" => self.variables.get_str("OLDPWD").map(|oldpwd| oldpwd.to_string() + rest),
             _ => {
                 let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
                     (false, &tilde_prefix[1..])

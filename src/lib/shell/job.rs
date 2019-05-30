@@ -2,8 +2,7 @@ use super::Shell;
 use crate::{
     builtins::BuiltinFunction,
     parser::{pipelines::RedirectFrom, Expander},
-    shell::flow_control::Function,
-    types,
+    types, Value,
 };
 use std::{fmt, fs::File, str};
 
@@ -21,8 +20,9 @@ impl<'a> Job<'a> {
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
     pub fn expand(&mut self, shell: &Shell) {
-        if shell.variables.get::<Function>(&self.args[0]).is_none() {
-            self.args = self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).collect();
+        match shell.variables.get_ref(&self.args[0]) {
+            Some(Value::Function(_)) => {}
+            _ => self.args = self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).collect(),
         }
     }
 

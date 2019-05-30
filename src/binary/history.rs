@@ -1,5 +1,5 @@
 use super::InteractiveBinary;
-use ion_shell::{status::*, types};
+use ion_shell::{status::*, Value};
 
 use regex::Regex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -26,40 +26,49 @@ impl<'a> InteractiveBinary<'a> {
     /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
     /// is changed.
     pub fn ignore_patterns(&self) -> IgnoreSetting {
-        let patterns: types::Array = self.shell.borrow().variables().get("HISTORY_IGNORE").unwrap();
-        let mut settings = IgnoreSetting::default();
-        let mut regexes = Vec::new();
-        // for convenience and to avoid typos
-        let regex_prefix = "regex:";
-        for pattern in patterns.into_iter() {
-            let pattern = format!("{}", pattern);
-            match pattern.as_ref() {
-                "all" => settings.all = true,
-                "no_such_command" => settings.no_such_command = true,
-                "whitespace" => settings.whitespace = true,
-                "duplicates" => settings.duplicates = true,
-                // The length check is there to just ignore empty regex definitions
-                _ if pattern.starts_with(regex_prefix) && pattern.len() > regex_prefix.len() => {
-                    settings.based_on_regex = true;
-                    let regex_string = &pattern[regex_prefix.len()..];
-                    // We save the compiled regexes, as compiling them can be  an expensive task
-                    if let Ok(regex) = Regex::new(regex_string) {
-                        regexes.push(regex);
+        if let Some(Value::Array(patterns)) =
+            self.shell.borrow().variables().get_ref("HISTORY_IGNORE")
+        {
+            let mut settings = IgnoreSetting::default();
+            let mut regexes = Vec::new();
+            // for convenience and to avoid typos
+            let regex_prefix = "regex:";
+            for pattern in patterns.into_iter() {
+                let pattern = format!("{}", pattern);
+                match pattern.as_ref() {
+                    "all" => settings.all = true,
+                    "no_such_command" => settings.no_such_command = true,
+                    "whitespace" => settings.whitespace = true,
+                    "duplicates" => settings.duplicates = true,
+                    // The length check is there to just ignore empty regex definitions
+                    _ if pattern.starts_with(regex_prefix)
+                        && pattern.len() > regex_prefix.len() =>
+                    {
+                        settings.based_on_regex = true;
+                        let regex_string = &pattern[regex_prefix.len()..];
+                        // We save the compiled regexes, as compiling them can be  an expensive task
+                        if let Ok(regex) = Regex::new(regex_string) {
+                            regexes.push(regex);
+                        }
                     }
+                    _ => continue,
                 }
-                _ => continue,
             }
-        }
-        settings.regexes = if !regexes.is_empty() { Some(regexes) } else { None };
+            settings.regexes = if !regexes.is_empty() { Some(regexes) } else { None };
 
-        settings
+            settings
+        } else {
+            panic!("HISTORY_IGNORE is not set!");
+        }
     }
 
     /// Saves a command in the history, depending on @HISTORY_IGNORE. Should be called
     /// immediately after `on_command()`
     pub fn save_command_in_history(&self, command: &str) {
         if self.should_save_command(command) {
-            if self.shell.borrow().variables().get_str_or_empty("HISTORY_TIMESTAMP") == "1" {
+            if self.shell.borrow().variables().get_str("HISTORY_TIMESTAMP").unwrap_or_default()
+                == "1"
+            {
                 // Get current time stamp
                 let since_unix_epoch =
                     SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();

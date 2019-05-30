@@ -17,11 +17,11 @@ use self::{
     streams::{duplicate_streams, redirect_streams},
 };
 use super::{
-    flow_control::{Function, FunctionError},
+    flow_control::FunctionError,
     job::{Job, JobVariant, RefinedJob, TeeItem},
     signals::{self, SignalHandler},
     status::*,
-    Shell,
+    Shell, Value,
 };
 use crate::{
     builtins::{self, BuiltinFunction},
@@ -276,19 +276,23 @@ impl<'b> Shell<'b> {
     }
 
     fn exec_function<S: AsRef<str>>(&mut self, name: &str, args: &[S]) -> i32 {
-        match self.variables.get::<Function>(name).unwrap().execute(self, args) {
-            Ok(()) => SUCCESS,
-            Err(FunctionError::InvalidArgumentCount) => {
-                eprintln!("ion: invalid number of function arguments supplied");
-                FAILURE
+        if let Some(Value::Function(function)) = self.variables.get_ref(name).cloned() {
+            match function.execute(self, args) {
+                Ok(()) => SUCCESS,
+                Err(FunctionError::InvalidArgumentCount) => {
+                    eprintln!("ion: invalid number of function arguments supplied");
+                    FAILURE
+                }
+                Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
+                    eprintln!(
+                        "ion: function argument has invalid type: expected {}, found value \'{}\'",
+                        expected_type, value
+                    );
+                    FAILURE
+                }
             }
-            Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
-                eprintln!(
-                    "ion: function argument has invalid type: expected {}, found value \'{}\'",
-                    expected_type, value
-                );
-                FAILURE
-            }
+        } else {
+            unreachable!()
         }
     }
 
@@ -340,7 +344,7 @@ impl<'b> Shell<'b> {
                 &builtins::builtin_cd,
                 iter::once("cd".into()).chain(job.args).collect(),
             )
-        } else if self.variables.get::<Function>(&job.args[0]).is_some() {
+        } else if let Some(Value::Function(_)) = self.variables.get_ref(&job.args[0]) {
             RefinedJob::function(job.args)
         } else if let Some(builtin) = job.builtin {
             RefinedJob::builtin(builtin, job.args)

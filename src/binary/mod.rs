@@ -10,7 +10,7 @@ use ion_shell::{
     builtins::man_pages,
     parser::{Expander, Terminator},
     status::{FAILURE, SUCCESS},
-    types, Shell,
+    Shell,
 };
 use itertools::Itertools;
 use liner::{Buffer, Context, KeyBindings};
@@ -57,8 +57,8 @@ impl<'a> InteractiveBinary<'a> {
     pub fn new(shell: Shell<'a>) -> Self {
         let mut context = Context::new();
         context.word_divider_fn = Box::new(word_divide);
-        if shell.variables().get_str_or_empty("HISTFILE_ENABLED") == "1" {
-            let path = shell.get::<types::Str>("HISTFILE").expect("shell didn't set HISTFILE");
+        if shell.variables().get_str("HISTFILE_ENABLED") == Some("1".into()) {
+            let path = shell.variables().get_str("HISTFILE").expect("shell didn't set HISTFILE");
             if !Path::new(path.as_str()).exists() {
                 eprintln!("ion: creating history file at \"{}\"", path);
             }
@@ -96,7 +96,7 @@ impl<'a> InteractiveBinary<'a> {
             // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the
             // pipline just executed to the the file and context histories. At the
             // moment, this means record how long it took.
-            if "1" == shell.variables().get_str_or_empty("RECORD_SUMMARY") {
+            if Some("1".into()) == shell.variables().get_str("RECORD_SUMMARY") {
                 let summary = format!(
                     "#summary# elapsed real time: {}.{:09} seconds",
                     elapsed.as_secs(),
