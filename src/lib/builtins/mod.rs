@@ -38,7 +38,7 @@ use hashbrown::HashMap;
 use liner::{Completer, Context};
 
 use crate::{
-    shell::{self, directory_stack::parse_numeric_arg, status::*, ProcessState, Shell},
+    shell::{self, status::*, ProcessState, Shell},
     sys, types,
 };
 use itertools::Itertools;
@@ -62,6 +62,17 @@ macro_rules! map {
         )+
         $builtins
     }};
+}
+
+// parses -N or +N patterns
+// required for popd, pushd, dirs
+fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
+    match arg.chars().nth(0) {
+        Some('+') => Some(true),
+        Some('-') => Some(false),
+        _ => None,
+    }
+    .and_then(|b| arg[1..].parse::<usize>().ok().map(|num| (b, num)))
 }
 
 /// A container for builtins and their respective help text

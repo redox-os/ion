@@ -12,18 +12,13 @@ pub(crate) mod signals;
 pub mod status;
 pub mod variables;
 
-pub use self::{
-    fork::{Capture, IonResult},
-    job::Job,
-    pipe_exec::job_control::ProcessState,
-    variables::Value,
-};
+pub use self::{fork::Capture, job::Job, pipe_exec::job_control::ProcessState, variables::Value};
 
 use self::{
     directory_stack::DirectoryStack,
     flow_control::{Block, Function, FunctionError, Statement},
     foreground::ForegroundSignals,
-    fork::Fork,
+    fork::{Fork, IonResult},
     pipe_exec::{foreground, job_control::BackgroundProcess},
     status::*,
     variables::{GetVariable, Variables},

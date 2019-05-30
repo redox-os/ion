@@ -227,14 +227,3 @@ impl DirectoryStack {
         DirectoryStack { dirs }
     }
 }
-
-// parses -N or +N patterns
-// required for popd, pushd, dirs
-pub fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
-    match arg.chars().nth(0) {
-        Some('+') => Some(true),
-        Some('-') => Some(false),
-        _ => None,
-    }
-    .and_then(|b| arg[1..].parse::<usize>().ok().map(|num| (b, num)))
-}
