@@ -38,7 +38,7 @@ use hashbrown::HashMap;
 use liner::{Completer, Context};
 
 use crate::{
-    shell::{self, status::*, ProcessState, Shell},
+    shell::{self, status::*, Capture, ProcessState, Shell},
     sys, types,
 };
 use itertools::Itertools;
@@ -270,7 +270,7 @@ pub fn builtin_cd(args: &[small::String], shell: &mut Shell) -> i32 {
 
     match shell.cd(args.get(1)) {
         Ok(()) => {
-            let _ = shell.fork_function("CD_CHANGE", &["ion"]);
+            let _ = shell.fork_function(Capture::None, |_| Ok(()), "CD_CHANGE", &["ion"]);
             SUCCESS
         }
         Err(why) => {
