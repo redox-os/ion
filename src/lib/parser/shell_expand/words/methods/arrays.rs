@@ -6,10 +6,7 @@ use super::{
     strings::unescape,
     Pattern,
 };
-use crate::{
-    ranges::Index,
-    types::{self, Args},
-};
+use crate::types::{self, Args};
 use small;
 use std::char;
 use unicode_segmentation::UnicodeSegmentation;
@@ -91,69 +88,19 @@ impl<'a> ArrayMethod<'a> {
 
     fn split<E: Expander>(&self, expand_func: &E) -> Result<Args, &'static str> {
         let variable = self.resolve_var(expand_func);
-        let res = match (&self.pattern, &self.selection) {
-            (_, Select::None) => Some("".into()).into_iter().collect(),
-            (&Pattern::StringPattern(pattern), Select::All) => variable
+        let data: Args = match self.pattern {
+            Pattern::Whitespace => variable
+                .split(char::is_whitespace)
+                .filter(|x| !x.is_empty())
+                .map(From::from)
+                .collect(),
+            Pattern::StringPattern(pattern) => variable
                 .split(unescape(&expand_func.expand_string(pattern).join(" "))?.as_str())
                 .map(From::from)
                 .collect(),
-            (&Pattern::Whitespace, Select::All) => variable
-                .split(char::is_whitespace)
-                .filter(|x| !x.is_empty())
-                .map(From::from)
-                .collect(),
-            (&Pattern::StringPattern(pattern), Select::Index(Index::Forward(id))) => variable
-                .split(&unescape(&expand_func.expand_string(pattern).join(" "))?.as_str())
-                .nth(*id)
-                .map(From::from)
-                .into_iter()
-                .collect(),
-            (&Pattern::Whitespace, Select::Index(Index::Forward(id))) => variable
-                .split(char::is_whitespace)
-                .filter(|x| !x.is_empty())
-                .nth(*id)
-                .map(From::from)
-                .into_iter()
-                .collect(),
-            (&Pattern::StringPattern(pattern), Select::Index(Index::Backward(id))) => variable
-                .rsplit(&unescape(&expand_func.expand_string(pattern).join(" "))?.as_str())
-                .nth(*id)
-                .map(From::from)
-                .into_iter()
-                .collect(),
-            (&Pattern::Whitespace, Select::Index(Index::Backward(id))) => variable
-                .rsplit(char::is_whitespace)
-                .filter(|x| !x.is_empty())
-                .nth(*id)
-                .map(From::from)
-                .into_iter()
-                .collect(),
-            (&Pattern::StringPattern(pattern), Select::Range(range)) => {
-                let expansion = unescape(&expand_func.expand_string(pattern).join(" "))?;
-                let iter = variable.split(expansion.as_str());
-                if let Some((start, length)) = range.bounds(iter.clone().count()) {
-                    iter.skip(start).take(length).map(From::from).collect()
-                } else {
-                    Args::new()
-                }
-            }
-            (&Pattern::Whitespace, Select::Range(range)) => {
-                let len = variable.split(char::is_whitespace).filter(|x| !x.is_empty()).count();
-                if let Some((start, length)) = range.bounds(len) {
-                    variable
-                        .split(char::is_whitespace)
-                        .filter(|x| !x.is_empty())
-                        .skip(start)
-                        .take(length)
-                        .map(From::from)
-                        .collect()
-                } else {
-                    Args::new()
-                }
-            }
-            (_, Select::Key(_)) => Some("".into()).into_iter().collect(),
         };
-        Ok(res)
+        let len = data.len();
+        Ok(data.into_iter().select(&self.selection, len))
     }
 
     #[inline]
@@ -213,7 +160,10 @@ impl<'a> ArrayMethod<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{ranges::Range, types};
+    use crate::{
+        ranges::{Index, Range},
+        types,
+    };
 
     struct VariableExpander;
 

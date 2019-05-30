@@ -99,37 +99,22 @@ where
     type Item = small::String;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.loop_count {
-            0 => {
-                let small_vec =
-                    self.tokens.iter().fold(SmallVec::with_capacity(64), |mut small_vec, token| {
-                        escape_string(
-                            &mut small_vec,
-                            match *token {
-                                BraceToken::Normal(ref text) => text,
-                                BraceToken::Expander => self.elements.next().unwrap(),
-                            },
-                        );
-                        small_vec
-                    });
-                self.loop_count = 1;
-                Some(unsafe { small::String::from_utf8_unchecked(small_vec.to_vec()) })
-            }
-            _ => self.elements.next().and_then(|element| {
-                let small_vec =
-                    self.tokens.iter().fold(SmallVec::with_capacity(64), |mut small_vec, token| {
-                        escape_string(
-                            &mut small_vec,
-                            match *token {
-                                BraceToken::Normal(ref text) => text,
-                                BraceToken::Expander => element,
-                            },
-                        );
-                        small_vec
-                    });
-                Some(unsafe { small::String::from_utf8_unchecked(small_vec.to_vec()) })
-            }),
+        let element = self.elements.next()?;
+        let small_vec =
+            self.tokens.iter().fold(SmallVec::with_capacity(64), |mut small_vec, token| {
+                escape_string(
+                    &mut small_vec,
+                    match *token {
+                        BraceToken::Normal(ref text) => text,
+                        BraceToken::Expander => element.as_ref(),
+                    },
+                );
+                small_vec
+            });
+        if self.loop_count == 0 {
+            self.loop_count = 1;
         }
+        Some(unsafe { small::String::from_utf8_unchecked(small_vec.to_vec()) })
     }
 }
 
