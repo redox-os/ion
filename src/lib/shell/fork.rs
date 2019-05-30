@@ -20,7 +20,7 @@ pub fn wait_for_child(pid: u32) -> io::Result<u8> {
 }
 
 #[repr(u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 /// Instructs whether or not to capture the standard output and error streams.
 ///
 /// A type that is utilized by the `Fork` structure.

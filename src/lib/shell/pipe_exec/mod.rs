@@ -223,9 +223,7 @@ impl<'b> Shell<'b> {
                 self.watch_foreground(-(pid as i32), "")
             }
             Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
-                if self.fork_function("COMMAND_NOT_FOUND", &["ion", &name]).is_err() {
-                    eprintln!("ion: command not found: {}", name);
-                }
+                self.command_not_found(&args[0]);
                 NO_SUCH_COMMAND
             }
             Err(ref err) => {
@@ -537,9 +535,7 @@ fn spawn_proc(
                     *current_pid = pid;
                 }
                 Err(ref mut err) if err.kind() == io::ErrorKind::NotFound => {
-                    if shell.fork_function("COMMAND_NOT_FOUND", &["ion", &name]).is_err() {
-                        eprintln!("ion: command not found: {}", name);
-                    }
+                    shell.command_not_found(&args[0])
                 }
                 Err(ref mut err) => {
                     eprintln!("ion: command exec error: {}", err);

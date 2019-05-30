@@ -12,8 +12,7 @@ pub(crate) mod signals;
 pub mod status;
 pub mod variables;
 
-pub use self::{fork::Capture, job::Job, pipe_exec::job_control::ProcessState, variables::Value};
-
+pub(crate) use self::job::Job;
 use self::{
     directory_stack::DirectoryStack,
     flow_control::{Block, Function, FunctionError, Statement},
@@ -23,6 +22,7 @@ use self::{
     status::*,
     variables::{GetVariable, Variables},
 };
+pub use self::{fork::Capture, pipe_exec::job_control::ProcessState, variables::Value};
 use crate::{
     builtins::BuiltinMap,
     lexers::{Key, Primitive},

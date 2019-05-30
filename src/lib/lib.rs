@@ -5,7 +5,7 @@ extern crate err_derive;
 extern crate ion_braces as braces;
 extern crate ion_lexers as lexers;
 extern crate ion_ranges as ranges;
-pub extern crate ion_sys as sys;
+extern crate ion_sys as sys;
 
 #[macro_use]
 pub mod types;
