@@ -29,7 +29,7 @@ pub trait SelectWithSize {
 
 impl<I, T> SelectWithSize for I
 where
-    I: Iterator<Item = T>,
+    I: DoubleEndedIterator<Item = T>,
 {
     type Item = T;
 
@@ -38,16 +38,14 @@ where
         O: FromIterator<Self::Item>,
     {
         match s {
-            Select::None => empty().collect(),
+            Select::None | Select::Key(_) => empty().collect(),
             Select::All => self.collect(),
-            Select::Index(idx) => {
-                idx.resolve(size).and_then(|idx| self.nth(idx)).into_iter().collect()
-            }
-            Select::Range(range) if range.bounds(size).is_some() => range
+            Select::Index(Index::Forward(idx)) => self.nth(*idx).into_iter().collect(),
+            Select::Index(Index::Backward(idx)) => self.rev().nth(*idx).into_iter().collect(),
+            Select::Range(range) => range
                 .bounds(size)
                 .map(|(start, length)| self.skip(start).take(length).collect())
-                .unwrap(),
-            _ => empty().collect(),
+                .unwrap_or_else(|| empty().collect()),
         }
     }
 }
