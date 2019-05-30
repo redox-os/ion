@@ -40,7 +40,7 @@ use std::{
     fmt,
     fs::{self, OpenOptions},
     io::{self, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process,
     sync::{atomic::Ordering, Arc, Mutex},
     time::SystemTime,
@@ -205,27 +205,37 @@ impl<'a> Shell<'a> {
         }
     }
 
+    pub fn rotate_right(&mut self, num: usize) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.rotate_right(num)
+    }
+
+    pub fn rotate_left(&mut self, num: usize) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.rotate_left(num)
+    }
+
+    pub fn swap(&mut self, index: usize) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.swap(index)
+    }
+
+    pub fn set_current_dir_by_index(&self, index: usize) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.set_current_dir_by_index(index)
+    }
+
     pub fn cd<T: AsRef<str>>(&mut self, dir: Option<T>) -> Result<(), Cow<'static, str>> {
         self.directory_stack.cd(dir, &mut self.variables)
     }
 
-    pub fn pushd<T: AsRef<str>, I: IntoIterator<Item = T>>(
-        &mut self,
-        iter: I,
-    ) -> Result<(), Cow<'static, str>> {
-        self.directory_stack.pushd(iter, &mut self.variables)
+    pub fn pushd(&mut self, path: PathBuf, keep_front: bool) -> Result<(), Cow<'static, str>> {
+        self.directory_stack.pushd(path, keep_front, &mut self.variables)
     }
 
-    pub fn popd<T: AsRef<str>, I: IntoIterator<Item = T>>(
-        &mut self,
-        iter: I,
-    ) -> Result<(), Cow<'static, str>> {
-        self.directory_stack.popd(iter)
+    pub fn popd(&mut self, index: usize) -> Option<PathBuf> { self.directory_stack.popd(index) }
+
+    pub fn dir_stack(&self) -> impl DoubleEndedIterator<Item = &PathBuf> + ExactSizeIterator {
+        self.directory_stack.dirs()
     }
 
-    pub fn dir_stack<T: AsRef<str>, I: IntoIterator<Item = T>>(&mut self, iter: I) -> i32 {
-        self.directory_stack.dirs(iter)
-    }
+    pub fn clear_dir_stack(&mut self) { self.directory_stack.clear() }
 
     /// Resets the flow control fields to their default values.
     pub fn reset_flow(&mut self) { self.flow_control.clear(); }
