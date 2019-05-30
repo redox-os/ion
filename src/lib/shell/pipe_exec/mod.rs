@@ -223,7 +223,7 @@ impl<'b> Shell<'b> {
                 self.watch_foreground(-(pid as i32), "")
             }
             Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
-                self.command_not_found(&args[0]);
+                self.command_not_found(name);
                 NO_SUCH_COMMAND
             }
             Err(ref err) => {
@@ -535,7 +535,7 @@ fn spawn_proc(
                     *current_pid = pid;
                 }
                 Err(ref mut err) if err.kind() == io::ErrorKind::NotFound => {
-                    shell.command_not_found(&args[0])
+                    shell.command_not_found(name)
                 }
                 Err(ref mut err) => {
                     eprintln!("ion: command exec error: {}", err);
