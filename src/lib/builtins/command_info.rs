@@ -66,7 +66,7 @@ pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
     Ok(result)
 }
 
-pub fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<Cow<'a, str>, ()> {
+fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<Cow<'a, str>, ()> {
     match shell.variables().get_ref(command) {
         Some(Value::Alias(_)) => Ok("alias".into()),
         Some(Value::Function(_)) => Ok("function".into()),
