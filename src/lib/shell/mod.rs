@@ -89,7 +89,7 @@ pub struct Shell<'a> {
     /// here.
     previous_status: i32,
     /// The job ID of the previous command sent to the background.
-    previous_job: u32,
+    previous_job: usize,
     /// Contains all the options relative to the shell
     opts: ShellOptions,
     /// Contains information on all of the active background processes that are being managed
@@ -381,7 +381,7 @@ impl<'a> Shell<'a> {
         exit_status
     }
 
-    pub fn previous_job(&self) -> Option<u32> {
+    pub fn previous_job(&self) -> Option<usize> {
         if self.previous_job == !0 {
             None
         } else {
