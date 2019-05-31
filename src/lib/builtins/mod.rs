@@ -38,7 +38,7 @@ use hashbrown::HashMap;
 use liner::{Completer, Context};
 
 use crate::{
-    shell::{self, status::*, Capture, ProcessState, Shell},
+    shell::{status::*, Capture, Shell},
     sys, types,
 };
 use itertools::Itertools;
@@ -728,11 +728,11 @@ fn builtin_fg(args: &[small::String], shell: &mut Shell) -> i32 {
     job_control::fg(shell, &args[1..])
 }
 
-fn builtin_suspend(args: &[small::String], _: &mut Shell) -> i32 {
+fn builtin_suspend(args: &[small::String], shell: &mut Shell) -> i32 {
     if check_help(args, MAN_SUSPEND) {
         return SUCCESS;
     }
-    shell::signals::suspend(0);
+    shell.suspend();
     SUCCESS
 }
 
@@ -781,9 +781,9 @@ fn builtin_exit(args: &[small::String], shell: &mut Shell) -> i32 {
         return SUCCESS;
     }
     // Kill all active background tasks before exiting the shell.
-    for process in shell.background.lock().unwrap().iter() {
-        if process.state != ProcessState::Empty {
-            let _ = sys::kill(process.pid, sys::SIGTERM);
+    for process in shell.background_jobs().iter() {
+        if process.exists() {
+            let _ = sys::kill(process.pid(), sys::SIGTERM);
         }
     }
     shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok()))

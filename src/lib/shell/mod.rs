@@ -2,13 +2,13 @@ mod assignments;
 mod colors;
 mod directory_stack;
 mod flow;
-pub(crate) mod flow_control;
+pub mod flow_control;
 mod fork;
 mod fork_function;
 mod job;
-pub(crate) mod pipe_exec;
+mod pipe_exec;
 mod shell_expand;
-pub(crate) mod signals;
+mod signals;
 pub mod status;
 pub mod variables;
 
@@ -18,11 +18,11 @@ use self::{
     flow_control::{Block, FunctionError, Statement},
     foreground::ForegroundSignals,
     fork::{Fork, IonResult},
-    pipe_exec::{foreground, job_control::BackgroundProcess},
+    pipe_exec::foreground,
     status::*,
     variables::Variables,
 };
-pub use self::{fork::Capture, pipe_exec::job_control::ProcessState, variables::Value};
+pub use self::{fork::Capture, pipe_exec::job_control::BackgroundProcess, variables::Value};
 use crate::{
     builtins::BuiltinMap,
     lexers::{Key, Primitive},
@@ -35,6 +35,7 @@ use std::{
     fmt,
     fs::{self, OpenOptions},
     io::{self, Write},
+    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
     process,
     sync::{atomic::Ordering, Arc, Mutex},
@@ -93,7 +94,7 @@ pub struct Shell<'a> {
     opts: ShellOptions,
     /// Contains information on all of the active background processes that are being managed
     /// by the shell.
-    pub(crate) background: Arc<Mutex<Vec<BackgroundProcess>>>,
+    background: Arc<Mutex<Vec<BackgroundProcess>>>,
     /// Used by an interactive session to know when the input is not terminated.
     pub unterminated: bool,
     /// Set when a signal is received, this will tell the flow control logic to
@@ -454,6 +455,22 @@ impl<'a> Shell<'a> {
 
     /// Mutable access to the variables
     pub fn variables_mut(&mut self) -> &mut Variables<'a> { &mut self.variables }
+
+    /// Access to the variables
+    pub fn background_jobs<'mutex>(
+        &'mutex self,
+    ) -> impl Deref<Target = Vec<BackgroundProcess>> + 'mutex {
+        self.background.lock().expect("Could not lock the mutex")
+    }
+
+    /// Mutable access to the variables
+    pub fn background_jobs_mut<'mutex>(
+        &'mutex mut self,
+    ) -> impl DerefMut<Target = Vec<BackgroundProcess>> + 'mutex {
+        self.background.lock().expect("Could not lock the mutex")
+    }
+
+    pub fn suspend(&self) { signals::suspend(0); }
 
     /// Get the last command's return code and/or the code for the error
     pub fn previous_status(&self) -> i32 { self.previous_status }

@@ -4,12 +4,17 @@ pub use self::collector::*;
 
 use crate::{
     parser::Expander,
-    shell::{pipe_exec::stdin_of, Job, Shell},
+    shell::{Job, Shell},
     types,
 };
 use itertools::Itertools;
 use small;
-use std::{fmt, fs::File, os::unix::io::FromRawFd};
+use std::{
+    fmt,
+    fs::File,
+    io::{self, Write},
+    os::unix::io::{FromRawFd, RawFd},
+};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RedirectFrom {
@@ -37,6 +42,22 @@ pub enum Input {
     HereString(small::String),
 }
 
+/// Create an OS pipe and write the contents of a byte slice to one end
+/// such that reading from this pipe will produce the byte slice. Return
+/// A file descriptor representing the read end of the pipe.
+pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<RawFd, io::Error> {
+    let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)?;
+    let mut infile = File::from_raw_fd(writer);
+    // Write the contents; make sure to use write_all so that we block until
+    // the entire string is written
+    infile.write_all(input.as_ref())?;
+    infile.flush()?;
+    // `infile` currently owns the writer end RawFd. If we just return the reader
+    // end and let `infile` go out of scope, it will be closed, sending EOF to
+    // the reader!
+    Ok(reader)
+}
+
 impl Input {
     pub fn get_infile(&mut self) -> Result<File, ()> {
         match self {
@@ -51,6 +72,7 @@ impl Input {
                 if !string.ends_with('\n') {
                     string.push('\n');
                 }
+
                 match unsafe { stdin_of(&string) } {
                     Ok(stdio) => Ok(unsafe { File::from_raw_fd(stdio) }),
                     Err(e) => {

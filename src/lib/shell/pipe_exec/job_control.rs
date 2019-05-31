@@ -15,7 +15,7 @@ use std::{
 
 const OPTS: i32 = WUNTRACED | WCONTINUED | WNOHANG;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Hash, Debug, PartialEq)]
 /// Defines whether the background process is running or stopped.
 pub enum ProcessState {
     Running,
@@ -33,16 +33,36 @@ impl fmt::Display for ProcessState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 /// A background process is a process that is attached to, but not directly managed
 /// by the shell. The shell will only retain information about the process, such
 /// as the process ID, state that the process is in, and the command that the
 /// process is executing.
 pub struct BackgroundProcess {
-    pub pid:           u32,
-    pub ignore_sighup: bool,
-    pub state:         ProcessState,
-    pub name:          String,
+    pid:           u32,
+    ignore_sighup: bool,
+    state:         ProcessState,
+    name:          String,
+}
+
+impl BackgroundProcess {
+    pub fn pid(&self) -> u32 { self.pid }
+
+    pub fn is_running(&self) -> bool { self.state == ProcessState::Running }
+
+    pub fn exists(&self) -> bool { self.state == ProcessState::Empty }
+
+    pub fn forget(&mut self) { self.state = ProcessState::Empty }
+
+    pub fn set_ignore_sighup(&mut self, ignore: bool) { self.ignore_sighup = ignore }
+
+    pub fn resume(&self) { signals::resume(self.pid); }
+}
+
+impl fmt::Display for BackgroundProcess {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} {}\t{}", self.pid, self.state, self.name)
+    }
 }
 
 impl<'a> Shell<'a> {

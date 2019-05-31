@@ -10,8 +10,8 @@ use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ElseIf<'a> {
-    pub expression: Vec<Statement<'a>>,
-    pub success:    Vec<Statement<'a>>,
+    pub expression: Block<'a>,
+    pub success:    Block<'a>,
 }
 
 /// Represents a single branch in a match statement. For example, in the expression
@@ -46,7 +46,7 @@ pub struct Case<'a> {
     pub value:       Option<String>,
     pub binding:     Option<String>,
     pub conditional: Option<String>,
-    pub statements:  Vec<Statement<'a>>,
+    pub statements:  Block<'a>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -69,10 +69,10 @@ pub enum Statement<'a> {
     Case(Case<'a>),
     Export(ExportAction),
     If {
-        expression: Vec<Statement<'a>>,
-        success:    Vec<Statement<'a>>,
+        expression: Block<'a>,
+        success:    Block<'a>,
         else_if:    Vec<ElseIf<'a>>,
-        failure:    Vec<Statement<'a>>,
+        failure:    Block<'a>,
         mode:       u8, // {0 = success, 1 = else_if, 2 = failure}
     },
     ElseIf(ElseIf<'a>),
@@ -80,16 +80,16 @@ pub enum Statement<'a> {
         name:        types::Str,
         description: Option<small::String>,
         args:        Vec<KeyBuf>,
-        statements:  Vec<Statement<'a>>,
+        statements:  Block<'a>,
     },
     For {
         variables:  SmallVec<[types::Str; 4]>,
         values:     Vec<small::String>,
-        statements: Vec<Statement<'a>>,
+        statements: Block<'a>,
     },
     While {
-        expression: Vec<Statement<'a>>,
-        statements: Vec<Statement<'a>>,
+        expression: Block<'a>,
+        statements: Block<'a>,
     },
     Match {
         expression: small::String,
@@ -337,7 +337,7 @@ pub struct Function<'a> {
     description: Option<small::String>,
     name:        types::Str,
     args:        Vec<KeyBuf>,
-    statements:  Vec<Statement<'a>>,
+    statements:  Block<'a>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
