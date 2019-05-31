@@ -213,8 +213,7 @@ pub fn insert_statement<'a>(
             }
         }
         Statement::And(_) | Statement::Or(_) if !block.is_empty() => {
-            let mut pushed = true;
-            match block.last_mut().unwrap() {
+            let pushed = match block.last_mut().unwrap() {
                 Statement::If {
                     ref mut expression,
                     ref mode,
@@ -225,32 +224,31 @@ pub fn insert_statement<'a>(
                     IfMode::Success if success.is_empty() => {
                         // Insert into If expression if there's no previous statement.
                         expression.push(statement.clone());
+                        true
                     }
                     IfMode::ElseIf => {
                         // Try to insert into last ElseIf expression if there's no previous
                         // statement.
-                        if let Some(eif) = else_if.last_mut() {
-                            if eif.success.is_empty() {
-                                eif.expression.push(statement.clone());
-                            } else {
-                                pushed = false;
-                            }
+                        let eif = else_if.last_mut().expect("Missmatch in 'If' mode!");
+                        if eif.success.is_empty() {
+                            eif.expression.push(statement.clone());
+                            true
                         } else {
-                            // should not be reached...
-                            unreachable!("Missmatch in 'If' mode!")
+                            false
                         }
                     }
-                    _ => pushed = false,
+                    _ => false,
                 },
                 Statement::While { ref mut expression, ref statements } => {
                     if statements.is_empty() {
                         expression.push(statement.clone());
+                        true
                     } else {
-                        pushed = false;
+                        false
                     }
                 }
-                _ => pushed = false,
-            }
+                _ => false,
+            };
             if !pushed {
                 insert_into_block(block, statement)?;
             }
