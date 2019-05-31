@@ -62,6 +62,13 @@ pub enum ExportAction {
     Assign(String, Operator, String),
 }
 
+#[derive(Debug, PartialEq, Clone, Copy, Hash)]
+pub enum IfMode {
+    Success,
+    ElseIf,
+    Else,
+}
+
 // TODO: Enable statements and expressions to contain &str values.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement<'a> {
@@ -73,7 +80,7 @@ pub enum Statement<'a> {
         success:    Block<'a>,
         else_if:    Vec<ElseIf<'a>>,
         failure:    Block<'a>,
-        mode:       u8, // {0 = success, 1 = else_if, 2 = failure}
+        mode:       IfMode,
     },
     ElseIf(ElseIf<'a>),
     Function {
@@ -206,44 +213,42 @@ pub fn insert_statement<'a>(
             }
         }
         Statement::And(_) | Statement::Or(_) if !block.is_empty() => {
-            let mut pushed = true;
-            match block.last_mut().unwrap() {
+            let pushed = match block.last_mut().unwrap() {
                 Statement::If {
                     ref mut expression,
                     ref mode,
                     ref success,
                     ref mut else_if,
                     ..
-                } => match *mode {
-                    0 if success.is_empty() => {
+                } => match mode {
+                    IfMode::Success if success.is_empty() => {
                         // Insert into If expression if there's no previous statement.
                         expression.push(statement.clone());
+                        true
                     }
-                    1 => {
+                    IfMode::ElseIf => {
                         // Try to insert into last ElseIf expression if there's no previous
                         // statement.
-                        if let Some(eif) = else_if.last_mut() {
-                            if eif.success.is_empty() {
-                                eif.expression.push(statement.clone());
-                            } else {
-                                pushed = false;
-                            }
+                        let eif = else_if.last_mut().expect("Missmatch in 'If' mode!");
+                        if eif.success.is_empty() {
+                            eif.expression.push(statement.clone());
+                            true
                         } else {
-                            // should not be reached...
-                            unreachable!("Missmatch in 'If' mode!")
+                            false
                         }
                     }
-                    _ => pushed = false,
+                    _ => false,
                 },
                 Statement::While { ref mut expression, ref statements } => {
                     if statements.is_empty() {
                         expression.push(statement.clone());
+                        true
                     } else {
-                        pushed = false;
+                        false
                     }
                 }
-                _ => pushed = false,
-            }
+                _ => false,
+            };
             if !pushed {
                 insert_into_block(block, statement)?;
             }
@@ -306,25 +311,24 @@ fn insert_into_block<'a>(
             ref mut success, ref mut else_if, ref mut failure, ref mut mode, ..
         } => match statement {
             Statement::ElseIf(eif) => {
-                if *mode > 1 {
+                if *mode == IfMode::Else {
                     return Err("ion: error: ElseIf { .. } found after Else");
                 } else {
-                    *mode = 1;
+                    *mode = IfMode::ElseIf;
                     else_if.push(eif);
                 }
             }
             Statement::Else => {
-                if *mode == 2 {
+                if *mode == IfMode::Else {
                     return Err("ion: error: Else block already exists");
                 } else {
-                    *mode = 2;
+                    *mode = IfMode::Else;
                 }
             }
-            _ => match *mode {
-                0 => success.push(statement),
-                1 => else_if.last_mut().unwrap().success.push(statement),
-                2 => failure.push(statement),
-                _ => unreachable!(),
+            _ => match mode {
+                IfMode::Success => success.push(statement),
+                IfMode::ElseIf => else_if.last_mut().unwrap().success.push(statement),
+                IfMode::Else => failure.push(statement),
             },
         },
         _ => unreachable!("Not block-like statement pushed to stack!"),
@@ -430,7 +434,7 @@ mod tests {
             success:    Vec::new(),
             else_if:    Vec::new(),
             failure:    Vec::new(),
-            mode:       0,
+            mode:       IfMode::Success,
         }
     }
     fn new_case() -> Statement<'static> {

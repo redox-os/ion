@@ -183,7 +183,7 @@ impl<'b> Shell<'b> {
     }
 }
 
-// This should logically be a method over iterator, but Value is only accessible in the main repo
+// This should logically be a method over operator, but Value is only accessible in the main repo
 // TODO: too much allocations occur over here. We need to expand variables before they get
 // parsed
 fn apply<'b>(op: Operator, lhs: &Value<'b>, rhs: Value<'b>) -> Result<Value<'b>, OpError> {

@@ -29,9 +29,9 @@ impl ForegroundSignals {
     pub fn was_processed(&self) -> Option<BackgroundResult> {
         let reply = self.reply.load(Ordering::SeqCst) as u8;
         self.reply.store(0, Ordering::SeqCst);
-        if reply & ERRORED != 0 {
+        if reply == ERRORED {
             Some(BackgroundResult::Errored)
-        } else if reply & REPLIED != 0 {
+        } else if reply == REPLIED {
             Some(BackgroundResult::Status(self.status.load(Ordering::SeqCst) as u8))
         } else {
             None
