@@ -8,7 +8,7 @@ use crate::sys::{
 };
 use std::{
     fmt, process,
-    sync::{Arc, Mutex},
+    sync::Mutex,
     thread::{sleep, spawn},
     time::Duration,
 };
@@ -46,6 +46,10 @@ pub struct BackgroundProcess {
 }
 
 impl BackgroundProcess {
+    pub(super) fn new(pid: u32, state: ProcessState, name: String) -> Self {
+        BackgroundProcess { pid, ignore_sighup: false, state, name }
+    }
+
     pub fn pid(&self) -> u32 { self.pid }
 
     pub fn is_running(&self) -> bool { self.state == ProcessState::Running }
@@ -77,52 +81,40 @@ impl<'a> Shell<'a> {
         }
     }
 
-    fn add_to_background(
-        processes: &Arc<Mutex<Vec<BackgroundProcess>>>,
-        pid: u32,
-        state: ProcessState,
-        command: String,
-    ) -> u32 {
-        let mut processes = processes.lock().unwrap();
-        match (*processes).iter().position(|x| x.state == ProcessState::Empty) {
+    fn add_to_background(&mut self, job: BackgroundProcess) -> usize {
+        let mut processes = self.background_jobs_mut();
+        match processes.iter().position(|x| !x.exists()) {
             Some(id) => {
-                (*processes)[id] =
-                    BackgroundProcess { pid, ignore_sighup: false, state, name: command };
-                id as u32
+                processes[id] = job;
+                id
             }
             None => {
-                let njobs = (*processes).len();
-                (*processes).push(BackgroundProcess {
-                    pid,
-                    ignore_sighup: false,
-                    state,
-                    name: command,
-                });
-                njobs as u32
+                let njobs = processes.len();
+                processes.push(job);
+                njobs
             }
         }
     }
 
     fn watch_background(
-        fg: &Arc<ForegroundSignals>,
-        processes: &Arc<Mutex<Vec<BackgroundProcess>>>,
+        fg: &ForegroundSignals,
+        processes: &Mutex<Vec<BackgroundProcess>>,
         pgid: u32,
         njob: usize,
     ) {
-        let (mut fg_was_grabbed, mut status);
         let mut exit_status = 0;
 
         macro_rules! get_process {
             (| $ident:ident | $func:expr) => {
                 let mut processes = processes.lock().unwrap();
-                let $ident = &mut processes.iter_mut().nth(njob).unwrap();
+                let $ident = &mut processes.get_mut(njob).unwrap();
                 $func
             };
         }
 
         loop {
-            fg_was_grabbed = fg.was_grabbed(pgid);
-            status = 0;
+            let fg_was_grabbed = fg.was_grabbed(pgid);
+            let mut status = 0;
             match waitpid(-(pgid as i32), &mut status, OPTS) {
                 Err(errno) if errno == ECHILD => {
                     if !fg_was_grabbed {
@@ -130,7 +122,7 @@ impl<'a> Shell<'a> {
                     }
 
                     get_process!(|process| {
-                        process.state = ProcessState::Empty;
+                        process.forget();
                         if fg_was_grabbed {
                             fg.reply_with(exit_status as i8);
                         }
@@ -142,7 +134,7 @@ impl<'a> Shell<'a> {
                     eprintln!("ion: ([{}] {}) errored: {}", njob, pgid, errno);
 
                     get_process!(|process| {
-                        process.state = ProcessState::Empty;
+                        process.forget();
                         if fg_was_grabbed {
                             fg.errored();
                         }
@@ -177,18 +169,18 @@ impl<'a> Shell<'a> {
         }
     }
 
-    pub fn send_to_background(&mut self, pid: u32, state: ProcessState, command: String) {
+    pub fn send_to_background(&mut self, process: BackgroundProcess) {
+        // Add the process to the background list, and mark the job's ID as
+        // the previous job in the shell (in case fg/bg is executed w/ no args).
+        let pid = process.pid();
+        let njob = self.add_to_background(process);
+        self.previous_job = njob;
+        eprintln!("ion: bg [{}] {}", njob, pid);
+
         // Increment the `Arc` counters so that these fields can be moved into
         // the upcoming background thread.
         let processes = self.background.clone();
         let fg_signals = self.foreground_signals.clone();
-
-        // Add the process to the background list, and mark the job's ID as
-        // the previous job in the shell (in case fg/bg is executed w/ no args).
-        let njob = Self::add_to_background(&processes, pid, state, command);
-        self.previous_job = njob;
-        eprintln!("ion: bg [{}] {}", njob, pid);
-
         // Spawn a background thread that will monitor the progress of the
         // background process, updating it's state changes until it finally
         // exits.
@@ -197,37 +189,27 @@ impl<'a> Shell<'a> {
 
     /// Send a kill signal to all running background tasks.
     pub fn background_send(&self, signal: i32) {
-        if signal == sys::SIGHUP {
-            for process in self.background.lock().unwrap().iter() {
-                if !process.ignore_sighup {
-                    let _ = sys::killpg(process.pid, signal);
-                }
-            }
-        } else {
-            for process in self.background.lock().unwrap().iter() {
-                if let ProcessState::Running = process.state {
-                    let _ = sys::killpg(process.pid, signal);
-                }
-            }
-        }
+        let filter: fn(&&BackgroundProcess) -> bool =
+            if signal == sys::SIGHUP { |p| !p.ignore_sighup } else { |p| p.is_running() };
+        self.background.lock().unwrap().iter().filter(filter).for_each(|p| {
+            let _ = sys::killpg(p.pid(), signal);
+        })
     }
 
     /// Resumes all stopped background jobs
     pub fn resume_stopped(&mut self) {
-        for process in self.background.lock().unwrap().iter() {
-            if process.state == ProcessState::Stopped {
-                signals::resume(process.pid);
-            }
+        for process in self.background_jobs().iter().filter(|p| p.state == ProcessState::Stopped) {
+            signals::resume(process.pid());
         }
     }
 
-    pub fn watch_foreground<T: Into<String>>(&mut self, pid: i32, command: T) -> i32 {
+    pub fn watch_foreground(&mut self, pgid: u32) -> i32 {
         let mut signaled = 0;
         let mut exit_status = 0;
 
         loop {
             let mut status = 0;
-            match waitpid(pid, &mut status, WUNTRACED) {
+            match waitpid(-(pgid as i32), &mut status, WUNTRACED) {
                 Err(errno) => match errno {
                     ECHILD if signaled == 0 => break exit_status,
                     ECHILD => break signaled,
@@ -258,11 +240,11 @@ impl<'a> Shell<'a> {
                     }
                 }
                 Ok(pid) if wifstopped(status) => {
-                    self.send_to_background(
+                    self.send_to_background(BackgroundProcess::new(
                         pid.abs() as u32,
                         ProcessState::Stopped,
-                        command.into(),
-                    );
+                        "".to_string(),
+                    ));
                     self.break_flow = true;
                     break 128 + wstopsig(status);
                 }

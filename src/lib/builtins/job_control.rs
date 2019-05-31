@@ -74,9 +74,8 @@ pub fn jobs(shell: &mut Shell) {
 /// If the job is stopped, the job will be resumed.
 /// If multiple jobs are given, then only the last job's exit status will be returned.
 pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
-    fn fg_job(shell: &mut Shell, njob: u32) -> i32 {
-        if let Some(job) = shell.background_jobs().iter().nth(njob as usize).filter(|p| p.exists())
-        {
+    fn fg_job(shell: &mut Shell, njob: usize) -> i32 {
+        if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
             // Give the bg task the foreground, and wait for it to finish. Also resume it if it
             // isn't running
             shell.set_bg_task_in_foreground(job.pid(), !job.is_running())
@@ -97,7 +96,7 @@ pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
         };
     } else {
         for arg in args {
-            match arg.parse::<u32>() {
+            match arg.parse::<usize>() {
                 Ok(njob) => status = fg_job(shell, njob),
                 Err(_) => {
                     eprintln!("ion: fg: {} is not a valid job number", arg);
@@ -111,9 +110,8 @@ pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
 
 /// Resumes a stopped background process, if it was stopped.
 pub fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
-    fn bg_job(shell: &mut Shell, njob: u32) -> bool {
-        if let Some(job) = shell.background_jobs().iter().nth(njob as usize).filter(|p| p.exists())
-        {
+    fn bg_job(shell: &mut Shell, njob: usize) -> bool {
+        if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
             if job.is_running() {
                 eprintln!("ion: bg: job {} is already running", njob);
                 false
@@ -140,7 +138,7 @@ pub fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
         }
     } else {
         for arg in args {
-            if let Ok(njob) = arg.parse::<u32>() {
+            if let Ok(njob) = arg.parse::<usize>() {
                 if !bg_job(shell, njob) {
                     return FAILURE;
                 }

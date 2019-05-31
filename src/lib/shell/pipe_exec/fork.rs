@@ -2,7 +2,7 @@ use crate::sys;
 
 use super::{
     super::{status::*, Shell},
-    job_control::ProcessState,
+    job_control::{BackgroundProcess, ProcessState},
 };
 use crate::parser::pipelines::Pipeline;
 use std::process::exit;
@@ -36,7 +36,7 @@ impl<'a> Shell<'a> {
             Ok(pid) => {
                 if state != ProcessState::Empty {
                     // The parent process should add the child fork's PID to the background.
-                    self.send_to_background(pid, state, command_name);
+                    self.send_to_background(BackgroundProcess::new(pid, state, command_name));
                 }
                 SUCCESS
             }
