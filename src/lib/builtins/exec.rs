@@ -8,13 +8,11 @@ use std::error::Error;
 
 /// Executes the givent commmand.
 pub fn exec(shell: &mut Shell, args: &[small::String]) -> Result<(), small::String> {
-    const CLEAR_ENV: u8 = 1;
-
-    let mut flags = 0u8;
+    let mut clear_env = false;
     let mut idx = 0;
     for arg in args.iter() {
         match &**arg {
-            "-c" => flags |= CLEAR_ENV,
+            "-c" => clear_env = true,
             _ if check_help(args, MAN_EXEC) => {
                 return Ok(());
             }
@@ -27,7 +25,7 @@ pub fn exec(shell: &mut Shell, args: &[small::String]) -> Result<(), small::Stri
         Some(argument) => {
             let args = if args.len() > idx + 1 { &args[idx + 1..] } else { &[] };
             shell.prep_for_exit();
-            Err(execve(argument, args, (flags & CLEAR_ENV) == 1).description().into())
+            Err(execve(argument, args, clear_env).description().into())
         }
         None => Err("no command provided".into()),
     }
