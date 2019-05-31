@@ -1,15 +1,15 @@
 use crate::{
     builtins::man_pages::*,
-    shell::{status::*, Shell, Value},
+    shell::{status::Status, Shell, Value},
     sys,
 };
 use small;
 
 use std::{borrow::Cow, env, path::Path};
 
-pub fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
+pub fn which(args: &[small::String], shell: &mut Shell) -> Result<Status, ()> {
     if check_help(args, MAN_WHICH) {
-        return Ok(SUCCESS);
+        return Ok(Status::SUCCESS);
     }
 
     if args.len() == 1 {
@@ -17,7 +17,7 @@ pub fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
         return Err(());
     }
 
-    let mut result = SUCCESS;
+    let mut result = Status::SUCCESS;
     for command in &args[1..] {
         match get_command_info(command, shell) {
             Ok(c_type) => match c_type.as_ref() {
@@ -30,20 +30,20 @@ pub fn which(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
                 "builtin" => println!("{}: built-in shell command", command),
                 _path => println!("{}", _path),
             },
-            Err(_) => result = FAILURE,
+            Err(_) => result = Status::from_exit_code(1),
         }
     }
     Ok(result)
 }
 
-pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
+pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<Status, ()> {
     // Type does not accept help flags, aka "--help".
     if args.len() == 1 {
         eprintln!("type: Expected at least 1 args, got only 0");
         return Err(());
     }
 
-    let mut result = FAILURE;
+    let mut result = Status::SUCCESS;
     for command in &args[1..] {
         match get_command_info(command, shell) {
             Ok(c_type) => {
@@ -58,9 +58,8 @@ pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<i32, ()> {
                     "builtin" => println!("{} is a shell builtin", command),
                     _path => println!("{} is {}", command, _path),
                 }
-                result = SUCCESS;
             }
-            Err(_) => eprintln!("type: {}: not found", command),
+            Err(_) => result = Status::error(format!("type: {}: not found", command)),
         }
     }
     Ok(result)

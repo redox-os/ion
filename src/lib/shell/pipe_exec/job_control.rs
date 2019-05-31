@@ -151,7 +151,7 @@ impl<'a> Shell<'a> {
 
                     get_process!(|process| {
                         if fg_was_grabbed {
-                            fg.reply_with(TERMINATED as i8);
+                            fg.reply_with(Status::TERMINATED.as_os_code() as i8);
                         }
                         process.state = ProcessState::Stopped;
                     });
@@ -203,23 +203,24 @@ impl<'a> Shell<'a> {
         }
     }
 
-    pub fn watch_foreground(&mut self, pgid: u32) -> i32 {
-        let mut signaled = 0;
-        let mut exit_status = 0;
+    pub fn watch_foreground(&mut self, pgid: u32) -> Status {
+        let mut signaled = Status::SUCCESS;
+        let mut exit_status = Status::SUCCESS;
 
         loop {
             let mut status = 0;
             match waitpid(-(pgid as i32), &mut status, WUNTRACED) {
                 Err(errno) => match errno {
-                    ECHILD if signaled == 0 => break exit_status,
+                    ECHILD if signaled.is_success() => break exit_status,
                     ECHILD => break signaled,
                     errno => {
-                        eprintln!("ion: waitpid error: {}", strerror(errno));
-                        break FAILURE;
+                        break Status::error(format!("ion: waitpid error: {}", strerror(errno)))
                     }
                 },
                 Ok(0) => (),
-                Ok(_) if wifexited(status) => exit_status = wexitstatus(status),
+                Ok(_) if wifexited(status) => {
+                    exit_status = Status::from_exit_code(wexitstatus(status))
+                }
                 Ok(pid) if wifsignaled(status) => {
                     let signal = wtermsig(status);
                     if signal == SIGPIPE {
@@ -236,7 +237,7 @@ impl<'a> Shell<'a> {
                                 self.handle_signal(signal);
                             }
                         }
-                        signaled = 128 + signal as i32;
+                        signaled = Status::from_signal(signal as i32);
                     }
                 }
                 Ok(pid) if wifstopped(status) => {
@@ -246,7 +247,7 @@ impl<'a> Shell<'a> {
                         "".to_string(),
                     ));
                     self.break_flow = true;
-                    break 128 + wstopsig(status);
+                    break Status::from_signal(wstopsig(status));
                 }
                 Ok(_) => (),
             }
@@ -259,7 +260,7 @@ impl<'a> Shell<'a> {
         while self.background.lock().unwrap().iter().any(|p| p.state == ProcessState::Running) {
             if let Some(signal) = signals::SignalHandler.find(|&s| s != sys::SIGTSTP) {
                 self.background_send(signal);
-                self.exit(Some(get_signal_code(signal)));
+                self.exit_with_code(Status::from_signal(signal));
             }
             sleep(Duration::from_millis(100));
         }
@@ -276,7 +277,7 @@ impl<'a> Shell<'a> {
     /// Takes a background tasks's PID and whether or not it needs to be continued; resumes the
     /// task and sets it as the foreground process. Once the task exits or stops, the exit status
     /// will be returned, and ownership of the TTY given back to the shell.
-    pub fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> i32 {
+    pub fn set_bg_task_in_foreground(&self, pid: u32, cont: bool) -> Status {
         // Pass the TTY to the background job
         Self::set_foreground_as(pid);
         // Signal the background thread that is waiting on this process to stop waiting.
@@ -291,8 +292,8 @@ impl<'a> Shell<'a> {
             // signal, the status of that process will be communicated back. To
             // avoid consuming CPU cycles, we wait 25 ms between polls.
             match self.foreground_signals.was_processed() {
-                Some(BackgroundResult::Status(stat)) => break i32::from(stat),
-                Some(BackgroundResult::Errored) => break TERMINATED,
+                Some(BackgroundResult::Status(stat)) => break Status::from_exit_code(stat as i32),
+                Some(BackgroundResult::Errored) => break Status::TERMINATED,
                 None => sleep(Duration::from_millis(25)),
             }
         };

@@ -42,7 +42,7 @@ fn list_vars(shell: &Shell) -> Result<(), io::Error> {
 /// exporting variables to some global environment
 impl<'b> Shell<'b> {
     /// Export a variable to the process environment given a binding
-    pub fn export(&mut self, action: &ExportAction) -> i32 {
+    pub fn export(&mut self, action: &ExportAction) -> Status {
         match action {
             ExportAction::Assign(ref keys, op, ref vals) => {
                 let actions = AssignmentActions::new(keys, *op, vals);
@@ -73,21 +73,19 @@ impl<'b> Shell<'b> {
                     });
 
                     if let Err(why) = err {
-                        eprintln!("ion: assignment error: {}", why);
-                        return FAILURE;
+                        return Status::error(format!("ion: assignment error: {}", why));
                     }
                 }
 
-                SUCCESS
+                Status::SUCCESS
             }
             ExportAction::LocalExport(ref key) => match self.variables.get_str(key) {
                 Some(var) => {
                     env::set_var(key, &*var);
-                    SUCCESS
+                    Status::SUCCESS
                 }
                 None => {
-                    eprintln!("ion: cannot export {} because it does not exist.", key);
-                    FAILURE
+                    Status::error(format!("ion: cannot export {} because it does not exist.", key))
                 }
             },
             ExportAction::List => {
@@ -96,7 +94,7 @@ impl<'b> Shell<'b> {
                 for (key, val) in env::vars() {
                     let _ = writeln!(stdout, "{} = \"{}\"", key, val);
                 }
-                SUCCESS
+                Status::SUCCESS
             }
         }
     }
@@ -159,11 +157,11 @@ impl<'b> Shell<'b> {
     }
 
     /// Set a local variable given a binding
-    pub fn local(&mut self, action: &LocalAction) -> i32 {
+    pub fn local(&mut self, action: &LocalAction) -> Status {
         match action {
             LocalAction::List => {
                 let _ = list_vars(&self);
-                SUCCESS
+                Status::SUCCESS
             }
             LocalAction::Assign(ref keys, op, ref vals) => {
                 let actions = AssignmentActions::new(keys, *op, vals);
@@ -173,10 +171,9 @@ impl<'b> Shell<'b> {
                     }
                     Ok(())
                 }) {
-                    eprintln!("ion: assignment error: {}", why);
-                    FAILURE
+                    Status::error(format!("ion: assignment error: {}", why))
                 } else {
-                    SUCCESS
+                    Status::SUCCESS
                 }
             }
         }

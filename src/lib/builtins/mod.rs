@@ -30,7 +30,6 @@ use self::{
 
 use std::{
     borrow::Cow,
-    error::Error,
     io::{self, BufRead, Write},
     path::PathBuf,
 };
@@ -39,7 +38,7 @@ use hashbrown::HashMap;
 use liner::{Completer, Context};
 
 use crate::{
-    shell::{status::*, Capture, Shell},
+    shell::{status::Status, Capture, Shell},
     sys, types,
 };
 use itertools::Itertools;
@@ -54,7 +53,7 @@ const DISOWN_DESC: &str =
     "Disowning a process removes that process from the shell's background process table.";
 
 /// The type for builtin functions. Builtins have direct access to the shell
-pub type BuiltinFunction<'a> = &'a dyn Fn(&[small::String], &mut Shell) -> i32;
+pub type BuiltinFunction<'a> = &'a dyn Fn(&[small::String], &mut Shell) -> Status;
 
 macro_rules! map {
     ($builtins:ident, $($name:expr => $func:ident: $help:expr),+) => {{
@@ -81,12 +80,12 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
 /// Note: To reduce allocations, function are provided as pointer rather than boxed closures
 /// ```
 /// use ion_shell::builtins::BuiltinMap;
-/// use ion_shell::Shell;
+/// use ion_shell::{Shell, status::Status};
 ///
 /// // create a builtin
 /// let mut custom = |_args: &[small::String], _shell: &mut Shell| {
 ///     println!("Hello world!");
-///     42
+///     Status::error("Can't proceed")
 /// };
 ///
 /// // create a builtin map with some predefined builtins
@@ -96,9 +95,8 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
 /// builtins.add("custom builtin", &mut custom, "Very helpful comment to display to the user");
 ///
 /// // execute a builtin
-/// assert_eq!(
-///     builtins.get("custom builtin").unwrap()(&["ion".into()], &mut Shell::new(false)),
-///     42,
+/// assert!(
+///     builtins.get("custom builtin").unwrap()(&["ion".into()], &mut Shell::new(false)).is_failure(),
 /// );
 /// // >> Hello world!
 pub struct BuiltinMap<'a> {
@@ -121,7 +119,7 @@ impl<'a> Default for BuiltinMap<'a> {
 // If you are implementing a builtin add it to the table below, create a well named manpage in
 // man_pages and check for help flags by adding to the start of your builtin the following
 // if check_help(args, MAN_BUILTIN_NAME) {
-//     return SUCCESS
+//     return Status::SUCCESS
 // }
 impl<'a> BuiltinMap<'a> {
     /// Create a new, blank builtin map
@@ -247,46 +245,36 @@ impl<'a> BuiltinMap<'a> {
     }
 }
 
-fn starts_with(args: &[small::String], _: &mut Shell) -> i32 { conditionals::starts_with(args) }
-fn ends_with(args: &[small::String], _: &mut Shell) -> i32 { conditionals::ends_with(args) }
-fn contains(args: &[small::String], _: &mut Shell) -> i32 { conditionals::contains(args) }
-
-// Definitions of simple builtins go here
-pub fn builtin_status(args: &[small::String], shell: &mut Shell) -> i32 {
-    match status(args, shell) {
-        Ok(()) => SUCCESS,
-        Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
-            FAILURE
-        }
-    }
+fn starts_with(args: &[small::String], _: &mut Shell) -> Status {
+    Status::from_exit_code(conditionals::starts_with(args))
+}
+fn ends_with(args: &[small::String], _: &mut Shell) -> Status {
+    Status::from_exit_code(conditionals::ends_with(args))
+}
+fn contains(args: &[small::String], _: &mut Shell) -> Status {
+    Status::from_exit_code(conditionals::contains(args))
 }
 
-pub fn builtin_cd(args: &[small::String], shell: &mut Shell) -> i32 {
+// Definitions of simple builtins go here
+pub fn builtin_status(args: &[small::String], shell: &mut Shell) -> Status { status(args, shell) }
+
+pub fn builtin_cd(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_CD) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
 
     match shell.cd(args.get(1)) {
         Ok(()) => {
             let _ = shell.fork_function(Capture::None, |_| Ok(()), "CD_CHANGE", &["ion"]);
-            SUCCESS
+            Status::SUCCESS
         }
-        Err(why) => {
-            eprintln!("{}", why);
-            FAILURE
-        }
+        Err(why) => Status::error(why),
     }
 }
 
-pub fn builtin_bool(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_bool(args: &[small::String], shell: &mut Shell) -> Status {
     if args.len() != 2 {
-        let stderr = io::stderr();
-        let mut stderr = stderr.lock();
-        let _ = stderr.write_all(b"bool requires one argument\n");
-        return FAILURE;
+        return Status::error("bool requires one argument");
     }
 
     let opt = if args[1].is_empty() { None } else { shell.variables().get_str(&args[1][1..]) };
@@ -299,29 +287,21 @@ pub fn builtin_bool(args: &[small::String], shell: &mut Shell) -> i32 {
             "true" => (),
             "--help" => println!("{}", MAN_BOOL),
             "-h" => println!("{}", MAN_BOOL),
-            _ => return FAILURE,
+            _ => return Status::from_exit_code(1),
         },
     }
-    SUCCESS
+    Status::SUCCESS
 }
 
-pub fn builtin_is(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_is(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_IS) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
 
-    match is(args, shell) {
-        Ok(()) => SUCCESS,
-        Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
-            FAILURE
-        }
-    }
+    is(args, shell)
 }
 
-pub fn builtin_dirs(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_dirs(args: &[small::String], shell: &mut Shell) -> Status {
     // converts pbuf to an absolute path if possible
     fn try_abs_path(pbuf: &PathBuf) -> Cow<str> {
         Cow::Owned(
@@ -330,7 +310,7 @@ pub fn builtin_dirs(args: &[small::String], shell: &mut Shell) -> i32 {
     }
 
     if check_help(args, MAN_DIRS) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
 
     let mut clear = false; // -c
@@ -373,30 +353,24 @@ pub fn builtin_dirs(args: &[small::String], shell: &mut Shell) -> i32 {
             Some((false, num)) if shell.dir_stack().count() > num => {
                 shell.dir_stack().count() - num - 1
             }
-            _ => return FAILURE, /* Err(Cow::Owned(format!("ion: dirs: {}: invalid
-                                  * argument\n", arg))) */
+            _ => return Status::error(format!("ion: dirs: {}: invalid argument", arg)),
         };
         match iter.nth(num) {
             Some(x) => {
                 println!("{}", x);
-                SUCCESS
+                Status::SUCCESS
             }
-            None => FAILURE,
+            None => Status::error(""),
         }
     } else {
-        let folder: fn(String, Cow<str>) -> String =
-            if multiline { |x, y| x + "\n" + &y } else { |x, y| x + " " + &y };
-
-        if let Some(x) = iter.next() {
-            println!("{}", iter.fold(x.to_string(), folder));
-        }
-        SUCCESS
+        println!("{}", iter.join(if multiline { "\n" } else { " " }));
+        Status::SUCCESS
     }
 }
 
-pub fn builtin_pushd(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_pushd(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_PUSHD) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
 
     enum Action {
@@ -421,8 +395,7 @@ pub fn builtin_pushd(args: &[small::String], shell: &mut Shell) -> i32 {
                 None => Action::Push(PathBuf::from(arg)), // no numeric arg => `dir`-parameter
             };
         } else {
-            eprintln!("ion: pushd: too many arguments");
-            return FAILURE;
+            return Status::error("ion: pushd: too many arguments");
         }
     }
 
@@ -430,31 +403,27 @@ pub fn builtin_pushd(args: &[small::String], shell: &mut Shell) -> i32 {
         Action::Switch => {
             if !keep_front {
                 if let Err(why) = shell.swap(1) {
-                    eprintln!("ion: pushd: {}", why);
-                    return FAILURE;
+                    return Status::error(format!("ion: pushd: {}", why));
                 }
             }
         }
         Action::RotLeft(num) => {
             if !keep_front {
                 if let Err(why) = shell.rotate_left(num) {
-                    eprintln!("ion: pushd: {}", why);
-                    return FAILURE;
+                    return Status::error(format!("ion: pushd: {}", why));
                 }
             }
         }
         Action::RotRight(num) => {
             if !keep_front {
                 if let Err(why) = shell.rotate_right(num) {
-                    eprintln!("ion: pushd: {}", why);
-                    return FAILURE;
+                    return Status::error(format!("ion: pushd: {}", why));
                 }
             }
         }
         Action::Push(dir) => {
             if let Err(why) = shell.pushd(dir, keep_front) {
-                eprintln!("ion: pushd: {}", why);
-                return FAILURE;
+                return Status::error(format!("ion: pushd: {}", why));
             }
         }
     };
@@ -463,18 +432,17 @@ pub fn builtin_pushd(args: &[small::String], shell: &mut Shell) -> i32 {
         "{}",
         shell.dir_stack().map(|dir| dir.to_str().unwrap_or("ion: no directory found")).join(" ")
     );
-    SUCCESS
+    Status::SUCCESS
 }
 
-pub fn builtin_popd(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_popd(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_POPD) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
 
     let len = shell.dir_stack().len();
     if len <= 1 {
-        eprintln!("ion: popd: directory stack empty");
-        return FAILURE;
+        return Status::error("ion: popd: directory stack empty");
     }
 
     let mut keep_front = false; // whether the -n option is present
@@ -488,8 +456,7 @@ pub fn builtin_popd(args: &[small::String], shell: &mut Shell) -> i32 {
             let (count_from_front, num) = match parse_numeric_arg(arg) {
                 Some(n) => n,
                 None => {
-                    eprintln!("ion: popd: {}: invalid argument", arg);
-                    return FAILURE;
+                    return Status::error(format!("ion: popd: {}: invalid argument", arg));
                 }
             };
 
@@ -499,8 +466,7 @@ pub fn builtin_popd(args: &[small::String], shell: &mut Shell) -> i32 {
             } else if let Some(n) = (len - 1).checked_sub(num) {
                 n
             } else {
-                eprintln!("ion: popd: negative directory stack index out of range");
-                return FAILURE;
+                return Status::error("ion: popd: negative directory stack index out of range");
             };
         }
     }
@@ -511,8 +477,7 @@ pub fn builtin_popd(args: &[small::String], shell: &mut Shell) -> i32 {
     } else if index == 0 {
         // change to new directory, return if not possible
         if let Err(why) = shell.set_current_dir_by_index(1) {
-            eprintln!("ion: popd: {}", why);
-            return FAILURE;
+            return Status::error(format!("ion: popd: {}", why));
         }
     }
 
@@ -525,25 +490,24 @@ pub fn builtin_popd(args: &[small::String], shell: &mut Shell) -> i32 {
                 .map(|dir| dir.to_str().unwrap_or("ion: no directory found"))
                 .join(" ")
         );
-        SUCCESS
+        Status::SUCCESS
     } else {
-        eprintln!("ion: popd: {}: directory stack index out of range", index);
-        FAILURE
+        Status::error(format!("ion: popd: {}: directory stack index out of range", index))
     }
 }
 
-pub fn builtin_alias(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_alias(args: &[small::String], shell: &mut Shell) -> Status {
     let args_str = args[1..].join(" ");
     alias(shell.variables_mut(), &args_str)
 }
 
-pub fn builtin_unalias(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_unalias(args: &[small::String], shell: &mut Shell) -> Status {
     drop_alias(shell.variables_mut(), args)
 }
 
 // TODO There is a man page for fn however the -h and --help flags are not
 // checked for.
-pub fn builtin_fn(_: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_fn(_: &[small::String], shell: &mut Shell) -> Status {
     print_functions(shell.variables())
 }
 
@@ -553,9 +517,9 @@ impl Completer for EmptyCompleter {
     fn completions(&mut self, _start: &str) -> Vec<String> { Vec::new() }
 }
 
-pub fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_read(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_READ) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
 
     if sys::isatty(sys::STDIN_FILENO) {
@@ -565,7 +529,7 @@ pub fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
                 Ok(buffer) => {
                     shell.variables_mut().set(arg.as_ref(), buffer.trim());
                 }
-                Err(_) => return FAILURE,
+                Err(_) => return Status::error(""),
             }
         }
     } else {
@@ -578,12 +542,12 @@ pub fn builtin_read(args: &[small::String], shell: &mut Shell) -> i32 {
             }
         }
     }
-    SUCCESS
+    Status::SUCCESS
 }
 
-pub fn builtin_drop(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_drop(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_DROP) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     if args.len() >= 2 && args[1] == "-a" {
         drop_array(shell.variables_mut(), args)
@@ -592,168 +556,139 @@ pub fn builtin_drop(args: &[small::String], shell: &mut Shell) -> i32 {
     }
 }
 
-pub fn builtin_set(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_set(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_SET) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     set::set(args, shell)
 }
 
-pub fn builtin_eq(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_eq(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_EQ) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
 
-    match is(args, shell) {
-        Ok(()) => SUCCESS,
-        Err(why) => {
-            eprintln!("{}", why);
-            FAILURE
-        }
-    }
+    is(args, shell)
 }
 
-pub fn builtin_eval(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_eval(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_EVAL) {
-        SUCCESS
+        Status::SUCCESS
     } else {
         shell.execute_command(args[1..].join(" ").as_bytes()).unwrap_or_else(|_| {
-            eprintln!("ion: supplied eval expression was not terminated");
-            FAILURE
+            Status::error(format!("ion: supplied eval expression was not terminated"))
         })
     }
 }
 
-pub fn builtin_source(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_source(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_SOURCE) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     match source(shell, args) {
-        Ok(()) => SUCCESS,
-        Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.as_bytes());
-            FAILURE
-        }
+        Ok(()) => Status::SUCCESS,
+        Err(why) => Status::error(why),
     }
 }
 
-pub fn builtin_echo(args: &[small::String], _: &mut Shell) -> i32 {
+pub fn builtin_echo(args: &[small::String], _: &mut Shell) -> Status {
     if check_help(args, MAN_ECHO) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     match echo(args) {
-        Ok(()) => SUCCESS,
-        Err(why) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr.write_all(why.description().as_bytes());
-            FAILURE
-        }
+        Ok(()) => Status::SUCCESS,
+        Err(why) => Status::error(why.to_string()),
     }
 }
 
-pub fn builtin_test(args: &[small::String], _: &mut Shell) -> i32 {
+pub fn builtin_test(args: &[small::String], _: &mut Shell) -> Status {
     // Do not use `check_help` for the `test` builtin. The
     // `test` builtin contains a "-h" option.
     match test(args) {
-        Ok(true) => SUCCESS,
-        Ok(false) => FAILURE,
-        Err(why) => {
-            eprintln!("{}", why);
-            FAILURE
-        }
+        Ok(true) => Status::SUCCESS,
+        Ok(false) => Status::error(""),
+        Err(why) => Status::error(why),
     }
 }
 
 // TODO create manpage.
-pub fn builtin_calc(args: &[small::String], _: &mut Shell) -> i32 {
+pub fn builtin_calc(args: &[small::String], _: &mut Shell) -> Status {
     match calc::calc(&args[1..]) {
-        Ok(()) => SUCCESS,
-        Err(why) => {
-            eprintln!("{}", why);
-            FAILURE
-        }
+        Ok(()) => Status::SUCCESS,
+        Err(why) => Status::error(why),
     }
 }
 
-pub fn builtin_random(args: &[small::String], _: &mut Shell) -> i32 {
+pub fn builtin_random(args: &[small::String], _: &mut Shell) -> Status {
     if check_help(args, MAN_RANDOM) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     match random::random(&args[1..]) {
-        Ok(()) => SUCCESS,
-        Err(why) => {
-            eprintln!("{}", why);
-            FAILURE
-        }
+        Ok(()) => Status::SUCCESS,
+        Err(why) => Status::error(why),
     }
 }
 
-pub fn builtin_true(args: &[small::String], _: &mut Shell) -> i32 {
+pub fn builtin_true(args: &[small::String], _: &mut Shell) -> Status {
     check_help(args, MAN_TRUE);
-    SUCCESS
+    Status::SUCCESS
 }
 
-pub fn builtin_false(args: &[small::String], _: &mut Shell) -> i32 {
+pub fn builtin_false(args: &[small::String], _: &mut Shell) -> Status {
     if check_help(args, MAN_FALSE) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
-    FAILURE
+    Status::error("")
 }
 
 // TODO create a manpage
-pub fn builtin_wait(_: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_wait(_: &[small::String], shell: &mut Shell) -> Status {
     shell.wait_for_background();
-    SUCCESS
+    Status::SUCCESS
 }
 
-pub fn builtin_jobs(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_jobs(args: &[small::String], shell: &mut Shell) -> Status {
     check_help(args, MAN_JOBS);
     job_control::jobs(shell);
-    SUCCESS
+    Status::SUCCESS
 }
 
-pub fn builtin_bg(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_bg(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_BG) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     job_control::bg(shell, &args[1..])
 }
 
-pub fn builtin_fg(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_fg(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_FG) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     job_control::fg(shell, &args[1..])
 }
 
-pub fn builtin_suspend(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_suspend(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_SUSPEND) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     shell.suspend();
-    SUCCESS
+    Status::SUCCESS
 }
 
-pub fn builtin_disown(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_disown(args: &[small::String], shell: &mut Shell) -> Status {
     for arg in args {
         if *arg == "--help" {
             println!("{}", MAN_DISOWN);
-            return SUCCESS;
+            return Status::SUCCESS;
         }
     }
     match job_control::disown(shell, &args[1..]) {
-        Ok(()) => SUCCESS,
-        Err(err) => {
-            eprintln!("ion: disown: {}", err);
-            FAILURE
-        }
+        Ok(()) => Status::SUCCESS,
+        Err(err) => Status::error(format!("ion: disown: {}", err)),
     }
 }
 
-pub fn builtin_help(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_help(args: &[small::String], shell: &mut Shell) -> Status {
     let builtins = shell.builtins();
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
@@ -774,12 +709,12 @@ pub fn builtin_help(args: &[small::String], shell: &mut Shell) -> i32 {
         }
         let _ = stdout.write_all(&buffer);
     }
-    SUCCESS
+    Status::SUCCESS
 }
 
-pub fn builtin_exit(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_exit(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_EXIT) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     // Kill all active background tasks before exiting the shell.
     for process in shell.background_jobs().iter() {
@@ -787,109 +722,95 @@ pub fn builtin_exit(args: &[small::String], shell: &mut Shell) -> i32 {
             let _ = sys::kill(process.pid(), sys::SIGTERM);
         }
     }
-    shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok()))
+    if let Some(status) = args.get(1).and_then(|status| status.parse::<i32>().ok()) {
+        shell.exit_with_code(Status::from_exit_code(status))
+    } else {
+        shell.exit()
+    }
 }
 
-pub fn builtin_exec(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_exec(args: &[small::String], shell: &mut Shell) -> Status {
     match exec(shell, &args[1..]) {
         // Shouldn't ever hit this case.
-        Ok(()) => SUCCESS,
-        Err(err) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = writeln!(stderr, "ion: exec: {}", err);
-            FAILURE
-        }
+        Ok(()) => Status::SUCCESS,
+        Err(err) => Status::error(format!("ion: exec: {}", err)),
     }
 }
 
 use regex::Regex;
-pub fn builtin_matches(args: &[small::String], _: &mut Shell) -> i32 {
+pub fn builtin_matches(args: &[small::String], _: &mut Shell) -> Status {
     if check_help(args, MAN_MATCHES) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     if args[1..].len() != 2 {
         let stderr = io::stderr();
         let mut stderr = stderr.lock();
         let _ = stderr.write_all(b"match takes two arguments\n");
-        return BAD_ARG;
+        return Status::BAD_ARG;
     }
     let input = &args[1];
     let re = match Regex::new(&args[2]) {
         Ok(r) => r,
         Err(e) => {
-            let stderr = io::stderr();
-            let mut stderr = stderr.lock();
-            let _ = stderr
-                .write_all(format!("couldn't compile input regex {}: {}\n", args[2], e).as_bytes());
-            return FAILURE;
+            return Status::error(format!("couldn't compile input regex {}: {}\n", args[2], e));
         }
     };
 
     if re.is_match(input) {
-        SUCCESS
+        Status::SUCCESS
     } else {
-        FAILURE
+        Status::error("")
     }
 }
 
-pub fn builtin_exists(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_exists(args: &[small::String], shell: &mut Shell) -> Status {
     if check_help(args, MAN_EXISTS) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
     match exists(args, shell) {
-        Ok(true) => SUCCESS,
-        Ok(false) => FAILURE,
-        Err(why) => {
-            eprintln!("{}", why);
-            FAILURE
-        }
+        Ok(true) => Status::SUCCESS,
+        Ok(false) => Status::error(""),
+        Err(why) => Status::error(why),
     }
 }
 
-pub fn builtin_which(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_which(args: &[small::String], shell: &mut Shell) -> Status {
     match which(args, shell) {
         Ok(result) => result,
-        Err(()) => FAILURE,
+        Err(()) => Status::error(""),
     }
 }
 
-pub fn builtin_type(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn builtin_type(args: &[small::String], shell: &mut Shell) -> Status {
     match find_type(args, shell) {
         Ok(result) => result,
-        Err(()) => FAILURE,
+        Err(()) => Status::error(""),
     }
 }
 
-pub fn builtin_isatty(args: &[small::String], _: &mut Shell) -> i32 {
+pub fn builtin_isatty(args: &[small::String], _: &mut Shell) -> Status {
     if check_help(args, MAN_ISATTY) {
-        return SUCCESS;
+        return Status::SUCCESS;
     }
 
     if args.len() > 1 {
         // sys::isatty expects a usize if compiled for redox but otherwise a i32.
         #[cfg(target_os = "redox")]
-        match args[1].parse::<usize>() {
-            Ok(r) => {
-                if sys::isatty(r) {
-                    return SUCCESS;
-                }
-            }
-            Err(_) => eprintln!("ion: isatty given bad number"),
-        }
-
+        let pid = args[1].parse::<usize>();
         #[cfg(not(target_os = "redox"))]
-        match args[1].parse::<i32>() {
+        let pid = args[1].parse::<i32>();
+
+        match pid {
             Ok(r) => {
                 if sys::isatty(r) {
-                    return SUCCESS;
+                    Status::SUCCESS
+                } else {
+                    Status::error("")
                 }
             }
-            Err(_) => eprintln!("ion: isatty given bad number"),
+            Err(_) => Status::error("ion: isatty given bad number"),
         }
     } else {
-        return SUCCESS;
+        Status::SUCCESS
     }
-
-    FAILURE
 }

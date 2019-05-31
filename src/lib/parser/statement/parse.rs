@@ -8,7 +8,7 @@ use crate::{
     lexers::{assignment_lexer, ArgumentSplitter},
     shell::{
         flow_control::{Case, ElseIf, ExportAction, IfMode, LocalAction, Statement},
-        status::FAILURE,
+        status::Status,
     },
 };
 use small;
@@ -27,8 +27,7 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
         "break" => Statement::Break,
         "continue" => Statement::Continue,
         "for" | "match" | "case" => {
-            eprintln!("ion: syntax error: incomplete control flow statement");
-            Statement::Error(FAILURE)
+            Statement::Error(Status::error("ion: syntax error: incomplete control flow statement"))
         }
         "let" => Statement::Let(LocalAction::List),
         _ if cmd.starts_with("let ") => {
@@ -45,11 +44,14 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
                 }
                 None => {
                     if op.is_none() {
-                        eprintln!("ion: assignment error: no operator supplied.");
+                        Statement::Error(Status::error(
+                            "ion: assignment error: no operator supplied.",
+                        ))
                     } else {
-                        eprintln!("ion: assignment error: no values supplied.");
+                        Statement::Error(Status::error(
+                            "ion: assignment error: no values supplied.",
+                        ))
                     }
-                    Statement::Error(FAILURE)
                 }
             }
         }
@@ -68,13 +70,14 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
                 }
                 None => {
                     if keys.is_none() {
-                        eprintln!("ion: assignment error: no keys supplied.")
+                        Statement::Error(Status::error("ion: assignment error: no keys supplied."))
                     } else if op.is_some() {
-                        eprintln!("ion: assignment error: no values supplied.")
+                        Statement::Error(Status::error(
+                            "ion: assignment error: no values supplied.",
+                        ))
                     } else {
-                        return Statement::Export(ExportAction::LocalExport(keys.unwrap().into()));
+                        Statement::Export(ExportAction::LocalExport(keys.unwrap().into()))
                     }
-                    Statement::Error(FAILURE)
                 }
             }
         }
@@ -132,10 +135,9 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
                     values: ArgumentSplitter::new(cmd).map(small::String::from).collect(),
                     statements: Vec::new(),
                 },
-                None => {
-                    eprintln!("ion: syntax error: for loop lacks the `in` keyword");
-                    Statement::Error(FAILURE)
-                }
+                None => Statement::Error(Status::error(
+                    "ion: syntax error: for loop lacks the `in` keyword",
+                )),
             }
         }
         _ if cmd.starts_with("case ") => {
@@ -145,8 +147,10 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
                     let (value, binding, conditional) = match case::parse_case(value) {
                         Ok(values) => values,
                         Err(why) => {
-                            eprintln!("ion: case error: {}", why);
-                            return Statement::Error(FAILURE);
+                            return Statement::Error(Status::error(format!(
+                                "ion: case error: {}",
+                                why
+                            )))
                         }
                     };
                     let binding = binding.map(Into::into);
@@ -168,12 +172,11 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
             let pos = cmd.find(char::is_whitespace).unwrap_or_else(|| cmd.len());
             let name = &cmd[..pos];
             if !is_valid_name(name) {
-                eprintln!(
+                return Statement::Error(Status::error(format!(
                     "ion: syntax error: '{}' is not a valid function name\n     Function names \
                      may only contain alphanumeric characters",
                     name
-                );
-                return Statement::Error(FAILURE);
+                )));
             }
 
             let (args, description) = parse_function(&cmd[pos..]);
@@ -184,10 +187,10 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
                     args,
                     statements: Vec::new(),
                 },
-                Err(why) => {
-                    eprintln!("ion: function argument error: {}", why);
-                    Statement::Error(FAILURE)
-                }
+                Err(why) => Statement::Error(Status::error(format!(
+                    "ion: function argument error: {}",
+                    why
+                ))),
             }
         }
         _ if cmd.starts_with("time ") => {

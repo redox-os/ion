@@ -7,7 +7,10 @@ pub use self::{
     parse::{is_valid_name, parse},
     splitter::{StatementError, StatementSplitter, StatementVariant},
 };
-use crate::{builtins::BuiltinMap, shell::flow_control::Statement};
+use crate::{
+    builtins::BuiltinMap,
+    shell::{flow_control::Statement, status::Status},
+};
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
@@ -23,7 +26,7 @@ pub fn parse_and_validate<'b>(
         Ok(StatementVariant::Default(statement)) => parse(statement, builtins),
         Err(err) => {
             eprintln!("ion: {}", err);
-            Statement::Error(-1)
+            Statement::Error(Status::from_exit_code(-1))
         }
     }
 }

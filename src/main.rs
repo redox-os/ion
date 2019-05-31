@@ -86,5 +86,5 @@ fn main() {
         shell.execute_script(BufReader::new(stdin()));
     }
     shell.wait_for_background();
-    shell.exit(None);
+    shell.exit();
 }

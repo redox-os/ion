@@ -22,7 +22,7 @@ pub fn readln(binary: &InteractiveBinary) -> Option<String> {
         Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
             let mut shell = binary.shell.borrow_mut();
             if !shell.unterminated && shell.exit_block().is_err() {
-                shell.exit(None);
+                shell.exit();
             }
             None
         }

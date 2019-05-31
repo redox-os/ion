@@ -20,7 +20,7 @@ use super::{
     flow_control::FunctionError,
     job::{Job, JobVariant, RefinedJob, TeeItem},
     signals::{self, SignalHandler},
-    status::*,
+    status::Status,
     Shell, Value,
 };
 use crate::{
@@ -187,7 +187,7 @@ impl<'b> Shell<'b> {
         stdin: &Option<File>,
         stdout: &Option<File>,
         stderr: &Option<File>,
-    ) -> i32 {
+    ) -> Status {
         let result = sys::fork_and_exec(
             name,
             args,
@@ -208,12 +208,9 @@ impl<'b> Shell<'b> {
             }
             Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
                 self.command_not_found(name);
-                NO_SUCH_COMMAND
+                Status::NO_SUCH_COMMAND
             }
-            Err(ref err) => {
-                eprintln!("ion: command exec error: {}", err);
-                FAILURE
-            }
+            Err(ref err) => Status::error(format!("ion: command exec error: {}", err)),
         }
     }
 
@@ -222,7 +219,7 @@ impl<'b> Shell<'b> {
         &mut self,
         items: &mut (Option<TeeItem>, Option<TeeItem>),
         redirection: RedirectFrom,
-    ) -> i32 {
+    ) -> Status {
         let res = match *items {
             (None, None) => panic!("There must be at least one TeeItem, this is a bug"),
             (Some(ref mut tee_out), None) => match redirection {
@@ -239,40 +236,39 @@ impl<'b> Shell<'b> {
             }
         };
         if let Err(e) = res {
-            eprintln!("ion: error in multiple output redirection process: {:?}", e);
-            FAILURE
+            Status::error(format!("ion: error in multiple output redirection process: {:?}", e))
         } else {
-            SUCCESS
+            Status::SUCCESS
         }
     }
 
     /// For cat jobs
-    fn exec_multi_in(&mut self, sources: &mut [File], stdin: &mut Option<File>) -> i32 {
+    fn exec_multi_in(&mut self, sources: &mut [File], stdin: &mut Option<File>) -> Status {
         let stdout = io::stdout();
         let mut stdout = stdout.lock();
         for file in stdin.iter_mut().chain(sources) {
             if let Err(why) = std::io::copy(file, &mut stdout) {
-                eprintln!("ion: error in multiple input redirect process: {:?}", why);
-                return FAILURE;
+                return Status::error(format!(
+                    "ion: error in multiple input redirect process: {:?}",
+                    why
+                ));
             }
         }
-        SUCCESS
+        Status::SUCCESS
     }
 
-    fn exec_function<S: AsRef<str>>(&mut self, name: &str, args: &[S]) -> i32 {
+    fn exec_function<S: AsRef<str>>(&mut self, name: &str, args: &[S]) -> Status {
         if let Some(Value::Function(function)) = self.variables.get_ref(name).cloned() {
             match function.execute(self, args) {
-                Ok(()) => SUCCESS,
+                Ok(()) => Status::SUCCESS,
                 Err(FunctionError::InvalidArgumentCount) => {
-                    eprintln!("ion: invalid number of function arguments supplied");
-                    FAILURE
+                    Status::error(format!("ion: invalid number of function arguments supplied"))
                 }
                 Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
-                    eprintln!(
+                    Status::error(format!(
                         "ion: function argument has invalid type: expected {}, found value \'{}\'",
                         expected_type, value
-                    );
-                    FAILURE
+                    ))
                 }
             }
         } else {
@@ -286,7 +282,7 @@ impl<'b> Shell<'b> {
     /// * `name`: Name of the builtin to execute.
     /// * `stdin`, `stdout`, `stderr`: File descriptors that will replace the respective standard
     ///   streams if they are not `None`
-    fn exec_builtin<'a>(&mut self, main: BuiltinFunction<'a>, args: &[small::String]) -> i32 {
+    fn exec_builtin<'a>(&mut self, main: BuiltinFunction<'a>, args: &[small::String]) -> Status {
         main(args, self)
     }
 
@@ -294,7 +290,7 @@ impl<'b> Shell<'b> {
     ///
     /// The aforementioned `RefinedJob` may be either a builtin or external command.
     /// The purpose of this function is therefore to execute both types accordingly.
-    fn exec_job(&mut self, job: &RefinedJob<'b>) -> i32 {
+    fn exec_job(&mut self, job: &RefinedJob<'b>) -> Status {
         // Duplicate file descriptors, execute command, and redirect back.
         if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
             redirect_streams(&job.stdin, &job.stdout, &job.stderr);
@@ -314,7 +310,7 @@ impl<'b> Shell<'b> {
                 job.long()
             );
 
-            COULD_NOT_EXEC
+            Status::COULD_NOT_EXEC
         }
     }
 
@@ -353,10 +349,10 @@ impl<'b> Shell<'b> {
     /// If a job is stopped, the shell will add that job to a list of background jobs and
     /// continue to watch the job in the background, printing notifications on status changes
     /// of that job over time.
-    pub fn execute_pipeline(&mut self, pipeline: Pipeline<'b>) -> i32 {
+    pub fn execute_pipeline(&mut self, pipeline: Pipeline<'b>) -> Status {
         // Don't execute commands when the `-n` flag is passed.
         if self.opts.no_exec {
-            return SUCCESS;
+            return Status::SUCCESS;
         }
 
         // A string representing the command is stored here.
@@ -387,10 +383,10 @@ impl<'b> Shell<'b> {
     /// Executes a piped job `job1 | job2 | job3`
     ///
     /// This function will panic if called with an empty slice
-    fn pipe(&mut self, pipeline: Pipeline<'b>) -> i32 {
+    fn pipe(&mut self, pipeline: Pipeline<'b>) -> Status {
         let mut commands = match prepare(self, pipeline) {
             Ok(c) => c.into_iter().peekable(),
-            Err(_) => return COULD_NOT_EXEC,
+            Err(_) => return Status::COULD_NOT_EXEC,
         };
 
         if let Some((mut parent, mut kind)) = commands.next() {
@@ -468,7 +464,7 @@ impl<'b> Shell<'b> {
                 // returning the exit status of the last process in the queue.
                 // Watch the foreground group, dropping all commands that exit as they exit.
                 let status = self.watch_foreground(pgid);
-                if status == TERMINATED {
+                if status == Status::TERMINATED {
                     if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
                         eprintln!("ion: failed to terminate foreground jobs: {}", why);
                     }
@@ -486,7 +482,7 @@ impl<'b> Shell<'b> {
                 status
             }
         } else {
-            SUCCESS
+            Status::SUCCESS
         }
     }
 }
@@ -592,7 +588,7 @@ fn fork_exec_internal<F>(
     pgid: u32,
     mut exec_action: F,
 ) where
-    F: FnMut(Option<File>, Option<File>, Option<File>) -> i32,
+    F: FnMut(Option<File>, Option<File>, Option<File>) -> Status,
 {
     match unsafe { sys::fork() } {
         Ok(0) => {
@@ -600,7 +596,7 @@ fn fork_exec_internal<F>(
 
             redirect_streams(&stdin, &stdout, &stderr);
             let exit_status = exec_action(stdout, stderr, stdin);
-            exit(exit_status)
+            exit(exit_status.as_os_code())
         }
         Ok(pid) => {
             *last_pid = *current_pid;

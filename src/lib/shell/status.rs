@@ -1,8 +1,39 @@
-pub const SUCCESS: i32 = 0;
-pub const FAILURE: i32 = 1;
-pub const BAD_ARG: i32 = 2;
-pub const COULD_NOT_EXEC: i32 = 126;
-pub const NO_SUCH_COMMAND: i32 = 127;
-pub const TERMINATED: i32 = 143;
+use super::{super::types, Value};
 
-pub fn get_signal_code(signal: i32) -> i32 { 128 + signal }
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
+pub struct Status(i32);
+
+impl Status {
+    pub const BAD_ARG: Self = Status(2);
+    pub const COULD_NOT_EXEC: Self = Status(126);
+    pub const NO_SUCH_COMMAND: Self = Status(127);
+    pub const SUCCESS: Self = Status(0);
+    pub const TERMINATED: Self = Status(143);
+
+    pub fn from_signal(signal: i32) -> Self { Status(128 + signal) }
+
+    pub fn from_exit_code(code: i32) -> Self { Status(code) }
+
+    pub fn from_bool(b: bool) -> Self { Status(!b as i32) }
+
+    pub fn error<T: AsRef<str>>(err: T) -> Self {
+        eprintln!("{}", err.as_ref());
+        Status(1)
+    }
+
+    pub fn is_success(&self) -> bool { self.0 == 0 }
+
+    pub fn is_failure(&self) -> bool { self.0 != 0 }
+
+    pub fn as_os_code(&self) -> i32 { self.0 }
+
+    pub fn toggle(&mut self) { self.0 = if self.is_success() { 1 } else { 0 }; }
+}
+
+impl<'a> From<Status> for Value<'a> {
+    fn from(status: Status) -> Self { Value::Str(status.into()) }
+}
+
+impl From<Status> for types::Str {
+    fn from(status: Status) -> Self { types::Str::from(status.as_os_code().to_string()) }
+}

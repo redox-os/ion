@@ -1,7 +1,7 @@
 use crate::{
     lexers::assignments::{KeyBuf, Operator, Primitive},
     parser::{assignments::*, pipelines::Pipeline},
-    shell::Shell,
+    shell::{status::Status, Shell},
     types,
 };
 use small;
@@ -104,7 +104,7 @@ pub enum Statement<'a> {
     },
     Else,
     End,
-    Error(i32),
+    Error(Status),
     Break,
     Continue,
     Pipeline(Pipeline<'a>),
@@ -502,7 +502,7 @@ mod tests {
     fn return_toplevel() {
         let mut flow_control = Block::default();
         let oks = vec![
-            Statement::Error(1),
+            Statement::Error(Status::from_exit_code(1)),
             Statement::Time(Box::new(Statement::Default)),
             Statement::And(Box::new(Statement::Default)),
             Statement::Or(Box::new(Statement::Default)),
