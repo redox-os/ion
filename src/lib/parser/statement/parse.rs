@@ -7,7 +7,7 @@ use crate::{
     builtins::BuiltinMap,
     lexers::{assignment_lexer, ArgumentSplitter},
     shell::{
-        flow_control::{Case, ElseIf, ExportAction, LocalAction, Statement},
+        flow_control::{Case, ElseIf, ExportAction, IfMode, LocalAction, Statement},
         status::FAILURE,
     },
 };
@@ -83,7 +83,7 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
             success:    Vec::new(),
             else_if:    Vec::new(),
             failure:    Vec::new(),
-            mode:       0,
+            mode:       IfMode::Success,
         },
         "else" => Statement::Else,
         _ if cmd.starts_with("else") => {
@@ -279,7 +279,7 @@ mod tests {
             success:    vec![],
             else_if:    vec![],
             failure:    vec![],
-            mode:       0,
+            mode:       IfMode::Success,
         };
         assert_eq!(correct_parse, parsed_if);
 
