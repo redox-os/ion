@@ -46,6 +46,10 @@ pub struct BackgroundProcess {
 }
 
 impl BackgroundProcess {
+    pub(super) fn new(pid: u32, state: ProcessState, name: String) -> Self {
+        BackgroundProcess { pid, ignore_sighup: false, state, name }
+    }
+
     pub fn pid(&self) -> u32 { self.pid }
 
     pub fn is_running(&self) -> bool { self.state == ProcessState::Running }
@@ -79,25 +83,17 @@ impl<'a> Shell<'a> {
 
     fn add_to_background(
         processes: &Arc<Mutex<Vec<BackgroundProcess>>>,
-        pid: u32,
-        state: ProcessState,
-        command: String,
+        job: BackgroundProcess,
     ) -> u32 {
         let mut processes = processes.lock().unwrap();
-        match (*processes).iter().position(|x| x.state == ProcessState::Empty) {
+        match (*processes).iter().position(|x| !x.exists()) {
             Some(id) => {
-                (*processes)[id] =
-                    BackgroundProcess { pid, ignore_sighup: false, state, name: command };
+                (*processes)[id] = job;
                 id as u32
             }
             None => {
                 let njobs = (*processes).len();
-                (*processes).push(BackgroundProcess {
-                    pid,
-                    ignore_sighup: false,
-                    state,
-                    name: command,
-                });
+                (*processes).push(job);
                 njobs as u32
             }
         }
@@ -177,7 +173,7 @@ impl<'a> Shell<'a> {
         }
     }
 
-    pub fn send_to_background(&mut self, pid: u32, state: ProcessState, command: String) {
+    pub fn send_to_background(&mut self, process: BackgroundProcess) {
         // Increment the `Arc` counters so that these fields can be moved into
         // the upcoming background thread.
         let processes = self.background.clone();
@@ -185,7 +181,8 @@ impl<'a> Shell<'a> {
 
         // Add the process to the background list, and mark the job's ID as
         // the previous job in the shell (in case fg/bg is executed w/ no args).
-        let njob = Self::add_to_background(&processes, pid, state, command);
+        let pid = process.pid();
+        let njob = Self::add_to_background(&processes, process);
         self.previous_job = njob;
         eprintln!("ion: bg [{}] {}", njob, pid);
 
@@ -221,13 +218,13 @@ impl<'a> Shell<'a> {
         }
     }
 
-    pub fn watch_foreground<T: Into<String>>(&mut self, pid: i32, command: T) -> i32 {
+    pub fn watch_foreground(&mut self, pgid: u32) -> i32 {
         let mut signaled = 0;
         let mut exit_status = 0;
 
         loop {
             let mut status = 0;
-            match waitpid(pid, &mut status, WUNTRACED) {
+            match waitpid(-(pgid as i32), &mut status, WUNTRACED) {
                 Err(errno) => match errno {
                     ECHILD if signaled == 0 => break exit_status,
                     ECHILD => break signaled,
@@ -258,11 +255,11 @@ impl<'a> Shell<'a> {
                     }
                 }
                 Ok(pid) if wifstopped(status) => {
-                    self.send_to_background(
+                    self.send_to_background(BackgroundProcess::new(
                         pid.abs() as u32,
                         ProcessState::Stopped,
-                        command.into(),
-                    );
+                        "".to_string(),
+                    ));
                     self.break_flow = true;
                     break 128 + wstopsig(status);
                 }

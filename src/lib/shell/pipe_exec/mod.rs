@@ -204,7 +204,7 @@ impl<'b> Shell<'b> {
                 let _ = sys::tcsetpgrp(0, pid);
                 let _ = wait_for_interrupt(pid);
                 let _ = sys::kill(pid, sys::SIGCONT);
-                self.watch_foreground(-(pid as i32), "")
+                self.watch_foreground(pid)
             }
             Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
                 self.command_not_found(name);
@@ -467,7 +467,7 @@ impl<'b> Shell<'b> {
                 // Waits for all of the children of the assigned pgid to finish executing,
                 // returning the exit status of the last process in the queue.
                 // Watch the foreground group, dropping all commands that exit as they exit.
-                let status = self.watch_foreground(-(pgid as i32), "");
+                let status = self.watch_foreground(pgid);
                 if status == TERMINATED {
                     if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
                         eprintln!("ion: failed to terminate foreground jobs: {}", why);
