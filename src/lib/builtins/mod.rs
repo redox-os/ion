@@ -38,7 +38,7 @@ use hashbrown::HashMap;
 use liner::{Completer, Context};
 
 use crate::{
-    shell::{self, status::*, Capture, ProcessState, Shell},
+    shell::{self, status::*, Capture, Shell},
     sys, types,
 };
 use itertools::Itertools;
@@ -782,8 +782,8 @@ fn builtin_exit(args: &[small::String], shell: &mut Shell) -> i32 {
     }
     // Kill all active background tasks before exiting the shell.
     for process in shell.background.lock().unwrap().iter() {
-        if process.state != ProcessState::Empty {
-            let _ = sys::kill(process.pid, sys::SIGTERM);
+        if process.exists() {
+            let _ = sys::kill(process.pid(), sys::SIGTERM);
         }
     }
     shell.exit(args.get(1).and_then(|status| status.parse::<i32>().ok()))

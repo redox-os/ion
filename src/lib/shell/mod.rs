@@ -6,7 +6,7 @@ pub(crate) mod flow_control;
 mod fork;
 mod fork_function;
 mod job;
-pub(crate) mod pipe_exec;
+mod pipe_exec;
 mod shell_expand;
 pub(crate) mod signals;
 pub mod status;
@@ -18,11 +18,11 @@ use self::{
     flow_control::{Block, FunctionError, Statement},
     foreground::ForegroundSignals,
     fork::{Fork, IonResult},
-    pipe_exec::{foreground, job_control::BackgroundProcess},
+    pipe_exec::foreground,
     status::*,
     variables::Variables,
 };
-pub use self::{fork::Capture, pipe_exec::job_control::ProcessState, variables::Value};
+pub use self::{fork::Capture, pipe_exec::job_control::BackgroundProcess, variables::Value};
 use crate::{
     builtins::BuiltinMap,
     lexers::{Key, Primitive},

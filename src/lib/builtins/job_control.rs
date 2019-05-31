@@ -1,7 +1,7 @@
 //! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job
 //! control in the shell.
 
-use crate::shell::{signals, status::*, ProcessState, Shell};
+use crate::shell::{signals, status::*, BackgroundProcess, Shell};
 use small;
 use smallvec::SmallVec;
 
@@ -10,65 +10,50 @@ use smallvec::SmallVec;
 /// SIGHUP ignoral.
 pub fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), String> {
     // Specifies that a process should be set to not receive SIGHUP signals.
-    const NO_SIGHUP: u8 = 1;
+    let mut no_sighup = false;
     // Specifies that all jobs in the process table should be manipulated.
-    const ALL_JOBS: u8 = 2;
+    let mut all_jobs = false;
     // Specifies that only running jobs in the process table should be manipulated.
-    const RUN_JOBS: u8 = 4;
+    let mut run_jobs = false;
 
     // Set flags and collect all job specs listed as arguments.
-    let mut collected_jobs: SmallVec<[u32; 16]> = SmallVec::with_capacity(16);
-    let mut flags = 0u8;
+    let mut collected_jobs: SmallVec<[usize; 16]> = SmallVec::with_capacity(16);
     for arg in args {
         match &**arg {
-            "-a" => flags |= ALL_JOBS,
-            "-h" => flags |= NO_SIGHUP,
-            "-r" => flags |= RUN_JOBS,
+            "-a" => all_jobs = true,
+            "-h" => no_sighup = true,
+            "-r" => run_jobs = true,
             _ => {
                 let jobspec =
-                    arg.parse::<u32>().map_err(|_| format!("invalid jobspec: '{}'", arg))?;
+                    arg.parse::<usize>().map_err(|_| format!("invalid jobspec: '{}'", arg))?;
                 collected_jobs.push(jobspec);
             }
         }
     }
 
-    if flags == 0 {
-        return Err("must provide arguments".to_owned());
-    } else if (flags & ALL_JOBS) == 0 && collected_jobs.is_empty() {
-        return Err("must provide a jobspec with -h or -r".to_owned());
+    if !all_jobs && !run_jobs && collected_jobs.is_empty() {
+        return Err("must provide arguments to select jobs".to_owned());
+    } else if (all_jobs && run_jobs) || (collected_jobs.is_empty() && (all_jobs || run_jobs)) {
+        return Err("must only provide a single job spec".to_owned());
     }
+
+    let action: fn(&mut BackgroundProcess) = if no_sighup {
+        |process| process.set_ignore_sighup(true)
+    } else {
+        |process| process.forget()
+    };
 
     // Open the process table to access and manipulate process metadata.
     let mut process_table = shell.background.lock().unwrap();
-    if collected_jobs.is_empty() && flags & ALL_JOBS != 0 {
-        if flags & NO_SIGHUP != 0 {
-            process_table.iter_mut().for_each(|process| process.ignore_sighup = true);
-        } else {
-            process_table.iter_mut().for_each(|process| process.state = ProcessState::Empty);
-        }
+    if all_jobs {
+        process_table.iter_mut().for_each(action);
+    } else if run_jobs {
+        // Drop every job from the process table by setting their state to `Empty`.
+        process_table.iter_mut().filter(|p| p.is_running()).for_each(action)
     } else {
-        collected_jobs.sort();
-        let mut collected_jobs = collected_jobs.into_iter();
-        let mut current_jobspec = collected_jobs.next().unwrap();
-        for (id, process) in process_table.iter_mut().enumerate() {
-            if id == current_jobspec as usize {
-                if flags & NO_SIGHUP != 0 {
-                    process.ignore_sighup = true;
-                }
-                process.state = ProcessState::Empty;
-                match collected_jobs.next() {
-                    Some(jobspec) => current_jobspec = jobspec,
-                    None => break,
-                }
-            }
-        }
-
-        if flags & RUN_JOBS != 0 {
-            // Drop every job from the process table by setting their state to `Empty`.
-            for process in process_table.iter_mut() {
-                if process.state == ProcessState::Running {
-                    process.state = ProcessState::Empty;
-                }
+        for current_jobspec in collected_jobs {
+            if let Some(process) = process_table.get_mut(current_jobspec) {
+                action(process);
             }
         }
     }
@@ -79,8 +64,8 @@ pub fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), String> {
 /// Display a list of all jobs running in the background.
 pub fn jobs(shell: &mut Shell) {
     for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
-        if process.state != ProcessState::Empty {
-            eprintln!("[{}] {} {}\t{}", id, process.pid, process.state, process.name);
+        if process.exists() {
+            eprintln!("[{}] {}", id, process);
         }
     }
 }
@@ -90,26 +75,16 @@ pub fn jobs(shell: &mut Shell) {
 /// If multiple jobs are given, then only the last job's exit status will be returned.
 pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
     fn fg_job(shell: &mut Shell, njob: u32) -> i32 {
-        let job = if let Some(borrowed_job) =
-            shell.background.lock().unwrap().iter().nth(njob as usize)
+        if let Some(job) =
+            shell.background.lock().unwrap().iter().nth(njob as usize).filter(|p| p.exists())
         {
-            borrowed_job.clone()
+            // Give the bg task the foreground, and wait for it to finish. Also resume it if it
+            // isn't running
+            shell.set_bg_task_in_foreground(job.pid(), !job.is_running())
         } else {
+            // Informs the user that the specified job ID no longer exists.
             eprintln!("ion: fg: job {} does not exist", njob);
             return FAILURE;
-        };
-
-        // Bring the process into the foreground and wait for it to finish.
-        match job.state {
-            // Give the bg task the foreground, and wait for it to finish.
-            ProcessState::Running => shell.set_bg_task_in_foreground(job.pid, false),
-            // Same as above, but also resumes the stopped process in advance.
-            ProcessState::Stopped => shell.set_bg_task_in_foreground(job.pid, true),
-            // Informs the user that the specified job ID no longer exists.
-            ProcessState::Empty => {
-                eprintln!("ion: fg: job {} does not exist", njob);
-                FAILURE
-            }
         }
     }
 
@@ -138,20 +113,15 @@ pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
 /// Resumes a stopped background process, if it was stopped.
 pub fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
-        if let Some(job) = shell.background.lock().unwrap().iter().nth(njob as usize) {
-            match job.state {
-                ProcessState::Running => {
-                    eprintln!("ion: bg: job {} is already running", njob);
-                    false
-                }
-                ProcessState::Stopped => {
-                    signals::resume(job.pid);
-                    true
-                }
-                ProcessState::Empty => {
-                    eprintln!("ion: bg: job {} does not exist", njob);
-                    false
-                }
+        if let Some(job) =
+            shell.background.lock().unwrap().iter().nth(njob as usize).filter(|p| p.exists())
+        {
+            if job.is_running() {
+                eprintln!("ion: bg: job {} is already running", njob);
+                false
+            } else {
+                signals::resume(job.pid());
+                true
             }
         } else {
             eprintln!("ion: bg: job {} does not exist", njob);

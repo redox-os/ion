@@ -31,28 +31,12 @@ use crate::{
 use smallvec::SmallVec;
 use std::{
     fs::{File, OpenOptions},
-    io::{self, Error, Write},
+    io::{self, Write},
     iter,
     os::unix::io::{AsRawFd, FromRawFd, RawFd},
     path::Path,
     process::{self, exit},
 };
-
-/// Create an OS pipe and write the contents of a byte slice to one end
-/// such that reading from this pipe will produce the byte slice. Return
-/// A file descriptor representing the read end of the pipe.
-pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<RawFd, Error> {
-    let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)?;
-    let mut infile = File::from_raw_fd(writer);
-    // Write the contents; make sure to use write_all so that we block until
-    // the entire string is written
-    infile.write_all(input.as_ref())?;
-    infile.flush()?;
-    // `infile` currently owns the writer end RawFd. If we just return the reader
-    // end and let `infile` go out of scope, it will be closed, sending EOF to
-    // the reader!
-    Ok(reader)
-}
 
 /// Determines if the supplied command implicitly defines to change the directory.
 ///
