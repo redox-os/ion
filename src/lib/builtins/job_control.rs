@@ -1,7 +1,7 @@
 //! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job
 //! control in the shell.
 
-use crate::shell::{signals, status::*, BackgroundProcess, Shell};
+use crate::shell::{status::*, BackgroundProcess, Shell};
 use small;
 use smallvec::SmallVec;
 
@@ -44,7 +44,7 @@ pub fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), String> {
     };
 
     // Open the process table to access and manipulate process metadata.
-    let mut process_table = shell.background.lock().unwrap();
+    let mut process_table = shell.background_jobs_mut();
     if all_jobs {
         process_table.iter_mut().for_each(action);
     } else if run_jobs {
@@ -63,7 +63,7 @@ pub fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), String> {
 
 /// Display a list of all jobs running in the background.
 pub fn jobs(shell: &mut Shell) {
-    for (id, process) in shell.background.lock().unwrap().iter().enumerate() {
+    for (id, process) in shell.background_jobs().iter().enumerate() {
         if process.exists() {
             eprintln!("[{}] {}", id, process);
         }
@@ -75,8 +75,7 @@ pub fn jobs(shell: &mut Shell) {
 /// If multiple jobs are given, then only the last job's exit status will be returned.
 pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
     fn fg_job(shell: &mut Shell, njob: u32) -> i32 {
-        if let Some(job) =
-            shell.background.lock().unwrap().iter().nth(njob as usize).filter(|p| p.exists())
+        if let Some(job) = shell.background_jobs().iter().nth(njob as usize).filter(|p| p.exists())
         {
             // Give the bg task the foreground, and wait for it to finish. Also resume it if it
             // isn't running
@@ -113,14 +112,13 @@ pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
 /// Resumes a stopped background process, if it was stopped.
 pub fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
     fn bg_job(shell: &mut Shell, njob: u32) -> bool {
-        if let Some(job) =
-            shell.background.lock().unwrap().iter().nth(njob as usize).filter(|p| p.exists())
+        if let Some(job) = shell.background_jobs().iter().nth(njob as usize).filter(|p| p.exists())
         {
             if job.is_running() {
                 eprintln!("ion: bg: job {} is already running", njob);
                 false
             } else {
-                signals::resume(job.pid());
+                job.resume();
                 true
             }
         } else {

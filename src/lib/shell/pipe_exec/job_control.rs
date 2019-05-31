@@ -55,6 +55,8 @@ impl BackgroundProcess {
     pub fn forget(&mut self) { self.state = ProcessState::Empty }
 
     pub fn set_ignore_sighup(&mut self, ignore: bool) { self.ignore_sighup = ignore }
+
+    pub fn resume(&self) { signals::resume(self.pid); }
 }
 
 impl fmt::Display for BackgroundProcess {
