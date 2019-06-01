@@ -26,6 +26,7 @@ fn main() {
     let mut args = env::args().skip(1);
     let mut script_path = None;
     let mut key_bindings = None;
+    let mut force_interactive = false;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-o" => match args.next().as_ref().map(|s| s.as_str()) {
@@ -51,6 +52,7 @@ fn main() {
                 println!("{}", MAN_ION);
                 return;
             }
+            "-i" | "--interactive" => force_interactive = true,
             _ => {
                 script_path = Some(arg);
                 break;
@@ -75,7 +77,7 @@ fn main() {
         shell.execute_script(command.as_bytes());
     } else if let Some(path) = script_path {
         shell.execute_file(&path.as_str());
-    } else if stdin_is_a_tty {
+    } else if stdin_is_a_tty || force_interactive {
         let mut interactive = InteractiveBinary::new(shell);
         if let Some(key_bindings) = key_bindings {
             interactive.set_keybindings(key_bindings);
