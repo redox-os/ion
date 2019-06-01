@@ -17,7 +17,10 @@ impl Status {
     pub fn from_bool(b: bool) -> Self { Status(!b as i32) }
 
     pub fn error<T: AsRef<str>>(err: T) -> Self {
-        eprintln!("{}", err.as_ref());
+        let err = err.as_ref();
+        if !err.is_empty() {
+            eprintln!("{}", err);
+        }
         Status(1)
     }
 

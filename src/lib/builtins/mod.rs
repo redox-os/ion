@@ -30,7 +30,7 @@ use self::{
 
 use std::{
     borrow::Cow,
-    io::{self, BufRead, Write},
+    io::{self, BufRead},
     path::PathBuf,
 };
 
@@ -689,25 +689,14 @@ pub fn builtin_disown(args: &[small::String], shell: &mut Shell) -> Status {
 }
 
 pub fn builtin_help(args: &[small::String], shell: &mut Shell) -> Status {
-    let builtins = shell.builtins();
-    let stdout = io::stdout();
-    let mut stdout = stdout.lock();
     if let Some(command) = args.get(1) {
-        if let Some(help) = builtins.get_help(command) {
-            let _ = stdout.write_all(help.as_bytes());
-            let _ = stdout.write_all(b"\n");
+        if let Some(help) = shell.builtins().get_help(command) {
+            println!("{}", help);
         } else {
-            let _ = stdout.write_all(b"Command helper not found [run 'help']...");
-            let _ = stdout.write_all(b"\n");
+            println!("Command helper not found [run 'help']...");
         }
     } else {
-        let commands = builtins.keys();
-
-        let mut buffer: Vec<u8> = Vec::new();
-        for command in commands {
-            let _ = writeln!(buffer, "{}", command);
-        }
-        let _ = stdout.write_all(&buffer);
+        println!("{}", shell.builtins().keys().join(""));
     }
     Status::SUCCESS
 }
@@ -743,16 +732,14 @@ pub fn builtin_matches(args: &[small::String], _: &mut Shell) -> Status {
         return Status::SUCCESS;
     }
     if args[1..].len() != 2 {
-        let stderr = io::stderr();
-        let mut stderr = stderr.lock();
-        let _ = stderr.write_all(b"match takes two arguments\n");
+        eprintln!("match takes two arguments");
         return Status::BAD_ARG;
     }
     let input = &args[1];
     let re = match Regex::new(&args[2]) {
         Ok(r) => r,
         Err(e) => {
-            return Status::error(format!("couldn't compile input regex {}: {}\n", args[2], e));
+            return Status::error(format!("couldn't compile input regex {}: {}", args[2], e));
         }
     };
 
