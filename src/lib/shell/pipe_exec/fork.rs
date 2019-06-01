@@ -18,7 +18,7 @@ impl<'a> Shell<'a> {
         pipeline: Pipeline<'a>,
         command_name: String,
         state: ProcessState,
-    ) -> i32 {
+    ) -> Status {
         match unsafe { sys::fork() } {
             Ok(0) => {
                 self.opts_mut().is_background_shell = true;
@@ -31,18 +31,18 @@ impl<'a> Shell<'a> {
                 Self::create_process_group(0);
 
                 // After execution of it's commands, exit with the last command's status.
-                sys::fork_exit(self.pipe(pipeline));
+                sys::fork_exit(self.pipe(pipeline).as_os_code());
             }
             Ok(pid) => {
                 if state != ProcessState::Empty {
                     // The parent process should add the child fork's PID to the background.
                     self.send_to_background(BackgroundProcess::new(pid, state, command_name));
                 }
-                SUCCESS
+                Status::SUCCESS
             }
             Err(why) => {
                 eprintln!("ion: background fork failed: {}", why);
-                exit(FAILURE);
+                exit(1);
             }
         }
     }

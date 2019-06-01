@@ -87,7 +87,7 @@ pub struct Shell<'a> {
     directory_stack: DirectoryStack,
     /// When a command is executed, the final result of that command is stored
     /// here.
-    previous_status: i32,
+    previous_status: Status,
     /// The job ID of the previous command sent to the background.
     previous_job: usize,
     /// Contains all the options relative to the shell
@@ -184,7 +184,7 @@ impl<'a> Shell<'a> {
             flow_control: Block::with_capacity(5),
             directory_stack: DirectoryStack::new(),
             previous_job: !0,
-            previous_status: SUCCESS,
+            previous_status: Status::SUCCESS,
             opts: ShellOptions {
                 err_exit: false,
                 print_comms: false,
@@ -265,7 +265,7 @@ impl<'a> Shell<'a> {
         &mut self,
         name: &str,
         args: &[S],
-    ) -> Result<i32, IonError> {
+    ) -> Result<Status, IonError> {
         if let Some(Value::Function(function)) = self.variables.get_ref(name).cloned() {
             function
                 .execute(self, args)
@@ -290,8 +290,7 @@ impl<'a> Shell<'a> {
     /// commands as they arrive
     pub fn execute_script<T: std::io::Read>(&mut self, lines: T) {
         if let Err(why) = self.execute_command(lines) {
-            eprintln!("ion: {}", why);
-            self.previous_status = FAILURE;
+            self.previous_status = Status::error(format!("ion: {}", why));
         }
     }
 
@@ -302,7 +301,7 @@ impl<'a> Shell<'a> {
     /// the command(s) in the command line REPL interface for Ion. If the supplied command is
     /// not
     /// terminated, then an error will be returned.
-    pub fn execute_command<T: std::io::Read>(&mut self, command: T) -> Result<i32, IonError> {
+    pub fn execute_command<T: std::io::Read>(&mut self, command: T) -> Result<Status, IonError> {
         for cmd in command
             .bytes()
             .filter_map(Result::ok)
@@ -312,7 +311,7 @@ impl<'a> Shell<'a> {
         }
 
         if let Some(block) = self.flow_control.last().map(Statement::short) {
-            self.previous_status = FAILURE;
+            self.previous_status = Status::from_exit_code(1);
             Err(IonError::UnclosedBlock { block: block.to_string() })
         } else {
             Ok(self.previous_status)
@@ -320,7 +319,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Option<i32> {
+    pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Status {
         let command_start_time = SystemTime::now();
 
         pipeline.expand(self);
@@ -332,12 +331,12 @@ impl<'a> Shell<'a> {
                     eprintln!("> {}", pipeline.to_string());
                 }
                 if self.opts.no_exec {
-                    Some(SUCCESS)
+                    Status::SUCCESS
                 } else {
-                    Some(main(&pipeline.items[0].job.args, self))
+                    main(&pipeline.items[0].job.args, self)
                 }
             } else {
-                Some(self.execute_pipeline(pipeline))
+                self.execute_pipeline(pipeline)
             }
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(Value::Function(function)) =
@@ -345,25 +344,23 @@ impl<'a> Shell<'a> {
         {
             if !pipeline.requires_piping() {
                 match function.execute(self, &pipeline.items[0].job.args) {
-                    Ok(()) => None,
+                    Ok(()) => self.previous_status,
                     Err(FunctionError::InvalidArgumentCount) => {
-                        eprintln!("ion: invalid number of function arguments supplied");
-                        Some(FAILURE)
+                        Status::error("ion: invalid number of function arguments supplied")
                     }
                     Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
-                        eprintln!(
+                        Status::error(format!(
                             "ion: function argument has invalid type: expected {}, found value \
                              \'{}\'",
                             expected_type, value
-                        );
-                        Some(FAILURE)
+                        ))
                     }
                 }
             } else {
-                Some(self.execute_pipeline(pipeline))
+                self.execute_pipeline(pipeline)
             }
         } else {
-            Some(self.execute_pipeline(pipeline))
+            self.execute_pipeline(pipeline)
         };
 
         if let Some(ref callback) = self.on_command {
@@ -373,10 +370,8 @@ impl<'a> Shell<'a> {
         }
 
         // Retrieve the exit_status and set the $? variable and history.previous_status
-        if let Some(code) = exit_status {
-            self.variables_mut().set("?", code.to_string());
-            self.previous_status = code;
-        }
+        self.variables_mut().set("?", exit_status);
+        self.previous_status = exit_status;
 
         exit_status
     }
@@ -473,12 +468,15 @@ impl<'a> Shell<'a> {
     pub fn suspend(&self) { signals::suspend(0); }
 
     /// Get the last command's return code and/or the code for the error
-    pub fn previous_status(&self) -> i32 { self.previous_status }
+    pub fn previous_status(&self) -> Status { self.previous_status }
 
     /// Cleanly exit ion
-    pub fn exit(&mut self, status: Option<i32>) -> ! {
+    pub fn exit(&mut self) -> ! { self.exit_with_code(self.previous_status) }
+
+    /// Cleanly exit ion with custom code
+    pub fn exit_with_code(&mut self, status: Status) -> ! {
         self.prep_for_exit();
-        process::exit(status.unwrap_or(self.previous_status));
+        process::exit(status.as_os_code());
     }
 
     pub fn assign(&mut self, key: &Key, value: Value<'a>) -> Result<(), String> {

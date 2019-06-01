@@ -36,7 +36,7 @@ impl<'a, 'b> Expander for Shell<'b> {
     /// Expand a string variable given if its quoted / unquoted
     fn string(&self, name: &str) -> Option<types::Str> {
         if name == "?" {
-            Some(types::Str::from(self.previous_status.to_string()))
+            Some(self.previous_status.into())
         } else {
             self.variables().get_str(name)
         }

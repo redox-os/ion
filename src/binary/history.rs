@@ -103,7 +103,9 @@ impl<'a> InteractiveBinary<'a> {
             return false;
         }
 
-        if ignore.no_such_command && self.shell.borrow().previous_status() == NO_SUCH_COMMAND {
+        if ignore.no_such_command
+            && self.shell.borrow().previous_status() == Status::NO_SUCH_COMMAND
+        {
             return false;
         }
 

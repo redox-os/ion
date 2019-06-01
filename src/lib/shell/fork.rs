@@ -127,7 +127,7 @@ impl<'a, 'b> Fork<'a, 'b> {
 
                 // Execute the given closure within the child's shell.
                 child_func(&mut shell);
-                sys::fork_exit(shell.previous_status);
+                sys::fork_exit(shell.previous_status.as_os_code());
             }
             Ok(pid) => {
                 Ok(IonResult {

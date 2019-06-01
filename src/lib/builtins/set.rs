@@ -1,5 +1,5 @@
 use crate::{
-    shell::{variables::Value, Shell},
+    shell::{status::Status, variables::Value, Shell},
     types,
 };
 use small;
@@ -12,7 +12,7 @@ enum PositionalArgs {
 
 use self::PositionalArgs::*;
 
-pub fn set(args: &[small::String], shell: &mut Shell) -> i32 {
+pub fn set(args: &[small::String], shell: &mut Shell) -> Status {
     let mut args_iter = args.iter();
     let mut positionals = None;
 
@@ -22,7 +22,7 @@ pub fn set(args: &[small::String], shell: &mut Shell) -> i32 {
                 positionals = Some(UnsetIfNone);
                 break;
             }
-            return 0;
+            return Status::SUCCESS;
         } else if arg.starts_with('-') {
             if arg.len() == 1 {
                 positionals = Some(RetainIfNone);
@@ -31,7 +31,7 @@ pub fn set(args: &[small::String], shell: &mut Shell) -> i32 {
             for flag in arg.bytes().skip(1) {
                 match flag {
                     b'e' => shell.opts_mut().err_exit = true,
-                    _ => return 0,
+                    _ => return Status::SUCCESS,
                 }
             }
         } else if arg.starts_with('+') {
@@ -42,15 +42,13 @@ pub fn set(args: &[small::String], shell: &mut Shell) -> i32 {
                     b'o' => match args_iter.next().map(|s| s as &str) {
                         Some("huponexit") => shell.opts_mut().huponexit = false,
                         Some(_) => {
-                            eprintln!("ion: set: invalid option");
-                            return 0;
+                            return Status::error(format!("ion: set: invalid option"));
                         }
                         None => {
-                            eprintln!("ion: set: no option given");
-                            return 0;
+                            return Status::error(format!("ion: set: no option given"));
                         }
                     },
-                    _ => return 0,
+                    _ => return Status::SUCCESS,
                 }
             }
         }
@@ -80,5 +78,5 @@ pub fn set(args: &[small::String], shell: &mut Shell) -> i32 {
         }
     }
 
-    0
+    Status::SUCCESS
 }

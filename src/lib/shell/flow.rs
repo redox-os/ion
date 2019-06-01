@@ -39,7 +39,7 @@ impl<'a> Shell<'a> {
         if let Condition::SigInt = self.execute_statements(&expression) {
             return Condition::SigInt;
         }
-        if self.previous_status == 0 {
+        if self.previous_status.is_success() {
             return self.execute_statements(&success);
         }
 
@@ -49,7 +49,7 @@ impl<'a> Shell<'a> {
                 return Condition::SigInt;
             }
 
-            if self.previous_status == 0 {
+            if self.previous_status.is_success() {
                 return self.execute_statements(&success);
             }
         }
@@ -118,7 +118,7 @@ impl<'a> Shell<'a> {
     ) -> Condition {
         loop {
             self.execute_statements(expression);
-            if self.previous_status != 0 {
+            if !self.previous_status.is_success() {
                 return Condition::NoOp;
             }
 
@@ -136,16 +136,16 @@ impl<'a> Shell<'a> {
         match statement {
             Statement::Error(number) => {
                 self.previous_status = *number;
-                self.variables.set("?", self.previous_status.to_string());
+                self.variables.set("?", self.previous_status);
                 self.flow_control.clear();
             }
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
-                self.variables.set("?", self.previous_status.to_string());
+                self.variables.set("?", self.previous_status);
             }
             Statement::Export(action) => {
                 self.previous_status = self.export(action);
-                self.variables.set("?", self.previous_status.to_string());
+                self.variables.set("?", self.previous_status);
             }
             Statement::While { expression, statements } => {
                 if self.execute_while(&expression, &statements) == Condition::SigInt {
@@ -180,17 +180,17 @@ impl<'a> Shell<'a> {
                     if !pipeline.items.is_empty() {
                         self.run_pipeline(pipeline);
                     }
-                    if self.opts.err_exit && self.previous_status != SUCCESS {
-                        self.exit(None);
+                    if self.opts.err_exit && !self.previous_status.is_success() {
+                        self.exit();
                     }
                     if !statements.is_empty() {
                         self.execute_statements(&statements);
                     }
                 }
                 Err(e) => {
-                    eprintln!("ion: pipeline expansion error: {}", e);
-                    self.previous_status = FAILURE;
-                    self.variables.set("?", self.previous_status.to_string());
+                    self.previous_status =
+                        Status::error(format!("ion: pipeline expansion error: {}", e));
+                    self.variables.set("?", self.previous_status);
                     self.flow_control.clear();
                     return Condition::Break;
                 }
@@ -214,9 +214,10 @@ impl<'a> Shell<'a> {
                 }
             }
             Statement::And(box_statement) => {
-                let condition = match self.previous_status {
-                    SUCCESS => self.execute_statement(box_statement),
-                    _ => Condition::NoOp,
+                let condition = if self.previous_status.is_success() {
+                    self.execute_statement(box_statement)
+                } else {
+                    Condition::NoOp
                 };
 
                 if condition != Condition::NoOp {
@@ -224,9 +225,10 @@ impl<'a> Shell<'a> {
                 }
             }
             Statement::Or(box_statement) => {
-                let condition = match self.previous_status {
-                    FAILURE => self.execute_statement(box_statement),
-                    _ => Condition::NoOp,
+                let condition = if self.previous_status.is_success() {
+                    Condition::NoOp
+                } else {
+                    self.execute_statement(box_statement)
                 };
 
                 if condition != Condition::NoOp {
@@ -236,13 +238,8 @@ impl<'a> Shell<'a> {
             Statement::Not(box_statement) => {
                 // NOTE: Should the condition be used?
                 let _condition = self.execute_statement(box_statement);
-                match self.previous_status {
-                    FAILURE => self.previous_status = SUCCESS,
-                    SUCCESS => self.previous_status = FAILURE,
-                    _ => (),
-                }
-                let previous_status = self.previous_status.to_string();
-                self.variables_mut().set("?", previous_status);
+                self.previous_status.toggle();
+                self.variables.set("?", self.previous_status);
             }
             Statement::Break => return Condition::Break,
             Statement::Continue => return Condition::Continue,
@@ -257,7 +254,7 @@ impl<'a> Shell<'a> {
         }
         if let Some(signal) = signals::SignalHandler.next() {
             if self.handle_signal(signal) {
-                self.exit(Some(get_signal_code(signal)));
+                self.exit_with_code(Status::from_signal(signal));
             }
             Condition::SigInt
         } else if self.break_flow {
@@ -327,7 +324,7 @@ impl<'a> Shell<'a> {
 
                 if let Some(statement) = case.conditional.as_ref() {
                     self.on_command(statement);
-                    if self.previous_status != SUCCESS {
+                    if self.previous_status.is_failure() {
                         continue;
                     }
                 }

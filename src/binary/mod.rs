@@ -9,7 +9,7 @@ use self::{prompt::prompt, readln::readln};
 use ion_shell::{
     builtins::man_pages,
     parser::{Expander, Terminator},
-    status::{FAILURE, SUCCESS},
+    status::Status,
     Shell,
 };
 use itertools::Itertools;
@@ -114,34 +114,28 @@ impl<'a> InteractiveBinary<'a> {
     /// Liner.
     pub fn execute_interactive(self) -> ! {
         let context_bis = self.context.clone();
-        let history = &move |args: &[small::String], _shell: &mut Shell| -> i32 {
+        let history = &move |args: &[small::String], _shell: &mut Shell| -> Status {
             if man_pages::check_help(args, MAN_HISTORY) {
-                return SUCCESS;
+                return Status::SUCCESS;
             }
 
             print!("{}", context_bis.borrow().history.buffers.iter().format("\n"));
-            SUCCESS
+            Status::SUCCESS
         };
 
         let context_bis = self.context.clone();
-        let keybindings = &move |args: &[small::String], _shell: &mut Shell| -> i32 {
+        let keybindings = &move |args: &[small::String], _shell: &mut Shell| -> Status {
             match args.get(1).map(|s| s.as_str()) {
                 Some("vi") => {
                     context_bis.borrow_mut().key_bindings = KeyBindings::Vi;
-                    SUCCESS
+                    Status::SUCCESS
                 }
                 Some("emacs") => {
                     context_bis.borrow_mut().key_bindings = KeyBindings::Emacs;
-                    SUCCESS
+                    Status::SUCCESS
                 }
-                Some(_) => {
-                    eprintln!("Invalid keybindings. Choices are vi and emacs");
-                    FAILURE
-                }
-                None => {
-                    eprintln!("keybindings need an argument");
-                    FAILURE
-                }
+                Some(_) => Status::error("Invalid keybindings. Choices are vi and emacs"),
+                None => Status::error("keybindings need an argument"),
             }
         };
 

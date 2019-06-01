@@ -3,7 +3,7 @@
 use std::io::{self, Write};
 
 use crate::{
-    shell::{status::*, variables::Variables},
+    shell::{status::Status, variables::Variables},
     types,
 };
 
@@ -12,11 +12,7 @@ fn print_list(vars: &Variables) {
     let stdout = &mut stdout.lock();
 
     for (key, value) in vars.aliases() {
-        let _ = stdout
-            .write(key.as_bytes())
-            .and_then(|_| stdout.write_all(b" = "))
-            .and_then(|_| stdout.write_all(value.as_bytes()))
-            .and_then(|_| stdout.write_all(b"\n"));
+        writeln!(stdout, "{} = {}", key, value).unwrap();
     }
 }
 
@@ -69,84 +65,72 @@ fn parse_alias(args: &str) -> Binding {
 
 /// The `alias` command will define an alias for another command, and thus may be used as a
 /// command itself.
-pub fn alias(vars: &mut Variables, args: &str) -> i32 {
+pub fn alias(vars: &mut Variables, args: &str) -> Status {
     match parse_alias(args) {
         Binding::InvalidKey(key) => {
-            eprintln!("ion: alias name, '{}', is invalid", key);
-            return FAILURE;
+            return Status::error(format!("ion: alias name, '{}', is invalid", key));
         }
         Binding::KeyValue(key, value) => {
             vars.set(&key, types::Alias(value));
         }
         Binding::ListEntries => print_list(&vars),
         Binding::KeyOnly(key) => {
-            eprintln!("ion: please provide value for alias '{}'", key);
-            return FAILURE;
+            return Status::error(format!("ion: please provide value for alias '{}'", key));
         }
     }
-    SUCCESS
+    Status::SUCCESS
 }
 
 /// Dropping an alias will erase it from the shell.
-pub fn drop_alias<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
+pub fn drop_alias<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> Status {
     if args.len() <= 1 {
-        eprintln!("ion: you must specify an alias name");
-        return FAILURE;
+        return Status::error(format!("ion: you must specify an alias name"));
     }
     for alias in args.iter().skip(1) {
         if vars.remove_variable(alias.as_ref()).is_none() {
-            eprintln!("ion: undefined alias: {}", alias.as_ref());
-            return FAILURE;
+            return Status::error(format!("ion: undefined alias: {}", alias.as_ref()));
         }
     }
-    SUCCESS
+    Status::SUCCESS
 }
 
 /// Dropping an array will erase it from the shell.
-pub fn drop_array<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
+pub fn drop_array<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> Status {
     if args.len() <= 2 {
-        eprintln!("ion: you must specify an array name");
-        return FAILURE;
+        return Status::error(format!("ion: you must specify an array name"));
     }
 
     if args[1].as_ref() != "-a" {
-        eprintln!("ion: drop_array must be used with -a option");
-        return FAILURE;
+        return Status::error(format!("ion: drop_array must be used with -a option"));
     }
 
     for array in args.iter().skip(2) {
         if vars.remove_variable(array.as_ref()).is_none() {
-            eprintln!("ion: undefined array: {}", array.as_ref());
-            return FAILURE;
+            return Status::error(format!("ion: undefined array: {}", array.as_ref()));
         }
     }
-    SUCCESS
+    Status::SUCCESS
 }
 
 /// Dropping a variable will erase it from the shell.
-pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> i32 {
+pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> Status {
     if args.len() <= 1 {
-        eprintln!("ion: you must specify a variable name");
-        return FAILURE;
+        return Status::error(format!("ion: you must specify a variable name"));
     }
 
     for variable in args.iter().skip(1) {
         if vars.remove_variable(variable.as_ref()).is_none() {
-            eprintln!("ion: undefined variable: {}", variable.as_ref());
-            return FAILURE;
+            return Status::error(format!("ion: undefined variable: {}", variable.as_ref()));
         }
     }
 
-    SUCCESS
+    Status::SUCCESS
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        parser::Expander,
-        shell::status::{FAILURE, SUCCESS},
-    };
+    use crate::parser::Expander;
 
     struct VariableExpander<'a>(pub Variables<'a>);
 
@@ -183,7 +167,7 @@ mod test {
         let mut variables = Variables::default();
         variables.set("FOO", "BAR");
         let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
-        assert_eq!(SUCCESS, return_status);
+        assert!(return_status.is_success());
         let expanded = VariableExpander(variables).expand_string("$FOO").join("");
         assert_eq!("", expanded);
     }
@@ -192,14 +176,14 @@ mod test {
     fn drop_fails_with_no_arguments() {
         let mut variables = Variables::default();
         let return_status = drop_variable(&mut variables, &["drop"]);
-        assert_eq!(FAILURE, return_status);
+        assert!(!return_status.is_success());
     }
 
     #[test]
     fn drop_fails_with_undefined_variable() {
         let mut variables = Variables::default();
         let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
-        assert_eq!(FAILURE, return_status);
+        assert!(!return_status.is_success());
     }
 
     #[test]
@@ -207,7 +191,7 @@ mod test {
         let mut variables = Variables::default();
         variables.set("FOO", array!["BAR"]);
         let return_status = drop_array(&mut variables, &["drop", "-a", "FOO"]);
-        assert_eq!(SUCCESS, return_status);
+        assert_eq!(Status::SUCCESS, return_status);
         let expanded = VariableExpander(variables).expand_string("@FOO").join("");
         assert_eq!("", expanded);
     }
@@ -216,13 +200,13 @@ mod test {
     fn drop_array_fails_with_no_arguments() {
         let mut variables = Variables::default();
         let return_status = drop_array(&mut variables, &["drop", "-a"]);
-        assert_eq!(FAILURE, return_status);
+        assert!(!return_status.is_success());
     }
 
     #[test]
     fn drop_array_fails_with_undefined_array() {
         let mut variables = Variables::default();
         let return_status = drop_array(&mut variables, &["drop", "FOO"]);
-        assert_eq!(FAILURE, return_status);
+        assert!(!return_status.is_success());
     }
 }

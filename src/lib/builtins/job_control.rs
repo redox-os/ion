@@ -73,34 +73,31 @@ pub fn jobs(shell: &mut Shell) {
 /// Hands control of the foreground process to the specified jobs, recording their exit status.
 /// If the job is stopped, the job will be resumed.
 /// If multiple jobs are given, then only the last job's exit status will be returned.
-pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
-    fn fg_job(shell: &mut Shell, njob: usize) -> i32 {
+pub fn fg(shell: &mut Shell, args: &[small::String]) -> Status {
+    fn fg_job(shell: &mut Shell, njob: usize) -> Status {
         if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
             // Give the bg task the foreground, and wait for it to finish. Also resume it if it
             // isn't running
             shell.set_bg_task_in_foreground(job.pid(), !job.is_running())
         } else {
             // Informs the user that the specified job ID no longer exists.
-            eprintln!("ion: fg: job {} does not exist", njob);
-            return FAILURE;
+            return Status::error(format!("ion: fg: job {} does not exist", njob));
         }
     }
 
-    let mut status = 0;
+    let mut status = Status::SUCCESS;
     if args.is_empty() {
         status = if let Some(previous_job) = shell.previous_job() {
             fg_job(shell, previous_job)
         } else {
-            eprintln!("ion: fg: no jobs are running in the background");
-            FAILURE
+            Status::error(format!("ion: fg: no jobs are running in the background"))
         };
     } else {
         for arg in args {
             match arg.parse::<usize>() {
                 Ok(njob) => status = fg_job(shell, njob),
                 Err(_) => {
-                    eprintln!("ion: fg: {} is not a valid job number", arg);
-                    status = FAILURE;
+                    status = Status::error(format!("ion: fg: {} is not a valid job number", arg))
                 }
             }
         }
@@ -109,44 +106,37 @@ pub fn fg(shell: &mut Shell, args: &[small::String]) -> i32 {
 }
 
 /// Resumes a stopped background process, if it was stopped.
-pub fn bg(shell: &mut Shell, args: &[small::String]) -> i32 {
-    fn bg_job(shell: &mut Shell, njob: usize) -> bool {
+pub fn bg(shell: &mut Shell, args: &[small::String]) -> Status {
+    fn bg_job(shell: &mut Shell, njob: usize) -> Status {
         if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
             if job.is_running() {
-                eprintln!("ion: bg: job {} is already running", njob);
-                false
+                Status::error(format!("ion: bg: job {} is already running", njob))
             } else {
                 job.resume();
-                true
+                Status::SUCCESS
             }
         } else {
-            eprintln!("ion: bg: job {} does not exist", njob);
-            false
+            Status::error(format!("ion: bg: job {} does not exist", njob))
         }
     }
 
     if args.is_empty() {
         if let Some(previous_job) = shell.previous_job() {
-            if bg_job(shell, previous_job) {
-                SUCCESS
-            } else {
-                FAILURE
-            }
+            bg_job(shell, previous_job)
         } else {
-            eprintln!("ion: bg: no jobs are running in the background");
-            FAILURE
+            Status::error(format!("ion: bg: no jobs are running in the background"))
         }
     } else {
         for arg in args {
             if let Ok(njob) = arg.parse::<usize>() {
-                if !bg_job(shell, njob) {
-                    return FAILURE;
+                let status = bg_job(shell, njob);
+                if !status.is_success() {
+                    return status;
                 }
             } else {
-                eprintln!("ion: bg: {} is not a valid job number", arg);
-                return FAILURE;
+                return Status::error(format!("ion: bg: {} is not a valid job number", arg));
             };
         }
-        SUCCESS
+        Status::SUCCESS
     }
 }

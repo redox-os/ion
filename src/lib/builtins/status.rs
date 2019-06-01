@@ -1,8 +1,11 @@
-use crate::{builtins::man_pages::MAN_STATUS, shell::Shell};
+use crate::{
+    builtins::man_pages::MAN_STATUS,
+    shell::{status::Status, Shell},
+};
 use small;
 use std::env;
 
-pub fn status(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
+pub fn status(args: &[small::String], shell: &mut Shell) -> Status {
     let mut help = false;
     let mut login_shell = false;
     let mut interactive = false;
@@ -33,11 +36,11 @@ pub fn status(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
             }
 
             if login_shell && !is_login {
-                return Err("".to_string());
+                return Status::error("");
             }
 
             if interactive && shell.opts().is_background_shell {
-                return Err("".to_string());
+                return Status::error("");
             }
 
             if filename {
@@ -55,7 +58,7 @@ pub fn status(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
                 println!("{}", MAN_STATUS);
             }
 
-            Ok(())
+            Status::SUCCESS
         }
         1 => {
             if is_login {
@@ -63,8 +66,8 @@ pub fn status(args: &[small::String], shell: &mut Shell) -> Result<(), String> {
             } else {
                 println!("This is not a login shell");
             }
-            Ok(())
+            Status::SUCCESS
         }
-        _ => Err("status takes one argument\n".to_string()),
+        _ => Status::error("status takes one argument"),
     }
 }
