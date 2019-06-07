@@ -16,7 +16,7 @@ use std::char;
 
 pub fn is_valid_name(name: &str) -> bool {
     let mut chars = name.chars();
-    chars.next().map_or(false, char::is_alphabetic)
+    chars.next().map_or(false, |b| char::is_alphabetic(b) || b == '_')
         && chars.all(|b| b.is_alphanumeric() || b == '_')
 }
 

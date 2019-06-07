@@ -99,7 +99,7 @@ impl<'b> Shell<'b> {
         }
     }
 
-    /// Collect all updates to perform on variables for a given assignement action
+    /// Collect all updates to perform on variables for a given assignment action
     pub(crate) fn calculate<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
@@ -115,7 +115,7 @@ impl<'b> Shell<'b> {
 
             if !is_valid_name(key.name) {
                 return Err("invalid variable name\nVariable names may only be (unicode) \
-                            alphanumeric or `_`\nThe first character must be alphabetic"
+                            alphanumeric or `_`\nThe first character must be alphabetic or `_`"
                     .to_string());
             }
 
