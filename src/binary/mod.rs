@@ -14,7 +14,7 @@ use ion_shell::{
 };
 use itertools::Itertools;
 use liner::{Buffer, Context, KeyBindings};
-use std::{cell::RefCell, path::Path, rc::Rc};
+use std::{io, io::Write, cell::RefCell, path::Path, rc::Rc};
 
 pub const MAN_ION: &str = "NAME
     Ion - The Ion shell
@@ -119,7 +119,37 @@ impl<'a> InteractiveBinary<'a> {
                 return Status::SUCCESS;
             }
 
-            print!("{}", context_bis.borrow().history.buffers.iter().format("\n"));
+            match args.get(1).map(|s| s.as_str()) {
+                Some("+inc_append") => {
+                    context_bis.borrow_mut().history.inc_append = true;
+                }
+                Some("-inc_append") => {
+                    context_bis.borrow_mut().history.inc_append = false;
+                }
+                Some("+share") => {
+                    context_bis.borrow_mut().history.inc_append = true;
+                    context_bis.borrow_mut().history.share = true;
+                }
+                Some("-share") => {
+                    context_bis.borrow_mut().history.inc_append = false;
+                    context_bis.borrow_mut().history.share = false;
+                }
+                Some("+duplicates") => {
+                    context_bis.borrow_mut().history.load_duplicates = true;
+                }
+                Some("-duplicates") => {
+                    context_bis.borrow_mut().history.load_duplicates = false;
+                }
+                Some(_) => {
+                    Status::error("Invalid history option. Choices are [+|-] inc_append and share (implies inc_append).");
+                }
+                None => {
+                    print!("{}", context_bis.borrow().history.buffers.iter().format("\n"));
+                    io::stdout().flush().unwrap_or_else(|err| {
+                        eprintln!("ion: history print: {}", err);
+                    });
+                }
+            }
             Status::SUCCESS
         };
 
