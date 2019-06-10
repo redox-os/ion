@@ -65,9 +65,11 @@ pub enum RedirectError {
 #[derive(Debug, Error)]
 pub enum PipeError {
     #[error(display = "ion: {}", cause)]
-    RedirectError { cause: RedirectError },
+    RedirectPipeError { cause: RedirectError },
     #[error(display = "ion: could not create pipe: {}", cause)]
-    CreateError { cause: io::Error },
+    CreatePipeError { cause: io::Error },
+    #[error(display = "ion: could not run function: {}", cause)]
+    RunFunctionError { cause: FunctionError },
 }
 
 impl fmt::Display for OutputError {
@@ -100,7 +102,11 @@ impl From<InputError> for RedirectError {
 }
 
 impl From<RedirectError> for PipeError {
-    fn from(cause: RedirectError) -> Self { PipeError::RedirectError { cause } }
+    fn from(cause: RedirectError) -> Self { PipeError::RedirectPipeError { cause } }
+}
+
+impl From<FunctionError> for PipeError {
+    fn from(cause: FunctionError) -> Self { PipeError::RunFunctionError { cause } }
 }
 
 /// Create an OS pipe and write the contents of a byte slice to one end
@@ -332,15 +338,7 @@ impl<'b> Shell<'b> {
         if let Some(Value::Function(function)) = self.variables.get_ref(name).cloned() {
             match function.execute(self, args) {
                 Ok(()) => Status::SUCCESS,
-                Err(FunctionError::InvalidArgumentCount) => {
-                    Status::error(format!("ion: invalid number of function arguments supplied"))
-                }
-                Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
-                    Status::error(format!(
-                        "ion: function argument has invalid type: expected {}, found value \'{}\'",
-                        expected_type, value
-                    ))
-                }
+                Err(why) => Status::error(format!("{}", why)),
             }
         } else {
             unreachable!()
@@ -409,31 +407,17 @@ impl<'b> Shell<'b> {
     /// If a job is stopped, the shell will add that job to a list of background jobs and
     /// continue to watch the job in the background, printing notifications on status changes
     /// of that job over time.
-    pub fn execute_pipeline(&mut self, pipeline: Pipeline<'b>) -> Status {
-        // Don't execute commands when the `-n` flag is passed.
-        if self.opts.no_exec {
-            return Status::SUCCESS;
-        }
-
-        // A string representing the command is stored here.
-        let command = pipeline.to_string();
-        if self.opts.print_comms {
-            eprintln!("> {}", command);
-        }
-
+    pub fn execute_pipeline(&mut self, pipeline: Pipeline<'b>) -> Result<Status, PipeError> {
         // While active, the SIGTTOU signal will be ignored.
         let _sig_ignore = SignalHandler::new();
 
         // If the given pipeline is a background task, fork the shell.
         match pipeline.pipe {
-            PipeType::Disown => self.fork_pipe(pipeline, command, ProcessState::Empty),
-            PipeType::Background => self.fork_pipe(pipeline, command, ProcessState::Running),
+            PipeType::Disown => Ok(self.fork_pipe(pipeline, ProcessState::Empty)),
+            PipeType::Background => Ok(self.fork_pipe(pipeline, ProcessState::Running)),
             // Execute each command in the pipeline, giving each command the foreground.
             PipeType::Normal => {
-                let exit_status = self.pipe(pipeline).unwrap_or_else(|err| {
-                    eprintln!("{}", err);
-                    Status::COULD_NOT_EXEC
-                });
+                let exit_status = self.pipe(pipeline);
                 // Set the shell as the foreground process again to regain the TTY.
                 if !self.opts.is_background_shell {
                     let _ = sys::tcsetpgrp(0, process::id());
@@ -484,7 +468,7 @@ impl<'b> Shell<'b> {
                     } else {
                         // Pipe the previous command's stdin to this commands stdout/stderr.
                         let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)
-                            .map_err(|cause| PipeError::CreateError { cause })?;
+                            .map_err(|cause| PipeError::CreatePipeError { cause })?;
                         if is_external {
                             append_external_stdio_pipe(&mut ext_stdio_pipes, writer);
                         }
@@ -664,7 +648,7 @@ where
             *current_pid = pid;
             Ok(())
         }
-        Err(cause) => Err(PipeError::CreateError { cause }),
+        Err(cause) => Err(PipeError::CreatePipeError { cause }),
     }
 }
 

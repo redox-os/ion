@@ -15,5 +15,5 @@ goodbye
 9
 16
 25
-ion: function argument has invalid type: expected int, found value '$num'
-ion: function argument has invalid type: expected int, found value '$num'
+ion: could not run function: argument has invalid type: expected int, found value '$num'
+ion: could not run function: argument has invalid type: expected int, found value '$num'

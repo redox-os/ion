@@ -12,12 +12,7 @@ impl<'a> Shell<'a> {
 
     /// Forks the shell, adding the child to the parent's background list, and executing
     /// the given commands in the child fork.
-    pub(super) fn fork_pipe(
-        &mut self,
-        pipeline: Pipeline<'a>,
-        command_name: String,
-        state: ProcessState,
-    ) -> Status {
+    pub(super) fn fork_pipe(&mut self, pipeline: Pipeline<'a>, state: ProcessState) -> Status {
         match unsafe { sys::fork() } {
             Ok(0) => {
                 self.opts_mut().is_background_shell = true;
@@ -42,7 +37,11 @@ impl<'a> Shell<'a> {
             Ok(pid) => {
                 if state != ProcessState::Empty {
                     // The parent process should add the child fork's PID to the background.
-                    self.send_to_background(BackgroundProcess::new(pid, state, command_name));
+                    self.send_to_background(BackgroundProcess::new(
+                        pid,
+                        state,
+                        pipeline.to_string(),
+                    ));
                 }
                 Status::SUCCESS
             }

@@ -6,7 +6,6 @@ use crate::{
 };
 use small;
 use smallvec::SmallVec;
-use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ElseIf<'a> {
@@ -344,20 +343,12 @@ pub struct Function<'a> {
     statements:  Block<'a>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Error)]
 pub enum FunctionError {
+    #[error(display = "invalid number of arguments supplied")]
     InvalidArgumentCount,
-    InvalidArgumentType(Primitive, String),
-}
-
-impl Display for FunctionError {
-    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
-        use self::FunctionError::*;
-        match *self {
-            InvalidArgumentCount => write!(fmt, "invalid number of arguments"),
-            InvalidArgumentType(ref t, ref value) => write!(fmt, "{} is not of type {}", value, t),
-        }
-    }
+    #[error(display = "argument has invalid type: expected {}, found value '{}'", t, val)]
+    InvalidArgumentType { t: Primitive, val: String },
 }
 
 impl<'a> Function<'a> {
@@ -380,10 +371,10 @@ impl<'a> Function<'a> {
                 if let Ok(value) = value_check(shell, value.as_ref(), &type_.kind) {
                     Ok((type_.clone(), value))
                 } else {
-                    Err(FunctionError::InvalidArgumentType(
-                        type_.kind.clone(),
-                        value.as_ref().into(),
-                    ))
+                    Err(FunctionError::InvalidArgumentType {
+                        t:   type_.kind.clone(),
+                        val: value.as_ref().into(),
+                    })
                 }
             })
             .collect::<Result<SmallVec<[_; 8]>, _>>()?;

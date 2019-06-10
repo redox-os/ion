@@ -23,12 +23,12 @@ pub fn duplicate_streams() -> Result<(Option<File>, File, File), PipeError> {
 
     let stdout = unsafe {
         File::from_raw_fd(
-            sys::dup(sys::STDOUT_FILENO).map_err(|cause| PipeError::CreateError { cause })?,
+            sys::dup(sys::STDOUT_FILENO).map_err(|cause| PipeError::CreatePipeError { cause })?,
         )
     };
     let stderr = unsafe {
         File::from_raw_fd(
-            sys::dup(sys::STDERR_FILENO).map_err(|cause| PipeError::CreateError { cause })?,
+            sys::dup(sys::STDERR_FILENO).map_err(|cause| PipeError::CreatePipeError { cause })?,
         )
     };
     // And then meld stderr alongside stdin and stdout
