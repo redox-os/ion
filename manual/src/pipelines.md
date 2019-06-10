@@ -62,3 +62,17 @@ command &| command
 ```sh
 command | command > stdout
 ```
+
+## Detaching processes
+
+### Send to background
+
+```sh
+command &
+```
+
+### Disown (detach from shell)
+
+```sh
+command &!
+```
