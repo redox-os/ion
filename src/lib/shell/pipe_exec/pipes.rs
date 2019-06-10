@@ -1,6 +1,6 @@
 use super::{
     super::job::{RefinedJob, TeeItem},
-    append_external_stdio_pipe, pipe_fail,
+    append_external_stdio_pipe, PipeError,
 };
 
 use crate::sys;
@@ -21,24 +21,22 @@ impl<'a, 'b> TeePipe<'a, 'b> {
         TeePipe { parent, ext_stdio_pipes, is_external }
     }
 
-    fn inner_connect<F>(&mut self, tee: &mut TeeItem, mut action: F)
+    fn inner_connect<F>(&mut self, tee: &mut TeeItem, mut action: F) -> Result<(), PipeError>
     where
         F: FnMut(&mut RefinedJob<'b>, File),
     {
-        match sys::pipe2(sys::O_CLOEXEC) {
-            Err(e) => pipe_fail(e),
-            Ok((reader, writer)) => {
-                (*tee).source = Some(unsafe { File::from_raw_fd(reader) });
-                action(self.parent, unsafe { File::from_raw_fd(writer) });
-                if self.is_external {
-                    append_external_stdio_pipe(self.ext_stdio_pipes, writer);
-                }
-            }
+        let (reader, writer) =
+            sys::pipe2(sys::O_CLOEXEC).map_err(|cause| PipeError::CreateError { cause })?;
+        (*tee).source = Some(unsafe { File::from_raw_fd(reader) });
+        action(self.parent, unsafe { File::from_raw_fd(writer) });
+        if self.is_external {
+            append_external_stdio_pipe(self.ext_stdio_pipes, writer);
         }
+        Ok(())
     }
 
-    pub fn connect(&mut self, out: &mut TeeItem, err: &mut TeeItem) {
-        self.inner_connect(out, RefinedJob::stdout);
-        self.inner_connect(err, RefinedJob::stderr);
+    pub fn connect(&mut self, out: &mut TeeItem, err: &mut TeeItem) -> Result<(), PipeError> {
+        self.inner_connect(out, RefinedJob::stdout)?;
+        self.inner_connect(err, RefinedJob::stderr)
     }
 }
