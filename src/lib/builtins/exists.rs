@@ -3,7 +3,7 @@ use std::{fs, os::unix::fs::PermissionsExt};
 use crate::shell::{Shell, Value};
 use small;
 
-pub fn exists(args: &[small::String], shell: &Shell) -> Result<bool, small::String> {
+pub fn exists(args: &[small::String], shell: &Shell<'_>) -> Result<bool, small::String> {
     match args.get(1) {
         Some(ref s) if s.starts_with("--") => {
             let (_, option) = s.split_at(2);
@@ -36,7 +36,7 @@ pub fn exists(args: &[small::String], shell: &Shell) -> Result<bool, small::Stri
 
 /// Matches flag arguments to their respective functionaity when the `-`
 /// character is detected.
-fn match_flag_argument(flag: char, argument: &str, shell: &Shell) -> bool {
+fn match_flag_argument(flag: char, argument: &str, shell: &Shell<'_>) -> bool {
     match flag {
         'a' => array_var_is_not_empty(argument, shell),
         'b' => binary_is_in_path(argument, shell),
@@ -48,7 +48,7 @@ fn match_flag_argument(flag: char, argument: &str, shell: &Shell) -> bool {
 }
 
 // Matches option arguments to their respective functionality
-fn match_option_argument(option: &str, argument: &str, shell: &Shell) -> bool {
+fn match_option_argument(option: &str, argument: &str, shell: &Shell<'_>) -> bool {
     match option {
         "fn" => function_is_defined(argument, &shell),
         _ => false,
@@ -66,7 +66,7 @@ fn path_is_directory(filepath: &str) -> bool {
 }
 
 /// Returns true if the binary is found in path (and is executable)
-fn binary_is_in_path(binaryname: &str, shell: &Shell) -> bool {
+fn binary_is_in_path(binaryname: &str, shell: &Shell<'_>) -> bool {
     // TODO: Maybe this function should reflect the logic for spawning new processes
     // TODO: Right now they use an entirely different logic which means that it
     // *might* be possible TODO: that `exists` reports a binary to be in the
@@ -107,7 +107,7 @@ fn file_has_execute_permission(filepath: &str) -> bool {
 fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
 
 /// Returns true if the variable is an array and the array is not empty
-fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
+fn array_var_is_not_empty(arrayvar: &str, shell: &Shell<'_>) -> bool {
     match shell.variables().get_ref(arrayvar) {
         Some(Value::Array(array)) => !array.is_empty(),
         _ => false,
@@ -115,7 +115,7 @@ fn array_var_is_not_empty(arrayvar: &str, shell: &Shell) -> bool {
 }
 
 /// Returns true if the variable is a string and the string is not empty
-fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
+fn string_var_is_not_empty(stringvar: &str, shell: &Shell<'_>) -> bool {
     match shell.variables().get_str(stringvar) {
         Some(string) => !string.is_empty(),
         None => false,
@@ -123,7 +123,7 @@ fn string_var_is_not_empty(stringvar: &str, shell: &Shell) -> bool {
 }
 
 /// Returns true if a function with the given name is defined
-fn function_is_defined(function: &str, shell: &Shell) -> bool {
+fn function_is_defined(function: &str, shell: &Shell<'_>) -> bool {
     if let Some(Value::Function(_)) = shell.variables().get_ref(function) {
         true
     } else {

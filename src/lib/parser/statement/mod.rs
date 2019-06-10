@@ -15,7 +15,7 @@ use crate::{
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
 pub fn parse_and_validate<'b>(
-    statement: Result<StatementVariant, StatementError>,
+    statement: Result<StatementVariant<'_>, StatementError>,
     builtins: &BuiltinMap<'b>,
 ) -> Statement<'b> {
     match statement {

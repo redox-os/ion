@@ -24,11 +24,11 @@ impl Status {
         Status(1)
     }
 
-    pub fn is_success(&self) -> bool { self.0 == 0 }
+    pub fn is_success(self) -> bool { self.0 == 0 }
 
-    pub fn is_failure(&self) -> bool { self.0 != 0 }
+    pub fn is_failure(self) -> bool { self.0 != 0 }
 
-    pub fn as_os_code(&self) -> i32 { self.0 }
+    pub fn as_os_code(self) -> i32 { self.0 }
 
     pub fn toggle(&mut self) { self.0 = if self.is_success() { 1 } else { 0 }; }
 }

@@ -105,7 +105,7 @@ value_from_type!(bmap: types::BTreeMap<'a> => BTreeMap(bmap));
 value_from_type!(function: Function<'a> => Function(function));
 
 impl<'a> fmt::Display for Value<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Value::Str(ref str_) => write!(f, "{}", str_),
             Value::Alias(ref alias) => write!(f, "{}", **alias),
@@ -146,7 +146,7 @@ impl<'a> Variables<'a> {
         })
     }
 
-    pub fn functions(&self) -> impl Iterator<Item = (&types::Str, &Function)> {
+    pub fn functions(&self) -> impl Iterator<Item = (&types::Str, &Function<'a>)> {
         self.0.scopes().rev().flat_map(|map| {
             map.iter().filter_map(|(key, val)| {
                 if let Value::Function(val) = val {
@@ -158,7 +158,7 @@ impl<'a> Variables<'a> {
         })
     }
 
-    pub fn arrays(&self) -> impl Iterator<Item = (&types::Str, &types::Array)> {
+    pub fn arrays(&self) -> impl Iterator<Item = (&types::Str, &types::Array<'a>)> {
         self.0.scopes().rev().flat_map(|map| {
             map.iter().filter_map(
                 |(key, val)| {
@@ -326,7 +326,7 @@ impl<'a> Variables<'a> {
 
 impl<'a> Default for Variables<'a> {
     fn default() -> Self {
-        let mut map: Scopes<types::Str, Value> = Scopes::with_capacity(64);
+        let mut map: Scopes<types::Str, Value<'a>> = Scopes::with_capacity(64);
         map.set("DIRECTORY_STACK_SIZE", "1000");
         map.set("HISTORY_SIZE", "1000");
         map.set("HISTFILE_SIZE", "100000");

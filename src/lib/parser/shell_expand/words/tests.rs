@@ -8,7 +8,7 @@ struct Empty;
 
 impl Expander for Empty {}
 
-fn compare(input: &str, expected: Vec<WordToken>) {
+fn compare(input: &str, expected: Vec<WordToken<'_>>) {
     let mut correct = 0;
     for (actual, expected) in WordIterator::new(input, &Empty, true).zip(expected.iter()) {
         assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);

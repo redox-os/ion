@@ -122,7 +122,7 @@ impl<'a, 'b> Fork<'a, 'b> {
                 drop(null_file);
 
                 // Obtain ownership of the child's copy of the shell, and then configure it.
-                let mut shell: Shell = unsafe { (self.shell as *const Shell).read() };
+                let mut shell: Shell<'b> = unsafe { (self.shell as *const Shell<'b>).read() };
                 shell.variables_mut().set("PID", sys::getpid().unwrap_or(0).to_string());
 
                 // Execute the given closure within the child's shell.

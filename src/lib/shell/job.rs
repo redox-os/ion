@@ -19,7 +19,7 @@ impl<'a> Job<'a> {
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand(&mut self, shell: &Shell) {
+    pub fn expand(&mut self, shell: &Shell<'_>) {
         match shell.variables.get_ref(&self.args[0]) {
             Some(Value::Function(_)) => {}
             _ => self.args = self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).collect(),
@@ -36,13 +36,13 @@ impl<'a> Job<'a> {
 }
 
 impl<'a> PartialEq for Job<'a> {
-    fn eq(&self, other: &Job) -> bool {
+    fn eq(&self, other: &Job<'_>) -> bool {
         self.args == other.args && self.redirection == other.redirection
     }
 }
 
 impl<'a> fmt::Debug for Job<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Job {{ command: {}, args: {:?}, redirection: {:?} }}",
@@ -52,7 +52,7 @@ impl<'a> fmt::Debug for Job<'a> {
 }
 
 /// Expands a given argument and returns it as an `Args`.
-fn expand_arg(arg: &str, shell: &Shell) -> types::Args {
+fn expand_arg(arg: &str, shell: &Shell<'_>) -> types::Args {
     let res = shell.expand_string(&arg);
     if res.is_empty() {
         args![""]

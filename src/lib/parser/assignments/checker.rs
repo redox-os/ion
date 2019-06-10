@@ -146,7 +146,7 @@ pub fn value_check<E: Expander>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use lexers::TypeError;
+    use crate::lexers::TypeError;
 
     struct VariableExpander;
 

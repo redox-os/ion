@@ -88,12 +88,12 @@ impl DirectoryStack {
         self.dirs.iter()
     }
 
-    fn insert_dir(&mut self, index: usize, path: PathBuf, variables: &Variables) {
+    fn insert_dir(&mut self, index: usize, path: PathBuf, variables: &Variables<'_>) {
         self.dirs.insert(index, path);
         self.dirs.truncate(DirectoryStack::get_size(variables));
     }
 
-    fn push_dir(&mut self, path: PathBuf, variables: &Variables) {
+    fn push_dir(&mut self, path: PathBuf, variables: &Variables<'_>) {
         self.dirs.push_front(path);
         self.dirs.truncate(DirectoryStack::get_size(variables));
     }
@@ -101,7 +101,7 @@ impl DirectoryStack {
     fn change_and_push_dir(
         &mut self,
         dir: &str,
-        variables: &Variables,
+        variables: &Variables<'_>,
     ) -> Result<(), Cow<'static, str>> {
         let new_dir = self.normalize_path(dir);
         set_current_dir_ion(&new_dir).map_err(|err| {
@@ -121,7 +121,7 @@ impl DirectoryStack {
 
     fn switch_to_previous_directory(
         &mut self,
-        variables: &Variables,
+        variables: &Variables<'_>,
     ) -> Result<(), Cow<'static, str>> {
         self.get_previous_dir()
             .ok_or(Cow::Borrowed("ion: no previous directory to switch to"))
@@ -132,7 +132,10 @@ impl DirectoryStack {
             })
     }
 
-    fn switch_to_home_directory(&mut self, variables: &Variables) -> Result<(), Cow<'static, str>> {
+    fn switch_to_home_directory(
+        &mut self,
+        variables: &Variables<'_>,
+    ) -> Result<(), Cow<'static, str>> {
         sys_env::home_dir().map_or(
             Err(Cow::Borrowed("ion: failed to get home directory")),
             |home| {
@@ -147,7 +150,7 @@ impl DirectoryStack {
     pub fn cd<T: AsRef<str>>(
         &mut self,
         dir: Option<T>,
-        variables: &Variables,
+        variables: &Variables<'_>,
     ) -> Result<(), Cow<'static, str>> {
         match dir {
             Some(dir) => {
@@ -187,7 +190,7 @@ impl DirectoryStack {
         &mut self,
         path: PathBuf,
         keep_front: bool,
-        variables: &mut Variables,
+        variables: &mut Variables<'_>,
     ) -> Result<(), Cow<'static, str>> {
         let index = if keep_front { 1 } else { 0 };
         let new_dir = self.normalize_path(path.to_str().unwrap());
@@ -206,7 +209,7 @@ impl DirectoryStack {
     /// directory stack size variable. If it succeeds, it will return the value of that
     /// variable,
     /// else it will return a default value of 1000.
-    fn get_size(variables: &Variables) -> usize {
+    fn get_size(variables: &Variables<'_>) -> usize {
         variables
             .get_str("DIRECTORY_STACK_SIZE")
             .unwrap_or_default()

@@ -1,7 +1,7 @@
 use super::{completer::IonCompleter, InteractiveBinary};
 use std::io::ErrorKind;
 
-pub fn readln(binary: &InteractiveBinary) -> Option<String> {
+pub fn readln(binary: &InteractiveBinary<'_>) -> Option<String> {
     let prompt = binary.prompt();
     let line = binary.context.borrow_mut().read_line(
         prompt,

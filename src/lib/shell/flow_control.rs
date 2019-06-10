@@ -4,6 +4,7 @@ use crate::{
     shell::{status::Status, Shell},
     types,
 };
+use err_derive::Error;
 use small;
 use smallvec::SmallVec;
 
@@ -406,8 +407,8 @@ impl<'a> Function<'a> {
         description: Option<small::String>,
         name: types::Str,
         args: Vec<KeyBuf>,
-        statements: Vec<Statement>,
-    ) -> Function {
+        statements: Vec<Statement<'a>>,
+    ) -> Self {
         Function { description, name, args, statements }
     }
 }

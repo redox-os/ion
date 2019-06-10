@@ -10,7 +10,7 @@ pub enum CaseError<'a> {
 }
 
 impl<'a> Display for CaseError<'a> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
             CaseError::NoBindVariable => write!(f, "no bind variable was supplied"),
             CaseError::NoConditional => write!(f, "no conditional statement was given"),
@@ -22,7 +22,9 @@ impl<'a> Display for CaseError<'a> {
     }
 }
 
-pub fn parse_case(data: &str) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError> {
+pub fn parse_case(
+    data: &str,
+) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError<'_>> {
     let mut splitter = ArgumentSplitter::new(data);
     // let argument = splitter.next().ok_or(CaseError::Empty)?;
     let mut argument = None;

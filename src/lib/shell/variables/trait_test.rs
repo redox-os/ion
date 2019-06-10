@@ -425,7 +425,7 @@ fn euc_var_var_array() {
 fn filter_var() {
     let mut a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
     let b = Value::Str("1".into());
-    Option::<&mut types::Array>::from(&mut a).unwrap().retain(|c| c != &b);
+    Option::<&mut types::Array<'_>>::from(&mut a).unwrap().retain(|c| c != &b);
     assert_eq!(a, Value::Array(array![types::Str::from(".16")]));
 }
 
@@ -433,7 +433,7 @@ fn filter_var() {
 fn filter_var_float() {
     let mut a = Value::Array(array![types::Str::from(".16"), types::Str::from("1")]);
     let b = Value::Str("0.16".into());
-    Option::<&mut types::Array>::from(&mut a).unwrap().retain(|c| c != &b);
+    Option::<&mut types::Array<'_>>::from(&mut a).unwrap().retain(|c| c != &b);
     assert_eq!(a, Value::Array(array![types::Str::from(".16"), types::Str::from("1")]));
 }
 

@@ -312,7 +312,7 @@ impl<'a> Shell<'a> {
                         };
                         self.variables_mut().set(
                             &bind,
-                            value.iter().cloned().map(Value::Str).collect::<types::Array>(),
+                            value.iter().cloned().map(Value::Str).collect::<types::Array<'_>>(),
                         );
                         out
                     } else {
@@ -381,7 +381,7 @@ fn expand_pipeline<'a>(
     pipeline: &Pipeline<'a>,
 ) -> Result<(Pipeline<'a>, Vec<Statement<'a>>), String> {
     let mut item_iter = pipeline.items.iter();
-    let mut items: Vec<PipeItem> = Vec::with_capacity(item_iter.size_hint().0);
+    let mut items: Vec<PipeItem<'a>> = Vec::with_capacity(item_iter.size_hint().0);
     let mut statements = Vec::new();
 
     while let Some(item) = item_iter.next() {

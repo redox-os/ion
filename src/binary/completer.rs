@@ -4,6 +4,7 @@ use ion_shell::{
     parser::{unescape, Expander},
     Shell,
 };
+use ion_sys::PATH_SEPARATOR;
 use liner::{BasicCompleter, Completer, CursorPosition, Event, EventKind};
 use smallvec::SmallVec;
 use std::{env, iter, path::PathBuf, str};
@@ -69,7 +70,7 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
             // in the environment's **$PATH** variable.
             let file_completers: Vec<_> = env::var("PATH")
                 .unwrap_or_else(|_| "/bin/".to_string())
-                .split(sys::PATH_SEPARATOR)
+                .split(PATH_SEPARATOR)
                 .map(|s| IonFileCompleter::new(Some(s), &self.shell))
                 .collect();
             // Merge the collected definitions with the file path definitions.
@@ -78,7 +79,7 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
         completions
     }
 
-    fn on_event<W: std::io::Write>(&mut self, event: Event<W>) {
+    fn on_event<W: std::io::Write>(&mut self, event: Event<'_, '_, W>) {
         if let EventKind::BeforeComplete = event.kind {
             let (words, pos) = event.editor.get_words_and_cursor_position();
 

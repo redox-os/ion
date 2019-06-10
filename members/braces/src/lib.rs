@@ -106,7 +106,7 @@ where
                     &mut small_vec,
                     match *token {
                         BraceToken::Normal(ref text) => text,
-                        BraceToken::Expander => element.as_ref(),
+                        BraceToken::Expander => element,
                     },
                 );
                 small_vec

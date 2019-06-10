@@ -12,6 +12,7 @@ use ion_shell::{
     status::Status,
     Shell,
 };
+use ion_sys::SIGHUP;
 use itertools::Itertools;
 use liner::{Buffer, Context, KeyBindings};
 use std::{cell::RefCell, path::Path, rc::Rc};
@@ -86,7 +87,7 @@ impl<'a> InteractiveBinary<'a> {
             // and waiting for the history thread in the background to finish.
             if shell.opts().huponexit {
                 shell.resume_stopped();
-                shell.background_send(sys::SIGHUP);
+                shell.background_send(SIGHUP);
             }
             context.borrow_mut().history.commit_to_file();
         })));
@@ -114,7 +115,7 @@ impl<'a> InteractiveBinary<'a> {
     /// Liner.
     pub fn execute_interactive(self) -> ! {
         let context_bis = self.context.clone();
-        let history = &move |args: &[small::String], _shell: &mut Shell| -> Status {
+        let history = &move |args: &[small::String], _shell: &mut Shell<'_>| -> Status {
             if man_pages::check_help(args, MAN_HISTORY) {
                 return Status::SUCCESS;
             }
@@ -124,7 +125,7 @@ impl<'a> InteractiveBinary<'a> {
         };
 
         let context_bis = self.context.clone();
-        let keybindings = &move |args: &[small::String], _shell: &mut Shell| -> Status {
+        let keybindings = &move |args: &[small::String], _shell: &mut Shell<'_>| -> Status {
             match args.get(1).map(|s| s.as_str()) {
                 Some("vi") => {
                     context_bis.borrow_mut().key_bindings = KeyBindings::Vi;

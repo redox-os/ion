@@ -7,7 +7,7 @@ use small;
 use std::error::Error;
 
 /// Executes the givent commmand.
-pub fn exec(shell: &mut Shell, args: &[small::String]) -> Result<(), small::String> {
+pub fn exec(shell: &mut Shell<'_>, args: &[small::String]) -> Result<(), small::String> {
     let mut clear_env = false;
     let mut idx = 0;
     for arg in args.iter() {

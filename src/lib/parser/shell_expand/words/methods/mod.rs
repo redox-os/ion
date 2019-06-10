@@ -15,7 +15,7 @@ pub enum Pattern<'a> {
 }
 
 #[derive(Debug)]
-pub struct MethodArgs<'a, 'b, E: 'b + Expander> {
+pub struct MethodArgs<'a, 'b, E: Expander> {
     args:   &'a str,
     expand: &'b E,
 }
