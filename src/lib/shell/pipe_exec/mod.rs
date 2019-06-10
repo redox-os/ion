@@ -180,40 +180,6 @@ fn prepare<'a, 'b>(
 }
 
 impl<'b> Shell<'b> {
-    fn exec_external<'a, S: AsRef<str>>(
-        &mut self,
-        name: &'a str,
-        args: &'a [S],
-        stdin: &Option<File>,
-        stdout: &Option<File>,
-        stderr: &Option<File>,
-    ) -> Status {
-        let result = sys::fork_and_exec(
-            name,
-            args,
-            stdin.as_ref().map(File::as_raw_fd),
-            stdout.as_ref().map(File::as_raw_fd),
-            stderr.as_ref().map(File::as_raw_fd),
-            false,
-            || prepare_child(true, 0),
-        );
-
-        match result {
-            Ok(pid) => {
-                let _ = sys::setpgid(pid, pid);
-                let _ = sys::tcsetpgrp(0, pid);
-                let _ = wait_for_interrupt(pid);
-                let _ = sys::kill(pid, sys::SIGCONT);
-                self.watch_foreground(pid)
-            }
-            Err(ref err) if err.kind() == io::ErrorKind::NotFound => {
-                self.command_not_found(name);
-                Status::NO_SUCH_COMMAND
-            }
-            Err(ref err) => Status::error(format!("ion: command exec error: {}", err)),
-        }
-    }
-
     /// For tee jobs
     fn exec_multi_out(
         &mut self,
@@ -295,11 +261,8 @@ impl<'b> Shell<'b> {
         if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
             redirect_streams(&job.stdin, &job.stdout, &job.stderr);
             let code = match job.var {
-                JobVariant::External { ref args } => {
-                    self.exec_external(&args[0], &args[1..], &job.stdin, &job.stdout, &job.stderr)
-                }
-                JobVariant::Builtin { ref main, ref args } => self.exec_builtin(main, &**args),
-                JobVariant::Function { ref args } => self.exec_function(&args[0], args),
+                JobVariant::Builtin { ref main } => self.exec_builtin(main, job.args()),
+                JobVariant::Function => self.exec_function(job.command(), job.args()),
                 _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
             };
             redirect_streams(&stdin_bk, &Some(stdout_bk), &Some(stderr_bk));
@@ -390,7 +353,14 @@ impl<'b> Shell<'b> {
         };
 
         if let Some((mut parent, mut kind)) = commands.next() {
-            if kind != RedirectFrom::None {
+            if kind == RedirectFrom::None && !parent.needs_forking() {
+                let status = self.exec_job(&parent);
+
+                let _ = io::stdout().flush();
+                let _ = io::stderr().flush();
+
+                status
+            } else {
                 let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
 
                 // Append jobs until all piped jobs are running
@@ -473,13 +443,6 @@ impl<'b> Shell<'b> {
                     let _ = io::stderr().flush();
                 }
                 status
-            } else {
-                let status = self.exec_job(&parent);
-
-                let _ = io::stdout().flush();
-                let _ = io::stderr().flush();
-
-                status
             }
         } else {
             Status::SUCCESS
@@ -489,23 +452,19 @@ impl<'b> Shell<'b> {
 
 fn spawn_proc(
     shell: &mut Shell,
-    mut cmd: RefinedJob,
+    cmd: RefinedJob,
     redirection: RedirectFrom,
     block_child: bool,
     last_pid: &mut u32,
     current_pid: &mut u32,
     pgid: u32,
 ) {
-    let stdin = cmd.stdin;
-    let stdout = cmd.stdout;
-    let stderr = cmd.stderr;
-    match cmd.var {
-        JobVariant::External { ref args } => {
-            let name = &args[0];
-            let args: Vec<&str> = args.iter().skip(1).map(|x| x as &str).collect();
+    let RefinedJob { mut var, args, stdin, stdout, stderr } = cmd;
+    match var {
+        JobVariant::External => {
             let mut result = sys::fork_and_exec(
-                name,
-                &args,
+                &args[0],
+                &args[1..],
                 stdin.as_ref().map(AsRawFd::as_raw_fd),
                 stdout.as_ref().map(AsRawFd::as_raw_fd),
                 stderr.as_ref().map(AsRawFd::as_raw_fd),
@@ -519,14 +478,14 @@ fn spawn_proc(
                     *current_pid = pid;
                 }
                 Err(ref mut err) if err.kind() == io::ErrorKind::NotFound => {
-                    shell.command_not_found(name)
+                    shell.command_not_found(&args[0])
                 }
                 Err(ref mut err) => {
                     eprintln!("ion: command exec error: {}", err);
                 }
             }
         }
-        JobVariant::Builtin { main, ref mut args } => {
+        JobVariant::Builtin { main } => {
             fork_exec_internal(
                 stdout,
                 stderr,
@@ -535,10 +494,10 @@ fn spawn_proc(
                 last_pid,
                 current_pid,
                 pgid,
-                |_, _, _| shell.exec_builtin(main, args),
+                |_, _, _| main(&args, shell),
             );
         }
-        JobVariant::Function { ref mut args } => {
+        JobVariant::Function => {
             fork_exec_internal(
                 stdout,
                 stderr,
