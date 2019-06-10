@@ -5,7 +5,6 @@ use super::{
     job_control::{BackgroundProcess, ProcessState},
 };
 use crate::parser::pipelines::Pipeline;
-use std::process::exit;
 
 impl<'a> Shell<'a> {
     /// Ensures that the forked child is given a unique process ID.
@@ -31,7 +30,14 @@ impl<'a> Shell<'a> {
                 Self::create_process_group(0);
 
                 // After execution of it's commands, exit with the last command's status.
-                sys::fork_exit(self.pipe(pipeline).as_os_code());
+                sys::fork_exit(
+                    self.pipe(pipeline)
+                        .unwrap_or_else(|err| {
+                            eprintln!("{}", err);
+                            Status::COULD_NOT_EXEC
+                        })
+                        .as_os_code(),
+                );
             }
             Ok(pid) => {
                 if state != ProcessState::Empty {
@@ -40,10 +46,7 @@ impl<'a> Shell<'a> {
                 }
                 Status::SUCCESS
             }
-            Err(why) => {
-                eprintln!("ion: background fork failed: {}", why);
-                exit(1);
-            }
+            Err(why) => Status::error(format!("ion: background fork failed: {}", why)),
         }
     }
 }

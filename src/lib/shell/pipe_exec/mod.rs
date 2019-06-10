@@ -41,9 +41,9 @@ use std::{
 
 #[derive(Debug, Error)]
 pub enum InputError {
-    #[error(display = "ion: failed to redirect '{}' to stdin: {}", file, why)]
+    #[error(display = "failed to redirect '{}' to stdin: {}", file, why)]
     File { file: String, why: io::Error },
-    #[error(display = "ion: failed to redirect herestring '{}' to stdin: {}", string, why)]
+    #[error(display = "failed to redirect herestring '{}' to stdin: {}", string, why)]
     HereString { string: String, why: io::Error },
 }
 
@@ -54,17 +54,25 @@ pub struct OutputError {
     why:      io::Error,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum RedirectError {
-    Input(InputError),
-    Output(OutputError),
+    #[error(display = "{}", cause)]
+    Input { cause: InputError },
+    #[error(display = "{}", cause)]
+    Output { cause: OutputError },
+}
+
+#[derive(Debug, Error)]
+pub enum PipeError {
+    #[error(display = "ion: {}", cause)]
+    RedirectError { cause: RedirectError },
 }
 
 impl fmt::Display for OutputError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "ion: failed to redirect {} to file '{}': {}",
+            "failed to redirect {} to file '{}': {}",
             match self.redirect {
                 RedirectFrom::Both => "both stdout and stderr",
                 RedirectFrom::Stdout => "stdout",
@@ -81,30 +89,16 @@ impl std::error::Error for OutputError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { Some(&self.why) }
 }
 
-impl fmt::Display for RedirectError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            RedirectError::Output(why) => write!(f, "ion: failed to redirect {}", why),
-            RedirectError::Input(why) => write!(f, "ion: failed to redirect {}", why),
-        }
-    }
-}
-
-impl std::error::Error for RedirectError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(match self {
-            RedirectError::Output(why) => why,
-            RedirectError::Input(why) => why,
-        })
-    }
-}
-
 impl From<OutputError> for RedirectError {
-    fn from(error: OutputError) -> Self { RedirectError::Output(error) }
+    fn from(cause: OutputError) -> Self { RedirectError::Output { cause } }
 }
 
 impl From<InputError> for RedirectError {
-    fn from(error: InputError) -> Self { RedirectError::Input(error) }
+    fn from(cause: InputError) -> Self { RedirectError::Input { cause } }
+}
+
+impl From<RedirectError> for PipeError {
+    fn from(cause: RedirectError) -> Self { PipeError::RedirectError { cause } }
 }
 
 /// Create an OS pipe and write the contents of a byte slice to one end
@@ -442,7 +436,10 @@ impl<'b> Shell<'b> {
             PipeType::Background => self.fork_pipe(pipeline, command, ProcessState::Running),
             // Execute each command in the pipeline, giving each command the foreground.
             PipeType::Normal => {
-                let exit_status = self.pipe(pipeline);
+                let exit_status = self.pipe(pipeline).unwrap_or_else(|err| {
+                    eprintln!("{}", err);
+                    Status::COULD_NOT_EXEC
+                });
                 // Set the shell as the foreground process again to regain the TTY.
                 if !self.opts.is_background_shell {
                     let _ = sys::tcsetpgrp(0, process::id());
@@ -455,14 +452,8 @@ impl<'b> Shell<'b> {
     /// Executes a piped job `job1 | job2 | job3`
     ///
     /// This function will panic if called with an empty slice
-    fn pipe(&mut self, pipeline: Pipeline<'b>) -> Status {
-        let mut commands = match prepare(self, pipeline) {
-            Ok(c) => c.into_iter().peekable(),
-            Err(why) => {
-                eprintln!("{}", why);
-                return Status::COULD_NOT_EXEC;
-            }
-        };
+    fn pipe(&mut self, pipeline: Pipeline<'b>) -> Result<Status, PipeError> {
+        let mut commands = prepare(self, pipeline)?.into_iter().peekable();
 
         if let Some((mut parent, mut kind)) = commands.next() {
             if kind == RedirectFrom::None && !parent.needs_forking() {
@@ -471,7 +462,7 @@ impl<'b> Shell<'b> {
                 let _ = io::stdout().flush();
                 let _ = io::stderr().flush();
 
-                status
+                Ok(status)
             } else {
                 let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
 
@@ -510,18 +501,17 @@ impl<'b> Shell<'b> {
                                     RedirectFrom::None => (),
                                     RedirectFrom::Stderr => parent.stderr(writer),
                                     RedirectFrom::Stdout => parent.stdout(writer),
-                                    RedirectFrom::Both => match writer.try_clone() {
-                                        Err(e) => {
-                                            eprintln!(
-                                                "ion: failed to redirect stdout and stderr: {}",
-                                                e
-                                            );
-                                        }
-                                        Ok(duped) => {
-                                            parent.stderr(writer);
-                                            parent.stdout(duped);
-                                        }
-                                    },
+                                    RedirectFrom::Both => {
+                                        let duped = writer.try_clone().map_err(|why| {
+                                            RedirectError::from(OutputError {
+                                                redirect: kind,
+                                                file: "pipe".to_string(),
+                                                why,
+                                            })
+                                        })?;
+                                        parent.stderr(writer);
+                                        parent.stdout(duped);
+                                    }
                                 }
                             }
                         }
@@ -554,10 +544,10 @@ impl<'b> Shell<'b> {
                     let _ = io::stdout().flush();
                     let _ = io::stderr().flush();
                 }
-                status
+                Ok(status)
             }
         } else {
-            Status::SUCCESS
+            Ok(Status::SUCCESS)
         }
     }
 }
