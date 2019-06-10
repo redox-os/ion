@@ -24,7 +24,7 @@ use super::{
     Shell, Value,
 };
 use crate::{
-    builtins::{self, BuiltinFunction},
+    builtins,
     parser::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
     sys,
 };
@@ -63,13 +63,19 @@ pub enum RedirectError {
 }
 
 #[derive(Debug, Error)]
-pub enum PipeError {
+pub enum PipelineError {
     #[error(display = "ion: {}", cause)]
     RedirectPipeError { cause: RedirectError },
     #[error(display = "ion: could not create pipe: {}", cause)]
     CreatePipeError { cause: io::Error },
+    #[error(display = "ion: could not fork: {}", cause)]
+    CreateForkError { cause: io::Error },
     #[error(display = "ion: could not run function: {}", cause)]
     RunFunctionError { cause: FunctionError },
+    #[error(display = "ion: failed to terminate foreground jobs: {}", cause)]
+    TerminateJobsError { cause: io::Error },
+    #[error(display = "ion: command exec error: {}", cause)]
+    CommandExecError { cause: io::Error },
 }
 
 impl fmt::Display for OutputError {
@@ -101,12 +107,12 @@ impl From<InputError> for RedirectError {
     fn from(cause: InputError) -> Self { RedirectError::Input { cause } }
 }
 
-impl From<RedirectError> for PipeError {
-    fn from(cause: RedirectError) -> Self { PipeError::RedirectPipeError { cause } }
+impl From<RedirectError> for PipelineError {
+    fn from(cause: RedirectError) -> Self { PipelineError::RedirectPipeError { cause } }
 }
 
-impl From<FunctionError> for PipeError {
-    fn from(cause: FunctionError) -> Self { PipeError::RunFunctionError { cause } }
+impl From<FunctionError> for PipelineError {
+    fn from(cause: FunctionError) -> Self { PipelineError::RunFunctionError { cause } }
 }
 
 /// Create an OS pipe and write the contents of a byte slice to one end
@@ -345,26 +351,17 @@ impl<'b> Shell<'b> {
         }
     }
 
-    /// Execute a builtin in the current process.
-    /// # Args
-    /// * `shell`: A `Shell` that forwards relevant information to the builtin
-    /// * `name`: Name of the builtin to execute.
-    /// * `stdin`, `stdout`, `stderr`: File descriptors that will replace the respective standard
-    ///   streams if they are not `None`
-    fn exec_builtin<'a>(&mut self, main: BuiltinFunction<'a>, args: &[small::String]) -> Status {
-        main(args, self)
-    }
-
     /// Executes a `RefinedJob` that was created in the `generate_commands` method.
     ///
     /// The aforementioned `RefinedJob` may be either a builtin or external command.
     /// The purpose of this function is therefore to execute both types accordingly.
-    fn exec_job(&mut self, job: &RefinedJob<'b>) -> Result<Status, PipeError> {
+    fn exec_job(&mut self, job: &RefinedJob<'b>) -> Result<Status, PipelineError> {
         // Duplicate file descriptors, execute command, and redirect back.
-        let (stdin_bk, stdout_bk, stderr_bk) = duplicate_streams()?;
+        let (stdin_bk, stdout_bk, stderr_bk) =
+            duplicate_streams().map_err(|cause| PipelineError::CreatePipeError { cause })?;
         redirect_streams(&job.stdin, &job.stdout, &job.stderr);
         let code = match job.var {
-            JobVariant::Builtin { ref main } => self.exec_builtin(main, job.args()),
+            JobVariant::Builtin { ref main } => main(job.args(), self),
             JobVariant::Function => self.exec_function(job.command(), job.args()),
             _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
         };
@@ -407,7 +404,7 @@ impl<'b> Shell<'b> {
     /// If a job is stopped, the shell will add that job to a list of background jobs and
     /// continue to watch the job in the background, printing notifications on status changes
     /// of that job over time.
-    pub fn execute_pipeline(&mut self, pipeline: Pipeline<'b>) -> Result<Status, PipeError> {
+    pub fn execute_pipeline(&mut self, pipeline: Pipeline<'b>) -> Result<Status, PipelineError> {
         // While active, the SIGTTOU signal will be ignored.
         let _sig_ignore = SignalHandler::new();
 
@@ -430,7 +427,7 @@ impl<'b> Shell<'b> {
     /// Executes a piped job `job1 | job2 | job3`
     ///
     /// This function will panic if called with an empty slice
-    fn pipe(&mut self, pipeline: Pipeline<'b>) -> Result<Status, PipeError> {
+    fn pipe(&mut self, pipeline: Pipeline<'b>) -> Result<Status, PipelineError> {
         let mut commands = prepare(self, pipeline)?.into_iter().peekable();
 
         if let Some((mut parent, mut kind)) = commands.next() {
@@ -468,9 +465,11 @@ impl<'b> Shell<'b> {
                     } else {
                         // Pipe the previous command's stdin to this commands stdout/stderr.
                         let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)
-                            .map_err(|cause| PipeError::CreatePipeError { cause })?;
+                            .map_err(|cause| PipelineError::CreatePipeError { cause })?;
                         if is_external {
-                            append_external_stdio_pipe(&mut ext_stdio_pipes, writer);
+                            ext_stdio_pipes
+                                .get_or_insert_with(|| Vec::with_capacity(4))
+                                .push(unsafe { File::from_raw_fd(writer) });
                         }
                         child.stdin(unsafe { File::from_raw_fd(reader) });
                         let writer = unsafe { File::from_raw_fd(writer) };
@@ -517,9 +516,8 @@ impl<'b> Shell<'b> {
                 // Watch the foreground group, dropping all commands that exit as they exit.
                 let status = self.watch_foreground(pgid);
                 if status == Status::TERMINATED {
-                    if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
-                        eprintln!("ion: failed to terminate foreground jobs: {}", why);
-                    }
+                    sys::killpg(pgid, sys::SIGTERM)
+                        .map_err(|cause| PipelineError::TerminateJobsError { cause })?;
                 } else {
                     let _ = io::stdout().flush();
                     let _ = io::stderr().flush();
@@ -540,7 +538,7 @@ fn spawn_proc(
     last_pid: &mut u32,
     current_pid: &mut u32,
     pgid: &mut u32,
-) -> Result<(), PipeError> {
+) -> Result<(), PipelineError> {
     let RefinedJob { mut var, args, stdin, stdout, stderr } = cmd;
     match var {
         JobVariant::External => {
@@ -562,8 +560,8 @@ fn spawn_proc(
                 Err(ref mut err) if err.kind() == io::ErrorKind::NotFound => {
                     shell.command_not_found(&args[0])
                 }
-                Err(ref mut err) => {
-                    eprintln!("ion: command exec error: {}", err);
+                Err(cause) => {
+                    return Err(PipelineError::CommandExecError { cause });
                 }
             }
         }
@@ -631,7 +629,7 @@ fn fork_exec_internal<F>(
     current_pid: &mut u32,
     pgid: u32,
     mut exec_action: F,
-) -> Result<(), PipeError>
+) -> Result<(), PipelineError>
 where
     F: FnMut(Option<File>, Option<File>, Option<File>) -> Status,
 {
@@ -648,7 +646,7 @@ where
             *current_pid = pid;
             Ok(())
         }
-        Err(cause) => Err(PipeError::CreatePipeError { cause }),
+        Err(cause) => Err(PipelineError::CreateForkError { cause }),
     }
 }
 
@@ -696,8 +694,4 @@ pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
             Err(errno) => break Err(io::Error::from_raw_os_error(errno)),
         }
     }
-}
-
-pub fn append_external_stdio_pipe(pipes: &mut Option<Vec<File>>, file: RawFd) {
-    pipes.get_or_insert_with(|| Vec::with_capacity(4)).push(unsafe { File::from_raw_fd(file) });
 }
