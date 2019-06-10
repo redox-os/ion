@@ -30,6 +30,7 @@ use crate::{
 };
 use smallvec::SmallVec;
 use std::{
+    fmt,
     fs::{File, OpenOptions},
     io::{self, Write},
     iter,
@@ -37,6 +38,111 @@ use std::{
     path::Path,
     process::{self, exit},
 };
+
+#[derive(Debug, Error)]
+pub enum InputError {
+    #[error(display = "ion: failed to redirect '{}' to stdin: {}", file, why)]
+    File { file: String, why: io::Error },
+    #[error(display = "ion: failed to redirect herestring '{}' to stdin: {}", string, why)]
+    HereString { string: String, why: io::Error },
+}
+
+#[derive(Debug)]
+pub struct OutputError {
+    redirect: RedirectFrom,
+    file:     String,
+    why:      io::Error,
+}
+
+#[derive(Debug)]
+pub enum RedirectError {
+    Input(InputError),
+    Output(OutputError),
+}
+
+impl fmt::Display for OutputError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "ion: failed to redirect {} to file '{}': {}",
+            match self.redirect {
+                RedirectFrom::Both => "both stdout and stderr",
+                RedirectFrom::Stdout => "stdout",
+                RedirectFrom::Stderr => "stderr",
+                _ => unreachable!(),
+            },
+            self.file,
+            self.why,
+        )
+    }
+}
+
+impl std::error::Error for OutputError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { Some(&self.why) }
+}
+
+impl fmt::Display for RedirectError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RedirectError::Output(why) => write!(f, "ion: failed to redirect {}", why),
+            RedirectError::Input(why) => write!(f, "ion: failed to redirect {}", why),
+        }
+    }
+}
+
+impl std::error::Error for RedirectError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(match self {
+            RedirectError::Output(why) => why,
+            RedirectError::Input(why) => why,
+        })
+    }
+}
+
+impl From<OutputError> for RedirectError {
+    fn from(error: OutputError) -> Self { RedirectError::Output(error) }
+}
+
+impl From<InputError> for RedirectError {
+    fn from(error: InputError) -> Self { RedirectError::Input(error) }
+}
+
+/// Create an OS pipe and write the contents of a byte slice to one end
+/// such that reading from this pipe will produce the byte slice. Return
+/// A file descriptor representing the read end of the pipe.
+pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<RawFd, io::Error> {
+    let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)?;
+    let mut infile = File::from_raw_fd(writer);
+    // Write the contents; make sure to use write_all so that we block until
+    // the entire string is written
+    infile.write_all(input.as_ref())?;
+    infile.flush()?;
+    // `infile` currently owns the writer end RawFd. If we just return the reader
+    // end and let `infile` go out of scope, it will be closed, sending EOF to
+    // the reader!
+    Ok(reader)
+}
+
+impl Input {
+    pub fn get_infile(&mut self) -> Result<File, InputError> {
+        match self {
+            Input::File(ref filename) => match File::open(filename.as_str()) {
+                Ok(file) => Ok(file),
+                Err(why) => Err(InputError::File { file: filename.to_string(), why }),
+            },
+            Input::HereString(ref mut string) => {
+                if !string.ends_with('\n') {
+                    string.push('\n');
+                }
+
+                match unsafe { stdin_of(&string) } {
+                    Ok(stdio) => Ok(unsafe { File::from_raw_fd(stdio) }),
+                    Err(why) => Err(InputError::HereString { string: string.to_string(), why }),
+                }
+            }
+        }
+    }
+}
 
 /// Determines if the supplied command implicitly defines to change the directory.
 ///
@@ -79,7 +185,7 @@ fn do_tee<'a>(
     job: &mut RefinedJob<'a>,
     stdout: &mut dyn FnMut(&mut RefinedJob<'a>, File),
     stderr: &mut dyn FnMut(&mut RefinedJob<'a>, File),
-) -> Result<(), ()> {
+) -> Result<(), OutputError> {
     // XXX: Possibly add an assertion here for correctness
     for output in outputs {
         match OpenOptions::new()
@@ -88,27 +194,30 @@ fn do_tee<'a>(
             .append(output.append)
             .open(output.file.as_str())
         {
-            Ok(f) => match output.from {
+            Ok(file) => match output.from {
                 RedirectFrom::None => (),
-                RedirectFrom::Stdout => stdout(job, f),
-                RedirectFrom::Stderr => stderr(job, f),
-                RedirectFrom::Both => match f.try_clone() {
+                RedirectFrom::Stdout => stdout(job, file),
+                RedirectFrom::Stderr => stderr(job, file),
+                RedirectFrom::Both => match file.try_clone() {
                     Ok(f_copy) => {
-                        stdout(job, f);
+                        stdout(job, file);
                         stderr(job, f_copy);
                     }
-                    Err(e) => {
-                        eprintln!(
-                            "ion: failed to redirect both stdout and stderr to file '{:?}': {}",
-                            f, e
-                        );
-                        return Err(());
+                    Err(why) => {
+                        return Err(OutputError {
+                            redirect: output.from,
+                            file: output.file.to_string(),
+                            why,
+                        });
                     }
                 },
             },
-            Err(e) => {
-                eprintln!("ion: failed to redirect output into {}: {}", output.file, e);
-                return Err(());
+            Err(why) => {
+                return Err(OutputError {
+                    redirect: output.from,
+                    file: output.file.to_string(),
+                    why,
+                });
             }
         }
     }
@@ -120,7 +229,7 @@ fn do_tee<'a>(
 fn prepare<'a, 'b>(
     shell: &'a Shell<'b>,
     pipeline: Pipeline<'b>,
-) -> Result<impl IntoIterator<Item = (RefinedJob<'b>, RedirectFrom)>, ()> {
+) -> Result<impl IntoIterator<Item = (RefinedJob<'b>, RedirectFrom)>, RedirectError> {
     // Real logic begins here
     let mut new_commands = SmallVec::<[_; 16]>::with_capacity(2 * pipeline.items.len());
     let mut prev_kind = RedirectFrom::None;
@@ -349,7 +458,10 @@ impl<'b> Shell<'b> {
     fn pipe(&mut self, pipeline: Pipeline<'b>) -> Status {
         let mut commands = match prepare(self, pipeline) {
             Ok(c) => c.into_iter().peekable(),
-            Err(_) => return Status::COULD_NOT_EXEC,
+            Err(why) => {
+                eprintln!("{}", why);
+                return Status::COULD_NOT_EXEC;
+            }
         };
 
         if let Some((mut parent, mut kind)) = commands.next() {
