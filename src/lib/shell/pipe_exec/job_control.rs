@@ -24,7 +24,7 @@ pub enum ProcessState {
 }
 
 impl fmt::Display for ProcessState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ProcessState::Running => write!(f, "Running"),
             ProcessState::Stopped => write!(f, "Stopped"),
@@ -64,7 +64,7 @@ impl BackgroundProcess {
 }
 
 impl fmt::Display for BackgroundProcess {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} {}\t{}", self.pid, self.state, self.name)
     }
 }
@@ -292,7 +292,9 @@ impl<'a> Shell<'a> {
             // signal, the status of that process will be communicated back. To
             // avoid consuming CPU cycles, we wait 25 ms between polls.
             match self.foreground_signals.was_processed() {
-                Some(BackgroundResult::Status(stat)) => break Status::from_exit_code(stat as i32),
+                Some(BackgroundResult::Status(stat)) => {
+                    break Status::from_exit_code(i32::from(stat))
+                }
                 Some(BackgroundResult::Errored) => break Status::TERMINATED,
                 None => sleep(Duration::from_millis(25)),
             }

@@ -1,7 +1,7 @@
 use crate::{shell::Shell, status::Status, types};
 use small;
 
-pub fn is(args: &[small::String], shell: &mut Shell) -> Status {
+pub fn is(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     match args.len() {
         4 => {
             if args[1] != "not" {
@@ -21,7 +21,7 @@ pub fn is(args: &[small::String], shell: &mut Shell) -> Status {
     Status::SUCCESS
 }
 
-fn eval_arg(arg: &str, shell: &mut Shell) -> types::Str {
+fn eval_arg(arg: &str, shell: &mut Shell<'_>) -> types::Str {
     let value = get_var_string(arg, shell);
     if &*value != "" {
         return value;
@@ -30,7 +30,7 @@ fn eval_arg(arg: &str, shell: &mut Shell) -> types::Str {
 }
 
 // On error returns an empty String.
-fn get_var_string(name: &str, shell: &mut Shell) -> types::Str {
+fn get_var_string(name: &str, shell: &mut Shell<'_>) -> types::Str {
     if name.chars().nth(0).unwrap() != '$' {
         return "".into();
     }

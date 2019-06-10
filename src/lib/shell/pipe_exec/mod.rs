@@ -28,6 +28,7 @@ use crate::{
     parser::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
     sys,
 };
+use err_derive::Error;
 use smallvec::SmallVec;
 use std::{
     fmt,
@@ -442,7 +443,7 @@ impl<'b> Shell<'b> {
                 let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
 
                 // Append jobs until all piped jobs are running
-                while let Some((mut child, ckind)) = commands.next() {
+                for (mut child, ckind) in commands {
                     // Keep a reference to the FD to keep them open
                     let mut ext_stdio_pipes: Option<Vec<File>> = None;
 
@@ -531,8 +532,8 @@ impl<'b> Shell<'b> {
 }
 
 fn spawn_proc(
-    shell: &mut Shell,
-    cmd: RefinedJob,
+    shell: &mut Shell<'_>,
+    cmd: RefinedJob<'_>,
     redirection: RedirectFrom,
     block_child: bool,
     last_pid: &mut u32,

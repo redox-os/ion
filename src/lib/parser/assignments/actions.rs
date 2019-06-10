@@ -16,7 +16,7 @@ pub enum AssignmentError<'a> {
 }
 
 impl<'a> Display for AssignmentError<'a> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
             AssignmentError::InvalidValue(ref expected, ref actual) => {
                 write!(f, "expected {}, but received {}", expected, actual)

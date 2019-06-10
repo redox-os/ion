@@ -141,7 +141,7 @@ trait ExpanderInternal: Expander {
         for word in nodes.iter().flat_map(|node| self.expand_string_no_glob(node)) {
             match parse_range(&word) {
                 Some(elements) => temp.extend(elements),
-                None => temp.push(word.into()),
+                None => temp.push(word),
             }
         }
         if !temp.is_empty() {
@@ -227,7 +227,7 @@ trait ExpanderInternal: Expander {
         self.expand_tokens(&token_buffer, contains_brace)
     }
 
-    fn expand_braces(&self, word_tokens: &[WordToken]) -> types::Args {
+    fn expand_braces(&self, word_tokens: &[WordToken<'_>]) -> types::Args {
         let mut expanded_words = types::Args::new();
         let mut output = small::String::new();
         let tokens: &mut Vec<BraceToken> = &mut Vec::new();
@@ -338,7 +338,7 @@ trait ExpanderInternal: Expander {
     }
 
     #[auto_enum]
-    fn expand_single_array_token(&self, token: &WordToken) -> Option<types::Args> {
+    fn expand_single_array_token(&self, token: &WordToken<'_>) -> Option<types::Args> {
         match *token {
             WordToken::Array(ref elements, ref index) => Some(self.array_expand(elements, &index)),
             WordToken::ArrayVariable(array, quoted, ref index) => match self.array(array, index) {
@@ -395,7 +395,7 @@ trait ExpanderInternal: Expander {
         }
     }
 
-    fn expand_single_string_token(&self, token: &WordToken) -> types::Args {
+    fn expand_single_string_token(&self, token: &WordToken<'_>) -> types::Args {
         let mut output = small::String::new();
         let mut expanded_words = types::Args::new();
 
@@ -483,7 +483,7 @@ trait ExpanderInternal: Expander {
         }
     }
 
-    fn expand_tokens(&self, token_buffer: &[WordToken], contains_brace: bool) -> types::Args {
+    fn expand_tokens(&self, token_buffer: &[WordToken<'_>], contains_brace: bool) -> types::Args {
         if !token_buffer.is_empty() {
             if contains_brace {
                 return self.expand_braces(&token_buffer);
@@ -606,7 +606,7 @@ trait ExpanderInternal: Expander {
 
                 for c in input.bytes() {
                     match c {
-                        48...57 | 65...90 | 95 | 97...122 => {
+                        48..=57 | 65..=90 | 95 | 97..=122 => {
                             varbuf.push(c as char);
                         }
                         _ => {

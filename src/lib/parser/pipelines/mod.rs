@@ -38,7 +38,7 @@ pub enum Input {
 }
 
 impl<'a> fmt::Display for Input {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Input::File(ref file) => write!(f, "< {}", file),
             Input::HereString(ref string) => write!(f, "<<< '{}'", string),
@@ -47,7 +47,7 @@ impl<'a> fmt::Display for Input {
 }
 
 impl<'a> fmt::Display for Redirection {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}>{} {}",
@@ -70,7 +70,11 @@ pub enum PipeType {
     Disown,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+impl Default for PipeType {
+    fn default() -> Self { PipeType::Normal }
+}
+
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct Pipeline<'a> {
     pub items: Vec<PipeItem<'a>>,
     pub pipe:  PipeType,
@@ -107,7 +111,7 @@ impl<'a> PipeItem<'a> {
 }
 
 impl<'a> fmt::Display for PipeItem<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.job.args.iter().format(" "))?;
         for input in &self.inputs {
             write!(f, " {}", input)?;
@@ -140,11 +144,11 @@ impl<'a> Pipeline<'a> {
         self.items.iter_mut().for_each(|i| i.expand(shell));
     }
 
-    pub fn new() -> Self { Pipeline { items: Vec::new(), pipe: PipeType::Normal } }
+    pub fn new() -> Self { Self::default() }
 }
 
 impl<'a> fmt::Display for Pipeline<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}{}",

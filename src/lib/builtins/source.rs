@@ -3,7 +3,7 @@ use small;
 use std::fs::File;
 
 /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
-pub fn source(shell: &mut Shell, arguments: &[small::String]) -> Result<(), String> {
+pub fn source(shell: &mut Shell<'_>, arguments: &[small::String]) -> Result<(), String> {
     match arguments.get(1) {
         Some(argument) => {
             if let Ok(file) = File::open(argument.as_str()) {

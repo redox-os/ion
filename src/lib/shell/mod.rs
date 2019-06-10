@@ -29,6 +29,7 @@ use crate::{
     parser::{assignments::value_check, pipelines::Pipeline, Terminator},
     sys, types,
 };
+use err_derive::Error;
 use itertools::Itertools;
 use std::{
     borrow::Cow,
@@ -104,22 +105,22 @@ pub struct Shell<'a> {
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,
     /// Custom callback to cleanup before exit
-    prep_for_exit: Option<Box<FnMut(&mut Shell) + 'a>>,
+    prep_for_exit: Option<Box<dyn FnMut(&mut Shell<'_>) + 'a>>,
     /// Custom callback for each command call
-    on_command: Option<Box<Fn(&Shell, std::time::Duration) + 'a>>,
+    on_command: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
 }
 
 pub struct EmptyBlockError;
 
 impl fmt::Display for EmptyBlockError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Could not exit the current block since it does not exist!")
     }
 }
 
 // Implement std::fmt::Debug for AppError
 impl fmt::Debug for EmptyBlockError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "EmptyBlockError {{ file: {}, line: {} }}", file!(), line!())
     }
 }
@@ -218,7 +219,7 @@ impl<'a> Shell<'a> {
     }
 
     pub fn cd<T: AsRef<str>>(&mut self, dir: Option<T>) -> Result<(), Cow<'static, str>> {
-        self.directory_stack.cd(dir, &mut self.variables)
+        self.directory_stack.cd(dir, &self.variables)
     }
 
     pub fn pushd(&mut self, path: PathBuf, keep_front: bool) -> Result<(), Cow<'static, str>> {
@@ -413,14 +414,14 @@ impl<'a> Shell<'a> {
     }
 
     /// Set the callback to call before exiting the shell
-    pub fn set_prep_for_exit(&mut self, callback: Option<Box<dyn FnMut(&mut Shell) + 'a>>) {
+    pub fn set_prep_for_exit(&mut self, callback: Option<Box<dyn FnMut(&mut Shell<'_>) + 'a>>) {
         self.prep_for_exit = callback;
     }
 
     /// Set the callback to call on each command
     pub fn set_on_command(
         &mut self,
-        callback: Option<Box<dyn Fn(&Shell, std::time::Duration) + 'a>>,
+        callback: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
     ) {
         self.on_command = callback;
     }
@@ -475,7 +476,7 @@ impl<'a> Shell<'a> {
         process::exit(status.as_os_code());
     }
 
-    pub fn assign(&mut self, key: &Key, value: Value<'a>) -> Result<(), String> {
+    pub fn assign(&mut self, key: &Key<'_>, value: Value<'a>) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)

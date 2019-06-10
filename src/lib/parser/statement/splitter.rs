@@ -24,7 +24,7 @@ pub enum StatementError {
 }
 
 impl Display for StatementError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match *self {
             StatementError::IllegalCommandName(ref command) => {
                 writeln!(f, "illegal command name: {}", command)
@@ -134,7 +134,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b'\\' => self.skip = true,
                 // [^A-Za-z0-9_:,}]
-                0...43 | 45...47 | 59...64 | 91...94 | 96 | 123...124 | 126...127
+                0..=43 | 45..=47 | 59..=64 | 91..=94 | 96 | 123..=124 | 126..=127
                     if self.vbrace =>
                 {
                     // If we are just ending the braced section continue as normal
@@ -183,7 +183,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b')' => self.paren_level -= 1,
                 b'}' if self.vbrace => self.vbrace = false,
                 // [^A-Za-z0-9_]
-                0...37 | 39...47 | 58 | 60...64 | 91...94 | 96 | 126...127 => self.variable = false,
+                0..=37 | 39..=47 | 58 | 60..=64 | 91..=94 | 96 | 126..=127 => self.variable = false,
                 _ if self.quotes => {}
                 b'{' => self.brace_level += 1,
                 b'}' => {

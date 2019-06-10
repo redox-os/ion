@@ -14,7 +14,7 @@ use std::{
     result::Result,
 };
 
-fn list_vars(shell: &Shell) -> Result<(), io::Error> {
+fn list_vars(shell: &Shell<'_>) -> Result<(), io::Error> {
     let stdout = io::stdout();
     let mut buffer = BufWriter::new(stdout.lock());
 
