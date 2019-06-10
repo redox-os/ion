@@ -24,12 +24,13 @@ use super::{
     Shell, Value,
 };
 use crate::{
-    builtins::{self, BuiltinFunction},
+    builtins,
     parser::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
     sys,
 };
 use smallvec::SmallVec;
 use std::{
+    fmt,
     fs::{File, OpenOptions},
     io::{self, Write},
     iter,
@@ -37,6 +38,119 @@ use std::{
     path::Path,
     process::{self, exit},
 };
+
+#[derive(Debug, Error)]
+pub enum InputError {
+    #[error(display = "failed to redirect '{}' to stdin: {}", file, why)]
+    File { file: String, why: io::Error },
+    #[error(display = "failed to redirect herestring '{}' to stdin: {}", string, why)]
+    HereString { string: String, why: io::Error },
+}
+
+#[derive(Debug)]
+pub struct OutputError {
+    redirect: RedirectFrom,
+    file:     String,
+    why:      io::Error,
+}
+
+#[derive(Debug, Error)]
+pub enum RedirectError {
+    #[error(display = "{}", cause)]
+    Input { cause: InputError },
+    #[error(display = "{}", cause)]
+    Output { cause: OutputError },
+}
+
+#[derive(Debug, Error)]
+pub enum PipelineError {
+    #[error(display = "ion: {}", cause)]
+    RedirectPipeError { cause: RedirectError },
+    #[error(display = "ion: could not create pipe: {}", cause)]
+    CreatePipeError { cause: io::Error },
+    #[error(display = "ion: could not fork: {}", cause)]
+    CreateForkError { cause: io::Error },
+    #[error(display = "ion: could not run function: {}", cause)]
+    RunFunctionError { cause: FunctionError },
+    #[error(display = "ion: failed to terminate foreground jobs: {}", cause)]
+    TerminateJobsError { cause: io::Error },
+    #[error(display = "ion: command exec error: {}", cause)]
+    CommandExecError { cause: io::Error },
+}
+
+impl fmt::Display for OutputError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "failed to redirect {} to file '{}': {}",
+            match self.redirect {
+                RedirectFrom::Both => "both stdout and stderr",
+                RedirectFrom::Stdout => "stdout",
+                RedirectFrom::Stderr => "stderr",
+                _ => unreachable!(),
+            },
+            self.file,
+            self.why,
+        )
+    }
+}
+
+impl std::error::Error for OutputError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { Some(&self.why) }
+}
+
+impl From<OutputError> for RedirectError {
+    fn from(cause: OutputError) -> Self { RedirectError::Output { cause } }
+}
+
+impl From<InputError> for RedirectError {
+    fn from(cause: InputError) -> Self { RedirectError::Input { cause } }
+}
+
+impl From<RedirectError> for PipelineError {
+    fn from(cause: RedirectError) -> Self { PipelineError::RedirectPipeError { cause } }
+}
+
+impl From<FunctionError> for PipelineError {
+    fn from(cause: FunctionError) -> Self { PipelineError::RunFunctionError { cause } }
+}
+
+/// Create an OS pipe and write the contents of a byte slice to one end
+/// such that reading from this pipe will produce the byte slice. Return
+/// A file descriptor representing the read end of the pipe.
+pub unsafe fn stdin_of<T: AsRef<[u8]>>(input: T) -> Result<RawFd, io::Error> {
+    let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)?;
+    let mut infile = File::from_raw_fd(writer);
+    // Write the contents; make sure to use write_all so that we block until
+    // the entire string is written
+    infile.write_all(input.as_ref())?;
+    infile.flush()?;
+    // `infile` currently owns the writer end RawFd. If we just return the reader
+    // end and let `infile` go out of scope, it will be closed, sending EOF to
+    // the reader!
+    Ok(reader)
+}
+
+impl Input {
+    pub fn get_infile(&mut self) -> Result<File, InputError> {
+        match self {
+            Input::File(ref filename) => match File::open(filename.as_str()) {
+                Ok(file) => Ok(file),
+                Err(why) => Err(InputError::File { file: filename.to_string(), why }),
+            },
+            Input::HereString(ref mut string) => {
+                if !string.ends_with('\n') {
+                    string.push('\n');
+                }
+
+                match unsafe { stdin_of(&string) } {
+                    Ok(stdio) => Ok(unsafe { File::from_raw_fd(stdio) }),
+                    Err(why) => Err(InputError::HereString { string: string.to_string(), why }),
+                }
+            }
+        }
+    }
+}
 
 /// Determines if the supplied command implicitly defines to change the directory.
 ///
@@ -79,7 +193,7 @@ fn do_tee<'a>(
     job: &mut RefinedJob<'a>,
     stdout: &mut dyn FnMut(&mut RefinedJob<'a>, File),
     stderr: &mut dyn FnMut(&mut RefinedJob<'a>, File),
-) -> Result<(), ()> {
+) -> Result<(), OutputError> {
     // XXX: Possibly add an assertion here for correctness
     for output in outputs {
         match OpenOptions::new()
@@ -88,27 +202,30 @@ fn do_tee<'a>(
             .append(output.append)
             .open(output.file.as_str())
         {
-            Ok(f) => match output.from {
+            Ok(file) => match output.from {
                 RedirectFrom::None => (),
-                RedirectFrom::Stdout => stdout(job, f),
-                RedirectFrom::Stderr => stderr(job, f),
-                RedirectFrom::Both => match f.try_clone() {
+                RedirectFrom::Stdout => stdout(job, file),
+                RedirectFrom::Stderr => stderr(job, file),
+                RedirectFrom::Both => match file.try_clone() {
                     Ok(f_copy) => {
-                        stdout(job, f);
+                        stdout(job, file);
                         stderr(job, f_copy);
                     }
-                    Err(e) => {
-                        eprintln!(
-                            "ion: failed to redirect both stdout and stderr to file '{:?}': {}",
-                            f, e
-                        );
-                        return Err(());
+                    Err(why) => {
+                        return Err(OutputError {
+                            redirect: output.from,
+                            file: output.file.to_string(),
+                            why,
+                        });
                     }
                 },
             },
-            Err(e) => {
-                eprintln!("ion: failed to redirect output into {}: {}", output.file, e);
-                return Err(());
+            Err(why) => {
+                return Err(OutputError {
+                    redirect: output.from,
+                    file: output.file.to_string(),
+                    why,
+                });
             }
         }
     }
@@ -120,7 +237,7 @@ fn do_tee<'a>(
 fn prepare<'a, 'b>(
     shell: &'a Shell<'b>,
     pipeline: Pipeline<'b>,
-) -> Result<impl IntoIterator<Item = (RefinedJob<'b>, RedirectFrom)>, ()> {
+) -> Result<impl IntoIterator<Item = (RefinedJob<'b>, RedirectFrom)>, RedirectError> {
     // Real logic begins here
     let mut new_commands = SmallVec::<[_; 16]>::with_capacity(2 * pipeline.items.len());
     let mut prev_kind = RedirectFrom::None;
@@ -227,54 +344,29 @@ impl<'b> Shell<'b> {
         if let Some(Value::Function(function)) = self.variables.get_ref(name).cloned() {
             match function.execute(self, args) {
                 Ok(()) => Status::SUCCESS,
-                Err(FunctionError::InvalidArgumentCount) => {
-                    Status::error(format!("ion: invalid number of function arguments supplied"))
-                }
-                Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
-                    Status::error(format!(
-                        "ion: function argument has invalid type: expected {}, found value \'{}\'",
-                        expected_type, value
-                    ))
-                }
+                Err(why) => Status::error(format!("{}", why)),
             }
         } else {
             unreachable!()
         }
     }
 
-    /// Execute a builtin in the current process.
-    /// # Args
-    /// * `shell`: A `Shell` that forwards relevant information to the builtin
-    /// * `name`: Name of the builtin to execute.
-    /// * `stdin`, `stdout`, `stderr`: File descriptors that will replace the respective standard
-    ///   streams if they are not `None`
-    fn exec_builtin<'a>(&mut self, main: BuiltinFunction<'a>, args: &[small::String]) -> Status {
-        main(args, self)
-    }
-
     /// Executes a `RefinedJob` that was created in the `generate_commands` method.
     ///
     /// The aforementioned `RefinedJob` may be either a builtin or external command.
     /// The purpose of this function is therefore to execute both types accordingly.
-    fn exec_job(&mut self, job: &RefinedJob<'b>) -> Status {
+    fn exec_job(&mut self, job: &RefinedJob<'b>) -> Result<Status, PipelineError> {
         // Duplicate file descriptors, execute command, and redirect back.
-        if let Ok((stdin_bk, stdout_bk, stderr_bk)) = duplicate_streams() {
-            redirect_streams(&job.stdin, &job.stdout, &job.stderr);
-            let code = match job.var {
-                JobVariant::Builtin { ref main } => self.exec_builtin(main, job.args()),
-                JobVariant::Function => self.exec_function(job.command(), job.args()),
-                _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
-            };
-            redirect_streams(&stdin_bk, &Some(stdout_bk), &Some(stderr_bk));
-            code
-        } else {
-            eprintln!(
-                "ion: failed to `dup` STDOUT, STDIN, or STDERR: not running '{}'",
-                job.long()
-            );
-
-            Status::COULD_NOT_EXEC
-        }
+        let (stdin_bk, stdout_bk, stderr_bk) =
+            duplicate_streams().map_err(|cause| PipelineError::CreatePipeError { cause })?;
+        redirect_streams(&job.stdin, &job.stdout, &job.stderr);
+        let code = match job.var {
+            JobVariant::Builtin { ref main } => main(job.args(), self),
+            JobVariant::Function => self.exec_function(job.command(), job.args()),
+            _ => panic!("exec job should not be able to be called on Cat or Tee jobs"),
+        };
+        redirect_streams(&stdin_bk, &Some(stdout_bk), &Some(stderr_bk));
+        Ok(code)
     }
 
     /// Generates a vector of commands from a given `Pipeline`.
@@ -312,25 +404,14 @@ impl<'b> Shell<'b> {
     /// If a job is stopped, the shell will add that job to a list of background jobs and
     /// continue to watch the job in the background, printing notifications on status changes
     /// of that job over time.
-    pub fn execute_pipeline(&mut self, pipeline: Pipeline<'b>) -> Status {
-        // Don't execute commands when the `-n` flag is passed.
-        if self.opts.no_exec {
-            return Status::SUCCESS;
-        }
-
-        // A string representing the command is stored here.
-        let command = pipeline.to_string();
-        if self.opts.print_comms {
-            eprintln!("> {}", command);
-        }
-
+    pub fn execute_pipeline(&mut self, pipeline: Pipeline<'b>) -> Result<Status, PipelineError> {
         // While active, the SIGTTOU signal will be ignored.
         let _sig_ignore = SignalHandler::new();
 
         // If the given pipeline is a background task, fork the shell.
         match pipeline.pipe {
-            PipeType::Disown => self.fork_pipe(pipeline, command, ProcessState::Empty),
-            PipeType::Background => self.fork_pipe(pipeline, command, ProcessState::Running),
+            PipeType::Disown => Ok(self.fork_pipe(pipeline, ProcessState::Empty)),
+            PipeType::Background => Ok(self.fork_pipe(pipeline, ProcessState::Running)),
             // Execute each command in the pipeline, giving each command the foreground.
             PipeType::Normal => {
                 let exit_status = self.pipe(pipeline);
@@ -346,11 +427,8 @@ impl<'b> Shell<'b> {
     /// Executes a piped job `job1 | job2 | job3`
     ///
     /// This function will panic if called with an empty slice
-    fn pipe(&mut self, pipeline: Pipeline<'b>) -> Status {
-        let mut commands = match prepare(self, pipeline) {
-            Ok(c) => c.into_iter().peekable(),
-            Err(_) => return Status::COULD_NOT_EXEC,
-        };
+    fn pipe(&mut self, pipeline: Pipeline<'b>) -> Result<Status, PipelineError> {
+        let mut commands = prepare(self, pipeline)?.into_iter().peekable();
 
         if let Some((mut parent, mut kind)) = commands.next() {
             if kind == RedirectFrom::None && !parent.needs_forking() {
@@ -383,42 +461,47 @@ impl<'b> Shell<'b> {
                     } = child.var
                     {
                         TeePipe::new(&mut parent, &mut ext_stdio_pipes, is_external)
-                            .connect(tee_out, tee_err);
+                            .connect(tee_out, tee_err)?;
                     } else {
                         // Pipe the previous command's stdin to this commands stdout/stderr.
-                        match sys::pipe2(sys::O_CLOEXEC) {
-                            Err(e) => pipe_fail(e),
-                            Ok((reader, writer)) => {
-                                if is_external {
-                                    append_external_stdio_pipe(&mut ext_stdio_pipes, writer);
-                                }
-                                child.stdin(unsafe { File::from_raw_fd(reader) });
-                                let writer = unsafe { File::from_raw_fd(writer) };
-                                match kind {
-                                    RedirectFrom::None => (),
-                                    RedirectFrom::Stderr => parent.stderr(writer),
-                                    RedirectFrom::Stdout => parent.stdout(writer),
-                                    RedirectFrom::Both => match writer.try_clone() {
-                                        Err(e) => {
-                                            eprintln!(
-                                                "ion: failed to redirect stdout and stderr: {}",
-                                                e
-                                            );
-                                        }
-                                        Ok(duped) => {
-                                            parent.stderr(writer);
-                                            parent.stdout(duped);
-                                        }
-                                    },
-                                }
+                        let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)
+                            .map_err(|cause| PipelineError::CreatePipeError { cause })?;
+                        if is_external {
+                            ext_stdio_pipes
+                                .get_or_insert_with(|| Vec::with_capacity(4))
+                                .push(unsafe { File::from_raw_fd(writer) });
+                        }
+                        child.stdin(unsafe { File::from_raw_fd(reader) });
+                        let writer = unsafe { File::from_raw_fd(writer) };
+                        match kind {
+                            RedirectFrom::None => (),
+                            RedirectFrom::Stderr => parent.stderr(writer),
+                            RedirectFrom::Stdout => parent.stdout(writer),
+                            RedirectFrom::Both => {
+                                let duped = writer.try_clone().map_err(|why| {
+                                    RedirectError::from(OutputError {
+                                        redirect: kind,
+                                        file: "pipe".to_string(),
+                                        why,
+                                    })
+                                })?;
+                                parent.stderr(writer);
+                                parent.stdout(duped);
                             }
                         }
                     }
 
-                    spawn_proc(self, parent, kind, true, &mut last_pid, &mut current_pid, pgid);
-                    set_process_group(&mut pgid, current_pid, !self.opts.is_background_shell);
-                    resume_prior_process(&mut last_pid, current_pid);
+                    spawn_proc(
+                        self,
+                        parent,
+                        kind,
+                        true,
+                        &mut last_pid,
+                        &mut current_pid,
+                        &mut pgid,
+                    )?;
 
+                    last_pid = current_pid;
                     parent = child;
                     kind = ckind;
                     if ckind == RedirectFrom::None {
@@ -426,26 +509,23 @@ impl<'b> Shell<'b> {
                     }
                 }
 
-                spawn_proc(self, parent, kind, false, &mut last_pid, &mut current_pid, pgid);
-                set_process_group(&mut pgid, current_pid, !self.opts.is_background_shell);
-                resume_prior_process(&mut last_pid, current_pid);
+                spawn_proc(self, parent, kind, false, &mut last_pid, &mut current_pid, &mut pgid)?;
 
                 // Waits for all of the children of the assigned pgid to finish executing,
                 // returning the exit status of the last process in the queue.
                 // Watch the foreground group, dropping all commands that exit as they exit.
                 let status = self.watch_foreground(pgid);
                 if status == Status::TERMINATED {
-                    if let Err(why) = sys::killpg(pgid, sys::SIGTERM) {
-                        eprintln!("ion: failed to terminate foreground jobs: {}", why);
-                    }
+                    sys::killpg(pgid, sys::SIGTERM)
+                        .map_err(|cause| PipelineError::TerminateJobsError { cause })?;
                 } else {
                     let _ = io::stdout().flush();
                     let _ = io::stderr().flush();
                 }
-                status
+                Ok(status)
             }
         } else {
-            Status::SUCCESS
+            Ok(Status::SUCCESS)
         }
     }
 }
@@ -457,8 +537,8 @@ fn spawn_proc(
     block_child: bool,
     last_pid: &mut u32,
     current_pid: &mut u32,
-    pgid: u32,
-) {
+    pgid: &mut u32,
+) -> Result<(), PipelineError> {
     let RefinedJob { mut var, args, stdin, stdout, stderr } = cmd;
     match var {
         JobVariant::External => {
@@ -469,7 +549,7 @@ fn spawn_proc(
                 stdout.as_ref().map(AsRawFd::as_raw_fd),
                 stderr.as_ref().map(AsRawFd::as_raw_fd),
                 false,
-                || prepare_child(block_child, pgid),
+                || prepare_child(block_child, *pgid),
             );
 
             match result {
@@ -480,8 +560,8 @@ fn spawn_proc(
                 Err(ref mut err) if err.kind() == io::ErrorKind::NotFound => {
                     shell.command_not_found(&args[0])
                 }
-                Err(ref mut err) => {
-                    eprintln!("ion: command exec error: {}", err);
+                Err(cause) => {
+                    return Err(PipelineError::CommandExecError { cause });
                 }
             }
         }
@@ -493,9 +573,9 @@ fn spawn_proc(
                 block_child,
                 last_pid,
                 current_pid,
-                pgid,
+                *pgid,
                 |_, _, _| main(&args, shell),
-            );
+            )?;
         }
         JobVariant::Function => {
             fork_exec_internal(
@@ -505,9 +585,9 @@ fn spawn_proc(
                 block_child,
                 last_pid,
                 current_pid,
-                pgid,
+                *pgid,
                 |_, _, _| shell.exec_function(&args[0], &args),
-            );
+            )?;
         }
         JobVariant::Cat { ref mut sources } => {
             fork_exec_internal(
@@ -517,9 +597,9 @@ fn spawn_proc(
                 block_child,
                 last_pid,
                 current_pid,
-                pgid,
+                *pgid,
                 |_, _, mut stdin| shell.exec_multi_in(sources, &mut stdin),
-            );
+            )?;
         }
         JobVariant::Tee { ref mut items } => {
             fork_exec_internal(
@@ -529,11 +609,14 @@ fn spawn_proc(
                 block_child,
                 last_pid,
                 current_pid,
-                pgid,
+                *pgid,
                 |_, _, _| shell.exec_multi_out(items, redirection),
-            );
+            )?;
         }
-    }
+    };
+    set_process_group(pgid, *current_pid, !shell.opts.is_background_shell);
+    resume_process(*last_pid);
+    Ok(())
 }
 
 // TODO: Integrate this better within the RefinedJob type.
@@ -546,7 +629,8 @@ fn fork_exec_internal<F>(
     current_pid: &mut u32,
     pgid: u32,
     mut exec_action: F,
-) where
+) -> Result<(), PipelineError>
+where
     F: FnMut(Option<File>, Option<File>, Option<File>) -> Status,
 {
     match unsafe { sys::fork() } {
@@ -560,8 +644,9 @@ fn fork_exec_internal<F>(
         Ok(pid) => {
             *last_pid = *current_pid;
             *current_pid = pid;
+            Ok(())
         }
-        Err(e) => pipe_fail(e),
+        Err(cause) => Err(PipelineError::CreateForkError { cause }),
     }
 }
 
@@ -578,16 +663,14 @@ fn prepare_child(block_child: bool, pgid: u32) {
     }
 }
 
-fn resume_prior_process(last_pid: &mut u32, current_pid: u32) {
-    if *last_pid != 0 {
+fn resume_process(last_pid: u32) {
+    if last_pid != 0 {
         // Ensure that the process is stopped before continuing.
-        if let Err(why) = wait_for_interrupt(*last_pid) {
+        if let Err(why) = wait_for_interrupt(last_pid) {
             eprintln!("ion: error waiting for sigstop: {}", why);
         }
-        let _ = sys::kill(*last_pid, sys::SIGCONT);
+        let _ = sys::kill(last_pid, sys::SIGCONT);
     }
-
-    *last_pid = current_pid;
 }
 
 fn set_process_group(pgid: &mut u32, pid: u32, set_foreground: bool) {
@@ -611,13 +694,4 @@ pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
             Err(errno) => break Err(io::Error::from_raw_os_error(errno)),
         }
     }
-}
-
-#[inline]
-pub fn pipe_fail(why: io::Error) {
-    eprintln!("ion: failed to create pipe: {:?}", why);
-}
-
-pub fn append_external_stdio_pipe(pipes: &mut Option<Vec<File>>, file: RawFd) {
-    pipes.get_or_insert_with(|| Vec::with_capacity(4)).push(unsafe { File::from_raw_fd(file) });
 }

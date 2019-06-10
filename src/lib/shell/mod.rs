@@ -323,18 +323,19 @@ impl<'a> Shell<'a> {
         let command_start_time = SystemTime::now();
 
         pipeline.expand(self);
-        // Branch if -> input == shell command i.e. echo
-        let exit_status = if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
+        // A string representing the command is stored here.
+        if self.opts.print_comms {
+            eprintln!("> {}", pipeline);
+        }
+
+        // Don't execute commands when the `-n` flag is passed.
+        let exit_status = if self.opts.no_exec {
+            Ok(Status::SUCCESS)
+        // Branch else if -> input == shell command i.e. echo
+        } else if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
-                if self.opts.print_comms {
-                    eprintln!("> {}", pipeline.to_string());
-                }
-                if self.opts.no_exec {
-                    Status::SUCCESS
-                } else {
-                    main(&pipeline.items[0].job.args, self)
-                }
+                Ok(main(&pipeline.items[0].job.args, self))
             } else {
                 self.execute_pipeline(pipeline)
             }
@@ -343,25 +344,20 @@ impl<'a> Shell<'a> {
             self.variables.get_ref(&pipeline.items[0].job.args[0]).cloned()
         {
             if !pipeline.requires_piping() {
-                match function.execute(self, &pipeline.items[0].job.args) {
-                    Ok(()) => self.previous_status,
-                    Err(FunctionError::InvalidArgumentCount) => {
-                        Status::error("ion: invalid number of function arguments supplied")
-                    }
-                    Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
-                        Status::error(format!(
-                            "ion: function argument has invalid type: expected {}, found value \
-                             \'{}\'",
-                            expected_type, value
-                        ))
-                    }
-                }
+                function
+                    .execute(self, &pipeline.items[0].job.args)
+                    .map(|_| self.previous_status)
+                    .map_err(Into::into)
             } else {
                 self.execute_pipeline(pipeline)
             }
         } else {
             self.execute_pipeline(pipeline)
-        };
+        }
+        .unwrap_or_else(|err| {
+            eprintln!("{}", err);
+            Status::COULD_NOT_EXEC
+        });
 
         if let Some(ref callback) = self.on_command {
             if let Ok(elapsed_time) = command_start_time.elapsed() {

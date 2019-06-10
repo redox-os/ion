@@ -151,9 +151,6 @@ impl TeeItem {
 }
 
 impl<'a> RefinedJob<'a> {
-    /// Returns a long description of this job: the commands and arguments
-    pub fn long(&self) -> String { self.args.join(" ") }
-
     pub fn command(&self) -> &types::Str { &self.args[0] }
 
     pub fn args(&self) -> &types::Args { &self.args }

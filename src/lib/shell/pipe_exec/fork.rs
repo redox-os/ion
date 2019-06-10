@@ -5,7 +5,6 @@ use super::{
     job_control::{BackgroundProcess, ProcessState},
 };
 use crate::parser::pipelines::Pipeline;
-use std::process::exit;
 
 impl<'a> Shell<'a> {
     /// Ensures that the forked child is given a unique process ID.
@@ -13,12 +12,7 @@ impl<'a> Shell<'a> {
 
     /// Forks the shell, adding the child to the parent's background list, and executing
     /// the given commands in the child fork.
-    pub(super) fn fork_pipe(
-        &mut self,
-        pipeline: Pipeline<'a>,
-        command_name: String,
-        state: ProcessState,
-    ) -> Status {
+    pub(super) fn fork_pipe(&mut self, pipeline: Pipeline<'a>, state: ProcessState) -> Status {
         match unsafe { sys::fork() } {
             Ok(0) => {
                 self.opts_mut().is_background_shell = true;
@@ -31,19 +25,27 @@ impl<'a> Shell<'a> {
                 Self::create_process_group(0);
 
                 // After execution of it's commands, exit with the last command's status.
-                sys::fork_exit(self.pipe(pipeline).as_os_code());
+                sys::fork_exit(
+                    self.pipe(pipeline)
+                        .unwrap_or_else(|err| {
+                            eprintln!("{}", err);
+                            Status::COULD_NOT_EXEC
+                        })
+                        .as_os_code(),
+                );
             }
             Ok(pid) => {
                 if state != ProcessState::Empty {
                     // The parent process should add the child fork's PID to the background.
-                    self.send_to_background(BackgroundProcess::new(pid, state, command_name));
+                    self.send_to_background(BackgroundProcess::new(
+                        pid,
+                        state,
+                        pipeline.to_string(),
+                    ));
                 }
                 Status::SUCCESS
             }
-            Err(why) => {
-                eprintln!("ion: background fork failed: {}", why);
-                exit(1);
-            }
+            Err(why) => Status::error(format!("ion: background fork failed: {}", why)),
         }
     }
 }
