@@ -74,6 +74,7 @@ itertools = "0.8"
 lexical = "2.0"
 object-pool = "0.3.1"
 auto_enums = "0.5.5"
+doc-comment = "0.3"
 
 [lib]
 path = "src/lib/lib.rs"
