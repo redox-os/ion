@@ -223,7 +223,7 @@ impl DirectoryStack {
         let mut dirs: VecDeque<PathBuf> = VecDeque::new();
         match env::current_dir() {
             Ok(curr_dir) => {
-                env::set_var("PWD", curr_dir.to_str().unwrap_or_else(|| "?"));
+                env::set_var("PWD", curr_dir.to_str().unwrap_or("?"));
                 dirs.push_front(curr_dir);
             }
             Err(_) => {

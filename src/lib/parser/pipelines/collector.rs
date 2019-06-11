@@ -1,14 +1,42 @@
+use err_derive::Error;
 use std::iter::Peekable;
 
 use super::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection};
 use crate::{
     builtins::BuiltinMap,
-    lexers::arguments::{Field, Levels},
+    lexers::arguments::{Field, Levels, LevelsError},
     shell::Job,
     types::*,
 };
 
 const ARG_DEFAULT_SIZE: usize = 10;
+
+#[derive(Debug, Error)]
+pub enum PipelineParsingError {
+    // redirections
+    #[error(display = "expected file argument after redirection for output")]
+    NoRedirection,
+    #[error(display = "heredocs are not a part of Ion. Use redirection and/or cat instead")]
+    HeredocsDeprecated,
+    #[error(display = "expected string argument after '<<<'")]
+    NoHereStringArg,
+    #[error(display = "expected file argument after redirection for input")]
+    NoRedirectionArg,
+
+    // quotes
+    #[error(display = "unterminated double quote")]
+    UnterminatedDoubleQuote,
+    #[error(display = "unterminated single quote")]
+    UnterminatedSingleQuote,
+
+    // paired
+    #[error(display = "{}", cause)]
+    Paired { cause: LevelsError },
+}
+
+impl From<LevelsError> for PipelineParsingError {
+    fn from(cause: LevelsError) -> Self { PipelineParsingError::Paired { cause } }
+}
 
 trait AddItem<'a> {
     fn add_item(
@@ -44,7 +72,11 @@ pub struct Collector<'a> {
 
 impl<'a> Collector<'a> {
     /// Add a new argument that is re
-    fn push_arg<I>(&self, args: &mut Args, bytes: &mut Peekable<I>) -> Result<(), &'static str>
+    fn push_arg<I>(
+        &self,
+        args: &mut Args,
+        bytes: &mut Peekable<I>,
+    ) -> Result<(), PipelineParsingError>
     where
         I: Iterator<Item = (usize, u8)>,
     {
@@ -60,7 +92,7 @@ impl<'a> Collector<'a> {
         from: RedirectFrom,
         outputs: &mut Vec<Redirection>,
         bytes: &mut Peekable<I>,
-    ) -> Result<(), &'static str>
+    ) -> Result<(), PipelineParsingError>
     where
         I: Iterator<Item = (usize, u8)>,
     {
@@ -71,14 +103,14 @@ impl<'a> Collector<'a> {
             false
         };
         self.arg(bytes)?
-            .ok_or("expected file argument after redirection for output")
+            .ok_or(PipelineParsingError::NoRedirection)
             .map(|file| outputs.push(Redirection { from, file: file.into(), append }))
     }
 
     pub fn parse<'builtins>(
         &self,
         builtins: &BuiltinMap<'builtins>,
-    ) -> Result<Pipeline<'builtins>, &'static str> {
+    ) -> Result<Pipeline<'builtins>, PipelineParsingError> {
         let mut bytes = self.data.bytes().enumerate().peekable();
         let mut args = Args::with_capacity(ARG_DEFAULT_SIZE);
         let mut pipeline = Pipeline::new();
@@ -174,17 +206,16 @@ impl<'a> Collector<'a> {
                             if let Some(cmd) = self.arg(&mut bytes)? {
                                 inputs.push(Input::HereString(cmd.into()));
                             } else {
-                                return Err("expected string argument after '<<<'");
+                                return Err(PipelineParsingError::NoHereStringArg);
                             }
                         } else {
-                            return Err("heredocs are not a part of Ion. Use redirection and/or \
-                                        cat instead");
+                            return Err(PipelineParsingError::HeredocsDeprecated);
                         }
                     } else if let Some(file) = self.arg(&mut bytes)? {
                         // Otherwise interpret it as stdin redirection
                         inputs.push(Input::File(file.into()));
                     } else {
-                        return Err("expected file argument after redirection for input");
+                        return Err(PipelineParsingError::NoRedirectionArg);
                     }
                 }
                 // Skip over whitespace between jobs
@@ -200,7 +231,7 @@ impl<'a> Collector<'a> {
         Ok(pipeline)
     }
 
-    fn arg<I>(&self, bytes: &mut Peekable<I>) -> Result<Option<&'a str>, &'static str>
+    fn arg<I>(&self, bytes: &mut Peekable<I>) -> Result<Option<&'a str>, PipelineParsingError>
     where
         I: Iterator<Item = (usize, u8)>,
     {
@@ -325,7 +356,7 @@ impl<'a> Collector<'a> {
         &self,
         bytes: &mut Peekable<I>,
         start: usize,
-    ) -> Result<&'a str, &'static str>
+    ) -> Result<&'a str, PipelineParsingError>
     where
         I: Iterator<Item = (usize, u8)>,
     {
@@ -343,14 +374,14 @@ impl<'a> Collector<'a> {
             }
             bytes.next();
         }
-        Err("ion: syntax error: unterminated quote")
+        Err(PipelineParsingError::UnterminatedDoubleQuote)
     }
 
     fn single_quoted<I>(
         &self,
         bytes: &mut Peekable<I>,
         start: usize,
-    ) -> Result<&'a str, &'static str>
+    ) -> Result<&'a str, PipelineParsingError>
     where
         I: Iterator<Item = (usize, u8)>,
     {
@@ -362,7 +393,7 @@ impl<'a> Collector<'a> {
             }
             bytes.next();
         }
-        Err("ion: syntax error: unterminated single quote")
+        Err(PipelineParsingError::UnterminatedSingleQuote)
     }
 
     fn peek(&self, index: usize) -> Option<u8> {
@@ -376,7 +407,7 @@ impl<'a> Collector<'a> {
     pub fn run<'builtins>(
         data: &'a str,
         builtins: &BuiltinMap<'builtins>,
-    ) -> Result<Pipeline<'builtins>, &'static str> {
+    ) -> Result<Pipeline<'builtins>, PipelineParsingError> {
         Collector::new(data).parse(builtins)
     }
 

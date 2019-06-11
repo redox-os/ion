@@ -6,7 +6,10 @@ use super::{
 use crate::{
     builtins::BuiltinMap,
     lexers::{assignment_lexer, ArgumentSplitter},
-    parser::statement::{case::CaseError, functions::FunctionParseError},
+    parser::{
+        pipelines::PipelineParsingError,
+        statement::{case::CaseError, functions::FunctionParseError},
+    },
     shell::flow_control::{Case, ElseIf, ExportAction, IfMode, LocalAction, Statement},
 };
 use err_derive::Error;
@@ -42,7 +45,7 @@ pub enum ParseError {
     #[error(display = "function argument error: {}", cause)]
     InvalidFunctionArgument { cause: FunctionParseError },
     #[error(display = "{}", cause)]
-    PipelineParsingError { cause: String },
+    PipelineParsingError { cause: PipelineParsingError },
 }
 
 impl From<FunctionParseError> for ParseError {
@@ -53,8 +56,8 @@ impl From<CaseError> for ParseError {
     fn from(cause: CaseError) -> Self { ParseError::CaseError { cause } }
 }
 
-impl From<&str> for ParseError {
-    fn from(cause: &str) -> Self { ParseError::PipelineParsingError { cause: cause.to_string() } }
+impl From<PipelineParsingError> for ParseError {
+    fn from(cause: PipelineParsingError) -> Self { ParseError::PipelineParsingError { cause } }
 }
 
 pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
