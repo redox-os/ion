@@ -34,8 +34,7 @@ use crate::{
 use err_derive::Error;
 use itertools::Itertools;
 use std::{
-    fmt,
-    fs::{self, OpenOptions},
+    fmt, fs,
     io::{self, Write},
     ops::{Deref, DerefMut},
     path::Path,
@@ -43,7 +42,6 @@ use std::{
     sync::{atomic::Ordering, Arc, Mutex},
     time::SystemTime,
 };
-use xdg::BaseDirectories;
 
 #[derive(Debug, Error)]
 pub enum IonError {
@@ -153,8 +151,6 @@ impl fmt::Debug for EmptyBlockError {
 }
 
 impl<'a> Shell<'a> {
-    const CONFIG_FILE_NAME: &'static str = "initrc";
-
     /// Set the shell as the terminal primary executable
     pub fn set_unique_pid(&self) {
         if let Ok(pid) = sys::getpid() {
@@ -376,31 +372,6 @@ impl<'a> Shell<'a> {
         } else {
             Some(self.previous_job)
         }
-    }
-
-    /// Evaluates the source init file in the user's home directory.
-    pub fn evaluate_init_file(&mut self) {
-        let base_dirs = match BaseDirectories::with_prefix("ion") {
-            Ok(base_dirs) => base_dirs,
-            Err(err) => {
-                eprintln!("ion: unable to get base directory: {}", err);
-                return;
-            }
-        };
-        match base_dirs.find_config_file(Self::CONFIG_FILE_NAME) {
-            Some(initrc) => self.execute_file(&initrc),
-            None => {
-                if let Err(err) = Self::create_config_file(base_dirs, Self::CONFIG_FILE_NAME) {
-                    eprintln!("ion: could not create config file: {}", err);
-                }
-            }
-        }
-    }
-
-    fn create_config_file(base_dirs: BaseDirectories, file_name: &str) -> Result<(), io::Error> {
-        let path = base_dirs.place_config_file(file_name)?;
-        OpenOptions::new().write(true).create_new(true).open(path)?;
-        Ok(())
     }
 
     /// Call the cleanup callback

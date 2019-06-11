@@ -630,10 +630,7 @@ pub fn builtin_source(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_SOURCE) {
         return Status::SUCCESS;
     }
-    match source(shell, args) {
-        Ok(()) => Status::SUCCESS,
-        Err(why) => Status::error(why),
-    }
+    source(shell, args)
 }
 
 pub fn builtin_echo(args: &[small::String], _: &mut Shell<'_>) -> Status {
