@@ -6,11 +6,13 @@ use super::{
 use crate::{
     builtins::BuiltinMap,
     lexers::{assignment_lexer, ArgumentSplitter},
-    shell::{
-        flow_control::{Case, ElseIf, ExportAction, IfMode, LocalAction, Statement},
-        status::Status,
+    parser::{
+        pipelines::PipelineParsingError,
+        statement::{case::CaseError, functions::FunctionParseError},
     },
+    shell::flow_control::{Case, ElseIf, ExportAction, IfMode, LocalAction, Statement},
 };
+use err_derive::Error;
 use small;
 use std::char;
 
@@ -20,97 +22,117 @@ pub fn is_valid_name(name: &str) -> bool {
         && chars.all(|b| b.is_alphanumeric() || b == '_')
 }
 
-pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
+#[derive(Debug, Error)]
+pub enum ParseError {
+    #[error(display = "incomplete control flow statement")]
+    IncompleteFlowControl,
+    #[error(display = "no key supplied for assignment")]
+    NoKeySupplied,
+    #[error(display = "no operator supplied for assignment")]
+    NoOperatorSupplied,
+    #[error(display = "no values supplied for assignment")]
+    NoValueSupplied,
+    #[error(display = "no value supplied for iteration in for loop")]
+    NoInKeyword,
+    #[error(display = "case error: {}", cause)]
+    CaseError { cause: CaseError },
+    #[error(
+        display = "'{}' is not a valid function name\n     Function names may only contain \
+                   alphanumeric characters",
+        name
+    )]
+    InvalidFunctionName { name: String },
+    #[error(display = "function argument error: {}", cause)]
+    InvalidFunctionArgument { cause: FunctionParseError },
+    #[error(display = "{}", cause)]
+    PipelineParsingError { cause: PipelineParsingError },
+}
+
+impl From<FunctionParseError> for ParseError {
+    fn from(cause: FunctionParseError) -> Self { ParseError::InvalidFunctionArgument { cause } }
+}
+
+impl From<CaseError> for ParseError {
+    fn from(cause: CaseError) -> Self { ParseError::CaseError { cause } }
+}
+
+impl From<PipelineParsingError> for ParseError {
+    fn from(cause: PipelineParsingError) -> Self { ParseError::PipelineParsingError { cause } }
+}
+
+pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
     let cmd = code.trim();
     match cmd {
-        "end" => Statement::End,
-        "break" => Statement::Break,
-        "continue" => Statement::Continue,
-        "for" | "match" | "case" => {
-            Statement::Error(Status::error("ion: syntax error: incomplete control flow statement"))
-        }
-        "let" => Statement::Let(LocalAction::List),
+        "end" => Ok(Statement::End),
+        "break" => Ok(Statement::Break),
+        "continue" => Ok(Statement::Continue),
+        "for" | "match" | "case" => Err(ParseError::IncompleteFlowControl),
+        "let" => Ok(Statement::Let(LocalAction::List)),
         _ if cmd.starts_with("let ") => {
             // Split the let expression and ensure that the statement is valid.
             let (keys, op, vals) = assignment_lexer(cmd[4..].trim_start());
             match vals {
                 Some(vals) => {
                     // If the values exist, then the keys and operator also exists.
-                    Statement::Let(LocalAction::Assign(
+                    Ok(Statement::Let(LocalAction::Assign(
                         keys.unwrap().into(),
                         op.unwrap(),
                         vals.into(),
-                    ))
+                    )))
                 }
-                None => {
-                    if op.is_none() {
-                        Statement::Error(Status::error(
-                            "ion: assignment error: no operator supplied.",
-                        ))
-                    } else {
-                        Statement::Error(Status::error(
-                            "ion: assignment error: no values supplied.",
-                        ))
-                    }
-                }
+                None if op.is_none() => Err(ParseError::NoOperatorSupplied),
+                _ => Err(ParseError::NoValueSupplied),
             }
         }
-        "export" => Statement::Export(ExportAction::List),
+        "export" => Ok(Statement::Export(ExportAction::List)),
         _ if cmd.starts_with("export ") => {
             // Split the let expression and ensure that the statement is valid.
             let (keys, op, vals) = assignment_lexer(cmd[7..].trim_start());
             match vals {
                 Some(vals) => {
                     // If the values exist, then the keys and operator also exists.
-                    Statement::Export(ExportAction::Assign(
+                    Ok(Statement::Export(ExportAction::Assign(
                         keys.unwrap().into(),
                         op.unwrap(),
                         vals.into(),
-                    ))
+                    )))
                 }
                 None => {
                     if keys.is_none() {
-                        Statement::Error(Status::error("ion: assignment error: no keys supplied."))
+                        Err(ParseError::NoKeySupplied)
                     } else if op.is_some() {
-                        Statement::Error(Status::error(
-                            "ion: assignment error: no values supplied.",
-                        ))
+                        Err(ParseError::NoValueSupplied)
                     } else {
-                        Statement::Export(ExportAction::LocalExport(keys.unwrap().into()))
+                        Ok(Statement::Export(ExportAction::LocalExport(keys.unwrap().into())))
                     }
                 }
             }
         }
-        _ if cmd.starts_with("if ") => Statement::If {
-            expression: vec![parse(cmd[3..].trim_start(), builtins)],
+        _ if cmd.starts_with("if ") => Ok(Statement::If {
+            expression: vec![parse(cmd[3..].trim_start(), builtins)?],
             success:    Vec::new(),
             else_if:    Vec::new(),
             failure:    Vec::new(),
             mode:       IfMode::Success,
-        },
-        "else" => Statement::Else,
+        }),
+        "else" => Ok(Statement::Else),
         _ if cmd.starts_with("else") => {
             let cmd = cmd[4..].trim_start();
             if !cmd.is_empty() && cmd.starts_with("if ") {
-                Statement::ElseIf(ElseIf {
-                    expression: vec![parse(cmd[3..].trim_start(), builtins)],
+                Ok(Statement::ElseIf(ElseIf {
+                    expression: vec![parse(cmd[3..].trim_start(), builtins)?],
                     success:    Vec::new(),
-                })
+                }))
             } else {
-                Statement::Else
+                Ok(Statement::Else)
             }
         }
         _ if cmd.starts_with("while ") => {
-            match pipelines::Collector::run(cmd[6..].trim_start(), builtins) {
-                Ok(pipeline) => Statement::While {
-                    expression: vec![Statement::Pipeline(pipeline)],
-                    statements: Vec::new(),
-                },
-                Err(err) => {
-                    eprintln!("ion: syntax error: {}", err);
-                    Statement::Default
-                }
-            }
+            let pipeline = pipelines::Collector::run(cmd[6..].trim_start(), builtins)?;
+            Ok(Statement::While {
+                expression: vec![Statement::Pipeline(pipeline)],
+                statements: Vec::new(),
+            })
         }
         _ if cmd.starts_with("for ") => {
             let mut cmd = cmd[4..].trim_start();
@@ -130,29 +152,19 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
             }
 
             match variables {
-                Some(variables) => Statement::For {
+                Some(variables) => Ok(Statement::For {
                     variables,
                     values: ArgumentSplitter::new(cmd).map(small::String::from).collect(),
                     statements: Vec::new(),
-                },
-                None => Statement::Error(Status::error(
-                    "ion: syntax error: for loop lacks the `in` keyword",
-                )),
+                }),
+                None => Err(ParseError::NoInKeyword),
             }
         }
         _ if cmd.starts_with("case ") => {
             let (value, binding, conditional) = match cmd[5..].trim_start() {
                 "_" => (None, None, None),
                 value => {
-                    let (value, binding, conditional) = match case::parse_case(value) {
-                        Ok(values) => values,
-                        Err(why) => {
-                            return Statement::Error(Status::error(format!(
-                                "ion: case error: {}",
-                                why
-                            )))
-                        }
-                    };
+                    let (value, binding, conditional) = case::parse_case(value)?;
                     let binding = binding.map(Into::into);
                     match value {
                         Some("_") => (None, binding, conditional),
@@ -162,36 +174,27 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
                 }
             };
 
-            Statement::Case(Case { value, binding, conditional, statements: Vec::new() })
+            Ok(Statement::Case(Case { value, binding, conditional, statements: Vec::new() }))
         }
-        _ if cmd.starts_with("match ") => {
-            Statement::Match { expression: cmd[6..].trim_start().into(), cases: Vec::new() }
-        }
+        _ if cmd.starts_with("match ") => Ok(Statement::Match {
+            expression: cmd[6..].trim_start().into(),
+            cases:      Vec::new(),
+        }),
         _ if cmd.starts_with("fn ") => {
             let cmd = cmd[3..].trim_start();
             let pos = cmd.find(char::is_whitespace).unwrap_or_else(|| cmd.len());
             let name = &cmd[..pos];
             if !is_valid_name(name) {
-                return Statement::Error(Status::error(format!(
-                    "ion: syntax error: '{}' is not a valid function name\n     Function names \
-                     may only contain alphanumeric characters",
-                    name
-                )));
+                return Err(ParseError::InvalidFunctionName { name: name.into() });
             }
 
             let (args, description) = parse_function(&cmd[pos..]);
-            match collect_arguments(args) {
-                Ok(args) => Statement::Function {
-                    description: description.map(small::String::from),
-                    name: name.into(),
-                    args,
-                    statements: Vec::new(),
-                },
-                Err(why) => Statement::Error(Status::error(format!(
-                    "ion: function argument error: {}",
-                    why
-                ))),
-            }
+            Ok(Statement::Function {
+                description: description.map(small::String::from),
+                name:        name.into(),
+                args:        collect_arguments(args)?,
+                statements:  Vec::new(),
+            })
         }
         _ if cmd.starts_with("time ") => {
             // Ignore embedded time calls
@@ -199,32 +202,26 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> Statement<'a> {
             while timed.starts_with("time ") {
                 timed = timed[4..].trim_start();
             }
-            Statement::Time(Box::new(parse(timed, builtins)))
+            Ok(Statement::Time(Box::new(parse(timed, builtins)?)))
         }
-        _ if cmd.eq("time") => Statement::Time(Box::new(Statement::Default)),
+        _ if cmd.eq("time") => Ok(Statement::Time(Box::new(Statement::Default))),
         _ if cmd.starts_with("and ") => {
-            Statement::And(Box::new(parse(cmd[3..].trim_start(), builtins)))
+            Ok(Statement::And(Box::new(parse(cmd[3..].trim_start(), builtins)?)))
         }
-        _ if cmd.eq("and") => Statement::And(Box::new(Statement::Default)),
+        _ if cmd.eq("and") => Ok(Statement::And(Box::new(Statement::Default))),
         _ if cmd.starts_with("or ") => {
-            Statement::Or(Box::new(parse(cmd[2..].trim_start(), builtins)))
+            Ok(Statement::Or(Box::new(parse(cmd[2..].trim_start(), builtins)?)))
         }
-        _ if cmd.eq("or") => Statement::Or(Box::new(Statement::Default)),
+        _ if cmd.eq("or") => Ok(Statement::Or(Box::new(Statement::Default))),
         _ if cmd.starts_with("not ") => {
-            Statement::Not(Box::new(parse(cmd[3..].trim_start(), builtins)))
+            Ok(Statement::Not(Box::new(parse(cmd[3..].trim_start(), builtins)?)))
         }
         _ if cmd.starts_with("! ") => {
-            Statement::Not(Box::new(parse(cmd[1..].trim_start(), builtins)))
+            Ok(Statement::Not(Box::new(parse(cmd[1..].trim_start(), builtins)?)))
         }
-        _ if cmd.eq("not") | cmd.eq("!") => Statement::Not(Box::new(Statement::Default)),
-        _ if cmd.is_empty() || cmd.starts_with('#') => Statement::Default,
-        _ => match pipelines::Collector::run(cmd, builtins) {
-            Ok(pipeline) => Statement::Pipeline(pipeline),
-            Err(err) => {
-                eprintln!("ion: syntax error: {}", err);
-                Statement::Default
-            }
-        },
+        _ if cmd.eq("not") | cmd.eq("!") => Ok(Statement::Not(Box::new(Statement::Default))),
+        _ if cmd.is_empty() || cmd.starts_with('#') => Ok(Statement::Default),
+        _ => Ok(Statement::Pipeline(pipelines::Collector::run(cmd, builtins)?)),
     }
 }
 
@@ -242,7 +239,7 @@ mod tests {
     #[test]
     fn parsing_for() {
         assert_eq!(
-            parse("for x y z in 1..=10", &BuiltinMap::new()),
+            parse("for x y z in 1..=10", &BuiltinMap::new()).unwrap(),
             Statement::For {
                 variables:  vec!["x", "y", "z"].into_iter().map(Into::into).collect(),
                 values:     vec!["1..=10"].into_iter().map(Into::into).collect(),
@@ -251,7 +248,7 @@ mod tests {
         );
 
         assert_eq!(
-            parse("for  x  in  {1..=10} {1..=10}", &BuiltinMap::new()),
+            parse("for  x  in  {1..=10} {1..=10}", &BuiltinMap::new()).unwrap(),
             Statement::For {
                 variables:  vec!["x"].into_iter().map(Into::into).collect(),
                 values:     vec!["{1..=10}", "{1..=10}"].into_iter().map(Into::into).collect(),
@@ -263,7 +260,7 @@ mod tests {
     #[test]
     fn parsing_ifs() {
         // Default case where spaced normally
-        let parsed_if = parse("if test 1 -eq 2", &BuiltinMap::new());
+        let parsed_if = parse("if test 1 -eq 2", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::If {
             expression: vec![Statement::Pipeline(Pipeline {
                 items: vec![PipeItem {
@@ -287,40 +284,40 @@ mod tests {
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = parse("if test 1 -eq 2         ", &BuiltinMap::new());
+        let parsed_if = parse("if test 1 -eq 2         ", &BuiltinMap::new()).unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 
     #[test]
     fn parsing_elses() {
         // Default case where spaced normally
-        let mut parsed_if = parse("else", &BuiltinMap::new());
+        let mut parsed_if = parse("else", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::Else;
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        parsed_if = parse("else         ", &BuiltinMap::new());
+        parsed_if = parse("else         ", &BuiltinMap::new()).unwrap();
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
-        parsed_if = parse("         else", &BuiltinMap::new());
+        parsed_if = parse("         else", &BuiltinMap::new()).unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 
     #[test]
     fn parsing_ends() {
         // Default case where spaced normally
-        let parsed_if = parse("end", &BuiltinMap::new());
+        let parsed_if = parse("end", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = parse("end         ", &BuiltinMap::new());
+        let parsed_if = parse("end         ", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
-        let parsed_if = parse("         end", &BuiltinMap::new());
+        let parsed_if = parse("         end", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::End;
         assert_eq!(correct_parse, parsed_if);
     }
@@ -328,7 +325,7 @@ mod tests {
     #[test]
     fn parsing_functions() {
         // Default case where spaced normally
-        let parsed_if = parse("fn bob", &BuiltinMap::new());
+        let parsed_if = parse("fn bob", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::Function {
             description: None,
             name:        "bob".into(),
@@ -338,15 +335,15 @@ mod tests {
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = parse("fn bob        ", &BuiltinMap::new());
+        let parsed_if = parse("fn bob        ", &BuiltinMap::new()).unwrap();
         assert_eq!(correct_parse, parsed_if);
 
         // Leading spaces after final value
-        let parsed_if = parse("         fn bob", &BuiltinMap::new());
+        let parsed_if = parse("         fn bob", &BuiltinMap::new()).unwrap();
         assert_eq!(correct_parse, parsed_if);
 
         // Default case where spaced normally
-        let parsed_if = parse("fn bob a b", &BuiltinMap::new());
+        let parsed_if = parse("fn bob a b", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::Function {
             description: None,
             name:        "bob".into(),
@@ -359,10 +356,10 @@ mod tests {
         assert_eq!(correct_parse, parsed_if);
 
         // Trailing spaces after final value
-        let parsed_if = parse("fn bob a b       ", &BuiltinMap::new());
+        let parsed_if = parse("fn bob a b       ", &BuiltinMap::new()).unwrap();
         assert_eq!(correct_parse, parsed_if);
 
-        let parsed_if = parse("fn bob a b --bob is a nice function", &BuiltinMap::new());
+        let parsed_if = parse("fn bob a b --bob is a nice function", &BuiltinMap::new()).unwrap();
         let correct_parse = Statement::Function {
             description: Some("bob is a nice function".into()),
             name:        "bob".into(),
@@ -373,9 +370,11 @@ mod tests {
             statements:  vec![],
         };
         assert_eq!(correct_parse, parsed_if);
-        let parsed_if = parse("fn bob a b --          bob is a nice function", &BuiltinMap::new());
+        let parsed_if =
+            parse("fn bob a b --          bob is a nice function", &BuiltinMap::new()).unwrap();
         assert_eq!(correct_parse, parsed_if);
-        let parsed_if = parse("fn bob a b      --bob is a nice function", &BuiltinMap::new());
+        let parsed_if =
+            parse("fn bob a b      --bob is a nice function", &BuiltinMap::new()).unwrap();
         assert_eq!(correct_parse, parsed_if);
     }
 }

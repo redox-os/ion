@@ -68,7 +68,7 @@ pub struct IonResult {
 impl<'a, 'b> Fork<'a, 'b> {
     /// Executes a closure within the child of the fork, and returning an `IonResult` in a
     /// non-blocking fashion.
-    pub fn exec<F: FnMut(&mut Shell<'b>) + 'a>(
+    pub fn exec<F: FnMut(&mut Shell<'b>) -> Result<(), IonError> + 'a>(
         self,
         mut child_func: F,
     ) -> Result<IonResult, IonError> {
@@ -76,7 +76,7 @@ impl<'a, 'b> Fork<'a, 'b> {
 
         // If we are to capture stdout, create a pipe for capturing outputs.
         let outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
-            let fds = sys::pipe2(sys::O_CLOEXEC).map_err(|why| IonError::Fork { why })?;
+            let fds = sys::pipe2(sys::O_CLOEXEC)?;
             Some(unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
         } else {
             None
@@ -84,7 +84,7 @@ impl<'a, 'b> Fork<'a, 'b> {
 
         // And if we are to capture stderr, create a pipe for that as well.
         let errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
-            let fds = sys::pipe2(sys::O_CLOEXEC).map_err(|why| IonError::Fork { why })?;
+            let fds = sys::pipe2(sys::O_CLOEXEC)?;
             Some(unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
         } else {
             None
@@ -95,8 +95,8 @@ impl<'a, 'b> Fork<'a, 'b> {
         // be repeated.
         let null_file = File::open(sys::NULL_PATH);
 
-        match unsafe { sys::fork() } {
-            Ok(0) => {
+        match unsafe { sys::fork() }? {
+            0 => {
                 // Allow the child to handle it's own signal handling.
                 sys::signals::unblock();
 
@@ -126,10 +126,14 @@ impl<'a, 'b> Fork<'a, 'b> {
                 shell.variables_mut().set("PID", sys::getpid().unwrap_or(0).to_string());
 
                 // Execute the given closure within the child's shell.
-                child_func(&mut shell);
-                sys::fork_exit(shell.previous_status.as_os_code());
+                if let Err(why) = child_func(&mut shell) {
+                    eprintln!("{}", why);
+                    sys::fork_exit(-1);
+                } else {
+                    sys::fork_exit(shell.previous_status.as_os_code());
+                }
             }
-            Ok(pid) => {
+            pid => {
                 Ok(IonResult {
                     pid,
                     stdout: outs.map(|(read, write)| {
@@ -141,10 +145,9 @@ impl<'a, 'b> Fork<'a, 'b> {
                         read
                     }),
                     // `waitpid()` is required to reap the child.
-                    status: wait_for_child(pid).map_err(|why| IonError::Fork { why })?,
+                    status: wait_for_child(pid)?,
                 })
             }
-            Err(why) => Err(IonError::Fork { why }),
         }
     }
 

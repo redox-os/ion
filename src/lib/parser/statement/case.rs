@@ -2,16 +2,16 @@ use crate::lexers::ArgumentSplitter;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
-pub enum CaseError<'a> {
+pub enum CaseError {
     NoBindVariable,
     NoConditional,
-    ExtraBind(&'a str),
-    ExtraVar(&'a str),
+    ExtraBind(String),
+    ExtraVar(String),
 }
 
-impl<'a> Display for CaseError<'a> {
+impl Display for CaseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match *self {
+        match self {
             CaseError::NoBindVariable => write!(f, "no bind variable was supplied"),
             CaseError::NoConditional => write!(f, "no conditional statement was given"),
             CaseError::ExtraBind(value) => write!(f, "extra value, '{}', was given to bind", value),
@@ -22,9 +22,7 @@ impl<'a> Display for CaseError<'a> {
     }
 }
 
-pub fn parse_case(
-    data: &str,
-) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError<'_>> {
+pub fn parse_case(data: &str) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError> {
     let mut splitter = ArgumentSplitter::new(data);
     // let argument = splitter.next().ok_or(CaseError::Empty)?;
     let mut argument = None;
@@ -50,7 +48,7 @@ pub fn parse_case(
                         }
                         conditional = Some(string);
                     }
-                    Some(value) => return Err(CaseError::ExtraBind(value)),
+                    Some(value) => return Err(CaseError::ExtraBind(value.into())),
                     None => (),
                 }
             }
@@ -71,7 +69,7 @@ pub fn parse_case(
                 argument = Some(inner);
                 continue;
             }
-            Some(inner) => return Err(CaseError::ExtraVar(inner)),
+            Some(inner) => return Err(CaseError::ExtraVar(inner.into())),
             None => (),
         }
         return Ok((argument, binding, conditional));

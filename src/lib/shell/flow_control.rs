@@ -1,7 +1,7 @@
 use crate::{
     lexers::assignments::{KeyBuf, Operator, Primitive},
     parser::{assignments::*, pipelines::Pipeline},
-    shell::{status::Status, Shell},
+    shell::Shell,
     types,
 };
 use err_derive::Error;
@@ -104,7 +104,6 @@ pub enum Statement<'a> {
     },
     Else,
     End,
-    Error(Status),
     Break,
     Continue,
     Pipeline(Pipeline<'a>),
@@ -129,7 +128,6 @@ impl<'a> Statement<'a> {
             Statement::Match { .. } => "Match { .. }",
             Statement::Else => "Else",
             Statement::End => "End",
-            Statement::Error(_) => "Error { .. }",
             Statement::Break => "Break",
             Statement::Continue => "Continue",
             Statement::Pipeline(_) => "Pipeline { .. }",
@@ -494,7 +492,6 @@ mod tests {
     fn return_toplevel() {
         let mut flow_control = Block::default();
         let oks = vec![
-            Statement::Error(Status::from_exit_code(1)),
             Statement::Time(Box::new(Statement::Default)),
             Statement::And(Box::new(Statement::Default)),
             Statement::Or(Box::new(Statement::Default)),

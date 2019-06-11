@@ -26,7 +26,9 @@ pub use self::{fork::Capture, pipe_exec::job_control::BackgroundProcess, variabl
 use crate::{
     builtins::BuiltinMap,
     lexers::{Key, Primitive},
-    parser::{assignments::value_check, pipelines::Pipeline, Terminator},
+    parser::{
+        assignments::value_check, pipelines::Pipeline, ParseError, StatementError, Terminator,
+    },
     sys, types,
 };
 use err_derive::Error;
@@ -46,16 +48,42 @@ use xdg::BaseDirectories;
 
 #[derive(Debug, Error)]
 pub enum IonError {
-    #[error(display = "failed to fork: {}", why)]
-    Fork { why: io::Error },
+    #[error(display = "failed to fork: {}", cause)]
+    Fork { cause: io::Error },
     #[error(display = "element does not exist")]
     DoesNotExist,
     #[error(display = "input was not terminated")]
     Unterminated,
-    #[error(display = "function error: {}", why)]
-    Function { why: FunctionError },
+    #[error(display = "function error: {}", cause)]
+    Function { cause: FunctionError },
     #[error(display = "unexpected end of script: expected end block for `{}`", block)]
     UnclosedBlock { block: String },
+    #[error(display = "syntax error: {}", cause)]
+    InvalidSyntax { cause: ParseError },
+    #[error(display = "block error: {}", cause)]
+    StatementFlowError { cause: String },
+    #[error(display = "statement error: {}", cause)]
+    UnterminatedStatementError { cause: StatementError },
+}
+
+impl From<ParseError> for IonError {
+    fn from(cause: ParseError) -> Self { IonError::InvalidSyntax { cause } }
+}
+
+impl From<&str> for IonError {
+    fn from(cause: &str) -> Self { IonError::StatementFlowError { cause: cause.into() } }
+}
+
+impl From<StatementError> for IonError {
+    fn from(cause: StatementError) -> Self { IonError::UnterminatedStatementError { cause } }
+}
+
+impl From<FunctionError> for IonError {
+    fn from(cause: FunctionError) -> Self { IonError::Function { cause } }
+}
+
+impl From<io::Error> for IonError {
+    fn from(cause: io::Error) -> Self { IonError::Fork { cause } }
 }
 
 #[derive(Debug, Clone, Hash)]
@@ -252,7 +280,7 @@ impl<'a> Shell<'a> {
     /// The method is non-blocking, and therefore will immediately return file handles to the
     /// stdout and stderr of the child. The PID of the child is returned, which may be used to
     /// wait for and obtain the exit status.
-    pub fn fork<F: FnMut(&mut Self)>(
+    pub fn fork<F: FnMut(&mut Self) -> Result<(), IonError>>(
         &self,
         capture: Capture,
         child_func: F,
@@ -268,10 +296,8 @@ impl<'a> Shell<'a> {
         args: &[S],
     ) -> Result<Status, IonError> {
         if let Some(Value::Function(function)) = self.variables.get_ref(name).cloned() {
-            function
-                .execute(self, args)
-                .map(|_| self.previous_status)
-                .map_err(|err| IonError::Function { why: err })
+            function.execute(self, args)?;
+            Ok(self.previous_status)
         } else {
             Err(IonError::DoesNotExist)
         }
@@ -308,7 +334,7 @@ impl<'a> Shell<'a> {
             .filter_map(Result::ok)
             .batching(|bytes| Terminator::new(bytes).terminate())
         {
-            self.on_command(&cmd)
+            self.on_command(&cmd)?;
         }
 
         if let Some(block) = self.flow_control.last().map(Statement::short) {
