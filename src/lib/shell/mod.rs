@@ -34,7 +34,7 @@ use crate::{
 use err_derive::Error;
 use itertools::Itertools;
 use std::{
-    fmt, fs,
+    fs,
     io::{self, Write},
     ops::{Deref, DerefMut},
     path::Path,
@@ -61,6 +61,10 @@ pub enum IonError {
     StatementFlowError { cause: String },
     #[error(display = "statement error: {}", cause)]
     UnterminatedStatementError { cause: StatementError },
+    #[error(display = "Could not exit the current block since it does not exist!")]
+    EmptyBlock,
+    #[error(display = "Could not execute file '{}': {}", file, cause)]
+    FileExecutionError { file: String, cause: io::Error },
 }
 
 impl From<ParseError> for IonError {
@@ -135,31 +139,7 @@ pub struct Shell<'a> {
     on_command: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
 }
 
-pub struct EmptyBlockError;
-
-impl fmt::Display for EmptyBlockError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Could not exit the current block since it does not exist!")
-    }
-}
-
-// Implement std::fmt::Debug for AppError
-impl fmt::Debug for EmptyBlockError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EmptyBlockError {{ file: {}, line: {} }}", file!(), line!())
-    }
-}
-
 impl<'a> Shell<'a> {
-    /// Set the shell as the terminal primary executable
-    pub fn set_unique_pid(&self) {
-        if let Ok(pid) = sys::getpid() {
-            if sys::setpgid(0, pid).is_ok() {
-                let _ = sys::tcsetpgrp(0, pid);
-            }
-        }
-    }
-
     /// Install signal handlers necessary for the shell to work
     fn install_signal_handler() {
         extern "C" fn handler(signal: i32) {
@@ -233,8 +213,8 @@ impl<'a> Shell<'a> {
     pub fn reset_flow(&mut self) { self.flow_control.clear(); }
 
     /// Exit the current block
-    pub fn exit_block(&mut self) -> Result<(), EmptyBlockError> {
-        self.flow_control.pop().map(|_| ()).ok_or(EmptyBlockError)
+    pub fn exit_block(&mut self) -> Result<(), IonError> {
+        self.flow_control.pop().map(|_| ()).ok_or(IonError::EmptyBlock)
     }
 
     /// Get the depth of the current block
@@ -273,18 +253,13 @@ impl<'a> Shell<'a> {
     /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
     /// method will attempt to execute that file as a script, and then returns the final exit
     /// status of the evaluated script.
-    pub fn execute_file<P: AsRef<Path>>(&mut self, script: P) {
+    pub fn execute_file<P: AsRef<Path>>(&mut self, script: P) -> Result<Status, IonError> {
         match fs::File::open(script.as_ref()) {
-            Ok(script) => self.execute_script(std::io::BufReader::new(script)),
-            Err(err) => eprintln!("ion: {}", err),
-        }
-    }
-
-    /// A method for executing literal scripts. Given a read instance, the shell will process
-    /// commands as they arrive
-    pub fn execute_script<T: std::io::Read>(&mut self, lines: T) {
-        if let Err(why) = self.execute_command(lines) {
-            self.previous_status = Status::error(format!("ion: {}", why));
+            Ok(script) => self.execute_command(std::io::BufReader::new(script)),
+            Err(cause) => Err(IonError::FileExecutionError {
+                file: script.as_ref().to_string_lossy().into(),
+                cause,
+            }),
         }
     }
 

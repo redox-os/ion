@@ -166,7 +166,11 @@ impl<'a> InteractiveBinary<'a> {
 
         match BaseDirectories::with_prefix("ion") {
             Ok(base_dirs) => match base_dirs.find_config_file(Self::CONFIG_FILE_NAME) {
-                Some(initrc) => this.shell.borrow_mut().execute_file(&initrc),
+                Some(initrc) => {
+                    if let Err(err) = this.shell.borrow_mut().execute_file(&initrc) {
+                        eprintln!("ion: {}", err)
+                    }
+                }
                 None => {
                     if let Err(err) = Self::create_config_file(base_dirs, Self::CONFIG_FILE_NAME) {
                         eprintln!("ion: could not create config file: {}", err);

@@ -191,7 +191,7 @@ impl<'a> Shell<'a> {
     pub fn background_send(&self, signal: i32) {
         let filter: fn(&&BackgroundProcess) -> bool =
             if signal == sys::SIGHUP { |p| !p.ignore_sighup } else { |p| p.is_running() };
-        self.background.lock().unwrap().iter().filter(filter).for_each(|p| {
+        self.background_jobs().iter().filter(filter).for_each(|p| {
             let _ = sys::killpg(p.pid(), signal);
         })
     }

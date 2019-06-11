@@ -664,26 +664,24 @@ fn prepare_child(block_child: bool, pgid: u32) {
     }
 }
 
-fn resume_process(last_pid: u32) {
-    if last_pid != 0 {
+fn resume_process(pid: u32) {
+    if pid != 0 {
         // Ensure that the process is stopped before continuing.
-        if let Err(why) = wait_for_interrupt(last_pid) {
+        if let Err(why) = wait_for_interrupt(pid) {
             eprintln!("ion: error waiting for sigstop: {}", why);
         }
-        let _ = sys::kill(last_pid, sys::SIGCONT);
+        let _ = sys::kill(pid, sys::SIGCONT);
     }
 }
 
 fn set_process_group(pgid: &mut u32, pid: u32, set_foreground: bool) {
     if *pgid == 0 {
         *pgid = pid;
-        let _ = sys::setpgid(pid, pid);
         if set_foreground {
             let _ = sys::tcsetpgrp(0, pid);
         }
-    } else {
-        let _ = sys::setpgid(pid, *pgid);
     }
+    let _ = sys::setpgid(pid, *pgid);
 }
 
 pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
