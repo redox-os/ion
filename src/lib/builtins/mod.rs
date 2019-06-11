@@ -748,11 +748,7 @@ pub fn builtin_exit(args: &[small::String], shell: &mut Shell<'_>) -> Status {
         return Status::SUCCESS;
     }
     // Kill all active background tasks before exiting the shell.
-    for process in shell.background_jobs().iter() {
-        if process.exists() {
-            let _ = sys::kill(process.pid(), sys::SIGTERM);
-        }
-    }
+    shell.background_send(sys::SIGTERM);
     if let Some(status) = args.get(1).and_then(|status| status.parse::<i32>().ok()) {
         shell.exit_with_code(Status::from_exit_code(status))
     } else {
