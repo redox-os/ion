@@ -15,7 +15,8 @@ use ion_shell::{
 use ion_sys::SIGHUP;
 use itertools::Itertools;
 use liner::{Buffer, Context, KeyBindings};
-use std::{cell::RefCell, path::Path, rc::Rc};
+use std::{cell::RefCell, fs::OpenOptions, io, path::Path, rc::Rc};
+use xdg::BaseDirectories;
 
 pub const MAN_ION: &str = "NAME
     Ion - The Ion shell
@@ -55,6 +56,8 @@ pub struct InteractiveBinary<'a> {
 }
 
 impl<'a> InteractiveBinary<'a> {
+    const CONFIG_FILE_NAME: &'static str = "initrc";
+
     pub fn new(shell: Shell<'a>) -> Self {
         let mut context = Context::new();
         context.word_divider_fn = Box::new(word_divide);
@@ -111,6 +114,12 @@ impl<'a> InteractiveBinary<'a> {
         })));
     }
 
+    fn create_config_file(base_dirs: BaseDirectories, file_name: &str) -> Result<(), io::Error> {
+        let path = base_dirs.place_config_file(file_name)?;
+        OpenOptions::new().write(true).create_new(true).open(path)?;
+        Ok(())
+    }
+
     /// Creates an interactive session that reads from a prompt provided by
     /// Liner.
     pub fn execute_interactive(self) -> ! {
@@ -154,7 +163,20 @@ impl<'a> InteractiveBinary<'a> {
             keybindings,
             "Change the keybindings",
         );
-        this.shell.borrow_mut().evaluate_init_file();
+
+        match BaseDirectories::with_prefix("ion") {
+            Ok(base_dirs) => match base_dirs.find_config_file(Self::CONFIG_FILE_NAME) {
+                Some(initrc) => this.shell.borrow_mut().execute_file(&initrc),
+                None => {
+                    if let Err(err) = Self::create_config_file(base_dirs, Self::CONFIG_FILE_NAME) {
+                        eprintln!("ion: could not create config file: {}", err);
+                    }
+                }
+            },
+            Err(err) => {
+                eprintln!("ion: unable to get base directory: {}", err);
+            }
+        }
 
         loop {
             let mut lines = std::iter::repeat_with(|| this.readln())

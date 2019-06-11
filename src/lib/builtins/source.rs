@@ -1,20 +1,21 @@
-use crate::shell::Shell;
+use crate::shell::{status::Status, Shell};
 use small;
 use std::fs::File;
 
 /// Evaluates the given file and returns 'SUCCESS' if it succeeds.
-pub fn source(shell: &mut Shell<'_>, arguments: &[small::String]) -> Result<(), String> {
+pub fn source(shell: &mut Shell<'_>, arguments: &[small::String]) -> Status {
     match arguments.get(1) {
         Some(argument) => {
             if let Ok(file) = File::open(argument.as_str()) {
-                shell.execute_command(file).map_err(|why| format!("ion: {}", why)).map(|_| ())
+                if let Err(why) = shell.execute_command(file) {
+                    Status::error(format!("ion: {}", why))
+                } else {
+                    Status::SUCCESS
+                }
             } else {
-                Err(format!("ion: failed to open {}\n", argument))
+                Status::error(format!("ion: failed to open {}\n", argument))
             }
         }
-        None => {
-            shell.evaluate_init_file();
-            Ok(())
-        }
+        None => Status::error("an argument is required for source"),
     }
 }
