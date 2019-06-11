@@ -38,7 +38,7 @@ use hashbrown::HashMap;
 use liner::{Completer, Context};
 
 use crate::{
-    shell::{status::Status, Capture, Shell},
+    shell::{status::Status, Capture, Shell, Value},
     sys, types,
 };
 use itertools::Itertools;
@@ -191,7 +191,8 @@ impl<'a> BuiltinMap<'a> {
             "popd" => builtin_popd : "Pop a directory from the stack",
             "pushd" => builtin_pushd : "Push a directory to the stack",
             "dirs" => builtin_dirs : "Display the current directory stack",
-            "cd" => builtin_cd : "Change the current directory\n    cd <path>"
+            "cd" => builtin_cd : "Change the current directory\n    cd <path>",
+            "dir_depth" => builtin_dir_depth : "Set the maximum directory depth"
         )
     }
 
@@ -260,12 +261,49 @@ pub fn builtin_status(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     status(args, shell)
 }
 
+pub fn builtin_dir_depth(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+    let depth = match args.get(1) {
+        None => None,
+        Some(arg) => match arg.parse::<usize>() {
+            Ok(num) => Some(num),
+            Err(_) => return Status::error("dir_depth's argument must be a positive integer"),
+        },
+    };
+    shell.dir_stack_mut().set_max_depth(depth);
+    Status::SUCCESS
+}
+
 pub fn builtin_cd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_CD) {
         return Status::SUCCESS;
     }
 
-    match shell.cd(args.get(1)) {
+    let err = match args.get(1) {
+        Some(dir) => {
+            let dir = dir.as_ref();
+            if let Some(Value::Array(cdpath)) = shell.variables().get_ref("CDPATH").cloned() {
+                if dir == "-" {
+                    shell.dir_stack_mut().switch_to_previous_directory()
+                } else {
+                    let check_cdpath_first = cdpath
+                        .iter()
+                        .map(|path| {
+                            let path_dir = format!("{}/{}", path, dir);
+                            shell.dir_stack_mut().change_and_push_dir(&path_dir)
+                        })
+                        .find(Result::is_ok)
+                        .unwrap_or_else(|| shell.dir_stack_mut().change_and_push_dir(dir));
+                    shell.dir_stack_mut().popd(1);
+                    check_cdpath_first
+                }
+            } else {
+                shell.dir_stack_mut().change_and_push_dir(dir)
+            }
+        }
+        None => shell.dir_stack_mut().switch_to_home_directory(),
+    };
+
+    match err {
         Ok(()) => {
             let _ = shell.fork_function(Capture::None, |_| Ok(()), "CD_CHANGE", &["ion"]);
             Status::SUCCESS
@@ -336,7 +374,7 @@ pub fn builtin_dirs(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     }
 
     if clear {
-        shell.clear_dir_stack();
+        shell.dir_stack_mut().clear();
     }
 
     let mapper: fn((usize, &PathBuf)) -> Cow<'_, str> = match (abs_pathnames, index) {
@@ -347,13 +385,13 @@ pub fn builtin_dirs(args: &[small::String], shell: &mut Shell<'_>) -> Status {
         (false, false) => |(_, x)| x.to_string_lossy(),
     };
 
-    let mut iter = shell.dir_stack().enumerate().map(mapper);
+    let mut iter = shell.dir_stack().dirs().enumerate().map(mapper);
 
     if let Some(arg) = num_arg {
         let num = match parse_numeric_arg(arg.as_ref()) {
             Some((true, num)) => num,
-            Some((false, num)) if shell.dir_stack().count() > num => {
-                shell.dir_stack().count() - num - 1
+            Some((false, num)) if shell.dir_stack().dirs().count() > num => {
+                shell.dir_stack().dirs().count() - num - 1
             }
             _ => return Status::error(format!("ion: dirs: {}: invalid argument", arg)),
         };
@@ -404,27 +442,27 @@ pub fn builtin_pushd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     match action {
         Action::Switch => {
             if !keep_front {
-                if let Err(why) = shell.swap(1) {
+                if let Err(why) = shell.dir_stack_mut().swap(1) {
                     return Status::error(format!("ion: pushd: {}", why));
                 }
             }
         }
         Action::RotLeft(num) => {
             if !keep_front {
-                if let Err(why) = shell.rotate_left(num) {
+                if let Err(why) = shell.dir_stack_mut().rotate_left(num) {
                     return Status::error(format!("ion: pushd: {}", why));
                 }
             }
         }
         Action::RotRight(num) => {
             if !keep_front {
-                if let Err(why) = shell.rotate_right(num) {
+                if let Err(why) = shell.dir_stack_mut().rotate_right(num) {
                     return Status::error(format!("ion: pushd: {}", why));
                 }
             }
         }
         Action::Push(dir) => {
-            if let Err(why) = shell.pushd(dir, keep_front) {
+            if let Err(why) = shell.dir_stack_mut().pushd(dir, keep_front) {
                 return Status::error(format!("ion: pushd: {}", why));
             }
         }
@@ -432,7 +470,11 @@ pub fn builtin_pushd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
 
     println!(
         "{}",
-        shell.dir_stack().map(|dir| dir.to_str().unwrap_or("ion: no directory found")).join(" ")
+        shell
+            .dir_stack()
+            .dirs()
+            .map(|dir| dir.to_str().unwrap_or("ion: no directory found"))
+            .join(" ")
     );
     Status::SUCCESS
 }
@@ -442,7 +484,7 @@ pub fn builtin_popd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
         return Status::SUCCESS;
     }
 
-    let len = shell.dir_stack().len();
+    let len = shell.dir_stack().dirs().len();
     if len <= 1 {
         return Status::error("ion: popd: directory stack empty");
     }
@@ -478,17 +520,18 @@ pub fn builtin_popd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
         index = 1;
     } else if index == 0 {
         // change to new directory, return if not possible
-        if let Err(why) = shell.set_current_dir_by_index(1) {
+        if let Err(why) = shell.dir_stack_mut().set_current_dir_by_index(1) {
             return Status::error(format!("ion: popd: {}", why));
         }
     }
 
     // pop element
-    if shell.popd(index).is_some() {
+    if shell.dir_stack_mut().popd(index).is_some() {
         println!(
             "{}",
             shell
                 .dir_stack()
+                .dirs()
                 .map(|dir| dir.to_str().unwrap_or("ion: no directory found"))
                 .join(" ")
         );
