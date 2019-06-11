@@ -11,7 +11,7 @@ use crate::{
         pipelines::{PipeItem, Pipeline},
         Expander, ForValueExpression, StatementSplitter, Terminator,
     },
-    shell::Value,
+    shell::{IonError, Value},
     types,
 };
 use itertools::Itertools;
@@ -318,7 +318,12 @@ impl<'a> Shell<'a> {
                 });
 
                 if let Some(statement) = case.conditional.as_ref() {
-                    self.on_command(statement);
+                    if let Err(why) = self.on_command(statement) {
+                        eprintln!("{}", why);
+                        self.previous_status = Status::from_exit_code(-1);
+                        self.variables.set("?", self.previous_status);
+                        self.flow_control.clear();
+                    }
                     if self.previous_status.is_failure() {
                         continue;
                     }
@@ -345,44 +350,19 @@ impl<'a> Shell<'a> {
     }
 
     /// Receives a command and attempts to execute the contents.
-    pub fn on_command(&mut self, command_string: &str) {
+    pub fn on_command(&mut self, command_string: &str) -> Result<(), IonError> {
         self.break_flow = false;
         for stmt in command_string.bytes().batching(|cmd| Terminator::new(cmd).terminate()) {
             // Go through all of the statements and build up the block stack
             // When block is done return statement for execution.
             for statement in StatementSplitter::new(&stmt) {
-                match statement {
-                    Ok(statement) => {
-                        let statement = match parse_and_validate(statement, &self.builtins) {
-                            Err(why) => {
-                                eprintln!("{}", why);
-                                self.reset_flow();
-                                return;
-                            }
-                            Ok(r) => r,
-                        };
-                        match insert_statement(&mut self.flow_control, statement) {
-                            Err(why) => {
-                                eprintln!("{}", why);
-                                self.reset_flow();
-                                return;
-                            }
-                            Ok(Some(stm)) => {
-                                let _ = self.execute_statement(&stm);
-                            }
-                            Ok(None) => {}
-                        }
-                    }
-                    Err(err) => {
-                        eprintln!("ion: {}", err);
-
-                        self.previous_status = Status::from_exit_code(-1);
-                        self.variables.set("?", self.previous_status);
-                        self.flow_control.clear();
-                    }
+                let statement = parse_and_validate(statement?, &self.builtins)?;
+                if let Some(stm) = insert_statement(&mut self.flow_control, statement)? {
+                    let _ = self.execute_statement(&stm);
                 }
             }
         }
+        Ok(())
     }
 }
 

@@ -167,7 +167,9 @@ impl<'a> InteractiveBinary<'a> {
                         &this.context.borrow(),
                         command.trim_end(),
                     );
-                    this.shell.borrow_mut().on_command(&cmd);
+                    if let Err(why) = this.shell.borrow_mut().on_command(&cmd) {
+                        eprintln!("{}", why);
+                    }
                     this.save_command(&cmd);
                 }
                 None => {
