@@ -327,7 +327,6 @@ impl<'a> Variables<'a> {
 impl<'a> Default for Variables<'a> {
     fn default() -> Self {
         let mut map: Scopes<types::Str, Value<'a>> = Scopes::with_capacity(64);
-        map.set("DIRECTORY_STACK_SIZE", "1000");
         map.set("HISTORY_SIZE", "1000");
         map.set("HISTFILE_SIZE", "100000");
         map.set(

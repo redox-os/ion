@@ -1,4 +1,3 @@
-use super::variables::{Value, Variables};
 use crate::sys::env as sys_env;
 use err_derive::Error;
 use std::{
@@ -44,7 +43,8 @@ fn set_current_dir_ion(dir: &Path) -> Result<(), DirStackError> {
 
 #[derive(Debug)]
 pub struct DirectoryStack {
-    dirs: VecDeque<PathBuf>, // The top is always the current directory
+    dirs:      VecDeque<PathBuf>, // The top is always the current directory
+    max_depth: Option<usize>,
 }
 
 impl DirectoryStack {
@@ -71,6 +71,10 @@ impl DirectoryStack {
 
         new_dir
     }
+
+    pub fn set_max_depth(&mut self, max_depth: Option<usize>) { self.max_depth = max_depth; }
+
+    pub fn max_depth(&mut self) -> Option<usize> { self.max_depth }
 
     // pushd -<num>
     pub fn rotate_right(&mut self, num: usize) -> Result<(), DirStackError> {
@@ -105,24 +109,24 @@ impl DirectoryStack {
         self.dirs.iter()
     }
 
-    fn insert_dir(&mut self, index: usize, path: PathBuf, variables: &Variables<'_>) {
+    fn insert_dir(&mut self, index: usize, path: PathBuf) {
         self.dirs.insert(index, path);
-        self.dirs.truncate(DirectoryStack::get_size(variables));
+        if let Some(max_depth) = self.max_depth {
+            self.dirs.truncate(max_depth);
+        }
     }
 
-    fn push_dir(&mut self, path: PathBuf, variables: &Variables<'_>) {
+    fn push_dir(&mut self, path: PathBuf) {
         self.dirs.push_front(path);
-        self.dirs.truncate(DirectoryStack::get_size(variables));
+        if let Some(max_depth) = self.max_depth {
+            self.dirs.truncate(max_depth);
+        }
     }
 
-    fn change_and_push_dir(
-        &mut self,
-        dir: &str,
-        variables: &Variables<'_>,
-    ) -> Result<(), DirStackError> {
+    pub fn change_and_push_dir(&mut self, dir: &str) -> Result<(), DirStackError> {
         let new_dir = self.normalize_path(dir);
         set_current_dir_ion(&new_dir)?;
-        self.push_dir(new_dir, variables);
+        self.push_dir(new_dir);
         Ok(())
     }
 
@@ -130,54 +134,20 @@ impl DirectoryStack {
         env::var("OLDPWD").ok().filter(|pwd| !pwd.is_empty() && pwd != "?")
     }
 
-    fn switch_to_previous_directory(
-        &mut self,
-        variables: &Variables<'_>,
-    ) -> Result<(), DirStackError> {
+    pub fn switch_to_previous_directory(&mut self) -> Result<(), DirStackError> {
         let prev = self.get_previous_dir().ok_or(DirStackError::NoPreviousDir)?;
 
         self.dirs.remove(0);
         println!("{}", prev);
-        self.change_and_push_dir(&prev, variables)
+        self.change_and_push_dir(&prev)
     }
 
-    fn switch_to_home_directory(&mut self, variables: &Variables<'_>) -> Result<(), DirStackError> {
+    pub fn switch_to_home_directory(&mut self) -> Result<(), DirStackError> {
         sys_env::home_dir().map_or(Err(DirStackError::FailedFetchHome), |home| {
             home.to_str().map_or(Err(DirStackError::PathConversionFailed), |home| {
-                self.change_and_push_dir(home, variables)
+                self.change_and_push_dir(home)
             })
         })
-    }
-
-    pub fn cd<T: AsRef<str>>(
-        &mut self,
-        dir: Option<T>,
-        variables: &Variables<'_>,
-    ) -> Result<(), DirStackError> {
-        match dir {
-            Some(dir) => {
-                let dir = dir.as_ref();
-                if let Some(Value::Array(cdpath)) = variables.get_ref("CDPATH") {
-                    if dir == "-" {
-                        self.switch_to_previous_directory(variables)
-                    } else {
-                        let check_cdpath_first = cdpath
-                            .iter()
-                            .map(|path| {
-                                let path_dir = format!("{}/{}", path, dir);
-                                self.change_and_push_dir(&path_dir, variables)
-                            })
-                            .find(Result::is_ok)
-                            .unwrap_or_else(|| self.change_and_push_dir(dir, variables));
-                        self.dirs.remove(1);
-                        check_cdpath_first
-                    }
-                } else {
-                    self.change_and_push_dir(dir, variables)
-                }
-            }
-            None => self.switch_to_home_directory(variables),
-        }
     }
 
     pub fn swap(&mut self, index: usize) -> Result<(), DirStackError> {
@@ -188,15 +158,10 @@ impl DirectoryStack {
         self.set_current_dir_by_index(0)
     }
 
-    pub fn pushd(
-        &mut self,
-        path: PathBuf,
-        keep_front: bool,
-        variables: &mut Variables<'_>,
-    ) -> Result<(), DirStackError> {
+    pub fn pushd(&mut self, path: PathBuf, keep_front: bool) -> Result<(), DirStackError> {
         let index = if keep_front { 1 } else { 0 };
         let new_dir = self.normalize_path(path.to_str().unwrap());
-        self.insert_dir(index, new_dir, variables);
+        self.insert_dir(index, new_dir);
         self.set_current_dir_by_index(index)
     }
 
@@ -205,19 +170,6 @@ impl DirectoryStack {
     pub fn popd(&mut self, index: usize) -> Option<PathBuf> { self.dirs.remove(index) }
 
     pub fn clear(&mut self) { self.dirs.truncate(1) }
-
-    /// This function will take a map of variables as input and attempt to parse the value of
-    /// the
-    /// directory stack size variable. If it succeeds, it will return the value of that
-    /// variable,
-    /// else it will return a default value of 1000.
-    fn get_size(variables: &Variables<'_>) -> usize {
-        variables
-            .get_str("DIRECTORY_STACK_SIZE")
-            .unwrap_or_default()
-            .parse::<usize>()
-            .unwrap_or(1000)
-    }
 
     /// Create a new `DirectoryStack` containing the current working directory,
     /// if available.
@@ -233,6 +185,6 @@ impl DirectoryStack {
                 env::set_var("PWD", "?");
             }
         }
-        DirectoryStack { dirs }
+        DirectoryStack { dirs, max_depth: None }
     }
 }
