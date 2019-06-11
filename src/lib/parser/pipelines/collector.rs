@@ -397,7 +397,7 @@ mod tests {
     #[test]
     fn stderr_redirection() {
         if let Statement::Pipeline(pipeline) =
-            parse("git rev-parse --abbrev-ref HEAD ^> /dev/null", &BuiltinMap::new())
+            parse("git rev-parse --abbrev-ref HEAD ^> /dev/null", &BuiltinMap::new()).unwrap()
         {
             assert_eq!("git", &pipeline.items[0].job.args[0]);
             assert_eq!("rev-parse", &pipeline.items[0].job.args[1]);
@@ -418,7 +418,9 @@ mod tests {
 
     #[test]
     fn braces() {
-        if let Statement::Pipeline(pipeline) = parse("echo {a b} {a {b c}}", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo {a b} {a {b c}}", &BuiltinMap::new()).unwrap()
+        {
             let items = pipeline.items;
             assert_eq!("{a b}", &items[0].job.args[1]);
             assert_eq!("{a {b c}}", &items[0].job.args[2]);
@@ -430,7 +432,7 @@ mod tests {
     #[test]
     fn methods() {
         if let Statement::Pipeline(pipeline) =
-            parse("echo @split(var, ', ') $join(array, ',')", &BuiltinMap::new())
+            parse("echo @split(var, ', ') $join(array, ',')", &BuiltinMap::new()).unwrap()
         {
             let items = pipeline.items;
             assert_eq!("echo", &items[0].job.args[0]);
@@ -444,7 +446,7 @@ mod tests {
     #[test]
     fn nested_process() {
         if let Statement::Pipeline(pipeline) =
-            parse("echo $(echo one $(echo two) three)", &BuiltinMap::new())
+            parse("echo $(echo one $(echo two) three)", &BuiltinMap::new()).unwrap()
         {
             let items = pipeline.items;
             assert_eq!("echo", &items[0].job.args[0]);
@@ -457,7 +459,7 @@ mod tests {
     #[test]
     fn nested_array_process() {
         if let Statement::Pipeline(pipeline) =
-            parse("echo @(echo one @(echo two) three)", &BuiltinMap::new())
+            parse("echo @(echo one @(echo two) three)", &BuiltinMap::new()).unwrap()
         {
             let items = pipeline.items;
             assert_eq!("echo", &items[0].job.args[0]);
@@ -469,7 +471,9 @@ mod tests {
 
     #[test]
     fn quoted_process() {
-        if let Statement::Pipeline(pipeline) = parse("echo \"$(seq 1 10)\"", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo \"$(seq 1 10)\"", &BuiltinMap::new()).unwrap()
+        {
             let items = pipeline.items;
             assert_eq!("echo", &items[0].job.args[0]);
             assert_eq!("\"$(seq 1 10)\"", &items[0].job.args[1]);
@@ -482,7 +486,7 @@ mod tests {
     #[test]
     fn process() {
         if let Statement::Pipeline(pipeline) =
-            parse("echo $(seq 1 10 | head -1)", &BuiltinMap::new())
+            parse("echo $(seq 1 10 | head -1)", &BuiltinMap::new()).unwrap()
         {
             let items = pipeline.items;
             assert_eq!("echo", &items[0].job.args[0]);
@@ -496,7 +500,7 @@ mod tests {
     #[test]
     fn array_process() {
         if let Statement::Pipeline(pipeline) =
-            parse("echo @(seq 1 10 | head -1)", &BuiltinMap::new())
+            parse("echo @(seq 1 10 | head -1)", &BuiltinMap::new()).unwrap()
         {
             let items = pipeline.items;
             assert_eq!("echo", &items[0].job.args[0]);
@@ -509,7 +513,7 @@ mod tests {
 
     #[test]
     fn single_job_no_args() {
-        if let Statement::Pipeline(pipeline) = parse("cat", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) = parse("cat", &BuiltinMap::new()).unwrap() {
             let items = pipeline.items;
             assert_eq!(1, items.len());
             assert_eq!("cat", items[0].command());
@@ -521,7 +525,7 @@ mod tests {
 
     #[test]
     fn single_job_with_single_character_arguments() {
-        if let Statement::Pipeline(pipeline) = parse("echo a b c", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) = parse("echo a b c", &BuiltinMap::new()).unwrap() {
             let items = pipeline.items;
             assert_eq!(1, items.len());
             assert_eq!("echo", &items[0].job.args[0]);
@@ -536,7 +540,7 @@ mod tests {
 
     #[test]
     fn job_with_args() {
-        if let Statement::Pipeline(pipeline) = parse("ls -al dir", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) = parse("ls -al dir", &BuiltinMap::new()).unwrap() {
             let items = pipeline.items;
             assert_eq!(1, items.len());
             assert_eq!("ls", &items[0].job.args[0]);
@@ -549,7 +553,7 @@ mod tests {
 
     #[test]
     fn parse_empty_string() {
-        if let Statement::Default = parse("", &BuiltinMap::new()) {
+        if let Statement::Default = parse("", &BuiltinMap::new()).unwrap() {
             return;
         } else {
             assert!(false);
@@ -558,7 +562,9 @@ mod tests {
 
     #[test]
     fn multiple_white_space_between_words() {
-        if let Statement::Pipeline(pipeline) = parse("ls \t -al\t\tdir", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) =
+            parse("ls \t -al\t\tdir", &BuiltinMap::new()).unwrap()
+        {
             let items = pipeline.items;
             assert_eq!(1, items.len());
             assert_eq!("ls", &items[0].job.args[0]);
@@ -571,7 +577,7 @@ mod tests {
 
     #[test]
     fn trailing_whitespace() {
-        if let Statement::Pipeline(pipeline) = parse("ls -al\t ", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) = parse("ls -al\t ", &BuiltinMap::new()).unwrap() {
             assert_eq!(1, pipeline.items.len());
             assert_eq!("ls", &pipeline.items[0].job.args[0]);
             assert_eq!("-al", &pipeline.items[0].job.args[1]);
@@ -583,7 +589,7 @@ mod tests {
     #[test]
     fn double_quoting() {
         if let Statement::Pipeline(pipeline) =
-            parse("echo \"a > 10\" \"a < 10\"", &BuiltinMap::new())
+            parse("echo \"a > 10\" \"a < 10\"", &BuiltinMap::new()).unwrap()
         {
             let items = pipeline.items;
             assert_eq!("\"a > 10\"", &items[0].job.args[1]);
@@ -597,7 +603,7 @@ mod tests {
     #[test]
     fn double_quoting_contains_single() {
         if let Statement::Pipeline(pipeline) =
-            parse("echo \"Hello 'Rusty' World\"", &BuiltinMap::new())
+            parse("echo \"Hello 'Rusty' World\"", &BuiltinMap::new()).unwrap()
         {
             let items = pipeline.items;
             assert_eq!(2, items[0].job.args.len());
@@ -610,7 +616,7 @@ mod tests {
     #[test]
     fn multi_quotes() {
         if let Statement::Pipeline(pipeline) =
-            parse("echo \"Hello \"Rusty\" World\"", &BuiltinMap::new())
+            parse("echo \"Hello \"Rusty\" World\"", &BuiltinMap::new()).unwrap()
         {
             let items = pipeline.items;
             assert_eq!(2, items[0].job.args.len());
@@ -620,7 +626,7 @@ mod tests {
         }
 
         if let Statement::Pipeline(pipeline) =
-            parse("echo \'Hello \'Rusty\' World\'", &BuiltinMap::new())
+            parse("echo \'Hello \'Rusty\' World\'", &BuiltinMap::new()).unwrap()
         {
             let items = pipeline.items;
             assert_eq!(2, items[0].job.args.len());
@@ -632,7 +638,7 @@ mod tests {
 
     #[test]
     fn all_whitespace() {
-        if let Statement::Default = parse("  \t ", &BuiltinMap::new()) {
+        if let Statement::Default = parse("  \t ", &BuiltinMap::new()).unwrap() {
             return;
         } else {
             assert!(false);
@@ -641,7 +647,9 @@ mod tests {
 
     #[test]
     fn not_background_job() {
-        if let Statement::Pipeline(pipeline) = parse("echo hello world", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo hello world", &BuiltinMap::new()).unwrap()
+        {
             let items = pipeline.items;
             assert_eq!(RedirectFrom::None, items[0].job.redirection);
         } else {
@@ -651,13 +659,17 @@ mod tests {
 
     #[test]
     fn background_job() {
-        if let Statement::Pipeline(pipeline) = parse("echo hello world&", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo hello world&", &BuiltinMap::new()).unwrap()
+        {
             assert_eq!(PipeType::Background, pipeline.pipe);
         } else {
             assert!(false);
         }
 
-        if let Statement::Pipeline(pipeline) = parse("echo hello world &", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo hello world &", &BuiltinMap::new()).unwrap()
+        {
             assert_eq!(PipeType::Background, pipeline.pipe);
         } else {
             assert!(false);
@@ -666,7 +678,9 @@ mod tests {
 
     #[test]
     fn disown_job() {
-        if let Statement::Pipeline(pipeline) = parse("echo hello world&!", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo hello world&!", &BuiltinMap::new()).unwrap()
+        {
             assert_eq!(PipeType::Disown, pipeline.pipe);
         } else {
             assert!(false);
@@ -675,7 +689,7 @@ mod tests {
 
     #[test]
     fn lone_comment() {
-        if let Statement::Default = parse("# ; \t as!!+dfa", &BuiltinMap::new()) {
+        if let Statement::Default = parse("# ; \t as!!+dfa", &BuiltinMap::new()).unwrap() {
             return;
         } else {
             assert!(false);
@@ -684,7 +698,7 @@ mod tests {
 
     #[test]
     fn leading_whitespace() {
-        if let Statement::Pipeline(pipeline) = parse("    \techo", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) = parse("    \techo", &BuiltinMap::new()).unwrap() {
             let items = pipeline.items;
             assert_eq!(1, items.len());
             assert_eq!("echo", items[0].command());
@@ -695,7 +709,8 @@ mod tests {
 
     #[test]
     fn single_quoting() {
-        if let Statement::Pipeline(pipeline) = parse("echo '#!!;\"\\'", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) = parse("echo '#!!;\"\\'", &BuiltinMap::new()).unwrap()
+        {
             let items = pipeline.items;
             assert_eq!("'#!!;\"\\'", &items[0].job.args[1]);
         } else {
@@ -706,7 +721,7 @@ mod tests {
     #[test]
     fn mixed_quoted_and_unquoted() {
         if let Statement::Pipeline(pipeline) =
-            parse("echo 123 456 \"ABC 'DEF' GHI\" 789 one'  'two", &BuiltinMap::new())
+            parse("echo 123 456 \"ABC 'DEF' GHI\" 789 one'  'two", &BuiltinMap::new()).unwrap()
         {
             let items = pipeline.items;
             assert_eq!("123", &items[0].job.args[1]);
@@ -721,7 +736,7 @@ mod tests {
 
     #[test]
     fn several_blank_lines() {
-        if let Statement::Default = parse("\n\n\n", &BuiltinMap::new()) {
+        if let Statement::Default = parse("\n\n\n", &BuiltinMap::new()).unwrap() {
             return;
         } else {
             assert!(false);
@@ -733,7 +748,7 @@ mod tests {
     // the input redirection shoud be associated with.
     fn pipeline_with_redirection() {
         let input = "cat | echo hello | cat < stuff > other";
-        if let Statement::Pipeline(pipeline) = parse(input, &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) = parse(input, &BuiltinMap::new()).unwrap() {
             assert_eq!(3, pipeline.items.len());
             assert_eq!("cat", &pipeline.items[0].job.args[0]);
             assert_eq!("echo", &pipeline.items[1].job.args[0]);
@@ -753,7 +768,7 @@ mod tests {
     // the input redirection shoud be associated with.
     fn pipeline_with_redirection_append() {
         if let Statement::Pipeline(pipeline) =
-            parse("cat | echo hello | cat < stuff >> other", &BuiltinMap::new())
+            parse("cat | echo hello | cat < stuff >> other", &BuiltinMap::new()).unwrap()
         {
             assert_eq!(3, pipeline.items.len());
             assert_eq!(Input::File("stuff".into()), pipeline.items[2].inputs[0]);
@@ -768,7 +783,7 @@ mod tests {
     // Ensures no regression for infinite loop when args() hits
     // '^' while not in the top level
     fn args_loop_terminates() {
-        if let Statement::Pipeline(pipeline) = parse("$(^) '$(^)'", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) = parse("$(^) '$(^)'", &BuiltinMap::new()).unwrap() {
             assert_eq!("$(^)", &pipeline.items[0].job.args[0]);
             assert_eq!("\'$(^)\'", &pipeline.items[0].job.args[1]);
         } else {
@@ -815,7 +830,7 @@ mod tests {
             ],
             pipe:  PipeType::Normal,
         };
-        assert_eq!(parse(input, &BuiltinMap::new()), Statement::Pipeline(expected));
+        assert_eq!(parse(input, &BuiltinMap::new()).unwrap(), Statement::Pipeline(expected));
     }
 
     #[test]
@@ -850,7 +865,7 @@ mod tests {
             ],
             pipe:  PipeType::Normal,
         };
-        assert_eq!(parse(input, &BuiltinMap::new()), Statement::Pipeline(expected));
+        assert_eq!(parse(input, &BuiltinMap::new()).unwrap(), Statement::Pipeline(expected));
     }
 
     #[test]
@@ -885,7 +900,7 @@ mod tests {
             ],
             pipe:  PipeType::Normal,
         };
-        assert_eq!(parse(input, &BuiltinMap::new()), Statement::Pipeline(expected));
+        assert_eq!(parse(input, &BuiltinMap::new()).unwrap(), Statement::Pipeline(expected));
     }
 
     #[test]
@@ -893,7 +908,7 @@ mod tests {
     // the input redirection shoud be associated with.
     fn pipeline_with_redirection_reverse_order() {
         if let Statement::Pipeline(pipeline) =
-            parse("cat | echo hello | cat > stuff < other", &BuiltinMap::new())
+            parse("cat | echo hello | cat > stuff < other", &BuiltinMap::new()).unwrap()
         {
             assert_eq!(3, pipeline.items.len());
             assert_eq!(vec![Input::File("other".into())], pipeline.items[2].inputs);
@@ -905,7 +920,9 @@ mod tests {
 
     #[test]
     fn var_meets_quote() {
-        if let Statement::Pipeline(pipeline) = parse("echo $x '{()}' test", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo $x '{()}' test", &BuiltinMap::new()).unwrap()
+        {
             assert_eq!(1, pipeline.items.len());
             assert_eq!("echo", &pipeline.items[0].job.args[0]);
             assert_eq!("$x", &pipeline.items[0].job.args[1]);
@@ -915,7 +932,9 @@ mod tests {
             assert!(false);
         }
 
-        if let Statement::Pipeline(pipeline) = parse("echo $x'{()}' test", &BuiltinMap::new()) {
+        if let Statement::Pipeline(pipeline) =
+            parse("echo $x'{()}' test", &BuiltinMap::new()).unwrap()
+        {
             assert_eq!(1, pipeline.items.len());
             assert_eq!("echo", &pipeline.items[0].job.args[0]);
             assert_eq!("$x'{()}'", &pipeline.items[0].job.args[1]);
@@ -937,7 +956,7 @@ mod tests {
             }],
             pipe:  PipeType::Normal,
         };
-        assert_eq!(Statement::Pipeline(expected), parse(input, &BuiltinMap::new()));
+        assert_eq!(Statement::Pipeline(expected), parse(input, &BuiltinMap::new()).unwrap());
     }
 
     #[test]
@@ -966,13 +985,13 @@ mod tests {
             ],
             pipe:  PipeType::Normal,
         };
-        assert_eq!(Statement::Pipeline(expected), parse(input, &BuiltinMap::new()));
+        assert_eq!(Statement::Pipeline(expected), parse(input, &BuiltinMap::new()).unwrap());
     }
 
     #[test]
     fn awk_tests() {
         if let Statement::Pipeline(pipeline) =
-            parse("awk -v x=$x '{ if (1) print $1 }' myfile", &BuiltinMap::new())
+            parse("awk -v x=$x '{ if (1) print $1 }' myfile", &BuiltinMap::new()).unwrap()
         {
             assert_eq!(1, pipeline.items.len());
             assert_eq!("awk", &pipeline.items[0].job.args[0]);
@@ -1001,7 +1020,7 @@ mod tests {
             }],
             pipe:  PipeType::Normal,
         };
-        assert_eq!(parse(input, &BuiltinMap::new()), Statement::Pipeline(expected));
+        assert_eq!(parse(input, &BuiltinMap::new()).unwrap(), Statement::Pipeline(expected));
     }
 
     fn assert_parse_error(s: &str) {

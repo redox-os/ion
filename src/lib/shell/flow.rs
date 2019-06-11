@@ -134,11 +134,6 @@ impl<'a> Shell<'a> {
     /// Executes a single statement
     pub fn execute_statement(&mut self, statement: &Statement<'a>) -> Condition {
         match statement {
-            Statement::Error(number) => {
-                self.previous_status = *number;
-                self.variables.set("?", self.previous_status);
-                self.flow_control.clear();
-            }
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
                 self.variables.set("?", self.previous_status);
@@ -356,17 +351,35 @@ impl<'a> Shell<'a> {
             // Go through all of the statements and build up the block stack
             // When block is done return statement for execution.
             for statement in StatementSplitter::new(&stmt) {
-                let statement = parse_and_validate(statement, &self.builtins);
-                match insert_statement(&mut self.flow_control, statement) {
-                    Err(why) => {
-                        eprintln!("{}", why);
-                        self.reset_flow();
-                        return;
+                match statement {
+                    Ok(statement) => {
+                        let statement = match parse_and_validate(statement, &self.builtins) {
+                            Err(why) => {
+                                eprintln!("{}", why);
+                                self.reset_flow();
+                                return;
+                            }
+                            Ok(r) => r,
+                        };
+                        match insert_statement(&mut self.flow_control, statement) {
+                            Err(why) => {
+                                eprintln!("{}", why);
+                                self.reset_flow();
+                                return;
+                            }
+                            Ok(Some(stm)) => {
+                                let _ = self.execute_statement(&stm);
+                            }
+                            Ok(None) => {}
+                        }
                     }
-                    Ok(Some(stm)) => {
-                        let _ = self.execute_statement(&stm);
+                    Err(err) => {
+                        eprintln!("ion: {}", err);
+
+                        self.previous_status = Status::from_exit_code(-1);
+                        self.variables.set("?", self.previous_status);
+                        self.flow_control.clear();
                     }
-                    Ok(None) => {}
                 }
             }
         }
@@ -387,8 +400,14 @@ fn expand_pipeline<'a>(
     while let Some(item) = item_iter.next() {
         if let Some(Value::Alias(alias)) = shell.variables.get_ref(item.command()) {
             statements = StatementSplitter::new(alias.0.as_str())
-                .map(|stmt| parse_and_validate(stmt, &shell.builtins))
-                .collect();
+                .map(|stmt| {
+                    stmt.map_err(|why| format!("ion: {}", why)).and_then(|stmt| {
+                        parse_and_validate(stmt, &shell.builtins)
+                            .map_err(|why| format!("ion: {}", why))
+                    })
+                })
+                .collect::<Result<_, _>>()
+                .map_err(|why| format!("ion: {}", why))?;
 
             // First item in the alias should be a pipeline item, otherwise it cannot
             // be placed into a pipeline!
