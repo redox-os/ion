@@ -15,7 +15,7 @@ pub mod variables;
 pub(crate) use self::job::Job;
 use self::{
     directory_stack::DirectoryStack,
-    flow_control::{Block, FunctionError, Statement},
+    flow_control::{Block, BlockError, FunctionError, Statement},
     foreground::ForegroundSignals,
     fork::{Fork, IonResult},
     pipe_exec::foreground,
@@ -58,7 +58,7 @@ pub enum IonError {
     #[error(display = "syntax error: {}", cause)]
     InvalidSyntax { cause: ParseError },
     #[error(display = "block error: {}", cause)]
-    StatementFlowError { cause: String },
+    StatementFlowError { cause: BlockError },
     #[error(display = "statement error: {}", cause)]
     UnterminatedStatementError { cause: StatementError },
     #[error(display = "Could not exit the current block since it does not exist!")]
@@ -71,16 +71,16 @@ impl From<ParseError> for IonError {
     fn from(cause: ParseError) -> Self { IonError::InvalidSyntax { cause } }
 }
 
-impl From<&str> for IonError {
-    fn from(cause: &str) -> Self { IonError::StatementFlowError { cause: cause.into() } }
-}
-
 impl From<StatementError> for IonError {
     fn from(cause: StatementError) -> Self { IonError::UnterminatedStatementError { cause } }
 }
 
 impl From<FunctionError> for IonError {
     fn from(cause: FunctionError) -> Self { IonError::Function { cause } }
+}
+
+impl From<BlockError> for IonError {
+    fn from(cause: BlockError) -> Self { IonError::StatementFlowError { cause } }
 }
 
 impl From<io::Error> for IonError {
