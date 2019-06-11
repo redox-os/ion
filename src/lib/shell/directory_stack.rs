@@ -1,14 +1,34 @@
 use super::variables::{Value, Variables};
 use crate::sys::env as sys_env;
+use err_derive::Error;
 use std::{
-    borrow::Cow,
     collections::VecDeque,
     env::{self, set_current_dir},
+    io,
     path::{Component, Path, PathBuf},
 };
 
-fn set_current_dir_ion(dir: &Path) -> Result<(), Cow<'static, str>> {
-    set_current_dir(dir).map_err(|why| Cow::Owned(format!("{}", why)))?;
+#[derive(Debug, Error)]
+pub enum DirStackError {
+    #[error(display = "index '{}' out of range", index)]
+    OutOfRange { index: usize },
+    #[error(display = "failed to get home directory")]
+    FailedFetchHome,
+    #[error(display = "failed to convert home directory to str")]
+    PathConversionFailed,
+    #[error(display = "failed to set current dir to {}: {}", dir, cause)]
+    DirChangeFailure { dir: String, cause: io::Error },
+    #[error(display = "no previous directory to switch to")]
+    NoPreviousDir,
+    #[error(display = "no directory to switch with")]
+    NoOtherDir,
+}
+
+fn set_current_dir_ion(dir: &Path) -> Result<(), DirStackError> {
+    set_current_dir(dir).map_err(|cause| DirStackError::DirChangeFailure {
+        cause,
+        dir: dir.to_string_lossy().into(),
+    })?;
 
     env::set_var(
         "OLDPWD",
@@ -53,13 +73,13 @@ impl DirectoryStack {
     }
 
     // pushd -<num>
-    pub fn rotate_right(&mut self, num: usize) -> Result<(), Cow<'static, str>> {
+    pub fn rotate_right(&mut self, num: usize) -> Result<(), DirStackError> {
         let len = self.dirs.len();
         self.rotate_left(len - (num % len))
     }
 
     // pushd +<num>
-    pub fn rotate_left(&mut self, num: usize) -> Result<(), Cow<'static, str>> {
+    pub fn rotate_left(&mut self, num: usize) -> Result<(), DirStackError> {
         for _ in 0..num {
             if let Some(popped_front) = self.dirs.pop_front() {
                 self.dirs.push_back(popped_front);
@@ -69,11 +89,8 @@ impl DirectoryStack {
     }
 
     // sets current_dir to the element referred by index
-    pub fn set_current_dir_by_index(&self, index: usize) -> Result<(), Cow<'static, str>> {
-        let dir = self
-            .dirs
-            .get(index)
-            .ok_or_else(|| Cow::Owned(format!("{}: directory stack out of range", index)))?;
+    pub fn set_current_dir_by_index(&self, index: usize) -> Result<(), DirStackError> {
+        let dir = self.dirs.get(index).ok_or_else(|| DirStackError::OutOfRange { index })?;
 
         set_current_dir_ion(dir)
     }
@@ -102,15 +119,9 @@ impl DirectoryStack {
         &mut self,
         dir: &str,
         variables: &Variables<'_>,
-    ) -> Result<(), Cow<'static, str>> {
+    ) -> Result<(), DirStackError> {
         let new_dir = self.normalize_path(dir);
-        set_current_dir_ion(&new_dir).map_err(|err| {
-            Cow::Owned(format!(
-                "ion: failed to set current dir to {}: {}",
-                new_dir.to_string_lossy(),
-                err
-            ))
-        })?;
+        set_current_dir_ion(&new_dir)?;
         self.push_dir(new_dir, variables);
         Ok(())
     }
@@ -122,36 +133,27 @@ impl DirectoryStack {
     fn switch_to_previous_directory(
         &mut self,
         variables: &Variables<'_>,
-    ) -> Result<(), Cow<'static, str>> {
-        self.get_previous_dir()
-            .ok_or(Cow::Borrowed("ion: no previous directory to switch to"))
-            .and_then(|prev| {
-                self.dirs.remove(0);
-                println!("{}", prev);
-                self.change_and_push_dir(&prev, variables)
-            })
+    ) -> Result<(), DirStackError> {
+        let prev = self.get_previous_dir().ok_or(DirStackError::NoPreviousDir)?;
+
+        self.dirs.remove(0);
+        println!("{}", prev);
+        self.change_and_push_dir(&prev, variables)
     }
 
-    fn switch_to_home_directory(
-        &mut self,
-        variables: &Variables<'_>,
-    ) -> Result<(), Cow<'static, str>> {
-        sys_env::home_dir().map_or(
-            Err(Cow::Borrowed("ion: failed to get home directory")),
-            |home| {
-                home.to_str().map_or(
-                    Err(Cow::Borrowed("ion: failed to convert home directory to str")),
-                    |home| self.change_and_push_dir(home, variables),
-                )
-            },
-        )
+    fn switch_to_home_directory(&mut self, variables: &Variables<'_>) -> Result<(), DirStackError> {
+        sys_env::home_dir().map_or(Err(DirStackError::FailedFetchHome), |home| {
+            home.to_str().map_or(Err(DirStackError::PathConversionFailed), |home| {
+                self.change_and_push_dir(home, variables)
+            })
+        })
     }
 
     pub fn cd<T: AsRef<str>>(
         &mut self,
         dir: Option<T>,
         variables: &Variables<'_>,
-    ) -> Result<(), Cow<'static, str>> {
+    ) -> Result<(), DirStackError> {
         match dir {
             Some(dir) => {
                 let dir = dir.as_ref();
@@ -178,9 +180,9 @@ impl DirectoryStack {
         }
     }
 
-    pub fn swap(&mut self, index: usize) -> Result<(), Cow<'static, str>> {
+    pub fn swap(&mut self, index: usize) -> Result<(), DirStackError> {
         if self.dirs.len() <= index {
-            return Err(Cow::Borrowed("no other directory"));
+            return Err(DirStackError::NoOtherDir);
         }
         self.dirs.swap(0, index);
         self.set_current_dir_by_index(0)
@@ -191,7 +193,7 @@ impl DirectoryStack {
         path: PathBuf,
         keep_front: bool,
         variables: &mut Variables<'_>,
-    ) -> Result<(), Cow<'static, str>> {
+    ) -> Result<(), DirStackError> {
         let index = if keep_front { 1 } else { 0 };
         let new_dir = self.normalize_path(path.to_str().unwrap());
         self.insert_dir(index, new_dir, variables);
