@@ -270,7 +270,7 @@ pub fn builtin_cd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
             let _ = shell.fork_function(Capture::None, |_| Ok(()), "CD_CHANGE", &["ion"]);
             Status::SUCCESS
         }
-        Err(why) => Status::error(why),
+        Err(why) => Status::error(format!("{}", why)),
     }
 }
 

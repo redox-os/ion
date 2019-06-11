@@ -14,7 +14,7 @@ pub mod variables;
 
 pub(crate) use self::job::Job;
 use self::{
-    directory_stack::DirectoryStack,
+    directory_stack::{DirStackError, DirectoryStack},
     flow_control::{Block, FunctionError, Statement},
     foreground::ForegroundSignals,
     fork::{Fork, IonResult},
@@ -34,7 +34,6 @@ use crate::{
 use err_derive::Error;
 use itertools::Itertools;
 use std::{
-    borrow::Cow,
     fmt,
     fs::{self, OpenOptions},
     io::{self, Write},
@@ -230,27 +229,27 @@ impl<'a> Shell<'a> {
         }
     }
 
-    pub fn rotate_right(&mut self, num: usize) -> Result<(), Cow<'static, str>> {
+    pub fn rotate_right(&mut self, num: usize) -> Result<(), DirStackError> {
         self.directory_stack.rotate_right(num)
     }
 
-    pub fn rotate_left(&mut self, num: usize) -> Result<(), Cow<'static, str>> {
+    pub fn rotate_left(&mut self, num: usize) -> Result<(), DirStackError> {
         self.directory_stack.rotate_left(num)
     }
 
-    pub fn swap(&mut self, index: usize) -> Result<(), Cow<'static, str>> {
+    pub fn swap(&mut self, index: usize) -> Result<(), DirStackError> {
         self.directory_stack.swap(index)
     }
 
-    pub fn set_current_dir_by_index(&self, index: usize) -> Result<(), Cow<'static, str>> {
+    pub fn set_current_dir_by_index(&self, index: usize) -> Result<(), DirStackError> {
         self.directory_stack.set_current_dir_by_index(index)
     }
 
-    pub fn cd<T: AsRef<str>>(&mut self, dir: Option<T>) -> Result<(), Cow<'static, str>> {
+    pub fn cd<T: AsRef<str>>(&mut self, dir: Option<T>) -> Result<(), DirStackError> {
         self.directory_stack.cd(dir, &self.variables)
     }
 
-    pub fn pushd(&mut self, path: PathBuf, keep_front: bool) -> Result<(), Cow<'static, str>> {
+    pub fn pushd(&mut self, path: PathBuf, keep_front: bool) -> Result<(), DirStackError> {
         self.directory_stack.pushd(path, keep_front, &mut self.variables)
     }
 
