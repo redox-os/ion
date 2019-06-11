@@ -8,6 +8,30 @@ use err_derive::Error;
 use small;
 use smallvec::SmallVec;
 
+#[derive(Debug, Error, PartialEq, Eq, Hash)]
+pub enum BlockError {
+    #[error(display = "Case found outside of Match block")]
+    LoneCase,
+    #[error(display = "statement found outside of Case block in Match")]
+    StatementOutsideMatch,
+
+    #[error(display = "End found but no block to close")]
+    UnmatchedEnd,
+    #[error(display = "found ElseIf without If block")]
+    LoneElseIf,
+    #[error(display = "found Else without If block")]
+    LoneElse,
+    #[error(display = "Else block already exists")]
+    MultipleElse,
+    #[error(display = "ElseIf found after Else")]
+    ElseWrongOrder,
+
+    #[error(display = "found Break without loop body")]
+    UnmatchedBreak,
+    #[error(display = "found Continue without loop body")]
+    UnmatchedContinue,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct ElseIf<'a> {
     pub expression: Block<'a>,
@@ -159,7 +183,7 @@ pub type Block<'a> = Vec<Statement<'a>>;
 pub fn insert_statement<'a>(
     block: &mut Block<'a>,
     statement: Statement<'a>,
-) -> Result<Option<Statement<'a>>, &'static str> {
+) -> Result<Option<Statement<'a>>, BlockError> {
     match statement {
         // Push new block to stack
         Statement::For { .. }
@@ -178,7 +202,7 @@ pub fn insert_statement<'a>(
                     let _ = insert_into_block(block, case);
                 }
                 Some(Statement::Match { .. }) => (),
-                _ => return Err("ion: error: Case { .. } found outside of Match { .. } block"),
+                _ => return Err(BlockError::LoneCase),
             }
 
             block.push(statement);
@@ -186,7 +210,7 @@ pub fn insert_statement<'a>(
         }
         Statement::End => {
             match block.len() {
-                0 => Err("ion: error: keyword End found but no block to close"),
+                0 => Err(BlockError::UnmatchedEnd),
                 // Ready to return the complete block
                 1 => Ok(block.pop()),
                 // Merge back the top block into the previous one
@@ -269,12 +293,10 @@ pub fn insert_statement<'a>(
                 // Filter out toplevel statements that should produce an error
                 // otherwise return the statement for immediat execution
                 match statement {
-                    Statement::ElseIf(_) => {
-                        Err("ion: error: found ElseIf { .. } without If { .. } block")
-                    }
-                    Statement::Else => Err("ion: error: found Else without If { .. } block"),
-                    Statement::Break => Err("ion: error: found Break without loop body"),
-                    Statement::Continue => Err("ion: error: found Continue without loop body"),
+                    Statement::ElseIf(_) => Err(BlockError::LoneElseIf),
+                    Statement::Else => Err(BlockError::LoneElse),
+                    Statement::Break => Err(BlockError::UnmatchedBreak),
+                    Statement::Continue => Err(BlockError::UnmatchedContinue),
                     // Toplevel statement, return to execute immediately
                     _ => Ok(Some(statement)),
                 }
@@ -286,7 +308,7 @@ pub fn insert_statement<'a>(
 fn insert_into_block<'a>(
     block: &mut Block<'a>,
     statement: Statement<'a>,
-) -> Result<(), &'static str> {
+) -> Result<(), BlockError> {
     let block = match block.last_mut().expect("Should not insert statement if stack is empty!") {
         Statement::Time(inner) => inner,
         top_block => top_block,
@@ -299,9 +321,7 @@ fn insert_into_block<'a>(
         Statement::Match { ref mut cases, .. } => match statement {
             Statement::Case(case) => cases.push(case),
             _ => {
-                return Err(
-                    "ion: error: statement found outside of Case { .. } block in Match { .. }"
-                );
+                return Err(BlockError::StatementOutsideMatch);
             }
         },
         Statement::Case(ref mut case) => case.statements.push(statement),
@@ -310,7 +330,7 @@ fn insert_into_block<'a>(
         } => match statement {
             Statement::ElseIf(eif) => {
                 if *mode == IfMode::Else {
-                    return Err("ion: error: ElseIf { .. } found after Else");
+                    return Err(BlockError::ElseWrongOrder);
                 } else {
                     *mode = IfMode::ElseIf;
                     else_if.push(eif);
@@ -318,7 +338,7 @@ fn insert_into_block<'a>(
             }
             Statement::Else => {
                 if *mode == IfMode::Else {
-                    return Err("ion: error: Else block already exists");
+                    return Err(BlockError::MultipleElse);
                 } else {
                     *mode = IfMode::Else;
                 }
