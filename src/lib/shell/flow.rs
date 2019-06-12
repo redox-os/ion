@@ -1,5 +1,6 @@
 use super::{
     flow_control::{insert_statement, Case, ElseIf, Function, Statement},
+    pipe_exec::PipelineError,
     signals,
     status::*,
     Shell,
@@ -25,6 +26,8 @@ pub enum Condition {
     SigInt,
 }
 
+type Result = std::result::Result<Condition, IonError>;
+
 impl<'a> Shell<'a> {
     /// Conditionally executes branches of statements according to evaluated
     /// expressions
@@ -34,10 +37,10 @@ impl<'a> Shell<'a> {
         success: &[Statement<'a>],
         else_if: &[ElseIf<'a>],
         failure: &[Statement<'a>],
-    ) -> Condition {
+    ) -> Result {
         // Try execute success branch
-        if let Condition::SigInt = self.execute_statements(&expression) {
-            return Condition::SigInt;
+        if let Condition::SigInt = self.execute_statements(&expression)? {
+            return Ok(Condition::SigInt);
         }
         if self.previous_status.is_success() {
             return self.execute_statements(&success);
@@ -45,8 +48,8 @@ impl<'a> Shell<'a> {
 
         // Try to execute else_if branches
         for ElseIf { expression, success } in else_if {
-            if let Condition::SigInt = self.execute_statements(&expression) {
-                return Condition::SigInt;
+            if let Condition::SigInt = self.execute_statements(&expression)? {
+                return Ok(Condition::SigInt);
             }
 
             if self.previous_status.is_success() {
@@ -64,7 +67,7 @@ impl<'a> Shell<'a> {
         variables: &[types::Str],
         values: &[small::String],
         statements: &[Statement<'a>],
-    ) -> Condition {
+    ) -> Result {
         macro_rules! set_vars_then_exec {
             ($chunk:expr, $def:expr) => {
                 for (key, value) in variables.iter().zip($chunk.chain(::std::iter::repeat($def))) {
@@ -73,9 +76,9 @@ impl<'a> Shell<'a> {
                     }
                 }
 
-                match self.execute_statements(statements) {
+                match self.execute_statements(statements)? {
                     Condition::Break => break,
-                    Condition::SigInt => return Condition::SigInt,
+                    Condition::SigInt => return Ok(Condition::SigInt),
                     Condition::Continue | Condition::NoOp => (),
                 }
             };
@@ -94,8 +97,8 @@ impl<'a> Shell<'a> {
                     self.variables_mut().set(&variables[0], value.clone());
                 }
 
-                match self.execute_statements(statements) {
-                    Condition::SigInt => return Condition::SigInt,
+                match self.execute_statements(statements)? {
+                    Condition::SigInt => return Ok(Condition::SigInt),
                     Condition::Break | Condition::Continue | Condition::NoOp => (),
                 }
             }
@@ -106,7 +109,7 @@ impl<'a> Shell<'a> {
             }
         };
 
-        Condition::NoOp
+        Ok(Condition::NoOp)
     }
 
     /// Executes all of the statements within a while block until a certain
@@ -115,24 +118,24 @@ impl<'a> Shell<'a> {
         &mut self,
         expression: &[Statement<'a>],
         statements: &[Statement<'a>],
-    ) -> Condition {
+    ) -> Result {
         loop {
-            self.execute_statements(expression);
+            self.execute_statements(expression)?;
             if !self.previous_status.is_success() {
-                return Condition::NoOp;
+                return Ok(Condition::NoOp);
             }
 
             // Cloning is needed so the statement can be re-iterated again if needed.
-            match self.execute_statements(statements) {
-                Condition::Break => return Condition::NoOp,
-                Condition::SigInt => return Condition::SigInt,
+            match self.execute_statements(statements)? {
+                Condition::Break => return Ok(Condition::NoOp),
+                Condition::SigInt => return Ok(Condition::SigInt),
                 _ => (),
             }
         }
     }
 
     /// Executes a single statement
-    pub fn execute_statement(&mut self, statement: &Statement<'a>) -> Condition {
+    pub fn execute_statement(&mut self, statement: &Statement<'a>) -> Result {
         match statement {
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
@@ -143,20 +146,20 @@ impl<'a> Shell<'a> {
                 self.variables.set("?", self.previous_status);
             }
             Statement::While { expression, statements } => {
-                if self.execute_while(&expression, &statements) == Condition::SigInt {
-                    return Condition::SigInt;
+                if self.execute_while(&expression, &statements)? == Condition::SigInt {
+                    return Ok(Condition::SigInt);
                 }
             }
             Statement::For { variables, values, statements } => {
-                if self.execute_for(&variables, &values, &statements) == Condition::SigInt {
-                    return Condition::SigInt;
+                if self.execute_for(&variables, &values, &statements)? == Condition::SigInt {
+                    return Ok(Condition::SigInt);
                 }
             }
             Statement::If { expression, success, else_if, failure, .. } => {
-                let condition = self.execute_if(&expression, &success, &else_if, &failure);
+                let condition = self.execute_if(&expression, &success, &else_if, &failure)?;
 
                 if condition != Condition::NoOp {
-                    return condition;
+                    return Ok(condition);
                 }
             }
             Statement::Function { name, args, statements, description } => {
@@ -170,38 +173,30 @@ impl<'a> Shell<'a> {
                     ),
                 );
             }
-            Statement::Pipeline(pipeline) => match expand_pipeline(&self, &pipeline) {
-                Ok((pipeline, statements)) => {
-                    if !pipeline.items.is_empty() {
-                        let status = self.run_pipeline(pipeline).unwrap_or_else(|err| {
-                            eprintln!("ion: {}", err);
-                            Status::COULD_NOT_EXEC
-                        });
+            Statement::Pipeline(pipeline) => {
+                let (pipeline, statements) = expand_pipeline(&self, &pipeline)?;
+                if !pipeline.items.is_empty() {
+                    let status = self.run_pipeline(pipeline).unwrap_or_else(|err| {
+                        eprintln!("ion: {}", err);
+                        Status::COULD_NOT_EXEC
+                    });
 
-                        // Retrieve the exit_status and set the $? variable and
-                        // history.previous_status
-                        self.variables_mut().set("?", status);
-                        self.previous_status = status;
-                    }
-                    if self.opts.err_exit && !self.previous_status.is_success() {
-                        self.exit();
-                    }
-                    if !statements.is_empty() {
-                        self.execute_statements(&statements);
-                    }
+                    // Retrieve the exit_status and set the $? variable and
+                    // history.previous_status
+                    self.variables_mut().set("?", status);
+                    self.previous_status = status;
                 }
-                Err(e) => {
-                    self.previous_status =
-                        Status::error(format!("ion: pipeline expansion error: {}", e));
-                    self.variables.set("?", self.previous_status);
-                    self.flow_control.clear();
-                    return Condition::Break;
+                if self.opts.err_exit && !self.previous_status.is_success() {
+                    self.exit();
                 }
-            },
+                if !statements.is_empty() {
+                    self.execute_statements(&statements)?;
+                }
+            }
             Statement::Time(box_statement) => {
                 let time = std::time::Instant::now();
 
-                let condition = self.execute_statement(box_statement);
+                let condition = self.execute_statement(box_statement)?;
 
                 let duration = time.elapsed();
                 let seconds = duration.as_secs();
@@ -213,44 +208,44 @@ impl<'a> Shell<'a> {
                     println!("real    {}.{:09}s", seconds, nanoseconds);
                 }
                 if condition != Condition::NoOp {
-                    return condition;
+                    return Ok(condition);
                 }
             }
             Statement::And(box_statement) => {
                 let condition = if self.previous_status.is_success() {
-                    self.execute_statement(box_statement)
+                    self.execute_statement(box_statement)?
                 } else {
                     Condition::NoOp
                 };
 
                 if condition != Condition::NoOp {
-                    return condition;
+                    return Ok(condition);
                 }
             }
             Statement::Or(box_statement) => {
                 let condition = if self.previous_status.is_success() {
                     Condition::NoOp
                 } else {
-                    self.execute_statement(box_statement)
+                    self.execute_statement(box_statement)?
                 };
 
                 if condition != Condition::NoOp {
-                    return condition;
+                    return Ok(condition);
                 }
             }
             Statement::Not(box_statement) => {
                 // NOTE: Should the condition be used?
-                let _condition = self.execute_statement(box_statement);
+                let _condition = self.execute_statement(box_statement)?;
                 self.previous_status.toggle();
                 self.variables.set("?", self.previous_status);
             }
-            Statement::Break => return Condition::Break,
-            Statement::Continue => return Condition::Continue,
+            Statement::Break => return Ok(Condition::Break),
+            Statement::Continue => return Ok(Condition::Continue),
             Statement::Match { expression, cases } => {
-                let condition = self.execute_match(expression, &cases);
+                let condition = self.execute_match(expression, &cases)?;
 
                 if condition != Condition::NoOp {
-                    return condition;
+                    return Ok(condition);
                 }
             }
             _ => {}
@@ -259,24 +254,24 @@ impl<'a> Shell<'a> {
             if self.handle_signal(signal) {
                 self.exit_with_code(Status::from_signal(signal));
             }
-            Condition::SigInt
+            Ok(Condition::SigInt)
         } else if self.break_flow {
             self.break_flow = false;
-            Condition::SigInt
+            Ok(Condition::SigInt)
         } else {
-            Condition::NoOp
+            Ok(Condition::NoOp)
         }
     }
 
     /// Simply executes all supplied statements.
-    pub fn execute_statements(&mut self, statements: &[Statement<'a>]) -> Condition {
+    pub fn execute_statements(&mut self, statements: &[Statement<'a>]) -> Result {
         self.variables.new_scope(false);
 
         let condition = statements
             .iter()
             .map(|statement| self.execute_statement(statement))
-            .find(|&condition| condition != Condition::NoOp)
-            .unwrap_or(Condition::NoOp);
+            .find(|condition| if let Ok(Condition::NoOp) = condition { false } else { true })
+            .unwrap_or(Ok(Condition::NoOp));
 
         self.variables.pop_scope();
 
@@ -285,7 +280,7 @@ impl<'a> Shell<'a> {
 
     /// Expand an expression and run a branch based on the value of the
     /// expanded expression
-    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case<'a>]) -> Condition {
+    fn execute_match<T: AsRef<str>>(&mut self, expression: T, cases: &[Case<'a>]) -> Result {
         // Logic for determining if the LHS of a match-case construct (the value we are
         // matching against) matches the RHS of a match-case construct (a value
         // in a case statement). For example, checking to see if the value
@@ -354,11 +349,11 @@ impl<'a> Shell<'a> {
             }
         }
 
-        Condition::NoOp
+        Ok(Condition::NoOp)
     }
 
     /// Receives a command and attempts to execute the contents.
-    pub fn on_command(&mut self, command_string: &str) -> Result<(), IonError> {
+    pub fn on_command(&mut self, command_string: &str) -> std::result::Result<(), IonError> {
         self.break_flow = false;
         for stmt in command_string.bytes().batching(|cmd| Terminator::new(cmd).terminate()) {
             // Go through all of the statements and build up the block stack
@@ -380,7 +375,7 @@ impl<'a> Shell<'a> {
 fn expand_pipeline<'a>(
     shell: &Shell<'a>,
     pipeline: &Pipeline<'a>,
-) -> Result<(Pipeline<'a>, Vec<Statement<'a>>), String> {
+) -> std::result::Result<(Pipeline<'a>, Vec<Statement<'a>>), IonError> {
     let mut item_iter = pipeline.items.iter();
     let mut items: Vec<PipeItem<'a>> = Vec::with_capacity(item_iter.size_hint().0);
     let mut statements = Vec::new();
@@ -388,14 +383,8 @@ fn expand_pipeline<'a>(
     while let Some(item) = item_iter.next() {
         if let Some(Value::Alias(alias)) = shell.variables.get_ref(item.command()) {
             statements = StatementSplitter::new(alias.0.as_str())
-                .map(|stmt| {
-                    stmt.map_err(|why| format!("ion: {}", why)).and_then(|stmt| {
-                        parse_and_validate(stmt, &shell.builtins)
-                            .map_err(|why| format!("ion: {}", why))
-                    })
-                })
-                .collect::<Result<_, _>>()
-                .map_err(|why| format!("ion: {}", why))?;
+                .map(|stmt| parse_and_validate(stmt?, &shell.builtins).map_err(Into::into))
+                .collect::<std::result::Result<_, IonError>>()?;
 
             // First item in the alias should be a pipeline item, otherwise it cannot
             // be placed into a pipeline!
@@ -436,11 +425,10 @@ fn expand_pipeline<'a>(
                             pline.items.extend(item_iter.cloned());
                         } else {
                             // Error in expansion
-                            return Err(format!(
-                                "unable to pipe outputs of alias: '{} = {}'",
-                                item.command(),
-                                alias.0.as_str()
-                            ));
+                            Err(PipelineError::InvalidAlias(
+                                item.command().to_string(),
+                                alias.0.to_string(),
+                            ))?;
                         }
                     }
                     _ => (),

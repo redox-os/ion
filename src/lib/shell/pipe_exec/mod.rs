@@ -77,6 +77,8 @@ pub enum PipelineError {
     TerminateJobsError(#[error(cause)] io::Error),
     #[error(display = "command exec error: {}", _0)]
     CommandExecError(#[error(cause)] io::Error),
+    #[error(display = "unable to pipe outputs of alias: '{} = {}'", _0, _1)]
+    InvalidAlias(String, String),
 }
 
 impl fmt::Display for OutputError {

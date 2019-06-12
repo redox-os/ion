@@ -69,6 +69,8 @@ pub enum IonError {
     EmptyBlock,
     #[error(display = "Could not execute file '{}': {}", _0, _1)]
     FileExecutionError(String, #[error(cause)] io::Error),
+    #[error(display = "Pipeline execution error: {}", _0)]
+    PipelineExecutionError(#[error(cause)] PipelineError),
 }
 
 impl From<ParseError> for IonError {
@@ -85,6 +87,10 @@ impl From<FunctionError> for IonError {
 
 impl From<BlockError> for IonError {
     fn from(cause: BlockError) -> Self { IonError::StatementFlowError(cause) }
+}
+
+impl From<PipelineError> for IonError {
+    fn from(cause: PipelineError) -> Self { IonError::PipelineExecutionError(cause) }
 }
 
 impl From<io::Error> for IonError {

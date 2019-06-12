@@ -1,7 +1,7 @@
 use crate::{
     lexers::assignments::{KeyBuf, Operator, Primitive},
     parser::{assignments::*, pipelines::Pipeline},
-    shell::Shell,
+    shell::{status::Status, Shell},
     types,
 };
 use err_derive::Error;
@@ -412,7 +412,12 @@ impl<'a> Function<'a> {
             shell.variables.set(&type_.name, value);
         }
 
-        shell.execute_statements(&self.statements);
+        if let Err(why) = shell.execute_statements(&self.statements) {
+            shell.previous_status =
+                Status::error(format!("ion: pipeline expansion error: {}", why));
+            shell.variables.set("?", shell.previous_status);
+            shell.flow_control.clear();
+        }
 
         shell.variables.pop_scope();
         shell.variables.append_scopes(temporary);
