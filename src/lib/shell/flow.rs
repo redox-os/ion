@@ -173,7 +173,15 @@ impl<'a> Shell<'a> {
             Statement::Pipeline(pipeline) => match expand_pipeline(&self, &pipeline) {
                 Ok((pipeline, statements)) => {
                     if !pipeline.items.is_empty() {
-                        self.run_pipeline(pipeline);
+                        let status = self.run_pipeline(pipeline).unwrap_or_else(|err| {
+                            eprintln!("ion: {}", err);
+                            Status::COULD_NOT_EXEC
+                        });
+
+                        // Retrieve the exit_status and set the $? variable and
+                        // history.previous_status
+                        self.variables_mut().set("?", status);
+                        self.previous_status = status;
                     }
                     if self.opts.err_exit && !self.previous_status.is_success() {
                         self.exit();

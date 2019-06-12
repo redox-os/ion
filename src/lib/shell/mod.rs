@@ -22,7 +22,11 @@ use self::{
     status::*,
     variables::Variables,
 };
-pub use self::{fork::Capture, pipe_exec::job_control::BackgroundProcess, variables::Value};
+pub use self::{
+    fork::Capture,
+    pipe_exec::{job_control::BackgroundProcess, PipelineError},
+    variables::Value,
+};
 use crate::{
     builtins::BuiltinMap,
     lexers::{Key, Primitive},
@@ -287,7 +291,7 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Status {
+    pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Result<Status, PipelineError> {
         let command_start_time = SystemTime::now();
 
         pipeline.expand(self);
@@ -321,21 +325,13 @@ impl<'a> Shell<'a> {
             }
         } else {
             self.execute_pipeline(pipeline)
-        }
-        .unwrap_or_else(|err| {
-            eprintln!("{}", err);
-            Status::COULD_NOT_EXEC
-        });
+        };
 
         if let Some(ref callback) = self.on_command {
             if let Ok(elapsed_time) = command_start_time.elapsed() {
                 callback(self, elapsed_time);
             }
         }
-
-        // Retrieve the exit_status and set the $? variable and history.previous_status
-        self.variables_mut().set("?", exit_status);
-        self.previous_status = exit_status;
 
         exit_status
     }
@@ -425,7 +421,7 @@ impl<'a> Shell<'a> {
                     .map_err(|why| format!("{}: {}", key.name, why))?;
 
                 match index {
-                    Value::Str(ref index) => {
+                    Value::Str(index) => {
                         let lhs = self
                             .variables
                             .get_mut(key.name)
@@ -433,11 +429,11 @@ impl<'a> Shell<'a> {
 
                         match lhs {
                             Value::HashMap(hmap) => {
-                                let _ = hmap.insert(index.clone(), value);
+                                let _ = hmap.insert(index, value);
                                 Ok(())
                             }
                             Value::BTreeMap(bmap) => {
-                                let _ = bmap.insert(index.clone(), value);
+                                let _ = bmap.insert(index, value);
                                 Ok(())
                             }
                             Value::Array(array) => {
