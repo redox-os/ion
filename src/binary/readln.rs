@@ -1,7 +1,11 @@
 use super::{completer::IonCompleter, InteractiveBinary};
+use ion_shell::Shell;
 use std::io::ErrorKind;
 
-pub fn readln(binary: &InteractiveBinary<'_>) -> Option<String> {
+pub fn readln<T: Fn(&mut Shell<'_>)>(
+    binary: &InteractiveBinary<'_>,
+    prep_for_exit: &T,
+) -> Option<String> {
     let prompt = binary.prompt();
     let line = binary.context.borrow_mut().read_line(
         prompt,
@@ -22,7 +26,7 @@ pub fn readln(binary: &InteractiveBinary<'_>) -> Option<String> {
         Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
             let mut shell = binary.shell.borrow_mut();
             if !shell.unterminated && shell.exit_block().is_err() {
-                shell.prep_for_exit();
+                prep_for_exit(&mut shell);
                 std::process::exit(shell.previous_status().as_os_code())
             }
             None

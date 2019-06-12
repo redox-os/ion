@@ -83,20 +83,8 @@ impl<'a> InteractiveBinary<'a> {
     }
 
     pub fn add_callbacks(&self) {
-        let mut shell = self.shell.borrow_mut();
         let context = self.context.clone();
-        shell.set_prep_for_exit(Some(Box::new(move |shell| {
-            // context will be sent a signal to commit all changes to the history file,
-            // and waiting for the history thread in the background to finish.
-            if shell.opts().huponexit {
-                shell.resume_stopped();
-                shell.background_send(SIGHUP);
-            }
-            context.borrow_mut().history.commit_to_file();
-        })));
-
-        let context = self.context.clone();
-        shell.set_on_command(Some(Box::new(move |shell, elapsed| {
+        self.shell.borrow_mut().set_on_command(Some(Box::new(move |shell, elapsed| {
             // If `RECORD_SUMMARY` is set to "1" (True, Yes), then write a summary of the
             // pipline just executed to the the file and context histories. At the
             // moment, this means record how long it took.
@@ -123,6 +111,29 @@ impl<'a> InteractiveBinary<'a> {
     /// Creates an interactive session that reads from a prompt provided by
     /// Liner.
     pub fn execute_interactive(self) -> ! {
+        let context_bis = self.context.clone();
+        let prep_for_exit = &move |shell: &mut Shell<'_>| {
+            // context will be sent a signal to commit all changes to the history file,
+            // and waiting for the history thread in the background to finish.
+            if shell.opts().huponexit {
+                shell.resume_stopped();
+                shell.background_send(SIGHUP);
+            }
+            context_bis.borrow_mut().history.commit_to_file();
+        };
+
+        let exit = self.shell.borrow().builtins().get("exit").unwrap();
+        let exit = &|args: &[small::String], shell: &mut Shell<'_>| -> Status {
+            prep_for_exit(shell);
+            exit(args, shell)
+        };
+
+        let exec = self.shell.borrow().builtins().get("exec").unwrap();
+        let exec = &|args: &[small::String], shell: &mut Shell<'_>| -> Status {
+            prep_for_exit(shell);
+            exec(args, shell)
+        };
+
         let context_bis = self.context.clone();
         let history = &move |args: &[small::String], _shell: &mut Shell<'_>| -> Status {
             if man_pages::check_help(args, MAN_HISTORY) {
@@ -163,6 +174,12 @@ impl<'a> InteractiveBinary<'a> {
             keybindings,
             "Change the keybindings",
         );
+        this.shell.borrow_mut().builtins_mut().add("exit", exit, "Exits the current session");
+        this.shell.borrow_mut().builtins_mut().add(
+            "exec",
+            exec,
+            "Replace the shell with the given command.",
+        );
 
         match BaseDirectories::with_prefix("ion") {
             Ok(base_dirs) => match base_dirs.find_config_file(Self::CONFIG_FILE_NAME) {
@@ -183,7 +200,7 @@ impl<'a> InteractiveBinary<'a> {
         }
 
         loop {
-            let mut lines = std::iter::repeat_with(|| this.readln())
+            let mut lines = std::iter::repeat_with(|| this.readln(prep_for_exit))
                 .filter_map(|cmd| cmd)
                 .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
             match Terminator::new(&mut lines).terminate() {
@@ -214,7 +231,9 @@ impl<'a> InteractiveBinary<'a> {
     /// Ion's interface to Liner's `read_line` method, which handles everything related to
     /// rendering, controlling, and getting input from the prompt.
     #[inline]
-    pub fn readln(&self) -> Option<String> { readln(self) }
+    pub fn readln<T: Fn(&mut Shell<'_>)>(&self, prep_for_exit: &T) -> Option<String> {
+        readln(self, prep_for_exit)
+    }
 
     /// Generates the prompt that will be used by Liner.
     #[inline]

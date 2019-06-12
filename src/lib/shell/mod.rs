@@ -139,8 +139,6 @@ pub struct Shell<'a> {
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,
-    /// Custom callback to cleanup before exit
-    prep_for_exit: Option<Box<dyn FnMut(&mut Shell<'_>) + 'a>>,
     /// Custom callback for each command call
     on_command: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
 }
@@ -205,7 +203,6 @@ impl<'a> Shell<'a> {
             background: Arc::new(Mutex::new(Vec::new())),
             foreground_signals: Arc::new(ForegroundSignals::new()),
             on_command: None,
-            prep_for_exit: None,
             unterminated: false,
         }
     }
@@ -348,18 +345,6 @@ impl<'a> Shell<'a> {
         } else {
             Some(self.previous_job)
         }
-    }
-
-    /// Call the cleanup callback
-    pub fn prep_for_exit(&mut self) {
-        if let Some(mut callback) = self.prep_for_exit.take() {
-            callback(self);
-        }
-    }
-
-    /// Set the callback to call before exiting the shell
-    pub fn set_prep_for_exit(&mut self, callback: Option<Box<dyn FnMut(&mut Shell<'_>) + 'a>>) {
-        self.prep_for_exit = callback;
     }
 
     /// Set the callback to call on each command

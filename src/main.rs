@@ -50,7 +50,7 @@ DESCRIPTION
     Makes ion exit. The exit status will be that of the last command executed."#;
 
 /// Executes the givent commmand.
-pub fn exec(shell: &mut Shell<'_>, args: &[small::String]) -> Result<(), small::String> {
+pub fn exec(args: &[small::String]) -> Result<(), small::String> {
     let mut clear_env = false;
     let mut idx = 0;
     for arg in args.iter() {
@@ -67,7 +67,6 @@ pub fn exec(shell: &mut Shell<'_>, args: &[small::String]) -> Result<(), small::
     match args.get(idx) {
         Some(argument) => {
             let args = if args.len() > idx + 1 { &args[idx + 1..] } else { &[] };
-            shell.prep_for_exit();
             Err(execve(argument, args, clear_env).description().into())
         }
         None => Err("no command provided".into()),
@@ -80,7 +79,6 @@ fn builtin_exit(args: &[Str], shell: &mut Shell<'_>) -> Status {
     }
     // Kill all active background tasks before exiting the shell.
     shell.background_send(sys::SIGTERM);
-    shell.prep_for_exit();
     let exit_code = args
         .get(1)
         .and_then(|status| status.parse::<i32>().ok())
@@ -88,10 +86,10 @@ fn builtin_exit(args: &[Str], shell: &mut Shell<'_>) -> Status {
     std::process::exit(exit_code);
 }
 
-fn builtin_exec(args: &[Str], shell: &mut Shell<'_>) -> Status {
-    match exec(shell, &args[1..]) {
+fn builtin_exec(args: &[Str], _shell: &mut Shell<'_>) -> Status {
+    match exec(&args[1..]) {
         // Shouldn't ever hit this case.
-        Ok(()) => Status::SUCCESS,
+        Ok(()) => unreachable!(),
         Err(err) => Status::error(format!("ion: exec: {}", err)),
     }
 }
