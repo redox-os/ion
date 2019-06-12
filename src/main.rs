@@ -2,7 +2,8 @@ mod binary;
 
 use self::binary::{InteractiveBinary, MAN_ION};
 use ion_shell::{
-    builtins::man_pages::check_help, status::Status, types::Str, BuiltinMap, Shell, Value,
+    builtins::man_pages::check_help, status::Status, types::Str, BuiltinMap, IonError,
+    PipelineError, Shell, Value,
 };
 use ion_sys as sys;
 use ion_sys::execve;
@@ -79,11 +80,12 @@ fn builtin_exit(args: &[Str], shell: &mut Shell<'_>) -> Status {
     }
     // Kill all active background tasks before exiting the shell.
     shell.background_send(sys::SIGTERM);
-    if let Some(status) = args.get(1).and_then(|status| status.parse::<i32>().ok()) {
-        shell.exit_with_code(Status::from_exit_code(status))
-    } else {
-        shell.exit()
-    }
+    shell.prep_for_exit();
+    let exit_code = args
+        .get(1)
+        .and_then(|status| status.parse::<i32>().ok())
+        .unwrap_or_else(|| shell.previous_status().as_os_code());
+    std::process::exit(exit_code);
 }
 
 fn builtin_exec(args: &[Str], shell: &mut Shell<'_>) -> Status {
@@ -175,8 +177,17 @@ fn main() {
     };
     if let Err(why) = err {
         eprintln!("ion: {}", why);
-        process::exit(-1);
+        process::exit(
+            if let IonError::PipelineExecutionError(PipelineError::Interrupted(_, signal)) = why {
+                signal
+            } else {
+                1
+            },
+        );
     }
-    shell.wait_for_background();
-    shell.exit();
+    if let Err(why) = shell.wait_for_background() {
+        eprintln!("ion: {}", why);
+        process::exit(if let PipelineError::Interrupted(_, signal) = why { signal } else { 1 });
+    }
+    process::exit(shell.previous_status().as_os_code());
 }

@@ -257,14 +257,16 @@ impl<'a> Shell<'a> {
 
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
-    pub fn wait_for_background(&mut self) {
-        while self.background.lock().unwrap().iter().any(|p| p.state == ProcessState::Running) {
+    pub fn wait_for_background(&mut self) -> Result<(), PipelineError> {
+        while let Some(p) = self.background_jobs().iter().find(|p| p.state == ProcessState::Running)
+        {
             if let Some(signal) = signals::SignalHandler.find(|&s| s != sys::SIGTSTP) {
                 self.background_send(signal);
-                self.exit_with_code(Status::from_signal(signal));
+                return Err(PipelineError::Interrupted(p.pid(), signal));
             }
             sleep(Duration::from_millis(100));
         }
+        Ok(())
     }
 
     /// When given a process ID, that process's group will be assigned as the

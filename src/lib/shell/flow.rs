@@ -167,9 +167,6 @@ impl<'a> Shell<'a> {
                     self.variables_mut().set("?", status);
                     self.previous_status = status;
                 }
-                if self.opts.err_exit && !self.previous_status.is_success() {
-                    self.exit();
-                }
                 if !statements.is_empty() {
                     self.execute_statements(&statements)?;
                 }
@@ -232,9 +229,7 @@ impl<'a> Shell<'a> {
             _ => {}
         }
         if let Some(signal) = signals::SignalHandler.next() {
-            if self.handle_signal(signal) {
-                self.exit_with_code(Status::from_signal(signal));
-            }
+            self.handle_signal(signal);
             Err(IonError::from(PipelineError::Interrupted(0, signal)))
         } else {
             Ok(Condition::NoOp)

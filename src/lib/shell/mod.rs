@@ -42,7 +42,6 @@ use std::{
     io::{self, Write},
     ops::{Deref, DerefMut},
     path::Path,
-    process,
     sync::{atomic::Ordering, Arc, Mutex},
     time::SystemTime,
 };
@@ -334,6 +333,11 @@ impl<'a> Shell<'a> {
                 callback(self, elapsed_time);
             }
         }
+        if let Ok(status) = exit_status {
+            if self.opts.err_exit && !status.is_success() {
+                return Err(PipelineError::EarlyExit);
+            }
+        }
 
         exit_status
     }
@@ -364,6 +368,13 @@ impl<'a> Shell<'a> {
         callback: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
     ) {
         self.on_command = callback;
+    }
+
+    /// Set the callback to call on each command
+    pub fn on_command_mut(
+        &mut self,
+    ) -> &mut Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>> {
+        &mut self.on_command
     }
 
     /// Get access to the builtins
@@ -406,15 +417,6 @@ impl<'a> Shell<'a> {
 
     /// Get the last command's return code and/or the code for the error
     pub fn previous_status(&self) -> Status { self.previous_status }
-
-    /// Cleanly exit ion
-    pub fn exit(&mut self) -> ! { self.exit_with_code(self.previous_status) }
-
-    /// Cleanly exit ion with custom code
-    pub fn exit_with_code(&mut self, status: Status) -> ! {
-        self.prep_for_exit();
-        process::exit(status.as_os_code());
-    }
 
     pub fn assign(&mut self, key: &Key<'_>, value: Value<'a>) -> Result<(), String> {
         match (&key.kind, &value) {

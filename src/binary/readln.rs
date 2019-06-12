@@ -22,7 +22,8 @@ pub fn readln(binary: &InteractiveBinary<'_>) -> Option<String> {
         Err(ref err) if err.kind() == ErrorKind::UnexpectedEof => {
             let mut shell = binary.shell.borrow_mut();
             if !shell.unterminated && shell.exit_block().is_err() {
-                shell.exit();
+                shell.prep_for_exit();
+                std::process::exit(shell.previous_status().as_os_code())
             }
             None
         }

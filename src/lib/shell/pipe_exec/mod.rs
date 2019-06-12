@@ -84,8 +84,11 @@ pub enum PipelineError {
     Interrupted(u32, i32),
     #[error(display = "process ({}) had a core dump", _0)]
     CoreDump(u32),
-    #[error(display = "ion: waitpid error: {}", _0)]
+    #[error(display = "waitpid error: {}", _0)]
     WaitPid(&'static str),
+
+    #[error(display = "early exit: pipeline failed")]
+    EarlyExit,
 }
 
 impl fmt::Display for OutputError {

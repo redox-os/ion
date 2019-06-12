@@ -681,7 +681,7 @@ pub fn builtin_false(args: &[small::String], _: &mut Shell<'_>) -> Status {
 
 // TODO create a manpage
 pub fn builtin_wait(_: &[small::String], shell: &mut Shell<'_>) -> Status {
-    shell.wait_for_background();
+    let _ = shell.wait_for_background();
     Status::SUCCESS
 }
 
