@@ -1,11 +1,11 @@
 //! Contains the binary logic of Ion.
+pub mod builtins;
 mod completer;
 mod designators;
 mod history;
 mod prompt;
 mod readln;
 
-use self::{prompt::prompt, readln::readln};
 use ion_shell::{
     builtins::man_pages,
     parser::{Expander, Terminator},
@@ -162,29 +162,23 @@ impl<'a> InteractiveBinary<'a> {
 
         // change the lifetime to allow adding local builtins
         let InteractiveBinary { context, shell } = self;
-        let this = InteractiveBinary { context, shell: RefCell::new(shell.into_inner()) };
+        let mut shell = shell.into_inner();
+        let builtins = shell.builtins_mut();
+        builtins.add("history", history, "Display a log of all commands previously executed");
+        builtins.add("keybindings", keybindings, "Change the keybindings");
+        builtins.add("exit", exit, "Exits the current session");
+        builtins.add("exec", exec, "Replace the shell with the given command.");
 
-        this.shell.borrow_mut().builtins_mut().add(
-            "history",
-            history,
-            "Display a log of all commands previously executed",
-        );
-        this.shell.borrow_mut().builtins_mut().add(
-            "keybindings",
-            keybindings,
-            "Change the keybindings",
-        );
-        this.shell.borrow_mut().builtins_mut().add("exit", exit, "Exits the current session");
-        this.shell.borrow_mut().builtins_mut().add(
-            "exec",
-            exec,
-            "Replace the shell with the given command.",
-        );
+        Self::exec_init_file(&mut shell);
 
+        InteractiveBinary { context, shell: RefCell::new(shell) }.exec(prep_for_exit)
+    }
+
+    fn exec_init_file(shell: &mut Shell) {
         match BaseDirectories::with_prefix("ion") {
             Ok(base_dirs) => match base_dirs.find_config_file(Self::CONFIG_FILE_NAME) {
                 Some(initrc) => {
-                    if let Err(err) = this.shell.borrow_mut().execute_file(&initrc) {
+                    if let Err(err) = shell.execute_file(&initrc) {
                         eprintln!("ion: {}", err)
                     }
                 }
@@ -198,46 +192,36 @@ impl<'a> InteractiveBinary<'a> {
                 eprintln!("ion: unable to get base directory: {}", err);
             }
         }
+    }
 
+    fn exec<T: Fn(&mut Shell<'_>)>(self, prep_for_exit: &T) -> ! {
         loop {
-            let mut lines = std::iter::repeat_with(|| this.readln(prep_for_exit))
+            let mut lines = std::iter::repeat_with(|| self.readln(prep_for_exit))
                 .filter_map(|cmd| cmd)
                 .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
             match Terminator::new(&mut lines).terminate() {
                 Some(command) => {
-                    this.shell.borrow_mut().unterminated = false;
+                    self.shell.borrow_mut().unterminated = false;
                     let cmd: &str = &designators::expand_designators(
-                        &this.context.borrow(),
+                        &self.context.borrow(),
                         command.trim_end(),
                     );
-                    if let Err(why) = this.shell.borrow_mut().on_command(&cmd) {
+                    if let Err(why) = self.shell.borrow_mut().on_command(&cmd) {
                         eprintln!("{}", why);
                     }
-                    this.save_command(&cmd);
+                    self.save_command(&cmd);
                 }
                 None => {
-                    this.shell.borrow_mut().unterminated = true;
+                    self.shell.borrow_mut().unterminated = true;
                 }
             }
         }
     }
 
     /// Set the keybindings of the underlying liner context
-    #[inline]
     pub fn set_keybindings(&mut self, key_bindings: KeyBindings) {
         self.context.borrow_mut().key_bindings = key_bindings;
     }
-
-    /// Ion's interface to Liner's `read_line` method, which handles everything related to
-    /// rendering, controlling, and getting input from the prompt.
-    #[inline]
-    pub fn readln<T: Fn(&mut Shell<'_>)>(&self, prep_for_exit: &T) -> Option<String> {
-        readln(self, prep_for_exit)
-    }
-
-    /// Generates the prompt that will be used by Liner.
-    #[inline]
-    pub fn prompt(&self) -> String { prompt(&self.shell.borrow_mut()) }
 }
 
 #[derive(Debug)]
