@@ -26,7 +26,7 @@ impl<'a, 'b> TeePipe<'a, 'b> {
         F: FnMut(&mut RefinedJob<'b>, File),
     {
         let (reader, writer) =
-            sys::pipe2(sys::O_CLOEXEC).map_err(|cause| PipelineError::CreatePipeError { cause })?;
+            sys::pipe2(sys::O_CLOEXEC).map_err(PipelineError::CreatePipeError)?;
         (*tee).source = Some(unsafe { File::from_raw_fd(reader) });
         action(self.parent, unsafe { File::from_raw_fd(writer) });
         if self.is_external {

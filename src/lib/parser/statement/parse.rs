@@ -34,30 +34,30 @@ pub enum ParseError {
     NoValueSupplied,
     #[error(display = "no value supplied for iteration in for loop")]
     NoInKeyword,
-    #[error(display = "case error: {}", cause)]
-    CaseError { cause: CaseError },
+    #[error(display = "case error: {}", _0)]
+    CaseError(#[error(cause)] CaseError),
     #[error(
         display = "'{}' is not a valid function name\n     Function names may only contain \
                    alphanumeric characters",
-        name
+        _0
     )]
-    InvalidFunctionName { name: String },
-    #[error(display = "function argument error: {}", cause)]
-    InvalidFunctionArgument { cause: FunctionParseError },
-    #[error(display = "{}", cause)]
-    PipelineParsingError { cause: PipelineParsingError },
+    InvalidFunctionName(String),
+    #[error(display = "function argument error: {}", _0)]
+    InvalidFunctionArgument(#[error(cause)] FunctionParseError),
+    #[error(display = "{}", _0)]
+    PipelineParsingError(#[error(cause)] PipelineParsingError),
 }
 
 impl From<FunctionParseError> for ParseError {
-    fn from(cause: FunctionParseError) -> Self { ParseError::InvalidFunctionArgument { cause } }
+    fn from(cause: FunctionParseError) -> Self { ParseError::InvalidFunctionArgument(cause) }
 }
 
 impl From<CaseError> for ParseError {
-    fn from(cause: CaseError) -> Self { ParseError::CaseError { cause } }
+    fn from(cause: CaseError) -> Self { ParseError::CaseError(cause) }
 }
 
 impl From<PipelineParsingError> for ParseError {
-    fn from(cause: PipelineParsingError) -> Self { ParseError::PipelineParsingError { cause } }
+    fn from(cause: PipelineParsingError) -> Self { ParseError::PipelineParsingError(cause) }
 }
 
 pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
@@ -185,7 +185,7 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
             let pos = cmd.find(char::is_whitespace).unwrap_or_else(|| cmd.len());
             let name = &cmd[..pos];
             if !is_valid_name(name) {
-                return Err(ParseError::InvalidFunctionName { name: name.into() });
+                return Err(ParseError::InvalidFunctionName(name.into()));
             }
 
             let (args, description) = parse_function(&cmd[pos..]);

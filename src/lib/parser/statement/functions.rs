@@ -1,22 +1,13 @@
 use super::split_pattern;
 use crate::lexers::assignments::{KeyBuf, KeyIterator, TypeError};
-use std::fmt::{self, Display, Formatter};
+use err_derive::Error;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum FunctionParseError {
+    #[error(display = "repeated argument name: '{}'", _0)]
     RepeatedArgument(String),
-    TypeError(TypeError),
-}
-
-impl<'a> Display for FunctionParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match *self {
-            FunctionParseError::RepeatedArgument(ref arg) => {
-                write!(f, "repeated argument name: '{}'", arg)
-            }
-            FunctionParseError::TypeError(ref t) => write!(f, "{}", t),
-        }
-    }
+    #[error(display = "{}", _0)]
+    TypeError(#[error(cause)] TypeError),
 }
 
 /// The arguments expression given to a function declaration goes into here, which will be

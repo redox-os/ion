@@ -45,46 +45,46 @@ use std::{
 
 #[derive(Debug, Error)]
 pub enum IonError {
-    #[error(display = "failed to fork: {}", cause)]
-    Fork { cause: io::Error },
+    #[error(display = "failed to fork: {}", _0)]
+    Fork(#[error(cause)] io::Error),
     #[error(display = "element does not exist")]
     DoesNotExist,
     #[error(display = "input was not terminated")]
     Unterminated,
-    #[error(display = "function error: {}", cause)]
-    Function { cause: FunctionError },
-    #[error(display = "unexpected end of script: expected end block for `{}`", block)]
-    UnclosedBlock { block: String },
-    #[error(display = "syntax error: {}", cause)]
-    InvalidSyntax { cause: ParseError },
-    #[error(display = "block error: {}", cause)]
-    StatementFlowError { cause: BlockError },
-    #[error(display = "statement error: {}", cause)]
-    UnterminatedStatementError { cause: StatementError },
+    #[error(display = "function error: {}", _0)]
+    Function(#[error(cause)] FunctionError),
+    #[error(display = "unexpected end of script: expected end block for `{}`", _0)]
+    UnclosedBlock(String),
+    #[error(display = "syntax error: {}", _0)]
+    InvalidSyntax(#[error(cause)] ParseError),
+    #[error(display = "block error: {}", _0)]
+    StatementFlowError(#[error(cause)] BlockError),
+    #[error(display = "statement error: {}", _0)]
+    UnterminatedStatementError(#[error(cause)] StatementError),
     #[error(display = "Could not exit the current block since it does not exist!")]
     EmptyBlock,
-    #[error(display = "Could not execute file '{}': {}", file, cause)]
-    FileExecutionError { file: String, cause: io::Error },
+    #[error(display = "Could not execute file '{}': {}", _0, _1)]
+    FileExecutionError(String, #[error(cause)] io::Error),
 }
 
 impl From<ParseError> for IonError {
-    fn from(cause: ParseError) -> Self { IonError::InvalidSyntax { cause } }
+    fn from(cause: ParseError) -> Self { IonError::InvalidSyntax(cause) }
 }
 
 impl From<StatementError> for IonError {
-    fn from(cause: StatementError) -> Self { IonError::UnterminatedStatementError { cause } }
+    fn from(cause: StatementError) -> Self { IonError::UnterminatedStatementError(cause) }
 }
 
 impl From<FunctionError> for IonError {
-    fn from(cause: FunctionError) -> Self { IonError::Function { cause } }
+    fn from(cause: FunctionError) -> Self { IonError::Function(cause) }
 }
 
 impl From<BlockError> for IonError {
-    fn from(cause: BlockError) -> Self { IonError::StatementFlowError { cause } }
+    fn from(cause: BlockError) -> Self { IonError::StatementFlowError(cause) }
 }
 
 impl From<io::Error> for IonError {
-    fn from(cause: io::Error) -> Self { IonError::Fork { cause } }
+    fn from(cause: io::Error) -> Self { IonError::Fork(cause) }
 }
 
 #[derive(Debug, Clone, Hash)]
@@ -256,10 +256,9 @@ impl<'a> Shell<'a> {
     pub fn execute_file<P: AsRef<Path>>(&mut self, script: P) -> Result<Status, IonError> {
         match fs::File::open(script.as_ref()) {
             Ok(script) => self.execute_command(std::io::BufReader::new(script)),
-            Err(cause) => Err(IonError::FileExecutionError {
-                file: script.as_ref().to_string_lossy().into(),
-                cause,
-            }),
+            Err(cause) => {
+                Err(IonError::FileExecutionError(script.as_ref().to_string_lossy().into(), cause))
+            }
         }
     }
 
@@ -281,7 +280,7 @@ impl<'a> Shell<'a> {
 
         if let Some(block) = self.flow_control.last().map(Statement::short) {
             self.previous_status = Status::from_exit_code(1);
-            Err(IonError::UnclosedBlock { block: block.to_string() })
+            Err(IonError::UnclosedBlock(block.into()))
         } else {
             Ok(self.previous_status)
         }

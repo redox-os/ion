@@ -271,11 +271,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "doc-comment"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
 name = "either"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -360,7 +355,6 @@ dependencies = [
  "auto_enums 0.5.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "calculate 0.7.0 (git+https://gitlab.redox-os.org/redox-os/calc)",
  "criterion 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "doc-comment 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "err-derive 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "glob 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1134,7 +1128,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum csv-core 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "fa5cdef62f37e6ffe7d1f07a381bc0db32b7a3ff1cac0de56cb0d81e71f53d65"
 "checksum decimal 2.0.4 (git+https://github.com/alkis/decimal.git)" = "<none>"
 "checksum derive_utils 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)" = "8051728ec2caf87b15d051687024572810187693f9d8f4ec561714d7a3fa7d9c"
-"checksum doc-comment 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "923dea538cea0aa3025e8685b20d6ee21ef99c4f77e954a30febbaac5ec73a97"
 "checksum either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5527cfe0d098f36e3f8839852688e63c8fff1c90b2b405aef730615f9a7bcf7b"
 "checksum err-derive 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3d8ff65eb6c2fc68e76557239d16f5698fd56603925b89856d3f0f7105fd4543"
 "checksum errno-dragonfly 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "14ca354e36190500e1e1fb267c647932382b54053c50b14970856c0b00a35067"

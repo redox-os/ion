@@ -366,8 +366,8 @@ pub struct Function<'a> {
 pub enum FunctionError {
     #[error(display = "invalid number of arguments supplied")]
     InvalidArgumentCount,
-    #[error(display = "argument has invalid type: expected {}, found value '{}'", t, val)]
-    InvalidArgumentType { t: Primitive, val: String },
+    #[error(display = "argument has invalid type: expected {}, found value '{}'", _0, _1)]
+    InvalidArgumentType(Primitive, String),
 }
 
 impl<'a> Function<'a> {
@@ -390,10 +390,10 @@ impl<'a> Function<'a> {
                 if let Ok(value) = value_check(shell, value.as_ref(), &type_.kind) {
                     Ok((type_.clone(), value))
                 } else {
-                    Err(FunctionError::InvalidArgumentType {
-                        t:   type_.kind.clone(),
-                        val: value.as_ref().into(),
-                    })
+                    Err(FunctionError::InvalidArgumentType(
+                        type_.kind.clone(),
+                        value.as_ref().into(),
+                    ))
                 }
             })
             .collect::<Result<SmallVec<[_; 8]>, _>>()?;

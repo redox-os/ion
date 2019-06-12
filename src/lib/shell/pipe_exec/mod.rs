@@ -57,26 +57,26 @@ pub struct OutputError {
 
 #[derive(Debug, Error)]
 pub enum RedirectError {
-    #[error(display = "{}", cause)]
-    Input { cause: InputError },
-    #[error(display = "{}", cause)]
-    Output { cause: OutputError },
+    #[error(display = "{}", _0)]
+    Input(#[error(cause)] InputError),
+    #[error(display = "{}", _0)]
+    Output(#[error(cause)] OutputError),
 }
 
 #[derive(Debug, Error)]
 pub enum PipelineError {
-    #[error(display = "ion: {}", cause)]
-    RedirectPipeError { cause: RedirectError },
-    #[error(display = "ion: could not create pipe: {}", cause)]
-    CreatePipeError { cause: io::Error },
-    #[error(display = "ion: could not fork: {}", cause)]
-    CreateForkError { cause: io::Error },
-    #[error(display = "ion: could not run function: {}", cause)]
-    RunFunctionError { cause: FunctionError },
-    #[error(display = "ion: failed to terminate foreground jobs: {}", cause)]
-    TerminateJobsError { cause: io::Error },
-    #[error(display = "ion: command exec error: {}", cause)]
-    CommandExecError { cause: io::Error },
+    #[error(display = "{}", _0)]
+    RedirectPipeError(#[error(cause)] RedirectError),
+    #[error(display = "could not create pipe: {}", _0)]
+    CreatePipeError(#[error(cause)] io::Error),
+    #[error(display = "could not fork: {}", _0)]
+    CreateForkError(#[error(cause)] io::Error),
+    #[error(display = "could not run function: {}", _0)]
+    RunFunctionError(#[error(cause)] FunctionError),
+    #[error(display = "failed to terminate foreground jobs: {}", _0)]
+    TerminateJobsError(#[error(cause)] io::Error),
+    #[error(display = "command exec error: {}", _0)]
+    CommandExecError(#[error(cause)] io::Error),
 }
 
 impl fmt::Display for OutputError {
@@ -101,19 +101,19 @@ impl std::error::Error for OutputError {
 }
 
 impl From<OutputError> for RedirectError {
-    fn from(cause: OutputError) -> Self { RedirectError::Output { cause } }
+    fn from(cause: OutputError) -> Self { RedirectError::Output(cause) }
 }
 
 impl From<InputError> for RedirectError {
-    fn from(cause: InputError) -> Self { RedirectError::Input { cause } }
+    fn from(cause: InputError) -> Self { RedirectError::Input(cause) }
 }
 
 impl From<RedirectError> for PipelineError {
-    fn from(cause: RedirectError) -> Self { PipelineError::RedirectPipeError { cause } }
+    fn from(cause: RedirectError) -> Self { PipelineError::RedirectPipeError(cause) }
 }
 
 impl From<FunctionError> for PipelineError {
-    fn from(cause: FunctionError) -> Self { PipelineError::RunFunctionError { cause } }
+    fn from(cause: FunctionError) -> Self { PipelineError::RunFunctionError(cause) }
 }
 
 /// Create an OS pipe and write the contents of a byte slice to one end
@@ -359,7 +359,7 @@ impl<'b> Shell<'b> {
     fn exec_job(&mut self, job: &RefinedJob<'b>) -> Result<Status, PipelineError> {
         // Duplicate file descriptors, execute command, and redirect back.
         let (stdin_bk, stdout_bk, stderr_bk) =
-            duplicate_streams().map_err(|cause| PipelineError::CreatePipeError { cause })?;
+            duplicate_streams().map_err(PipelineError::CreatePipeError)?;
         redirect_streams(&job.stdin, &job.stdout, &job.stderr);
         let code = match job.var {
             JobVariant::Builtin { ref main } => main(job.args(), self),
@@ -465,8 +465,8 @@ impl<'b> Shell<'b> {
                             .connect(tee_out, tee_err)?;
                     } else {
                         // Pipe the previous command's stdin to this commands stdout/stderr.
-                        let (reader, writer) = sys::pipe2(sys::O_CLOEXEC)
-                            .map_err(|cause| PipelineError::CreatePipeError { cause })?;
+                        let (reader, writer) =
+                            sys::pipe2(sys::O_CLOEXEC).map_err(PipelineError::CreatePipeError)?;
                         if is_external {
                             ext_stdio_pipes
                                 .get_or_insert_with(|| Vec::with_capacity(4))
@@ -517,8 +517,7 @@ impl<'b> Shell<'b> {
                 // Watch the foreground group, dropping all commands that exit as they exit.
                 let status = self.watch_foreground(pgid);
                 if status == Status::TERMINATED {
-                    sys::killpg(pgid, sys::SIGTERM)
-                        .map_err(|cause| PipelineError::TerminateJobsError { cause })?;
+                    sys::killpg(pgid, sys::SIGTERM).map_err(PipelineError::TerminateJobsError)?;
                 } else {
                     let _ = io::stdout().flush();
                     let _ = io::stderr().flush();
@@ -561,9 +560,7 @@ fn spawn_proc(
                 Err(ref mut err) if err.kind() == io::ErrorKind::NotFound => {
                     shell.command_not_found(&args[0])
                 }
-                Err(cause) => {
-                    return Err(PipelineError::CommandExecError { cause });
-                }
+                Err(cause) => return Err(PipelineError::CommandExecError(cause)),
             }
         }
         JobVariant::Builtin { main } => {
@@ -647,7 +644,7 @@ where
             *current_pid = pid;
             Ok(())
         }
-        Err(cause) => Err(PipelineError::CreateForkError { cause }),
+        Err(cause) => Err(PipelineError::CreateForkError(cause)),
     }
 }
 

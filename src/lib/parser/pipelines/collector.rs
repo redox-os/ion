@@ -30,12 +30,12 @@ pub enum PipelineParsingError {
     UnterminatedSingleQuote,
 
     // paired
-    #[error(display = "{}", cause)]
-    Paired { cause: LevelsError },
+    #[error(display = "{}", _0)]
+    Paired(#[error(cause)] LevelsError),
 }
 
 impl From<LevelsError> for PipelineParsingError {
-    fn from(cause: LevelsError) -> Self { PipelineParsingError::Paired { cause } }
+    fn from(cause: LevelsError) -> Self { PipelineParsingError::Paired(cause) }
 }
 
 trait AddItem<'a> {

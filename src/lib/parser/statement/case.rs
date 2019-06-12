@@ -1,25 +1,16 @@
 use crate::lexers::ArgumentSplitter;
-use std::fmt::{self, Display, Formatter};
+use err_derive::Error;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum CaseError {
+    #[error(display = "no bind variable was supplied")]
     NoBindVariable,
+    #[error(display = "no conditional statement was given")]
     NoConditional,
+    #[error(display = "extra value, '{}', was given to bind", _0)]
     ExtraBind(String),
+    #[error(display = "extra variable, '{}', was given to case", _0)]
     ExtraVar(String),
-}
-
-impl Display for CaseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            CaseError::NoBindVariable => write!(f, "no bind variable was supplied"),
-            CaseError::NoConditional => write!(f, "no conditional statement was given"),
-            CaseError::ExtraBind(value) => write!(f, "extra value, '{}', was given to bind", value),
-            CaseError::ExtraVar(value) => {
-                write!(f, "extra variable, '{}', was given to case", value)
-            }
-        }
-    }
 }
 
 pub fn parse_case(data: &str) -> Result<(Option<&str>, Option<&str>, Option<String>), CaseError> {
