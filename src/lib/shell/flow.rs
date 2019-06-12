@@ -23,7 +23,6 @@ pub enum Condition {
     Continue,
     Break,
     NoOp,
-    SigInt,
 }
 
 type Result = std::result::Result<Condition, IonError>;
@@ -39,18 +38,14 @@ impl<'a> Shell<'a> {
         failure: &[Statement<'a>],
     ) -> Result {
         // Try execute success branch
-        if let Condition::SigInt = self.execute_statements(&expression)? {
-            return Ok(Condition::SigInt);
-        }
+        self.execute_statements(&expression)?;
         if self.previous_status.is_success() {
             return self.execute_statements(&success);
         }
 
         // Try to execute else_if branches
         for ElseIf { expression, success } in else_if {
-            if let Condition::SigInt = self.execute_statements(&expression)? {
-                return Ok(Condition::SigInt);
-            }
+            self.execute_statements(&expression)?;
 
             if self.previous_status.is_success() {
                 return self.execute_statements(&success);
@@ -76,10 +71,8 @@ impl<'a> Shell<'a> {
                     }
                 }
 
-                match self.execute_statements(statements)? {
-                    Condition::Break => break,
-                    Condition::SigInt => return Ok(Condition::SigInt),
-                    Condition::Continue | Condition::NoOp => (),
+                if self.execute_statements(statements)? == Condition::Break {
+                    break;
                 }
             };
         }
@@ -97,10 +90,7 @@ impl<'a> Shell<'a> {
                     self.variables_mut().set(&variables[0], value.clone());
                 }
 
-                match self.execute_statements(statements)? {
-                    Condition::SigInt => return Ok(Condition::SigInt),
-                    Condition::Break | Condition::Continue | Condition::NoOp => (),
-                }
+                self.execute_statements(statements)?;
             }
             ForValueExpression::Range(range) => {
                 for chunk in &range.chunks(variables.len()) {
@@ -126,10 +116,8 @@ impl<'a> Shell<'a> {
             }
 
             // Cloning is needed so the statement can be re-iterated again if needed.
-            match self.execute_statements(statements)? {
-                Condition::Break => return Ok(Condition::NoOp),
-                Condition::SigInt => return Ok(Condition::SigInt),
-                _ => (),
+            if self.execute_statements(statements)? == Condition::Break {
+                return Ok(Condition::NoOp);
             }
         }
     }
@@ -146,14 +134,10 @@ impl<'a> Shell<'a> {
                 self.variables.set("?", self.previous_status);
             }
             Statement::While { expression, statements } => {
-                if self.execute_while(&expression, &statements)? == Condition::SigInt {
-                    return Ok(Condition::SigInt);
-                }
+                self.execute_while(&expression, &statements)?;
             }
             Statement::For { variables, values, statements } => {
-                if self.execute_for(&variables, &values, &statements)? == Condition::SigInt {
-                    return Ok(Condition::SigInt);
-                }
+                self.execute_for(&variables, &values, &statements)?;
             }
             Statement::If { expression, success, else_if, failure, .. } => {
                 let condition = self.execute_if(&expression, &success, &else_if, &failure)?;
@@ -254,10 +238,10 @@ impl<'a> Shell<'a> {
             if self.handle_signal(signal) {
                 self.exit_with_code(Status::from_signal(signal));
             }
-            Ok(Condition::SigInt)
+            Err(IonError::from(PipelineError::Interrupted))
         } else if self.break_flow {
             self.break_flow = false;
-            Ok(Condition::SigInt)
+            Err(IonError::from(PipelineError::Interrupted))
         } else {
             Ok(Condition::NoOp)
         }
@@ -372,6 +356,7 @@ impl<'a> Shell<'a> {
 /// Expand a pipeline containing aliases. As aliases can split the pipeline by having logical
 /// operators in them, the function returns the first half of the pipeline and the rest of the
 /// statements, where the last statement has the other half of the pipeline merged.
+// TODO: If the aliases are made standard functions, the error type must be changed
 fn expand_pipeline<'a>(
     shell: &Shell<'a>,
     pipeline: &Pipeline<'a>,

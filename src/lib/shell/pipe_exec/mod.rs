@@ -79,6 +79,8 @@ pub enum PipelineError {
     CommandExecError(#[error(cause)] io::Error),
     #[error(display = "unable to pipe outputs of alias: '{} = {}'", _0, _1)]
     InvalidAlias(String, String),
+    #[error(display = "interrupted by signal")]
+    Interrupted,
 }
 
 impl fmt::Display for OutputError {

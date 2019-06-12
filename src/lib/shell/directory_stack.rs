@@ -41,10 +41,14 @@ fn set_current_dir_ion(dir: &Path) -> Result<(), DirStackError> {
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirectoryStack {
     dirs:      VecDeque<PathBuf>, // The top is always the current directory
     max_depth: Option<usize>,
+}
+
+impl Default for DirectoryStack {
+    fn default() -> Self { Self::new() }
 }
 
 impl DirectoryStack {
