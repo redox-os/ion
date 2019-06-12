@@ -1,7 +1,6 @@
 pub mod man_pages;
 
 mod command_info;
-mod exec;
 mod exists;
 mod functions;
 mod is;
@@ -17,7 +16,6 @@ pub use self::man_pages::check_help;
 use self::{
     command_info::{find_type, which},
     echo::echo,
-    exec::exec,
     exists::exists,
     functions::print_functions,
     is::is,
@@ -234,12 +232,10 @@ impl<'a> BuiltinMap<'a> {
     /// Utilities specific for a shell, that should probably not be included in an embedded context
     ///
     /// Contains `eval`, `exec`, `exit`, `set`, `suspend`
-    pub fn with_shell_dangerous(mut self) -> Self {
+    pub fn with_shell_unsafe(mut self) -> Self {
         map!(
             self,
             "eval" => builtin_eval : "Evaluates the evaluated expression",
-            "exec" => builtin_exec : "Replace the shell with the given command.",
-            "exit" => builtin_exit : "Exits the current session",
             "set" => builtin_set : "Set or unset values of shell options and positional parameters.",
             "suspend" => builtin_suspend : "Suspends the shell with a SIGTSTOP signal"
         )
@@ -741,27 +737,6 @@ pub fn builtin_help(args: &[small::String], shell: &mut Shell<'_>) -> Status {
         println!("{}", shell.builtins().keys().join(""));
     }
     Status::SUCCESS
-}
-
-pub fn builtin_exit(args: &[small::String], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_EXIT) {
-        return Status::SUCCESS;
-    }
-    // Kill all active background tasks before exiting the shell.
-    shell.background_send(sys::SIGTERM);
-    if let Some(status) = args.get(1).and_then(|status| status.parse::<i32>().ok()) {
-        shell.exit_with_code(Status::from_exit_code(status))
-    } else {
-        shell.exit()
-    }
-}
-
-pub fn builtin_exec(args: &[small::String], shell: &mut Shell<'_>) -> Status {
-    match exec(shell, &args[1..]) {
-        // Shouldn't ever hit this case.
-        Ok(()) => Status::SUCCESS,
-        Err(err) => Status::error(format!("ion: exec: {}", err)),
-    }
 }
 
 use regex::Regex;

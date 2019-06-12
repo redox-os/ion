@@ -178,7 +178,7 @@ impl<'a> Shell<'a> {
     pub fn library() -> Self { Self::new(true) }
 
     pub fn new(is_background_shell: bool) -> Self {
-        Self::with_builtins(BuiltinMap::default().with_shell_dangerous(), is_background_shell)
+        Self::with_builtins(BuiltinMap::default(), is_background_shell)
     }
 
     /// Create a shell with custom builtins
