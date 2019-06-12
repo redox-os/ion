@@ -1,7 +1,7 @@
 use ion_shell::{parser::Expander, Capture, Shell};
 use std::io::Read;
 
-pub fn prompt(shell: &Shell) -> String {
+pub fn prompt(shell: &Shell<'_>) -> String {
     let blocks = shell.block_len() + if shell.unterminated { 1 } else { 0 };
 
     if blocks == 0 {
@@ -16,7 +16,7 @@ pub fn prompt(shell: &Shell) -> String {
     }
 }
 
-pub fn prompt_fn(shell: &Shell) -> Option<String> {
+pub fn prompt_fn(shell: &Shell<'_>) -> Option<String> {
     shell
         .fork_function(
             Capture::StdoutThenIgnoreStderr,

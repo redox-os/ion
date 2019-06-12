@@ -4,30 +4,25 @@ mod parse;
 mod splitter;
 
 pub use self::{
-    parse::{is_valid_name, parse},
+    parse::{is_valid_name, parse, ParseError},
     splitter::{StatementError, StatementSplitter, StatementVariant},
 };
-use crate::{
-    builtins::BuiltinMap,
-    shell::{flow_control::Statement, status::Status},
-};
+use crate::{builtins::BuiltinMap, shell::flow_control::Statement};
+
+pub type Result<'a> = std::result::Result<Statement<'a>, ParseError>;
 
 /// Parses a given statement string and return's the corresponding mapped
 /// `Statement`
 pub fn parse_and_validate<'b>(
-    statement: Result<StatementVariant, StatementError>,
+    statement: StatementVariant<'_>,
     builtins: &BuiltinMap<'b>,
-) -> Statement<'b> {
+) -> Result<'b> {
     match statement {
-        Ok(StatementVariant::And(statement)) => {
-            Statement::And(Box::new(parse(statement, builtins)))
+        StatementVariant::And(statement) => {
+            Ok(Statement::And(Box::new(parse(statement, builtins)?)))
         }
-        Ok(StatementVariant::Or(statement)) => Statement::Or(Box::new(parse(statement, builtins))),
-        Ok(StatementVariant::Default(statement)) => parse(statement, builtins),
-        Err(err) => {
-            eprintln!("ion: {}", err);
-            Statement::Error(Status::from_exit_code(-1))
-        }
+        StatementVariant::Or(statement) => Ok(Statement::Or(Box::new(parse(statement, builtins)?))),
+        StatementVariant::Default(statement) => parse(statement, builtins),
     }
 }
 

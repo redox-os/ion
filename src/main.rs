@@ -1,25 +1,33 @@
-extern crate ion_sys as sys;
 mod binary;
 
 use self::binary::{InteractiveBinary, MAN_ION};
 use ion_shell::{Shell, Value};
+use ion_sys as sys;
 use liner::KeyBindings;
 use std::{
     alloc::System,
     env,
-    io::{stdin, BufReader},
+    io::{self, stdin, BufReader},
     process,
 };
 
 #[global_allocator]
 static A: System = System;
 
+fn set_unique_pid() -> io::Result<()> {
+    let pid = sys::getpid()?;
+    sys::setpgid(0, pid)?;
+    sys::tcsetpgrp(0, pid)
+}
+
 fn main() {
     let stdin_is_a_tty = sys::isatty(sys::STDIN_FILENO);
     let mut shell = Shell::binary();
 
     if stdin_is_a_tty {
-        shell.set_unique_pid();
+        if let Err(why) = set_unique_pid() {
+            eprintln!("ion: could not assign a pid to the shell: {}", why);
+        }
     }
 
     let mut command = None;
@@ -73,10 +81,10 @@ fn main() {
         ),
     );
 
-    if let Some(command) = command {
-        shell.execute_script(command.as_bytes());
+    let err = if let Some(command) = command {
+        shell.execute_command(command.as_bytes())
     } else if let Some(path) = script_path {
-        shell.execute_file(&path.as_str());
+        shell.execute_file(&path.as_str())
     } else if stdin_is_a_tty || force_interactive {
         let mut interactive = InteractiveBinary::new(shell);
         if let Some(key_bindings) = key_bindings {
@@ -85,7 +93,11 @@ fn main() {
         interactive.add_callbacks();
         interactive.execute_interactive();
     } else {
-        shell.execute_script(BufReader::new(stdin()));
+        shell.execute_command(BufReader::new(stdin()))
+    };
+    if let Err(why) = err {
+        eprintln!("ion: {}", why);
+        process::exit(-1);
     }
     shell.wait_for_background();
     shell.exit();

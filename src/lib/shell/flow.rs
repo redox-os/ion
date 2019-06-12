@@ -11,7 +11,7 @@ use crate::{
         pipelines::{PipeItem, Pipeline},
         Expander, ForValueExpression, StatementSplitter, Terminator,
     },
-    shell::Value,
+    shell::{IonError, Value},
     types,
 };
 use itertools::Itertools;
@@ -134,11 +134,6 @@ impl<'a> Shell<'a> {
     /// Executes a single statement
     pub fn execute_statement(&mut self, statement: &Statement<'a>) -> Condition {
         match statement {
-            Statement::Error(number) => {
-                self.previous_status = *number;
-                self.variables.set("?", self.previous_status);
-                self.flow_control.clear();
-            }
             Statement::Let(action) => {
                 self.previous_status = self.local(action);
                 self.variables.set("?", self.previous_status);
@@ -178,7 +173,15 @@ impl<'a> Shell<'a> {
             Statement::Pipeline(pipeline) => match expand_pipeline(&self, &pipeline) {
                 Ok((pipeline, statements)) => {
                     if !pipeline.items.is_empty() {
-                        self.run_pipeline(pipeline);
+                        let status = self.run_pipeline(pipeline).unwrap_or_else(|err| {
+                            eprintln!("ion: {}", err);
+                            Status::COULD_NOT_EXEC
+                        });
+
+                        // Retrieve the exit_status and set the $? variable and
+                        // history.previous_status
+                        self.variables_mut().set("?", status);
+                        self.previous_status = status;
                     }
                     if self.opts.err_exit && !self.previous_status.is_success() {
                         self.exit();
@@ -312,7 +315,7 @@ impl<'a> Shell<'a> {
                         };
                         self.variables_mut().set(
                             &bind,
-                            value.iter().cloned().map(Value::Str).collect::<types::Array>(),
+                            value.iter().cloned().map(Value::Str).collect::<types::Array<'_>>(),
                         );
                         out
                     } else {
@@ -323,7 +326,12 @@ impl<'a> Shell<'a> {
                 });
 
                 if let Some(statement) = case.conditional.as_ref() {
-                    self.on_command(statement);
+                    if let Err(why) = self.on_command(statement) {
+                        eprintln!("{}", why);
+                        self.previous_status = Status::from_exit_code(-1);
+                        self.variables.set("?", self.previous_status);
+                        self.flow_control.clear();
+                    }
                     if self.previous_status.is_failure() {
                         continue;
                     }
@@ -350,26 +358,19 @@ impl<'a> Shell<'a> {
     }
 
     /// Receives a command and attempts to execute the contents.
-    pub fn on_command(&mut self, command_string: &str) {
+    pub fn on_command(&mut self, command_string: &str) -> Result<(), IonError> {
         self.break_flow = false;
         for stmt in command_string.bytes().batching(|cmd| Terminator::new(cmd).terminate()) {
             // Go through all of the statements and build up the block stack
             // When block is done return statement for execution.
             for statement in StatementSplitter::new(&stmt) {
-                let statement = parse_and_validate(statement, &self.builtins);
-                match insert_statement(&mut self.flow_control, statement) {
-                    Err(why) => {
-                        eprintln!("{}", why);
-                        self.reset_flow();
-                        return;
-                    }
-                    Ok(Some(stm)) => {
-                        let _ = self.execute_statement(&stm);
-                    }
-                    Ok(None) => {}
+                let statement = parse_and_validate(statement?, &self.builtins)?;
+                if let Some(stm) = insert_statement(&mut self.flow_control, statement)? {
+                    let _ = self.execute_statement(&stm);
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -381,14 +382,20 @@ fn expand_pipeline<'a>(
     pipeline: &Pipeline<'a>,
 ) -> Result<(Pipeline<'a>, Vec<Statement<'a>>), String> {
     let mut item_iter = pipeline.items.iter();
-    let mut items: Vec<PipeItem> = Vec::with_capacity(item_iter.size_hint().0);
+    let mut items: Vec<PipeItem<'a>> = Vec::with_capacity(item_iter.size_hint().0);
     let mut statements = Vec::new();
 
     while let Some(item) = item_iter.next() {
         if let Some(Value::Alias(alias)) = shell.variables.get_ref(item.command()) {
             statements = StatementSplitter::new(alias.0.as_str())
-                .map(|stmt| parse_and_validate(stmt, &shell.builtins))
-                .collect();
+                .map(|stmt| {
+                    stmt.map_err(|why| format!("ion: {}", why)).and_then(|stmt| {
+                        parse_and_validate(stmt, &shell.builtins)
+                            .map_err(|why| format!("ion: {}", why))
+                    })
+                })
+                .collect::<Result<_, _>>()
+                .map_err(|why| format!("ion: {}", why))?;
 
             // First item in the alias should be a pipeline item, otherwise it cannot
             // be placed into a pipeline!

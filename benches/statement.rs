@@ -1,5 +1,5 @@
 use criterion::*;
-use ion_shell::parser::{statement::StatementSplitter, Terminator};
+use ion_shell::parser::{StatementSplitter, Terminator};
 use itertools::Itertools;
 
 const TEXT: &[u8] = include_bytes!("test.ion");

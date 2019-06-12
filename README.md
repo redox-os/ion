@@ -32,7 +32,7 @@ with **mdbook**.
 
 ## Pop!\_OS / Ubuntu
 
-The following PPA supports the 18.04 (bionic) and 18.10 (cosmic) releases. Bionic builds were made using the Pop\_OS PPA's rustc 1.31.0 package.
+The following PPA supports the 18.04 (bionic) and 18.10 (cosmic) releases. Bionic builds were made using the Pop\_OS PPA's rustc 1.32.0 package.
 
 ```
 sudo add-apt-repository ppa:mmstick76/ion-shell
@@ -41,13 +41,13 @@ sudo add-apt-repository ppa:mmstick76/ion-shell
 # Developer set up
 
 Those who are developing software with Rust should install the [Rustup toolchain manager](https://rustup.rs/).
-After installing rustup, run `rustup override set 1.31.0` to set your Rust toolchain to the version that Ion is
+After installing rustup, run `rustup override set 1.32.0` to set your Rust toolchain to the version that Ion is
 targeting at the moment. To build for Redox OS, `rustup override set nightly` is required to build the Redox
 dependencies.
 
 # Build dependencies
 
-Please ensure that both cargo and rustc 1.31.0 or higher is installed for your system.
+Please ensure that both cargo and rustc 1.32.0 or higher is installed for your system.
 Release tarballs have not been made yet due to Ion being incomplete in a few remaining areas.
 
 # Compile instructions for distribution

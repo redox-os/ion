@@ -2,7 +2,7 @@
 // - Rewrite this in the same style as shell_expand::words.
 // - Validate syntax in methods
 
-use std::fmt::{self, Display, Formatter};
+use err_derive::Error;
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 enum LogicalOp {
@@ -11,45 +11,24 @@ enum LogicalOp {
     None,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum StatementError {
+    #[error(display = "illegal command name: {}", _0)]
     IllegalCommandName(String),
+    #[error(display = "syntax error: '{}' at position {} is out of place", _0, _1)]
     InvalidCharacter(char, usize),
+    #[error(display = "syntax error: unterminated subshell")]
     UnterminatedSubshell,
+    #[error(display = "syntax error: unterminated brace")]
     UnterminatedBracedVar,
+    #[error(display = "syntax error: unterminated braced var")]
     UnterminatedBrace,
+    #[error(display = "syntax error: unterminated method")]
     UnterminatedMethod,
+    #[error(display = "syntax error: unterminated arithmetic subexpression")]
     UnterminatedArithmetic,
+    #[error(display = "expected command, but found {}", _0)]
     ExpectedCommandButFound(&'static str),
-}
-
-impl Display for StatementError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match *self {
-            StatementError::IllegalCommandName(ref command) => {
-                writeln!(f, "illegal command name: {}", command)
-            }
-            StatementError::InvalidCharacter(character, position) => writeln!(
-                f,
-                "syntax error: '{}' at position {} is out of place",
-                character, position
-            ),
-            StatementError::UnterminatedSubshell => {
-                writeln!(f, "syntax error: unterminated subshell")
-            }
-            StatementError::UnterminatedBrace => writeln!(f, "syntax error: unterminated brace"),
-            StatementError::UnterminatedBracedVar => {
-                writeln!(f, "syntax error: unterminated braced var")
-            }
-            StatementError::UnterminatedMethod => writeln!(f, "syntax error: unterminated method"),
-            StatementError::UnterminatedArithmetic => {
-                writeln!(f, "syntax error: unterminated arithmetic subexpression")
-            }
-            StatementError::ExpectedCommandButFound(element) => {
-                writeln!(f, "expected command, but found {}", element)
-            }
-        }
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -134,7 +113,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 }
                 b'\\' => self.skip = true,
                 // [^A-Za-z0-9_:,}]
-                0...43 | 45...47 | 59...64 | 91...94 | 96 | 123...124 | 126...127
+                0..=43 | 45..=47 | 59..=64 | 91..=94 | 96 | 123..=124 | 126..=127
                     if self.vbrace =>
                 {
                     // If we are just ending the braced section continue as normal
@@ -183,7 +162,7 @@ impl<'a> Iterator for StatementSplitter<'a> {
                 b')' => self.paren_level -= 1,
                 b'}' if self.vbrace => self.vbrace = false,
                 // [^A-Za-z0-9_]
-                0...37 | 39...47 | 58 | 60...64 | 91...94 | 96 | 126...127 => self.variable = false,
+                0..=37 | 39..=47 | 58 | 60..=64 | 91..=94 | 96 | 126..=127 => self.variable = false,
                 _ if self.quotes => {}
                 b'{' => self.brace_level += 1,
                 b'}' => {

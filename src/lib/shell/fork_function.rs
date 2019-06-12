@@ -22,6 +22,7 @@ impl<'a> Shell<'a> {
                             eprintln!("ion: {} function call: {}", fn_name, err);
                         }
                     }
+                    Ok(())
                 })
                 .map_err(|err| eprintln!("ion: fork error: {}", err))
                 .and_then(result);

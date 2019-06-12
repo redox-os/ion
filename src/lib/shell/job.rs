@@ -19,7 +19,7 @@ impl<'a> Job<'a> {
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand(&mut self, shell: &Shell) {
+    pub fn expand(&mut self, shell: &Shell<'_>) {
         match shell.variables.get_ref(&self.args[0]) {
             Some(Value::Function(_)) => {}
             _ => self.args = self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).collect(),
@@ -36,13 +36,13 @@ impl<'a> Job<'a> {
 }
 
 impl<'a> PartialEq for Job<'a> {
-    fn eq(&self, other: &Job) -> bool {
+    fn eq(&self, other: &Job<'_>) -> bool {
         self.args == other.args && self.redirection == other.redirection
     }
 }
 
 impl<'a> fmt::Debug for Job<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Job {{ command: {}, args: {:?}, redirection: {:?} }}",
@@ -52,7 +52,7 @@ impl<'a> fmt::Debug for Job<'a> {
 }
 
 /// Expands a given argument and returns it as an `Args`.
-fn expand_arg(arg: &str, shell: &Shell) -> types::Args {
+fn expand_arg(arg: &str, shell: &Shell<'_>) -> types::Args {
     let res = shell.expand_string(&arg);
     if res.is_empty() {
         args![""]
@@ -67,16 +67,17 @@ pub struct RefinedJob<'a> {
     pub stdin:  Option<File>,
     pub stdout: Option<File>,
     pub stderr: Option<File>,
+    pub args:   types::Args,
     pub var:    JobVariant<'a>,
 }
 
 pub enum JobVariant<'a> {
     /// An external program that is executed by this shell
-    External { args: types::Args },
+    External,
     /// A procedure embedded into Ion
-    Builtin { main: BuiltinFunction<'a>, args: types::Args },
+    Builtin { main: BuiltinFunction<'a> },
     /// Functions can act as commands too!
-    Function { args: types::Args },
+    Function,
     /// Represents redirection into stdin from more than one source
     Cat { sources: Vec<File> },
     Tee {
@@ -150,16 +151,9 @@ impl TeeItem {
 }
 
 impl<'a> RefinedJob<'a> {
-    /// Returns a long description of this job: the commands and arguments
-    pub fn long(&self) -> String {
-        match self.var {
-            JobVariant::External { ref args, .. }
-            | JobVariant::Builtin { ref args, .. }
-            | JobVariant::Function { ref args, .. } => args.join(" ").to_owned(),
-            // TODO: Figure out real printing
-            JobVariant::Cat { .. } | JobVariant::Tee { .. } => "".into(),
-        }
-    }
+    pub fn command(&self) -> &types::Str { &self.args[0] }
+
+    pub fn args(&self) -> &types::Args { &self.args }
 
     pub fn stderr(&mut self, file: File) {
         if let JobVariant::Cat { .. } = self.var {
@@ -167,6 +161,13 @@ impl<'a> RefinedJob<'a> {
         }
 
         self.stderr = Some(file);
+    }
+
+    pub fn needs_forking(&self) -> bool {
+        match self.var {
+            JobVariant::Function | JobVariant::Builtin { .. } => false,
+            _ => true,
+        }
     }
 
     pub fn stdout(&mut self, file: File) { self.stdout = Some(file); }
@@ -178,38 +179,36 @@ impl<'a> RefinedJob<'a> {
             stdin:  None,
             stdout: None,
             stderr: None,
+            args:   types::Args::new(),
             var:    JobVariant::Tee { items: (tee_out, tee_err) },
         }
     }
 
     pub fn cat(sources: Vec<File>) -> Self {
-        RefinedJob { stdin: None, stdout: None, stderr: None, var: JobVariant::Cat { sources } }
-    }
-
-    pub fn function(args: types::Args) -> Self {
         RefinedJob {
             stdin:  None,
             stdout: None,
             stderr: None,
-            var:    JobVariant::Function { args },
+            args:   types::Args::new(),
+            var:    JobVariant::Cat { sources },
         }
+    }
+
+    pub fn function(args: types::Args) -> Self {
+        RefinedJob { stdin: None, stdout: None, stderr: None, args, var: JobVariant::Function }
     }
 
     pub fn builtin(main: BuiltinFunction<'a>, args: types::Args) -> Self {
         RefinedJob {
-            stdin:  None,
+            stdin: None,
             stdout: None,
             stderr: None,
-            var:    JobVariant::Builtin { main, args },
+            args,
+            var: JobVariant::Builtin { main },
         }
     }
 
     pub fn external(args: types::Args) -> Self {
-        RefinedJob {
-            stdin:  None,
-            stdout: None,
-            stderr: None,
-            var:    JobVariant::External { args },
-        }
+        RefinedJob { stdin: None, stdout: None, stderr: None, args, var: JobVariant::External }
     }
 }

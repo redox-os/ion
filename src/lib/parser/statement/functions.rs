@@ -1,28 +1,19 @@
 use super::split_pattern;
 use crate::lexers::assignments::{KeyBuf, KeyIterator, TypeError};
-use std::fmt::{self, Display, Formatter};
+use err_derive::Error;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum FunctionParseError {
+    #[error(display = "repeated argument name: '{}'", _0)]
     RepeatedArgument(String),
-    TypeError(TypeError),
-}
-
-impl<'a> Display for FunctionParseError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match *self {
-            FunctionParseError::RepeatedArgument(ref arg) => {
-                write!(f, "repeated argument name: '{}'", arg)
-            }
-            FunctionParseError::TypeError(ref t) => write!(f, "{}", t),
-        }
-    }
+    #[error(display = "{}", _0)]
+    TypeError(#[error(cause)] TypeError),
 }
 
 /// The arguments expression given to a function declaration goes into here, which will be
 /// converted into a tuple consisting of a `KeyIterator` iterator, which will collect type
 /// information, and an optional description of the function.
-pub fn parse_function(arg: &str) -> (KeyIterator, Option<&str>) {
+pub fn parse_function(arg: &str) -> (KeyIterator<'_>, Option<&str>) {
     let (args, description) = split_pattern(arg, "--");
     (KeyIterator::new(args), description)
 }
@@ -31,7 +22,7 @@ pub fn parse_function(arg: &str) -> (KeyIterator, Option<&str>) {
 /// type or argument error is detected, then that error will be returned instead. This is required
 /// because of lifetime restrictions on `KeyIterator`, which will not live for the remainder of the
 /// declared function's lifetime.
-pub fn collect_arguments(args: KeyIterator) -> Result<Vec<KeyBuf>, FunctionParseError> {
+pub fn collect_arguments(args: KeyIterator<'_>) -> Result<Vec<KeyBuf>, FunctionParseError> {
     let mut keybuf: Vec<KeyBuf> = Vec::new();
     for arg in args {
         match arg {

@@ -3,45 +3,30 @@ use crate::lexers::{
     assignments::{Key, KeyIterator, Operator, Primitive, TypeError},
     ArgumentSplitter,
 };
-use std::fmt::{self, Display, Formatter};
+use err_derive::Error;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum AssignmentError<'a> {
+    #[error(display = "expected {}, but received {}", _0, _1)]
     InvalidValue(Primitive, Primitive),
-    TypeError(TypeError),
+    #[error(display = "{}", _0)]
+    TypeError(#[error(cause)] TypeError),
+    #[error(
+        display = "extra values were supplied, and thus ignored. Previous assignment: '{}' = '{}'",
+        _0,
+        _1
+    )]
     ExtraValues(&'a str, &'a str),
+    #[error(
+        display = "extra keys were supplied, and thus ignored. Previous assignment: '{}' = '{}'",
+        _0,
+        _1
+    )]
     ExtraKeys(&'a str, &'a str),
+    #[error(display = "repeated assignment to same key, and thus ignored. Repeated key: '{}'", _0)]
     RepeatedKey(&'a str),
+    #[error(display = "no key to assign value, thus ignored. Value: '{}'", _0)]
     NoKey(&'a str),
-}
-
-impl<'a> Display for AssignmentError<'a> {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match *self {
-            AssignmentError::InvalidValue(ref expected, ref actual) => {
-                write!(f, "expected {}, but received {}", expected, actual)
-            }
-            AssignmentError::TypeError(ref type_err) => write!(f, "{}", type_err),
-            AssignmentError::ExtraValues(ref prevkey, ref prevval) => write!(
-                f,
-                "extra values were supplied, and thus ignored. Previous assignment: '{}' = '{}'",
-                prevkey, prevval
-            ),
-            AssignmentError::ExtraKeys(ref prevkey, ref prevval) => write!(
-                f,
-                "extra keys were supplied, and thus ignored. Previous assignment: '{}' = '{}'",
-                prevkey, prevval
-            ),
-            AssignmentError::RepeatedKey(ref repkey) => write!(
-                f,
-                "repeated assignment to same key, and thus ignored. Repeated key: '{}'",
-                repkey
-            ),
-            AssignmentError::NoKey(ref lone_val) => {
-                write!(f, "no key to assign value, thus ignored. Value: '{}'", lone_val)
-            }
-        }
-    }
 }
 
 /// An iterator structure which returns `Action` enums which tell the shell how to enact the

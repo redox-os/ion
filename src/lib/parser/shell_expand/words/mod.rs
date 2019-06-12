@@ -16,8 +16,8 @@ enum Quotes {
 }
 
 /// Unescapes filenames to be passed into the completer
-pub fn unescape(input: &str) -> Cow<str> {
-    let mut input: Cow<str> = input.into();
+pub fn unescape(input: &str) -> Cow<'_, str> {
+    let mut input: Cow<'_, str> = input.into();
     while let Some(found) = input.find('\\') {
         if input.as_ref().len() > found + 1 {
             input.to_mut().remove(found);
@@ -46,7 +46,7 @@ pub enum WordToken<'a> {
 }
 
 #[derive(Debug)]
-pub struct WordIterator<'a, E: Expander + 'a> {
+pub struct WordIterator<'a, E: Expander> {
     data:      &'a str,
     read:      usize,
     quotes:    Quotes,
@@ -342,7 +342,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     );
                 }
                 // Only alphanumerical and underscores are allowed in variable names
-                0...47 | 58...64 | 91...94 | 96 | 123...127 => {
+                0..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
                     return WordToken::ArrayVariable(
                         &self.data[start..self.read],
                         self.quotes == Quotes::Double,
@@ -460,7 +460,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     );
                 }
                 // Only alphanumerical and underscores are allowed in variable names
-                0...47 | 58...64 | 91...94 | 96 | 123...127 => {
+                0..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
                     return WordToken::ArrayVariable(
                         &self.data[start..self.read],
                         self.quotes == Quotes::Double,
@@ -587,7 +587,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                     panic!("ion: fatal error with syntax validation parsing: unterminated method");
                 }
                 // Only alphanumerical and underscores are allowed in variable names
-                0...47 | 58...64 | 91...94 | 96 | 123...127 => {
+                0..=47 | 58..=64 | 91..=94 | 96 | 123..=127 => {
                     let variable = &self.data[start..self.read];
 
                     return if character == b'[' {

@@ -5,7 +5,7 @@ use crate::{
 use small;
 use std::env;
 
-pub fn status(args: &[small::String], shell: &mut Shell) -> Status {
+pub fn status(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     let mut help = false;
     let mut login_shell = false;
     let mut interactive = false;

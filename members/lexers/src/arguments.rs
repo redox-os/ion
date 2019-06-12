@@ -1,3 +1,5 @@
+use err_derive::Error;
+
 bitflags! {
     struct ArgumentFlags: u8 {
         /// Double quotes
@@ -28,6 +30,23 @@ pub struct Levels {
     braces: i32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
+pub enum LevelsError {
+    // paired
+    #[error(display = "unmatched left paren")]
+    UnmatchedParen,
+    #[error(display = "unmatched left bracket")]
+    UnmatchedBracket,
+    #[error(display = "unmatched left brace")]
+    UnmatchedBrace,
+    #[error(display = "extra right paren(s)")]
+    ExtraParen,
+    #[error(display = "extra right bracket(s)")]
+    ExtraBracket,
+    #[error(display = "extra right brace(s)")]
+    ExtraBrace,
+}
+
 impl Levels {
     pub fn up(&mut self, field: Field) {
         let level = match field {
@@ -49,19 +68,19 @@ impl Levels {
 
     pub fn are_rooted(&self) -> bool { self.parens == 0 && self.array == 0 && self.braces == 0 }
 
-    pub fn check(&self) -> Result<(), &'static str> {
+    pub fn check(&self) -> Result<(), LevelsError> {
         if self.parens > 0 {
-            Err("ion: syntax error: unmatched left paren")
+            Err(LevelsError::UnmatchedParen)
         } else if self.array > 0 {
-            Err("ion: syntax error: unmatched left bracket")
+            Err(LevelsError::UnmatchedBracket)
         } else if self.braces > 0 {
-            Err("ion: syntax error: unmatched left brace")
+            Err(LevelsError::UnmatchedBrace)
         } else if self.parens < 0 {
-            Err("ion: syntax error: extra right paren(s)")
+            Err(LevelsError::ExtraParen)
         } else if self.array < 0 {
-            Err("ion: syntax error: extra right bracket(s)")
+            Err(LevelsError::ExtraBracket)
         } else if self.braces < 0 {
-            Err("ion: syntax error: extra right brace(s)")
+            Err(LevelsError::ExtraBrace)
         } else {
             Ok(())
         }

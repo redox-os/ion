@@ -15,46 +15,80 @@ pub mod variables;
 pub(crate) use self::job::Job;
 use self::{
     directory_stack::DirectoryStack,
-    flow_control::{Block, FunctionError, Statement},
+    flow_control::{Block, BlockError, FunctionError, Statement},
     foreground::ForegroundSignals,
     fork::{Fork, IonResult},
     pipe_exec::foreground,
     status::*,
     variables::Variables,
 };
-pub use self::{fork::Capture, pipe_exec::job_control::BackgroundProcess, variables::Value};
+pub use self::{
+    fork::Capture,
+    pipe_exec::{job_control::BackgroundProcess, PipelineError},
+    variables::Value,
+};
 use crate::{
     builtins::BuiltinMap,
     lexers::{Key, Primitive},
-    parser::{assignments::value_check, pipelines::Pipeline, Terminator},
+    parser::{
+        assignments::value_check, pipelines::Pipeline, ParseError, StatementError, Terminator,
+    },
     sys, types,
 };
+use err_derive::Error;
 use itertools::Itertools;
 use std::{
-    borrow::Cow,
-    fmt,
-    fs::{self, OpenOptions},
+    fs,
     io::{self, Write},
     ops::{Deref, DerefMut},
-    path::{Path, PathBuf},
+    path::Path,
     process,
     sync::{atomic::Ordering, Arc, Mutex},
     time::SystemTime,
 };
-use xdg::BaseDirectories;
 
 #[derive(Debug, Error)]
 pub enum IonError {
-    #[error(display = "failed to fork: {}", why)]
-    Fork { why: io::Error },
+    #[error(display = "failed to fork: {}", _0)]
+    Fork(#[error(cause)] io::Error),
     #[error(display = "element does not exist")]
     DoesNotExist,
     #[error(display = "input was not terminated")]
     Unterminated,
-    #[error(display = "function error: {}", why)]
-    Function { why: FunctionError },
-    #[error(display = "unexpected end of script: expected end block for `{}`", block)]
-    UnclosedBlock { block: String },
+    #[error(display = "function error: {}", _0)]
+    Function(#[error(cause)] FunctionError),
+    #[error(display = "unexpected end of script: expected end block for `{}`", _0)]
+    UnclosedBlock(String),
+    #[error(display = "syntax error: {}", _0)]
+    InvalidSyntax(#[error(cause)] ParseError),
+    #[error(display = "block error: {}", _0)]
+    StatementFlowError(#[error(cause)] BlockError),
+    #[error(display = "statement error: {}", _0)]
+    UnterminatedStatementError(#[error(cause)] StatementError),
+    #[error(display = "Could not exit the current block since it does not exist!")]
+    EmptyBlock,
+    #[error(display = "Could not execute file '{}': {}", _0, _1)]
+    FileExecutionError(String, #[error(cause)] io::Error),
+}
+
+impl From<ParseError> for IonError {
+    fn from(cause: ParseError) -> Self { IonError::InvalidSyntax(cause) }
+}
+
+impl From<StatementError> for IonError {
+    fn from(cause: StatementError) -> Self { IonError::UnterminatedStatementError(cause) }
+}
+
+impl From<FunctionError> for IonError {
+    fn from(cause: FunctionError) -> Self { IonError::Function(cause) }
+}
+
+impl From<BlockError> for IonError {
+    fn from(cause: BlockError) -> Self { IonError::StatementFlowError(cause) }
+}
+
+impl From<io::Error> for IonError {
+    fn from(cause: io::Error) -> Self { IonError::Fork(cause) }
 }
 
 #[derive(Debug, Clone, Hash)]
@@ -104,38 +138,12 @@ pub struct Shell<'a> {
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,
     /// Custom callback to cleanup before exit
-    prep_for_exit: Option<Box<FnMut(&mut Shell) + 'a>>,
+    prep_for_exit: Option<Box<dyn FnMut(&mut Shell<'_>) + 'a>>,
     /// Custom callback for each command call
-    on_command: Option<Box<Fn(&Shell, std::time::Duration) + 'a>>,
-}
-
-pub struct EmptyBlockError;
-
-impl fmt::Display for EmptyBlockError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Could not exit the current block since it does not exist!")
-    }
-}
-
-// Implement std::fmt::Debug for AppError
-impl fmt::Debug for EmptyBlockError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "EmptyBlockError {{ file: {}, line: {} }}", file!(), line!())
-    }
+    on_command: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
 }
 
 impl<'a> Shell<'a> {
-    const CONFIG_FILE_NAME: &'static str = "initrc";
-
-    /// Set the shell as the terminal primary executable
-    pub fn set_unique_pid(&self) {
-        if let Ok(pid) = sys::getpid() {
-            if sys::setpgid(0, pid).is_ok() {
-                let _ = sys::tcsetpgrp(0, pid);
-            }
-        }
-    }
-
     /// Install signal handlers necessary for the shell to work
     fn install_signal_handler() {
         extern "C" fn handler(signal: i32) {
@@ -201,44 +209,16 @@ impl<'a> Shell<'a> {
         }
     }
 
-    pub fn rotate_right(&mut self, num: usize) -> Result<(), Cow<'static, str>> {
-        self.directory_stack.rotate_right(num)
-    }
+    pub fn dir_stack(&self) -> &DirectoryStack { &self.directory_stack }
 
-    pub fn rotate_left(&mut self, num: usize) -> Result<(), Cow<'static, str>> {
-        self.directory_stack.rotate_left(num)
-    }
-
-    pub fn swap(&mut self, index: usize) -> Result<(), Cow<'static, str>> {
-        self.directory_stack.swap(index)
-    }
-
-    pub fn set_current_dir_by_index(&self, index: usize) -> Result<(), Cow<'static, str>> {
-        self.directory_stack.set_current_dir_by_index(index)
-    }
-
-    pub fn cd<T: AsRef<str>>(&mut self, dir: Option<T>) -> Result<(), Cow<'static, str>> {
-        self.directory_stack.cd(dir, &mut self.variables)
-    }
-
-    pub fn pushd(&mut self, path: PathBuf, keep_front: bool) -> Result<(), Cow<'static, str>> {
-        self.directory_stack.pushd(path, keep_front, &mut self.variables)
-    }
-
-    pub fn popd(&mut self, index: usize) -> Option<PathBuf> { self.directory_stack.popd(index) }
-
-    pub fn dir_stack(&self) -> impl DoubleEndedIterator<Item = &PathBuf> + ExactSizeIterator {
-        self.directory_stack.dirs()
-    }
-
-    pub fn clear_dir_stack(&mut self) { self.directory_stack.clear() }
+    pub fn dir_stack_mut(&mut self) -> &mut DirectoryStack { &mut self.directory_stack }
 
     /// Resets the flow control fields to their default values.
     pub fn reset_flow(&mut self) { self.flow_control.clear(); }
 
     /// Exit the current block
-    pub fn exit_block(&mut self) -> Result<(), EmptyBlockError> {
-        self.flow_control.pop().map(|_| ()).ok_or(EmptyBlockError)
+    pub fn exit_block(&mut self) -> Result<(), IonError> {
+        self.flow_control.pop().map(|_| ()).ok_or(IonError::EmptyBlock)
     }
 
     /// Get the depth of the current block
@@ -251,7 +231,7 @@ impl<'a> Shell<'a> {
     /// The method is non-blocking, and therefore will immediately return file handles to the
     /// stdout and stderr of the child. The PID of the child is returned, which may be used to
     /// wait for and obtain the exit status.
-    pub fn fork<F: FnMut(&mut Self)>(
+    pub fn fork<F: FnMut(&mut Self) -> Result<(), IonError>>(
         &self,
         capture: Capture,
         child_func: F,
@@ -267,10 +247,8 @@ impl<'a> Shell<'a> {
         args: &[S],
     ) -> Result<Status, IonError> {
         if let Some(Value::Function(function)) = self.variables.get_ref(name).cloned() {
-            function
-                .execute(self, args)
-                .map(|_| self.previous_status)
-                .map_err(|err| IonError::Function { why: err })
+            function.execute(self, args)?;
+            Ok(self.previous_status)
         } else {
             Err(IonError::DoesNotExist)
         }
@@ -279,18 +257,12 @@ impl<'a> Shell<'a> {
     /// A method for executing scripts in the Ion shell without capturing. Given a `Path`, this
     /// method will attempt to execute that file as a script, and then returns the final exit
     /// status of the evaluated script.
-    pub fn execute_file<P: AsRef<Path>>(&mut self, script: P) {
+    pub fn execute_file<P: AsRef<Path>>(&mut self, script: P) -> Result<Status, IonError> {
         match fs::File::open(script.as_ref()) {
-            Ok(script) => self.execute_script(std::io::BufReader::new(script)),
-            Err(err) => eprintln!("ion: {}", err),
-        }
-    }
-
-    /// A method for executing literal scripts. Given a read instance, the shell will process
-    /// commands as they arrive
-    pub fn execute_script<T: std::io::Read>(&mut self, lines: T) {
-        if let Err(why) = self.execute_command(lines) {
-            self.previous_status = Status::error(format!("ion: {}", why));
+            Ok(script) => self.execute_command(std::io::BufReader::new(script)),
+            Err(cause) => {
+                Err(IonError::FileExecutionError(script.as_ref().to_string_lossy().into(), cause))
+            }
         }
     }
 
@@ -307,34 +279,35 @@ impl<'a> Shell<'a> {
             .filter_map(Result::ok)
             .batching(|bytes| Terminator::new(bytes).terminate())
         {
-            self.on_command(&cmd)
+            self.on_command(&cmd)?;
         }
 
         if let Some(block) = self.flow_control.last().map(Statement::short) {
             self.previous_status = Status::from_exit_code(1);
-            Err(IonError::UnclosedBlock { block: block.to_string() })
+            Err(IonError::UnclosedBlock(block.into()))
         } else {
             Ok(self.previous_status)
         }
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Status {
+    pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Result<Status, PipelineError> {
         let command_start_time = SystemTime::now();
 
         pipeline.expand(self);
-        // Branch if -> input == shell command i.e. echo
-        let exit_status = if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
+        // A string representing the command is stored here.
+        if self.opts.print_comms {
+            eprintln!("> {}", pipeline);
+        }
+
+        // Don't execute commands when the `-n` flag is passed.
+        let exit_status = if self.opts.no_exec {
+            Ok(Status::SUCCESS)
+        // Branch else if -> input == shell command i.e. echo
+        } else if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
-                if self.opts.print_comms {
-                    eprintln!("> {}", pipeline.to_string());
-                }
-                if self.opts.no_exec {
-                    Status::SUCCESS
-                } else {
-                    main(&pipeline.items[0].job.args, self)
-                }
+                Ok(main(&pipeline.items[0].job.args, self))
             } else {
                 self.execute_pipeline(pipeline)
             }
@@ -343,19 +316,10 @@ impl<'a> Shell<'a> {
             self.variables.get_ref(&pipeline.items[0].job.args[0]).cloned()
         {
             if !pipeline.requires_piping() {
-                match function.execute(self, &pipeline.items[0].job.args) {
-                    Ok(()) => self.previous_status,
-                    Err(FunctionError::InvalidArgumentCount) => {
-                        Status::error("ion: invalid number of function arguments supplied")
-                    }
-                    Err(FunctionError::InvalidArgumentType(expected_type, value)) => {
-                        Status::error(format!(
-                            "ion: function argument has invalid type: expected {}, found value \
-                             \'{}\'",
-                            expected_type, value
-                        ))
-                    }
-                }
+                function
+                    .execute(self, &pipeline.items[0].job.args)
+                    .map(|_| self.previous_status)
+                    .map_err(Into::into)
             } else {
                 self.execute_pipeline(pipeline)
             }
@@ -369,10 +333,6 @@ impl<'a> Shell<'a> {
             }
         }
 
-        // Retrieve the exit_status and set the $? variable and history.previous_status
-        self.variables_mut().set("?", exit_status);
-        self.previous_status = exit_status;
-
         exit_status
     }
 
@@ -384,31 +344,6 @@ impl<'a> Shell<'a> {
         }
     }
 
-    /// Evaluates the source init file in the user's home directory.
-    pub fn evaluate_init_file(&mut self) {
-        let base_dirs = match BaseDirectories::with_prefix("ion") {
-            Ok(base_dirs) => base_dirs,
-            Err(err) => {
-                eprintln!("ion: unable to get base directory: {}", err);
-                return;
-            }
-        };
-        match base_dirs.find_config_file(Self::CONFIG_FILE_NAME) {
-            Some(initrc) => self.execute_file(&initrc),
-            None => {
-                if let Err(err) = Self::create_config_file(base_dirs, Self::CONFIG_FILE_NAME) {
-                    eprintln!("ion: could not create config file: {}", err);
-                }
-            }
-        }
-    }
-
-    fn create_config_file(base_dirs: BaseDirectories, file_name: &str) -> Result<(), io::Error> {
-        let path = base_dirs.place_config_file(file_name)?;
-        OpenOptions::new().write(true).create_new(true).open(path)?;
-        Ok(())
-    }
-
     /// Call the cleanup callback
     pub fn prep_for_exit(&mut self) {
         if let Some(mut callback) = self.prep_for_exit.take() {
@@ -417,14 +352,14 @@ impl<'a> Shell<'a> {
     }
 
     /// Set the callback to call before exiting the shell
-    pub fn set_prep_for_exit(&mut self, callback: Option<Box<dyn FnMut(&mut Shell) + 'a>>) {
+    pub fn set_prep_for_exit(&mut self, callback: Option<Box<dyn FnMut(&mut Shell<'_>) + 'a>>) {
         self.prep_for_exit = callback;
     }
 
     /// Set the callback to call on each command
     pub fn set_on_command(
         &mut self,
-        callback: Option<Box<dyn Fn(&Shell, std::time::Duration) + 'a>>,
+        callback: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
     ) {
         self.on_command = callback;
     }
@@ -479,14 +414,14 @@ impl<'a> Shell<'a> {
         process::exit(status.as_os_code());
     }
 
-    pub fn assign(&mut self, key: &Key, value: Value<'a>) -> Result<(), String> {
+    pub fn assign(&mut self, key: &Key<'_>, value: Value<'a>) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)
                     .map_err(|why| format!("{}: {}", key.name, why))?;
 
                 match index {
-                    Value::Str(ref index) => {
+                    Value::Str(index) => {
                         let lhs = self
                             .variables
                             .get_mut(key.name)
@@ -494,11 +429,11 @@ impl<'a> Shell<'a> {
 
                         match lhs {
                             Value::HashMap(hmap) => {
-                                let _ = hmap.insert(index.clone(), value);
+                                let _ = hmap.insert(index, value);
                                 Ok(())
                             }
                             Value::BTreeMap(bmap) => {
-                                let _ = bmap.insert(index.clone(), value);
+                                let _ = bmap.insert(index, value);
                                 Ok(())
                             }
                             Value::Array(array) => {

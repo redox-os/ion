@@ -7,7 +7,7 @@ use small;
 
 use std::{borrow::Cow, env, path::Path};
 
-pub fn which(args: &[small::String], shell: &mut Shell) -> Result<Status, ()> {
+pub fn which(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status, ()> {
     if check_help(args, MAN_WHICH) {
         return Ok(Status::SUCCESS);
     }
@@ -36,7 +36,7 @@ pub fn which(args: &[small::String], shell: &mut Shell) -> Result<Status, ()> {
     Ok(result)
 }
 
-pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<Status, ()> {
+pub fn find_type(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status, ()> {
     // Type does not accept help flags, aka "--help".
     if args.len() == 1 {
         eprintln!("type: Expected at least 1 args, got only 0");
@@ -65,7 +65,7 @@ pub fn find_type(args: &[small::String], shell: &mut Shell) -> Result<Status, ()
     Ok(result)
 }
 
-fn get_command_info<'a>(command: &str, shell: &mut Shell) -> Result<Cow<'a, str>, ()> {
+fn get_command_info<'a>(command: &str, shell: &mut Shell<'_>) -> Result<Cow<'a, str>, ()> {
     match shell.variables().get_ref(command) {
         Some(Value::Alias(_)) => Ok("alias".into()),
         Some(Value::Function(_)) => Ok("function".into()),

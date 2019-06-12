@@ -1,5 +1,5 @@
 use super::Primitive;
-use std::fmt::{self, Display, Formatter};
+use err_derive::Error;
 
 /// Keys are used in assignments to define which variable will be set, and whether the correct
 /// types are being assigned.
@@ -17,19 +17,12 @@ pub struct KeyBuf {
     pub name: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum TypeError {
+    #[error(display = "invalid type supplied: {}", _0)]
     Invalid(String),
+    #[error(display = "expected {}", _0)]
     BadValue(Primitive),
-}
-
-impl<'a> Display for TypeError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match *self {
-            TypeError::Invalid(ref parm) => write!(f, "invalid type supplied: {}", parm),
-            TypeError::BadValue(ref expected) => write!(f, "expected {}", expected),
-        }
-    }
 }
 
 impl<'a> Key<'a> {

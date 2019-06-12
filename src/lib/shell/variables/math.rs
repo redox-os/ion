@@ -52,7 +52,7 @@ macro_rules! math {
         impl<'a, 'b> $trait<Value<'a>> for &'b Value<'a> {
             type Output = Result<Value<'static>, OpError>;
 
-            fn $fn(self, rhs: Value) -> Self::Output { self.$fn(&rhs) }
+            fn $fn(self, rhs: Value<'_>) -> Self::Output { self.$fn(&rhs) }
         }
 
         impl<'a, 'b> $trait<i128> for &'b Value<'a> {
@@ -79,7 +79,7 @@ macro_rules! math {
                     Value::Array(lhs) => lhs
                         .iter()
                         .map(|el| el.$fn(rhs))
-                        .collect::<Result<types::Array, _>>()
+                        .collect::<Result<types::Array<'_>, _>>()
                         .map(Value::Array),
                     _ => Err(OpError::TypeError),
                 }
@@ -98,7 +98,7 @@ macro_rules! math {
                     Value::Array(lhs) => lhs
                         .iter()
                         .map(|el| el.$fn(rhs))
-                        .collect::<Result<types::Array, _>>()
+                        .collect::<Result<types::Array<'_>, _>>()
                         .map(Value::Array),
                     _ => Err(OpError::TypeError),
                 }

@@ -12,9 +12,11 @@ use ion_shell::{
     status::Status,
     Shell,
 };
+use ion_sys::SIGHUP;
 use itertools::Itertools;
 use liner::{Buffer, Context, KeyBindings};
-use std::{io, io::Write, cell::RefCell, path::Path, rc::Rc};
+use std::{cell::RefCell, fs::OpenOptions, io, path::Path, rc::Rc};
+use xdg::BaseDirectories;
 
 pub const MAN_ION: &str = "NAME
     Ion - The Ion shell
@@ -54,6 +56,8 @@ pub struct InteractiveBinary<'a> {
 }
 
 impl<'a> InteractiveBinary<'a> {
+    const CONFIG_FILE_NAME: &'static str = "initrc";
+
     pub fn new(shell: Shell<'a>) -> Self {
         let mut context = Context::new();
         context.word_divider_fn = Box::new(word_divide);
@@ -86,7 +90,7 @@ impl<'a> InteractiveBinary<'a> {
             // and waiting for the history thread in the background to finish.
             if shell.opts().huponexit {
                 shell.resume_stopped();
-                shell.background_send(sys::SIGHUP);
+                shell.background_send(SIGHUP);
             }
             context.borrow_mut().history.commit_to_file();
         })));
@@ -110,11 +114,17 @@ impl<'a> InteractiveBinary<'a> {
         })));
     }
 
+    fn create_config_file(base_dirs: BaseDirectories, file_name: &str) -> Result<(), io::Error> {
+        let path = base_dirs.place_config_file(file_name)?;
+        OpenOptions::new().write(true).create_new(true).open(path)?;
+        Ok(())
+    }
+
     /// Creates an interactive session that reads from a prompt provided by
     /// Liner.
     pub fn execute_interactive(self) -> ! {
         let context_bis = self.context.clone();
-        let history = &move |args: &[small::String], _shell: &mut Shell| -> Status {
+        let history = &move |args: &[small::String], _shell: &mut Shell<'_>| -> Status {
             if man_pages::check_help(args, MAN_HISTORY) {
                 return Status::SUCCESS;
             }
@@ -154,7 +164,7 @@ impl<'a> InteractiveBinary<'a> {
         };
 
         let context_bis = self.context.clone();
-        let keybindings = &move |args: &[small::String], _shell: &mut Shell| -> Status {
+        let keybindings = &move |args: &[small::String], _shell: &mut Shell<'_>| -> Status {
             match args.get(1).map(|s| s.as_str()) {
                 Some("vi") => {
                     context_bis.borrow_mut().key_bindings = KeyBindings::Vi;
@@ -183,7 +193,24 @@ impl<'a> InteractiveBinary<'a> {
             keybindings,
             "Change the keybindings",
         );
-        this.shell.borrow_mut().evaluate_init_file();
+
+        match BaseDirectories::with_prefix("ion") {
+            Ok(base_dirs) => match base_dirs.find_config_file(Self::CONFIG_FILE_NAME) {
+                Some(initrc) => {
+                    if let Err(err) = this.shell.borrow_mut().execute_file(&initrc) {
+                        eprintln!("ion: {}", err)
+                    }
+                }
+                None => {
+                    if let Err(err) = Self::create_config_file(base_dirs, Self::CONFIG_FILE_NAME) {
+                        eprintln!("ion: could not create config file: {}", err);
+                    }
+                }
+            },
+            Err(err) => {
+                eprintln!("ion: unable to get base directory: {}", err);
+            }
+        }
 
         loop {
             let mut lines = std::iter::repeat_with(|| this.readln())
@@ -196,7 +223,9 @@ impl<'a> InteractiveBinary<'a> {
                         &this.context.borrow(),
                         command.trim_end(),
                     );
-                    this.shell.borrow_mut().on_command(&cmd);
+                    if let Err(why) = this.shell.borrow_mut().on_command(&cmd) {
+                        eprintln!("{}", why);
+                    }
                     this.save_command(&cmd);
                 }
                 None => {

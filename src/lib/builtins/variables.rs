@@ -7,7 +7,7 @@ use crate::{
     types,
 };
 
-fn print_list(vars: &Variables) {
+fn print_list(vars: &Variables<'_>) {
     let stdout = io::stdout();
     let stdout = &mut stdout.lock();
 
@@ -65,7 +65,7 @@ fn parse_alias(args: &str) -> Binding {
 
 /// The `alias` command will define an alias for another command, and thus may be used as a
 /// command itself.
-pub fn alias(vars: &mut Variables, args: &str) -> Status {
+pub fn alias(vars: &mut Variables<'_>, args: &str) -> Status {
     match parse_alias(args) {
         Binding::InvalidKey(key) => {
             return Status::error(format!("ion: alias name, '{}', is invalid", key));
@@ -82,9 +82,9 @@ pub fn alias(vars: &mut Variables, args: &str) -> Status {
 }
 
 /// Dropping an alias will erase it from the shell.
-pub fn drop_alias<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> Status {
+pub fn drop_alias<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Status {
     if args.len() <= 1 {
-        return Status::error(format!("ion: you must specify an alias name"));
+        return Status::error("ion: you must specify an alias name".to_string());
     }
     for alias in args.iter().skip(1) {
         if vars.remove_variable(alias.as_ref()).is_none() {
@@ -95,13 +95,13 @@ pub fn drop_alias<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> Status {
 }
 
 /// Dropping an array will erase it from the shell.
-pub fn drop_array<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> Status {
+pub fn drop_array<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Status {
     if args.len() <= 2 {
-        return Status::error(format!("ion: you must specify an array name"));
+        return Status::error("ion: you must specify an array name".to_string());
     }
 
     if args[1].as_ref() != "-a" {
-        return Status::error(format!("ion: drop_array must be used with -a option"));
+        return Status::error("ion: drop_array must be used with -a option".to_string());
     }
 
     for array in args.iter().skip(2) {
@@ -113,9 +113,9 @@ pub fn drop_array<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> Status {
 }
 
 /// Dropping a variable will erase it from the shell.
-pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables, args: &[S]) -> Status {
+pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Status {
     if args.len() <= 1 {
-        return Status::error(format!("ion: you must specify a variable name"));
+        return Status::error("ion: you must specify a variable name".to_string());
     }
 
     for variable in args.iter().skip(1) {

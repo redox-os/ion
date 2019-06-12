@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 /// Disowns given process job IDs, and optionally marks jobs to not receive SIGHUP signals.
 /// The `-a` flag selects all jobs, `-r` selects all running jobs, and `-h` specifies to mark
 /// SIGHUP ignoral.
-pub fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), String> {
+pub fn disown(shell: &mut Shell<'_>, args: &[small::String]) -> Result<(), String> {
     // Specifies that a process should be set to not receive SIGHUP signals.
     let mut no_sighup = false;
     // Specifies that all jobs in the process table should be manipulated.
@@ -62,7 +62,7 @@ pub fn disown(shell: &mut Shell, args: &[small::String]) -> Result<(), String> {
 }
 
 /// Display a list of all jobs running in the background.
-pub fn jobs(shell: &mut Shell) {
+pub fn jobs(shell: &mut Shell<'_>) {
     for (id, process) in shell.background_jobs().iter().enumerate() {
         if process.exists() {
             eprintln!("[{}] {}", id, process);
@@ -73,8 +73,8 @@ pub fn jobs(shell: &mut Shell) {
 /// Hands control of the foreground process to the specified jobs, recording their exit status.
 /// If the job is stopped, the job will be resumed.
 /// If multiple jobs are given, then only the last job's exit status will be returned.
-pub fn fg(shell: &mut Shell, args: &[small::String]) -> Status {
-    fn fg_job(shell: &mut Shell, njob: usize) -> Status {
+pub fn fg(shell: &mut Shell<'_>, args: &[small::String]) -> Status {
+    fn fg_job(shell: &mut Shell<'_>, njob: usize) -> Status {
         if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
             // Give the bg task the foreground, and wait for it to finish. Also resume it if it
             // isn't running
@@ -85,29 +85,30 @@ pub fn fg(shell: &mut Shell, args: &[small::String]) -> Status {
         }
     }
 
-    let mut status = Status::SUCCESS;
     if args.is_empty() {
-        status = if let Some(previous_job) = shell.previous_job() {
+        if let Some(previous_job) = shell.previous_job() {
             fg_job(shell, previous_job)
         } else {
-            Status::error(format!("ion: fg: no jobs are running in the background"))
-        };
+            Status::error("ion: fg: no jobs are running in the background")
+        }
     } else {
         for arg in args {
             match arg.parse::<usize>() {
-                Ok(njob) => status = fg_job(shell, njob),
+                Ok(njob) => {
+                    fg_job(shell, njob);
+                }
                 Err(_) => {
-                    status = Status::error(format!("ion: fg: {} is not a valid job number", arg))
+                    return Status::error(format!("ion: fg: {} is not a valid job number", arg))
                 }
             }
         }
+        Status::SUCCESS
     }
-    status
 }
 
 /// Resumes a stopped background process, if it was stopped.
-pub fn bg(shell: &mut Shell, args: &[small::String]) -> Status {
-    fn bg_job(shell: &mut Shell, njob: usize) -> Status {
+pub fn bg(shell: &mut Shell<'_>, args: &[small::String]) -> Status {
+    fn bg_job(shell: &mut Shell<'_>, njob: usize) -> Status {
         if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
             if job.is_running() {
                 Status::error(format!("ion: bg: job {} is already running", njob))
@@ -124,7 +125,7 @@ pub fn bg(shell: &mut Shell, args: &[small::String]) -> Status {
         if let Some(previous_job) = shell.previous_job() {
             bg_job(shell, previous_job)
         } else {
-            Status::error(format!("ion: bg: no jobs are running in the background"))
+            Status::error("ion: bg: no jobs are running in the background")
         }
     } else {
         for arg in args {
