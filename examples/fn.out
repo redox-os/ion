@@ -15,5 +15,4 @@ goodbye
 9
 16
 25
-ion: could not run function: argument has invalid type: expected int, found value '$num'
-ion: could not run function: argument has invalid type: expected int, found value '$num'
+ion: pipeline execution error: could not run function: argument has invalid type: expected int, found value '$num'

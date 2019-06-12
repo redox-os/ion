@@ -65,11 +65,11 @@ pub enum IonError {
     StatementFlowError(#[error(cause)] BlockError),
     #[error(display = "statement error: {}", _0)]
     UnterminatedStatementError(#[error(cause)] StatementError),
-    #[error(display = "Could not exit the current block since it does not exist!")]
+    #[error(display = "could not exit the current block since it does not exist!")]
     EmptyBlock,
-    #[error(display = "Could not execute file '{}': {}", _0, _1)]
+    #[error(display = "could not execute file '{}': {}", _0, _1)]
     FileExecutionError(String, #[error(cause)] io::Error),
-    #[error(display = "Pipeline execution error: {}", _0)]
+    #[error(display = "pipeline execution error: {}", _0)]
     PipelineExecutionError(#[error(cause)] PipelineError),
 }
 
@@ -137,9 +137,6 @@ pub struct Shell<'a> {
     background: Arc<Mutex<Vec<BackgroundProcess>>>,
     /// Used by an interactive session to know when the input is not terminated.
     pub unterminated: bool,
-    /// Set when a signal is received, this will tell the flow control logic to
-    /// abort.
-    break_flow: bool,
     /// When the `fg` command is run, this will be used to communicate with the specified
     /// background process.
     foreground_signals: Arc<ForegroundSignals>,
@@ -207,7 +204,6 @@ impl<'a> Shell<'a> {
                 is_background_shell,
             },
             background: Arc::new(Mutex::new(Vec::new())),
-            break_flow: false,
             foreground_signals: Arc::new(ForegroundSignals::new()),
             on_command: None,
             prep_for_exit: None,

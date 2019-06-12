@@ -160,10 +160,7 @@ impl<'a> Shell<'a> {
             Statement::Pipeline(pipeline) => {
                 let (pipeline, statements) = expand_pipeline(&self, &pipeline)?;
                 if !pipeline.items.is_empty() {
-                    let status = self.run_pipeline(pipeline).unwrap_or_else(|err| {
-                        eprintln!("ion: {}", err);
-                        Status::COULD_NOT_EXEC
-                    });
+                    let status = self.run_pipeline(pipeline)?;
 
                     // Retrieve the exit_status and set the $? variable and
                     // history.previous_status
@@ -238,10 +235,7 @@ impl<'a> Shell<'a> {
             if self.handle_signal(signal) {
                 self.exit_with_code(Status::from_signal(signal));
             }
-            Err(IonError::from(PipelineError::Interrupted))
-        } else if self.break_flow {
-            self.break_flow = false;
-            Err(IonError::from(PipelineError::Interrupted))
+            Err(IonError::from(PipelineError::Interrupted(0, signal)))
         } else {
             Ok(Condition::NoOp)
         }
@@ -338,14 +332,13 @@ impl<'a> Shell<'a> {
 
     /// Receives a command and attempts to execute the contents.
     pub fn on_command(&mut self, command_string: &str) -> std::result::Result<(), IonError> {
-        self.break_flow = false;
         for stmt in command_string.bytes().batching(|cmd| Terminator::new(cmd).terminate()) {
             // Go through all of the statements and build up the block stack
             // When block is done return statement for execution.
             for statement in StatementSplitter::new(&stmt) {
                 let statement = parse_and_validate(statement?, &self.builtins)?;
                 if let Some(stm) = insert_statement(&mut self.flow_control, statement)? {
-                    let _ = self.execute_statement(&stm);
+                    self.execute_statement(&stm)?;
                 }
             }
         }

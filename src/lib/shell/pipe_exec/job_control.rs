@@ -1,6 +1,7 @@
 use super::{
     super::{signals, status::*, Shell},
     foreground::{BackgroundResult, ForegroundSignals},
+    PipelineError,
 };
 use crate::sys::{
     self, kill, strerror, waitpid, wcoredump, wexitstatus, wifcontinued, wifexited, wifsignaled,
@@ -203,19 +204,22 @@ impl<'a> Shell<'a> {
         }
     }
 
-    pub fn watch_foreground(&mut self, pgid: u32) -> Status {
-        let mut signaled = Status::SUCCESS;
+    pub fn watch_foreground(&mut self, pgid: u32) -> Result<Status, PipelineError> {
+        let mut signaled = None;
         let mut exit_status = Status::SUCCESS;
 
         loop {
             let mut status = 0;
             match waitpid(-(pgid as i32), &mut status, WUNTRACED) {
                 Err(errno) => match errno {
-                    ECHILD if signaled.is_success() => break exit_status,
-                    ECHILD => break signaled,
-                    errno => {
-                        break Status::error(format!("ion: waitpid error: {}", strerror(errno)))
+                    ECHILD => {
+                        if let Some(signal) = signaled {
+                            break Err(signal);
+                        } else {
+                            break Ok(exit_status);
+                        }
                     }
+                    errno => break Err(PipelineError::WaitPid(strerror(errno))),
                 },
                 Ok(0) => (),
                 Ok(_) if wifexited(status) => {
@@ -225,19 +229,17 @@ impl<'a> Shell<'a> {
                     let signal = wtermsig(status);
                     if signal == SIGPIPE {
                     } else if wcoredump(status) {
-                        eprintln!("ion: process ({}) had a core dump", pid);
+                        signaled = Some(PipelineError::CoreDump(pid as u32));
                     } else {
-                        eprintln!("ion: process ({}) ended by signal {}", pid, signal);
                         match signal {
                             SIGINT => {
                                 let _ = kill(pid as u32, signal as i32);
-                                self.break_flow = true;
                             }
                             _ => {
                                 self.handle_signal(signal);
                             }
                         }
-                        signaled = Status::from_signal(signal as i32);
+                        signaled = Some(PipelineError::Interrupted(pid as u32, signal));
                     }
                 }
                 Ok(pid) if wifstopped(status) => {
@@ -246,8 +248,7 @@ impl<'a> Shell<'a> {
                         ProcessState::Stopped,
                         "".to_string(),
                     ));
-                    self.break_flow = true;
-                    break Status::from_signal(wstopsig(status));
+                    break Err(PipelineError::Interrupted(pid as u32, wstopsig(status)));
                 }
                 Ok(_) => (),
             }

@@ -79,8 +79,13 @@ pub enum PipelineError {
     CommandExecError(#[error(cause)] io::Error),
     #[error(display = "unable to pipe outputs of alias: '{} = {}'", _0, _1)]
     InvalidAlias(String, String),
-    #[error(display = "interrupted by signal")]
-    Interrupted,
+
+    #[error(display = "process ({}) ended by signal {}", _0, _1)]
+    Interrupted(u32, i32),
+    #[error(display = "process ({}) had a core dump", _0)]
+    CoreDump(u32),
+    #[error(display = "ion: waitpid error: {}", _0)]
+    WaitPid(&'static str),
 }
 
 impl fmt::Display for OutputError {
@@ -519,7 +524,7 @@ impl<'b> Shell<'b> {
                 // Waits for all of the children of the assigned pgid to finish executing,
                 // returning the exit status of the last process in the queue.
                 // Watch the foreground group, dropping all commands that exit as they exit.
-                let status = self.watch_foreground(pgid);
+                let status = self.watch_foreground(pgid)?;
                 if status == Status::TERMINATED {
                     sys::killpg(pgid, sys::SIGTERM).map_err(PipelineError::TerminateJobsError)?;
                 } else {
