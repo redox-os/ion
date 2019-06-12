@@ -15,7 +15,7 @@ use ion_shell::{
 use ion_sys::SIGHUP;
 use itertools::Itertools;
 use liner::{Buffer, Context, KeyBindings};
-use std::{cell::RefCell, fs::OpenOptions, io, path::Path, rc::Rc};
+use std::{cell::RefCell, fs::OpenOptions, io, io::Write, path::Path, rc::Rc};
 use xdg::BaseDirectories;
 
 pub const MAN_ION: &str = "NAME
@@ -45,10 +45,19 @@ pub(crate) const MAN_HISTORY: &str = r#"NAME
     history - print command history
 
 SYNOPSIS
-    history
+    history [option]
 
 DESCRIPTION
-    Prints the command history."#;
+    Prints or manupulate the command history.
+
+OPTIONS:
+    +inc_append: Append each command to history as entered.
+    -inc_append: Default, do not append each command to history as entered.
+    +shared: Share history between shells using the same history file, implies inc_append.
+    -shared: Default, do not share shell history.
+    +duplicates: Default, allow duplicates in history.
+    -duplicates: Do not allow duplicates in history.
+"#;
 
 pub struct InteractiveBinary<'a> {
     context: Rc<RefCell<Context>>,
