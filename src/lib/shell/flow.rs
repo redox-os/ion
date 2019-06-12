@@ -1,9 +1,7 @@
 use super::{
     flow_control::{insert_statement, Case, ElseIf, Function, Statement},
     pipe_exec::PipelineError,
-    signals,
-    status::*,
-    Shell,
+    signals, Shell,
 };
 use crate::{
     parser::{
@@ -293,12 +291,7 @@ impl<'a> Shell<'a> {
                 });
 
                 if let Some(statement) = case.conditional.as_ref() {
-                    if let Err(why) = self.on_command(statement) {
-                        eprintln!("{}", why);
-                        self.previous_status = Status::from_exit_code(-1);
-                        self.variables.set("?", self.previous_status);
-                        self.flow_control.clear();
-                    }
+                    self.on_command(statement)?;
                     if self.previous_status.is_failure() {
                         continue;
                     }

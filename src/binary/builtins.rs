@@ -1,4 +1,8 @@
-use ion_shell::{builtins::man_pages::check_help, status::Status, types::Str, Shell};
+use ion_shell::{
+    builtins::{man_pages::check_help, Status},
+    types::Str,
+    Shell,
+};
 use ion_sys::{execve, SIGTERM};
 use std::error::Error;
 

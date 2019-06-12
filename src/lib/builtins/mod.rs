@@ -3,6 +3,7 @@ pub mod man_pages;
 mod command_info;
 mod exists;
 mod functions;
+mod helpers;
 mod is;
 mod job_control;
 mod set;
@@ -12,7 +13,6 @@ mod variables;
 
 use ion_builtins::{calc, conditionals, echo, random, test};
 
-pub use self::man_pages::check_help;
 use self::{
     command_info::{find_type, which},
     echo::echo,
@@ -25,6 +25,7 @@ use self::{
     test::test,
     variables::{alias, drop_alias, drop_array, drop_variable},
 };
+pub use self::{helpers::Status, man_pages::check_help};
 
 use std::{
     borrow::Cow,
@@ -36,7 +37,7 @@ use hashbrown::HashMap;
 use liner::{Completer, Context};
 
 use crate::{
-    shell::{status::Status, Capture, Shell, Value},
+    shell::{Capture, Shell, Value},
     sys, types,
 };
 use itertools::Itertools;
@@ -76,8 +77,7 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
 ///
 /// Note: To reduce allocations, function are provided as pointer rather than boxed closures
 /// ```
-/// use ion_shell::builtins::BuiltinMap;
-/// use ion_shell::{types, Shell, status::Status};
+/// use ion_shell::{types, Shell, builtins::{BuiltinMap, Status}};
 ///
 /// // create a builtin
 /// let mut custom = |_args: &[types::Str], _shell: &mut Shell| {
@@ -742,8 +742,7 @@ pub fn builtin_matches(args: &[types::Str], _: &mut Shell<'_>) -> Status {
         return Status::SUCCESS;
     }
     if args[1..].len() != 2 {
-        eprintln!("match takes two arguments");
-        return Status::BAD_ARG;
+        return Status::bad_argument("match takes two arguments");
     }
     let input = &args[1];
     let re = match Regex::new(&args[2]) {

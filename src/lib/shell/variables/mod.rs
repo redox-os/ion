@@ -267,9 +267,13 @@ impl<'a> Variables<'a> {
         // If the parsed name contains the '::' pattern, then a namespace was
         // designated. Find it.
         match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
-            Some(("c", variable)) | Some(("color", variable)) => {
-                Colors::collect(variable).into_string().map(|s| s.into())
-            }
+            Some(("c", variable)) | Some(("color", variable)) => match Colors::collect(variable) {
+                Ok(color) => color.into_string().map(Into::into),
+                Err(why) => {
+                    eprintln!("{}", why);
+                    None
+                }
+            },
             Some(("x", variable)) | Some(("hex", variable)) => {
                 match u8::from_str_radix(variable, 16) {
                     Ok(c) => Some((c as char).to_string().into()),
@@ -279,7 +283,7 @@ impl<'a> Variables<'a> {
                     }
                 }
             }
-            Some(("env", variable)) => env::var(variable).map(Into::into).ok().map(|s| s),
+            Some(("env", variable)) => env::var(variable).ok().map(Into::into),
             Some(("super", _)) | Some(("global", _)) | None => {
                 // Otherwise, it's just a simple variable name.
                 match self.get_ref(name) {

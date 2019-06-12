@@ -7,9 +7,8 @@ mod prompt;
 mod readln;
 
 use ion_shell::{
-    builtins::man_pages,
+    builtins::{man_pages, Status},
     parser::{Expander, Terminator},
-    status::Status,
     types, Shell,
 };
 use ion_sys::SIGHUP;
@@ -208,6 +207,7 @@ impl<'a> InteractiveBinary<'a> {
                     );
                     if let Err(why) = self.shell.borrow_mut().on_command(&cmd) {
                         eprintln!("{}", why);
+                        self.shell.borrow_mut().reset_flow();
                     }
                     self.save_command(&cmd);
                 }

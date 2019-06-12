@@ -1,5 +1,5 @@
 use super::InteractiveBinary;
-use ion_shell::{status::*, Value};
+use ion_shell::{builtins::Status, Value};
 
 use regex::Regex;
 use std::time::{SystemTime, UNIX_EPOCH};

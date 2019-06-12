@@ -9,7 +9,6 @@ mod job;
 mod pipe_exec;
 mod shell_expand;
 mod signals;
-pub mod status;
 pub mod variables;
 
 pub(crate) use self::job::Job;
@@ -19,7 +18,6 @@ use self::{
     foreground::ForegroundSignals,
     fork::{Fork, IonResult},
     pipe_exec::foreground,
-    status::*,
     variables::Variables,
 };
 pub use self::{
@@ -28,7 +26,7 @@ pub use self::{
     variables::Value,
 };
 use crate::{
-    builtins::BuiltinMap,
+    builtins::{BuiltinMap, Status},
     lexers::{Key, Primitive},
     parser::{
         assignments::value_check, pipelines::Pipeline, shell_expand::ExpansionError, ParseError,
@@ -336,7 +334,7 @@ impl<'a> Shell<'a> {
         }
 
         if self.opts.err_exit && !exit_status.is_success() {
-            return Err(PipelineError::EarlyExit.into());
+            Err(PipelineError::EarlyExit)?
         }
 
         Ok(exit_status)

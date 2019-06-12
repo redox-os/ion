@@ -1,9 +1,9 @@
 use super::{
     flow_control::{ExportAction, LocalAction},
-    status::*,
     Shell,
 };
 use crate::{
+    builtins::Status,
     lexers::assignments::{Key, Operator, Primitive},
     parser::{assignments::*, is_valid_name},
     shell::variables::{EuclDiv, Modifications, OpError, Pow, Value},

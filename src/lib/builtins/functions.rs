@@ -1,4 +1,5 @@
-use crate::shell::{status::Status, variables::Variables};
+use super::Status;
+use crate::shell::variables::Variables;
 use std::io::{self, Write};
 
 pub fn print_functions(vars: &Variables<'_>) -> Status {

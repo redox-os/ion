@@ -1,7 +1,7 @@
 use crate::{
     lexers::assignments::{KeyBuf, Operator, Primitive},
     parser::{assignments::*, pipelines::Pipeline},
-    shell::{status::Status, Shell},
+    shell::{IonError, Shell},
     types,
 };
 use err_derive::Error;
@@ -376,9 +376,9 @@ impl<'a> Function<'a> {
         &self,
         shell: &mut Shell<'a>,
         args: &[S],
-    ) -> Result<(), FunctionError> {
+    ) -> Result<(), IonError> {
         if args.len() - 1 != self.args.len() {
-            return Err(FunctionError::InvalidArgumentCount);
+            Err(FunctionError::InvalidArgumentCount)?;
         }
 
         let values = self
@@ -411,16 +411,11 @@ impl<'a> Function<'a> {
             shell.variables.set(&type_.name, value);
         }
 
-        if let Err(why) = shell.execute_statements(&self.statements) {
-            shell.previous_status =
-                Status::error(format!("ion: pipeline expansion error: {}", why));
-            shell.variables.set("?", shell.previous_status);
-            shell.flow_control.clear();
-        }
+        let res = shell.execute_statements(&self.statements);
 
         shell.variables.pop_scope();
         shell.variables.append_scopes(temporary);
-        Ok(())
+        res.map(|_| ())
     }
 
     pub fn get_description(&self) -> Option<&types::Str> { self.description.as_ref() }

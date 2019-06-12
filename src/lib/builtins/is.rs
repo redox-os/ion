@@ -1,4 +1,5 @@
-use crate::{shell::Shell, status::Status, types};
+use super::Status;
+use crate::{shell::Shell, types};
 
 pub fn is(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match args.len() {

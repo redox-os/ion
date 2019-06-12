@@ -20,11 +20,10 @@ use super::{
     flow_control::FunctionError,
     job::{Job, JobVariant, RefinedJob, TeeItem},
     signals::{self, SignalHandler},
-    status::Status,
     Shell, Value,
 };
 use crate::{
-    builtins,
+    builtins::{self, Status},
     parser::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
     sys,
 };

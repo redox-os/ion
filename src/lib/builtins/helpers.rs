@@ -4,7 +4,6 @@ use super::{super::types, Value};
 pub struct Status(i32);
 
 impl Status {
-    pub const BAD_ARG: Self = Status(2);
     pub const COULD_NOT_EXEC: Self = Status(126);
     pub const NO_SUCH_COMMAND: Self = Status(127);
     pub const SUCCESS: Self = Status(0);
@@ -22,6 +21,14 @@ impl Status {
             eprintln!("{}", err);
         }
         Status(1)
+    }
+
+    pub fn bad_argument<T: AsRef<str>>(err: T) -> Self {
+        let err = err.as_ref();
+        if !err.is_empty() {
+            eprintln!("{}", err);
+        }
+        Status(2)
     }
 
     pub fn is_success(self) -> bool { self.0 == 0 }

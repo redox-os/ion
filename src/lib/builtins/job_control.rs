@@ -1,8 +1,9 @@
 //! Contains the `jobs`, `disown`, `bg`, and `fg` commands that manage job
 //! control in the shell.
 
+use super::Status;
 use crate::{
-    shell::{status::*, BackgroundProcess, Shell},
+    shell::{BackgroundProcess, Shell},
     types,
 };
 use smallvec::SmallVec;

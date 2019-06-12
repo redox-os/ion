@@ -1,3 +1,9 @@
+use err_derive::Error;
+
+#[derive(Debug, Clone, Error)]
+#[error(display = "ion: {} is not a valid color", _0)]
+pub struct InvalidColor(String);
+
 #[derive(Debug)]
 struct StaticMap {
     keys:   &'static [&'static str],
@@ -128,7 +134,7 @@ impl Colors {
     /// If no matches were made, then this will attempt to parse the variable as either a
     /// 24-bit true color color, or one of 256 colors. It supports both hexadecimal and
     /// decimals.
-    fn parse_colors(&mut self, variable: &str) -> bool {
+    fn parse_colors(&mut self, variable: &str) -> Result<(), InvalidColor> {
         // First, determine which field we will write to.
         let (field, variable) = if variable.ends_with("bg") {
             (&mut self.background, &variable[..variable.len() - 2])
@@ -145,7 +151,7 @@ impl Colors {
                 1 | 2 => {
                     if let Ok(value) = u8::from_str_radix(variable, 16) {
                         *field = Some(Mode::Range256(value));
-                        return true;
+                        return Ok(());
                     }
                 }
                 // 24-bit Color 0xRGB
@@ -155,7 +161,7 @@ impl Colors {
                         if let Some(green) = hex_char_to_u8_range(chars.next().unwrap()) {
                             if let Some(blue) = hex_char_to_u8_range(chars.next().unwrap()) {
                                 *field = Some(Mode::TrueColor(red, green, blue));
-                                return true;
+                                return Ok(());
                             }
                         }
                     }
@@ -166,7 +172,7 @@ impl Colors {
                         if let Ok(green) = u8::from_str_radix(&variable[2..4], 16) {
                             if let Ok(blue) = u8::from_str_radix(&variable[4..6], 16) {
                                 *field = Some(Mode::TrueColor(red, green, blue));
-                                return true;
+                                return Ok(());
                             }
                         }
                     }
@@ -175,10 +181,10 @@ impl Colors {
             }
         } else if let Ok(value) = variable.parse::<u8>() {
             *field = Some(Mode::Range256(value));
-            return true;
+            return Ok(());
         }
 
-        false
+        return Err(InvalidColor(variable.into()));
     }
 
     /// Attributes can be stacked, so this function serves to enable that
@@ -200,22 +206,26 @@ impl Colors {
     /// Parses the given input and returns a structure obtaining the text data needed for proper
     /// transformation into ANSI code parameters, which may be obtained by calling the
     /// `into_string()` method on the newly-created `Colors` structure.
-    pub fn collect(input: &str) -> Colors {
+    pub fn collect(input: &str) -> Result<Colors, InvalidColor> {
         let mut colors = Colors { foreground: None, background: None, attributes: None };
         for variable in input.split(',') {
             if variable == "reset" {
-                return Colors { foreground: None, background: None, attributes: Some(vec!["0"]) };
+                return Ok(Colors {
+                    foreground: None,
+                    background: None,
+                    attributes: Some(vec!["0"]),
+                });
             } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
                 colors.append_attribute(attribute);
             } else if let Some(color) = COLORS.get(&variable) {
                 colors.foreground = Some(Mode::Name(color));
             } else if let Some(color) = BG_COLORS.get(&variable) {
                 colors.background = Some(Mode::Name(color));
-            } else if !colors.parse_colors(variable) {
-                eprintln!("ion: {} is not a valid color", variable)
+            } else {
+                colors.parse_colors(variable)?;
             }
         }
-        colors
+        Ok(colors)
     }
 }
 
@@ -250,7 +260,7 @@ mod test {
     fn set_multiple_color_attributes() {
         let expected =
             Colors { attributes: Some(vec!["1", "4", "5"]), background: None, foreground: None };
-        let actual = Colors::collect("bold,underlined,blink");
+        let actual = Colors::collect("bold,underlined,blink").unwrap();
         assert_eq!(actual, expected);
         assert_eq!(Some("\x1b[1;4;5m".to_owned()), actual.into_string());
     }
@@ -262,7 +272,7 @@ mod test {
             background: Some(Mode::Name("107")),
             foreground: Some(Mode::Name("35")),
         };
-        let actual = Colors::collect("whitebg,magenta,bold");
+        let actual = Colors::collect("whitebg,magenta,bold").unwrap();
         assert_eq!(actual, expected);
         assert_eq!(Some("\x1b[1;35;107m".to_owned()), actual.into_string());
     }
@@ -274,7 +284,7 @@ mod test {
             background: Some(Mode::Range256(77)),
             foreground: Some(Mode::Range256(75)),
         };
-        let actual = Colors::collect("0x4b,0x4dbg");
+        let actual = Colors::collect("0x4b,0x4dbg").unwrap();
         assert_eq!(actual, expected);
         assert_eq!(Some("\x1b[38;5;75;48;5;77m".to_owned()), actual.into_string())
     }
@@ -286,7 +296,7 @@ mod test {
             background: Some(Mode::Range256(78)),
             foreground: Some(Mode::Range256(32)),
         };
-        let actual = Colors::collect("78bg,32");
+        let actual = Colors::collect("78bg,32").unwrap();
         assert_eq!(actual, expected);
         assert_eq!(Some("\x1b[38;5;32;48;5;78m".to_owned()), actual.into_string())
     }
@@ -298,7 +308,7 @@ mod test {
             background: Some(Mode::TrueColor(255, 255, 255)),
             foreground: Some(Mode::TrueColor(0, 0, 0)),
         };
-        let actual = Colors::collect("0x000,0xFFFbg");
+        let actual = Colors::collect("0x000,0xFFFbg").unwrap();
         assert_eq!(expected, actual);
         assert_eq!(Some("\x1b[38;2;0;0;0;48;2;255;255;255m".to_owned()), actual.into_string());
     }
@@ -310,7 +320,7 @@ mod test {
             background: Some(Mode::TrueColor(255, 0, 0)),
             foreground: Some(Mode::TrueColor(0, 255, 0)),
         };
-        let actual = Colors::collect("0x00FF00,0xFF0000bg");
+        let actual = Colors::collect("0x00FF00,0xFF0000bg").unwrap();
         assert_eq!(expected, actual);
     }
 }

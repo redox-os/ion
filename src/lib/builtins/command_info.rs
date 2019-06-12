@@ -1,6 +1,6 @@
+use super::{check_help, man_pages::MAN_WHICH, Status};
 use crate::{
-    builtins::man_pages::*,
-    shell::{status::Status, Shell, Value},
+    shell::{Shell, Value},
     sys, types,
 };
 

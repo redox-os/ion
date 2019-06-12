@@ -1,8 +1,5 @@
-use crate::{
-    builtins::man_pages::MAN_STATUS,
-    shell::{status::Status, Shell},
-    types,
-};
+use super::{man_pages::MAN_STATUS, Status};
+use crate::{shell::Shell, types};
 use std::env;
 
 pub fn status(args: &[types::Str], shell: &mut Shell<'_>) -> Status {

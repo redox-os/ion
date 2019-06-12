@@ -15,7 +15,7 @@
 //! ## Demo
 //!
 //! ```rust
-//! use ion_shell::{status::Status, types, BuiltinFunction, BuiltinMap, Shell};
+//! use ion_shell::{builtins::Status, types, BuiltinFunction, BuiltinMap, Shell};
 //! use std::{cell::RefCell, rc::Rc, thread, time};
 //!
 //! enum Layout {

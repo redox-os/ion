@@ -1,5 +1,6 @@
+use super::Status;
 use crate::{
-    shell::{status::Status, variables::Value, Shell},
+    shell::{variables::Value, Shell},
     types,
 };
 use std::iter;

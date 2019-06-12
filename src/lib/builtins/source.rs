@@ -1,7 +1,5 @@
-use crate::{
-    shell::{status::Status, Shell},
-    types,
-};
+use super::Status;
+use crate::{shell::Shell, types};
 use std::fs::File;
 
 /// Evaluates the given file and returns 'SUCCESS' if it succeeds.

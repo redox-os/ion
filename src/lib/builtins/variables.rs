@@ -2,10 +2,8 @@
 
 use std::io::{self, Write};
 
-use crate::{
-    shell::{status::Status, variables::Variables},
-    types,
-};
+use super::Status;
+use crate::{shell::variables::Variables, types};
 
 fn print_list(vars: &Variables<'_>) {
     let stdout = io::stdout();
