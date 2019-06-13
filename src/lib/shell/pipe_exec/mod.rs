@@ -69,6 +69,7 @@ pub enum PipelineError {
     RedirectPipeError(#[error(cause)] RedirectError),
     #[error(display = "could not create pipe: {}", _0)]
     CreatePipeError(#[error(cause)] io::Error),
+
     #[error(display = "could not fork: {}", _0)]
     CreateForkError(#[error(cause)] io::Error),
     #[error(display = "could not run function: {}", _0)]
@@ -86,6 +87,14 @@ pub enum PipelineError {
     CoreDump(u32),
     #[error(display = "waitpid error: {}", _0)]
     WaitPid(&'static str),
+
+    #[error(display = "error while resuming process: {}", _0)]
+    ResumeError(#[error(cause)] io::Error),
+    #[error(display = "can't set the process group: {}", _0)]
+    ProcessGroup(#[error(cause)] io::Error),
+
+    #[error(display = "Can't flush output stream: {}", _0)]
+    FlushIo(#[error(cause)] io::Error),
 
     #[error(display = "early exit: pipeline failed")]
     EarlyExit,
@@ -430,7 +439,7 @@ impl<'b> Shell<'b> {
                 let exit_status = self.pipe(pipeline);
                 // Set the shell as the foreground process again to regain the TTY.
                 if !self.opts.is_background_shell {
-                    let _ = sys::tcsetpgrp(0, process::id());
+                    sys::tcsetpgrp(0, process::id()).map_err(PipelineError::ProcessGroup)?;
                 }
                 exit_status
             }
@@ -444,13 +453,8 @@ impl<'b> Shell<'b> {
         let mut commands = prepare(self, pipeline)?.into_iter().peekable();
 
         if let Some((mut parent, mut kind)) = commands.next() {
-            if kind == RedirectFrom::None && !parent.needs_forking() {
-                let status = self.exec_job(&parent);
-
-                let _ = io::stdout().flush();
-                let _ = io::stderr().flush();
-
-                status
+            let status = if kind == RedirectFrom::None && !parent.needs_forking() {
+                self.exec_job(&parent)
             } else {
                 let (mut pgid, mut last_pid, mut current_pid) = (0, 0, 0);
 
@@ -530,12 +534,14 @@ impl<'b> Shell<'b> {
                 let status = self.watch_foreground(pgid)?;
                 if status == Status::TERMINATED {
                     sys::killpg(pgid, sys::SIGTERM).map_err(PipelineError::TerminateJobsError)?;
-                } else {
-                    let _ = io::stdout().flush();
-                    let _ = io::stderr().flush();
                 }
                 Ok(status)
-            }
+            };
+
+            io::stdout().flush().map_err(PipelineError::FlushIo)?;
+            io::stderr().flush().map_err(PipelineError::FlushIo)?;
+
+            status
         } else {
             Ok(Status::SUCCESS)
         }
@@ -561,7 +567,9 @@ fn spawn_proc(
                 stdout.as_ref().map(AsRawFd::as_raw_fd),
                 stderr.as_ref().map(AsRawFd::as_raw_fd),
                 false,
-                || prepare_child(block_child, *pgid),
+                || {
+                    let _ = prepare_child(block_child, *pgid);
+                },
             );
 
             match result {
@@ -624,8 +632,12 @@ fn spawn_proc(
             )?;
         }
     };
-    set_process_group(pgid, *current_pid, !shell.opts.is_background_shell);
-    resume_process(*last_pid);
+    set_process_group(pgid, *current_pid, !shell.opts.is_background_shell)
+        .map_err(PipelineError::ProcessGroup)?;
+
+    if *last_pid != 0 {
+        resume_process(*last_pid).map_err(PipelineError::ResumeError)?;
+    }
     Ok(())
 }
 
@@ -643,55 +655,53 @@ fn fork_exec_internal<F>(
 where
     F: FnMut(Option<File>, Option<File>, Option<File>) -> Status,
 {
-    match unsafe { sys::fork() } {
-        Ok(0) => {
-            prepare_child(block_child, pgid);
+    match unsafe { sys::fork() }.map_err(PipelineError::CreateForkError)? {
+        0 => {
+            if let Err(why) = prepare_child(block_child, pgid) {
+                eprintln!("ion: error while forking builtins: {}", why);
+            }
 
             redirect_streams(&stdin, &stdout, &stderr);
             let exit_status = exec_action(stdout, stderr, stdin);
             exit(exit_status.as_os_code())
         }
-        Ok(pid) => {
+        pid => {
             *last_pid = *current_pid;
             *current_pid = pid;
             Ok(())
         }
-        Err(cause) => Err(PipelineError::CreateForkError(cause)),
     }
 }
 
-fn prepare_child(block_child: bool, pgid: u32) {
+fn prepare_child(block_child: bool, pgid: u32) -> io::Result<()> {
     signals::unblock();
-    let _ = sys::reset_signal(sys::SIGINT);
-    let _ = sys::reset_signal(sys::SIGHUP);
-    let _ = sys::reset_signal(sys::SIGTERM);
+    sys::reset_signal(sys::SIGINT)?;
+    sys::reset_signal(sys::SIGHUP)?;
+    sys::reset_signal(sys::SIGTERM)?;
 
     if block_child {
-        let _ = sys::kill(process::id(), sys::SIGSTOP);
+        sys::kill(process::id(), sys::SIGSTOP)
     } else {
-        let _ = sys::setpgid(process::id(), pgid);
+        sys::setpgid(process::id(), pgid)
     }
 }
 
-fn resume_process(pid: u32) {
-    if pid != 0 {
-        // Ensure that the process is stopped before continuing.
-        if let Err(why) = wait_for_interrupt(pid) {
-            eprintln!("ion: error waiting for sigstop: {}", why);
-        }
-        let _ = sys::kill(pid, sys::SIGCONT);
-    }
+fn resume_process(pid: u32) -> io::Result<()> {
+    // Ensure that the process is stopped before continuing.
+    wait_for_interrupt(pid)?;
+    sys::kill(pid, sys::SIGCONT)
 }
 
-fn set_process_group(pgid: &mut u32, pid: u32, set_foreground: bool) {
+fn set_process_group(pgid: &mut u32, pid: u32, set_foreground: bool) -> io::Result<()> {
     if *pgid == 0 {
         *pgid = pid;
-        let _ = sys::setpgid(pid, pid);
+        sys::setpgid(pid, pid)?;
         if set_foreground {
-            let _ = sys::tcsetpgrp(0, pid);
+            sys::tcsetpgrp(0, pid)?;
         }
+        Ok(())
     } else {
-        let _ = sys::setpgid(pid, *pgid);
+        sys::setpgid(pid, *pgid)
     }
 }
 

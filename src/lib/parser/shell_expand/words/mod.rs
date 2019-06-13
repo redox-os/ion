@@ -2,7 +2,7 @@ mod methods;
 #[cfg(test)]
 mod tests;
 
-pub use self::methods::{ArrayMethod, Pattern, StringMethod};
+pub use self::methods::{ArrayMethod, Pattern, Result, StringMethod};
 use super::Expander;
 use crate::lexers::ArgumentSplitter;
 pub use crate::ranges::{Select, SelectWithSize};

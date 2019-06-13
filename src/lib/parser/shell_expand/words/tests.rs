@@ -276,13 +276,13 @@ fn array_methods() {
         Select::Index(Index::Forward(3)),
     );
     let expected = args!["é"];
-    assert_eq!(method.handle_as_array(&expanders), expected);
+    assert_eq!(method.handle_as_array(&expanders).unwrap(), expected);
     let method =
         ArrayMethod::new("chars", "pkmn2", Pattern::Whitespace, Select::Index(Index::Forward(3)));
     let expected = args!["e"];
-    assert_eq!(method.handle_as_array(&expanders), expected);
+    assert_eq!(method.handle_as_array(&expanders).unwrap(), expected);
     let method =
         ArrayMethod::new("bytes", "pkmn2", Pattern::Whitespace, Select::Index(Index::Forward(1)));
     let expected = args!["111"];
-    assert_eq!(method.handle_as_array(&expanders), expected);
+    assert_eq!(method.handle_as_array(&expanders).unwrap(), expected);
 }

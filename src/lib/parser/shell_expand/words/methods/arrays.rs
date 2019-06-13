@@ -4,10 +4,9 @@ use super::{
         Select, SelectWithSize,
     },
     strings::unescape,
-    Pattern,
+    MethodError, Pattern,
 };
 use crate::types::{self, Args};
-use small;
 use std::char;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -29,45 +28,49 @@ impl<'a> ArrayMethod<'a> {
         ArrayMethod { method, variable, pattern, selection }
     }
 
-    fn reverse<E: Expander>(&self, expand_func: &E) -> Result<Args, &'static str> {
+    fn reverse<E: Expander>(&self, expand_func: &E) -> Args {
         let mut result = self.resolve_array(expand_func);
         result.reverse();
-        Ok(result)
+        result
     }
 
-    fn lines<E: Expander>(&self, expand_func: &E) -> Result<Args, &'static str> {
-        Ok(self.resolve_var(expand_func).lines().map(types::Str::from).collect())
+    fn lines<E: Expander>(&self, expand_func: &E) -> Args {
+        self.resolve_var(expand_func).lines().map(types::Str::from).collect()
     }
 
-    fn chars<E: Expander>(&self, expand_func: &E) -> Result<Args, &'static str> {
+    fn chars<E: Expander>(&self, expand_func: &E) -> Args {
         let variable = self.resolve_var(expand_func);
         let len = variable.chars().count();
-        Ok(variable.chars().map(|c| types::Str::from(c.to_string())).select(&self.selection, len))
+        variable.chars().map(|c| types::Str::from(c.to_string())).select(&self.selection, len)
     }
 
-    fn bytes<E: Expander>(&self, expand_func: &E) -> Result<Args, &'static str> {
+    fn bytes<E: Expander>(&self, expand_func: &E) -> Args {
         let variable = self.resolve_var(expand_func);
         let len = variable.len();
-        Ok(variable.bytes().map(|b| types::Str::from(b.to_string())).select(&self.selection, len))
+        variable.bytes().map(|b| types::Str::from(b.to_string())).select(&self.selection, len)
     }
 
-    fn map_keys<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Args, &'static str> {
-        expand_func.map_keys(self.variable, &self.selection).ok_or("no map found")
+    fn map_keys<'b, E: Expander>(&self, expand_func: &'b E) -> super::Result<Args> {
+        expand_func
+            .map_keys(self.variable, &self.selection)
+            .ok_or(MethodError::Generic("map_keys", "no map found"))
     }
 
-    fn map_values<'b, E: Expander>(&self, expand_func: &'b E) -> Result<Args, &'static str> {
-        expand_func.map_values(self.variable, &self.selection).ok_or("no map found")
+    fn map_values<'b, E: Expander>(&self, expand_func: &'b E) -> super::Result<Args> {
+        expand_func
+            .map_values(self.variable, &self.selection)
+            .ok_or(MethodError::Generic("map_values", "no map found"))
     }
 
-    fn graphemes<E: Expander>(&self, expand_func: &E) -> Result<Args, &'static str> {
+    fn graphemes<E: Expander>(&self, expand_func: &E) -> Args {
         let variable = self.resolve_var(expand_func);
         let graphemes: Vec<types::Str> =
             UnicodeSegmentation::graphemes(variable.as_str(), true).map(From::from).collect();
         let len = graphemes.len();
-        Ok(graphemes.into_iter().select(&self.selection, len))
+        graphemes.into_iter().select(&self.selection, len)
     }
 
-    fn split_at<E: Expander>(&self, expand_func: &E) -> Result<Args, &'static str> {
+    fn split_at<E: Expander>(&self, expand_func: &E) -> super::Result<Args> {
         let variable = self.resolve_var(expand_func);
         match self.pattern {
             Pattern::StringPattern(string) => {
@@ -76,17 +79,22 @@ impl<'a> ArrayMethod<'a> {
                         let (l, r) = variable.split_at(value);
                         Ok(args![types::Str::from(l), types::Str::from(r)])
                     } else {
-                        Err("value is out of bounds")
+                        Err(MethodError::Generic("split_at", "value is out of bounds"))
                     }
                 } else {
-                    Err("requires a valid number as an argument")
+                    Err(MethodError::WrongArgument(
+                        "split_at",
+                        "requires a valid number as an argument",
+                    ))
                 }
             }
-            Pattern::Whitespace => Err("requires an argument"),
+            Pattern::Whitespace => {
+                Err(MethodError::WrongArgument("split_at", "requires an argument"))
+            }
         }
     }
 
-    fn split<E: Expander>(&self, expand_func: &E) -> Result<Args, &'static str> {
+    fn split<E: Expander>(&self, expand_func: &E) -> Args {
         let variable = self.resolve_var(expand_func);
         let data: Args = match self.pattern {
             Pattern::Whitespace => variable
@@ -95,12 +103,12 @@ impl<'a> ArrayMethod<'a> {
                 .map(From::from)
                 .collect(),
             Pattern::StringPattern(pattern) => variable
-                .split(unescape(&expand_func.expand_string(pattern).join(" "))?.as_str())
+                .split(unescape(&expand_func.expand_string(pattern).join(" ")).as_str())
                 .map(From::from)
                 .collect(),
         };
         let len = data.len();
-        Ok(data.into_iter().select(&self.selection, len))
+        data.into_iter().select(&self.selection, len)
     }
 
     #[inline]
@@ -125,34 +133,29 @@ impl<'a> ArrayMethod<'a> {
         }
     }
 
-    pub fn handle_as_array<E: Expander>(&self, expand_func: &E) -> Args {
-        let res = match self.method {
-            "bytes" => self.bytes(expand_func),
-            "chars" => self.chars(expand_func),
-            "graphemes" => self.graphemes(expand_func),
+    pub fn handle_as_array<E: Expander>(&self, expand_func: &E) -> super::Result<Args> {
+        match self.method {
+            "bytes" => Ok(self.bytes(expand_func)),
+            "chars" => Ok(self.chars(expand_func)),
+            "graphemes" => Ok(self.graphemes(expand_func)),
             "keys" => self.map_keys(expand_func),
-            "lines" => self.lines(expand_func),
-            "reverse" => self.reverse(expand_func),
+            "lines" => Ok(self.lines(expand_func)),
+            "reverse" => Ok(self.reverse(expand_func)),
             "split_at" => self.split_at(expand_func),
-            "split" => self.split(expand_func),
+            "split" => Ok(self.split(expand_func)),
             "values" => self.map_values(expand_func),
-            _ => Err("invalid array method"),
-        };
-
-        res.unwrap_or_else(|m| {
-            eprintln!("ion: {}: {}", self.method, m);
-            Args::new()
-        })
+            _ => Err(MethodError::InvalidArrayMethod(self.method.to_string())),
+        }
     }
 
-    pub fn handle<E: Expander>(&self, current: &mut small::String, expand_func: &E) {
-        let res = match self.method {
-            "split" => self.split(expand_func).map(|r| r.join(" ")),
-            _ => Err("invalid array method"),
-        };
-        match res {
-            Ok(output) => current.push_str(&output),
-            Err(msg) => eprintln!("ion: {}: {}", self.method, msg),
+    pub fn handle<E: Expander>(
+        &self,
+        current: &mut types::Str,
+        expand_func: &E,
+    ) -> super::Result<()> {
+        match self.method {
+            "split" => Ok(current.push_str(&self.split(expand_func).join(" "))),
+            _ => Err(MethodError::InvalidArrayMethod(self.method.to_string())),
         }
     }
 }
@@ -299,41 +302,44 @@ mod test {
     #[test]
     fn test_split_at_failing_whitespace() {
         let method = ArrayMethod::new("split_at", "$SPACEDFOO", Pattern::Whitespace, Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander), args![]);
+        assert!(method.handle_as_array(&VariableExpander).is_err());
     }
 
     #[test]
     fn test_split_at_failing_no_number() {
         let method =
             ArrayMethod::new("split_at", "$SPACEDFOO", Pattern::StringPattern("a"), Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander), args![]);
+        assert!(method.handle_as_array(&VariableExpander).is_err());
     }
 
     #[test]
     fn test_split_at_failing_out_of_bound() {
         let method =
             ArrayMethod::new("split_at", "$SPACEDFOO", Pattern::StringPattern("100"), Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander), args![]);
+        assert!(method.handle_as_array(&VariableExpander).is_err());
     }
 
     #[test]
     fn test_split_at_succeeding() {
         let method = ArrayMethod::new("split_at", "$FOO", Pattern::StringPattern("3"), Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander), args!["FOO", "BAR"]);
+        assert_eq!(method.handle_as_array(&VariableExpander).unwrap(), args!["FOO", "BAR"]);
     }
 
     #[test]
     fn test_graphemes() {
         let method =
             ArrayMethod::new("graphemes", "$FOO", Pattern::StringPattern("3"), Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander), args!["F", "O", "O", "B", "A", "R"]);
+        assert_eq!(
+            method.handle_as_array(&VariableExpander).unwrap(),
+            args!["F", "O", "O", "B", "A", "R"]
+        );
     }
 
     #[test]
     fn test_bytes() {
         let method = ArrayMethod::new("bytes", "$FOO", Pattern::StringPattern("3"), Select::All);
         assert_eq!(
-            method.handle_as_array(&VariableExpander),
+            method.handle_as_array(&VariableExpander).unwrap(),
             args!["70", "79", "79", "66", "65", "82"]
         );
     }
@@ -341,20 +347,23 @@ mod test {
     #[test]
     fn test_chars() {
         let method = ArrayMethod::new("chars", "$FOO", Pattern::StringPattern("3"), Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander), args!["F", "O", "O", "B", "A", "R"]);
+        assert_eq!(
+            method.handle_as_array(&VariableExpander).unwrap(),
+            args!["F", "O", "O", "B", "A", "R"]
+        );
     }
 
     #[test]
     fn test_lines() {
         let method =
             ArrayMethod::new("lines", "$MULTILINE", Pattern::StringPattern("3"), Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander), args!["FOO", "BAR"]);
+        assert_eq!(method.handle_as_array(&VariableExpander).unwrap(), args!["FOO", "BAR"]);
     }
 
     #[test]
     fn test_reverse() {
         let method =
             ArrayMethod::new("reverse", "@ARRAY", Pattern::StringPattern("3"), Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander), args!["c", "b", "a"]);
+        assert_eq!(method.handle_as_array(&VariableExpander).unwrap(), args!["c", "b", "a"]);
     }
 }

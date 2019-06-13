@@ -11,7 +11,7 @@ use small;
 use std::path::Path;
 use unicode_segmentation::UnicodeSegmentation;
 
-pub fn unescape(input: &str) -> Result<small::String, &'static str> {
+pub fn unescape(input: &str) -> small::String {
     let mut check = false;
     // small::String cannot be created with a capacity of 0 without causing a panic
     let len = if !input.is_empty() { input.len() } else { 1 };
@@ -45,16 +45,15 @@ pub fn unescape(input: &str) -> Result<small::String, &'static str> {
                 out.push('\\');
                 add_char(&mut out, &mut check, c);
             }
-            c if c.is_ascii() => out.push(c),
-            _ => return Err("ion: Invalid ASCII character"),
+            c => out.push(c),
         }
     }
-    Ok(out)
+    out
 }
-fn escape(input: &str) -> Result<String, &'static str> {
+fn escape(input: &str) -> String {
     let mut output = String::with_capacity(input.len() * 2);
-    for b in input.as_bytes() {
-        match *b {
+    for b in input.chars() {
+        match b as u8 {
             0 => output.push_str("\\0"),
             7 => output.push_str("\\a"),
             8 => output.push_str("\\b"),
@@ -74,11 +73,10 @@ fn escape(input: &str) -> Result<String, &'static str> {
                 output.push('\\');
                 output.push(n as char);
             }
-            n if n <= 127 => output.push(n as char),
-            _ => return Err("ion: Invalid ASCII character"),
+            _ => output.push(b),
         }
     }
-    Ok(output)
+    output
 }
 
 /// Represents a method that operates on and returns a string
@@ -279,10 +277,7 @@ impl<'a> StringMethod<'a> {
                 } else {
                     return;
                 };
-                match unescape(&out) {
-                    Ok(out) => output.push_str(&out),
-                    Err(msg) => eprintln!("{}", &msg),
-                };
+                output.push_str(&unescape(&out));
             }
             "escape" => {
                 let word = if let Some(value) = expand.string(variable) {
@@ -292,10 +287,7 @@ impl<'a> StringMethod<'a> {
                 } else {
                     return;
                 };
-                match escape(&word) {
-                    Ok(out) => output.push_str(&out),
-                    Err(msg) => eprintln!("{}", &msg),
-                };
+                output.push_str(&escape(&word));
             }
             "or" => {
                 let first_str = if let Some(value) = expand.string(variable) {
@@ -368,15 +360,15 @@ mod test {
 
     #[test]
     fn test_escape() {
-        let line = " Mary   had\ta little  \n\t lamb\t";
-        let output = escape(line).expect("error processing string");
-        assert_eq!(output, " Mary   had\\ta little  \\n\\t lamb\\t");
+        let line = " Mary   had\ta little  \n\t lamb\tツ";
+        let output = escape(line);
+        assert_eq!(output, " Mary   had\\ta little  \\n\\t lamb\\tツ");
     }
 
     #[test]
     fn test_unescape() {
-        let line = " Mary   had\ta little  \n\t lamb\t";
-        let output = unescape(line).expect("error processing string");
+        let line = " Mary   had\ta little  \n\t lamb\tツ";
+        let output = unescape(line);
         assert_eq!(output, line);
     }
 
