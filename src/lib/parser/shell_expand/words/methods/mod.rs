@@ -22,16 +22,22 @@ pub struct MethodArgs<'a, 'b, E: Expander> {
     expand: &'b E,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum MethodError {
     #[error(display = "'{}' is an unknown array method", _0)]
     InvalidArrayMethod(String),
     #[error(display = "'{}' is an unknown string method", _0)]
     InvalidScalarMethod(String),
     #[error(display = "{}: {}", _0, _1)]
-    Generic(&'static str, &'static str),
-    #[error(display = "{}: {}", _0, _1)]
     WrongArgument(&'static str, &'static str),
+
+    // specific to some builtins
+    #[error(display = "regex_replace: error in regular expression '{}': {}", _0, _1)]
+    InvalidRegex(String, #[error(cause)] regex::Error),
+    #[error(display = "{}: no map found", _0)]
+    NoMapFound(&'static str),
+    #[error(display = "split_at: value is out of bounds")]
+    OutOfBound,
 }
 
 impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {

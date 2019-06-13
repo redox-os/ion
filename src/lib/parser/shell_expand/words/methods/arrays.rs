@@ -4,7 +4,8 @@ use super::{
         Select, SelectWithSize,
     },
     strings::unescape,
-    MethodError, Pattern,
+    MethodError::*,
+    Pattern,
 };
 use crate::types::{self, Args};
 use std::char;
@@ -51,15 +52,11 @@ impl<'a> ArrayMethod<'a> {
     }
 
     fn map_keys<'b, E: Expander>(&self, expand_func: &'b E) -> super::Result<Args> {
-        expand_func
-            .map_keys(self.variable, &self.selection)
-            .ok_or(MethodError::Generic("map_keys", "no map found"))
+        expand_func.map_keys(self.variable, &self.selection).ok_or(NoMapFound("map_keys"))
     }
 
     fn map_values<'b, E: Expander>(&self, expand_func: &'b E) -> super::Result<Args> {
-        expand_func
-            .map_values(self.variable, &self.selection)
-            .ok_or(MethodError::Generic("map_values", "no map found"))
+        expand_func.map_values(self.variable, &self.selection).ok_or(NoMapFound("map_values"))
     }
 
     fn graphemes<E: Expander>(&self, expand_func: &E) -> Args {
@@ -79,18 +76,13 @@ impl<'a> ArrayMethod<'a> {
                         let (l, r) = variable.split_at(value);
                         Ok(args![types::Str::from(l), types::Str::from(r)])
                     } else {
-                        Err(MethodError::Generic("split_at", "value is out of bounds"))
+                        Err(OutOfBound)
                     }
                 } else {
-                    Err(MethodError::WrongArgument(
-                        "split_at",
-                        "requires a valid number as an argument",
-                    ))
+                    Err(WrongArgument("split_at", "requires a valid number as an argument"))
                 }
             }
-            Pattern::Whitespace => {
-                Err(MethodError::WrongArgument("split_at", "requires an argument"))
-            }
+            Pattern::Whitespace => Err(WrongArgument("split_at", "requires an argument")),
         }
     }
 
@@ -144,7 +136,7 @@ impl<'a> ArrayMethod<'a> {
             "split_at" => self.split_at(expand_func),
             "split" => Ok(self.split(expand_func)),
             "values" => self.map_values(expand_func),
-            _ => Err(MethodError::InvalidArrayMethod(self.method.to_string())),
+            _ => Err(InvalidArrayMethod(self.method.to_string())),
         }
     }
 
@@ -155,7 +147,7 @@ impl<'a> ArrayMethod<'a> {
     ) -> super::Result<()> {
         match self.method {
             "split" => Ok(current.push_str(&self.split(expand_func).join(" "))),
-            _ => Err(MethodError::InvalidArrayMethod(self.method.to_string())),
+            _ => Err(InvalidArrayMethod(self.method.to_string())),
         }
     }
 }

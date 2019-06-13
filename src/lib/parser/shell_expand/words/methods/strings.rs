@@ -3,7 +3,9 @@ use super::{
         super::{is_expression, Expander, ExpanderInternal},
         Select,
     },
-    MethodArgs, MethodError, Result,
+    MethodArgs,
+    MethodError::*,
+    Result,
 };
 use crate::{parser::assignments::is_array, types};
 use regex::Regex;
@@ -175,7 +177,7 @@ impl<'a> StringMethod<'a> {
             "repeat" => match pattern.join(" ").parse::<usize>() {
                 Ok(repeat) => output.push_str(&get_var!().repeat(repeat)),
                 Err(_) => {
-                    return Err(MethodError::WrongArgument(
+                    return Err(WrongArgument(
                         "repeat",
                         "argument is not a valid positive integer",
                     ));
@@ -187,12 +189,7 @@ impl<'a> StringMethod<'a> {
                     (Some(replace), Some(with)) => {
                         output.push_str(&get_var!().replace(replace.as_str(), &with));
                     }
-                    _ => {
-                        return Err(MethodError::WrongArgument(
-                            "replace",
-                            "two arguments are required",
-                        ))
-                    }
+                    _ => return Err(WrongArgument("replace", "two arguments are required")),
                 }
             }
             "replacen" => {
@@ -202,33 +199,23 @@ impl<'a> StringMethod<'a> {
                         if let Ok(nth) = nth.parse::<usize>() {
                             output.push_str(&get_var!().replacen(replace.as_str(), &with, nth));
                         } else {
-                            return Err(MethodError::WrongArgument(
+                            return Err(WrongArgument(
                                 "replacen",
                                 "third argument isn't a valid integer",
                             ));
                         }
                     }
-                    _ => {
-                        return Err(MethodError::WrongArgument(
-                            "replacen",
-                            "three arguments required",
-                        ))
-                    }
+                    _ => return Err(WrongArgument("replacen", "three arguments required")),
                 }
             }
             "regex_replace" => {
                 let mut args = pattern.array();
                 match (args.next(), args.next()) {
                     (Some(replace), Some(with)) => match Regex::new(&replace) {
-                        Ok(re) => {
-                            output.push_str(&re.replace_all(&get_var!(), &with[..]));
-                        }
-                        Err(_) => eprintln!(
-                            "ion: regex_replace: error in regular expression {}",
-                            &replace
-                        ),
+                        Ok(re) => output.push_str(&re.replace_all(&get_var!(), &with[..])),
+                        Err(why) => return Err(InvalidRegex(replace.to_string(), why)),
                     },
-                    _ => eprintln!("ion: regex_replace: two arguments required"),
+                    _ => return Err(WrongArgument("regex_replace", "two arguments required")),
                 }
             }
             "join" => {
@@ -331,7 +318,7 @@ impl<'a> StringMethod<'a> {
                 };
             }
             _ => {
-                return Err(MethodError::InvalidScalarMethod(self.method.to_string()));
+                return Err(InvalidScalarMethod(self.method.to_string()));
             }
         }
         Ok(())
