@@ -284,10 +284,10 @@ trait ExpanderInternal: Expander {
                             Select::Key(_) | Select::None => (),
                         },
                         WordToken::ArrayMethod(ref method, _) => {
-                            method.handle(output, self);
+                            method.handle(output, self)?;
                         }
                         WordToken::StringMethod(ref method) => {
-                            method.handle(output, self);
+                            method.handle(output, self)?;
                         }
                         WordToken::Brace(ref nodes) => {
                             self.expand_brace(output, &mut expanders, tokens, nodes)?;
@@ -410,7 +410,7 @@ trait ExpanderInternal: Expander {
         let mut expanded_words = Args::new();
 
         match *token {
-            WordToken::StringMethod(ref method) => method.handle(&mut output, self),
+            WordToken::StringMethod(ref method) => method.handle(&mut output, self)?,
             WordToken::Normal(ref text, do_glob, tilde) => {
                 self.expand(&mut output, &mut expanded_words, text.as_ref(), do_glob, tilde);
             }
@@ -552,10 +552,10 @@ trait ExpanderInternal: Expander {
                                 Select::Key(_) | Select::None => (),
                             },
                             WordToken::ArrayMethod(ref method, _) => {
-                                method.handle(output, self);
+                                method.handle(output, self)?;
                             }
                             WordToken::StringMethod(ref method) => {
-                                method.handle(output, self);
+                                method.handle(output, self)?;
                             }
                             WordToken::Brace(_) => unreachable!(),
                             WordToken::Normal(ref text, do_glob, tilde) => {
@@ -583,7 +583,8 @@ trait ExpanderInternal: Expander {
 
                         temp.clear();
                     }
-                });
+                    Ok(())
+                })?;
             }
 
             if !output.is_empty() {

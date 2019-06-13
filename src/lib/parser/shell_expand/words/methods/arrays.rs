@@ -192,7 +192,7 @@ mod test {
     fn test_split_string_all() {
         let mut output = types::Str::new();
         let method = ArrayMethod::new("split", "$FOO", Pattern::StringPattern("OB"), Select::All);
-        method.handle(&mut output, &VariableExpander);
+        method.handle(&mut output, &VariableExpander).unwrap();
         assert_eq!(&*output, "FO AR");
     }
 
@@ -200,7 +200,7 @@ mod test {
     fn test_split_whitespace_all() {
         let mut output = types::Str::new();
         let method = ArrayMethod::new("split", "$SPACEDFOO", Pattern::Whitespace, Select::All);
-        method.handle(&mut output, &VariableExpander);
+        method.handle(&mut output, &VariableExpander).unwrap();
         assert_eq!(&*output, "FOO BAR");
     }
 
@@ -213,7 +213,7 @@ mod test {
             Pattern::StringPattern("OB"),
             Select::Index(Index::Forward(1)),
         );
-        method.handle(&mut output, &VariableExpander);
+        method.handle(&mut output, &VariableExpander).unwrap();
         assert_eq!(&*output, "AR");
     }
 
@@ -226,7 +226,7 @@ mod test {
             Pattern::Whitespace,
             Select::Index(Index::Forward(1)),
         );
-        method.handle(&mut output, &VariableExpander);
+        method.handle(&mut output, &VariableExpander).unwrap();
         assert_eq!(&*output, "BAR");
     }
 
@@ -239,7 +239,7 @@ mod test {
             Pattern::StringPattern("OB"),
             Select::Index(Index::Backward(1)),
         );
-        method.handle(&mut output, &VariableExpander);
+        method.handle(&mut output, &VariableExpander).unwrap();
         assert_eq!(&*output, "FO");
     }
 
@@ -252,7 +252,7 @@ mod test {
             Pattern::Whitespace,
             Select::Index(Index::Backward(1)),
         );
-        method.handle(&mut output, &VariableExpander);
+        method.handle(&mut output, &VariableExpander).unwrap();
         assert_eq!(&*output, "FOO");
     }
 
@@ -265,7 +265,7 @@ mod test {
             Pattern::StringPattern("OB"),
             Select::Range(Range::from(Index::Forward(0))),
         );
-        method.handle(&mut output, &VariableExpander);
+        method.handle(&mut output, &VariableExpander).unwrap();
         assert_eq!(&*output, "FO AR");
     }
 
@@ -278,7 +278,7 @@ mod test {
             Pattern::Whitespace,
             Select::Range(Range::from(Index::Forward(0))),
         );
-        method.handle(&mut output, &VariableExpander);
+        method.handle(&mut output, &VariableExpander).unwrap();
         assert_eq!(&*output, "FOO BAR");
     }
 
@@ -286,7 +286,7 @@ mod test {
     fn test_split_none() {
         let mut output = types::Str::new();
         let method = ArrayMethod::new("split", "$SPACEDFOO", Pattern::Whitespace, Select::None);
-        method.handle(&mut output, &VariableExpander);
+        method.handle(&mut output, &VariableExpander).unwrap();
         assert_eq!(&*output, "");
     }
 
@@ -295,7 +295,7 @@ mod test {
         let mut output = types::Str::new();
         let method =
             ArrayMethod::new("split", "$SPACEDFOO", Pattern::Whitespace, Select::Key("1".into()));
-        method.handle(&mut output, &VariableExpander);
+        method.handle(&mut output, &VariableExpander).unwrap();
         assert_eq!(&*output, "");
     }
 

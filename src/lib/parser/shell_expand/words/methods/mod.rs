@@ -26,6 +26,8 @@ pub struct MethodArgs<'a, 'b, E: Expander> {
 pub enum MethodError {
     #[error(display = "'{}' is an unknown array method", _0)]
     InvalidArrayMethod(String),
+    #[error(display = "'{}' is an unknown string method", _0)]
+    InvalidScalarMethod(String),
     #[error(display = "{}: {}", _0, _1)]
     Generic(&'static str, &'static str),
     #[error(display = "{}: {}", _0, _1)]
