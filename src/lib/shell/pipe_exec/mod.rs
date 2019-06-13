@@ -686,11 +686,13 @@ fn resume_process(pid: u32) {
 fn set_process_group(pgid: &mut u32, pid: u32, set_foreground: bool) {
     if *pgid == 0 {
         *pgid = pid;
+        let _ = sys::setpgid(pid, pid);
         if set_foreground {
             let _ = sys::tcsetpgrp(0, pid);
         }
+    } else {
+        let _ = sys::setpgid(pid, *pgid);
     }
-    let _ = sys::setpgid(pid, *pgid);
 }
 
 pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
