@@ -1,7 +1,7 @@
 use super::Shell;
 use crate::{
     builtins::BuiltinFunction,
-    parser::{pipelines::RedirectFrom, Expander},
+    parser::{pipelines::RedirectFrom, shell_expand, Expander},
     types, Value,
 };
 use std::{fmt, fs::File, str};
@@ -19,11 +19,12 @@ impl<'a> Job<'a> {
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand(&mut self, shell: &Shell<'_>) {
+    pub fn expand(&mut self, shell: &Shell<'_>) -> shell_expand::Result<()> {
         match shell.variables.get_ref(&self.args[0]) {
             Some(Value::Function(_)) => {}
-            _ => self.args = self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).collect(),
+            _ => self.args = self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).collect()?,
         }
+        Ok(())
     }
 
     pub fn new(
@@ -52,12 +53,12 @@ impl<'a> fmt::Debug for Job<'a> {
 }
 
 /// Expands a given argument and returns it as an `Args`.
-fn expand_arg(arg: &str, shell: &Shell<'_>) -> types::Args {
-    let res = shell.expand_string(&arg);
+fn expand_arg(arg: &str, shell: &Shell<'_>) -> shell_expand::Result<types::Args> {
+    let res = shell.expand_string(&arg)?;
     if res.is_empty() {
-        args![""]
+        Ok(args![""])
     } else {
-        res
+        Ok(res)
     }
 }
 

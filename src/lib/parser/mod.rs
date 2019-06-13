@@ -2,13 +2,13 @@ pub mod assignments;
 mod loops;
 pub mod pipelines;
 mod quotes;
-mod shell_expand;
+pub mod shell_expand;
 mod statement;
 
 pub use self::{
     loops::ForValueExpression,
     quotes::Terminator,
-    shell_expand::{unescape, Expander, Select},
+    shell_expand::Expander,
     statement::{is_valid_name, parse_and_validate, ParseError, StatementError, StatementSplitter},
 };
 

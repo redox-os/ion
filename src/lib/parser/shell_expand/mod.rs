@@ -1,18 +1,40 @@
 // TODO: Handle Runtime Errors
 mod words;
 
-pub use self::words::{unescape, Result, Select, WordIterator, WordToken};
+pub use self::words::{unescape, MethodError, Select, WordIterator, WordToken};
 use crate::{
     braces::{self, BraceToken},
+    lexers::assignments::TypeError,
     ranges::{parse_range, Index, Range},
     types::{self, Args},
 };
 use auto_enums::auto_enum;
+use err_derive::Error;
 use glob::glob;
 use itertools::Itertools;
 use small;
 use std::{iter, str};
 use unicode_segmentation::UnicodeSegmentation;
+
+#[derive(Debug, Error)]
+pub enum ExpansionError {
+    #[error(display = "{}", _0)]
+    MethodError(#[error(cause)] MethodError),
+    #[error(display = "{}", _0)]
+    TypeError(#[error(cause)] TypeError),
+    #[error(display = "invalid index")] // TODO: Add more info
+    OutOfBound,
+}
+
+impl From<TypeError> for ExpansionError {
+    fn from(cause: TypeError) -> Self { ExpansionError::TypeError(cause) }
+}
+
+impl From<MethodError> for ExpansionError {
+    fn from(cause: MethodError) -> Self { ExpansionError::MethodError(cause) }
+}
+
+pub type Result<T> = std::result::Result<T, ExpansionError>;
 
 /// Determines whether an input string is expression-like as compared to a
 /// bare word. For example, strings starting with '"', '\'', '@', or '$' are
@@ -70,7 +92,7 @@ pub trait Expander: Sized {
     /// Performs shell expansions to an input string, efficiently returning the final
     /// expanded form. Shells must provide their own batteries for expanding tilde
     /// and variable words.
-    fn expand_string(&self, original: &str) -> Args {
+    fn expand_string(&self, original: &str) -> Result<Args> {
         let mut token_buffer = Vec::new();
         let mut contains_brace = false;
 
@@ -117,13 +139,7 @@ pub trait Expander: Sized {
         if original.is_empty() {
             token_buffer.push(WordToken::Normal("".into(), true, false));
         }
-        match self.expand_tokens(&token_buffer, contains_brace) {
-            Ok(tokens) => tokens,
-            Err(why) => {
-                eprintln!("ion: {}", why);
-                Args::new()
-            }
-        }
+        self.expand_tokens(&token_buffer, contains_brace)
     }
 }
 
@@ -165,29 +181,55 @@ trait ExpanderInternal: Expander {
         Ok(())
     }
 
-    fn array_expand(&self, elements: &[&str], selection: &Select) -> Args {
+    fn array_expand(&self, elements: &[&str], selection: &Select) -> Result<Args> {
         match selection {
-            Select::All => elements.iter().flat_map(|e| self.expand_string(e)).collect(),
-            Select::Index(index) => self.array_nth(elements, *index).into_iter().collect(),
+            Select::All => {
+                let collected = Args::new();
+                for element in elements {
+                    collected.extend(self.expand_string(element)?);
+                }
+                Ok(collected)
+            }
+            Select::Index(index) => Ok(self.array_nth(elements, *index).into_iter().collect()),
             Select::Range(range) => self.array_range(elements, *range),
-            Select::Key(_) | Select::None => Args::new(),
+            Select::Key(_) | Select::None => Ok(Args::new()),
         }
     }
 
-    fn array_nth(&self, elements: &[&str], index: Index) -> Option<types::Str> {
-        let mut expanded = elements.iter().flat_map(|e| self.expand_string(e));
-        match index {
-            Index::Forward(n) => expanded.nth(n),
-            Index::Backward(n) => expanded.rev().nth(n),
-        }
-    }
-
-    fn array_range(&self, elements: &[&str], range: Range) -> Args {
-        let expanded = elements.iter().flat_map(|e| self.expand_string(e)).collect::<Args>();
-        if let Some((start, length)) = range.bounds(expanded.len()) {
-            expanded.into_iter().skip(start).take(length).collect()
+    fn array_nth(&self, elements: &[&str], index: Index) -> Result<types::Str> {
+        let mut i = match index {
+            Index::Forward(n) => n,
+            Index::Backward(n) => n,
+        };
+        if let Index::Forward(_) = index {
+            for el in elements {
+                let expanded = self.expand_string(el)?;
+                if expanded.len() > i {
+                    return Ok(expanded.swap_remove(i));
+                }
+                i -= expanded.len();
+            }
         } else {
-            Args::new()
+            for el in elements.iter().rev() {
+                let expanded = self.expand_string(el)?;
+                if expanded.len() > i {
+                    return Ok(expanded.swap_remove(expanded.len() - i));
+                }
+                i -= expanded.len();
+            }
+        }
+        Err(ExpansionError::OutOfBound)
+    }
+
+    fn array_range(&self, elements: &[&str], range: Range) -> Result<Args> {
+        let expanded = Args::new();
+        for element in elements {
+            let expanded = expanded.extend(self.expand_string(element)?);
+        }
+        if let Some((start, length)) = range.bounds(expanded.len()) {
+            Ok(expanded.into_iter().skip(start).take(length).collect())
+        } else {
+            Ok(Args::new())
         }
     }
 
@@ -248,7 +290,7 @@ trait ExpanderInternal: Expander {
                 for word in word_tokens {
                     match *word {
                         WordToken::Array(ref elements, ref index) => {
-                            join_with_spaces(output, self.array_expand(elements, &index).iter());
+                            join_with_spaces(output, self.array_expand(elements, &index)?.iter());
                         }
                         WordToken::ArrayVariable(array, _, ref index) => {
                             if let Some(array) = self.array(array, index) {
@@ -350,7 +392,7 @@ trait ExpanderInternal: Expander {
     #[auto_enum]
     fn expand_single_array_token(&self, token: &WordToken<'_>) -> Result<Args> {
         match *token {
-            WordToken::Array(ref elements, ref index) => Ok(self.array_expand(elements, &index)),
+            WordToken::Array(ref elements, ref index) => self.array_expand(elements, &index),
             WordToken::ArrayVariable(array, quoted, ref index) => match self.array(array, index) {
                 Some(ref array) if quoted => Ok(args![small::String::from(array.join(" "))]),
                 Some(array) => Ok(array),
@@ -513,7 +555,7 @@ trait ExpanderInternal: Expander {
                             WordToken::Array(ref elements, ref index) => {
                                 join_with_spaces(
                                     output,
-                                    self.array_expand(elements, &index).iter(),
+                                    self.array_expand(elements, &index)?.iter(),
                                 );
                             }
                             WordToken::ArrayVariable(array, _, ref index) => {
@@ -682,7 +724,7 @@ mod test {
     fn expand_variable_normal_variable() {
         let input = "$FOO:NOT:$BAR";
         let expected = "FOO:NOT:BAR";
-        let expanded = VariableExpander.expand_string(input);
+        let expanded = VariableExpander.expand_string(input).unwrap();
         assert_eq!(args![expected], expanded);
     }
 
@@ -691,27 +733,27 @@ mod test {
         let line = "pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
         let expected = "prodigal programmer processed prototype procedures proficiently proving \
                         prospective projections";
-        let expanded = VariableExpander.expand_string(line);
-        assert_eq!(expected.split_whitespace().map(|x| x.into()).collect::<Args>(), expanded);
+        let expanded = VariableExpander.expand_string(line).unwrap();
+        assert_eq!(expected.split_whitespace().map(|x| x.into()).collect(), expanded);
     }
 
     #[test]
     fn expand_braces_v2() {
         let line = "It{{em,alic}iz,erat}e{d,}";
         let expected = "Itemized Itemize Italicized Italicize Iterated Iterate";
-        let expanded = VariableExpander.expand_string(line);
-        assert_eq!(expected.split_whitespace().map(|x| x.into()).collect::<Args>(), expanded);
+        let expanded = VariableExpander.expand_string(line).unwrap();
+        assert_eq!(expected.split_whitespace().map(|x| x.into()).collect(), expanded);
     }
 
     #[test]
     fn expand_variables_with_colons() {
-        let expanded = VariableExpander.expand_string("$FOO:$BAR");
+        let expanded = VariableExpander.expand_string("$FOO:$BAR").unwrap();
         assert_eq!(args!["FOO:BAR"], expanded);
     }
 
     #[test]
     fn expand_multiple_variables() {
-        let expanded = VariableExpander.expand_string("${B}${C}...${D}");
+        let expanded = VariableExpander.expand_string("${B}${C}...${D}").unwrap();
         assert_eq!(args!["testing...1 2 3"], expanded);
     }
 
@@ -719,7 +761,7 @@ mod test {
     fn expand_variable_alongside_braces() {
         let line = "$A{1,2}";
         let expected = args!["11", "12"];
-        let expanded = VariableExpander.expand_string(line);
+        let expanded = VariableExpander.expand_string(line).unwrap();
         assert_eq!(expected, expanded);
     }
 
@@ -727,7 +769,7 @@ mod test {
     fn expand_variable_within_braces() {
         let line = "1{$A,2}";
         let expected = args!["11", "12"];
-        let expanded = VariableExpander.expand_string(line);
+        let expanded = VariableExpander.expand_string(line).unwrap();
         assert_eq!(&expected, &expanded);
     }
 
@@ -735,13 +777,13 @@ mod test {
     fn array_indexing() {
         let base = |idx: &str| format!("[1 2 3][{}]", idx);
         for idx in vec!["-3", "0", "..-2"] {
-            assert_eq!(args!["1"], VariableExpander.expand_string(&base(idx)));
+            assert_eq!(args!["1"], VariableExpander.expand_string(&base(idx)).unwrap());
         }
         for idx in vec!["1...2", "1...-1"] {
-            assert_eq!(args!["2", "3"], VariableExpander.expand_string(&base(idx)));
+            assert_eq!(args!["2", "3"], VariableExpander.expand_string(&base(idx)).unwrap());
         }
         for idx in vec!["-17", "4..-4"] {
-            assert_eq!(Args::new(), VariableExpander.expand_string(&base(idx)));
+            assert_eq!(Args::new(), VariableExpander.expand_string(&base(idx)).unwrap());
         }
     }
 
@@ -755,7 +797,7 @@ mod test {
             (args!["bar", "baz", "bat"], "1...3"),
         ];
         for (expected, idx) in cases {
-            assert_eq!(expected, VariableExpander.expand_string(&line(idx)));
+            assert_eq!(expected, VariableExpander.expand_string(&line(idx)).unwrap());
         }
     }
 
@@ -763,10 +805,10 @@ mod test {
     fn arith_expression() {
         let line = "$((A * A - (A + A)))";
         let expected = args!["-1"];
-        assert_eq!(expected, VariableExpander.expand_string(line));
+        assert_eq!(expected, VariableExpander.expand_string(line).unwrap());
         let line = "$((3 * 10 - 27))";
         let expected = args!["3"];
-        assert_eq!(expected, VariableExpander.expand_string(line));
+        assert_eq!(expected, VariableExpander.expand_string(line).unwrap());
     }
 
     #[test]
@@ -774,7 +816,7 @@ mod test {
         let cases =
             vec![(args!["5"], "$len([0 1 2 3 4])"), (args!["FxOxO"], "$join(@chars('FOO') 'x')")];
         for (expected, input) in cases {
-            assert_eq!(expected, VariableExpander.expand_string(input));
+            assert_eq!(expected, VariableExpander.expand_string(input).unwrap());
         }
     }
 }

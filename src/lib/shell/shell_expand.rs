@@ -1,6 +1,6 @@
 use super::{fork::Capture, variables::Value, Shell};
 use crate::{
-    parser::{Expander, Select},
+    parser::shell_expand::{Expander, Select},
     sys::{self, env as sys_env, variables as self_sys},
     types,
 };

@@ -43,12 +43,13 @@ pub enum MethodError {
 impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
     pub fn array<'c>(&'c self) -> impl Iterator<Item = types::Str> + 'c {
         ArgumentSplitter::new(self.args)
-            .flat_map(move |x| self.expand.expand_string(x))
+            .filter_map(move |x| self.expand.expand_string(x).ok())
+            .flat_map(|x| x)
             .map(|s| unescape(&s))
     }
 
-    pub fn join(self, pattern: &str) -> types::Str {
-        unescape(&self.expand.expand_string(self.args).join(pattern))
+    pub fn join(self, pattern: &str) -> super::super::Result<types::Str> {
+        Ok(unescape(&self.expand.expand_string(self.args)?.join(pattern)))
     }
 
     pub fn new(args: &'a str, expand: &'b E) -> MethodArgs<'a, 'b, E> {

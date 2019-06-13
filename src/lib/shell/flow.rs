@@ -79,7 +79,7 @@ impl<'a> Shell<'a> {
 
         let default = ::small::String::new();
 
-        match ForValueExpression::new(values, self) {
+        match ForValueExpression::new(values, self)? {
             ForValueExpression::Multiple(values) => {
                 for chunk in &values.iter().chunks(variables.len()) {
                     set_vars_then_exec!(chunk, &default);
@@ -262,12 +262,12 @@ impl<'a> Shell<'a> {
         // matches("foo", "bar")
         // ```
         let is_array = is_array(expression.as_ref());
-        let value = self.expand_string(expression.as_ref());
+        let value = self.expand_string(expression.as_ref())?;
         for case in cases.iter() {
             if case
                 .value
                 .as_ref()
-                .map(|v| self.expand_string(&v))
+                .and_then(|v| self.expand_string(&v).ok())
                 .filter(|v| v.iter().all(|v| !value.contains(v)))
                 .is_none()
             {

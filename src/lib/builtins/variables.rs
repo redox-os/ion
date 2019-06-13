@@ -168,7 +168,7 @@ mod test {
         variables.set("FOO", "BAR");
         let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
         assert!(return_status.is_success());
-        let expanded = VariableExpander(variables).expand_string("$FOO").join("");
+        let expanded = VariableExpander(variables).expand_string("$FOO").unwrap().join("");
         assert_eq!("", expanded);
     }
 
@@ -192,7 +192,7 @@ mod test {
         variables.set("FOO", array!["BAR"]);
         let return_status = drop_array(&mut variables, &["drop", "-a", "FOO"]);
         assert_eq!(Status::SUCCESS, return_status);
-        let expanded = VariableExpander(variables).expand_string("@FOO").join("");
+        let expanded = VariableExpander(variables).expand_string("@FOO").unwrap().join("");
         assert_eq!("", expanded);
     }
 

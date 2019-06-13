@@ -46,8 +46,8 @@ fn get_map_of<E: Expander>(
     primitive_type: &Primitive,
     shell: &E,
     expression: &str,
-) -> Result<Value<'static>, TypeError> {
-    let array = shell.expand_string(expression);
+) -> super::super::shell_expand::Result<Value<'static>> {
+    let array = shell.expand_string(expression)?;
 
     let inner_kind = match primitive_type {
         Primitive::HashMap(ref inner) => inner,
@@ -64,10 +64,10 @@ fn get_map_of<E: Expander>(
                 Value::Str(_) | Value::Array(_) | Value::HashMap(_) | Value::BTreeMap(_) => {
                     Ok(((*key).into(), val))
                 }
-                _ => Err(TypeError::BadValue((**inner_kind).clone())),
+                _ => Err(TypeError::BadValue((**inner_kind).clone()).into()),
             })
         } else {
-            Err(TypeError::BadValue(*inner_kind.clone()))
+            Err(TypeError::BadValue(*inner_kind.clone()).into())
         }
     });
 
@@ -96,7 +96,7 @@ pub fn value_check<E: Expander>(
     shell: &E,
     value: &str,
     expected: &Primitive,
-) -> Result<Value<'static>, TypeError> {
+) -> super::super::shell_expand::Result<Value<'static>> {
     if is_array(value) {
         let extracted = shell.get_array(value);
         match expected {
@@ -122,7 +122,7 @@ pub fn value_check<E: Expander>(
                 .map(Value::Array),
             Primitive::HashMap(_) | Primitive::BTreeMap(_) => get_map_of(expected, shell, value),
             Primitive::Indexed(_, ref kind) => value_check(shell, value, kind),
-            _ => Err(TypeError::BadValue(expected.clone())),
+            _ => Err(TypeError::BadValue(expected.clone()).into()),
         }
     } else {
         let mut extracted = shell.get_string(value);
@@ -132,13 +132,13 @@ pub fn value_check<E: Expander>(
                 if is_boolean(&mut extracted) {
                     Ok(Value::Str(extracted))
                 } else {
-                    Err(TypeError::BadValue(expected.clone()))
+                    Err(TypeError::BadValue(expected.clone()).into())
                 }
             }
             Primitive::Integer if extracted.parse::<i64>().is_ok() => Ok(Value::Str(extracted)),
             Primitive::Float if extracted.parse::<f64>().is_ok() => Ok(Value::Str(extracted)),
             Primitive::Indexed(_, ref kind) => value_check(shell, value, kind),
-            _ => Err(TypeError::BadValue(expected.clone())),
+            _ => Err(TypeError::BadValue(expected.clone()).into()),
         }
     }
 }
@@ -146,7 +146,6 @@ pub fn value_check<E: Expander>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::lexers::TypeError;
 
     struct VariableExpander;
 
@@ -196,16 +195,13 @@ mod test {
     #[test]
     fn is_integer_array_() {
         assert_eq!(
-            value_check(&VariableExpander, "[1 2 3]", &Primitive::IntegerArray),
-            Ok(Value::Array(vec![
+            value_check(&VariableExpander, "[1 2 3]", &Primitive::IntegerArray).unwrap(),
+            Value::Array(vec![
                 Value::Str("1".into()),
                 Value::Str("2".into()),
                 Value::Str("3".into())
-            ]))
+            ])
         );
-        assert_eq!(
-            value_check(&VariableExpander, "[1 2 three]", &Primitive::IntegerArray),
-            Err(TypeError::BadValue(Primitive::Integer))
-        );
+        assert!(value_check(&VariableExpander, "[1 2 three]", &Primitive::IntegerArray).is_err());
     }
 }

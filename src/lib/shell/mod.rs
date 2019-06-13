@@ -31,7 +31,8 @@ use crate::{
     builtins::BuiltinMap,
     lexers::{Key, Primitive},
     parser::{
-        assignments::value_check, pipelines::Pipeline, ParseError, StatementError, Terminator,
+        assignments::value_check, pipelines::Pipeline, shell_expand::ExpansionError, ParseError,
+        StatementError, Terminator,
     },
     sys, types,
 };
@@ -70,6 +71,8 @@ pub enum IonError {
     FileExecutionError(String, #[error(cause)] io::Error),
     #[error(display = "pipeline execution error: {}", _0)]
     PipelineExecutionError(#[error(cause)] PipelineError),
+    #[error(display = "expansion error: {}", _0)]
+    ExpansionError(#[error(cause)] ExpansionError),
 }
 
 impl From<ParseError> for IonError {
@@ -94,6 +97,10 @@ impl From<PipelineError> for IonError {
 
 impl From<io::Error> for IonError {
     fn from(cause: io::Error) -> Self { IonError::Fork(cause) }
+}
+
+impl From<ExpansionError> for IonError {
+    fn from(cause: ExpansionError) -> Self { IonError::ExpansionError(cause) }
 }
 
 #[derive(Debug, Clone, Hash)]

@@ -387,7 +387,7 @@ mod tests {
     #[test]
     fn undefined_variable_expands_to_empty_string() {
         let variables = Variables::default();
-        let expanded = VariableExpander(variables).expand_string("$FOO").join("");
+        let expanded = VariableExpander(variables).expand_string("$FOO").unwrap().join("");
         assert_eq!("", &expanded);
     }
 
@@ -395,7 +395,7 @@ mod tests {
     fn set_var_and_expand_a_variable() {
         let mut variables = Variables::default();
         variables.set("FOO", "BAR");
-        let expanded = VariableExpander(variables).expand_string("$FOO").join("");
+        let expanded = VariableExpander(variables).expand_string("$FOO").unwrap().join("");
         assert_eq!("BAR", &expanded);
     }
 
