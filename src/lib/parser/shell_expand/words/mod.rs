@@ -383,7 +383,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                             b'"' if method_flags == Quotes::None => method_flags = Quotes::Double,
                             b'[' if method_flags == Quotes::None => depth += 1,
                             b']' if method_flags == Quotes::None => depth -= 1,
-                            b' ' if depth == 0 && method_flags != Quotes::Single => {
+                            b' ' if depth == 0 && method_flags == Quotes::None => {
                                 let variable = &self.data[start..self.read];
                                 self.read += 1;
                                 start = self.read;
