@@ -11,6 +11,7 @@ impl Expander for Empty {}
 fn compare(input: &str, expected: Vec<WordToken<'_>>) {
     let mut correct = 0;
     for (actual, expected) in WordIterator::new(input, &Empty, true).zip(expected.iter()) {
+        let actual = actual.unwrap();
         assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
         correct += 1;
     }

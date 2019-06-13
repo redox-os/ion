@@ -88,19 +88,30 @@ pub struct PipeItem<'a> {
 }
 
 impl<'a> PipeItem<'a> {
-    pub fn expand(&mut self, shell: &Shell<'a>) {
-        self.job.expand(shell);
+    pub fn expand(&self, shell: &Shell<'a>) -> super::shell_expand::Result<Self> {
+        let mut job = self.job.clone();
+        job.expand(shell)?;
 
-        for input in &mut self.inputs {
-            *input = match input {
-                Input::File(ref s) => Input::File(shell.get_string(s)),
-                Input::HereString(ref s) => Input::HereString(shell.get_string(s)),
-            };
-        }
+        let inputs = self
+            .inputs
+            .iter()
+            .map(|input| match input {
+                Input::File(ref s) => Ok(Input::File(shell.get_string(s)?)),
+                Input::HereString(ref s) => Ok(Input::HereString(shell.get_string(s)?)),
+            })
+            .collect::<Result<_, super::shell_expand::ExpansionError>>()?;
 
-        for output in &mut self.outputs {
-            output.file = shell.get_string(output.file.as_str());
-        }
+        let outputs = self
+            .outputs
+            .iter()
+            .map(|output| {
+                let mut output = output.clone();
+                output.file = shell.get_string(output.file.as_str())?;
+                Ok(output)
+            })
+            .collect::<Result<_, super::shell_expand::ExpansionError>>()?;
+
+        Ok(PipeItem { job, outputs, inputs })
     }
 
     pub fn command(&self) -> &types::Str { self.job.command() }
@@ -140,8 +151,9 @@ impl<'a> Pipeline<'a> {
             || self.pipe != PipeType::Normal
     }
 
-    pub fn expand(&mut self, shell: &Shell<'a>) {
-        self.items.iter_mut().for_each(|i| i.expand(shell));
+    pub fn expand(&self, shell: &Shell<'a>) -> super::shell_expand::Result<Self> {
+        let items = self.items.iter().map(|i| i.expand(shell)).collect::<Result<_, _>>()?;
+        Ok(Pipeline { items, pipe: self.pipe })
     }
 
     pub fn new() -> Self { Self::default() }

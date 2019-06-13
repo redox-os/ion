@@ -1,4 +1,4 @@
-use super::super::Expander;
+use super::super::{shell_expand, Expander};
 use crate::{
     lexers::assignments::{Primitive, TypeError},
     shell::variables::Value,
@@ -46,7 +46,7 @@ fn get_map_of<E: Expander>(
     primitive_type: &Primitive,
     shell: &E,
     expression: &str,
-) -> super::super::shell_expand::Result<Value<'static>> {
+) -> shell_expand::Result<Value<'static>> {
     let array = shell.expand_string(expression)?;
 
     let inner_kind = match primitive_type {
@@ -96,36 +96,32 @@ pub fn value_check<E: Expander>(
     shell: &E,
     value: &str,
     expected: &Primitive,
-) -> super::super::shell_expand::Result<Value<'static>> {
+) -> shell_expand::Result<Value<'static>> {
     if is_array(value) {
-        let extracted = shell.get_array(value);
+        let extracted = shell.get_array(value)?;
         match expected {
             Primitive::StrArray | Primitive::Str => extracted
                 .iter()
                 .map(|item| value_check(shell, item, &Primitive::Str))
-                .collect::<Result<Vec<_>, _>>()
-                .map(Value::Array),
+                .collect::<Result<Value, _>>(),
             Primitive::BooleanArray => extracted
                 .iter()
                 .map(|item| value_check(shell, item, &Primitive::Boolean))
-                .collect::<Result<Vec<_>, _>>()
-                .map(Value::Array),
+                .collect::<Result<Value, _>>(),
             Primitive::IntegerArray => extracted
                 .iter()
                 .map(|item| value_check(shell, item, &Primitive::Integer))
-                .collect::<Result<Vec<_>, _>>()
-                .map(Value::Array),
+                .collect::<Result<Value, _>>(),
             Primitive::FloatArray => extracted
                 .iter()
                 .map(|item| value_check(shell, item, &Primitive::Float))
-                .collect::<Result<Vec<_>, _>>()
-                .map(Value::Array),
+                .collect::<Result<Value, _>>(),
             Primitive::HashMap(_) | Primitive::BTreeMap(_) => get_map_of(expected, shell, value),
             Primitive::Indexed(_, ref kind) => value_check(shell, value, kind),
             _ => Err(TypeError::BadValue(expected.clone()).into()),
         }
     } else {
-        let mut extracted = shell.get_string(value);
+        let mut extracted = shell.get_string(value)?;
         match expected {
             Primitive::Str => Ok(Value::Str(extracted)),
             Primitive::Boolean => {
@@ -150,10 +146,12 @@ mod test {
     struct VariableExpander;
 
     impl Expander for VariableExpander {
-        fn get_string(&self, variable: &str) -> types::Str { variable.into() }
+        fn get_string(&self, variable: &str) -> shell_expand::Result<types::Str> {
+            Ok(variable.into())
+        }
 
-        fn get_array(&self, variable: &str) -> types::Args {
-            variable[1..variable.len() - 1].split(' ').map(Into::into).collect()
+        fn get_array(&self, variable: &str) -> shell_expand::Result<types::Args> {
+            Ok(variable[1..variable.len() - 1].split(' ').map(Into::into).collect())
         }
     }
 

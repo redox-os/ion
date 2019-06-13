@@ -10,10 +10,13 @@ impl<'a> InteractiveBinary<'a> {
 
         if blocks == 0 {
             Self::prompt_fn(&shell).unwrap_or_else(|| {
-                shell
-                    .get_string(&shell.variables().get_str("PROMPT").unwrap_or_default())
-                    .as_str()
-                    .into()
+                match shell.get_string(&shell.variables().get_str("PROMPT").unwrap_or_default()) {
+                    Ok(prompt) => prompt.to_string(),
+                    Err(why) => {
+                        eprintln!("ion: prompt expansion failed: {}", why);
+                        ">>> ".into()
+                    }
+                }
             })
         } else {
             "    ".repeat(blocks)

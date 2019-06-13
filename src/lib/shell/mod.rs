@@ -296,10 +296,10 @@ impl<'a> Shell<'a> {
     }
 
     /// Executes a pipeline and returns the final exit status of the pipeline.
-    pub fn run_pipeline(&mut self, mut pipeline: Pipeline<'a>) -> Result<Status, PipelineError> {
+    pub fn run_pipeline(&mut self, pipeline: Pipeline<'a>) -> Result<Status, IonError> {
         let command_start_time = SystemTime::now();
 
-        pipeline.expand(self);
+        let pipeline = pipeline.expand(self)?;
         // A string representing the command is stored here.
         if self.opts.print_comms {
             eprintln!("> {}", pipeline);
@@ -307,29 +307,26 @@ impl<'a> Shell<'a> {
 
         // Don't execute commands when the `-n` flag is passed.
         let exit_status = if self.opts.no_exec {
-            Ok(Status::SUCCESS)
+            Status::SUCCESS
         // Branch else if -> input == shell command i.e. echo
         } else if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
-                Ok(main(&pipeline.items[0].job.args, self))
+                main(&pipeline.items[0].job.args, self)
             } else {
-                self.execute_pipeline(pipeline)
+                self.execute_pipeline(pipeline)?
             }
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(Value::Function(function)) =
             self.variables.get_ref(&pipeline.items[0].job.args[0]).cloned()
         {
             if !pipeline.requires_piping() {
-                function
-                    .execute(self, &pipeline.items[0].job.args)
-                    .map(|_| self.previous_status)
-                    .map_err(Into::into)
+                function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)?
             } else {
-                self.execute_pipeline(pipeline)
+                self.execute_pipeline(pipeline)?
             }
         } else {
-            self.execute_pipeline(pipeline)
+            self.execute_pipeline(pipeline)?
         };
 
         if let Some(ref callback) = self.on_command {
@@ -337,13 +334,12 @@ impl<'a> Shell<'a> {
                 callback(self, elapsed_time);
             }
         }
-        if let Ok(status) = exit_status {
-            if self.opts.err_exit && !status.is_success() {
-                return Err(PipelineError::EarlyExit);
-            }
+
+        if self.opts.err_exit && !exit_status.is_success() {
+            return Err(PipelineError::EarlyExit.into());
         }
 
-        exit_status
+        Ok(exit_status)
     }
 
     pub fn previous_job(&self) -> Option<usize> {

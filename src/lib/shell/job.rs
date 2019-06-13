@@ -20,9 +20,13 @@ impl<'a> Job<'a> {
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
     pub fn expand(&mut self, shell: &Shell<'_>) -> shell_expand::Result<()> {
+        let mut args = types::Args::new();
+        for arg in &self.args {
+            args.extend(expand_arg(&arg, shell)?);
+        }
         match shell.variables.get_ref(&self.args[0]) {
             Some(Value::Function(_)) => {}
-            _ => self.args = self.args.drain().flat_map(|arg| expand_arg(&arg, shell)).collect()?,
+            _ => self.args = args,
         }
         Ok(())
     }
