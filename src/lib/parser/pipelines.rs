@@ -1,9 +1,9 @@
 use err_derive::Error;
 use std::iter::Peekable;
 
-use super::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection};
 use crate::{
     builtins::BuiltinMap,
+    expansion::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
     lexers::arguments::{Field, Levels, LevelsError},
     shell::Job,
     types::*,

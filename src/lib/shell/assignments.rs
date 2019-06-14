@@ -3,9 +3,10 @@ use super::{
     Shell,
 };
 use crate::{
+    assignments::*,
     builtins::Status,
     lexers::assignments::{Key, Operator, Primitive},
-    parser::{assignments::*, is_valid_name},
+    parser::is_valid_name,
     shell::variables::{EuclDiv, Modifications, OpError, Pow, Value},
 };
 use std::{

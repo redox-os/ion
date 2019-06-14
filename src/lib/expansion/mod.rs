@@ -1,7 +1,14 @@
 // TODO: Handle Runtime Errors
+mod loops;
+mod methods;
+pub mod pipelines;
 mod words;
 
-pub use self::words::{unescape, MethodError, Select, WordIterator, WordToken};
+pub use self::{
+    loops::ForValueExpression,
+    methods::MethodError,
+    words::{unescape, Select, WordIterator, WordToken},
+};
 use crate::{
     braces::{self, BraceToken},
     lexers::assignments::TypeError,

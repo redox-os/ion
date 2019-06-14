@@ -1,9 +1,10 @@
 use super::{
     super::{
-        super::{is_expression, Expander},
-        Select, SelectWithSize,
+        is_expression,
+        words::{Select, SelectWithSize},
     },
     strings::unescape,
+    Expander,
     MethodError::*,
     Pattern,
 };
@@ -29,23 +30,23 @@ impl<'a> ArrayMethod<'a> {
         ArrayMethod { method, variable, pattern, selection }
     }
 
-    fn reverse<E: Expander>(&self, expand_func: &E) -> super::super::super::Result<Args> {
+    fn reverse<E: Expander>(&self, expand_func: &E) -> super::super::Result<Args> {
         let mut result = self.resolve_array(expand_func)?;
         result.reverse();
         Ok(result)
     }
 
-    fn lines<E: Expander>(&self, expand_func: &E) -> super::super::super::Result<Args> {
+    fn lines<E: Expander>(&self, expand_func: &E) -> super::super::Result<Args> {
         Ok(self.resolve_var(expand_func)?.lines().map(types::Str::from).collect())
     }
 
-    fn chars<E: Expander>(&self, expand_func: &E) -> super::super::super::Result<Args> {
+    fn chars<E: Expander>(&self, expand_func: &E) -> super::super::Result<Args> {
         let variable = self.resolve_var(expand_func)?;
         let len = variable.chars().count();
         Ok(variable.chars().map(|c| types::Str::from(c.to_string())).select(&self.selection, len))
     }
 
-    fn bytes<E: Expander>(&self, expand_func: &E) -> super::super::super::Result<Args> {
+    fn bytes<E: Expander>(&self, expand_func: &E) -> super::super::Result<Args> {
         let variable = self.resolve_var(expand_func)?;
         let len = variable.len();
         Ok(variable.bytes().map(|b| types::Str::from(b.to_string())).select(&self.selection, len))
@@ -59,7 +60,7 @@ impl<'a> ArrayMethod<'a> {
         expand_func.map_values(self.variable, &self.selection).ok_or(NoMapFound("map_values"))
     }
 
-    fn graphemes<E: Expander>(&self, expand_func: &E) -> super::super::super::Result<Args> {
+    fn graphemes<E: Expander>(&self, expand_func: &E) -> super::super::Result<Args> {
         let variable = self.resolve_var(expand_func)?;
         let graphemes: Vec<types::Str> =
             UnicodeSegmentation::graphemes(variable.as_str(), true).map(From::from).collect();
@@ -67,7 +68,7 @@ impl<'a> ArrayMethod<'a> {
         Ok(graphemes.into_iter().select(&self.selection, len))
     }
 
-    fn split_at<E: Expander>(&self, expand_func: &E) -> super::super::super::Result<Args> {
+    fn split_at<E: Expander>(&self, expand_func: &E) -> super::super::Result<Args> {
         let variable = self.resolve_var(expand_func)?;
         match self.pattern {
             Pattern::StringPattern(string) => {
@@ -86,7 +87,7 @@ impl<'a> ArrayMethod<'a> {
         }
     }
 
-    fn split<E: Expander>(&self, expand_func: &E) -> super::super::super::Result<Args> {
+    fn split<E: Expander>(&self, expand_func: &E) -> super::super::Result<Args> {
         let variable = self.resolve_var(expand_func)?;
         let data: Args = match self.pattern {
             Pattern::Whitespace => variable
@@ -104,7 +105,7 @@ impl<'a> ArrayMethod<'a> {
     }
 
     #[inline]
-    fn resolve_array<E: Expander>(&self, expand_func: &E) -> super::super::super::Result<Args> {
+    fn resolve_array<E: Expander>(&self, expand_func: &E) -> super::super::Result<Args> {
         if let Some(array) = expand_func.array(self.variable, &Select::All) {
             Ok(array)
         } else if is_expression(self.variable) {
@@ -115,7 +116,7 @@ impl<'a> ArrayMethod<'a> {
     }
 
     #[inline]
-    fn resolve_var<E: Expander>(&self, expand_func: &E) -> super::super::super::Result<types::Str> {
+    fn resolve_var<E: Expander>(&self, expand_func: &E) -> super::super::Result<types::Str> {
         if let Some(variable) = expand_func.string(self.variable) {
             Ok(variable)
         } else if is_expression(self.variable) {
@@ -125,10 +126,7 @@ impl<'a> ArrayMethod<'a> {
         }
     }
 
-    pub fn handle_as_array<E: Expander>(
-        &self,
-        expand_func: &E,
-    ) -> super::super::super::Result<Args> {
+    pub fn handle_as_array<E: Expander>(&self, expand_func: &E) -> super::super::Result<Args> {
         match self.method {
             "bytes" => self.bytes(expand_func),
             "chars" => self.chars(expand_func),
@@ -147,7 +145,7 @@ impl<'a> ArrayMethod<'a> {
         &self,
         current: &mut types::Str,
         expand_func: &E,
-    ) -> super::super::super::Result<()> {
+    ) -> super::super::Result<()> {
         match self.method {
             "split" => Ok(current.push_str(&self.split(expand_func)?.join(" "))),
             _ => Err(InvalidArrayMethod(self.method.to_string()).into()),

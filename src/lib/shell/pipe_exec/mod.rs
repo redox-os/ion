@@ -24,7 +24,7 @@ use super::{
 };
 use crate::{
     builtins::{self, Status},
-    parser::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
+    expansion::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
     sys,
 };
 use err_derive::Error;

@@ -1,5 +1,5 @@
 use super::InteractiveBinary;
-use ion_shell::{parser::Expander, Capture, Shell};
+use ion_shell::{expansion::Expander, Capture, Shell};
 use std::io::Read;
 
 impl<'a> InteractiveBinary<'a> {

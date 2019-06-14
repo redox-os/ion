@@ -1,7 +1,5 @@
-use crate::{
-    parser::{shell_expand::Result, Expander},
-    ranges, types,
-};
+use super::{Expander, Result};
+use crate::{ranges, types};
 
 /// The expression given to a for loop as the value to iterate upon.
 pub enum ForValueExpression {

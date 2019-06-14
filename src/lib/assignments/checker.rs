@@ -1,5 +1,5 @@
-use super::super::{shell_expand, Expander};
 use crate::{
+    expansion::{self, Expander},
     lexers::assignments::{Primitive, TypeError},
     shell::variables::Value,
     types,
@@ -46,7 +46,7 @@ fn get_map_of<E: Expander>(
     primitive_type: &Primitive,
     shell: &E,
     expression: &str,
-) -> shell_expand::Result<Value<'static>> {
+) -> expansion::Result<Value<'static>> {
     let array = shell.expand_string(expression)?;
 
     let inner_kind = match primitive_type {
@@ -96,7 +96,7 @@ pub fn value_check<E: Expander>(
     shell: &E,
     value: &str,
     expected: &Primitive,
-) -> shell_expand::Result<Value<'static>> {
+) -> expansion::Result<Value<'static>> {
     if is_array(value) {
         let extracted = shell.get_array(value)?;
         match expected {
@@ -146,11 +146,11 @@ mod test {
     struct VariableExpander;
 
     impl Expander for VariableExpander {
-        fn get_string(&self, variable: &str) -> shell_expand::Result<types::Str> {
+        fn get_string(&self, variable: &str) -> expansion::Result<types::Str> {
             Ok(variable.into())
         }
 
-        fn get_array(&self, variable: &str) -> shell_expand::Result<types::Args> {
+        fn get_array(&self, variable: &str) -> expansion::Result<types::Args> {
             Ok(variable[1..variable.len() - 1].split(' ').map(Into::into).collect())
         }
     }

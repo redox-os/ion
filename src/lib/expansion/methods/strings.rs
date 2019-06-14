@@ -1,12 +1,9 @@
-use super::{
-    super::{
-        super::{is_expression, Expander, ExpanderInternal, Result},
-        Select,
-    },
-    MethodArgs,
-    MethodError::*,
+use super::{super::Select, MethodArgs, MethodError::*};
+use crate::{
+    assignments::is_array,
+    expansion::{is_expression, Expander, ExpanderInternal, Result},
+    types,
 };
-use crate::{parser::assignments::is_array, types};
 use regex::Regex;
 use std::path::Path;
 use unicode_segmentation::UnicodeSegmentation;

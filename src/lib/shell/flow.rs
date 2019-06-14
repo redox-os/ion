@@ -4,12 +4,12 @@ use super::{
     signals, Shell,
 };
 use crate::{
-    parser::{
-        assignments::is_array,
-        parse_and_validate,
+    assignments::is_array,
+    expansion::{
         pipelines::{PipeItem, Pipeline},
-        Expander, ForValueExpression, StatementSplitter, Terminator,
+        Expander, ForValueExpression,
     },
+    parser::{parse_and_validate, StatementSplitter, Terminator},
     shell::{IonError, Value},
     types,
 };

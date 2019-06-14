@@ -26,12 +26,11 @@ pub use self::{
     variables::Value,
 };
 use crate::{
+    assignments::value_check,
     builtins::{BuiltinMap, Status},
+    expansion::{pipelines::Pipeline, ExpansionError},
     lexers::{Key, Primitive},
-    parser::{
-        assignments::value_check, pipelines::Pipeline, shell_expand::ExpansionError, ParseError,
-        StatementError, Terminator,
-    },
+    parser::{ParseError, StatementError, Terminator},
     sys, types,
 };
 use err_derive::Error;

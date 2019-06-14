@@ -227,12 +227,11 @@ pub fn parse<'a>(code: &str, builtins: &BuiltinMap<'a>) -> super::Result<'a> {
 
 #[cfg(test)]
 mod tests {
-    use self::pipelines::{PipeItem, PipeType, Pipeline};
     use super::*;
     use crate::{
         builtins::BuiltinMap,
+        expansion::pipelines::{PipeItem, PipeType, Pipeline, RedirectFrom},
         lexers::assignments::{KeyBuf, Primitive},
-        parser::pipelines::RedirectFrom,
         shell::{flow_control::Statement, Job},
     };
 

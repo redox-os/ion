@@ -1,4 +1,4 @@
-use crate::parser::shell_expand::ExpansionError;
+use crate::expansion::ExpansionError;
 use itertools::Itertools;
 
 #[derive(Debug)]

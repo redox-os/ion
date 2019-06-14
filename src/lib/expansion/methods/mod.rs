@@ -48,7 +48,7 @@ impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {
             .map(|s| unescape(&s))
     }
 
-    pub fn join(self, pattern: &str) -> super::super::Result<types::Str> {
+    pub fn join(self, pattern: &str) -> super::Result<types::Str> {
         Ok(unescape(&self.expand.expand_string(self.args)?.join(pattern)))
     }
 

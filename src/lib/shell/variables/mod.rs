@@ -7,7 +7,7 @@ pub use self::{
 };
 use super::{colors::Colors, flow_control::Function};
 use crate::{
-    parser::shell_expand::ExpansionError,
+    expansion::ExpansionError,
     sys::{env as sys_env, geteuid, getpid, getuid, variables as self_sys},
     types::{self, Array},
 };
@@ -364,7 +364,7 @@ mod trait_test;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::Expander;
+    use crate::expansion::Expander;
     use serial_test_derive::serial;
 
     struct VariableExpander<'a>(pub Variables<'a>);

@@ -1,7 +1,7 @@
 use auto_enums::auto_enum;
 use glob::{glob_with, MatchOptions};
 use ion_shell::{
-    parser::{shell_expand::unescape, Expander},
+    expansion::{unescape, Expander},
     Shell,
 };
 use ion_sys::PATH_SEPARATOR;

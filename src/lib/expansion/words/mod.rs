@@ -1,9 +1,10 @@
-mod methods;
 #[cfg(test)]
 mod tests;
 
-pub use self::methods::{ArrayMethod, MethodError, Pattern, StringMethod};
-use super::{Expander, Result};
+use super::{
+    methods::{ArrayMethod, Pattern, StringMethod},
+    Expander, Result,
+};
 use crate::lexers::ArgumentSplitter;
 pub use crate::ranges::{Select, SelectWithSize};
 use std::borrow::Cow;

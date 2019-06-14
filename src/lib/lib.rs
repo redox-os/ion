@@ -70,7 +70,9 @@ use ion_sys as sys;
 pub mod types;
 #[macro_use]
 pub mod parser;
+mod assignments;
 pub mod builtins;
+pub mod expansion;
 mod memory;
 mod shell;
 

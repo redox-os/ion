@@ -128,7 +128,7 @@ pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Sta
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::parser::Expander;
+    use crate::expansion::Expander;
 
     struct VariableExpander<'a>(pub Variables<'a>);
 

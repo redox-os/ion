@@ -1,9 +1,5 @@
-mod collector;
-
-pub use self::collector::*;
-
+use super::Expander;
 use crate::{
-    parser::Expander,
     shell::{Job, Shell},
     types,
 };
@@ -87,7 +83,7 @@ pub struct PipeItem<'a> {
 }
 
 impl<'a> PipeItem<'a> {
-    pub fn expand(&self, shell: &Shell<'a>) -> super::shell_expand::Result<Self> {
+    pub fn expand(&self, shell: &Shell<'a>) -> super::Result<Self> {
         let mut job = self.job.clone();
         job.expand(shell)?;
 
@@ -98,7 +94,7 @@ impl<'a> PipeItem<'a> {
                 Input::File(ref s) => Ok(Input::File(shell.get_string(s)?)),
                 Input::HereString(ref s) => Ok(Input::HereString(shell.get_string(s)?)),
             })
-            .collect::<Result<_, super::shell_expand::ExpansionError>>()?;
+            .collect::<Result<_, super::ExpansionError>>()?;
 
         let outputs = self
             .outputs
@@ -108,7 +104,7 @@ impl<'a> PipeItem<'a> {
                 output.file = shell.get_string(output.file.as_str())?;
                 Ok(output)
             })
-            .collect::<Result<_, super::shell_expand::ExpansionError>>()?;
+            .collect::<Result<_, super::ExpansionError>>()?;
 
         Ok(PipeItem { job, outputs, inputs })
     }
@@ -150,7 +146,7 @@ impl<'a> Pipeline<'a> {
             || self.pipe != PipeType::Normal
     }
 
-    pub fn expand(&self, shell: &Shell<'a>) -> super::shell_expand::Result<Self> {
+    pub fn expand(&self, shell: &Shell<'a>) -> super::Result<Self> {
         let items = self.items.iter().map(|i| i.expand(shell)).collect::<Result<_, _>>()?;
         Ok(Pipeline { items, pipe: self.pipe })
     }

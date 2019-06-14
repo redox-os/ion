@@ -8,7 +8,8 @@ mod readln;
 
 use ion_shell::{
     builtins::{man_pages, Status},
-    parser::{Expander, Terminator},
+    expansion::Expander,
+    parser::Terminator,
     types, Shell,
 };
 use ion_sys::SIGHUP;

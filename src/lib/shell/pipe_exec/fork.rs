@@ -4,7 +4,7 @@ use super::{
     super::Shell,
     job_control::{BackgroundProcess, ProcessState},
 };
-use crate::{builtins::Status, parser::pipelines::Pipeline};
+use crate::{builtins::Status, expansion::pipelines::Pipeline};
 
 impl<'a> Shell<'a> {
     /// Ensures that the forked child is given a unique process ID.
