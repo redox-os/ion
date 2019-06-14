@@ -64,11 +64,11 @@ macro_rules! type_from_value {
                 }
             }
         }
-    }
+    };
 }
 
-type_from_value!(types::Str : Str);
-type_from_value!(types::Alias : Alias);
+type_from_value!(types::Str: Str);
+type_from_value!(types::Alias: Alias);
 type_from_value!(types::Array<'a> : Array);
 type_from_value!(types::HashMap<'a> : HashMap);
 type_from_value!(types::BTreeMap<'a> : BTreeMap);
