@@ -23,6 +23,19 @@ pub enum ExpansionError {
     TypeError(#[error(cause)] TypeError),
     #[error(display = "invalid index")] // TODO: Add more info
     OutOfBound,
+
+    #[error(display = "namespace '{}' is unsupported", _0)]
+    UnsupportedNamespace(String),
+    #[error(display = "could not parse '{}' as hexadecimal value: {}", _0, _1)]
+    InvalidHex(String, #[error(cause)] std::num::ParseIntError),
+    #[error(display = "could not parse '{}' as a color", _0)]
+    ColorError(String),
+    #[error(display = "no properties given to color")]
+    EmptyColor,
+    #[error(display = "environment variable '{}' is not set", _0)]
+    UnknownEnv(String),
+    #[error(display = "Variable does not exist")]
+    VarNotFound,
 }
 
 impl From<TypeError> for ExpansionError {

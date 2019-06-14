@@ -7,6 +7,7 @@ pub use self::{
 };
 use super::{colors::Colors, flow_control::Function};
 use crate::{
+    parser::shell_expand::ExpansionError,
     sys::{env as sys_env, geteuid, getpid, getuid, variables as self_sys},
     types::{self, Array},
 };
@@ -230,7 +231,7 @@ impl<'a> Variables<'a> {
     /// Useful for getting smaller prompts, this will produce a simplified variant of the
     /// working directory which the leading `HOME` prefix replaced with a tilde character.
     fn get_simplified_directory(&self) -> types::Str {
-        let home = self.get_str("HOME").unwrap_or_else(|| "?".into());
+        let home = self.get_str("HOME").unwrap_or_else(|_| "?".into());
         env::var("PWD").unwrap().replace(&*home, "~").into()
     }
 
@@ -258,43 +259,34 @@ impl<'a> Variables<'a> {
         self.0.get_mut(name)
     }
 
-    pub fn get_str(&self, name: &str) -> Option<types::Str> {
+    pub fn get_str(&self, name: &str) -> Result<types::Str, ExpansionError> {
         match name {
-            "MWD" => return Some(self.get_minimal_directory()),
-            "SWD" => return Some(self.get_simplified_directory()),
+            "MWD" => return Ok(self.get_minimal_directory()),
+            "SWD" => return Ok(self.get_simplified_directory()),
             _ => (),
         }
         // If the parsed name contains the '::' pattern, then a namespace was
         // designated. Find it.
         match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
-            Some(("c", variable)) | Some(("color", variable)) => match Colors::collect(variable) {
-                Ok(color) => color.into_string().map(Into::into),
-                Err(why) => {
-                    eprintln!("{}", why);
-                    None
-                }
-            },
-            Some(("x", variable)) | Some(("hex", variable)) => {
-                match u8::from_str_radix(variable, 16) {
-                    Ok(c) => Some((c as char).to_string().into()),
-                    Err(why) => {
-                        eprintln!("ion: hex parse error: {}: {}", variable, why);
-                        None
-                    }
-                }
+            Some(("c", variable)) | Some(("color", variable)) => {
+                Ok(Colors::collect(variable)?.into_string().into())
             }
-            Some(("env", variable)) => env::var(variable).ok().map(Into::into),
+            Some(("x", variable)) | Some(("hex", variable)) => {
+                let c = u8::from_str_radix(variable, 16)
+                    .map_err(|cause| ExpansionError::InvalidHex(variable.into(), cause))?;
+                Ok((c as char).to_string().into())
+            }
+            Some(("env", variable)) => env::var(variable)
+                .map(Into::into)
+                .map_err(|_| ExpansionError::UnknownEnv(variable.into())),
             Some(("super", _)) | Some(("global", _)) | None => {
                 // Otherwise, it's just a simple variable name.
                 match self.get_ref(name) {
-                    Some(Value::Str(val)) => Some(val.clone()),
-                    _ => env::var(name).ok().map(|s| s.into()),
+                    Some(Value::Str(val)) => Ok(val.clone()),
+                    _ => env::var(name).map(|s| s.into()).map_err(|_| ExpansionError::VarNotFound),
                 }
             }
-            Some((..)) => {
-                eprintln!("ion: unsupported namespace: '{}'", name);
-                None
-            }
+            Some((..)) => Err(ExpansionError::UnsupportedNamespace(name.into())),
         }
     }
 
@@ -378,7 +370,7 @@ mod tests {
     struct VariableExpander<'a>(pub Variables<'a>);
 
     impl<'a> Expander for VariableExpander<'a> {
-        fn string(&self, var: &str) -> Option<types::Str> { self.0.get_str(var) }
+        fn string(&self, var: &str) -> Option<types::Str> { self.0.get_str(var).ok() } // TODO: make string return a result
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use super::{fork::Capture, variables::Value, Shell};
 use crate::{
-    parser::shell_expand::{Expander, Select},
+    parser::shell_expand::{Expander, ExpansionError, Select},
     sys::{self, env as sys_env, variables as self_sys},
     types,
 };
@@ -38,7 +38,16 @@ impl<'a, 'b> Expander for Shell<'b> {
         if name == "?" {
             Some(self.previous_status.into())
         } else {
-            self.variables().get_str(name)
+            match self.variables().get_str(name) {
+                Ok(var) => Some(var),
+                Err(why) => {
+                    match why {
+                        ExpansionError::VarNotFound => {}
+                        _ => eprintln!("ion: 1 :{}", why),
+                    }
+                    None
+                }
+            }
         }
     }
 
@@ -185,7 +194,13 @@ impl<'a, 'b> Expander for Shell<'b> {
         match tilde_prefix {
             "" => sys_env::home_dir().map(|home| home.to_string_lossy().to_string() + rest),
             "+" => Some(env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest),
-            "-" => self.variables.get_str("OLDPWD").map(|oldpwd| oldpwd.to_string() + rest),
+            "-" => match self.variables.get_str("OLDPWD") {
+                Ok(oldpwd) => Some(oldpwd.to_string() + rest),
+                Err(why) => {
+                    eprintln!("ion: {}", why);
+                    None
+                }
+            },
             _ => {
                 let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
                     (false, &tilde_prefix[1..])

@@ -1,8 +1,5 @@
-use err_derive::Error;
-
-#[derive(Debug, Clone, Error)]
-#[error(display = "ion: {} is not a valid color", _0)]
-pub struct InvalidColor(String);
+use crate::parser::shell_expand::ExpansionError;
+use itertools::Itertools;
 
 #[derive(Debug)]
 struct StaticMap {
@@ -87,54 +84,41 @@ enum Mode {
 pub struct Colors {
     foreground: Option<Mode>,
     background: Option<Mode>,
-    attributes: Option<Vec<&'static str>>,
+    attributes: Vec<&'static str>,
 }
 
 impl Colors {
-    /// Attempts to transform the data in the structure into the corresponding ANSI code
+    /// Transform the data in the structure into the corresponding ANSI code
     /// representation. It would very ugly to require shell scripters to have to interface
     /// with these codes directly.
-    pub fn into_string(self) -> Option<String> {
-        let mut output = String::from("\x1b[");
+    pub fn into_string(&self) -> String {
+        let foreground = self.foreground.as_ref().map(|fg| match fg {
+            Mode::Name(ref string) => (*string).to_owned(),
+            Mode::Range256(value) => format!("38;5;{}", value),
+            Mode::TrueColor(red, green, blue) => format!("38;2;{};{};{}", red, green, blue),
+        });
 
-        let foreground = match self.foreground {
-            Some(Mode::Name(string)) => Some(string.to_owned()),
-            Some(Mode::Range256(value)) => Some(format!("38;5;{}", value)),
-            Some(Mode::TrueColor(red, green, blue)) => {
-                Some(format!("38;2;{};{};{}", red, green, blue))
-            }
-            None => None,
-        };
+        let background = self.background.as_ref().map(|bkg| match bkg {
+            Mode::Name(string) => (*string).to_owned(),
+            Mode::Range256(value) => format!("48;5;{}", value),
+            Mode::TrueColor(red, green, blue) => format!("48;2;{};{};{}", red, green, blue),
+        });
 
-        let background = match self.background {
-            Some(Mode::Name(string)) => Some(string.to_owned()),
-            Some(Mode::Range256(value)) => Some(format!("48;5;{}", value)),
-            Some(Mode::TrueColor(red, green, blue)) => {
-                Some(format!("48;2;{};{};{}", red, green, blue))
-            }
-            None => None,
-        };
-
-        if let Some(attr) = self.attributes {
-            output.push_str(&attr.join(";"));
-            match (foreground, background) {
-                (Some(c), None) | (None, Some(c)) => Some([&output, ";", &c, "m"].concat()),
-                (None, None) => Some([&output, "m"].concat()),
-                (Some(fg), Some(bg)) => Some([&output, ";", &fg, ";", &bg, "m"].concat()),
-            }
-        } else {
-            match (foreground, background) {
-                (Some(c), None) | (None, Some(c)) => Some([&output, &c, "m"].concat()),
-                (None, None) => None,
-                (Some(fg), Some(bg)) => Some([&output, &fg, ";", &bg, "m"].concat()),
-            }
-        }
+        format!(
+            "\x1b[{}m",
+            self.attributes
+                .iter()
+                .cloned()
+                .chain(foreground.as_ref().map(AsRef::as_ref))
+                .chain(background.as_ref().map(AsRef::as_ref))
+                .format(";")
+        )
     }
 
     /// If no matches were made, then this will attempt to parse the variable as either a
     /// 24-bit true color color, or one of 256 colors. It supports both hexadecimal and
     /// decimals.
-    fn parse_colors(&mut self, variable: &str) -> Result<(), InvalidColor> {
+    fn parse_colors(&mut self, variable: &str) -> Result<(), ()> {
         // First, determine which field we will write to.
         let (field, variable) = if variable.ends_with("bg") {
             (&mut self.background, &variable[..variable.len() - 2])
@@ -184,46 +168,34 @@ impl Colors {
             return Ok(());
         }
 
-        return Err(InvalidColor(variable.into()));
-    }
-
-    /// Attributes can be stacked, so this function serves to enable that
-    /// stacking.
-    fn append_attribute(&mut self, attribute: &'static str) {
-        let vec_exists = match self.attributes.as_mut() {
-            Some(vec) => {
-                vec.push(attribute);
-                true
-            }
-            None => false,
-        };
-
-        if !vec_exists {
-            self.attributes = Some(vec![attribute]);
-        }
+        Err(())
     }
 
     /// Parses the given input and returns a structure obtaining the text data needed for proper
     /// transformation into ANSI code parameters, which may be obtained by calling the
     /// `into_string()` method on the newly-created `Colors` structure.
-    pub fn collect(input: &str) -> Result<Colors, InvalidColor> {
-        let mut colors = Colors { foreground: None, background: None, attributes: None };
+    pub fn collect(input: &str) -> Result<Colors, ExpansionError> {
+        let mut colors = Colors { foreground: None, background: None, attributes: Vec::new() };
         for variable in input.split(',') {
             if variable == "reset" {
-                return Ok(Colors {
-                    foreground: None,
-                    background: None,
-                    attributes: Some(vec!["0"]),
-                });
+                return Ok(Colors { foreground: None, background: None, attributes: vec!["0"] });
             } else if let Some(attribute) = ATTRIBUTES.get(&variable) {
-                colors.append_attribute(attribute);
+                colors.attributes.push(attribute);
             } else if let Some(color) = COLORS.get(&variable) {
                 colors.foreground = Some(Mode::Name(color));
             } else if let Some(color) = BG_COLORS.get(&variable) {
                 colors.background = Some(Mode::Name(color));
             } else {
-                colors.parse_colors(variable)?;
+                colors
+                    .parse_colors(variable)
+                    .map_err(|_| ExpansionError::ColorError(variable.into()))?;
             }
+        }
+        if colors.foreground.is_none()
+            && colors.background.is_none()
+            && colors.attributes.is_empty()
+        {
+            return Err(ExpansionError::EmptyColor);
         }
         Ok(colors)
     }
@@ -259,64 +231,64 @@ mod test {
     #[test]
     fn set_multiple_color_attributes() {
         let expected =
-            Colors { attributes: Some(vec!["1", "4", "5"]), background: None, foreground: None };
+            Colors { attributes: vec!["1", "4", "5"], background: None, foreground: None };
         let actual = Colors::collect("bold,underlined,blink").unwrap();
         assert_eq!(actual, expected);
-        assert_eq!(Some("\x1b[1;4;5m".to_owned()), actual.into_string());
+        assert_eq!("\x1b[1;4;5m", &actual.into_string());
     }
 
     #[test]
     fn set_multiple_colors() {
         let expected = Colors {
-            attributes: Some(vec!["1"]),
+            attributes: vec!["1"],
             background: Some(Mode::Name("107")),
             foreground: Some(Mode::Name("35")),
         };
         let actual = Colors::collect("whitebg,magenta,bold").unwrap();
         assert_eq!(actual, expected);
-        assert_eq!(Some("\x1b[1;35;107m".to_owned()), actual.into_string());
+        assert_eq!("\x1b[1;35;107m", actual.into_string());
     }
 
     #[test]
     fn hexadecimal_256_colors() {
         let expected = Colors {
-            attributes: None,
+            attributes: Vec::default(),
             background: Some(Mode::Range256(77)),
             foreground: Some(Mode::Range256(75)),
         };
         let actual = Colors::collect("0x4b,0x4dbg").unwrap();
         assert_eq!(actual, expected);
-        assert_eq!(Some("\x1b[38;5;75;48;5;77m".to_owned()), actual.into_string())
+        assert_eq!("\x1b[38;5;75;48;5;77m", &actual.into_string())
     }
 
     #[test]
     fn decimal_256_colors() {
         let expected = Colors {
-            attributes: None,
+            attributes: Vec::default(),
             background: Some(Mode::Range256(78)),
             foreground: Some(Mode::Range256(32)),
         };
         let actual = Colors::collect("78bg,32").unwrap();
         assert_eq!(actual, expected);
-        assert_eq!(Some("\x1b[38;5;32;48;5;78m".to_owned()), actual.into_string())
+        assert_eq!("\x1b[38;5;32;48;5;78m", &actual.into_string())
     }
 
     #[test]
     fn three_digit_hex_24bit_colors() {
         let expected = Colors {
-            attributes: None,
+            attributes: Vec::default(),
             background: Some(Mode::TrueColor(255, 255, 255)),
             foreground: Some(Mode::TrueColor(0, 0, 0)),
         };
         let actual = Colors::collect("0x000,0xFFFbg").unwrap();
         assert_eq!(expected, actual);
-        assert_eq!(Some("\x1b[38;2;0;0;0;48;2;255;255;255m".to_owned()), actual.into_string());
+        assert_eq!("\x1b[38;2;0;0;0;48;2;255;255;255m", &actual.into_string());
     }
 
     #[test]
     fn six_digit_hex_24bit_colors() {
         let expected = Colors {
-            attributes: None,
+            attributes: Vec::default(),
             background: Some(Mode::TrueColor(255, 0, 0)),
             foreground: Some(Mode::TrueColor(0, 255, 0)),
         };

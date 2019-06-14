@@ -80,11 +80,11 @@ impl<'b> Shell<'b> {
                 Status::SUCCESS
             }
             ExportAction::LocalExport(ref key) => match self.variables.get_str(key) {
-                Some(var) => {
+                Ok(var) => {
                     env::set_var(key, &*var);
                     Status::SUCCESS
                 }
-                None => {
+                Err(_) => {
                     Status::error(format!("ion: cannot export {} because it does not exist.", key))
                 }
             },

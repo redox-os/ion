@@ -71,9 +71,9 @@ fn path_is_directory(filepath: &str) -> bool {
 fn binary_is_in_path(binaryname: &str, shell: &Shell<'_>) -> bool {
     // TODO: Maybe this function should reflect the logic for spawning new processes
     // TODO: Right now they use an entirely different logic which means that it
-    // *might* be possible TODO: that `exists` reports a binary to be in the
+    // *might* be possible that `exists` reports a binary to be in the
     // path, while the shell cannot find it or TODO: vice-versa
-    if let Some(path) = shell.variables().get_str("PATH") {
+    if let Ok(path) = shell.variables().get_str("PATH") {
         for fname in path.split(':').map(|dir| format!("{}/{}", dir, binaryname)) {
             if let Ok(metadata) = fs::metadata(&fname) {
                 if metadata.is_file() && file_has_execute_permission(&fname) {
@@ -119,8 +119,8 @@ fn array_var_is_not_empty(arrayvar: &str, shell: &Shell<'_>) -> bool {
 /// Returns true if the variable is a string and the string is not empty
 fn string_var_is_not_empty(stringvar: &str, shell: &Shell<'_>) -> bool {
     match shell.variables().get_str(stringvar) {
-        Some(string) => !string.is_empty(),
-        None => false,
+        Ok(string) => !string.is_empty(),
+        Err(_) => false,
     }
 }
 
@@ -175,7 +175,7 @@ mod tests {
         // TODO: see test_binary_is_in_path()
         // no argument means we treat it as a string
         assert_eq!(exists(&["ion".into(), "-b".into()], &shell), Ok(true));
-        let oldpath = shell.variables().get_str("PATH").unwrap_or_else(|| "/usr/bin".into());
+        let oldpath = shell.variables().get_str("PATH").unwrap_or_else(|_| "/usr/bin".into());
         shell.variables_mut().set("PATH", "testing/");
 
         assert_eq!(

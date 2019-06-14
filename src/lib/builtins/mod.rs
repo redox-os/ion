@@ -310,7 +310,7 @@ pub fn builtin_bool(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
         return Status::error("bool requires one argument");
     }
 
-    let opt = if args[1].is_empty() { None } else { shell.variables().get_str(&args[1][1..]) };
+    let opt = if args[1].is_empty() { None } else { shell.variables().get_str(&args[1][1..]).ok() };
 
     match opt.as_ref().map(types::Str::as_str) {
         Some("1") => (),

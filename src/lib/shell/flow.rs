@@ -284,9 +284,15 @@ impl<'a> Shell<'a> {
                         );
                         out
                     } else {
-                        let out = self.variables.get_str(bind).map(Value::Str);
+                        let out = self.variables.get_str(bind);
                         self.variables_mut().set(&bind, value.join(" "));
-                        out
+                        match out {
+                            Ok(out) => Some(Value::Str(out)),
+                            Err(why) => {
+                                eprintln!("ion: {}", why);
+                                None
+                            }
+                        }
                     }
                 });
 
