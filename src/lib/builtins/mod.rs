@@ -77,7 +77,7 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
 /// Note: To reduce allocations, function are provided as pointer rather than boxed closures
 /// ```
 /// use ion_shell::builtins::BuiltinMap;
-/// use ion_shell::{Shell, status::Status};
+/// use ion_shell::{types, Shell, status::Status};
 ///
 /// // create a builtin
 /// let mut custom = |_args: &[types::Str], _shell: &mut Shell| {
