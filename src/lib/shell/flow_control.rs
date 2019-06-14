@@ -353,7 +353,7 @@ fn insert_into_block<'a>(
     Ok(())
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Function<'a> {
     description: Option<types::Str>,
     name:        types::Str,

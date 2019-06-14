@@ -28,12 +28,12 @@ pub enum Value<'a> {
 }
 
 macro_rules! type_from_value {
-    ($to:ty : $variant:ident else $defaultmethod:ident($($args:expr),*)) => {
+    ($to:ty : $variant:ident) => {
         impl<'a> From<Value<'a>> for $to {
             fn from(var: Value<'a>) -> Self {
                 match var {
                     Value::$variant(inner) => inner,
-                    _ => <$to>::$defaultmethod($($args),*),
+                    _ => <$to>::default(),
                 }
             }
         }
@@ -67,19 +67,12 @@ macro_rules! type_from_value {
     }
 }
 
-type_from_value!(types::Str : Str else with_capacity(0));
-type_from_value!(types::Alias : Alias else empty());
-type_from_value!(types::Array<'a> : Array else with_capacity(0));
-type_from_value!(types::HashMap<'a> : HashMap else with_capacity_and_hasher(0, Default::default()));
-type_from_value!(types::BTreeMap<'a> : BTreeMap else new());
-type_from_value!(Function<'a> : Function else
-    new(
-        Default::default(),
-        Default::default(),
-        Default::default(),
-        Default::default()
-    )
-);
+type_from_value!(types::Str : Str);
+type_from_value!(types::Alias : Alias);
+type_from_value!(types::Array<'a> : Array);
+type_from_value!(types::HashMap<'a> : HashMap);
+type_from_value!(types::BTreeMap<'a> : BTreeMap);
+type_from_value!(Function<'a> : Function);
 
 impl<'a> Eq for Value<'a> {}
 

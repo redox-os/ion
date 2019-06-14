@@ -14,7 +14,7 @@ pub type HashMap<'a> = HashbrownMap<Str, Value<'a>>;
 pub type BTreeMap<'a> = StdBTreeMap<Str, Value<'a>>;
 pub type Str = small::String;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq, Default)]
 pub struct Alias(pub Str);
 
 impl Alias {
