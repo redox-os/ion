@@ -26,7 +26,7 @@ DESCRIPTION
     Makes ion exit. The exit status will be that of the last command executed."#;
 
 /// Executes the givent commmand.
-pub fn _exec(args: &[small::String]) -> Result<(), small::String> {
+pub fn _exec(args: &[Str]) -> Result<(), Str> {
     let mut clear_env = false;
     let mut idx = 0;
     for arg in args.iter() {

@@ -1,13 +1,12 @@
 use crate::{
     builtins::man_pages::*,
     shell::{status::Status, Shell, Value},
-    sys,
+    sys, types,
 };
-use small;
 
 use std::{borrow::Cow, env, path::Path};
 
-pub fn which(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status, ()> {
+pub fn which(args: &[types::Str], shell: &mut Shell<'_>) -> Result<Status, ()> {
     if check_help(args, MAN_WHICH) {
         return Ok(Status::SUCCESS);
     }
@@ -36,7 +35,7 @@ pub fn which(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status, ()
     Ok(result)
 }
 
-pub fn find_type(args: &[small::String], shell: &mut Shell<'_>) -> Result<Status, ()> {
+pub fn find_type(args: &[types::Str], shell: &mut Shell<'_>) -> Result<Status, ()> {
     // Type does not accept help flags, aka "--help".
     if args.len() == 1 {
         eprintln!("type: Expected at least 1 args, got only 0");

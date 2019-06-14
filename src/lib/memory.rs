@@ -1,5 +1,5 @@
+use crate::types::Str;
 use object_pool::Pool;
-use small::String;
 
 const MAX_SIZE: usize = 64;
 
@@ -17,16 +17,16 @@ macro_rules! call_and_shrink {
 }
 
 thread_local! {
-    static STRINGS: Pool<String> = Pool::new(256, || String::with_capacity(MAX_SIZE));
+    static STRINGS: Pool<Str> = Pool::new(256, || Str::with_capacity(MAX_SIZE));
 }
 
 pub struct IonPool;
 
 impl IonPool {
-    pub fn string<T, F: FnMut(&mut String) -> T>(mut callback: F) -> T {
+    pub fn string<T, F: FnMut(&mut Str) -> T>(mut callback: F) -> T {
         STRINGS.with(|pool| match pool.pull() {
             Some(ref mut string) => call_and_shrink!(string, callback),
-            None => callback(&mut String::new()),
+            None => callback(&mut Str::new()),
         })
     }
 }

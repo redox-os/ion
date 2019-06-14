@@ -10,7 +10,7 @@ use ion_shell::{
     builtins::man_pages,
     parser::{Expander, Terminator},
     status::Status,
-    Shell,
+    types, Shell,
 };
 use ion_sys::SIGHUP;
 use itertools::Itertools;
@@ -123,19 +123,19 @@ impl<'a> InteractiveBinary<'a> {
         };
 
         let exit = self.shell.borrow().builtins().get("exit").unwrap();
-        let exit = &|args: &[small::String], shell: &mut Shell<'_>| -> Status {
+        let exit = &|args: &[types::Str], shell: &mut Shell<'_>| -> Status {
             prep_for_exit(shell);
             exit(args, shell)
         };
 
         let exec = self.shell.borrow().builtins().get("exec").unwrap();
-        let exec = &|args: &[small::String], shell: &mut Shell<'_>| -> Status {
+        let exec = &|args: &[types::Str], shell: &mut Shell<'_>| -> Status {
             prep_for_exit(shell);
             exec(args, shell)
         };
 
         let context_bis = self.context.clone();
-        let history = &move |args: &[small::String], _shell: &mut Shell<'_>| -> Status {
+        let history = &move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
             if man_pages::check_help(args, MAN_HISTORY) {
                 return Status::SUCCESS;
             }
@@ -145,7 +145,7 @@ impl<'a> InteractiveBinary<'a> {
         };
 
         let context_bis = self.context.clone();
-        let keybindings = &move |args: &[small::String], _shell: &mut Shell<'_>| -> Status {
+        let keybindings = &move |args: &[types::Str], _shell: &mut Shell<'_>| -> Status {
             match args.get(1).map(|s| s.as_str()) {
                 Some("vi") => {
                     context_bis.borrow_mut().key_bindings = KeyBindings::Vi;

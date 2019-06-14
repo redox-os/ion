@@ -5,7 +5,6 @@ use crate::{
     types,
 };
 use err_derive::Error;
-use small;
 use smallvec::SmallVec;
 
 #[derive(Debug, Error, PartialEq, Eq, Hash)]
@@ -109,13 +108,13 @@ pub enum Statement<'a> {
     ElseIf(ElseIf<'a>),
     Function {
         name:        types::Str,
-        description: Option<small::String>,
+        description: Option<types::Str>,
         args:        Vec<KeyBuf>,
         statements:  Block<'a>,
     },
     For {
         variables:  SmallVec<[types::Str; 4]>,
-        values:     Vec<small::String>,
+        values:     Vec<types::Str>,
         statements: Block<'a>,
     },
     While {
@@ -123,7 +122,7 @@ pub enum Statement<'a> {
         statements: Block<'a>,
     },
     Match {
-        expression: small::String,
+        expression: types::Str,
         cases:      Vec<Case<'a>>,
     },
     Else,
@@ -356,7 +355,7 @@ fn insert_into_block<'a>(
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Function<'a> {
-    description: Option<small::String>,
+    description: Option<types::Str>,
     name:        types::Str,
     args:        Vec<KeyBuf>,
     statements:  Block<'a>,
@@ -424,10 +423,10 @@ impl<'a> Function<'a> {
         Ok(())
     }
 
-    pub fn get_description(&self) -> Option<&small::String> { self.description.as_ref() }
+    pub fn get_description(&self) -> Option<&types::Str> { self.description.as_ref() }
 
     pub fn new(
-        description: Option<small::String>,
+        description: Option<types::Str>,
         name: types::Str,
         args: Vec<KeyBuf>,
         statements: Vec<Statement<'a>>,
@@ -441,7 +440,7 @@ mod tests {
     use super::*;
 
     fn new_match() -> Statement<'static> {
-        Statement::Match { expression: small::String::from(""), cases: Vec::new() }
+        Statement::Match { expression: types::Str::from(""), cases: Vec::new() }
     }
     fn new_if() -> Statement<'static> {
         Statement::If {

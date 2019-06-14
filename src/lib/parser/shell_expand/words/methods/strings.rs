@@ -13,10 +13,10 @@ use unicode_segmentation::UnicodeSegmentation;
 
 pub fn unescape(input: &str) -> types::Str {
     let mut check = false;
-    // small::String cannot be created with a capacity of 0 without causing a panic
+    // types::Str cannot be created with a capacity of 0 without causing a panic
     let len = if !input.is_empty() { input.len() } else { 1 };
-    let mut out = small::String::with_capacity(len);
-    let add_char = |out: &mut small::String, check: &mut bool, c| {
+    let mut out = types::Str::with_capacity(len);
+    let add_char = |out: &mut types::Str, check: &mut bool, c| {
         out.push(c);
         *check = false;
     };
@@ -31,7 +31,7 @@ pub fn unescape(input: &str) -> types::Str {
             'a' if check => add_char(&mut out, &mut check, '\u{0007}'),
             'b' if check => add_char(&mut out, &mut check, '\u{0008}'),
             'c' if check => {
-                out = small::String::from("");
+                out = types::Str::from("");
                 break;
             }
             'e' if check => add_char(&mut out, &mut check, '\u{001B}'),
@@ -94,7 +94,7 @@ pub struct StringMethod<'a> {
 }
 
 impl<'a> StringMethod<'a> {
-    pub fn handle<E: Expander>(&self, output: &mut small::String, expand: &E) -> Result<()> {
+    pub fn handle<E: Expander>(&self, output: &mut types::Str, expand: &E) -> Result<()> {
         let variable = self.variable;
         let pattern = MethodArgs::new(self.pattern, expand);
 
@@ -149,7 +149,7 @@ impl<'a> StringMethod<'a> {
                 if let Some(value) = expand.string(variable) {
                     value
                 } else {
-                    small::String::from(expand.expand_string(variable)?.join(" "))
+                    types::Str::from(expand.expand_string(variable)?.join(" "))
                 }
             }};
         }
@@ -288,7 +288,7 @@ impl<'a> StringMethod<'a> {
                 } else if is_expression(variable) {
                     expand.expand_string(variable)?.join(" ").into()
                 } else {
-                    small::String::new()
+                    types::Str::new()
                 };
                 if first_str != "" {
                     output.push_str(&first_str)
@@ -348,7 +348,7 @@ mod test {
 
     #[test]
     fn test_ends_with_succeeding() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "ends_with",
             variable:  "$FOO",
@@ -361,7 +361,7 @@ mod test {
 
     #[test]
     fn test_ends_with_failing() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "ends_with",
             variable:  "$FOO",
@@ -374,7 +374,7 @@ mod test {
 
     #[test]
     fn test_contains_succeeding() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "contains",
             variable:  "$FOO",
@@ -387,7 +387,7 @@ mod test {
 
     #[test]
     fn test_contains_failing() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "contains",
             variable:  "$FOO",
@@ -400,7 +400,7 @@ mod test {
 
     #[test]
     fn test_starts_with_succeeding() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "starts_with",
             variable:  "$FOO",
@@ -413,7 +413,7 @@ mod test {
 
     #[test]
     fn test_starts_with_failing() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "starts_with",
             variable:  "$FOO",
@@ -426,7 +426,7 @@ mod test {
 
     #[test]
     fn test_basename() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "basename",
             variable:  "\"/home/redox/file.txt\"",
@@ -439,7 +439,7 @@ mod test {
 
     #[test]
     fn test_extension() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "extension",
             variable:  "\"/home/redox/file.txt\"",
@@ -452,7 +452,7 @@ mod test {
 
     #[test]
     fn test_filename() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "filename",
             variable:  "\"/home/redox/file.txt\"",
@@ -465,7 +465,7 @@ mod test {
 
     #[test]
     fn test_parent() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "parent",
             variable:  "\"/home/redox/file.txt\"",
@@ -478,7 +478,7 @@ mod test {
 
     #[test]
     fn test_to_lowercase() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "to_lowercase",
             variable:  "\"Ford Prefect\"",
@@ -491,7 +491,7 @@ mod test {
 
     #[test]
     fn test_to_uppercase() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "to_uppercase",
             variable:  "\"Ford Prefect\"",
@@ -504,7 +504,7 @@ mod test {
 
     #[test]
     fn test_trim_with_string() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "trim",
             variable:  "\"  Foo Bar \"",
@@ -517,7 +517,7 @@ mod test {
 
     #[test]
     fn test_trim_with_variable() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "trim",
             variable:  "$BAZ",
@@ -530,7 +530,7 @@ mod test {
 
     #[test]
     fn test_trim_right_with_string() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "trim_right",
             variable:  "\"  Foo Bar \"",
@@ -543,7 +543,7 @@ mod test {
 
     #[test]
     fn test_trim_right_with_variable() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "trim_right",
             variable:  "$BAZ",
@@ -556,7 +556,7 @@ mod test {
 
     #[test]
     fn test_trim_left_with_string() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "trim_left",
             variable:  "\"  Foo Bar \"",
@@ -569,7 +569,7 @@ mod test {
 
     #[test]
     fn test_trim_left_with_variable() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "trim_left",
             variable:  "$BAZ",
@@ -582,7 +582,7 @@ mod test {
 
     #[test]
     fn test_repeat_succeeding() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "repeat",
             variable:  "$FOO",
@@ -596,7 +596,7 @@ mod test {
     #[test]
     #[should_panic]
     fn test_repeat_failing() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "repeat",
             variable:  "$FOO",
@@ -608,7 +608,7 @@ mod test {
 
     #[test]
     fn test_replace_succeeding() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "replace",
             variable:  "$FOO",
@@ -622,7 +622,7 @@ mod test {
     #[test]
     #[should_panic]
     fn test_replace_failing() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "replace",
             variable:  "$FOO",
@@ -634,7 +634,7 @@ mod test {
 
     #[test]
     fn test_replacen_succeeding() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "replacen",
             variable:  "\"FOO$FOO\"",
@@ -648,7 +648,7 @@ mod test {
     #[test]
     #[should_panic]
     fn test_replacen_failing() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "replacen",
             variable:  "$FOO",
@@ -660,7 +660,7 @@ mod test {
 
     #[test]
     fn test_regex_replace_succeeding() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "regex_replace",
             variable:  "$FOO",
@@ -673,7 +673,7 @@ mod test {
 
     #[test]
     fn test_regex_replace_failing() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "regex_replace",
             variable:  "$FOO",
@@ -686,7 +686,7 @@ mod test {
 
     #[test]
     fn test_join_with_string() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "join",
             variable:  "[\"FOO\" \"BAR\"]",
@@ -699,7 +699,7 @@ mod test {
 
     #[test]
     fn test_join_with_array() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "join",
             variable:  "[\"FOO\" \"BAR\"]",
@@ -712,7 +712,7 @@ mod test {
 
     #[test]
     fn test_len_with_array() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "len",
             variable:  "[\"1\"]",
@@ -725,7 +725,7 @@ mod test {
 
     #[test]
     fn test_len_with_string() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "len",
             variable:  "\"FOO\"",
@@ -738,7 +738,7 @@ mod test {
 
     #[test]
     fn test_len_with_variable() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "len",
             variable:  "$FOO",
@@ -751,7 +751,7 @@ mod test {
 
     #[test]
     fn test_len_bytes_with_variable() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "len_bytes",
             variable:  "$FOO",
@@ -764,7 +764,7 @@ mod test {
 
     #[test]
     fn test_len_bytes_with_string() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "len_bytes",
             variable:  "\"oh là là\"",
@@ -777,7 +777,7 @@ mod test {
 
     #[test]
     fn test_reverse_with_variable() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "reverse",
             variable:  "$FOO",
@@ -790,7 +790,7 @@ mod test {
 
     #[test]
     fn test_reverse_with_string() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "reverse",
             variable:  "\"FOOBAR\"",
@@ -803,7 +803,7 @@ mod test {
 
     #[test]
     fn test_find_succeeding() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "find",
             variable:  "$FOO",
@@ -816,7 +816,7 @@ mod test {
 
     #[test]
     fn test_find_failing() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "find",
             variable:  "$FOO",
@@ -829,7 +829,7 @@ mod test {
 
     #[test]
     fn test_or_undefined() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "or",
             variable:  "$NDIUKFBINCF",
@@ -842,7 +842,7 @@ mod test {
 
     #[test]
     fn test_or_empty() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "or",
             variable:  "$EMPTY",
@@ -855,7 +855,7 @@ mod test {
 
     #[test]
     fn test_or_defined() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "or",
             variable:  "$FOO",
@@ -868,7 +868,7 @@ mod test {
 
     #[test]
     fn test_or_three_args_second_arg_defined() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "or",
             variable:  "$EMPTY",
@@ -881,7 +881,7 @@ mod test {
 
     #[test]
     fn test_or_three_args_third_arg_defined() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "or",
             variable:  "$EMPTY",
@@ -894,7 +894,7 @@ mod test {
 
     #[test]
     fn test_or_no_pattern() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let method = StringMethod {
             method:    "or",
             variable:  "$FOO",

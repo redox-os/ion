@@ -12,7 +12,6 @@ use auto_enums::auto_enum;
 use err_derive::Error;
 use glob::glob;
 use itertools::Itertools;
-use small;
 use std::{iter, str};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -47,7 +46,7 @@ pub fn is_expression(s: &str) -> bool {
         || s.starts_with('\'')
 }
 
-fn join_with_spaces<S: AsRef<str>, I: IntoIterator<Item = S>>(input: &mut small::String, iter: I) {
+fn join_with_spaces<S: AsRef<str>, I: IntoIterator<Item = S>>(input: &mut types::Str, iter: I) {
     let mut iter = iter.into_iter();
     if let Some(str) = iter.next() {
         input.push_str(str.as_ref());
@@ -150,7 +149,7 @@ pub trait Expander: Sized {
 impl<T: Expander> ExpanderInternal for T {}
 
 trait ExpanderInternal: Expander {
-    fn expand_process(&self, current: &mut small::String, command: &str, selection: &Select) {
+    fn expand_process(&self, current: &mut types::Str, command: &str, selection: &Select) {
         if let Some(ref output) = self.command(command).filter(|out| !out.is_empty()) {
             Self::slice(current, output.trim_end_matches('\n'), &selection);
         }
@@ -158,8 +157,8 @@ trait ExpanderInternal: Expander {
 
     fn expand_brace(
         &self,
-        current: &mut small::String,
-        expanders: &mut Vec<Vec<small::String>>,
+        current: &mut types::Str,
+        expanders: &mut Vec<Vec<types::Str>>,
         tokens: &mut Vec<BraceToken>,
         nodes: &[&str],
     ) -> Result<()> {
@@ -238,7 +237,7 @@ trait ExpanderInternal: Expander {
         }
     }
 
-    fn slice<S: AsRef<str>>(output: &mut small::String, expanded: S, selection: &Select) {
+    fn slice<S: AsRef<str>>(output: &mut types::Str, expanded: S, selection: &Select) {
         match selection {
             Select::All => output.push_str(expanded.as_ref()),
             Select::Index(Index::Forward(id)) => {
@@ -286,9 +285,9 @@ trait ExpanderInternal: Expander {
 
     fn expand_braces(&self, word_tokens: &[WordToken<'_>]) -> Result<Args> {
         let mut expanded_words = Args::new();
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let tokens: &mut Vec<BraceToken> = &mut Vec::new();
-        let mut expanders: Vec<Vec<small::String>> = Vec::new();
+        let mut expanders: Vec<Vec<types::Str>> = Vec::new();
 
         {
             let output = &mut output;
@@ -403,7 +402,7 @@ trait ExpanderInternal: Expander {
         match *token {
             WordToken::Array(ref elements, ref index) => self.array_expand(elements, &index),
             WordToken::ArrayVariable(array, quoted, ref index) => match self.array(array, index) {
-                Some(ref array) if quoted => Ok(args![small::String::from(array.join(" "))]),
+                Some(ref array) if quoted => Ok(args![types::Str::from(array.join(" "))]),
                 Some(array) => Ok(array),
                 None => Ok(Args::new()),
             },
@@ -457,7 +456,7 @@ trait ExpanderInternal: Expander {
     }
 
     fn expand_single_string_token(&self, token: &WordToken<'_>) -> Result<Args> {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
         let mut expanded_words = Args::new();
 
         match *token {
@@ -486,17 +485,17 @@ trait ExpanderInternal: Expander {
 
     fn expand(
         &self,
-        output: &mut small::String,
+        output: &mut types::Str,
         expanded_words: &mut Args,
         text: &str,
         do_glob: bool,
         tilde: bool,
     ) {
-        let concat: small::String = match output.rfind(char::is_whitespace) {
+        let concat: types::Str = match output.rfind(char::is_whitespace) {
             Some(sep) => {
                 if sep != output.len() - 1 {
                     let word_start = sep + 1;
-                    let mut t: small::String = output.split_at(word_start).1.into();
+                    let mut t: types::Str = output.split_at(word_start).1.into();
                     t.push_str(text);
                     output.truncate(word_start);
                     t
@@ -516,7 +515,7 @@ trait ExpanderInternal: Expander {
             }
         };
 
-        let expanded: small::String = if tilde {
+        let expanded: types::Str = if tilde {
             match self.tilde(&concat) {
                 Some(s) => s.into(),
                 None => concat,
@@ -553,7 +552,7 @@ trait ExpanderInternal: Expander {
                 return self.expand_single_array_token(token);
             }
 
-            let mut output = small::String::new();
+            let mut output = types::Str::new();
             let mut expanded_words = Args::new();
 
             {
@@ -655,10 +654,10 @@ trait ExpanderInternal: Expander {
     /// x * 5 + y => 22
     /// ```
     /// if `x=5` and `y=7`
-    fn expand_arithmetic(&self, output: &mut small::String, input: &str) {
+    fn expand_arithmetic(&self, output: &mut types::Str, input: &str) {
         crate::IonPool::string(|intermediate| {
             crate::IonPool::string(|varbuf| {
-                let flush = |var: &mut small::String, out: &mut small::String| {
+                let flush = |var: &mut types::Str, out: &mut types::Str| {
                     if !var.is_empty() {
                         // We have reached the end of a potential variable, so we expand it and push
                         // it onto the result
@@ -720,7 +719,7 @@ mod test {
 
     #[test]
     fn expand_process_test() {
-        let mut output = small::String::new();
+        let mut output = types::Str::new();
 
         let line = " Mary   had\ta little  \n\t lamb😉😉\t";
         CommandExpander.expand_process(&mut output, line, &Select::All);

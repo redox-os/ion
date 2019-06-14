@@ -1,6 +1,6 @@
-use small;
+use crate::types;
 
-pub fn check_help(args: &[small::String], man_page: &'static str) -> bool {
+pub fn check_help(args: &[types::Str], man_page: &'static str) -> bool {
     for arg in args {
         if arg == "-h" || arg == "--help" {
             println!("{}", man_page);

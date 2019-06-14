@@ -40,7 +40,6 @@ use crate::{
     sys, types,
 };
 use itertools::Itertools;
-use small;
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
                          none specified\n    help <command>";
@@ -51,7 +50,7 @@ const DISOWN_DESC: &str =
     "Disowning a process removes that process from the shell's background process table.";
 
 /// The type for builtin functions. Builtins have direct access to the shell
-pub type BuiltinFunction<'a> = &'a dyn Fn(&[small::String], &mut Shell<'_>) -> Status;
+pub type BuiltinFunction<'a> = &'a dyn Fn(&[types::Str], &mut Shell<'_>) -> Status;
 
 macro_rules! map {
     ($builtins:ident, $($name:expr => $func:ident: $help:expr),+) => {{
@@ -81,7 +80,7 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
 /// use ion_shell::{Shell, status::Status};
 ///
 /// // create a builtin
-/// let mut custom = |_args: &[small::String], _shell: &mut Shell| {
+/// let mut custom = |_args: &[types::Str], _shell: &mut Shell| {
 ///     println!("Hello world!");
 ///     Status::error("Can't proceed")
 /// };
@@ -242,22 +241,20 @@ impl<'a> BuiltinMap<'a> {
     }
 }
 
-fn starts_with(args: &[small::String], _: &mut Shell<'_>) -> Status {
+fn starts_with(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     Status::from_exit_code(conditionals::starts_with(args))
 }
-fn ends_with(args: &[small::String], _: &mut Shell<'_>) -> Status {
+fn ends_with(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     Status::from_exit_code(conditionals::ends_with(args))
 }
-fn contains(args: &[small::String], _: &mut Shell<'_>) -> Status {
+fn contains(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     Status::from_exit_code(conditionals::contains(args))
 }
 
 // Definitions of simple builtins go here
-pub fn builtin_status(args: &[small::String], shell: &mut Shell<'_>) -> Status {
-    status(args, shell)
-}
+pub fn builtin_status(args: &[types::Str], shell: &mut Shell<'_>) -> Status { status(args, shell) }
 
-pub fn builtin_dir_depth(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_dir_depth(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let depth = match args.get(1) {
         None => None,
         Some(arg) => match arg.parse::<usize>() {
@@ -269,7 +266,7 @@ pub fn builtin_dir_depth(args: &[small::String], shell: &mut Shell<'_>) -> Statu
     Status::SUCCESS
 }
 
-pub fn builtin_cd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_CD) {
         return Status::SUCCESS;
     }
@@ -308,7 +305,7 @@ pub fn builtin_cd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_bool(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_bool(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if args.len() != 2 {
         return Status::error("bool requires one argument");
     }
@@ -329,7 +326,7 @@ pub fn builtin_bool(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-pub fn builtin_is(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_is(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_IS) {
         return Status::SUCCESS;
     }
@@ -337,7 +334,7 @@ pub fn builtin_is(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     is(args, shell)
 }
 
-pub fn builtin_dirs(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_dirs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     // converts pbuf to an absolute path if possible
     fn try_abs_path(pbuf: &PathBuf) -> Cow<'_, str> {
         Cow::Owned(
@@ -404,7 +401,7 @@ pub fn builtin_dirs(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_pushd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_pushd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_PUSHD) {
         return Status::SUCCESS;
     }
@@ -475,7 +472,7 @@ pub fn builtin_pushd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-pub fn builtin_popd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_POPD) {
         return Status::SUCCESS;
     }
@@ -537,18 +534,18 @@ pub fn builtin_popd(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_alias(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_alias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let args_str = args[1..].join(" ");
     alias(shell.variables_mut(), &args_str)
 }
 
-pub fn builtin_unalias(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_unalias(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     drop_alias(shell.variables_mut(), args)
 }
 
 // TODO There is a man page for fn however the -h and --help flags are not
 // checked for.
-pub fn builtin_fn(_: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_fn(_: &[types::Str], shell: &mut Shell<'_>) -> Status {
     print_functions(shell.variables())
 }
 
@@ -558,7 +555,7 @@ impl Completer for EmptyCompleter {
     fn completions(&mut self, _start: &str) -> Vec<String> { Vec::new() }
 }
 
-pub fn builtin_read(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_read(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_READ) {
         return Status::SUCCESS;
     }
@@ -586,7 +583,7 @@ pub fn builtin_read(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-pub fn builtin_drop(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_drop(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_DROP) {
         return Status::SUCCESS;
     }
@@ -597,14 +594,14 @@ pub fn builtin_drop(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_set(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_SET) {
         return Status::SUCCESS;
     }
     set::set(args, shell)
 }
 
-pub fn builtin_eq(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_eq(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_EQ) {
         return Status::SUCCESS;
     }
@@ -612,7 +609,7 @@ pub fn builtin_eq(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     is(args, shell)
 }
 
-pub fn builtin_eval(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_eval(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_EVAL) {
         Status::SUCCESS
     } else {
@@ -622,14 +619,14 @@ pub fn builtin_eval(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_source(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_source(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_SOURCE) {
         return Status::SUCCESS;
     }
     source(shell, args)
 }
 
-pub fn builtin_echo(args: &[small::String], _: &mut Shell<'_>) -> Status {
+pub fn builtin_echo(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_ECHO) {
         return Status::SUCCESS;
     }
@@ -639,7 +636,7 @@ pub fn builtin_echo(args: &[small::String], _: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_test(args: &[small::String], _: &mut Shell<'_>) -> Status {
+pub fn builtin_test(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     // Do not use `check_help` for the `test` builtin. The
     // `test` builtin contains a "-h" option.
     match test(args) {
@@ -650,14 +647,14 @@ pub fn builtin_test(args: &[small::String], _: &mut Shell<'_>) -> Status {
 }
 
 // TODO create manpage.
-pub fn builtin_calc(args: &[small::String], _: &mut Shell<'_>) -> Status {
+pub fn builtin_calc(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     match calc::calc(&args[1..]) {
         Ok(()) => Status::SUCCESS,
         Err(why) => Status::error(why),
     }
 }
 
-pub fn builtin_random(args: &[small::String], _: &mut Shell<'_>) -> Status {
+pub fn builtin_random(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_RANDOM) {
         return Status::SUCCESS;
     }
@@ -667,12 +664,12 @@ pub fn builtin_random(args: &[small::String], _: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_true(args: &[small::String], _: &mut Shell<'_>) -> Status {
+pub fn builtin_true(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     check_help(args, MAN_TRUE);
     Status::SUCCESS
 }
 
-pub fn builtin_false(args: &[small::String], _: &mut Shell<'_>) -> Status {
+pub fn builtin_false(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_FALSE) {
         return Status::SUCCESS;
     }
@@ -680,32 +677,32 @@ pub fn builtin_false(args: &[small::String], _: &mut Shell<'_>) -> Status {
 }
 
 // TODO create a manpage
-pub fn builtin_wait(_: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_wait(_: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let _ = shell.wait_for_background();
     Status::SUCCESS
 }
 
-pub fn builtin_jobs(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_jobs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     check_help(args, MAN_JOBS);
     job_control::jobs(shell);
     Status::SUCCESS
 }
 
-pub fn builtin_bg(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_bg(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_BG) {
         return Status::SUCCESS;
     }
     job_control::bg(shell, &args[1..])
 }
 
-pub fn builtin_fg(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_fg(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_FG) {
         return Status::SUCCESS;
     }
     job_control::fg(shell, &args[1..])
 }
 
-pub fn builtin_suspend(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_suspend(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_SUSPEND) {
         return Status::SUCCESS;
     }
@@ -713,7 +710,7 @@ pub fn builtin_suspend(args: &[small::String], shell: &mut Shell<'_>) -> Status 
     Status::SUCCESS
 }
 
-pub fn builtin_disown(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_disown(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     for arg in args {
         if *arg == "--help" {
             println!("{}", MAN_DISOWN);
@@ -726,7 +723,7 @@ pub fn builtin_disown(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_help(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_help(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if let Some(command) = args.get(1) {
         if let Some(help) = shell.builtins().get_help(command) {
             println!("{}", help);
@@ -740,7 +737,7 @@ pub fn builtin_help(args: &[small::String], shell: &mut Shell<'_>) -> Status {
 }
 
 use regex::Regex;
-pub fn builtin_matches(args: &[small::String], _: &mut Shell<'_>) -> Status {
+pub fn builtin_matches(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_MATCHES) {
         return Status::SUCCESS;
     }
@@ -763,7 +760,7 @@ pub fn builtin_matches(args: &[small::String], _: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_exists(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_exists(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_EXISTS) {
         return Status::SUCCESS;
     }
@@ -774,21 +771,21 @@ pub fn builtin_exists(args: &[small::String], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_which(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_which(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match which(args, shell) {
         Ok(result) => result,
         Err(()) => Status::error(""),
     }
 }
 
-pub fn builtin_type(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_type(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match find_type(args, shell) {
         Ok(result) => result,
         Err(()) => Status::error(""),
     }
 }
 
-pub fn builtin_isatty(args: &[small::String], _: &mut Shell<'_>) -> Status {
+pub fn builtin_isatty(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_ISATTY) {
         return Status::SUCCESS;
     }

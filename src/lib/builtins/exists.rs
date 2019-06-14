@@ -1,9 +1,11 @@
 use std::{fs, os::unix::fs::PermissionsExt};
 
-use crate::shell::{Shell, Value};
-use small;
+use crate::{
+    shell::{Shell, Value},
+    types,
+};
 
-pub fn exists(args: &[small::String], shell: &Shell<'_>) -> Result<bool, small::String> {
+pub fn exists(args: &[types::Str], shell: &Shell<'_>) -> Result<bool, types::Str> {
     match args.get(1) {
         Some(ref s) if s.starts_with("--") => {
             let (_, option) = s.split_at(2);
@@ -139,7 +141,6 @@ mod tests {
         shell::flow_control::Statement,
         types,
     };
-    use small;
 
     #[test]
     fn test_evaluate_arguments() {
@@ -235,12 +236,12 @@ mod tests {
 
         // check `exists --fn`
         let name_str = "test_function";
-        let name = small::String::from(name_str);
+        let name = types::Str::from(name_str);
         let mut args = Vec::new();
         args.push(KeyBuf { name: "testy".into(), kind: Primitive::Str });
         let mut statements = Vec::new();
         statements.push(Statement::End);
-        let description: small::String = "description".into();
+        let description: types::Str = "description".into();
 
         shell
             .variables_mut()
@@ -383,12 +384,12 @@ mod tests {
 
         // create a simple dummy function
         let name_str = "test_function";
-        let name: small::String = name_str.into();
+        let name: types::Str = name_str.into();
         let mut args = Vec::new();
         args.push(KeyBuf { name: "testy".into(), kind: Primitive::Str });
         let mut statements = Vec::new();
         statements.push(Statement::End);
-        let description: small::String = "description".into();
+        let description: types::Str = "description".into();
 
         shell
             .variables_mut()

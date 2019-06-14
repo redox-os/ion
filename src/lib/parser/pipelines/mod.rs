@@ -8,7 +8,6 @@ use crate::{
     types,
 };
 use itertools::Itertools;
-use small;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -22,7 +21,7 @@ pub enum RedirectFrom {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Redirection {
     pub from:   RedirectFrom,
-    pub file:   small::String,
+    pub file:   types::Str,
     pub append: bool,
 }
 
@@ -31,10 +30,10 @@ pub struct Redirection {
 pub enum Input {
     /// A file; the contents of said file will be written to the `stdin` of a
     /// process
-    File(small::String),
+    File(types::Str),
     /// A string literal that is written to the `stdin` of a process.
     /// If there is a second string, that second string is the EOF phrase for the heredoc.
-    HereString(small::String),
+    HereString(types::Str),
 }
 
 impl<'a> fmt::Display for Input {

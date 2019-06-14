@@ -16,7 +16,6 @@ use crate::{
     types,
 };
 use itertools::Itertools;
-use small;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Condition {
@@ -60,7 +59,7 @@ impl<'a> Shell<'a> {
     fn execute_for(
         &mut self,
         variables: &[types::Str],
-        values: &[small::String],
+        values: &[types::Str],
         statements: &[Statement<'a>],
     ) -> Result {
         macro_rules! set_vars_then_exec {
@@ -77,7 +76,7 @@ impl<'a> Shell<'a> {
             };
         }
 
-        let default = ::small::String::new();
+        let default = types::Str::new();
 
         match ForValueExpression::new(values, self)? {
             ForValueExpression::Multiple(values) => {

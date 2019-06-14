@@ -2,7 +2,6 @@ use crate::{
     shell::{status::Status, variables::Value, Shell},
     types,
 };
-use small;
 use std::iter;
 
 enum PositionalArgs {
@@ -12,7 +11,7 @@ enum PositionalArgs {
 
 use self::PositionalArgs::*;
 
-pub fn set(args: &[small::String], shell: &mut Shell<'_>) -> Status {
+pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let mut args_iter = args.iter();
     let mut positionals = None;
 

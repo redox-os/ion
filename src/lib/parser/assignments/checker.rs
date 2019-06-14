@@ -165,27 +165,27 @@ mod test {
 
     #[test]
     fn is_boolean_() {
-        let mut test: small::String = "1".into();
+        let mut test: types::Str = "1".into();
         assert!(is_boolean(&mut test));
         assert_eq!(test, "true");
-        test = small::String::from("y");
+        test = types::Str::from("y");
         assert!(is_boolean(&mut test));
         assert_eq!(test, "true");
-        test = small::String::from("true");
+        test = types::Str::from("true");
         assert!(is_boolean(&mut test));
         assert_eq!(test, "true");
 
-        test = small::String::from("0");
+        test = types::Str::from("0");
         assert!(is_boolean(&mut test));
         assert_eq!(test, "false");
-        test = small::String::from("n");
+        test = types::Str::from("n");
         assert!(is_boolean(&mut test));
         assert_eq!(test, "false");
-        test = small::String::from("false");
+        test = types::Str::from("false");
         assert!(is_boolean(&mut test));
         assert_eq!(test, "false");
 
-        test = small::String::from("other");
+        test = types::Str::from("other");
         assert!(!is_boolean(&mut test));
         assert_eq!(test, "other");
     }

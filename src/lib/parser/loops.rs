@@ -7,7 +7,7 @@ use crate::{
 pub enum ForValueExpression {
     Multiple(Vec<types::Str>),
     Normal(types::Str),
-    Range(Box<dyn Iterator<Item = small::String> + 'static>),
+    Range(Box<dyn Iterator<Item = types::Str> + 'static>),
 }
 
 impl ForValueExpression {
