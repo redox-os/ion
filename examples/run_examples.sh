@@ -76,24 +76,32 @@ function check_return_value {
     test $1 $1 1
 }
 
+function perform_testing {
+    set +e
+    # Iterate over every Ion script in examples directory
+    for i in $EXAMPLES_DIR/*.ion; do
+        check_return_value $i;
+        if [[ $? -ne 0 ]]; then
+            EXIT_VAL=1;
+        fi
+    done
+
+    # Iterate over every parameter set
+    for i in $EXAMPLES_DIR/*.params; do
+        test_cli $i;
+        if [[ $? -ne 0 ]]; then
+            EXIT_VAL=1;
+        fi
+    done
+}
+
 # Build debug binary
 cargo +$TOOLCHAIN build
+perform_testing
 
-set +e
-# Iterate over every Ion script in examples directory
-for i in $EXAMPLES_DIR/*.ion; do
-    check_return_value $i;
-    if [[ $? -ne 0 ]]; then
-        EXIT_VAL=1;
-    fi
-done
-
-# Iterate over every parameter set
-for i in $EXAMPLES_DIR/*.params; do
-    test_cli $i;
-    if [[ $? -ne 0 ]]; then
-        EXIT_VAL=1;
-    fi
-done
+set -e
+# Build debug binary for testing structopt argument parsing
+cargo +$TOOLCHAIN build --features=advanced_arg_parsing
+perform_testing
 
 exit $EXIT_VAL

@@ -20,6 +20,9 @@ repository = "https://gitlab.redox-os.org/redox-os/ion"
 version = "1.0.0-alpha"
 edition = "2018"
 
+[features]
+advanced_arg_parsing = []
+
 [workspace]
 members = [
     "members/braces", "members/builtins", "members/lexers", "members/sys",
@@ -74,6 +77,7 @@ itertools = "0.8"
 lexical = "2.0"
 object-pool = "0.3.1"
 auto_enums = "0.5.5"
+structopt = "^0.2"
 
 [lib]
 path = "src/lib/lib.rs"

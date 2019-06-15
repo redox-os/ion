@@ -1,22 +1,21 @@
-NAME
-    Ion - The Ion shell
+Ion - The Ion Shell 1.0.0-alpha
+Ion is a commandline shell created to be a faster and easier to use alternative to the currently available shells. It is
+not POSIX compliant.
 
-SYNOPSIS
-    ion [options] [args...]
+USAGE:
+    ion [FLAGS] [OPTIONS] [args]...
 
-DESCRIPTION
-    Ion is a commandline shell created to be a faster and easier to use alternative to the
-    currently available shells. It is not POSIX compliant.
+FLAGS:
+    -h, --help           Prints help information
+    -i, --interactive    Force interactive mode
+    -n, --no-execute     Do not execute any commands, perform only syntax checking
+    -x                   Print commands before execution
+    -v, --version        Print the version, platform and revision of Ion then exit
 
 OPTIONS:
-    -c <command>        evaluates given commands instead of reading from the commandline.
-
-    -n or --no-execute
-        do not execute any commands, just do syntax checking.
-
-    -v or --version
-        prints the version, platform and revision of ion then exits.
+    -c <command>             Evaluate given commands instead of reading from the commandline
+    -o <key_bindings>        Shortcut layout. Valid options: "vi", "emacs"
 
 ARGS:
-    <args>...    Script arguments (@args). If the -c option is not specified, the first
-                 parameter is taken as a filename to execute
+    <args>...    Script arguments (@args). If the -c option is not specified, the first parameter is taken as a
+                 filename to execute
