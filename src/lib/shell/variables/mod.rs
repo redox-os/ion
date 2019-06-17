@@ -270,7 +270,7 @@ impl<'a> Variables<'a> {
         // designated. Find it.
         match name.find("::").map(|pos| (&name[..pos], &name[pos + 2..])) {
             Some(("c", variable)) | Some(("color", variable)) => {
-                Ok(Colors::collect(variable)?.into_string().into())
+                Ok(Colors::collect(variable)?.to_string().into())
             }
             Some(("x", variable)) | Some(("hex", variable)) => {
                 let c = u8::from_str_radix(variable, 16)

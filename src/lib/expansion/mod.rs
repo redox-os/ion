@@ -198,10 +198,11 @@ trait ExpanderInternal: Expander {
         expanders: &mut Vec<Vec<types::Str>>,
         tokens: &mut Vec<BraceToken>,
         nodes: &[&str],
-    ) -> std::result::Result<(), ExpansionError<Self::Error>> {
+    ) -> Result<(), Self::Error> {
         let mut temp = Vec::new();
         for node in nodes {
-            for word in self.expand_string_no_glob(node)? {
+            let expansions = self.expand_string_no_glob(node)?;
+            for word in expansions {
                 match parse_range(&word) {
                     Some(elements) => temp.extend(elements),
                     None => temp.push(word),
@@ -221,11 +222,7 @@ trait ExpanderInternal: Expander {
         Ok(())
     }
 
-    fn array_expand(
-        &self,
-        elements: &[&str],
-        selection: &Select,
-    ) -> std::result::Result<Args, ExpansionError<Self::Error>> {
+    fn array_expand(&self, elements: &[&str], selection: &Select) -> Result<Args, Self::Error> {
         match selection {
             Select::All => {
                 let mut collected = Args::new();
@@ -240,11 +237,7 @@ trait ExpanderInternal: Expander {
         }
     }
 
-    fn array_nth(
-        &self,
-        elements: &[&str],
-        index: Index,
-    ) -> std::result::Result<types::Str, ExpansionError<Self::Error>> {
+    fn array_nth(&self, elements: &[&str], index: Index) -> Result<types::Str, Self::Error> {
         let mut i = match index {
             Index::Forward(n) => n,
             Index::Backward(n) => n,
@@ -267,14 +260,10 @@ trait ExpanderInternal: Expander {
                 i -= expanded.len();
             }
         }
-        Err(ExpansionError::OutOfBound.into())
+        Err(ExpansionError::OutOfBound)
     }
 
-    fn array_range(
-        &self,
-        elements: &[&str],
-        range: Range,
-    ) -> std::result::Result<Args, ExpansionError<Self::Error>> {
+    fn array_range(&self, elements: &[&str], range: Range) -> Result<Args, Self::Error> {
         let mut expanded = Args::new();
         for element in elements {
             expanded.extend(self.expand_string(element)?);
@@ -315,10 +304,7 @@ trait ExpanderInternal: Expander {
         }
     }
 
-    fn expand_string_no_glob(
-        &self,
-        original: &str,
-    ) -> std::result::Result<Args, ExpansionError<Self::Error>> {
+    fn expand_string_no_glob(&self, original: &str) -> Result<Args, Self::Error> {
         let mut token_buffer = Vec::new();
         let mut contains_brace = false;
 
@@ -335,10 +321,7 @@ trait ExpanderInternal: Expander {
         self.expand_tokens(&token_buffer, contains_brace)
     }
 
-    fn expand_braces(
-        &self,
-        word_tokens: &[WordToken<'_>],
-    ) -> std::result::Result<Args, ExpansionError<Self::Error>> {
+    fn expand_braces(&self, word_tokens: &[WordToken<'_>]) -> Result<Args, Self::Error> {
         let mut expanded_words = Args::new();
         let mut output = types::Str::new();
         let tokens: &mut Vec<BraceToken> = &mut Vec::new();
@@ -452,10 +435,7 @@ trait ExpanderInternal: Expander {
     }
 
     #[auto_enum]
-    fn expand_single_array_token(
-        &self,
-        token: &WordToken<'_>,
-    ) -> std::result::Result<Args, ExpansionError<Self::Error>> {
+    fn expand_single_array_token(&self, token: &WordToken<'_>) -> Result<Args, Self::Error> {
         match *token {
             WordToken::Array(ref elements, ref index) => {
                 self.array_expand(elements, &index).map_err(Into::into)
@@ -514,10 +494,7 @@ trait ExpanderInternal: Expander {
         }
     }
 
-    fn expand_single_string_token(
-        &self,
-        token: &WordToken<'_>,
-    ) -> std::result::Result<Args, ExpansionError<Self::Error>> {
+    fn expand_single_string_token(&self, token: &WordToken<'_>) -> Result<Args, Self::Error> {
         let mut output = types::Str::new();
         let mut expanded_words = Args::new();
 
@@ -610,7 +587,7 @@ trait ExpanderInternal: Expander {
         &self,
         token_buffer: &[WordToken<'_>],
         contains_brace: bool,
-    ) -> std::result::Result<Args, ExpansionError<Self::Error>> {
+    ) -> Result<Args, Self::Error> {
         if !token_buffer.is_empty() {
             if contains_brace {
                 return self.expand_braces(&token_buffer);
@@ -766,10 +743,7 @@ mod test {
     impl Expander for VariableExpander {
         type Error = IonError;
 
-        fn string(
-            &self,
-            variable: &str,
-        ) -> std::result::Result<types::Str, ExpansionError<Self::Error>> {
+        fn string(&self, variable: &str) -> Result<types::Str, Self::Error> {
             match variable {
                 "A" => Ok("1".into()),
                 "B" => Ok("test".into()),
@@ -787,12 +761,7 @@ mod test {
     impl Expander for CommandExpander {
         type Error = IonError;
 
-        fn command(
-            &self,
-            cmd: &str,
-        ) -> std::result::Result<types::Str, ExpansionError<Self::Error>> {
-            Ok(cmd.into())
-        }
+        fn command(&self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
     }
 
     #[test]

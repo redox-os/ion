@@ -77,19 +77,13 @@ impl<'a> ArrayMethod<'a> {
                         let (l, r) = variable.split_at(value);
                         Ok(args![types::Str::from(l), types::Str::from(r)])
                     } else {
-                        Err(ExpansionError::from(OutOfBound).into())
+                        Err(OutOfBound.into())
                     }
                 } else {
-                    Err(ExpansionError::from(WrongArgument(
-                        "split_at",
-                        "requires a valid number as an argument",
-                    ))
-                    .into())
+                    Err(WrongArgument("split_at", "requires a valid number as an argument").into())
                 }
             }
-            Pattern::Whitespace => {
-                Err(ExpansionError::from(WrongArgument("split_at", "requires an argument")).into())
-            }
+            Pattern::Whitespace => Err(WrongArgument("split_at", "requires an argument").into()),
         }
     }
 
@@ -134,7 +128,7 @@ impl<'a> ArrayMethod<'a> {
             Err(ExpansionError::VarNotFound) if is_expression(self.variable) => {
                 Ok(types::Str::from_string(expand_func.expand_string(self.variable)?.join(" ")))
             }
-            Err(why) => Err(why.into()),
+            Err(why) => Err(why),
         }
     }
 
@@ -162,7 +156,10 @@ impl<'a> ArrayMethod<'a> {
         expand_func: &E,
     ) -> Result<(), ExpansionError<E::Error>> {
         match self.method {
-            "split" => Ok(current.push_str(&self.split(expand_func)?.join(" "))),
+            "split" => {
+                current.push_str(&self.split(expand_func)?.join(" "));
+                Ok(())
+            }
             _ => Err(InvalidArrayMethod(self.method.to_string()).into()),
         }
     }

@@ -178,7 +178,7 @@ impl<'a, 'b> Expander for Shell<'b> {
         match tilde_prefix {
             "" => sys_env::home_dir()
                 .map(|home| home.to_string_lossy().to_string() + rest)
-                .ok_or(ExpansionError::HomeNotFound.into()),
+                .ok_or(ExpansionError::HomeNotFound),
             "+" => Ok(env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest),
             "-" => Ok(self.variables.get_str("OLDPWD")?.to_string() + rest),
             _ => {
@@ -197,10 +197,10 @@ impl<'a, 'b> Expander for Shell<'b> {
                         self.directory_stack.dir_from_bottom(num)
                     }
                     .map(|path| path.to_str().unwrap().to_string())
-                    .ok_or_else(|| ExpansionError::OutOfStack(num).into()),
+                    .ok_or_else(|| ExpansionError::OutOfStack(num)),
                     Err(_) => self_sys::get_user_home(tilde_prefix)
                         .map(|home| home + rest)
-                        .ok_or(ExpansionError::HomeNotFound.into()),
+                        .ok_or(ExpansionError::HomeNotFound),
                 }
             }
         }

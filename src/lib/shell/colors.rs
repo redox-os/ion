@@ -1,5 +1,6 @@
 use crate::expansion::ExpansionError;
 use itertools::Itertools;
+use std::fmt;
 
 #[derive(Debug)]
 struct StaticMap {
@@ -87,11 +88,11 @@ pub struct Colors {
     attributes: Vec<&'static str>,
 }
 
-impl Colors {
-    /// Transform the data in the structure into the corresponding ANSI code
-    /// representation. It would very ugly to require shell scripters to have to interface
-    /// with these codes directly.
-    pub fn into_string(&self) -> String {
+/// Transform the data in the structure into the corresponding ANSI code
+/// representation. It would very ugly to require shell scripters to have to interface
+/// with these codes directly.
+impl fmt::Display for Colors {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let foreground = self.foreground.as_ref().map(|fg| match fg {
             Mode::Name(ref string) => (*string).to_owned(),
             Mode::Range256(value) => format!("38;5;{}", value),
@@ -104,7 +105,8 @@ impl Colors {
             Mode::TrueColor(red, green, blue) => format!("48;2;{};{};{}", red, green, blue),
         });
 
-        format!(
+        write!(
+            f,
             "\x1b[{}m",
             self.attributes
                 .iter()
@@ -114,7 +116,9 @@ impl Colors {
                 .format(";")
         )
     }
+}
 
+impl Colors {
     /// If no matches were made, then this will attempt to parse the variable as either a
     /// 24-bit true color color, or one of 256 colors. It supports both hexadecimal and
     /// decimals.
@@ -237,7 +241,7 @@ mod test {
             Colors { attributes: vec!["1", "4", "5"], background: None, foreground: None };
         let actual = Colors::collect::<IonError>("bold,underlined,blink").unwrap();
         assert_eq!(actual, expected);
-        assert_eq!("\x1b[1;4;5m", &actual.into_string());
+        assert_eq!("\x1b[1;4;5m", &actual.to_string());
     }
 
     #[test]
@@ -249,7 +253,7 @@ mod test {
         };
         let actual = Colors::collect::<IonError>("whitebg,magenta,bold").unwrap();
         assert_eq!(actual, expected);
-        assert_eq!("\x1b[1;35;107m", actual.into_string());
+        assert_eq!("\x1b[1;35;107m", actual.to_string());
     }
 
     #[test]
@@ -261,7 +265,7 @@ mod test {
         };
         let actual = Colors::collect::<IonError>("0x4b,0x4dbg").unwrap();
         assert_eq!(actual, expected);
-        assert_eq!("\x1b[38;5;75;48;5;77m", &actual.into_string())
+        assert_eq!("\x1b[38;5;75;48;5;77m", &actual.to_string())
     }
 
     #[test]
@@ -273,7 +277,7 @@ mod test {
         };
         let actual = Colors::collect::<IonError>("78bg,32").unwrap();
         assert_eq!(actual, expected);
-        assert_eq!("\x1b[38;5;32;48;5;78m", &actual.into_string())
+        assert_eq!("\x1b[38;5;32;48;5;78m", &actual.to_string())
     }
 
     #[test]
@@ -285,7 +289,7 @@ mod test {
         };
         let actual = Colors::collect::<IonError>("0x000,0xFFFbg").unwrap();
         assert_eq!(expected, actual);
-        assert_eq!("\x1b[38;2;0;0;0;48;2;255;255;255m", &actual.into_string());
+        assert_eq!("\x1b[38;2;0;0;0;48;2;255;255;255m", &actual.to_string());
     }
 
     #[test]
