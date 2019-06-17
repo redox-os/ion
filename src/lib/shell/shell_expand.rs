@@ -10,25 +10,16 @@ impl<'a, 'b> Expander for Shell<'b> {
     type Error = IonError;
 
     /// Uses a subshell to expand a given command.
-    fn command(&self, command: &str) -> Option<types::Str> {
-        let output = match self
+    fn command(&self, command: &str) -> Result<types::Str, IonError> {
+        let output = self
             .fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command))
-        {
-            Ok(result) => {
+            .and_then(|result| {
                 let mut string = String::with_capacity(1024);
                 match result.stdout.unwrap().read_to_string(&mut string) {
-                    Ok(_) => Some(string),
-                    Err(why) => {
-                        eprintln!("ion: error reading stdout of child: {}", why);
-                        None
-                    }
+                    Ok(_) => Ok(string),
+                    Err(why) => Err(IonError::CaptureFailed(why)),
                 }
-            }
-            Err(why) => {
-                eprintln!("ion: fork error: {}", why);
-                None
-            }
-        };
+            });
 
         // Ensure that the parent retains ownership of the terminal before exiting.
         let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());

@@ -84,7 +84,8 @@ fn join_with_spaces<S: AsRef<str>, I: IntoIterator<Item = S>>(input: &mut types:
 
 // TODO: Make array expansions iterators instead of arrays.
 // TODO: Use Cow<'a, types::Str> for hashmap values.
-/// Trait representing different elements of string expansion
+/// Trait representing different elements of string expansion. By default, these methods are
+/// unimplemented and will panic if you call one without defining it first
 pub trait Expander: Sized {
     type Error: std::fmt::Display + std::fmt::Debug;
 
@@ -95,7 +96,9 @@ pub trait Expander: Sized {
     /// Expand a string variable given if it's quoted / unquoted
     fn string(&self, _name: &str) -> Option<types::Str> { None }
     /// Expand a subshell expression.
-    fn command(&self, _command: &str) -> Option<types::Str> { None }
+    fn command(&self, _command: &str) -> std::result::Result<types::Str, Self::Error> {
+        unimplemented!()
+    }
     /// Iterating upon key-value maps.
     fn map_keys<'a>(&'a self, _name: &str, _select: &Select) -> Option<Args> { None }
     /// Iterating upon key-value maps.
@@ -177,7 +180,14 @@ impl<T: Expander> ExpanderInternal for T {}
 
 trait ExpanderInternal: Expander {
     fn expand_process(&self, current: &mut types::Str, command: &str, selection: &Select) {
-        if let Some(ref output) = self.command(command).filter(|out| !out.is_empty()) {
+        let result = match self.command(command) {
+            Ok(r) => Some(r),
+            Err(why) => {
+                eprintln!("ion: {}", why);
+                None
+            }
+        };
+        if let Some(ref output) = result.filter(|out| !out.is_empty()) {
             Self::slice(current, output.trim_end_matches('\n'), &selection);
         }
     }
@@ -749,7 +759,7 @@ mod test {
     impl Expander for CommandExpander {
         type Error = IonError;
 
-        fn command(&self, cmd: &str) -> Option<types::Str> { Some(cmd.into()) }
+        fn command(&self, cmd: &str) -> std::result::Result<types::Str, IonError> { Ok(cmd.into()) }
     }
 
     #[test]

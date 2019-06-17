@@ -48,6 +48,8 @@ use std::{
 pub enum IonError {
     #[error(display = "failed to fork: {}", _0)]
     Fork(#[error(cause)] io::Error),
+    #[error(display = "error reading stdout of child: {}", _0)]
+    CaptureFailed(#[error(cause)] io::Error),
     #[error(display = "element does not exist")]
     DoesNotExist,
     #[error(display = "input was not terminated")]
