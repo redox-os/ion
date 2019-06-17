@@ -128,14 +128,19 @@ pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Sta
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{expansion::Expander, shell::IonError};
+    use crate::{
+        expansion::{Expander, ExpansionError},
+        shell::IonError,
+    };
 
     struct VariableExpander<'a>(pub Variables<'a>);
 
     impl<'a> Expander for VariableExpander<'a> {
         type Error = IonError;
 
-        fn string(&self, var: &str) -> Option<types::Str> { self.0.get_str(var).ok() }
+        fn string(&self, var: &str) -> Result<types::Str, ExpansionError<Self::Error>> {
+            self.0.get_str(var)
+        }
     }
 
     // TODO: Rewrite tests now that let is part of the grammar.
@@ -168,8 +173,7 @@ mod test {
         variables.set("FOO", "BAR");
         let return_status = drop_variable(&mut variables, &["drop", "FOO"]);
         assert!(return_status.is_success());
-        let expanded = VariableExpander(variables).expand_string("$FOO").unwrap().join("");
-        assert_eq!("", expanded);
+        assert!(VariableExpander(variables).expand_string("$FOO").is_err());
     }
 
     #[test]

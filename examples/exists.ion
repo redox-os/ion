@@ -86,11 +86,11 @@ echo "testvar = $testvar"
 exists -s testvar
 echo $?
 drop testvar
-echo "testvar = $testvar"
-exists -s testvar
-echo $?
 
 exists --foo
 echo $?
 exists -x
 echo $?
+
+echo "testvar = $testvar"
+echo This line should not be reached. Accessing an undefined variable is a programming error

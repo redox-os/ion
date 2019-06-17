@@ -10,7 +10,7 @@ impl<'a, 'b> Expander for Shell<'b> {
     type Error = IonError;
 
     /// Uses a subshell to expand a given command.
-    fn command(&self, command: &str) -> Result<types::Str, IonError> {
+    fn command(&self, command: &str) -> Result<types::Str, ExpansionError<IonError>> {
         let output = self
             .fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command))
             .and_then(|result| {
@@ -23,24 +23,15 @@ impl<'a, 'b> Expander for Shell<'b> {
 
         // Ensure that the parent retains ownership of the terminal before exiting.
         let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
-        output.map(Into::into)
+        output.map(Into::into).map_err(|err| ExpansionError::Subprocess(Box::new(err)))
     }
 
     /// Expand a string variable given if its quoted / unquoted
-    fn string(&self, name: &str) -> Option<types::Str> {
+    fn string(&self, name: &str) -> Result<types::Str, ExpansionError<IonError>> {
         if name == "?" {
-            Some(self.previous_status.into())
+            Ok(self.previous_status.into())
         } else {
-            match self.variables().get_str(name) {
-                Ok(var) => Some(var),
-                Err(why) => {
-                    match why {
-                        ExpansionError::VarNotFound => {}
-                        _ => eprintln!("ion: 1 :{}", why),
-                    }
-                    None
-                }
-            }
+            self.variables().get_str(name).map_err(Into::into)
         }
     }
 
@@ -175,7 +166,7 @@ impl<'a, 'b> Expander for Shell<'b> {
         }
     }
 
-    fn tilde(&self, input: &str) -> Result<String, IonError> {
+    fn tilde(&self, input: &str) -> Result<String, ExpansionError<IonError>> {
         // Only if the first character is a tilde character will we perform expansions
         if !input.starts_with('~') {
             return Ok(input.into());

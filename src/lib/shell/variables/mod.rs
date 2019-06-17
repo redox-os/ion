@@ -8,6 +8,7 @@ pub use self::{
 use super::{colors::Colors, flow_control::Function};
 use crate::{
     expansion::ExpansionError,
+    shell::IonError,
     sys::{env as sys_env, geteuid, getpid, getuid, variables as self_sys},
     types::{self, Array},
 };
@@ -259,7 +260,7 @@ impl<'a> Variables<'a> {
         self.0.get_mut(name)
     }
 
-    pub fn get_str(&self, name: &str) -> Result<types::Str, ExpansionError> {
+    pub fn get_str(&self, name: &str) -> Result<types::Str, ExpansionError<IonError>> {
         match name {
             "MWD" => return Ok(self.get_minimal_directory()),
             "SWD" => return Ok(self.get_simplified_directory()),
@@ -372,14 +373,15 @@ mod tests {
     impl<'a> Expander for VariableExpander<'a> {
         type Error = IonError;
 
-        fn string(&self, var: &str) -> Option<types::Str> { self.0.get_str(var).ok() } // TODO: make string return a result
+        fn string(&self, var: &str) -> Result<types::Str, ExpansionError<IonError>> {
+            self.0.get_str(var)
+        }
     }
 
     #[test]
-    fn undefined_variable_expands_to_empty_string() {
+    fn undefined_variable_errors() {
         let variables = Variables::default();
-        let expanded = VariableExpander(variables).expand_string("$FOO").unwrap().join("");
-        assert_eq!("", &expanded);
+        assert!(VariableExpander(variables).expand_string("$FOO").is_err());
     }
 
     #[test]

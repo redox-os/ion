@@ -83,7 +83,7 @@ pub struct PipeItem<'a> {
 }
 
 impl<'a> PipeItem<'a> {
-    pub fn expand(&self, shell: &Shell<'a>) -> super::Result<Self> {
+    pub fn expand(&self, shell: &Shell<'a>) -> super::Result<Self, <Shell as Expander>::Error> {
         let mut job = self.job.clone();
         job.expand(shell)?;
 
@@ -91,20 +91,22 @@ impl<'a> PipeItem<'a> {
             .inputs
             .iter()
             .map(|input| match input {
-                Input::File(ref s) => Ok(Input::File(shell.get_string(s)?)),
-                Input::HereString(ref s) => Ok(Input::HereString(shell.get_string(s)?)),
+                Input::File(ref s) => shell.get_string(s).map(Input::File),
+                Input::HereString(ref s) => shell.get_string(s).map(Input::HereString),
             })
-            .collect::<Result<_, super::ExpansionError>>()?;
+            .collect::<Result<_, _>>()?;
 
         let outputs = self
             .outputs
             .iter()
             .map(|output| {
-                let mut output = output.clone();
-                output.file = shell.get_string(output.file.as_str())?;
-                Ok(output)
+                shell.get_string(output.file.as_str()).map(|file| {
+                    let mut output = output.clone();
+                    output.file = file;
+                    output
+                })
             })
-            .collect::<Result<_, super::ExpansionError>>()?;
+            .collect::<Result<_, _>>()?;
 
         Ok(PipeItem { job, outputs, inputs })
     }
@@ -146,7 +148,7 @@ impl<'a> Pipeline<'a> {
             || self.pipe != PipeType::Normal
     }
 
-    pub fn expand(&self, shell: &Shell<'a>) -> super::Result<Self> {
+    pub fn expand(&self, shell: &Shell<'a>) -> super::Result<Self, <Shell as Expander>::Error> {
         let items = self.items.iter().map(|i| i.expand(shell)).collect::<Result<_, _>>()?;
         Ok(Pipeline { items, pipe: self.pipe })
     }

@@ -201,14 +201,17 @@ impl<'a> InteractiveBinary<'a> {
                 .flat_map(|s| s.into_bytes().into_iter().chain(Some(b'\n')));
             match Terminator::new(&mut lines).terminate() {
                 Some(command) => {
-                    self.shell.borrow_mut().unterminated = false;
                     let cmd: &str = &designators::expand_designators(
                         &self.context.borrow(),
                         command.trim_end(),
                     );
-                    if let Err(why) = self.shell.borrow_mut().on_command(&cmd) {
-                        eprintln!("{}", why);
-                        self.shell.borrow_mut().reset_flow();
+                    {
+                        let mut shell = self.shell.borrow_mut();
+                        shell.unterminated = false;
+                        if let Err(why) = shell.on_command(&cmd) {
+                            eprintln!("{}", why);
+                            shell.reset_flow();
+                        }
                     }
                     self.save_command(&cmd);
                 }

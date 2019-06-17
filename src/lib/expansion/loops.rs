@@ -12,7 +12,7 @@ impl ForValueExpression {
     pub fn new<E: Expander>(
         expression: &[types::Str],
         expanders: &E,
-    ) -> Result<ForValueExpression> {
+    ) -> Result<ForValueExpression, E::Error> {
         let mut output = Vec::new();
         for exp in expression {
             output.extend(expanders.expand_string(exp)?);

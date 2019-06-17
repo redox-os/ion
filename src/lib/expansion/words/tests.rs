@@ -1,5 +1,6 @@
 use super::*;
 use crate::{
+    expansion::ExpansionError,
     ranges::{Index, Range},
     shell::IonError,
     types,
@@ -263,11 +264,11 @@ struct WithVars;
 impl Expander for WithVars {
     type Error = IonError;
 
-    fn string(&self, var: &str) -> Option<types::Str> {
+    fn string(&self, var: &str) -> Result<types::Str, Self::Error> {
         match var {
-            "pkmn1" => Some("Pokémon".into()),
-            "pkmn2" => Some("Poke\u{0301}mon".into()),
-            _ => None,
+            "pkmn1" => Ok("Pokémon".into()),
+            "pkmn2" => Ok("Poke\u{0301}mon".into()),
+            _ => Err(ExpansionError::VarNotFound.into()),
         }
     }
 }

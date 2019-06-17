@@ -4,4 +4,4 @@
 ion: assignment error: invalid variable name
 Variable names may only be (unicode) alphanumeric or `_`
 The first character must be alphabetic or `_`
-
+ion: expansion error: Variable does not exist

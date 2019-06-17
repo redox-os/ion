@@ -71,7 +71,7 @@ pub enum IonError {
     #[error(display = "pipeline execution error: {}", _0)]
     PipelineExecutionError(#[error(cause)] PipelineError),
     #[error(display = "expansion error: {}", _0)]
-    ExpansionError(#[error(cause)] ExpansionError),
+    ExpansionError(#[error(cause)] ExpansionError<IonError>),
 }
 
 impl From<ParseError> for IonError {
@@ -98,8 +98,8 @@ impl From<io::Error> for IonError {
     fn from(cause: io::Error) -> Self { IonError::Fork(cause) }
 }
 
-impl From<ExpansionError> for IonError {
-    fn from(cause: ExpansionError) -> Self { IonError::ExpansionError(cause) }
+impl From<ExpansionError<IonError>> for IonError {
+    fn from(cause: ExpansionError<IonError>) -> Self { IonError::ExpansionError(cause) }
 }
 
 #[derive(Debug, Clone, Hash)]

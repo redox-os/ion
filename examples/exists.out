@@ -146,7 +146,6 @@ emptyvar =
 1
 testvar = foobar
 0
-testvar = 
-1
 0
 0
+ion: expansion error: Variable does not exist

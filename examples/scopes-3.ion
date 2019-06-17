@@ -1,0 +1,13 @@
+if test 1 == 1
+    let x = 5
+
+    fn print
+        echo ${super::x}
+    end
+
+    if test 1 == 1
+        print
+    end
+end
+
+echo $x

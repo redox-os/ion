@@ -1,4 +1,4 @@
-use super::Shell;
+use super::{IonError, Shell};
 use crate::{
     builtins::BuiltinFunction,
     expansion::{self, pipelines::RedirectFrom, Expander},
@@ -19,7 +19,7 @@ impl<'a> Job<'a> {
 
     /// Takes the current job's arguments and expands them, one argument at a
     /// time, returning a new `Job` with the expanded arguments.
-    pub fn expand(&mut self, shell: &Shell<'_>) -> expansion::Result<()> {
+    pub fn expand(&mut self, shell: &Shell<'_>) -> expansion::Result<(), IonError> {
         let mut args = types::Args::new();
         for arg in &self.args {
             args.extend(expand_arg(&arg, shell)?);
@@ -57,7 +57,7 @@ impl<'a> fmt::Debug for Job<'a> {
 }
 
 /// Expands a given argument and returns it as an `Args`.
-fn expand_arg(arg: &str, shell: &Shell<'_>) -> expansion::Result<types::Args> {
+fn expand_arg(arg: &str, shell: &Shell<'_>) -> expansion::Result<types::Args, IonError> {
     let res = shell.expand_string(&arg)?;
     if res.is_empty() {
         Ok(args![""])

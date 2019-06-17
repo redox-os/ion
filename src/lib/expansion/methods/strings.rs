@@ -1,7 +1,7 @@
 use super::{super::Select, MethodArgs, MethodError::*};
 use crate::{
     assignments::is_array,
-    expansion::{is_expression, Expander, ExpanderInternal, Result},
+    expansion::{is_expression, Expander, ExpanderInternal, ExpansionError},
     types,
 };
 use regex::Regex;
@@ -91,19 +91,23 @@ pub struct StringMethod<'a> {
 }
 
 impl<'a> StringMethod<'a> {
-    pub fn handle<E: Expander>(&self, output: &mut types::Str, expand: &E) -> Result<()> {
+    pub fn handle<E: Expander>(
+        &self,
+        output: &mut types::Str,
+        expand: &E,
+    ) -> Result<(), ExpansionError<E::Error>> {
         let variable = self.variable;
         let pattern = MethodArgs::new(self.pattern, expand);
 
         macro_rules! string_eval {
             ($variable:ident $method:tt) => {{
                 let pattern = pattern.join(" ")?;
-                let is_true = if let Some(value) = expand.string($variable) {
-                    value.$method(pattern.as_str())
-                } else if is_expression($variable) {
-                    expand.expand_string($variable)?.join(" ").$method(pattern.as_str())
-                } else {
-                    false
+                let is_true = match expand.string($variable) {
+                    Ok(value) => value.$method(pattern.as_str()),
+                    Err(ExpansionError::VarNotFound) if is_expression($variable) => {
+                        expand.expand_string($variable)?.join(" ").$method(pattern.as_str())
+                    }
+                    Err(why) => return Err(why),
                 };
                 output.push_str(if is_true { "1" } else { "0" });
             }};
@@ -111,42 +115,48 @@ impl<'a> StringMethod<'a> {
 
         macro_rules! path_eval {
             ($method:tt) => {{
-                if let Some(value) = expand.string(variable) {
-                    output.push_str(
+                match expand.string(variable) {
+                    Ok(value) => output.push_str(
                         Path::new(&*value)
                             .$method()
                             .and_then(|os_str| os_str.to_str())
                             .unwrap_or(value.as_str()),
-                    );
-                } else if is_expression(variable) {
-                    let word = expand.expand_string(variable)?.join(" ");
-                    output.push_str(
-                        Path::new(&word)
-                            .$method()
-                            .and_then(|os_str| os_str.to_str())
-                            .unwrap_or(word.as_str()),
-                    );
+                    ),
+                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                        let word = expand.expand_string(variable)?.join(" ");
+                        output.push_str(
+                            Path::new(&word)
+                                .$method()
+                                .and_then(|os_str| os_str.to_str())
+                                .unwrap_or(word.as_str()),
+                        );
+                    }
+                    Err(why) => return Err(why),
                 }
             }};
         }
 
         macro_rules! string_case {
             ($method:tt) => {{
-                if let Some(value) = expand.string(variable) {
-                    output.push_str(value.$method().as_str());
-                } else if is_expression(variable) {
-                    let word = expand.expand_string(variable)?.join(" ");
-                    output.push_str(word.$method().as_str());
+                match expand.string(variable) {
+                    Ok(value) => output.push_str(value.$method().as_str()),
+                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                        let word = expand.expand_string(variable)?.join(" ");
+                        output.push_str(word.$method().as_str());
+                    }
+                    Err(why) => return Err(why),
                 }
             }};
         }
 
         macro_rules! get_var {
             () => {{
-                if let Some(value) = expand.string(variable) {
-                    value
-                } else {
-                    types::Str::from(expand.expand_string(variable)?.join(" "))
+                match expand.string(variable) {
+                    Ok(value) => value,
+                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                        types::Str::from(expand.expand_string(variable)?.join(" "))
+                    }
+                    Err(why) => return Err(why),
                 }
             }};
         }
@@ -222,71 +232,85 @@ impl<'a> StringMethod<'a> {
                 if variable.starts_with('@') || is_array(variable) {
                     let expanded = expand.expand_string(variable)?;
                     output.push_str(&expanded.len().to_string());
-                } else if let Some(value) = expand.string(variable) {
-                    let count = UnicodeSegmentation::graphemes(value.as_str(), true).count();
-                    output.push_str(&count.to_string());
-                } else if is_expression(variable) {
-                    let word = expand.expand_string(variable)?.join(" ");
-                    let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
-                    output.push_str(&count.to_string());
+                } else {
+                    match expand.string(variable) {
+                        Ok(value) => {
+                            let count =
+                                UnicodeSegmentation::graphemes(value.as_str(), true).count();
+                            output.push_str(&count.to_string());
+                        }
+                        Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                            let word = expand.expand_string(variable)?.join(" ");
+                            let count = UnicodeSegmentation::graphemes(word.as_str(), true).count();
+                            output.push_str(&count.to_string());
+                        }
+                        Err(why) => return Err(why),
+                    }
                 }
             }
-            "len_bytes" => {
-                if let Some(value) = expand.string(variable) {
-                    output.push_str(&value.as_bytes().len().to_string());
-                } else if is_expression(variable) {
+            "len_bytes" => match expand.string(variable) {
+                Ok(value) => output.push_str(&value.as_bytes().len().to_string()),
+                Err(ExpansionError::VarNotFound) if is_expression(variable) => {
                     let word = expand.expand_string(variable)?.join(" ");
                     output.push_str(&word.as_bytes().len().to_string());
                 }
-            }
-            "reverse" => {
-                if let Some(value) = expand.string(variable) {
+                Err(why) => return Err(why),
+            },
+            "reverse" => match expand.string(variable) {
+                Ok(value) => {
                     let rev_graphs = UnicodeSegmentation::graphemes(value.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
-                } else if is_expression(variable) {
+                }
+                Err(ExpansionError::VarNotFound) if is_expression(variable) => {
                     let word = expand.expand_string(variable)?.join(" ");
                     let rev_graphs = UnicodeSegmentation::graphemes(word.as_str(), true).rev();
                     output.push_str(rev_graphs.collect::<String>().as_str());
                 }
-            }
+                Err(why) => return Err(why),
+            },
             "find" => {
-                let out = if let Some(value) = expand.string(variable) {
-                    value.find(pattern.join(" ")?.as_str())
-                } else if is_expression(variable) {
-                    expand.expand_string(variable)?.join(" ").find(pattern.join(" ")?.as_str())
-                } else {
-                    None
+                let out = match expand.string(variable) {
+                    Ok(value) => value.find(pattern.join(" ")?.as_str()),
+                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                        expand.expand_string(variable)?.join(" ").find(pattern.join(" ")?.as_str())
+                    }
+                    Err(why) => return Err(why),
                 };
                 output.push_str(&out.map(|i| i as isize).unwrap_or(-1).to_string());
             }
             "unescape" => {
-                let out = if let Some(value) = expand.string(variable) {
-                    value
-                } else if is_expression(variable) {
-                    expand.expand_string(variable)?.join(" ").into()
-                } else {
-                    return Ok(());
+                let out = match expand.string(variable) {
+                    Ok(value) => value,
+                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                        expand.expand_string(variable)?.join(" ").into()
+                    }
+                    Err(why) => return Err(why),
                 };
                 output.push_str(&unescape(&out));
             }
             "escape" => {
-                let word = if let Some(value) = expand.string(variable) {
-                    value
-                } else if is_expression(variable) {
-                    expand.expand_string(variable)?.join(" ").into()
-                } else {
-                    return Ok(());
+                let word = match expand.string(variable) {
+                    Ok(value) => value,
+                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                        expand.expand_string(variable)?.join(" ").into()
+                    }
+                    Err(why) => return Err(why),
                 };
                 output.push_str(&escape(&word));
             }
             "or" => {
-                let first_str = if let Some(value) = expand.string(variable) {
-                    value
-                } else if is_expression(variable) {
-                    expand.expand_string(variable)?.join(" ").into()
-                } else {
-                    types::Str::new()
+                let first_str = match expand.string(variable) {
+                    Ok(value) => value,
+                    Err(ExpansionError::VarNotFound) if is_expression(variable) => expand
+                        .expand_string(variable)
+                        .map(|x| x.join(" ").into())
+                        .unwrap_or_default(),
+                    Err(why) => {
+                        eprintln!("ion: {}", why);
+                        types::Str::new()
+                    }
                 };
+
                 if first_str != "" {
                     output.push_str(&first_str)
                 } else {
@@ -305,7 +329,7 @@ impl<'a> StringMethod<'a> {
                     }
                 };
             }
-            _ => Err(InvalidScalarMethod(self.method.to_string()))?,
+            _ => Err(ExpansionError::from(InvalidScalarMethod(self.method.to_string())))?,
         }
         Ok(())
     }
@@ -321,12 +345,12 @@ mod test {
     impl Expander for VariableExpander {
         type Error = IonError;
 
-        fn string(&self, variable: &str) -> Option<types::Str> {
+        fn string(&self, variable: &str) -> Result<types::Str, ExpansionError<Self::Error>> {
             match variable {
-                "FOO" => Some("FOOBAR".into()),
-                "BAZ" => Some("  BARBAZ   ".into()),
-                "EMPTY" => Some("".into()),
-                _ => None,
+                "FOO" => Ok("FOOBAR".into()),
+                "BAZ" => Ok("  BARBAZ   ".into()),
+                "EMPTY" => Ok("".into()),
+                _ => Err(ExpansionError::VarNotFound),
             }
         }
     }

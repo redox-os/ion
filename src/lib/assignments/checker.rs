@@ -46,7 +46,7 @@ fn get_map_of<E: Expander>(
     primitive_type: &Primitive,
     shell: &E,
     expression: &str,
-) -> expansion::Result<Value<'static>> {
+) -> expansion::Result<Value<'static>, E::Error> {
     let array = shell.expand_string(expression)?;
 
     let inner_kind = match primitive_type {
@@ -96,7 +96,7 @@ pub fn value_check<E: Expander>(
     shell: &E,
     value: &str,
     expected: &Primitive,
-) -> expansion::Result<Value<'static>> {
+) -> expansion::Result<Value<'static>, E::Error> {
     if is_array(value) {
         let extracted = shell.get_array(value)?;
         match expected {
@@ -149,11 +149,11 @@ mod test {
     impl Expander for VariableExpander {
         type Error = IonError;
 
-        fn get_string(&self, variable: &str) -> expansion::Result<types::Str> {
+        fn get_string(&self, variable: &str) -> expansion::Result<types::Str, Self::Error> {
             Ok(variable.into())
         }
 
-        fn get_array(&self, variable: &str) -> expansion::Result<types::Args> {
+        fn get_array(&self, variable: &str) -> expansion::Result<types::Args, Self::Error> {
             Ok(variable[1..variable.len() - 1].split(' ').map(Into::into).collect())
         }
     }

@@ -174,7 +174,9 @@ impl Colors {
     /// Parses the given input and returns a structure obtaining the text data needed for proper
     /// transformation into ANSI code parameters, which may be obtained by calling the
     /// `into_string()` method on the newly-created `Colors` structure.
-    pub fn collect(input: &str) -> Result<Colors, ExpansionError> {
+    pub fn collect<T: std::fmt::Display + std::fmt::Debug + std::error::Error>(
+        input: &str,
+    ) -> Result<Colors, ExpansionError<T>> {
         let mut colors = Colors { foreground: None, background: None, attributes: Vec::new() };
         for variable in input.split(',') {
             if variable == "reset" {
@@ -220,6 +222,7 @@ fn hex_char_to_u8_range(character: char) -> Option<u8> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::shell::IonError;
 
     #[test]
     fn convert_hex_digit() {
@@ -232,7 +235,7 @@ mod test {
     fn set_multiple_color_attributes() {
         let expected =
             Colors { attributes: vec!["1", "4", "5"], background: None, foreground: None };
-        let actual = Colors::collect("bold,underlined,blink").unwrap();
+        let actual = Colors::collect::<IonError>("bold,underlined,blink").unwrap();
         assert_eq!(actual, expected);
         assert_eq!("\x1b[1;4;5m", &actual.into_string());
     }
@@ -244,7 +247,7 @@ mod test {
             background: Some(Mode::Name("107")),
             foreground: Some(Mode::Name("35")),
         };
-        let actual = Colors::collect("whitebg,magenta,bold").unwrap();
+        let actual = Colors::collect::<IonError>("whitebg,magenta,bold").unwrap();
         assert_eq!(actual, expected);
         assert_eq!("\x1b[1;35;107m", actual.into_string());
     }
@@ -256,7 +259,7 @@ mod test {
             background: Some(Mode::Range256(77)),
             foreground: Some(Mode::Range256(75)),
         };
-        let actual = Colors::collect("0x4b,0x4dbg").unwrap();
+        let actual = Colors::collect::<IonError>("0x4b,0x4dbg").unwrap();
         assert_eq!(actual, expected);
         assert_eq!("\x1b[38;5;75;48;5;77m", &actual.into_string())
     }
@@ -268,7 +271,7 @@ mod test {
             background: Some(Mode::Range256(78)),
             foreground: Some(Mode::Range256(32)),
         };
-        let actual = Colors::collect("78bg,32").unwrap();
+        let actual = Colors::collect::<IonError>("78bg,32").unwrap();
         assert_eq!(actual, expected);
         assert_eq!("\x1b[38;5;32;48;5;78m", &actual.into_string())
     }
@@ -280,7 +283,7 @@ mod test {
             background: Some(Mode::TrueColor(255, 255, 255)),
             foreground: Some(Mode::TrueColor(0, 0, 0)),
         };
-        let actual = Colors::collect("0x000,0xFFFbg").unwrap();
+        let actual = Colors::collect::<IonError>("0x000,0xFFFbg").unwrap();
         assert_eq!(expected, actual);
         assert_eq!("\x1b[38;2;0;0;0;48;2;255;255;255m", &actual.into_string());
     }
@@ -292,7 +295,7 @@ mod test {
             background: Some(Mode::TrueColor(255, 0, 0)),
             foreground: Some(Mode::TrueColor(0, 255, 0)),
         };
-        let actual = Colors::collect("0x00FF00,0xFF0000bg").unwrap();
+        let actual = Colors::collect::<IonError>("0x00FF00,0xFF0000bg").unwrap();
         assert_eq!(expected, actual);
     }
 }

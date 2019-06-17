@@ -8,34 +8,6 @@ if test 1 == 1
 
   echo $x
   echo $y
+  echo Should not be printed
 end
 
-if test 1 == 1
-  let x = 1
-
-  fn print
-    echo ${super::x}
-    echo ${super::y}
-  end
-
-  if test 1 == 1
-    let y = 2
-    print
-  end
-end
-
-echo $x
-echo $y
-fn demo
-  echo ${super::foo}
-  drop foo
-
-  fn bar
-    super::demo
-  end
-  bar
-end
-
-let foo = bar
-echo $foo
-demo

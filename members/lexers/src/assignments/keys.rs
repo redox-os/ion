@@ -17,7 +17,7 @@ pub struct KeyBuf {
     pub name: String,
 }
 
-#[derive(Debug, PartialEq, Error)]
+#[derive(Debug, PartialEq, Error, Eq)]
 pub enum TypeError {
     #[error(display = "invalid type supplied: {}", _0)]
     Invalid(String),

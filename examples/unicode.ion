@@ -8,3 +8,4 @@ let Ҳ = ӌ
 echo $Ҳ
 let 1Ҳ = ӌ
 echo $1Ҳ
+echo Should not be reached

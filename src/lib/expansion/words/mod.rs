@@ -126,7 +126,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     /// Contains the grammar for parsing array expression syntax
-    fn array<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>>
+    fn array<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
     where
         I: Iterator<Item = u8>,
     {
@@ -206,7 +206,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     /// Contains the logic for parsing array subshell syntax.
-    fn array_process<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>>
+    fn array_process<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
     where
         I: Iterator<Item = u8>,
     {
@@ -257,7 +257,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     /// Contains the logic for parsing subshell syntax.
-    fn process<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>>
+    fn process<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
     where
         I: Iterator<Item = u8>,
     {
@@ -310,7 +310,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         panic!("ion: fatal error with syntax validation: unterminated process");
     }
 
-    fn braced_array_variable<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>>
+    fn braced_array_variable<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
     where
         I: Iterator<Item = u8>,
     {
@@ -362,7 +362,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     /// Contains the logic for parsing array variable syntax
-    fn array_variable<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>>
+    fn array_variable<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
     where
         I: Iterator<Item = u8>,
     {
@@ -484,7 +484,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         ))
     }
 
-    fn read_selection<I>(&mut self, iterator: &mut I) -> Result<Select>
+    fn read_selection<I>(&mut self, iterator: &mut I) -> Result<Select, E::Error>
     where
         I: Iterator<Item = u8>,
     {
@@ -503,7 +503,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 
     /// Contains the logic for parsing variable syntax
-    fn variable<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>>
+    fn variable<I>(&mut self, iterator: &mut I) -> Result<WordToken<'a>, E::Error>
     where
         I: Iterator<Item = u8>,
     {
@@ -654,8 +654,11 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
     }
 }
 
-impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E> {
-    type Item = Result<WordToken<'a>>;
+impl<'a, E: Expander + 'a> Iterator for WordIterator<'a, E>
+where
+    <E as Expander>::Error: 'static,
+{
+    type Item = Result<WordToken<'a>, E::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.read == self.data.len() {
