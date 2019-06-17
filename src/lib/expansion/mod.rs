@@ -43,6 +43,11 @@ pub enum ExpansionError {
     UnknownEnv(String),
     #[error(display = "Variable does not exist")]
     VarNotFound,
+
+    #[error(display = "Could not fetch the user home directory")]
+    HomeNotFound,
+    #[error(display = "Can't expand tilde: {} is out of bound for directory stack", _0)]
+    OutOfStack(usize),
 }
 
 impl From<TypeError> for ExpansionError {
@@ -81,8 +86,10 @@ fn join_with_spaces<S: AsRef<str>, I: IntoIterator<Item = S>>(input: &mut types:
 // TODO: Use Cow<'a, types::Str> for hashmap values.
 /// Trait representing different elements of string expansion
 pub trait Expander: Sized {
+    type Error: std::fmt::Display + std::fmt::Debug;
+
     /// Expand a tilde form to the correct directory.
-    fn tilde(&self, _input: &str) -> Option<String> { None }
+    fn tilde(&self, _input: &str) -> std::result::Result<String, Self::Error> { unimplemented!() }
     /// Expand an array variable with some selection.
     fn array(&self, _name: &str, _selection: &Select) -> Option<Args> { None }
     /// Expand a string variable given if it's quoted / unquoted
@@ -537,8 +544,11 @@ trait ExpanderInternal: Expander {
 
         let expanded: types::Str = if tilde {
             match self.tilde(&concat) {
-                Some(s) => s.into(),
-                None => concat,
+                Ok(s) => s.into(),
+                Err(why) => {
+                    eprintln!("ion: {}", why);
+                    return;
+                }
             }
         } else {
             concat
@@ -714,10 +724,13 @@ trait ExpanderInternal: Expander {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::shell::IonError;
 
     struct VariableExpander;
 
     impl Expander for VariableExpander {
+        type Error = IonError;
+
         fn string(&self, variable: &str) -> Option<types::Str> {
             match variable {
                 "A" => Some("1".into()),
@@ -734,6 +747,8 @@ mod test {
     struct CommandExpander;
 
     impl Expander for CommandExpander {
+        type Error = IonError;
+
         fn command(&self, cmd: &str) -> Option<types::Str> { Some(cmd.into()) }
     }
 

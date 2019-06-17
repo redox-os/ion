@@ -364,12 +364,14 @@ mod trait_test;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expansion::Expander;
+    use crate::{expansion::Expander, shell::IonError};
     use serial_test_derive::serial;
 
     struct VariableExpander<'a>(pub Variables<'a>);
 
     impl<'a> Expander for VariableExpander<'a> {
+        type Error = IonError;
+
         fn string(&self, var: &str) -> Option<types::Str> { self.0.get_str(var).ok() } // TODO: make string return a result
     }
 

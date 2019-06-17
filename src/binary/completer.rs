@@ -153,40 +153,45 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
         // because no changes will occur to either of the underlying references in the
         // duration between creation of the completers and execution of their
         // completions.
-        if let Some(expanded) = self.shell.tilde(start) {
-            // Now we obtain completions for the `expanded` form of the `start` value.
-            let iterator = filename_completion(&expanded, &self.path);
-
-            // We can do that by obtaining the index position where the tilde character
-            // ends. We don't search with `~` because we also want to
-            // handle other tilde variants.
-            let t_index = start.find('/').unwrap_or(1);
-            // `tilde` is the tilde pattern, and `search` is the pattern that follows.
-            let (tilde, search) = start.split_at(t_index);
-
-            if search.len() < 2 {
-                // If the length of the search pattern is less than 2, the search pattern is
-                // empty, and thus the completions actually contain files and directories in
-                // the home directory.
-
-                // The tilde pattern will actually be our `start` command in itself,
-                // and the completed form will be all of the characters beyond the length of
-                // the expanded form of the tilde pattern.
-                iterator.map(|completion| [start, &completion[expanded.len()..]].concat()).collect()
-            // To save processing time, we should get obtain the index position where our
-            // search pattern begins, and re-use that index to slice the completions so
-            // that we may re-add the tilde character with the completion that follows.
-            } else if let Some(e_index) = expanded.rfind(search) {
-                // And then we will need to take those completions and remove the expanded form
-                // of the tilde pattern and replace it with that pattern yet again.
-                iterator
-                    .map(|completion| escape(&[tilde, &completion[e_index..]].concat()))
-                    .collect()
-            } else {
-                Vec::new()
+        let expanded = match self.shell.tilde(start) {
+            Ok(expanded) => expanded,
+            Err(why) => {
+                eprintln!("ion: {}", why);
+                return vec![start.into()];
             }
+        };
+        // Now we obtain completions for the `expanded` form of the `start` value.
+        let completions = filename_completion(&expanded, &self.path);
+        if expanded == start {
+            return completions.collect();
+        }
+        // We can do that by obtaining the index position where the tilde character
+        // ends. We don't search with `~` because we also want to
+        // handle other tilde variants.
+        let t_index = start.find('/').unwrap_or(1);
+        // `tilde` is the tilde pattern, and `search` is the pattern that follows.
+        let (tilde, search) = start.split_at(t_index);
+
+        if search.len() < 2 {
+            // If the length of the search pattern is less than 2, the search pattern is
+            // empty, and thus the completions actually contain files and directories in
+            // the home directory.
+
+            // The tilde pattern will actually be our `start` command in itself,
+            // and the completed form will be all of the characters beyond the length of
+            // the expanded form of the tilde pattern.
+            completions.map(|completion| [start, &completion[expanded.len()..]].concat()).collect()
+        // To save processing time, we should get obtain the index position where our
+        // search pattern begins, and re-use that index to slice the completions so
+        // that we may re-add the tilde character with the completion that follows.
+        } else if let Some(e_index) = expanded.rfind(search) {
+            // And then we will need to take those completions and remove the expanded form
+            // of the tilde pattern and replace it with that pattern yet again.
+            completions
+                .map(|completion| escape(&[tilde, &completion[e_index..]].concat()))
+                .collect()
         } else {
-            filename_completion(&start, &self.path).collect()
+            Vec::new()
         }
     }
 }

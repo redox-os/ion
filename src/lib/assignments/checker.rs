@@ -142,10 +142,13 @@ pub fn value_check<E: Expander>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::shell::IonError;
 
     struct VariableExpander;
 
     impl Expander for VariableExpander {
+        type Error = IonError;
+
         fn get_string(&self, variable: &str) -> expansion::Result<types::Str> {
             Ok(variable.into())
         }

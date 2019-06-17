@@ -314,11 +314,13 @@ impl<'a> StringMethod<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::types;
+    use crate::{shell::IonError, types};
 
     struct VariableExpander;
 
     impl Expander for VariableExpander {
+        type Error = IonError;
+
         fn string(&self, variable: &str) -> Option<types::Str> {
             match variable {
                 "FOO" => Some("FOOBAR".into()),

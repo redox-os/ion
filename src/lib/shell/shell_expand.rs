@@ -1,4 +1,4 @@
-use super::{fork::Capture, variables::Value, Shell};
+use super::{fork::Capture, variables::Value, IonError, Shell};
 use crate::{
     expansion::{Expander, ExpansionError, Select},
     sys::{self, env as sys_env, variables as self_sys},
@@ -7,6 +7,8 @@ use crate::{
 use std::{env, io::Read, iter::FromIterator, process};
 
 impl<'a, 'b> Expander for Shell<'b> {
+    type Error = IonError;
+
     /// Uses a subshell to expand a given command.
     fn command(&self, command: &str) -> Option<types::Str> {
         let output = match self
@@ -182,25 +184,21 @@ impl<'a, 'b> Expander for Shell<'b> {
         }
     }
 
-    fn tilde(&self, input: &str) -> Option<String> {
+    fn tilde(&self, input: &str) -> Result<String, IonError> {
         // Only if the first character is a tilde character will we perform expansions
         if !input.starts_with('~') {
-            return None;
+            return Ok(input.into());
         }
 
         let separator = input[1..].find(|c| c == '/' || c == '$');
         let (tilde_prefix, rest) = input[1..].split_at(separator.unwrap_or(input.len() - 1));
 
         match tilde_prefix {
-            "" => sys_env::home_dir().map(|home| home.to_string_lossy().to_string() + rest),
-            "+" => Some(env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest),
-            "-" => match self.variables.get_str("OLDPWD") {
-                Ok(oldpwd) => Some(oldpwd.to_string() + rest),
-                Err(why) => {
-                    eprintln!("ion: {}", why);
-                    None
-                }
-            },
+            "" => sys_env::home_dir()
+                .map(|home| home.to_string_lossy().to_string() + rest)
+                .ok_or(ExpansionError::HomeNotFound.into()),
+            "+" => Ok(env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest),
+            "-" => Ok(self.variables.get_str("OLDPWD")?.to_string() + rest),
             _ => {
                 let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
                     (false, &tilde_prefix[1..])
@@ -216,8 +214,11 @@ impl<'a, 'b> Expander for Shell<'b> {
                     } else {
                         self.directory_stack.dir_from_bottom(num)
                     }
-                    .map(|path| path.to_str().unwrap().to_string()),
-                    Err(_) => self_sys::get_user_home(tilde_prefix).map(|home| home + rest),
+                    .map(|path| path.to_str().unwrap().to_string())
+                    .ok_or_else(|| ExpansionError::OutOfStack(num).into()),
+                    Err(_) => self_sys::get_user_home(tilde_prefix)
+                        .map(|home| home + rest)
+                        .ok_or(ExpansionError::HomeNotFound.into()),
                 }
             }
         }

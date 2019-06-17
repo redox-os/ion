@@ -158,12 +158,15 @@ mod test {
     use super::*;
     use crate::{
         ranges::{Index, Range},
+        shell::IonError,
         types,
     };
 
     struct VariableExpander;
 
     impl Expander for VariableExpander {
+        type Error = IonError;
+
         fn array(&self, variable: &str, _: &Select) -> Option<types::Args> {
             match variable {
                 "ARRAY" => Some(args!["a", "b", "c"].to_owned()),

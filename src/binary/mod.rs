@@ -74,7 +74,7 @@ impl<'a> InteractiveBinary<'a> {
     /// Handles commands given by the REPL, and saves them to history.
     pub fn save_command(&self, cmd: &str) {
         if !cmd.ends_with('/')
-            && self.shell.borrow().tilde(cmd).map_or(false, |path| Path::new(&path).is_dir())
+            && self.shell.borrow().tilde(cmd).ok().map_or(false, |path| Path::new(&path).is_dir())
         {
             self.save_command_in_history(&[cmd, "/"].concat());
         } else {

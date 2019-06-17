@@ -1,12 +1,15 @@
 use super::*;
 use crate::{
     ranges::{Index, Range},
+    shell::IonError,
     types,
 };
 
 struct Empty;
 
-impl Expander for Empty {}
+impl Expander for Empty {
+    type Error = IonError;
+}
 
 fn compare(input: &str, expected: Vec<WordToken<'_>>) {
     let mut correct = 0;
@@ -258,6 +261,8 @@ fn test_braces() {
 struct WithVars;
 
 impl Expander for WithVars {
+    type Error = IonError;
+
     fn string(&self, var: &str) -> Option<types::Str> {
         match var {
             "pkmn1" => Some("Pokémon".into()),
