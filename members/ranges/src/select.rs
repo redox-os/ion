@@ -8,8 +8,6 @@ use std::{
 /// Represents a filter on a vector-like object
 #[derive(Debug, PartialEq, Clone)]
 pub enum Select {
-    /// Select no elements
-    None,
     /// Select all elements
     All,
     /// Select a single element based on its index
@@ -38,7 +36,7 @@ where
         O: FromIterator<Self::Item>,
     {
         match s {
-            Select::None | Select::Key(_) => empty().collect(),
+            Select::Key(_) => empty().collect(),
             Select::All => self.collect(),
             Select::Index(Index::Forward(idx)) => self.nth(*idx).into_iter().collect(),
             Select::Index(Index::Backward(idx)) => self.rev().nth(*idx).into_iter().collect(),

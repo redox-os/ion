@@ -30,6 +30,8 @@ pub enum ExpansionError<T: fmt::Debug + error::Error + fmt::Display + 'static> {
     TypeError(#[error(cause)] TypeError),
     #[error(display = "invalid index")] // TODO: Add more info
     OutOfBound,
+    #[error(display = "can't use key '{}' on array", _0)] // TODO: Add more info
+    KeyOnArray(String),
 
     #[error(display = "namespace '{}' is unsupported", _0)]
     UnsupportedNamespace(String),
@@ -51,6 +53,9 @@ pub enum ExpansionError<T: fmt::Debug + error::Error + fmt::Display + 'static> {
 
     #[error(display = "Could not expand subprocess: {}", _0)]
     Subprocess(#[error(cause)] Box<T>),
+
+    #[error(display = "Can't parse '{}' as a valid index for variable", _0)]
+    InvalidIndex(String),
 }
 
 impl<T: fmt::Display + fmt::Debug + error::Error> From<TypeError> for ExpansionError<T> {
@@ -141,7 +146,9 @@ pub trait Expander: Sized {
                             let keys = key.split(' ');
                             token_buffer.reserve(2 * keys.size_hint().0);
                             for index in keys {
-                                let select = index.parse::<Select>().unwrap_or(Select::None);
+                                let select = index
+                                    .parse::<Select>()
+                                    .map_err(|_| ExpansionError::InvalidIndex(index.into()))?;
                                 token_buffer.push(WordToken::ArrayVariable(
                                     data,
                                     contains_quote,
@@ -233,7 +240,7 @@ trait ExpanderInternal: Expander {
             }
             Select::Index(index) => Ok(self.array_nth(elements, *index).into_iter().collect()),
             Select::Range(range) => self.array_range(elements, *range),
-            Select::Key(_) | Select::None => Ok(Args::new()),
+            Select::Key(_) => Ok(Args::new()),
         }
     }
 
@@ -300,7 +307,7 @@ trait ExpanderInternal: Expander {
                     });
                 }
             }
-            Select::Key(_) | Select::None => (),
+            Select::Key(_) => (),
         }
     }
 
@@ -370,7 +377,7 @@ trait ExpanderInternal: Expander {
                                     );
                                 }
                             }
-                            Select::Key(_) | Select::None => (),
+                            Select::Key(_) => (),
                         },
                         WordToken::ArrayMethod(ref method, _) => {
                             method.handle(output, self)?;
@@ -447,7 +454,7 @@ trait ExpanderInternal: Expander {
             },
             WordToken::ArrayProcess(command, quoted, ref index) => {
                 crate::IonPool::string(|output| match *index {
-                    Select::Key(_) | Select::None => Ok(Args::new()),
+                    Select::Key(_) => Ok(Args::new()),
                     _ => {
                         self.expand_process(output, command, &Select::All);
 
@@ -471,7 +478,7 @@ trait ExpanderInternal: Expander {
                                         .map(From::from),
                                 }
                             }
-                            Select::Key(_) | Select::None => unreachable!(),
+                            Select::Key(_) => unreachable!(),
                         };
 
                         if quoted {
@@ -646,7 +653,7 @@ trait ExpanderInternal: Expander {
                                         );
                                     }
                                 }
-                                Select::Key(_) | Select::None => (),
+                                Select::Key(_) => (),
                             },
                             WordToken::ArrayMethod(ref method, _) => {
                                 method.handle(output, self)?;

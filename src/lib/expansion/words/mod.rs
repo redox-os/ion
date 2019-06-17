@@ -3,7 +3,7 @@ mod tests;
 
 use super::{
     methods::{ArrayMethod, Pattern, StringMethod},
-    Expander, Result,
+    Expander, ExpansionError, Result,
 };
 use crate::lexers::ArgumentSplitter;
 pub use crate::ranges::{Select, SelectWithSize};
@@ -494,7 +494,9 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
             if let b']' = character {
                 let value = self.expanders.expand_string(&self.data[start..self.read])?.join(" ");
                 self.read += 1;
-                return Ok(value.parse::<Select>().unwrap_or(Select::None));
+                return value
+                    .parse::<Select>()
+                    .map_err(|_| ExpansionError::InvalidIndex(value.into()));
             }
             self.read += 1;
         }

@@ -291,14 +291,6 @@ mod test {
     }
 
     #[test]
-    fn test_split_none() {
-        let mut output = types::Str::new();
-        let method = ArrayMethod::new("split", "$SPACEDFOO", Pattern::Whitespace, Select::None);
-        method.handle(&mut output, &VariableExpander).unwrap();
-        assert_eq!(&*output, "");
-    }
-
-    #[test]
     fn test_split_key() {
         let mut output = types::Str::new();
         let method =
