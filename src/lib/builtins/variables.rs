@@ -196,7 +196,7 @@ mod test {
     #[test]
     fn drop_deletes_array() {
         let mut variables = Variables::default();
-        variables.set("FOO", array!["BAR"]);
+        variables.set("FOO", types_rs::array!["BAR"]);
         let return_status = drop_array(&mut variables, &["drop", "-a", "FOO"]);
         assert_eq!(Status::SUCCESS, return_status);
         assert!(VariableExpander(variables).expand_string("@FOO").is_err());

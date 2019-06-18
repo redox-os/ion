@@ -1,0 +1,12 @@
+[package]
+name = "types-rs"
+version = "0.1.0"
+authors = ["Xavier L'Heureux <xavier.lheureux@icloud.com>"]
+edition = "2018"
+
+[dependencies]
+lexical = "2.0"
+hashbrown = "0.1.2"
+small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }
+smallvec = "0.6"
+itertools = "0.8"

@@ -243,9 +243,10 @@ mod tests {
         statements.push(Statement::End);
         let description: types::Str = "description".into();
 
-        shell
-            .variables_mut()
-            .set(&name, Function::new(Some(description), name.clone(), args, statements));
+        shell.variables_mut().set(
+            &name,
+            Value::Function(Function::new(Some(description), name.clone(), args, statements)),
+        );
 
         assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(true));
         shell.variables_mut().remove_variable(name_str);
@@ -391,9 +392,10 @@ mod tests {
         statements.push(Statement::End);
         let description: types::Str = "description".into();
 
-        shell
-            .variables_mut()
-            .set(&name, Function::new(Some(description), name.clone(), args, statements));
+        shell.variables_mut().set(
+            &name,
+            Value::Function(Function::new(Some(description), name.clone(), args, statements)),
+        );
 
         assert_eq!(function_is_defined(name_str, &shell), true);
         shell.variables_mut().remove_variable(name_str);

@@ -62,7 +62,7 @@ pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
                 // This used to take a `&[String]` but cloned them all, so although
                 // this is non-ideal and could probably be better done with `Rc`, it
                 // hasn't got any slower.
-                let arguments: types::Array<'_> =
+                let arguments: types::Array<types::Function<'_>> =
                     iter::once(command).chain(args_iter.cloned().map(Value::Str)).collect();
                 match kind {
                     UnsetIfNone => {

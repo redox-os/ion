@@ -1,4 +1,4 @@
-use super::{super::types, Value};
+use super::Value;
 use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -25,8 +25,8 @@ macro_rules! math {
         math!($trait, $fn, $op_f_f, $op_i_i, false);
     };
     ($trait:ident, $fn:ident, $op_f_f:expr, $op_i_i:expr, $allfloat:expr) => {
-        impl<'a, 'b> $trait for &'b Value<'a> {
-            type Output = Result<Value<'static>, OpError>;
+        impl<'a, T> $trait for &'a Value<T> {
+            type Output = Result<Value<T>, OpError>;
 
             fn $fn(self, rhs: Self) -> Self::Output {
                 if let Value::Str(rhs) = rhs {
@@ -49,14 +49,14 @@ macro_rules! math {
             }
         }
 
-        impl<'a, 'b> $trait<Value<'a>> for &'b Value<'a> {
-            type Output = Result<Value<'static>, OpError>;
+        impl<'a, T> $trait<Value<T>> for &'a Value<T> {
+            type Output = Result<Value<T>, OpError>;
 
-            fn $fn(self, rhs: Value<'_>) -> Self::Output { self.$fn(&rhs) }
+            fn $fn(self, rhs: Value<T>) -> Self::Output { self.$fn(&rhs) }
         }
 
-        impl<'a, 'b> $trait<i128> for &'b Value<'a> {
-            type Output = Result<Value<'static>, OpError>;
+        impl<'a, T> $trait<i128> for &'a Value<T> {
+            type Output = Result<Value<T>, OpError>;
 
             fn $fn(self, rhs: i128) -> Self::Output {
                 match self {
@@ -76,18 +76,16 @@ macro_rules! math {
                         }
                     }
                     .map(Value::from),
-                    Value::Array(lhs) => lhs
-                        .iter()
-                        .map(|el| el.$fn(rhs))
-                        .collect::<Result<types::Array<'_>, _>>()
-                        .map(Value::Array),
+                    Value::Array(lhs) => {
+                        lhs.iter().map(|el| el.$fn(rhs)).collect::<Result<Value<T>, _>>()
+                    }
                     _ => Err(OpError::TypeError),
                 }
             }
         }
 
-        impl<'a, 'b> $trait<f64> for &'b Value<'a> {
-            type Output = Result<Value<'static>, OpError>;
+        impl<'a, T> $trait<f64> for &'a Value<T> {
+            type Output = Result<Value<T>, OpError>;
 
             fn $fn(self, rhs: f64) -> Self::Output {
                 match self {
@@ -95,11 +93,9 @@ macro_rules! math {
                         .map_err(OpError::ParseError)
                         .map(|lhs| lexical::to_string($op_f_f(lhs, rhs)))
                         .map(Value::from),
-                    Value::Array(lhs) => lhs
-                        .iter()
-                        .map(|el| el.$fn(rhs))
-                        .collect::<Result<types::Array<'_>, _>>()
-                        .map(Value::Array),
+                    Value::Array(lhs) => {
+                        lhs.iter().map(|el| el.$fn(rhs)).collect::<Result<Value<T>, _>>()
+                    }
                     _ => Err(OpError::TypeError),
                 }
             }

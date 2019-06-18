@@ -14,7 +14,7 @@ pub mod variables;
 pub(crate) use self::job::Job;
 use self::{
     directory_stack::DirectoryStack,
-    flow_control::{Block, BlockError, FunctionError, Statement},
+    flow_control::{Block, BlockError, Function, FunctionError, Statement},
     foreground::ForegroundSignals,
     fork::{Fork, IonResult},
     pipe_exec::foreground,
@@ -31,7 +31,7 @@ use crate::{
     expansion::{pipelines::Pipeline, ExpansionError},
     lexers::{Key, Primitive},
     parser::{ParseError, StatementError, Terminator},
-    sys, types,
+    sys,
 };
 use err_derive::Error;
 use itertools::Itertools;
@@ -405,7 +405,7 @@ impl<'a> Shell<'a> {
     /// Get the last command's return code and/or the code for the error
     pub fn previous_status(&self) -> Status { self.previous_status }
 
-    pub fn assign(&mut self, key: &Key<'_>, value: Value<'a>) -> Result<(), String> {
+    pub fn assign(&mut self, key: &Key<'_>, value: Value<Function<'a>>) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)

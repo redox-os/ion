@@ -46,7 +46,7 @@ fn get_map_of<E: Expander>(
     primitive_type: &Primitive,
     shell: &E,
     expression: &str,
-) -> expansion::Result<Value<'static>, E::Error> {
+) -> expansion::Result<Value<types::Function<'static>>, E::Error> {
     let array = shell.expand_string(expression)?;
 
     let inner_kind = match primitive_type {
@@ -96,26 +96,26 @@ pub fn value_check<E: Expander>(
     shell: &E,
     value: &str,
     expected: &Primitive,
-) -> expansion::Result<Value<'static>, E::Error> {
+) -> expansion::Result<Value<types::Function<'static>>, E::Error> {
     if is_array(value) {
         let extracted = shell.get_array(value)?;
         match expected {
             Primitive::StrArray | Primitive::Str => extracted
                 .iter()
                 .map(|item| value_check(shell, item, &Primitive::Str))
-                .collect::<Result<Value, _>>(),
+                .collect::<Result<_, _>>(),
             Primitive::BooleanArray => extracted
                 .iter()
                 .map(|item| value_check(shell, item, &Primitive::Boolean))
-                .collect::<Result<Value, _>>(),
+                .collect::<Result<_, _>>(),
             Primitive::IntegerArray => extracted
                 .iter()
                 .map(|item| value_check(shell, item, &Primitive::Integer))
-                .collect::<Result<Value, _>>(),
+                .collect::<Result<_, _>>(),
             Primitive::FloatArray => extracted
                 .iter()
                 .map(|item| value_check(shell, item, &Primitive::Float))
-                .collect::<Result<Value, _>>(),
+                .collect::<Result<_, _>>(),
             Primitive::HashMap(_) | Primitive::BTreeMap(_) => get_map_of(expected, shell, value),
             Primitive::Indexed(_, ref kind) => value_check(shell, value, kind),
             _ => Err(TypeError::BadValue(expected.clone()).into()),

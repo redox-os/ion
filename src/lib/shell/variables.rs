@@ -1,10 +1,3 @@
-mod math;
-mod modification;
-
-pub use self::{
-    math::{EuclDiv, OpError, Pow},
-    modification::Modifications,
-};
 use super::{colors::Colors, flow_control::Function};
 use crate::{
     expansion::ExpansionError,
@@ -12,127 +5,32 @@ use crate::{
     sys::{env as sys_env, geteuid, getpid, getuid, variables as self_sys},
     types::{self, Array},
 };
-use itertools::Itertools;
 use scopes::{Namespace, Scope, Scopes};
-use std::{env, fmt};
+use std::env;
+use types_rs::array;
 use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Value<'a> {
-    Str(types::Str),
-    Alias(types::Alias),
-    Array(types::Array<'a>),
-    HashMap(types::HashMap<'a>),
-    BTreeMap(types::BTreeMap<'a>),
-    Function(Function<'a>),
-    None,
-}
-
-macro_rules! type_from_value {
-    ($to:ty : $variant:ident) => {
-        impl<'a> From<Value<'a>> for $to {
-            fn from(var: Value<'a>) -> Self {
-                match var {
-                    Value::$variant(inner) => inner,
-                    _ => <$to>::default(),
-                }
-            }
-        }
-
-        impl<'a> From<Value<'a>> for Option<$to> {
-            fn from(var: Value<'a>) -> Self {
-                match var {
-                    Value::$variant(inner) => Some(inner),
-                    _ => None,
-                }
-            }
-        }
-
-        impl<'a, 'b> From<&'b Value<'a>> for Option<&'b $to> {
-            fn from(var: &'b Value<'a>) -> Self {
-                match *var {
-                    Value::$variant(ref inner) => Some(inner),
-                    _ => None,
-                }
-            }
-        }
-
-        impl<'a, 'b> From<&'b mut Value<'a>> for Option<&'b mut $to> {
-            fn from(var: &'b mut Value<'a>) -> Self {
-                match *var {
-                    Value::$variant(ref mut inner) => Some(inner),
-                    _ => None,
-                }
-            }
-        }
-    };
-}
-
-type_from_value!(types::Str: Str);
-type_from_value!(types::Alias: Alias);
-type_from_value!(types::Array<'a> : Array);
-type_from_value!(types::HashMap<'a> : HashMap);
-type_from_value!(types::BTreeMap<'a> : BTreeMap);
-type_from_value!(Function<'a> : Function);
-
-impl<'a> Eq for Value<'a> {}
-
-// this one’s only special because of the lifetime parameter
-impl<'a, 'b> From<&'b str> for Value<'a> {
-    fn from(string: &'b str) -> Self { Value::Str(string.into()) }
-}
-
-macro_rules! value_from_type {
-    ($arg:ident: $from:ty => $variant:ident($inner:expr)) => {
-        impl<'a> From<$from> for Value<'a> {
-            fn from($arg: $from) -> Self { Value::$variant($inner) }
-        }
-    };
-}
-
-value_from_type!(string: types::Str => Str(string));
-value_from_type!(string: String => Str(string.into()));
-value_from_type!(alias: types::Alias => Alias(alias));
-value_from_type!(array: types::Array<'a> => Array(array));
-value_from_type!(hmap: types::HashMap<'a> => HashMap(hmap));
-value_from_type!(bmap: types::BTreeMap<'a> => BTreeMap(bmap));
-value_from_type!(function: Function<'a> => Function(function));
-
-impl<'a> fmt::Display for Value<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Value::Str(ref str_) => write!(f, "{}", str_),
-            Value::Alias(ref alias) => write!(f, "{}", **alias),
-            Value::Array(ref array) => write!(f, "{}", array.iter().format(" ")),
-            Value::HashMap(ref map) => write!(f, "{}", map.values().format(" ")),
-            Value::BTreeMap(ref map) => write!(f, "{}", map.values().format(" ")),
-            _ => write!(f, ""),
-        }
-    }
-}
-
-pub struct Variables<'a>(Scopes<types::Str, Value<'a>>);
+pub use types_rs::Value;
+pub struct Variables<'a>(Scopes<types::Str, Value<Function<'a>>>);
 
 impl<'a> Variables<'a> {
     pub fn string_vars(&self) -> impl Iterator<Item = (&types::Str, &types::Str)> {
         self.0.scopes().flat_map(|map| {
-            map.iter().filter_map(
-                |(key, val)| {
-                    if let Value::Str(val) = val {
-                        Some((key, val))
-                    } else {
-                        None
-                    }
-                },
-            )
+            map.iter().filter_map(|(key, val)| {
+                if let types_rs::Value::Str(val) = val {
+                    Some((key, val))
+                } else {
+                    None
+                }
+            })
         })
     }
 
     pub fn aliases(&self) -> impl Iterator<Item = (&types::Str, &types::Str)> {
         self.0.scopes().rev().flat_map(|map| {
             map.iter().filter_map(|(key, possible_alias)| {
-                if let Value::Alias(alias) = possible_alias {
+                if let types_rs::Value::Alias(alias) = possible_alias {
                     Some((key, &**alias))
                 } else {
                     None
@@ -144,7 +42,7 @@ impl<'a> Variables<'a> {
     pub fn functions(&self) -> impl Iterator<Item = (&types::Str, &Function<'a>)> {
         self.0.scopes().rev().flat_map(|map| {
             map.iter().filter_map(|(key, val)| {
-                if let Value::Function(val) = val {
+                if let types_rs::Value::Function(val) = val {
                     Some((key, val))
                 } else {
                     None
@@ -153,17 +51,15 @@ impl<'a> Variables<'a> {
         })
     }
 
-    pub fn arrays(&self) -> impl Iterator<Item = (&types::Str, &types::Array<'a>)> {
+    pub fn arrays(&self) -> impl Iterator<Item = (&types::Str, &types::Array<Function<'a>>)> {
         self.0.scopes().rev().flat_map(|map| {
-            map.iter().filter_map(
-                |(key, val)| {
-                    if let Value::Array(val) = val {
-                        Some((key, val))
-                    } else {
-                        None
-                    }
-                },
-            )
+            map.iter().filter_map(|(key, val)| {
+                if let types_rs::Value::Array(val) = val {
+                    Some((key, val))
+                } else {
+                    None
+                }
+            })
         })
     }
 
@@ -174,11 +70,11 @@ impl<'a> Variables<'a> {
     pub fn pop_scopes<'b>(
         &'b mut self,
         index: usize,
-    ) -> impl Iterator<Item = Scope<types::Str, Value<'a>>> + 'b {
+    ) -> impl Iterator<Item = Scope<types::Str, Value<Function<'a>>>> + 'b {
         self.0.pop_scopes(index)
     }
 
-    pub fn append_scopes(&mut self, scopes: Vec<Scope<types::Str, Value<'a>>>) {
+    pub fn append_scopes(&mut self, scopes: Vec<Scope<types::Str, Value<Function<'a>>>>) {
         self.0.append_scopes(scopes)
     }
 
@@ -186,7 +82,7 @@ impl<'a> Variables<'a> {
         self.0.index_scope_for_var(name)
     }
 
-    pub fn set<T: Into<Value<'a>>>(&mut self, name: &str, value: T) {
+    pub fn set<T: Into<Value<Function<'a>>>>(&mut self, name: &str, value: T) {
         let value = value.into();
         if let Some(val) = self.0.get_mut(name) {
             std::mem::replace(val, value);
@@ -244,7 +140,7 @@ impl<'a> Variables<'a> {
         c.is_alphanumeric() || c == '_' || c == '?' || c == '.' || c == '-' || c == '+'
     }
 
-    pub fn remove_variable(&mut self, name: &str) -> Option<Value<'a>> {
+    pub fn remove_variable(&mut self, name: &str) -> Option<Value<Function<'a>>> {
         if name.starts_with("super::") || name.starts_with("global::") {
             // Cannot mutate outer namespace
             return None;
@@ -252,7 +148,7 @@ impl<'a> Variables<'a> {
         self.0.remove_variable(name)
     }
 
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut Value<'a>> {
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Value<Function<'a>>> {
         if name.starts_with("super::") || name.starts_with("global::") {
             // Cannot mutate outer namespace
             return None;
@@ -291,7 +187,7 @@ impl<'a> Variables<'a> {
         }
     }
 
-    pub fn get_ref(&self, mut name: &str) -> Option<&Value<'a>> {
+    pub fn get_ref(&self, mut name: &str) -> Option<&Value<Function<'a>>> {
         const GLOBAL_NS: &str = "global::";
         const SUPER_NS: &str = "super::";
 
@@ -316,7 +212,7 @@ impl<'a> Variables<'a> {
 
 impl<'a> Default for Variables<'a> {
     fn default() -> Self {
-        let mut map: Scopes<types::Str, Value<'a>> = Scopes::with_capacity(64);
+        let mut map: Scopes<types::Str, Value<Function<'a>>> = Scopes::with_capacity(64);
         map.set("HISTORY_SIZE", "1000");
         map.set("HISTFILE_SIZE", "100000");
         map.set(
@@ -358,9 +254,6 @@ impl<'a> Default for Variables<'a> {
         Variables(map)
     }
 }
-
-#[cfg(test)]
-mod trait_test;
 
 #[cfg(test)]
 mod tests {

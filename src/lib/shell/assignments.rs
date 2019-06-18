@@ -7,13 +7,14 @@ use crate::{
     builtins::Status,
     lexers::assignments::{Key, Operator, Primitive},
     parser::is_valid_name,
-    shell::variables::{EuclDiv, Modifications, OpError, Pow, Value},
+    shell::{flow_control::Function, Value},
 };
 use std::{
     env,
     io::{self, BufWriter, Write},
     result::Result,
 };
+use types_rs::{EuclDiv, Modifications, OpError, Pow};
 
 fn list_vars(shell: &Shell<'_>) -> Result<(), io::Error> {
     let stdout = io::stdout();
@@ -104,7 +105,7 @@ impl<'b> Shell<'b> {
     pub(crate) fn calculate<'a>(
         &mut self,
         actions: AssignmentActions<'a>,
-    ) -> Result<Vec<(Key<'a>, Value<'b>)>, String> {
+    ) -> Result<Vec<(Key<'a>, Value<Function<'b>>)>, String> {
         let mut backup: Vec<_> = Vec::with_capacity(4);
         for action in actions {
             let Action(key, operator, expression) = action.map_err(|e| e.to_string())?;
@@ -184,7 +185,11 @@ impl<'b> Shell<'b> {
 // This should logically be a method over operator, but Value is only accessible in the main repo
 // TODO: too much allocations occur over here. We need to expand variables before they get
 // parsed
-fn apply<'b>(op: Operator, lhs: &Value<'b>, rhs: Value<'b>) -> Result<Value<'b>, OpError> {
+fn apply<'a>(
+    op: Operator,
+    lhs: &Value<Function<'a>>,
+    rhs: Value<Function<'a>>,
+) -> Result<Value<Function<'a>>, OpError> {
     match op {
         Operator::Add => lhs + rhs,
         Operator::Divide => lhs / rhs,

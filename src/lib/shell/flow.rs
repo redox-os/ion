@@ -146,12 +146,12 @@ impl<'a> Shell<'a> {
             Statement::Function { name, args, statements, description } => {
                 self.variables.set(
                     &name,
-                    Function::new(
+                    Value::Function(Function::new(
                         description.clone(),
                         name.clone(),
                         args.to_vec(),
                         statements.to_vec(),
-                    ),
+                    )),
                 );
             }
             Statement::Pipeline(pipeline) => {
@@ -280,7 +280,7 @@ impl<'a> Shell<'a> {
                         };
                         self.variables_mut().set(
                             &bind,
-                            value.iter().cloned().map(Value::Str).collect::<types::Array<'_>>(),
+                            value.iter().cloned().map(Value::Str).collect::<Value<Function<'a>>>(),
                         );
                         out
                     } else {

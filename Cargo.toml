@@ -26,7 +26,7 @@ advanced_arg_parsing = []
 [workspace]
 members = [
     "members/braces", "members/builtins", "members/lexers", "members/sys",
-    "members/ranges", "members/scopes-rs"
+    "members/ranges", "members/scopes-rs", "members/types-rs"
 ]
 
 [dev-dependencies]
@@ -72,6 +72,7 @@ ion_lexers = { path = "members/lexers" }
 ion_sys = { path = "members/sys" }
 ion-ranges = { path = "members/ranges" }
 scopes = { path = "members/scopes-rs" }
+types-rs = { path = "members/types-rs" }
 hashbrown = "0.1.2"
 itertools = "0.8"
 lexical = "2.0"
