@@ -368,7 +368,6 @@ dependencies = [
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "ion-ranges 0.1.0",
  "ion_braces 0.1.0",
- "ion_builtins 0.1.0",
  "ion_lexers 0.1.0",
  "ion_sys 0.1.0",
  "itertools 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -396,17 +395,6 @@ version = "0.1.0"
 dependencies = [
  "auto_enums 0.5.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "permutate 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "small 0.1.0 (git+https://gitlab.redox-os.org/redox-os/small)",
- "smallvec 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ion_builtins"
-version = "0.1.0"
-dependencies = [
- "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "calculate 0.7.0 (git+https://gitlab.redox-os.org/redox-os/calc)",
- "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "small 0.1.0 (git+https://gitlab.redox-os.org/redox-os/small)",
  "smallvec 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

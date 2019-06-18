@@ -1,17 +1,20 @@
 pub mod man_pages;
 
+mod calc;
 mod command_info;
+mod conditionals;
+mod echo;
 mod exists;
 mod functions;
 mod helpers;
 mod is;
 mod job_control;
+mod random;
 mod set;
 mod source;
 mod status;
+mod test;
 mod variables;
-
-use ion_builtins::{calc, conditionals, echo, random, test};
 
 use self::{
     command_info::{find_type, which},

@@ -25,7 +25,7 @@ advanced_arg_parsing = []
 
 [workspace]
 members = [
-    "members/braces", "members/builtins", "members/lexers", "members/sys",
+    "members/braces", "members/lexers", "members/sys",
     "members/ranges", "members/scopes-rs", "members/types-rs"
 ]
 
@@ -67,7 +67,6 @@ smallvec = "0.6"
 unicode-segmentation = "1.2"
 xdg = "2.2.0"
 ion_braces = { path = "members/braces" }
-ion_builtins = { path = "members/builtins" }
 ion_lexers = { path = "members/lexers" }
 ion_sys = { path = "members/sys" }
 ion-ranges = { path = "members/ranges" }

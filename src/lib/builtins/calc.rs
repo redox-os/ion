@@ -1,4 +1,4 @@
-use calculate::{eval, eval_polish, CalcError, Value};
+use calc::{eval, eval_polish, CalcError, Value};
 use small;
 use std::io::{self, Write};
 

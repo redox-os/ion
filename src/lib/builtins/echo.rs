@@ -1,33 +1,31 @@
-use small;
+use crate::types;
 use smallvec::SmallVec;
 use std::io::{self, BufWriter, Write};
 
-bitflags! {
-    struct Flags : u8 {
-        const ESCAPE = 1;
-        const NO_NEWLINE = 2;
-        const NO_SPACES = 4;
-    }
-}
-
-pub fn echo(args: &[small::String]) -> Result<(), io::Error> {
-    let mut flags = Flags::empty();
+pub fn echo(args: &[types::Str]) -> Result<(), io::Error> {
+    let mut escape = false;
+    let mut newline = true;
+    let mut spaces = true;
     let mut data: SmallVec<[&str; 16]> = SmallVec::with_capacity(16);
 
     for arg in args {
         match &**arg {
-            "--escape" => flags |= Flags::ESCAPE,
-            "--no-newline" => flags |= Flags::NO_NEWLINE,
-            "--no-spaces" => flags |= Flags::NO_SPACES,
+            "--escape" => escape = true,
+            "--no-newline" => newline = false,
+            "--no-spaces" => spaces = false,
             _ if arg.starts_with('-') => {
                 let mut is_opts = true;
                 let opts = &arg[1..];
-                let mut short_flags = Flags::empty();
-                for argopt in opts.chars() {
+
+                let mut short_escape = false;
+                let mut short_newline = true;
+                let mut short_spaces = true;
+
+                for argopt in opts.bytes() {
                     match argopt {
-                        'e' => short_flags |= Flags::ESCAPE,
-                        'n' => short_flags |= Flags::NO_NEWLINE,
-                        's' => short_flags |= Flags::NO_SPACES,
+                        b'e' => short_escape = true,
+                        b'n' => short_newline = false,
+                        b's' => short_spaces = false,
                         _ => {
                             is_opts = false;
                             break;
@@ -35,7 +33,9 @@ pub fn echo(args: &[small::String]) -> Result<(), io::Error> {
                     }
                 }
                 if is_opts {
-                    flags |= short_flags;
+                    escape = escape || short_escape;
+                    newline = newline && short_newline;
+                    spaces = spaces && short_spaces;
                 } else {
                     data.push(arg);
                 }
@@ -53,11 +53,11 @@ pub fn echo(args: &[small::String]) -> Result<(), io::Error> {
     for arg in data[1..].iter().map(|x| x.as_bytes()) {
         if first {
             first = false;
-        } else if !flags.contains(Flags::NO_SPACES) {
+        } else if spaces {
             buffer.write_all(&[b' '])?;
         }
 
-        if flags.contains(Flags::ESCAPE) {
+        if escape {
             let mut check = false;
             for &byte in arg {
                 match byte {
@@ -116,7 +116,7 @@ pub fn echo(args: &[small::String]) -> Result<(), io::Error> {
         }
     }
 
-    if !flags.contains(Flags::NO_NEWLINE) {
+    if newline {
         buffer.write_all(&[b'\n'])?;
     }
 
