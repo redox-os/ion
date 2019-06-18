@@ -129,7 +129,8 @@ pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Sta
 mod test {
     use super::*;
     use crate::{
-        expansion::{Expander, ExpansionError},
+        expansion::{Expander, ExpansionError, Result},
+        ranges::Select,
         shell::IonError,
     };
 
@@ -138,8 +139,10 @@ mod test {
     impl<'a> Expander for VariableExpander<'a> {
         type Error = IonError;
 
-        fn string(&self, var: &str) -> Result<types::Str, ExpansionError<Self::Error>> {
-            self.0.get_str(var)
+        fn string(&self, var: &str) -> Result<types::Str, Self::Error> { self.0.get_str(var) }
+
+        fn array(&self, _variable: &str, _selection: &Select) -> Result<types::Args, Self::Error> {
+            Err(ExpansionError::VarNotFound)
         }
     }
 
@@ -196,8 +199,7 @@ mod test {
         variables.set("FOO", array!["BAR"]);
         let return_status = drop_array(&mut variables, &["drop", "-a", "FOO"]);
         assert_eq!(Status::SUCCESS, return_status);
-        let expanded = VariableExpander(variables).expand_string("@FOO").unwrap().join("");
-        assert_eq!("", expanded);
+        assert!(VariableExpander(variables).expand_string("@FOO").is_err());
     }
 
     #[test]

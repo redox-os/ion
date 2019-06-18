@@ -55,7 +55,13 @@ pub enum ExpansionError<T: fmt::Debug + error::Error + fmt::Display + 'static> {
     Subprocess(#[error(cause)] Box<T>),
 
     #[error(display = "Can't parse '{}' as a valid index for variable", _0)]
-    InvalidIndex(String),
+    IndexParsingError(String),
+
+    #[error(display = "can't expand a scalar value '{}' as an array-like", _0)]
+    ScalarAsArray(String),
+
+    #[error(display = "index '{:?}' is not valid for {} variable '{}'", _0, _1, _2)]
+    InvalidIndex(Select, &'static str, String),
 }
 
 impl<T: fmt::Display + fmt::Debug + error::Error> From<TypeError> for ExpansionError<T> {
@@ -100,7 +106,9 @@ pub trait Expander: Sized {
     /// Expand a tilde form to the correct directory.
     fn tilde(&self, _input: &str) -> Result<String, Self::Error> { unimplemented!() }
     /// Expand an array variable with some selection.
-    fn array(&self, _name: &str, _selection: &Select) -> Option<Args> { None }
+    fn array(&self, _name: &str, _selection: &Select) -> Result<Args, Self::Error> {
+        unimplemented!()
+    }
     /// Expand a string variable given if it's quoted / unquoted
     fn string(&self, _name: &str) -> Result<types::Str, Self::Error> { unimplemented!() }
     /// Expand a subshell expression.
@@ -148,7 +156,7 @@ pub trait Expander: Sized {
                             for index in keys {
                                 let select = index
                                     .parse::<Select>()
-                                    .map_err(|_| ExpansionError::InvalidIndex(index.into()))?;
+                                    .map_err(|_| ExpansionError::IndexParsingError(index.into()))?;
                                 token_buffer.push(WordToken::ArrayVariable(
                                     data,
                                     contains_quote,
@@ -336,20 +344,14 @@ trait ExpanderInternal: Expander {
 
         {
             let output = &mut output;
-            crate::IonPool::string(|temp| {
+            crate::IonPool::string(|temp| -> Result<(), Self::Error> {
                 for word in word_tokens {
                     match *word {
                         WordToken::Array(ref elements, ref index) => {
-                            let array = match self.array_expand(elements, &index) {
-                                Ok(v) => v,
-                                Err(why) => return Err(why),
-                            };
-                            join_with_spaces(output, array)
+                            join_with_spaces(output, self.array_expand(elements, &index)?)
                         }
                         WordToken::ArrayVariable(array, _, ref index) => {
-                            if let Some(array) = self.array(array, index) {
-                                join_with_spaces(output, &array);
-                            }
+                            join_with_spaces(output, &self.array(array, index)?);
                         }
                         WordToken::ArrayProcess(command, _, ref index) => match *index {
                             Select::All => {
@@ -447,11 +449,14 @@ trait ExpanderInternal: Expander {
             WordToken::Array(ref elements, ref index) => {
                 self.array_expand(elements, &index).map_err(Into::into)
             }
-            WordToken::ArrayVariable(array, quoted, ref index) => match self.array(array, index) {
-                Some(ref array) if quoted => Ok(args![types::Str::from(array.join(" "))]),
-                Some(array) => Ok(array),
-                None => Ok(Args::new()),
-            },
+            WordToken::ArrayVariable(array, quoted, ref index) => {
+                let array = self.array(array, index)?;
+                if quoted {
+                    Ok(args![types::Str::from(array.join(" "))])
+                } else {
+                    Ok(array)
+                }
+            }
             WordToken::ArrayProcess(command, quoted, ref index) => {
                 crate::IonPool::string(|output| match *index {
                     Select::Key(_) => Ok(Args::new()),
@@ -621,9 +626,7 @@ trait ExpanderInternal: Expander {
                                 );
                             }
                             WordToken::ArrayVariable(array, _, ref index) => {
-                                if let Some(array) = self.array(array, index) {
-                                    join_with_spaces(output, array.iter());
-                                }
+                                join_with_spaces(output, self.array(array, index)?.iter());
                             }
                             WordToken::ArrayProcess(command, _, ref index) => match index {
                                 Select::All => {
@@ -760,6 +763,10 @@ mod test {
                 "BAR" => Ok("BAR".into()),
                 _ => Err(ExpansionError::VarNotFound),
             }
+        }
+
+        fn array(&self, _variable: &str, _selection: &Select) -> Result<types::Args, Self::Error> {
+            Err(ExpansionError::VarNotFound)
         }
     }
 

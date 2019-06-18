@@ -1,7 +1,7 @@
 use super::{super::Select, MethodArgs, MethodError::*};
 use crate::{
     assignments::is_array,
-    expansion::{is_expression, Expander, ExpanderInternal, ExpansionError},
+    expansion::{is_expression, Expander, ExpanderInternal, ExpansionError, Result},
     types,
 };
 use regex::Regex;
@@ -91,11 +91,7 @@ pub struct StringMethod<'a> {
 }
 
 impl<'a> StringMethod<'a> {
-    pub fn handle<E: Expander>(
-        &self,
-        output: &mut types::Str,
-        expand: &E,
-    ) -> Result<(), ExpansionError<E::Error>> {
+    pub fn handle<E: Expander>(&self, output: &mut types::Str, expand: &E) -> Result<(), E::Error> {
         let variable = self.variable;
         let pattern = MethodArgs::new(self.pattern, expand);
 
@@ -218,14 +214,20 @@ impl<'a> StringMethod<'a> {
             }
             "join" => {
                 let pattern = pattern.join(" ")?;
-                if let Some(array) = expand.array(variable, &Select::All) {
-                    <E as ExpanderInternal>::slice(output, array.join(&pattern), &self.selection);
-                } else if is_expression(variable) {
-                    <E as ExpanderInternal>::slice(
+                match expand.array(variable, &Select::All) {
+                    Ok(array) => <E as ExpanderInternal>::slice(
                         output,
-                        expand.expand_string(variable)?.join(&pattern),
+                        array.join(&pattern),
                         &self.selection,
-                    );
+                    ),
+                    Err(ExpansionError::VarNotFound) if is_expression(variable) => {
+                        <E as ExpanderInternal>::slice(
+                            output,
+                            expand.expand_string(variable)?.join(&pattern),
+                            &self.selection,
+                        )
+                    }
+                    Err(why) => return Err(why),
                 }
             }
             "len" => {
@@ -345,13 +347,17 @@ mod test {
     impl Expander for VariableExpander {
         type Error = IonError;
 
-        fn string(&self, variable: &str) -> Result<types::Str, ExpansionError<Self::Error>> {
+        fn string(&self, variable: &str) -> Result<types::Str, Self::Error> {
             match variable {
                 "FOO" => Ok("FOOBAR".into()),
                 "BAZ" => Ok("  BARBAZ   ".into()),
                 "EMPTY" => Ok("".into()),
                 _ => Err(ExpansionError::VarNotFound),
             }
+        }
+
+        fn array(&self, _variable: &str, _selection: &Select) -> Result<types::Args, Self::Error> {
+            Err(ExpansionError::VarNotFound)
         }
     }
 

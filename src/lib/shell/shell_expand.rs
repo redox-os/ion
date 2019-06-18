@@ -1,6 +1,6 @@
 use super::{fork::Capture, variables::Value, IonError, Shell};
 use crate::{
-    expansion::{Expander, ExpansionError, Select},
+    expansion::{self, Expander, ExpansionError, Select},
     sys::{self, env as sys_env, variables as self_sys},
     types,
 };
@@ -10,7 +10,7 @@ impl<'a, 'b> Expander for Shell<'b> {
     type Error = IonError;
 
     /// Uses a subshell to expand a given command.
-    fn command(&self, command: &str) -> Result<types::Str, ExpansionError<IonError>> {
+    fn command(&self, command: &str) -> expansion::Result<types::Str, Self::Error> {
         let output = self
             .fork(Capture::StdoutThenIgnoreStderr, move |shell| shell.on_command(command))
             .and_then(|result| {
@@ -27,7 +27,7 @@ impl<'a, 'b> Expander for Shell<'b> {
     }
 
     /// Expand a string variable given if its quoted / unquoted
-    fn string(&self, name: &str) -> Result<types::Str, ExpansionError<IonError>> {
+    fn string(&self, name: &str) -> expansion::Result<types::Str, Self::Error> {
         if name == "?" {
             Ok(self.previous_status.into())
         } else {
@@ -36,18 +36,20 @@ impl<'a, 'b> Expander for Shell<'b> {
     }
 
     /// Expand an array variable with some selection
-    fn array(&self, name: &str, selection: &Select) -> Option<types::Args> {
+    fn array(&self, name: &str, selection: &Select) -> expansion::Result<types::Args, Self::Error> {
         match self.variables.get_ref(name) {
             Some(Value::Array(array)) => match selection {
                 Select::All => {
-                    Some(types::Args::from_iter(array.iter().map(|x| format!("{}", x).into())))
+                    Ok(types::Args::from_iter(array.iter().map(|x| format!("{}", x).into())))
                 }
                 Select::Index(ref id) => id
                     .resolve(array.len())
                     .and_then(|n| array.get(n))
-                    .map(|x| args![types::Str::from(format!("{}", x))]),
-                Select::Range(ref range) => {
-                    range.bounds(array.len()).and_then(|(start, length)| {
+                    .map(|x| args![types::Str::from(format!("{}", x))])
+                    .ok_or(ExpansionError::OutOfBound),
+                Select::Range(ref range) => range
+                    .bounds(array.len())
+                    .and_then(|(start, length)| {
                         if array.len() > start {
                             Some(
                                 array
@@ -61,8 +63,10 @@ impl<'a, 'b> Expander for Shell<'b> {
                             None
                         }
                     })
+                    .ok_or(ExpansionError::OutOfBound),
+                Select::Key(_) => {
+                    Err(ExpansionError::InvalidIndex(selection.clone(), "array", name.into()))
                 }
-                _ => None,
             },
             Some(Value::HashMap(hmap)) => match selection {
                 Select::All => {
@@ -80,14 +84,14 @@ impl<'a, 'b> Expander for Shell<'b> {
                             _ => (),
                         }
                     }
-                    Some(array)
+                    Ok(array)
                 }
                 Select::Key(key) => {
-                    Some(args![format!("{}", hmap.get(&*key).unwrap_or(&Value::Str("".into())))])
+                    Ok(args![format!("{}", hmap.get(&*key).unwrap_or(&Value::Str("".into())))])
                 }
                 Select::Index(index) => {
                     use crate::ranges::Index;
-                    Some(args![format!(
+                    Ok(args![format!(
                         "{}",
                         hmap.get(&types::Str::from(
                             match index {
@@ -99,7 +103,9 @@ impl<'a, 'b> Expander for Shell<'b> {
                         .unwrap_or(&Value::Str("".into()))
                     )])
                 }
-                _ => None,
+                Select::Range(_) => {
+                    Err(ExpansionError::InvalidIndex(selection.clone(), "hashmap", name.into()))
+                }
             },
             Some(Value::BTreeMap(bmap)) => match selection {
                 Select::All => {
@@ -117,14 +123,14 @@ impl<'a, 'b> Expander for Shell<'b> {
                             _ => (),
                         }
                     }
-                    Some(array)
+                    Ok(array)
                 }
                 Select::Key(key) => {
-                    Some(args![format!("{}", bmap.get(&*key).unwrap_or(&Value::Str("".into())))])
+                    Ok(args![format!("{}", bmap.get(&*key).unwrap_or(&Value::Str("".into())))])
                 }
                 Select::Index(index) => {
                     use crate::ranges::Index;
-                    Some(args![format!(
+                    Ok(args![format!(
                         "{}",
                         bmap.get(&types::Str::from(
                             match index {
@@ -136,9 +142,12 @@ impl<'a, 'b> Expander for Shell<'b> {
                         .unwrap_or(&Value::Str("".into()))
                     )])
                 }
-                _ => None,
+                Select::Range(_) => {
+                    Err(ExpansionError::InvalidIndex(selection.clone(), "btreemap", name.into()))
+                }
             },
-            _ => None,
+            None => Err(ExpansionError::VarNotFound),
+            _ => Err(ExpansionError::ScalarAsArray(name.into())),
         }
     }
 

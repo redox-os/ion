@@ -109,12 +109,12 @@ impl<'a> ArrayMethod<'a> {
         &self,
         expand_func: &E,
     ) -> Result<Args, ExpansionError<E::Error>> {
-        if let Some(array) = expand_func.array(self.variable, &Select::All) {
-            Ok(array)
-        } else if is_expression(self.variable) {
-            expand_func.expand_string(self.variable)
-        } else {
-            Ok(Args::new())
+        match expand_func.array(self.variable, &Select::All) {
+            Ok(array) => Ok(array),
+            Err(ExpansionError::VarNotFound) if is_expression(self.variable) => {
+                expand_func.expand_string(self.variable)
+            }
+            Err(why) => Err(why),
         }
     }
 
@@ -179,10 +179,14 @@ mod test {
     impl Expander for VariableExpander {
         type Error = IonError;
 
-        fn array(&self, variable: &str, _: &Select) -> Option<types::Args> {
+        fn array(
+            &self,
+            variable: &str,
+            _: &Select,
+        ) -> Result<types::Args, ExpansionError<Self::Error>> {
             match variable {
-                "ARRAY" => Some(args!["a", "b", "c"].to_owned()),
-                _ => None,
+                "ARRAY" => Ok(args!["a", "b", "c"].to_owned()),
+                _ => Err(ExpansionError::VarNotFound),
             }
         }
 
