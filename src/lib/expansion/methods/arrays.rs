@@ -179,42 +179,16 @@ impl<'a> ArrayMethod<'a> {
 mod test {
     use super::*;
     use crate::{
+        expansion::test::DummyExpander,
         ranges::{Index, Range},
-        shell::IonError,
         types,
     };
-
-    struct VariableExpander;
-
-    impl Expander for VariableExpander {
-        type Error = IonError;
-
-        fn array(
-            &self,
-            variable: &str,
-            _: &Select,
-        ) -> Result<types::Args, ExpansionError<Self::Error>> {
-            match variable {
-                "ARRAY" => Ok(args!["a", "b", "c"].to_owned()),
-                _ => Err(ExpansionError::VarNotFound),
-            }
-        }
-
-        fn string(&self, variable: &str) -> Result<types::Str, ExpansionError<Self::Error>> {
-            match variable {
-                "FOO" => Ok("FOOBAR".into()),
-                "SPACEDFOO" => Ok("FOO BAR".into()),
-                "MULTILINE" => Ok("FOO\nBAR".into()),
-                _ => Err(ExpansionError::VarNotFound),
-            }
-        }
-    }
 
     #[test]
     fn test_split_string_all() {
         let mut output = types::Str::new();
         let method = ArrayMethod::new("split", "$FOO", Pattern::StringPattern("OB"), Select::All);
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FO AR");
     }
 
@@ -222,7 +196,7 @@ mod test {
     fn test_split_whitespace_all() {
         let mut output = types::Str::new();
         let method = ArrayMethod::new("split", "$SPACEDFOO", Pattern::Whitespace, Select::All);
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOO BAR");
     }
 
@@ -235,7 +209,7 @@ mod test {
             Pattern::StringPattern("OB"),
             Select::Index(Index::Forward(1)),
         );
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "AR");
     }
 
@@ -248,7 +222,7 @@ mod test {
             Pattern::Whitespace,
             Select::Index(Index::Forward(1)),
         );
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "BAR");
     }
 
@@ -261,7 +235,7 @@ mod test {
             Pattern::StringPattern("OB"),
             Select::Index(Index::Backward(1)),
         );
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FO");
     }
 
@@ -274,7 +248,7 @@ mod test {
             Pattern::Whitespace,
             Select::Index(Index::Backward(1)),
         );
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOO");
     }
 
@@ -287,7 +261,7 @@ mod test {
             Pattern::StringPattern("OB"),
             Select::Range(Range::from(Index::Forward(0))),
         );
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FO AR");
     }
 
@@ -300,7 +274,7 @@ mod test {
             Pattern::Whitespace,
             Select::Range(Range::from(Index::Forward(0))),
         );
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOO BAR");
     }
 
@@ -309,34 +283,34 @@ mod test {
         let mut output = types::Str::new();
         let method =
             ArrayMethod::new("split", "$SPACEDFOO", Pattern::Whitespace, Select::Key("1".into()));
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "");
     }
 
     #[test]
     fn test_split_at_failing_whitespace() {
         let method = ArrayMethod::new("split_at", "$SPACEDFOO", Pattern::Whitespace, Select::All);
-        assert!(method.handle_as_array(&VariableExpander).is_err());
+        assert!(method.handle_as_array(&DummyExpander).is_err());
     }
 
     #[test]
     fn test_split_at_failing_no_number() {
         let method =
             ArrayMethod::new("split_at", "$SPACEDFOO", Pattern::StringPattern("a"), Select::All);
-        assert!(method.handle_as_array(&VariableExpander).is_err());
+        assert!(method.handle_as_array(&DummyExpander).is_err());
     }
 
     #[test]
     fn test_split_at_failing_out_of_bound() {
         let method =
             ArrayMethod::new("split_at", "$SPACEDFOO", Pattern::StringPattern("100"), Select::All);
-        assert!(method.handle_as_array(&VariableExpander).is_err());
+        assert!(method.handle_as_array(&DummyExpander).is_err());
     }
 
     #[test]
     fn test_split_at_succeeding() {
         let method = ArrayMethod::new("split_at", "$FOO", Pattern::StringPattern("3"), Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander).unwrap(), args!["FOO", "BAR"]);
+        assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), args!["FOO", "BAR"]);
     }
 
     #[test]
@@ -344,7 +318,7 @@ mod test {
         let method =
             ArrayMethod::new("graphemes", "$FOO", Pattern::StringPattern("3"), Select::All);
         assert_eq!(
-            method.handle_as_array(&VariableExpander).unwrap(),
+            method.handle_as_array(&DummyExpander).unwrap(),
             args!["F", "O", "O", "B", "A", "R"]
         );
     }
@@ -353,7 +327,7 @@ mod test {
     fn test_bytes() {
         let method = ArrayMethod::new("bytes", "$FOO", Pattern::StringPattern("3"), Select::All);
         assert_eq!(
-            method.handle_as_array(&VariableExpander).unwrap(),
+            method.handle_as_array(&DummyExpander).unwrap(),
             args!["70", "79", "79", "66", "65", "82"]
         );
     }
@@ -362,7 +336,7 @@ mod test {
     fn test_chars() {
         let method = ArrayMethod::new("chars", "$FOO", Pattern::StringPattern("3"), Select::All);
         assert_eq!(
-            method.handle_as_array(&VariableExpander).unwrap(),
+            method.handle_as_array(&DummyExpander).unwrap(),
             args!["F", "O", "O", "B", "A", "R"]
         );
     }
@@ -371,13 +345,13 @@ mod test {
     fn test_lines() {
         let method =
             ArrayMethod::new("lines", "$MULTILINE", Pattern::StringPattern("3"), Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander).unwrap(), args!["FOO", "BAR"]);
+        assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), args!["FOO", "BAR"]);
     }
 
     #[test]
     fn test_reverse() {
         let method =
             ArrayMethod::new("reverse", "@ARRAY", Pattern::StringPattern("3"), Select::All);
-        assert_eq!(method.handle_as_array(&VariableExpander).unwrap(), args!["c", "b", "a"]);
+        assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), args!["c", "b", "a"]);
     }
 }

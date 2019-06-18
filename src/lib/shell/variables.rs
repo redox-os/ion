@@ -256,18 +256,35 @@ impl<'a> Default for Variables<'a> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    use crate::{expansion::Expander, shell::IonError};
+    use crate::{
+        expansion::{Expander, Result, Select},
+        shell::IonError,
+    };
     use serial_test_derive::serial;
 
-    struct VariableExpander<'a>(pub Variables<'a>);
+    pub struct VariableExpander<'a>(pub Variables<'a>);
 
     impl<'a> Expander for VariableExpander<'a> {
         type Error = IonError;
 
-        fn string(&self, var: &str) -> Result<types::Str, ExpansionError<IonError>> {
-            self.0.get_str(var)
+        fn string(&self, var: &str) -> Result<types::Str, IonError> { self.0.get_str(var) }
+
+        fn array(&self, _variable: &str, _selection: &Select) -> Result<types::Args, Self::Error> {
+            Err(ExpansionError::VarNotFound)
+        }
+
+        fn command(&self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
+
+        fn tilde(&self, input: &str) -> Result<String, Self::Error> { Ok(input.into()) }
+
+        fn map_keys(&self, _name: &str, _select: &Select) -> Result<types::Args, Self::Error> {
+            Err(ExpansionError::VarNotFound)
+        }
+
+        fn map_values(&self, _name: &str, _select: &Select) -> Result<types::Args, Self::Error> {
+            Err(ExpansionError::VarNotFound)
         }
     }
 

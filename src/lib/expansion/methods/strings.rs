@@ -340,26 +340,7 @@ impl<'a> StringMethod<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{shell::IonError, types};
-
-    struct VariableExpander;
-
-    impl Expander for VariableExpander {
-        type Error = IonError;
-
-        fn string(&self, variable: &str) -> Result<types::Str, Self::Error> {
-            match variable {
-                "FOO" => Ok("FOOBAR".into()),
-                "BAZ" => Ok("  BARBAZ   ".into()),
-                "EMPTY" => Ok("".into()),
-                _ => Err(ExpansionError::VarNotFound),
-            }
-        }
-
-        fn array(&self, _variable: &str, _selection: &Select) -> Result<types::Args, Self::Error> {
-            Err(ExpansionError::VarNotFound)
-        }
-    }
+    use crate::{expansion::test::DummyExpander, types};
 
     #[test]
     fn test_escape() {
@@ -384,7 +365,7 @@ mod test {
             pattern:   "\"BAR\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
 
@@ -397,7 +378,7 @@ mod test {
             pattern:   "\"BA\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "0");
     }
 
@@ -410,7 +391,7 @@ mod test {
             pattern:   "\"OBA\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
 
@@ -423,7 +404,7 @@ mod test {
             pattern:   "\"OBI\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "0");
     }
 
@@ -436,7 +417,7 @@ mod test {
             pattern:   "\"FOO\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
 
@@ -449,7 +430,7 @@ mod test {
             pattern:   "\"OO\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "0");
     }
 
@@ -462,7 +443,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "file.txt");
     }
 
@@ -475,7 +456,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "txt");
     }
 
@@ -488,7 +469,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "file");
     }
 
@@ -501,7 +482,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "/home/redox");
     }
 
@@ -514,7 +495,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "ford prefect");
     }
 
@@ -527,7 +508,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FORD PREFECT");
     }
 
@@ -540,7 +521,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "Foo Bar");
     }
 
@@ -553,7 +534,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "BARBAZ");
     }
 
@@ -566,7 +547,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "  Foo Bar");
     }
 
@@ -579,7 +560,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "  BARBAZ");
     }
 
@@ -592,7 +573,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "Foo Bar ");
     }
 
@@ -605,7 +586,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "BARBAZ   ");
     }
 
@@ -618,7 +599,7 @@ mod test {
             pattern:   "2",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBARFOOBAR");
     }
 
@@ -632,7 +613,7 @@ mod test {
             pattern:   "-2",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
     }
 
     #[test]
@@ -644,7 +625,7 @@ mod test {
             pattern:   "[\"FOO\" \"BAR\"]",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "BARBAR");
     }
 
@@ -658,7 +639,7 @@ mod test {
             pattern:   "[]",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
     }
 
     #[test]
@@ -670,7 +651,7 @@ mod test {
             pattern:   "[\"FOO\" \"BAR\" 1]",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "BARFOOBAR");
     }
 
@@ -684,7 +665,7 @@ mod test {
             pattern:   "[]",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
     }
 
     #[test]
@@ -696,7 +677,7 @@ mod test {
             pattern:   "[\"^F\" \"f\"]",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "fOOBAR");
     }
 
@@ -709,7 +690,7 @@ mod test {
             pattern:   "[\"^f\" \"F\"]",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBAR");
     }
 
@@ -722,7 +703,7 @@ mod test {
             pattern:   "\" \"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOO BAR");
     }
 
@@ -735,7 +716,7 @@ mod test {
             pattern:   "[\"-\" \"-\"]",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOO- -BAR");
     }
 
@@ -748,7 +729,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
 
@@ -761,7 +742,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "3");
     }
 
@@ -774,7 +755,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "6");
     }
 
@@ -787,7 +768,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "6");
     }
 
@@ -800,7 +781,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "10");
     }
 
@@ -813,7 +794,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "RABOOF");
     }
 
@@ -826,7 +807,7 @@ mod test {
             pattern:   "",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "RABOOF");
     }
 
@@ -839,7 +820,7 @@ mod test {
             pattern:   "\"O\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "1");
     }
 
@@ -852,7 +833,7 @@ mod test {
             pattern:   "\"L\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "-1");
     }
 
@@ -865,7 +846,7 @@ mod test {
             pattern:   "\"baz\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "baz");
     }
 
@@ -878,7 +859,7 @@ mod test {
             pattern:   "\"baz\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "baz");
     }
 
@@ -891,7 +872,7 @@ mod test {
             pattern:   "\"baz\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBAR");
     }
 
@@ -904,7 +885,7 @@ mod test {
             pattern:   "\"bar\", \"baz\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "bar");
     }
 
@@ -917,7 +898,7 @@ mod test {
             pattern:   "\"\", \"baz\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "baz");
     }
 
@@ -930,7 +911,7 @@ mod test {
             pattern:   "\"\"",
             selection: Select::All,
         };
-        method.handle(&mut output, &VariableExpander).unwrap();
+        method.handle(&mut output, &DummyExpander).unwrap();
         assert_eq!(&*output, "FOOBAR");
     }
 }

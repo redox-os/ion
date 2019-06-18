@@ -1,20 +1,12 @@
 use super::*;
 use crate::{
-    expansion::ExpansionError,
+    expansion::test::DummyExpander,
     ranges::{Index, Range},
-    shell::IonError,
-    types,
 };
-
-struct Empty;
-
-impl Expander for Empty {
-    type Error = IonError;
-}
 
 fn compare(input: &str, expected: Vec<WordToken<'_>>) {
     let mut correct = 0;
-    for (actual, expected) in WordIterator::new(input, &Empty, true).zip(expected.iter()) {
+    for (actual, expected) in WordIterator::new(input, &DummyExpander, true).zip(expected.iter()) {
         let actual = actual.unwrap();
         assert_eq!(actual, *expected, "{:?} != {:?}", actual, expected);
         correct += 1;
@@ -259,23 +251,8 @@ fn test_braces() {
     compare(input, expected);
 }
 
-struct WithVars;
-
-impl Expander for WithVars {
-    type Error = IonError;
-
-    fn string(&self, var: &str) -> Result<types::Str, Self::Error> {
-        match var {
-            "pkmn1" => Ok("Pokémon".into()),
-            "pkmn2" => Ok("Poke\u{0301}mon".into()),
-            _ => Err(ExpansionError::VarNotFound.into()),
-        }
-    }
-}
-
 #[test]
 fn array_methods() {
-    let expanders = WithVars;
     let method = ArrayMethod::new(
         "graphemes",
         "pkmn1",
@@ -283,13 +260,13 @@ fn array_methods() {
         Select::Index(Index::Forward(3)),
     );
     let expected = args!["é"];
-    assert_eq!(method.handle_as_array(&expanders).unwrap(), expected);
+    assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), expected);
     let method =
         ArrayMethod::new("chars", "pkmn2", Pattern::Whitespace, Select::Index(Index::Forward(3)));
     let expected = args!["e"];
-    assert_eq!(method.handle_as_array(&expanders).unwrap(), expected);
+    assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), expected);
     let method =
         ArrayMethod::new("bytes", "pkmn2", Pattern::Whitespace, Select::Index(Index::Forward(1)));
     let expected = args!["111"];
-    assert_eq!(method.handle_as_array(&expanders).unwrap(), expected);
+    assert_eq!(method.handle_as_array(&DummyExpander).unwrap(), expected);
 }

@@ -101,29 +101,22 @@ fn join_with_spaces<S: AsRef<str>, I: IntoIterator<Item = S>>(input: &mut types:
 
 // TODO: Make array expansions iterators instead of arrays.
 // TODO: Use Cow<'a, types::Str> for hashmap values.
-/// Trait representing different elements of string expansion. By default, these methods are
-/// unimplemented and will panic if you call one without defining it first
+/// Trait representing different elements of string expansion.
 pub trait Expander: Sized {
     type Error: fmt::Display + fmt::Debug + error::Error + 'static;
 
     /// Expand a tilde form to the correct directory.
-    fn tilde(&self, _input: &str) -> Result<String, Self::Error> { unimplemented!() }
+    fn tilde(&self, _input: &str) -> Result<String, Self::Error>;
     /// Expand an array variable with some selection.
-    fn array(&self, _name: &str, _selection: &Select) -> Result<Args, Self::Error> {
-        unimplemented!()
-    }
+    fn array(&self, _name: &str, _selection: &Select) -> Result<Args, Self::Error>;
     /// Expand a string variable given if it's quoted / unquoted
-    fn string(&self, _name: &str) -> Result<types::Str, Self::Error> { unimplemented!() }
+    fn string(&self, _name: &str) -> Result<types::Str, Self::Error>;
     /// Expand a subshell expression.
-    fn command(&self, _command: &str) -> Result<types::Str, Self::Error> { unimplemented!() }
+    fn command(&self, _command: &str) -> Result<types::Str, Self::Error>;
     /// Iterating upon key-value maps.
-    fn map_keys<'a>(&'a self, _name: &str, _select: &Select) -> Result<Args, Self::Error> {
-        unimplemented!()
-    }
+    fn map_keys(&self, _name: &str, _select: &Select) -> Result<Args, Self::Error>;
     /// Iterating upon key-value maps.
-    fn map_values<'a>(&'a self, _name: &str, _select: &Select) -> Result<Args, Self::Error> {
-        unimplemented!()
-    }
+    fn map_values(&self, _name: &str, _select: &Select) -> Result<Args, Self::Error>;
     /// Get a string that exists in the shell.
     fn get_string(&self, value: &str) -> Result<types::Str, Self::Error> {
         Ok(self.expand_string(value)?.join(" ").into())
@@ -751,13 +744,13 @@ trait ExpanderInternal: Expander {
 // TODO: Write Nested Brace Tests
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use super::*;
     use crate::shell::IonError;
 
-    struct VariableExpander;
+    pub struct DummyExpander;
 
-    impl Expander for VariableExpander {
+    impl Expander for DummyExpander {
         type Error = IonError;
 
         fn string(&self, variable: &str) -> Result<types::Str, Self::Error> {
@@ -766,23 +759,36 @@ mod test {
                 "B" => Ok("test".into()),
                 "C" => Ok("ing".into()),
                 "D" => Ok("1 2 3".into()),
-                "FOO" => Ok("FOO".into()),
                 "BAR" => Ok("BAR".into()),
+                "FOO" => Ok("FOOBAR".into()),
+                "SPACEDFOO" => Ok("FOO BAR".into()),
+                "MULTILINE" => Ok("FOO\nBAR".into()),
+                "pkmn1" => Ok("Pokémon".into()),
+                "pkmn2" => Ok("Poke\u{0301}mon".into()),
+                "BAZ" => Ok("  BARBAZ   ".into()),
+                "EMPTY" => Ok("".into()),
                 _ => Err(ExpansionError::VarNotFound),
             }
         }
 
-        fn array(&self, _variable: &str, _selection: &Select) -> Result<types::Args, Self::Error> {
-            Err(ExpansionError::VarNotFound)
+        fn array(&self, variable: &str, _selection: &Select) -> Result<types::Args, Self::Error> {
+            match variable {
+                "ARRAY" => Ok(args!["a", "b", "c"].to_owned()),
+                _ => Err(ExpansionError::VarNotFound),
+            }
         }
-    }
-
-    struct CommandExpander;
-
-    impl Expander for CommandExpander {
-        type Error = IonError;
 
         fn command(&self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
+
+        fn tilde(&self, input: &str) -> Result<String, Self::Error> { Ok(input.into()) }
+
+        fn map_keys<'a>(&'a self, _name: &str, _select: &Select) -> Result<Args, Self::Error> {
+            Err(ExpansionError::VarNotFound)
+        }
+
+        fn map_values<'a>(&'a self, _name: &str, _select: &Select) -> Result<Args, Self::Error> {
+            Err(ExpansionError::VarNotFound)
+        }
     }
 
     #[test]
@@ -790,20 +796,20 @@ mod test {
         let mut output = types::Str::new();
 
         let line = " Mary   had\ta little  \n\t lamb😉😉\t";
-        CommandExpander.expand_process(&mut output, line, &Select::All);
+        DummyExpander.expand_process(&mut output, line, &Select::All);
         assert_eq!(output.as_str(), line);
 
         output.clear();
         let line = "foo not bar😉😉\n\n";
-        CommandExpander.expand_process(&mut output, line, &Select::All);
+        DummyExpander.expand_process(&mut output, line, &Select::All);
         assert_eq!(output.as_str(), "foo not bar😉😉");
     }
 
     #[test]
     fn expand_variable_normal_variable() {
         let input = "$FOO:NOT:$BAR";
-        let expected = "FOO:NOT:BAR";
-        let expanded = VariableExpander.expand_string(input).unwrap();
+        let expected = "FOOBAR:NOT:BAR";
+        let expanded = DummyExpander.expand_string(input).unwrap();
         assert_eq!(args![expected], expanded);
     }
 
@@ -812,7 +818,7 @@ mod test {
         let line = "pro{digal,grammer,cessed,totype,cedures,ficiently,ving,spective,jections}";
         let expected = "prodigal programmer processed prototype procedures proficiently proving \
                         prospective projections";
-        let expanded = VariableExpander.expand_string(line).unwrap();
+        let expanded = DummyExpander.expand_string(line).unwrap();
         assert_eq!(expected.split_whitespace().map(types::Str::from).collect::<Args>(), expanded);
     }
 
@@ -820,19 +826,19 @@ mod test {
     fn expand_braces_v2() {
         let line = "It{{em,alic}iz,erat}e{d,}";
         let expected = "Itemized Itemize Italicized Italicize Iterated Iterate";
-        let expanded = VariableExpander.expand_string(line).unwrap();
+        let expanded = DummyExpander.expand_string(line).unwrap();
         assert_eq!(expected.split_whitespace().map(types::Str::from).collect::<Args>(), expanded);
     }
 
     #[test]
     fn expand_variables_with_colons() {
-        let expanded = VariableExpander.expand_string("$FOO:$BAR").unwrap();
-        assert_eq!(args!["FOO:BAR"], expanded);
+        let expanded = DummyExpander.expand_string("$FOO:$BAR").unwrap();
+        assert_eq!(args!["FOOBAR:BAR"], expanded);
     }
 
     #[test]
     fn expand_multiple_variables() {
-        let expanded = VariableExpander.expand_string("${B}${C}...${D}").unwrap();
+        let expanded = DummyExpander.expand_string("${B}${C}...${D}").unwrap();
         assert_eq!(args!["testing...1 2 3"], expanded);
     }
 
@@ -840,7 +846,7 @@ mod test {
     fn expand_variable_alongside_braces() {
         let line = "$A{1,2}";
         let expected = args!["11", "12"];
-        let expanded = VariableExpander.expand_string(line).unwrap();
+        let expanded = DummyExpander.expand_string(line).unwrap();
         assert_eq!(expected, expanded);
     }
 
@@ -848,7 +854,7 @@ mod test {
     fn expand_variable_within_braces() {
         let line = "1{$A,2}";
         let expected = args!["11", "12"];
-        let expanded = VariableExpander.expand_string(line).unwrap();
+        let expanded = DummyExpander.expand_string(line).unwrap();
         assert_eq!(&expected, &expanded);
     }
 
@@ -856,14 +862,14 @@ mod test {
     fn array_indexing() {
         let base = |idx: &str| format!("[1 2 3][{}]", idx);
         for idx in vec!["-3", "0", "..-2"] {
-            let expanded = VariableExpander.expand_string(&base(idx)).unwrap();
+            let expanded = DummyExpander.expand_string(&base(idx)).unwrap();
             assert_eq!(args!["1"], expanded, "array[{}] == {} != 1", idx, expanded[0]);
         }
         for idx in vec!["1...2", "1...-1"] {
-            assert_eq!(args!["2", "3"], VariableExpander.expand_string(&base(idx)).unwrap());
+            assert_eq!(args!["2", "3"], DummyExpander.expand_string(&base(idx)).unwrap());
         }
         for idx in vec!["-17", "4..-4"] {
-            assert_eq!(Args::new(), VariableExpander.expand_string(&base(idx)).unwrap());
+            assert_eq!(Args::new(), DummyExpander.expand_string(&base(idx)).unwrap());
         }
     }
 
@@ -877,7 +883,7 @@ mod test {
             (args!["bar", "baz", "bat"], "1...3"),
         ];
         for (expected, idx) in cases {
-            assert_eq!(expected, VariableExpander.expand_string(&line(idx)).unwrap());
+            assert_eq!(expected, DummyExpander.expand_string(&line(idx)).unwrap());
         }
     }
 
@@ -885,10 +891,10 @@ mod test {
     fn arith_expression() {
         let line = "$((A * A - (A + A)))";
         let expected = args!["-1"];
-        assert_eq!(expected, VariableExpander.expand_string(line).unwrap());
+        assert_eq!(expected, DummyExpander.expand_string(line).unwrap());
         let line = "$((3 * 10 - 27))";
         let expected = args!["3"];
-        assert_eq!(expected, VariableExpander.expand_string(line).unwrap());
+        assert_eq!(expected, DummyExpander.expand_string(line).unwrap());
     }
 
     #[test]
@@ -896,7 +902,7 @@ mod test {
         let cases =
             vec![(args!["5"], "$len([0 1 2 3 4])"), (args!["FxOxO"], "$join(@chars('FOO') 'x')")];
         for (expected, input) in cases {
-            assert_eq!(expected, VariableExpander.expand_string(input).unwrap());
+            assert_eq!(expected, DummyExpander.expand_string(input).unwrap());
         }
     }
 }

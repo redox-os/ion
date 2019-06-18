@@ -142,21 +142,7 @@ pub fn value_check<E: Expander>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::shell::IonError;
-
-    struct VariableExpander;
-
-    impl Expander for VariableExpander {
-        type Error = IonError;
-
-        fn get_string(&self, variable: &str) -> expansion::Result<types::Str, Self::Error> {
-            Ok(variable.into())
-        }
-
-        fn get_array(&self, variable: &str) -> expansion::Result<types::Args, Self::Error> {
-            Ok(variable[1..variable.len() - 1].split(' ').map(Into::into).collect())
-        }
-    }
+    use crate::expansion::test::DummyExpander;
 
     #[test]
     fn is_array_() {
@@ -196,13 +182,13 @@ mod test {
     #[test]
     fn is_integer_array_() {
         assert_eq!(
-            value_check(&VariableExpander, "[1 2 3]", &Primitive::IntegerArray).unwrap(),
+            value_check(&DummyExpander, "[1 2 3]", &Primitive::IntegerArray).unwrap(),
             Value::Array(vec![
                 Value::Str("1".into()),
                 Value::Str("2".into()),
                 Value::Str("3".into())
             ])
         );
-        assert!(value_check(&VariableExpander, "[1 2 three]", &Primitive::IntegerArray).is_err());
+        assert!(value_check(&DummyExpander, "[1 2 three]", &Primitive::IntegerArray).is_err());
     }
 }
