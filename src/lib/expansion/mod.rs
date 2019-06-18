@@ -326,84 +326,6 @@ trait ExpanderInternal: Expander {
         self.expand_tokens(&token_buffer, contains_brace)
     }
 
-    fn expand_braces(&self, word_tokens: &[WordToken<'_>]) -> Result<Args, Self::Error> {
-        let mut expanded_words = Args::new();
-        let mut output = types::Str::new();
-        let tokens: &mut Vec<BraceToken> = &mut Vec::new();
-        let mut expanders: Vec<Vec<types::Str>> = Vec::new();
-
-        for word in word_tokens {
-            match *word {
-                WordToken::Array(ref elements, ref index) => {
-                    write!(
-                        &mut output,
-                        "{}",
-                        self.array_expand(elements, &index)?.iter().format(" ")
-                    );
-                }
-                WordToken::ArrayVariable(array, _, ref index) => {
-                    write!(&mut output, "{}", self.array(array, index)?.iter().format(" "));
-                }
-                WordToken::ArrayProcess(command, _, ref index) => {
-                    self.expand_process(&mut output, command, index)?;
-                }
-                WordToken::ArrayMethod(ref method, _) => {
-                    method.handle(&mut output, self)?;
-                }
-                WordToken::StringMethod(ref method) => {
-                    method.handle(&mut output, self)?;
-                }
-                WordToken::Brace(ref nodes) => {
-                    self.expand_brace(&mut output, &mut expanders, tokens, nodes)?;
-                }
-                WordToken::Whitespace(whitespace) => output.push_str(whitespace),
-                WordToken::Process(command, ref index) => {
-                    self.expand_process(&mut output, command, &index)?;
-                }
-                WordToken::Variable(text, ref index) => {
-                    Self::slice(&mut output, self.string(text)?, &index);
-                }
-                WordToken::Normal(ref text, _, tilde) => {
-                    self.expand(&mut output, &mut expanded_words, text.as_ref(), false, tilde)?
-                }
-                WordToken::Arithmetic(s) => self.expand_arithmetic(&mut output, s),
-            }
-        }
-
-        if expanders.is_empty() {
-            expanded_words.push(output);
-        } else {
-            if !output.is_empty() {
-                tokens.push(BraceToken::Normal(output));
-            }
-            let tmp: Vec<Vec<&str>> = expanders
-                .iter()
-                .map(|list| list.iter().map(AsRef::as_ref).collect::<Vec<&str>>())
-                .collect();
-            let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
-            expanded_words.extend(braces::expand(&tokens, &*vector_of_arrays));
-        }
-
-        Ok(expanded_words.into_iter().fold(Args::new(), |mut array, word| {
-            if word.find('*').is_some() {
-                if let Ok(paths) = glob(&word) {
-                    array.extend(paths.map(|path| {
-                        if let Ok(path_buf) = path {
-                            (*path_buf.to_string_lossy()).into()
-                        } else {
-                            "".into()
-                        }
-                    }))
-                } else {
-                    array.push(word);
-                }
-            } else {
-                array.push(word);
-            }
-            array
-        }))
-    }
-
     #[auto_enum]
     fn expand_single_array_token(&self, token: &WordToken<'_>) -> Result<Args, Self::Error> {
         match *token {
@@ -536,67 +458,100 @@ trait ExpanderInternal: Expander {
         token_buffer: &[WordToken<'_>],
         contains_brace: bool,
     ) -> Result<Args, Self::Error> {
-        if !token_buffer.is_empty() {
-            if contains_brace {
-                return self.expand_braces(&token_buffer);
-            } else if token_buffer.len() == 1 {
-                let token = &token_buffer[0];
-                return self.expand_single_array_token(token);
-            }
+        if !contains_brace && token_buffer.len() == 1 {
+            let token = &token_buffer[0];
+            return self.expand_single_array_token(token);
+        }
 
-            let mut output = types::Str::new();
-            let mut expanded_words = Args::new();
+        let mut output = types::Str::new();
+        let mut expanded_words = Args::new();
+        let tokens: &mut Vec<BraceToken> = &mut Vec::new();
+        let mut expanders: Vec<Vec<types::Str>> = Vec::new();
 
-            for word in token_buffer {
-                match *word {
-                    WordToken::Array(ref elements, ref index) => {
-                        write!(
-                            &mut output,
-                            "{}",
-                            self.array_expand(elements, &index)?.iter().format(" ")
-                        );
-                    }
-                    WordToken::ArrayVariable(array, _, ref index) => {
-                        write!(&mut output, "{}", self.array(array, index)?.iter().format(" "));
-                    }
-                    WordToken::ArrayProcess(command, _, ref index) => {
-                        self.expand_process(&mut output, command, index)?;
-                    }
-                    WordToken::ArrayMethod(ref method, _) => {
-                        method.handle(&mut output, self)?;
-                    }
-                    WordToken::StringMethod(ref method) => {
-                        method.handle(&mut output, self)?;
-                    }
-                    WordToken::Brace(_) => unreachable!(),
-                    WordToken::Normal(ref text, do_glob, tilde) => {
-                        self.expand(
-                            &mut output,
-                            &mut expanded_words,
-                            text.as_ref(),
-                            do_glob,
-                            tilde,
-                        )?;
-                    }
-                    WordToken::Whitespace(text) => {
-                        output.push_str(text);
-                    }
-                    WordToken::Process(command, ref index) => {
-                        self.expand_process(&mut output, command, &index)?;
-                    }
-                    WordToken::Variable(text, ref index) => {
-                        Self::slice(&mut output, self.string(text)?, &index);
-                    }
-                    WordToken::Arithmetic(s) => self.expand_arithmetic(&mut output, s),
+        for word in token_buffer {
+            match *word {
+                WordToken::Array(ref elements, ref index) => {
+                    let _ = write!(
+                        &mut output,
+                        "{}",
+                        self.array_expand(elements, &index)?.iter().format(" ")
+                    );
                 }
+                WordToken::ArrayVariable(array, _, ref index) => {
+                    let _ = write!(&mut output, "{}", self.array(array, index)?.iter().format(" "));
+                }
+                WordToken::ArrayProcess(command, _, ref index) => {
+                    self.expand_process(&mut output, command, index)?;
+                }
+                WordToken::ArrayMethod(ref method, _) => {
+                    method.handle(&mut output, self)?;
+                }
+                WordToken::StringMethod(ref method) => {
+                    method.handle(&mut output, self)?;
+                }
+                WordToken::Brace(ref nodes) => {
+                    self.expand_brace(&mut output, &mut expanders, tokens, nodes)?;
+                }
+                WordToken::Normal(ref text, do_glob, tilde) => {
+                    self.expand(
+                        &mut output,
+                        &mut expanded_words,
+                        text.as_ref(),
+                        do_glob && !contains_brace,
+                        tilde,
+                    )?;
+                }
+                WordToken::Whitespace(text) => {
+                    output.push_str(text);
+                }
+                WordToken::Process(command, ref index) => {
+                    self.expand_process(&mut output, command, &index)?;
+                }
+                WordToken::Variable(text, ref index) => {
+                    Self::slice(&mut output, self.string(text)?, &index);
+                }
+                WordToken::Arithmetic(s) => self.expand_arithmetic(&mut output, s),
+            }
+        }
+
+        if contains_brace {
+            if expanders.is_empty() {
+                expanded_words.push(output);
+            } else {
+                if !output.is_empty() {
+                    tokens.push(BraceToken::Normal(output));
+                }
+                let tmp: Vec<Vec<&str>> = expanders
+                    .iter()
+                    .map(|list| list.iter().map(AsRef::as_ref).collect::<Vec<&str>>())
+                    .collect();
+                let vector_of_arrays: Vec<&[&str]> = tmp.iter().map(AsRef::as_ref).collect();
+                expanded_words.extend(braces::expand(&tokens, &*vector_of_arrays));
             }
 
+            Ok(expanded_words.into_iter().fold(Args::new(), |mut array, word| {
+                if word.find('*').is_some() {
+                    if let Ok(paths) = glob(&word) {
+                        array.extend(paths.map(|path| {
+                            if let Ok(path_buf) = path {
+                                (*path_buf.to_string_lossy()).into()
+                            } else {
+                                "".into()
+                            }
+                        }))
+                    } else {
+                        array.push(word);
+                    }
+                } else {
+                    array.push(word);
+                }
+                array
+            }))
+        } else {
             if !output.is_empty() {
                 expanded_words.insert(0, output);
             }
             Ok(expanded_words)
-        } else {
-            Ok(Args::new())
         }
     }
 
@@ -618,7 +573,7 @@ trait ExpanderInternal: Expander {
 
                 for c in input.bytes() {
                     match c {
-                        48..=57 | 65..=90 | 95 | 97..=122 => {
+                        b'0'..=b'9' | b'A'..=b'Z' | b'_' | b'a'..=b'z' => {
                             varbuf.push(c as char);
                         }
                         _ => {
