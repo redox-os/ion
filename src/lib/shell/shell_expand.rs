@@ -151,31 +151,37 @@ impl<'a, 'b> Expander for Shell<'b> {
         }
     }
 
-    fn map_keys(&self, name: &str, sel: &Select) -> Option<types::Args> {
+    fn map_keys(&self, name: &str, sel: &Select) -> expansion::Result<types::Args, Self::Error> {
         match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
+                    .ok_or(ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into()))
             }
             Some(&Value::BTreeMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
+                    .ok_or(ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into()))
             }
-            _ => None,
+            Some(_) => Err(ExpansionError::NotAMap(name.into())),
+            None => Err(ExpansionError::VarNotFound),
         }
     }
 
-    fn map_values(&self, name: &str, sel: &Select) -> Option<types::Args> {
+    fn map_values(&self, name: &str, sel: &Select) -> expansion::Result<types::Args, Self::Error> {
         match self.variables.get_ref(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
+                    .ok_or(ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into()))
             }
             Some(&Value::BTreeMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
+                    .ok_or(ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into()))
             }
-            _ => None,
+            Some(_) => Err(ExpansionError::NotAMap(name.into())),
+            None => Err(ExpansionError::VarNotFound),
         }
     }
 
-    fn tilde(&self, input: &str) -> Result<String, ExpansionError<IonError>> {
+    fn tilde(&self, input: &str) -> expansion::Result<String, Self::Error> {
         // Only if the first character is a tilde character will we perform expansions
         if !input.starts_with('~') {
             return Ok(input.into());

@@ -14,8 +14,6 @@ pub enum Pattern<'a> {
     Whitespace,
 }
 
-pub type Result<T> = std::result::Result<T, MethodError>;
-
 #[derive(Debug)]
 pub struct MethodArgs<'a, 'b, E: Expander> {
     args:   &'a str,
@@ -34,10 +32,6 @@ pub enum MethodError {
     // specific to some builtins
     #[error(display = "regex_replace: error in regular expression '{}': {}", _0, _1)]
     InvalidRegex(String, #[error(cause)] regex::Error),
-    #[error(display = "{}: no map found", _0)]
-    NoMapFound(&'static str),
-    #[error(display = "split_at: value is out of bounds")]
-    OutOfBound,
 }
 
 impl<'a, 'b, E: 'b + Expander> MethodArgs<'a, 'b, E> {

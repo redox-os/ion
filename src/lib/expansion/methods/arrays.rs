@@ -2,7 +2,7 @@ use super::{
     super::{
         is_expression,
         words::{Select, SelectWithSize},
-        Expander, ExpansionError,
+        Expander, ExpansionError, Index,
     },
     strings::unescape,
     MethodError::*,
@@ -52,12 +52,18 @@ impl<'a> ArrayMethod<'a> {
         Ok(variable.bytes().map(|b| types::Str::from(b.to_string())).select(&self.selection, len))
     }
 
-    fn map_keys<'b, E: Expander>(&self, expand_func: &'b E) -> super::Result<Args> {
-        expand_func.map_keys(self.variable, &self.selection).ok_or(NoMapFound("map_keys"))
+    fn map_keys<'b, E: Expander>(
+        &self,
+        expand_func: &'b E,
+    ) -> Result<Args, ExpansionError<E::Error>> {
+        expand_func.map_keys(self.variable, &self.selection)
     }
 
-    fn map_values<'b, E: Expander>(&self, expand_func: &'b E) -> super::Result<Args> {
-        expand_func.map_values(self.variable, &self.selection).ok_or(NoMapFound("map_values"))
+    fn map_values<'b, E: Expander>(
+        &self,
+        expand_func: &'b E,
+    ) -> Result<Args, ExpansionError<E::Error>> {
+        expand_func.map_values(self.variable, &self.selection)
     }
 
     fn graphemes<E: Expander>(&self, expand_func: &E) -> Result<Args, ExpansionError<E::Error>> {
@@ -77,7 +83,11 @@ impl<'a> ArrayMethod<'a> {
                         let (l, r) = variable.split_at(value);
                         Ok(args![types::Str::from(l), types::Str::from(r)])
                     } else {
-                        Err(OutOfBound.into())
+                        Err(ExpansionError::InvalidIndex(
+                            Select::Index(Index::Forward(value)),
+                            "array",
+                            variable.to_string(),
+                        ))
                     }
                 } else {
                     Err(WrongArgument("split_at", "requires a valid number as an argument").into())

@@ -62,6 +62,9 @@ pub enum ExpansionError<T: fmt::Debug + error::Error + fmt::Display + 'static> {
 
     #[error(display = "index '{:?}' is not valid for {} variable '{}'", _0, _1, _2)]
     InvalidIndex(Select, &'static str, String),
+
+    #[error(display = "variable '{}' is not a map-like value", _0)]
+    NotAMap(String),
 }
 
 impl<T: fmt::Display + fmt::Debug + error::Error> From<TypeError> for ExpansionError<T> {
@@ -114,9 +117,13 @@ pub trait Expander: Sized {
     /// Expand a subshell expression.
     fn command(&self, _command: &str) -> Result<types::Str, Self::Error> { unimplemented!() }
     /// Iterating upon key-value maps.
-    fn map_keys<'a>(&'a self, _name: &str, _select: &Select) -> Option<Args> { None }
+    fn map_keys<'a>(&'a self, _name: &str, _select: &Select) -> Result<Args, Self::Error> {
+        unimplemented!()
+    }
     /// Iterating upon key-value maps.
-    fn map_values<'a>(&'a self, _name: &str, _select: &Select) -> Option<Args> { None }
+    fn map_values<'a>(&'a self, _name: &str, _select: &Select) -> Result<Args, Self::Error> {
+        unimplemented!()
+    }
     /// Get a string that exists in the shell.
     fn get_string(&self, value: &str) -> Result<types::Str, Self::Error> {
         Ok(self.expand_string(value)?.join(" ").into())
