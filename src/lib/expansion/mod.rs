@@ -106,7 +106,7 @@ pub trait Expander: Sized {
     type Error: fmt::Display + fmt::Debug + error::Error + 'static;
 
     /// Expand a tilde form to the correct directory.
-    fn tilde(&self, _input: &str) -> Result<String, Self::Error>;
+    fn tilde(&self, _input: &str) -> Result<types::Str, Self::Error>;
     /// Expand an array variable with some selection.
     fn array(&self, _name: &str, _selection: &Select) -> Result<Args, Self::Error>;
     /// Expand a string variable given if it's quoted / unquoted
@@ -194,17 +194,14 @@ pub trait Expander: Sized {
 impl<T: Expander> ExpanderInternal for T {}
 
 trait ExpanderInternal: Expander {
-    fn expand_process(&self, current: &mut types::Str, command: &str, selection: &Select) {
-        let result = match self.command(command) {
-            Ok(r) => Some(r),
-            Err(why) => {
-                eprintln!("ion: {}", why);
-                None
-            }
-        };
-        if let Some(ref output) = result.filter(|out| !out.is_empty()) {
-            Self::slice(current, output.trim_end_matches('\n'), &selection);
-        }
+    fn expand_process(
+        &self,
+        current: &mut types::Str,
+        command: &str,
+        selection: &Select,
+    ) -> Result<(), Self::Error> {
+        self.command(command)
+            .map(|result| Self::slice(current, result.trim_end_matches('\n'), &selection))
     }
 
     fn expand_brace(
@@ -355,22 +352,22 @@ trait ExpanderInternal: Expander {
                         }
                         WordToken::ArrayProcess(command, _, ref index) => match *index {
                             Select::All => {
-                                self.expand_process(temp, command, &Select::All);
+                                self.expand_process(temp, command, &Select::All)?;
                                 output.push_str(&temp);
                             }
                             Select::Index(Index::Forward(id)) => {
-                                self.expand_process(temp, command, &Select::All);
+                                self.expand_process(temp, command, &Select::All)?;
                                 output
                                     .push_str(temp.split_whitespace().nth(id).unwrap_or_default());
                             }
                             Select::Index(Index::Backward(id)) => {
-                                self.expand_process(temp, command, &Select::All);
+                                self.expand_process(temp, command, &Select::All)?;
                                 output.push_str(
                                     temp.split_whitespace().rev().nth(id).unwrap_or_default(),
                                 );
                             }
                             Select::Range(range) => {
-                                self.expand_process(temp, command, &Select::All);
+                                self.expand_process(temp, command, &Select::All)?;
                                 let len = temp.split_whitespace().count();
                                 if let Some((start, length)) = range.bounds(len) {
                                     join_with_spaces(
@@ -392,13 +389,13 @@ trait ExpanderInternal: Expander {
                         }
                         WordToken::Whitespace(whitespace) => output.push_str(whitespace),
                         WordToken::Process(command, ref index) => {
-                            self.expand_process(output, command, &index);
+                            self.expand_process(output, command, &index)?;
                         }
                         WordToken::Variable(text, ref index) => {
                             Self::slice(output, self.string(text)?, &index);
                         }
                         WordToken::Normal(ref text, _, tilde) => {
-                            self.expand(output, &mut expanded_words, text.as_ref(), false, tilde);
+                            self.expand(output, &mut expanded_words, text.as_ref(), false, tilde)?
                         }
                         WordToken::Arithmetic(s) => self.expand_arithmetic(output, s),
                     }
@@ -461,7 +458,7 @@ trait ExpanderInternal: Expander {
                 crate::IonPool::string(|output| match *index {
                     Select::Key(_) => Ok(Args::new()),
                     _ => {
-                        self.expand_process(output, command, &Select::All);
+                        self.expand_process(output, command, &Select::All)?;
 
                         #[auto_enum(Iterator)]
                         let mut iterator = match *index {
@@ -513,11 +510,11 @@ trait ExpanderInternal: Expander {
         match *token {
             WordToken::StringMethod(ref method) => method.handle(&mut output, self)?,
             WordToken::Normal(ref text, do_glob, tilde) => {
-                self.expand(&mut output, &mut expanded_words, text.as_ref(), do_glob, tilde);
+                self.expand(&mut output, &mut expanded_words, text.as_ref(), do_glob, tilde)?
             }
             WordToken::Whitespace(text) => output.push_str(text),
             WordToken::Process(command, ref index) => {
-                self.expand_process(&mut output, command, &index);
+                self.expand_process(&mut output, command, &index)?
             }
             WordToken::Variable(text, ref index) => {
                 Self::slice(&mut output, self.string(text)?, &index);
@@ -539,7 +536,7 @@ trait ExpanderInternal: Expander {
         text: &str,
         do_glob: bool,
         tilde: bool,
-    ) {
+    ) -> Result<(), Self::Error> {
         let concat: types::Str = match output.rfind(char::is_whitespace) {
             Some(sep) => {
                 if sep != output.len() - 1 {
@@ -564,17 +561,7 @@ trait ExpanderInternal: Expander {
             }
         };
 
-        let expanded: types::Str = if tilde {
-            match self.tilde(&concat) {
-                Ok(s) => s.into(),
-                Err(why) => {
-                    eprintln!("ion: {}", why);
-                    return;
-                }
-            }
-        } else {
-            concat
-        };
+        let expanded: types::Str = if tilde { self.tilde(&concat)? } else { concat };
 
         if do_glob {
             match glob(&expanded) {
@@ -593,6 +580,7 @@ trait ExpanderInternal: Expander {
         } else {
             output.push_str(&expanded);
         }
+        Ok(())
     }
 
     fn expand_tokens(
@@ -630,23 +618,23 @@ trait ExpanderInternal: Expander {
                             }
                             WordToken::ArrayProcess(command, _, ref index) => match index {
                                 Select::All => {
-                                    self.expand_process(temp, command, &Select::All);
+                                    self.expand_process(temp, command, &Select::All)?;
                                     output.push_str(&temp);
                                 }
                                 Select::Index(Index::Forward(id)) => {
-                                    self.expand_process(temp, command, &Select::All);
+                                    self.expand_process(temp, command, &Select::All)?;
                                     output.push_str(
                                         temp.split_whitespace().nth(*id).unwrap_or_default(),
                                     );
                                 }
                                 Select::Index(Index::Backward(id)) => {
-                                    self.expand_process(temp, command, &Select::All);
+                                    self.expand_process(temp, command, &Select::All)?;
                                     output.push_str(
                                         temp.split_whitespace().rev().nth(*id).unwrap_or_default(),
                                     );
                                 }
                                 Select::Range(range) => {
-                                    self.expand_process(temp, command, &Select::All);
+                                    self.expand_process(temp, command, &Select::All)?;
                                     if let Some((start, length)) =
                                         range.bounds(temp.split_whitespace().count())
                                     {
@@ -672,13 +660,13 @@ trait ExpanderInternal: Expander {
                                     text.as_ref(),
                                     do_glob,
                                     tilde,
-                                );
+                                )?;
                             }
                             WordToken::Whitespace(text) => {
                                 output.push_str(text);
                             }
                             WordToken::Process(command, ref index) => {
-                                self.expand_process(output, command, &index);
+                                self.expand_process(output, command, &index)?;
                             }
                             WordToken::Variable(text, ref index) => {
                                 Self::slice(output, self.string(text)?, &index);
@@ -780,7 +768,7 @@ pub(crate) mod test {
 
         fn command(&self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
 
-        fn tilde(&self, input: &str) -> Result<String, Self::Error> { Ok(input.into()) }
+        fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 
         fn map_keys<'a>(&'a self, _name: &str, _select: &Select) -> Result<Args, Self::Error> {
             Err(ExpansionError::VarNotFound)
@@ -796,12 +784,12 @@ pub(crate) mod test {
         let mut output = types::Str::new();
 
         let line = " Mary   had\ta little  \n\t lamb😉😉\t";
-        DummyExpander.expand_process(&mut output, line, &Select::All);
+        DummyExpander.expand_process(&mut output, line, &Select::All).unwrap();
         assert_eq!(output.as_str(), line);
 
         output.clear();
         let line = "foo not bar😉😉\n\n";
-        DummyExpander.expand_process(&mut output, line, &Select::All);
+        DummyExpander.expand_process(&mut output, line, &Select::All).unwrap();
         assert_eq!(output.as_str(), "foo not bar😉😉");
     }
 

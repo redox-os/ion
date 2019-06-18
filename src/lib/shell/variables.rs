@@ -277,7 +277,7 @@ pub(crate) mod tests {
 
         fn command(&self, cmd: &str) -> Result<types::Str, Self::Error> { Ok(cmd.into()) }
 
-        fn tilde(&self, input: &str) -> Result<String, Self::Error> { Ok(input.into()) }
+        fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 
         fn map_keys(&self, _name: &str, _select: &Select) -> Result<types::Args, Self::Error> {
             Err(ExpansionError::VarNotFound)

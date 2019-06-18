@@ -307,10 +307,7 @@ impl<'a> StringMethod<'a> {
                         .expand_string(variable)
                         .map(|x| x.join(" ").into())
                         .unwrap_or_default(),
-                    Err(why) => {
-                        eprintln!("ion: {}", why);
-                        types::Str::new()
-                    }
+                    Err(why) => return Err(why),
                 };
 
                 if first_str != "" {

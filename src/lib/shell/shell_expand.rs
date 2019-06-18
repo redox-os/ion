@@ -181,7 +181,7 @@ impl<'a, 'b> Expander for Shell<'b> {
         }
     }
 
-    fn tilde(&self, input: &str) -> expansion::Result<String, Self::Error> {
+    fn tilde(&self, input: &str) -> expansion::Result<types::Str, Self::Error> {
         // Only if the first character is a tilde character will we perform expansions
         if !input.starts_with('~') {
             return Ok(input.into());
@@ -192,10 +192,10 @@ impl<'a, 'b> Expander for Shell<'b> {
 
         match tilde_prefix {
             "" => sys_env::home_dir()
-                .map(|home| home.to_string_lossy().to_string() + rest)
+                .map(|home| types::Str::from(home.to_string_lossy().as_ref()) + rest)
                 .ok_or(ExpansionError::HomeNotFound),
-            "+" => Ok(env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest),
-            "-" => Ok(self.variables.get_str("OLDPWD")?.to_string() + rest),
+            "+" => Ok((env::var("PWD").unwrap_or_else(|_| "?".to_string()) + rest).into()),
+            "-" => Ok((self.variables.get_str("OLDPWD")?.to_string() + rest).into()),
             _ => {
                 let (neg, tilde_num) = if tilde_prefix.starts_with('+') {
                     (false, &tilde_prefix[1..])
@@ -211,10 +211,10 @@ impl<'a, 'b> Expander for Shell<'b> {
                     } else {
                         self.directory_stack.dir_from_bottom(num)
                     }
-                    .map(|path| path.to_str().unwrap().to_string())
+                    .map(|path| path.to_str().unwrap().into())
                     .ok_or_else(|| ExpansionError::OutOfStack(num)),
                     Err(_) => self_sys::get_user_home(tilde_prefix)
-                        .map(|home| home + rest)
+                        .map(|home| (home + rest).into())
                         .ok_or(ExpansionError::HomeNotFound),
                 }
             }
