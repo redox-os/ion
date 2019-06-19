@@ -137,7 +137,7 @@ mod tests {
     use super::*;
     use crate::{
         flow_control::Function,
-        lexers::assignments::{KeyBuf, Primitive},
+        parser::lexers::assignments::{KeyBuf, Primitive},
         shell::flow_control::Statement,
         types,
     };
@@ -380,7 +380,6 @@ mod tests {
 
     #[test]
     fn test_function_is_defined() {
-        use crate::lexers::assignments::{KeyBuf, Primitive};
         let mut shell = Shell::library();
 
         // create a simple dummy function

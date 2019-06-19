@@ -1,4 +1,4 @@
-use crate::lexers::ArgumentSplitter;
+use crate::parser::lexers::ArgumentSplitter;
 use err_derive::Error;
 
 #[derive(Debug, PartialEq, Error)]

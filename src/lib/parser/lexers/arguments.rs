@@ -1,18 +1,10 @@
 use err_derive::Error;
 
-bitflags! {
-    struct ArgumentFlags: u8 {
-        /// Double quotes
-        const DOUBLE = 0b0000_0001;
-        /// Command flags
-        const COMM_1 = 0b0000_0010; // found $
-        const COMM_2 = 0b0000_0100; // found ( after $
-        /// String variable
-        const VARIAB = 0b0000_1000;
-        /// Array variable
-        const ARRAY  = 0b0001_0000;
-        const METHOD = 0b0010_0000;
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Comm {
+    Type1,
+    Type2,
+    None,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -93,12 +85,24 @@ pub struct ArgumentSplitter<'a> {
     data: &'a str,
     /// Number of bytes read
     read: usize,
-    bitflags: ArgumentFlags,
+    comm: Comm,
+    quotes: bool,
+    variab: bool,
+    array: bool,
+    method: bool,
 }
 
 impl<'a> ArgumentSplitter<'a> {
     pub fn new(data: &'a str) -> ArgumentSplitter<'a> {
-        ArgumentSplitter { data, read: 0, bitflags: ArgumentFlags::empty() }
+        ArgumentSplitter {
+            data,
+            read: 0,
+            comm: Comm::None,
+            quotes: false,
+            variab: false,
+            array: false,
+            method: false,
+        }
     }
 
     fn scan_singlequotes<B: Iterator<Item = u8>>(&mut self, bytes: &mut B) {
@@ -139,15 +143,15 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 }
                 // Disable COMM_1 and enable COMM_2 + ARRAY.
                 b'@' => {
-                    self.bitflags.remove(ArgumentFlags::COMM_1);
-                    self.bitflags.insert(ArgumentFlags::COMM_2 | ArgumentFlags::ARRAY);
+                    self.array = true;
+                    self.comm = Comm::Type2;
                     self.read += 1;
                     continue;
                 }
                 // Disable COMM_2 and enable COMM_1 + VARIAB.
                 b'$' => {
-                    self.bitflags.remove(ArgumentFlags::COMM_2);
-                    self.bitflags.insert(ArgumentFlags::COMM_1 | ArgumentFlags::VARIAB);
+                    self.variab = true;
+                    self.comm = Comm::Type1;
                     self.read += 1;
                     continue;
                 }
@@ -158,34 +162,31 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
                 b'(' => {
                     // Disable VARIAB + ARRAY and enable METHOD.
                     // if variab or array are set
-                    if self.bitflags.intersects(ArgumentFlags::VARIAB | ArgumentFlags::ARRAY) {
-                        self.bitflags.remove(ArgumentFlags::VARIAB | ArgumentFlags::ARRAY);
-                        self.bitflags.insert(ArgumentFlags::METHOD);
+                    if self.array || self.variab {
+                        self.array = false;
+                        self.variab = false;
+                        self.method = true;
                     }
                     levels.up(Proc);
                 }
                 b')' => {
-                    if self.bitflags.contains(ArgumentFlags::METHOD) {
-                        self.bitflags.remove(ArgumentFlags::METHOD);
-                    }
+                    self.method = false;
                     levels.down(Proc)
                 }
 
                 // Toggle double quote rules.
                 b'"' => {
-                    self.bitflags.toggle(ArgumentFlags::DOUBLE);
+                    self.quotes ^= true;
                 }
                 // Loop through characters until single quote rules are completed.
-                b'\'' if !self.bitflags.contains(ArgumentFlags::DOUBLE) => {
+                b'\'' if !self.quotes => {
                     self.scan_singlequotes(&mut bytes);
                     self.read += 2;
                     continue;
                 }
                 // Break from the loop once a root-level space is found.
                 b' ' => {
-                    if !self.bitflags.intersects(ArgumentFlags::DOUBLE | ArgumentFlags::METHOD)
-                        && levels.are_rooted()
-                    {
+                    if !self.quotes && !self.method && levels.are_rooted() {
                         break;
                     }
                 }
@@ -194,7 +195,7 @@ impl<'a> Iterator for ArgumentSplitter<'a> {
 
             self.read += 1;
             // disable COMM_1 and COMM_2
-            self.bitflags.remove(ArgumentFlags::COMM_1 | ArgumentFlags::COMM_2);
+            self.comm = Comm::None;
         }
 
         if start == self.read {

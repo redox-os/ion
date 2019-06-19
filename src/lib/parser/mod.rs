@@ -1,3 +1,4 @@
+pub mod lexers;
 pub mod pipelines;
 mod quotes;
 mod statement;

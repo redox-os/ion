@@ -4,7 +4,7 @@ use std::iter::Peekable;
 use crate::{
     builtins::BuiltinMap,
     expansion::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
-    lexers::arguments::{Field, Levels, LevelsError},
+    parser::lexers::arguments::{Field, Levels, LevelsError},
     shell::Job,
     types::*,
 };

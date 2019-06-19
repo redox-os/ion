@@ -24,7 +24,7 @@ edition = "2018"
 advanced_arg_parsing = []
 
 [workspace]
-members = [ "members/lexers", "members/ranges", "members/scopes-rs", "members/types-rs" ]
+members = [ "members/ranges", "members/scopes-rs", "members/types-rs" ]
 
 [dev-dependencies]
 criterion = "0.2"
@@ -63,7 +63,6 @@ small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"]
 smallvec = "0.6"
 unicode-segmentation = "1.2"
 xdg = "2.2.0"
-ion_lexers = { path = "members/lexers" }
 ion-ranges = { path = "members/ranges" }
 scopes = { path = "members/scopes-rs" }
 types-rs = { path = "members/types-rs" }

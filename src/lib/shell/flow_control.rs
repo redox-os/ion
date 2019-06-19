@@ -1,7 +1,7 @@
 use crate::{
     assignments::*,
     expansion::pipelines::Pipeline,
-    lexers::assignments::{KeyBuf, Operator, Primitive},
+    parser::lexers::assignments::{KeyBuf, Operator, Primitive},
     shell::{IonError, Shell},
     types,
 };

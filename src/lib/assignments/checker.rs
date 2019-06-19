@@ -1,6 +1,6 @@
 use crate::{
     expansion::{self, Expander},
-    lexers::assignments::{Primitive, TypeError},
+    parser::lexers::assignments::{Primitive, TypeError},
     shell::variables::Value,
     types,
 };

@@ -5,7 +5,7 @@ use super::{
     methods::{ArrayMethod, Pattern, StringMethod},
     Expander, ExpansionError, Result,
 };
-use crate::lexers::ArgumentSplitter;
+use crate::parser::lexers::ArgumentSplitter;
 pub use crate::ranges::{Select, SelectWithSize};
 use std::borrow::Cow;
 

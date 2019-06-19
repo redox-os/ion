@@ -12,7 +12,7 @@ pub use self::{
     words::{unescape, Select, SelectWithSize, WordIterator, WordToken},
 };
 use crate::{
-    lexers::assignments::TypeError,
+    parser::lexers::assignments::TypeError,
     ranges::{parse_range, Index, Range},
     types::{self, Args},
 };

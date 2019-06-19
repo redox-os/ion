@@ -1,5 +1,5 @@
 use super::split_pattern;
-use crate::lexers::assignments::{KeyBuf, KeyIterator, TypeError};
+use crate::parser::lexers::assignments::{KeyBuf, KeyIterator, TypeError};
 use err_derive::Error;
 
 #[derive(Debug, PartialEq, Error)]
@@ -42,9 +42,9 @@ pub fn collect_arguments(args: KeyIterator<'_>) -> Result<Vec<KeyBuf>, FunctionP
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use crate::parser::{
         lexers::assignments::{KeyBuf, Primitive},
-        parser::statement::functions::{collect_arguments, parse_function, FunctionParseError},
+        statement::functions::{collect_arguments, parse_function, FunctionParseError},
     };
 
     #[test]

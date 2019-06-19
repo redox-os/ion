@@ -30,8 +30,10 @@ use crate::{
     assignments::value_check,
     builtins::{BuiltinMap, Status},
     expansion::{pipelines::Pipeline, ExpansionError},
-    lexers::{Key, Primitive},
-    parser::{ParseError, StatementError, Terminator},
+    parser::{
+        lexers::{Key, Primitive},
+        ParseError, StatementError, Terminator,
+    },
 };
 use err_derive::Error;
 use itertools::Itertools;

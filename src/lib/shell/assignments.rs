@@ -5,8 +5,10 @@ use super::{
 use crate::{
     assignments::*,
     builtins::Status,
-    lexers::assignments::{Key, Operator, Primitive},
-    parser::is_valid_name,
+    parser::{
+        is_valid_name,
+        lexers::assignments::{Key, Operator, Primitive},
+    },
     shell::{flow_control::Function, Value},
 };
 use std::{

@@ -5,7 +5,7 @@ use self::strings::unescape;
 pub use self::{arrays::ArrayMethod, strings::StringMethod};
 
 use super::Expander;
-use crate::{lexers::ArgumentSplitter, types};
+use crate::{parser::lexers::ArgumentSplitter, types};
 use err_derive::Error;
 
 #[derive(Debug, PartialEq, Clone)]

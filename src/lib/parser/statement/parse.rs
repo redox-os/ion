@@ -5,8 +5,8 @@ use super::{
 };
 use crate::{
     builtins::BuiltinMap,
-    lexers::{assignment_lexer, ArgumentSplitter},
     parser::{
+        lexers::{assignment_lexer, ArgumentSplitter},
         pipelines::PipelineParsingError,
         statement::{case::CaseError, functions::FunctionParseError},
     },
@@ -231,7 +231,7 @@ mod tests {
     use crate::{
         builtins::BuiltinMap,
         expansion::pipelines::{PipeItem, PipeType, Pipeline, RedirectFrom},
-        lexers::assignments::{KeyBuf, Primitive},
+        parser::lexers::assignments::{KeyBuf, Primitive},
         shell::{flow_control::Statement, Job},
     };
 

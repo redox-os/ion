@@ -3,6 +3,7 @@ pub mod builtins;
 mod completer;
 mod designators;
 mod history;
+mod lexer;
 mod prompt;
 mod readln;
 

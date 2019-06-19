@@ -1,11 +1,10 @@
 use std::str;
 
-bitflags! {
-    struct Flags: u8 {
-        const DQUOTE = 1;
-        const SQUOTE = 2;
-        const DESIGN = 4;
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Quotes {
+    Double,
+    Single,
+    None,
 }
 
 #[derive(Debug)]
@@ -16,8 +15,9 @@ pub enum DesignatorToken<'a> {
 
 #[derive(Debug)]
 pub struct DesignatorLexer<'a> {
-    data:  &'a [u8],
-    flags: Flags,
+    data:   &'a [u8],
+    quotes: Quotes,
+    design: bool,
 }
 
 impl<'a> DesignatorLexer<'a> {
@@ -28,7 +28,7 @@ impl<'a> DesignatorLexer<'a> {
     }
 
     pub fn new(data: &'a [u8]) -> DesignatorLexer {
-        DesignatorLexer { data, flags: Flags::empty() }
+        DesignatorLexer { data, quotes: Quotes::None, design: false }
     }
 }
 
@@ -42,18 +42,18 @@ impl<'a> Iterator for DesignatorLexer<'a> {
                 b'\\' => {
                     let _ = iter.next();
                 }
-                b'"' if !self.flags.contains(Flags::SQUOTE) => self.flags ^= Flags::DQUOTE,
-                b'\'' if !self.flags.contains(Flags::DQUOTE) => self.flags ^= Flags::SQUOTE,
-                b'!' if !self.flags.intersects(Flags::DQUOTE | Flags::DESIGN) => {
-                    self.flags |= Flags::DESIGN;
+                b'"' if self.quotes == Quotes::None => self.quotes = Quotes::Double,
+                b'"' if self.quotes == Quotes::Double => self.quotes = Quotes::None,
+                b'\'' if self.quotes == Quotes::None => self.quotes = Quotes::Single,
+                b'\'' if self.quotes == Quotes::Single => self.quotes = Quotes::None,
+                b'!' if self.quotes != Quotes::Double && !self.design => {
+                    self.design = true;
                     if id != 0 {
                         return Some(DesignatorToken::Text(self.grab_and_shorten(id)));
                     }
                 }
-                b' ' | b'\t' | b'\'' | b'"' | b'a'...b'z' | b'A'...b'Z'
-                    if self.flags.contains(Flags::DESIGN) =>
-                {
-                    self.flags ^= Flags::DESIGN;
+                b' ' | b'\t' | b'\'' | b'"' | b'a'...b'z' | b'A'...b'Z' if self.design => {
+                    self.design = false;
                     return Some(DesignatorToken::Designator(self.grab_and_shorten(id)));
                 }
                 _ => (),
@@ -65,7 +65,7 @@ impl<'a> Iterator for DesignatorLexer<'a> {
         } else {
             let output = unsafe { str::from_utf8_unchecked(&self.data) };
             self.data = b"";
-            Some(if self.flags.contains(Flags::DESIGN) {
+            Some(if self.design {
                 DesignatorToken::Designator(output)
             } else {
                 DesignatorToken::Text(output)
