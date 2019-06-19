@@ -1,4 +1,4 @@
-use crate::sys;
+use super::sys;
 use std::{
     fs::File,
     io,

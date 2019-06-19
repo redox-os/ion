@@ -1,7 +1,5 @@
-use crate::sys;
-
 use super::{
-    super::Shell,
+    super::{sys, Shell},
     job_control::{BackgroundProcess, ProcessState},
 };
 use crate::{builtins::Status, expansion::pipelines::Pipeline};

@@ -1,6 +1,6 @@
 use self::binary::{builtins, InteractiveBinary};
-use ion_shell::{BuiltinMap, IonError, PipelineError, Shell, Value};
-use ion_sys as sys;
+use atty::Stream;
+use ion_shell::{sys, BuiltinMap, IonError, PipelineError, Shell, Value};
 use liner::KeyBindings;
 use std::{
     io::{self, stdin, BufReader},
@@ -143,7 +143,7 @@ fn main() {
     builtins.add("exec", &builtins::exec, "Replace the shell with the given command.");
     builtins.add("exit", &builtins::exit, "Exits the current session");
 
-    let stdin_is_a_tty = sys::isatty(sys::STDIN_FILENO);
+    let stdin_is_a_tty = atty::is(Stream::Stdin);
     let mut shell = Shell::with_builtins(builtins, false);
 
     if stdin_is_a_tty {

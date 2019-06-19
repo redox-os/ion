@@ -1,10 +1,10 @@
 use ion_shell::{
     builtins::{man_pages::check_help, Status},
+    sys::SIGTERM,
     types::Str,
     Shell,
 };
-use ion_sys::{execve, SIGTERM};
-use std::error::Error;
+use std::{error::Error, process::Command};
 
 const MAN_EXEC: &str = r#"NAME
     exec - Replace the shell with the given command.
@@ -47,7 +47,12 @@ pub fn _exec(args: &[Str]) -> Result<(), Str> {
     match args.get(idx) {
         Some(argument) => {
             let args = if args.len() > idx + 1 { &args[idx + 1..] } else { &[] };
-            Err(execve(argument, args, clear_env).description().into())
+            let mut command = Command::new(argument.as_str());
+            command.args(args.iter().map(Str::as_str));
+            if clear_env {
+                command.env_clear();
+            }
+            command.spawn().map(|_| ()).map_err(|err| err.description().into())
         }
         None => Err("no command provided".into()),
     }

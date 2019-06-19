@@ -19,7 +19,7 @@ use std::{
     ptr,
 };
 
-pub const PATH_SEPARATOR: &str = ":";
+pub const PATH_SEPARATOR: char = ':';
 pub const NULL_PATH: &str = "/dev/null";
 
 pub const O_CLOEXEC: usize = libc::O_CLOEXEC as usize;
@@ -79,8 +79,6 @@ pub fn wstopsig(status: i32) -> i32 { unsafe { WSTOPSIG(status) } }
 pub fn geteuid() -> io::Result<u32> { Ok(unsafe { libc::geteuid() } as u32) }
 
 pub fn getuid() -> io::Result<u32> { Ok(unsafe { libc::getuid() } as u32) }
-
-pub fn is_root() -> bool { unsafe { libc::geteuid() == 0 } }
 
 pub unsafe fn fork() -> io::Result<u32> { cvt(libc::fork()).map(|pid| pid as u32) }
 
@@ -214,79 +212,6 @@ pub fn fork_and_exec<F: Fn(), S: AsRef<str>>(
     }
 }
 
-pub fn execve<S: AsRef<str>>(prog: &str, args: &[S], clear_env: bool) -> io::Error {
-    let prog_str = match CString::new(prog) {
-        Ok(prog) => prog,
-        Err(_) => {
-            return io::Error::last_os_error();
-        }
-    };
-
-    // Create a vector of null-terminated strings.
-    let mut cvt_args: Vec<CString> = Vec::new();
-    cvt_args.push(prog_str.clone());
-    for arg in args.iter() {
-        match CString::new(&*arg.as_ref()) {
-            Ok(arg) => cvt_args.push(arg),
-            Err(_) => {
-                return io::Error::last_os_error();
-            }
-        }
-    }
-
-    // Create a null-terminated array of pointers to those strings.
-    let mut arg_ptrs: Vec<*const c_char> = cvt_args.iter().map(|x| x.as_ptr()).collect();
-    arg_ptrs.push(ptr::null());
-
-    // Get the PathBuf of the program if it exists.
-    let prog = if prog.contains('/') {
-        // This is a fully specified path to an executable.
-        Some(prog_str)
-    } else if let Ok(paths) = var("PATH") {
-        // This is not a fully specified scheme or path.
-        // Iterate through the possible paths in the
-        // env var PATH that this executable may be found
-        // in and return the first one found.
-        split_paths(&paths)
-            .filter_map(|mut path| {
-                path.push(prog);
-                match (path.exists(), path.to_str()) {
-                    (true, Some(path)) => CString::new(path).ok(),
-                    _ => None,
-                }
-            })
-            .next()
-    } else {
-        None
-    };
-
-    let mut env_ptrs: Vec<*const c_char> = Vec::new();
-    let mut env_vars: Vec<CString> = Vec::new();
-
-    // If clear_env is not specified build envp
-    if !clear_env {
-        for (key, value) in vars() {
-            match CString::new(format!("{}={}", key, value)) {
-                Ok(var) => env_vars.push(var),
-                Err(_) => {
-                    return io::Error::last_os_error();
-                }
-            }
-        }
-        env_ptrs = env_vars.iter().map(|x| x.as_ptr()).collect();
-    }
-    env_ptrs.push(ptr::null());
-
-    if let Some(prog) = prog {
-        // If we found the program. Run it!
-        unsafe { libc::execve(prog.as_ptr(), arg_ptrs.as_ptr(), env_ptrs.as_ptr()) };
-        io::Error::last_os_error()
-    } else {
-        // The binary was not found.
-        io::Error::from_raw_os_error(libc::ENOENT)
-    }
-}
-
 pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
     let mut fds = [0; 2];
 
@@ -356,7 +281,7 @@ fn cvt<T: IsMinusOne>(t: T) -> io::Result<T> {
 
 pub mod variables {
     use super::libc::{self, c_char};
-    use users_unix::{get_user_by_name, os::unix::UserExt};
+    use users::{get_user_by_name, os::unix::UserExt};
 
     pub fn get_user_home(username: &str) -> Option<String> {
         match get_user_by_name(username) {

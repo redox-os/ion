@@ -2,9 +2,9 @@ use auto_enums::auto_enum;
 use glob::{glob_with, MatchOptions};
 use ion_shell::{
     expansion::{unescape, Expander},
+    sys::PATH_SEPARATOR,
     Shell,
 };
-use ion_sys::PATH_SEPARATOR;
 use liner::{BasicCompleter, Completer, CursorPosition, Event, EventKind};
 use smallvec::SmallVec;
 use std::{env, iter, path::PathBuf, str};

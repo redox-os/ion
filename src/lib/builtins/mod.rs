@@ -40,8 +40,8 @@ use hashbrown::HashMap;
 use liner::{Completer, Context};
 
 use crate::{
-    shell::{Capture, Shell, Value},
-    sys, types,
+    shell::{sys, Capture, Shell, Value},
+    types,
 };
 use itertools::Itertools;
 

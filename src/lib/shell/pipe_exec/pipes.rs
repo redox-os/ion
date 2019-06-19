@@ -1,9 +1,11 @@
 use super::{
-    super::job::{RefinedJob, TeeItem},
+    super::{
+        job::{RefinedJob, TeeItem},
+        sys,
+    },
     PipelineError,
 };
 
-use crate::sys;
 use std::{fs::File, os::unix::io::FromRawFd};
 
 pub struct TeePipe<'a, 'b> {

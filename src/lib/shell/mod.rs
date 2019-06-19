@@ -9,6 +9,7 @@ mod job;
 mod pipe_exec;
 mod shell_expand;
 mod signals;
+pub(crate) mod sys;
 pub mod variables;
 
 pub(crate) use self::job::Job;
@@ -31,7 +32,6 @@ use crate::{
     expansion::{pipelines::Pipeline, ExpansionError},
     lexers::{Key, Primitive},
     parser::{ParseError, StatementError, Terminator},
-    sys,
 };
 use err_derive::Error;
 use itertools::Itertools;

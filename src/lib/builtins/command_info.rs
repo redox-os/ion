@@ -1,7 +1,7 @@
 use super::{check_help, man_pages::MAN_WHICH, Status};
 use crate::{
-    shell::{Shell, Value},
-    sys, types,
+    shell::{sys, Shell, Value},
+    types,
 };
 
 use std::{borrow::Cow, env, path::Path};

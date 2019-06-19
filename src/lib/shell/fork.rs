@@ -1,5 +1,4 @@
-use super::{IonError, Shell};
-use crate::sys;
+use super::{sys, IonError, Shell};
 use std::{
     fs::File,
     io,

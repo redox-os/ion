@@ -1,7 +1,4 @@
-use crate::{
-    shell::{fork::IonResult, variables::Value, Capture, Shell},
-    sys,
-};
+use super::{fork::IonResult, sys, variables::Value, Capture, Shell};
 use std::process;
 
 impl<'a> Shell<'a> {

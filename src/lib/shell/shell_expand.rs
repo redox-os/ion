@@ -1,7 +1,11 @@
-use super::{fork::Capture, variables::Value, IonError, Shell};
+use super::{
+    fork::Capture,
+    sys::{self, env as sys_env, variables as self_sys},
+    variables::Value,
+    IonError, Shell,
+};
 use crate::{
     expansion::{self, Expander, ExpansionError, Select},
-    sys::{self, env as sys_env, variables as self_sys},
     types,
 };
 use std::{env, io::Read, iter::FromIterator, process};

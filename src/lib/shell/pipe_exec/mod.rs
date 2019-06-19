@@ -20,12 +20,11 @@ use super::{
     flow_control::FunctionError,
     job::{Job, JobVariant, RefinedJob, TeeItem},
     signals::{self, SignalHandler},
-    Shell, Value,
+    sys, Shell, Value,
 };
 use crate::{
     builtins::{self, Status},
     expansion::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
-    sys,
 };
 use err_derive::Error;
 use smallvec::SmallVec;

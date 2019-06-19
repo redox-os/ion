@@ -1,4 +1,4 @@
-use crate::sys::env as sys_env;
+use super::sys::env as sys_env;
 use err_derive::Error;
 use std::{
     collections::VecDeque,

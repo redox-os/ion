@@ -1,16 +1,14 @@
 use super::{
     super::{signals, Shell},
     foreground::{BackgroundResult, ForegroundSignals},
-    PipelineError,
-};
-use crate::{
-    builtins::Status,
     sys::{
         self, kill, strerror, waitpid, wcoredump, wexitstatus, wifcontinued, wifexited,
         wifsignaled, wifstopped, wstopsig, wtermsig, ECHILD, SIGINT, SIGPIPE, WCONTINUED, WNOHANG,
         WUNTRACED,
     },
+    PipelineError,
 };
+use crate::builtins::Status;
 use std::{
     fmt, process,
     sync::Mutex,

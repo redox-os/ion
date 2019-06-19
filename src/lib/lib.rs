@@ -64,7 +64,6 @@
 use ion_braces as braces;
 use ion_lexers as lexers;
 use ion_ranges as ranges;
-use ion_sys as sys;
 
 #[macro_use]
 pub mod types;
@@ -75,6 +74,11 @@ pub mod builtins;
 pub mod expansion;
 mod memory;
 mod shell;
+
+// Should be removed, hackish at best
+pub mod sys {
+    pub use super::shell::sys::{getpid, setpgid, tcsetpgrp, PATH_SEPARATOR, SIGHUP, SIGTERM};
+}
 
 pub(crate) use self::memory::IonPool;
 pub use crate::{

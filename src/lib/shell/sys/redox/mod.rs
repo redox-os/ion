@@ -23,7 +23,7 @@ pub use syscall::{
     wstopsig as wstopsig_, wtermsig as wtermsig_, ECHILD, EINTR,
 };
 
-pub const PATH_SEPARATOR: &str = ";";
+pub const PATH_SEPARATOR: char = ';';
 pub const NULL_PATH: &str = "null:";
 
 pub const O_CLOEXEC: usize = syscall::O_CLOEXEC;

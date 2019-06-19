@@ -1,8 +1,10 @@
 use super::{colors::Colors, flow_control::Function};
 use crate::{
     expansion::ExpansionError,
-    shell::IonError,
-    sys::{env as sys_env, geteuid, getpid, getuid, variables as self_sys},
+    shell::{
+        sys::{env as sys_env, geteuid, getpid, getuid, variables as self_sys},
+        IonError,
+    },
     types::{self, Array},
 };
 use scopes::{Namespace, Scope, Scopes};
