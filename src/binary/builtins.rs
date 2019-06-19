@@ -30,33 +30,6 @@ DESCRIPTION
     Makes ion exit. The exit status will be that of the last command executed."#;
 
 /// Executes the givent commmand.
-pub fn _exec(args: &[Str]) -> Result<(), Str> {
-    let mut clear_env = false;
-    let mut idx = 0;
-    for arg in args.iter() {
-        match &**arg {
-            "-c" => clear_env = true,
-            _ if check_help(args, MAN_EXEC) => {
-                return Ok(());
-            }
-            _ => break,
-        }
-        idx += 1;
-    }
-
-    match args.get(idx) {
-        Some(argument) => {
-            let args = if args.len() > idx + 1 { &args[idx + 1..] } else { &[] };
-            let mut command = Command::new(argument.as_str());
-            command.args(args.iter().map(Str::as_str));
-            if clear_env {
-                command.env_clear();
-            }
-            Err(command.exec().description().into())
-        }
-        None => Err("no command provided".into()),
-    }
-}
 
 pub fn exit(args: &[Str], shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_EXIT) {
@@ -72,9 +45,29 @@ pub fn exit(args: &[Str], shell: &mut Shell<'_>) -> Status {
 }
 
 pub fn exec(args: &[Str], _shell: &mut Shell<'_>) -> Status {
-    match _exec(&args[1..]) {
-        // Shouldn't ever hit this case.
-        Ok(()) => unreachable!(),
-        Err(err) => Status::error(format!("ion: exec: {}", err)),
+    if check_help(args, MAN_EXEC) {
+        return Status::SUCCESS;
+    }
+    let mut clear_env = false;
+    let mut idx = 1;
+    for arg in args.iter().skip(1) {
+        match &**arg {
+            "-c" => clear_env = true,
+            _ => break,
+        }
+        idx += 1;
+    }
+
+    match args.get(idx) {
+        Some(argument) => {
+            let args = if args.len() > idx + 1 { &args[idx + 1..] } else { &[] };
+            let mut command = Command::new(argument.as_str());
+            command.args(args.iter().map(Str::as_str));
+            if clear_env {
+                command.env_clear();
+            }
+            Status::error(format!("ion: exec: {}", command.exec().description()))
+        }
+        None => Status::error("ion: exec: no command provided"),
     }
 }
