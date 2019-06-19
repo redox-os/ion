@@ -1,16 +1,17 @@
 // TODO: Handle Runtime Errors
+mod braces;
 mod loops;
 mod methods;
 pub mod pipelines;
 mod words;
 
+use self::braces::BraceToken;
 pub use self::{
     loops::ForValueExpression,
     methods::MethodError,
     words::{unescape, Select, SelectWithSize, WordIterator, WordToken},
 };
 use crate::{
-    braces::{self, BraceToken},
     lexers::assignments::TypeError,
     ranges::{parse_range, Index, Range},
     types::{self, Args},

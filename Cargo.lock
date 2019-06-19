@@ -369,7 +369,6 @@ dependencies = [
  "glob 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "ion-ranges 0.1.0",
- "ion_braces 0.1.0",
  "ion_lexers 0.1.0",
  "itertools 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "itoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -377,6 +376,7 @@ dependencies = [
  "libc 0.2.58 (registry+https://github.com/rust-lang/crates.io-index)",
  "liner 0.5.0 (git+https://gitlab.redox-os.org/redox-os/liner)",
  "object-pool 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "permutate 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.54 (git+https://gitlab.redox-os.org/redox-os/syscall.git)",
  "regex 1.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -391,16 +391,6 @@ dependencies = [
  "users 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "version_check 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "xdg 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ion_braces"
-version = "0.1.0"
-dependencies = [
- "auto_enums 0.5.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "permutate 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "small 0.1.0 (git+https://gitlab.redox-os.org/redox-os/small)",
- "smallvec 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

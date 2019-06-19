@@ -61,7 +61,6 @@
 
 #![allow(unknown_lints)]
 
-use ion_braces as braces;
 use ion_lexers as lexers;
 use ion_ranges as ranges;
 
