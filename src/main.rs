@@ -3,7 +3,6 @@ use ion_shell::{BuiltinMap, IonError, PipelineError, Shell, Value};
 use ion_sys as sys;
 use liner::KeyBindings;
 use std::{
-    alloc::System,
     io::{self, stdin, BufReader},
     process,
 };
@@ -18,9 +17,6 @@ use std::str::FromStr;
 use structopt::StructOpt;
 
 mod binary;
-
-#[global_allocator]
-static A: System = System;
 
 struct KeyBindingsWrapper(KeyBindings);
 
