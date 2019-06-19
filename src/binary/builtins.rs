@@ -4,7 +4,7 @@ use ion_shell::{
     types::Str,
     Shell,
 };
-use std::{error::Error, process::Command};
+use std::{error::Error, os::unix::process::CommandExt, process::Command};
 
 const MAN_EXEC: &str = r#"NAME
     exec - Replace the shell with the given command.
@@ -52,7 +52,7 @@ pub fn _exec(args: &[Str]) -> Result<(), Str> {
             if clear_env {
                 command.env_clear();
             }
-            command.spawn().map(|_| ()).map_err(|err| err.description().into())
+            Err(command.exec().description().into())
         }
         None => Err("no command provided".into()),
     }
