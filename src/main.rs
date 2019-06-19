@@ -1,6 +1,6 @@
 use self::binary::{builtins, InteractiveBinary};
 use atty::Stream;
-use ion_shell::{sys, BuiltinMap, IonError, PipelineError, Shell, Value};
+use ion_shell::{BuiltinMap, IonError, PipelineError, Shell, Value};
 use liner::KeyBindings;
 use std::{
     io::{self, stdin, BufReader},
@@ -34,9 +34,10 @@ impl FromStr for KeyBindingsWrapper {
 }
 
 fn set_unique_pid() -> io::Result<()> {
-    let pid = sys::getpid()?;
-    sys::setpgid(0, pid)?;
-    sys::tcsetpgrp(0, pid)
+    // let pid = sys::getpid()?;
+    // sys::setpgid(0, pid)
+    // sys::tcsetpgrp(0, pid)
+    Ok(())
 }
 
 /// Ion is a commandline shell created to be a faster and easier to use alternative to the
