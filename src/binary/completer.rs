@@ -21,7 +21,7 @@ fn escape(input: &str) -> String {
     for character in input.bytes() {
         match character {
             b'(' | b')' | b'[' | b']' | b'&' | b'$' | b'@' | b'{' | b'}' | b'<' | b'>' | b';'
-            | b'"' | b'\'' | b'#' | b'^' | b'*' => output.push(b'\\'),
+            | b'"' | b'\'' | b'#' | b'^' | b'*' | b' ' => output.push(b'\\'),
             _ => (),
         }
         output.push(character);
@@ -242,7 +242,7 @@ fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<I
             if file.is_dir() {
                 joined.push('/');
             }
-            Some(joined)
+            Some(escape(&joined))
         })
     });
 
