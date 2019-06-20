@@ -78,14 +78,17 @@ pub fn jobs(shell: &mut Shell<'_>) {
 /// If multiple jobs are given, then only the last job's exit status will be returned.
 pub fn fg(shell: &mut Shell<'_>, args: &[types::Str]) -> Status {
     fn fg_job(shell: &mut Shell<'_>, njob: usize) -> Status {
-        if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
-            // Give the bg task the foreground, and wait for it to finish. Also resume it if it
-            // isn't running
-            shell.set_bg_task_in_foreground(job.pid(), !job.is_running())
-        } else {
-            // Informs the user that the specified job ID no longer exists.
-            return Status::error(format!("ion: fg: job {} does not exist", njob));
-        }
+        let (pid, cont) = {
+            if let Some(job) = shell.background_jobs().iter().nth(njob).filter(|p| p.exists()) {
+                (job.pid(), !job.is_running())
+            } else {
+                // Informs the user that the specified job ID no longer exists.
+                return Status::error(format!("ion: fg: job {} does not exist", njob));
+            }
+        };
+        // Give the bg task the foreground, and wait for it to finish. Also resume it if it
+        // isn't running
+        shell.set_bg_task_in_foreground(pid, cont)
     }
 
     if args.is_empty() {

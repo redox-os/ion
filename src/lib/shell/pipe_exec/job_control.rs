@@ -57,7 +57,7 @@ impl BackgroundProcess {
 
     pub fn is_running(&self) -> bool { self.state == ProcessState::Running }
 
-    pub fn exists(&self) -> bool { self.state == ProcessState::Empty }
+    pub fn exists(&self) -> bool { self.state != ProcessState::Empty }
 
     pub fn forget(&mut self) { self.state = ProcessState::Empty }
 
@@ -260,8 +260,7 @@ impl<'a> Shell<'a> {
     /// Waits until all running background tasks have completed, and listens for signals in the
     /// event that a signal is sent to kill the running tasks.
     pub fn wait_for_background(&mut self) -> Result<(), PipelineError> {
-        while let Some(p) = self.background_jobs().iter().find(|p| p.state == ProcessState::Running)
-        {
+        while let Some(p) = { self.background_jobs().iter().find(|p| p.is_running()) } {
             if let Some(signal) = signals::SignalHandler.find(|&s| s != sys::SIGTSTP) {
                 self.background_send(signal);
                 return Err(PipelineError::Interrupted(p.pid(), signal));
