@@ -1,10 +1,10 @@
 use super::{check_help, man_pages::MAN_WHICH, Status};
 use crate::{
-    shell::{sys, Shell, Value},
+    shell::{Shell, Value},
     types,
 };
 
-use std::{borrow::Cow, env, path::Path};
+use std::{borrow::Cow, env};
 
 pub fn which(args: &[types::Str], shell: &mut Shell<'_>) -> Result<Status, ()> {
     if check_help(args, MAN_WHICH) {
@@ -70,10 +70,9 @@ fn get_command_info<'a>(command: &str, shell: &mut Shell<'_>) -> Result<Cow<'a, 
         Some(Value::Function(_)) => Ok("function".into()),
         _ if shell.builtins().contains(command) => Ok("builtin".into()),
         _ => {
-            for path in
-                env::var("PATH").unwrap_or_else(|_| String::from("/bin")).split(sys::PATH_SEPARATOR)
-            {
-                let executable = Path::new(path).join(command);
+            let paths = env::var_os("PATH").unwrap_or_else(|| "/bin".into());
+            for path in env::split_paths(&paths) {
+                let executable = path.join(command);
                 if executable.is_file() {
                     return Ok(executable.display().to_string().into());
                 }

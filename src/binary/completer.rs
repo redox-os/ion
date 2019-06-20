@@ -2,11 +2,9 @@ use auto_enums::auto_enum;
 use glob::{glob_with, MatchOptions};
 use ion_shell::{
     expansion::{unescape, Expander},
-    sys::PATH_SEPARATOR,
     Shell,
 };
 use liner::{BasicCompleter, Completer, CursorPosition, Event, EventKind};
-use smallvec::SmallVec;
 use std::{env, iter, path::PathBuf, str};
 
 pub struct IonCompleter<'a, 'b> {
@@ -68,11 +66,13 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
             // Creates completers containing definitions from all directories
             // listed
             // in the environment's **$PATH** variable.
-            let file_completers: Vec<_> = env::var("PATH")
-                .unwrap_or_else(|_| "/bin/".to_string())
-                .split(PATH_SEPARATOR)
-                .map(|s| IonFileCompleter::new(Some(s), &self.shell))
-                .collect();
+            let file_completers: Vec<_> = if let Some(paths) = env::var_os("PATH") {
+                env::split_paths(&paths)
+                    .map(|s| IonFileCompleter::new(Some(s), &self.shell))
+                    .collect()
+            } else {
+                vec![IonFileCompleter::new(Some("/bin/".into()), &self.shell)]
+            };
             // Merge the collected definitions with the file path definitions.
             completions.extend(MultiCompleter::new(file_completers).completions(start));
         }
@@ -125,15 +125,12 @@ impl<'a, 'b> Completer for IonCompleter<'a, 'b> {
 pub struct IonFileCompleter<'a, 'b> {
     shell: &'b Shell<'a>,
     /// The directory the expansion takes place in
-    path: String,
+    path: PathBuf,
 }
 
 impl<'a, 'b> IonFileCompleter<'a, 'b> {
-    pub fn new(path: Option<&str>, shell: &'b Shell<'a>) -> Self {
-        let mut path = path.unwrap_or("").to_string();
-        if !path.is_empty() && !path.ends_with('/') {
-            path.push('/');
-        }
+    pub fn new(path: Option<PathBuf>, shell: &'b Shell<'a>) -> Self {
+        let path = path.unwrap_or_default();
         IonFileCompleter { shell, path }
     }
 }
@@ -197,37 +194,36 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
 }
 
 #[auto_enum]
-fn filename_completion<'a>(start: &'a str, path: &'a str) -> impl Iterator<Item = String> + 'a {
+fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<Item = String> + 'a {
     let unescaped_start = unescape(start);
 
     let mut split_start = unescaped_start.split('/');
-    let mut string: SmallVec<[u8; 128]> = SmallVec::with_capacity(128);
+    let mut string = String::with_capacity(128);
 
     // When 'start' is an absolute path, "/..." gets split to ["", "..."]
     // So we skip the first element and add "/" to the start of the string
     if unescaped_start.starts_with('/') {
         split_start.next();
-        string.push(b'/');
+        string.push('/');
     } else {
-        string.extend_from_slice(path.as_bytes());
+        string.push_str(&path.to_string_lossy());
     }
 
     for element in split_start {
-        string.extend_from_slice(element.as_bytes());
+        string.push_str(element);
         if element != "." && element != ".." {
-            string.push(b'*');
+            string.push('*');
         }
-        string.push(b'/');
+        string.push('/');
     }
 
     string.pop(); // pop out the last '/' character
-    if string.last() == Some(&b'.') {
-        string.push(b'*')
+    if string.ends_with('.') {
+        string.push('*')
     }
-    let string = unsafe { &str::from_utf8_unchecked(&string) };
 
     let globs = glob_with(
-        string,
+        &string,
         MatchOptions {
             case_sensitive:              true,
             require_literal_separator:   true,
@@ -237,7 +233,7 @@ fn filename_completion<'a>(start: &'a str, path: &'a str) -> impl Iterator<Item 
     .ok()
     .map(|completions| {
         completions.filter_map(Result::ok).filter_map(move |file| {
-            let out = file.to_str()?.trim_start_matches(&path);
+            let out = file.to_str()?.trim_start_matches(&path.to_string_lossy().as_ref());
             let mut joined = String::with_capacity(out.len() + 3); // worst case senario
             if unescaped_start.starts_with("./") {
                 joined.push_str("./");

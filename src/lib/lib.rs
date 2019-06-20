@@ -75,7 +75,7 @@ mod shell;
 
 // Should be removed, hackish at best
 pub mod sys {
-    pub use super::shell::sys::{PATH_SEPARATOR, SIGHUP, SIGTERM};
+    pub use super::shell::sys::{SIGHUP, SIGTERM};
 }
 
 pub(crate) use self::memory::IonPool;

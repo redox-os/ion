@@ -6,4 +6,6 @@ mod sys;
 #[path = "unix/mod.rs"]
 mod sys;
 
-pub use self::sys::*;
+mod shared;
+
+pub use self::{shared::*, sys::*};
