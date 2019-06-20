@@ -9,6 +9,9 @@ cache:
   paths:
     - cargo/
     - target/
+    # Redox only:
+    - prefix/
+    - rust/
 
 format:
   script:
@@ -34,8 +37,17 @@ redox:
   before_script:
     - apt-get update -qq
     - apt-get install -qq tar
-    - wget -O - https://static.redox-os.org/toolchain/x86_64-unknown-redox/relibc-install.tar.gz |
-      tar --extract --gzip --directory /usr/local
+    - '[ -e "prefix" ] || (mkdir prefix && wget -O - https://static.redox-os.org/toolchain/x86_64-unknown-redox/gcc-install.tar.gz |
+          tar --extract --gzip --directory prefix)'
+    - export PATH="$PWD/prefix/bin:$PATH"
+    - export RUSTUP_TOOLCHAIN="$PWD/prefix"
+
+        # Prepare xargo
+    - cargo install xargo
+    - '[ -e "rust" ] || git clone -b redox-2019-04-06 "https://gitlab.redox-os.org/redox-os/rust" --recursive'
+    - export CARGO=xargo
+    - export XARGO_HOME="$PWD/build/xargo"
+    - export XARGO_RUST_SRC="$PWD/rust/src"
     - rustup default nightly-2019-04-06
     - rustup target add x86_64-unknown-redox
   script:
