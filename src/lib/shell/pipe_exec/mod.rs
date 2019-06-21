@@ -25,6 +25,7 @@ use super::{
 use crate::{
     builtins::{self, Status},
     expansion::pipelines::{Input, PipeItem, PipeType, Pipeline, RedirectFrom, Redirection},
+    types,
 };
 use err_derive::Error;
 use smallvec::SmallVec;
@@ -33,9 +34,12 @@ use std::{
     fs::{File, OpenOptions},
     io::{self, Write},
     iter,
-    os::unix::io::{AsRawFd, FromRawFd, RawFd},
+    os::unix::{
+        io::{FromRawFd, RawFd},
+        process::CommandExt,
+    },
     path::Path,
-    process::{self, exit},
+    process::{self, exit, Command, Stdio},
 };
 
 #[derive(Debug, Error)]
@@ -87,6 +91,9 @@ pub enum PipelineError {
 
     #[error(display = "early exit: pipeline failed")]
     EarlyExit,
+
+    #[error(display = "command not found: {}", _0)]
+    CommandNotFound(String),
 }
 
 impl fmt::Display for OutputError {
@@ -502,15 +509,7 @@ impl<'b> Shell<'b> {
                         }
                     }
 
-                    spawn_proc(
-                        self,
-                        parent,
-                        kind,
-                        true,
-                        &mut last_pid,
-                        &mut current_pid,
-                        &mut pgid,
-                    )?;
+                    spawn_proc(self, parent, kind, &mut last_pid, &mut current_pid, &mut pgid)?;
 
                     last_pid = current_pid;
                     parent = child;
@@ -520,7 +519,13 @@ impl<'b> Shell<'b> {
                     }
                 }
 
-                spawn_proc(self, parent, kind, false, &mut last_pid, &mut current_pid, &mut pgid)?;
+                spawn_proc(self, parent, kind, &mut last_pid, &mut current_pid, &mut pgid)?;
+                if !self.opts.is_background_shell {
+                    let _ = sys::tcsetpgrp(libc::STDIN_FILENO, pgid); // TODO: Add more errors
+                }
+                // When waking up functions, it may happen that no process is currently running.
+                // Since sigcont is sent in the function, it does not matter
+                sys::killpg(pgid, sys::SIGCONT).unwrap();
 
                 // Waits for all of the children of the assigned pgid to finish executing,
                 // returning the exit status of the last process in the queue.
@@ -544,86 +549,68 @@ fn spawn_proc(
     shell: &mut Shell<'_>,
     cmd: RefinedJob<'_>,
     redirection: RedirectFrom,
-    block_child: bool,
     last_pid: &mut u32,
     current_pid: &mut u32,
     pgid: &mut u32,
 ) -> Result<(), PipelineError> {
     let RefinedJob { mut var, args, stdin, stdout, stderr } = cmd;
-    match var {
+    let pid = match var {
         JobVariant::External => {
-            let mut result = sys::fork_and_exec(
-                &args[0],
-                &args[1..],
-                stdin.as_ref().map(AsRawFd::as_raw_fd),
-                stdout.as_ref().map(AsRawFd::as_raw_fd),
-                stderr.as_ref().map(AsRawFd::as_raw_fd),
-                false,
-                || prepare_child(block_child, *pgid),
-            );
+            let mut command = Command::new(&args[0].as_str());
+            command.args(args[1..].iter().map(types::Str::as_str));
 
-            match result {
-                Ok(pid) => {
-                    *last_pid = *current_pid;
-                    *current_pid = pid;
+            if let Some(stdin) = stdin {
+                command.stdin(stdin);
+            } else {
+                command.stdin(Stdio::inherit());
+            }
+            if let Some(stdout) = stdout {
+                command.stdout(stdout);
+            } else {
+                command.stdout(Stdio::inherit());
+            }
+            if let Some(stderr) = stderr {
+                command.stderr(stderr);
+            } else {
+                command.stderr(Stdio::inherit());
+            }
+
+            let pgid_copy = *pgid;
+            command.before_exec(move || sys::setpgid(0, pgid_copy));
+            match command.spawn() {
+                Ok(child) => Ok(child.id()),
+                Err(err) => {
+                    if err.kind() == io::ErrorKind::NotFound {
+                        Err(PipelineError::CommandNotFound(args[0].to_string()))
+                    } else {
+                        Err(PipelineError::CommandExecError(err))
+                    }
                 }
-                Err(ref mut err) if err.kind() == io::ErrorKind::NotFound => {
-                    shell.command_not_found(&args[0])
-                }
-                Err(cause) => return Err(PipelineError::CommandExecError(cause)),
             }
         }
         JobVariant::Builtin { main } => {
-            fork_exec_internal(
-                stdout,
-                stderr,
-                stdin,
-                block_child,
-                last_pid,
-                current_pid,
-                *pgid,
-                |_, _, _| main(&args, shell),
-            )?;
+            fork_exec_internal(stdout, stderr, stdin, *pgid, |_, _, _| main(&args, shell))
         }
-        JobVariant::Function => {
-            fork_exec_internal(
-                stdout,
-                stderr,
-                stdin,
-                block_child,
-                last_pid,
-                current_pid,
-                *pgid,
-                |_, _, _| shell.exec_function(&args[0], &args),
-            )?;
-        }
+        JobVariant::Function => fork_exec_internal(stdout, stderr, stdin, *pgid, |_, _, _| {
+            shell.exec_function(&args[0], &args)
+        }),
         JobVariant::Cat { ref mut sources } => {
-            fork_exec_internal(
-                stdout,
-                None,
-                stdin,
-                block_child,
-                last_pid,
-                current_pid,
-                *pgid,
-                |_, _, mut stdin| shell.exec_multi_in(sources, &mut stdin),
-            )?;
+            fork_exec_internal(stdout, None, stdin, *pgid, |_, _, mut stdin| {
+                shell.exec_multi_in(sources, &mut stdin)
+            })
         }
         JobVariant::Tee { ref mut items } => {
-            fork_exec_internal(
-                stdout,
-                stderr,
-                stdin,
-                block_child,
-                last_pid,
-                current_pid,
-                *pgid,
-                |_, _, _| shell.exec_multi_out(items, redirection),
-            )?;
+            fork_exec_internal(stdout, stderr, stdin, *pgid, |_, _, _| {
+                shell.exec_multi_out(items, redirection)
+            })
         }
-    };
-    set_process_group(pgid, *current_pid, !shell.opts.is_background_shell);
-    resume_process(*last_pid);
+    }?;
+    *last_pid = *current_pid;
+    *current_pid = pid;
+    if *pgid == 0 {
+        *pgid = pid;
+    }
+    let _ = sys::setpgid(pid, *pgid); // try in the parent too to avoid race conditions
     Ok(())
 }
 
@@ -632,74 +619,24 @@ fn fork_exec_internal<F>(
     stdout: Option<File>,
     stderr: Option<File>,
     stdin: Option<File>,
-    block_child: bool,
-    last_pid: &mut u32,
-    current_pid: &mut u32,
     pgid: u32,
     mut exec_action: F,
-) -> Result<(), PipelineError>
+) -> Result<u32, PipelineError>
 where
     F: FnMut(Option<File>, Option<File>, Option<File>) -> Status,
 {
-    match unsafe { sys::fork() } {
-        Ok(0) => {
-            prepare_child(block_child, pgid);
+    match unsafe { sys::fork() }.map_err(PipelineError::CreateForkError)? {
+        0 => {
+            let _ = sys::reset_signal(sys::SIGINT);
+            let _ = sys::reset_signal(sys::SIGHUP);
+            let _ = sys::reset_signal(sys::SIGTERM);
+            signals::unblock();
 
+            sys::setpgid(0, pgid).expect(" aaaa");
             redirect_streams(&stdin, &stdout, &stderr);
             let exit_status = exec_action(stdout, stderr, stdin);
             exit(exit_status.as_os_code())
         }
-        Ok(pid) => {
-            *last_pid = *current_pid;
-            *current_pid = pid;
-            Ok(())
-        }
-        Err(cause) => Err(PipelineError::CreateForkError(cause)),
-    }
-}
-
-fn prepare_child(block_child: bool, pgid: u32) {
-    signals::unblock();
-    let _ = sys::reset_signal(sys::SIGINT);
-    let _ = sys::reset_signal(sys::SIGHUP);
-    let _ = sys::reset_signal(sys::SIGTERM);
-
-    if block_child {
-        let _ = sys::kill(process::id(), sys::SIGSTOP);
-    } else {
-        let _ = sys::setpgid(process::id(), pgid);
-    }
-}
-
-fn resume_process(pid: u32) {
-    if pid != 0 {
-        // Ensure that the process is stopped before continuing.
-        if let Err(why) = wait_for_interrupt(pid) {
-            eprintln!("ion: error waiting for sigstop: {}", why);
-        }
-        let _ = sys::kill(pid, sys::SIGCONT);
-    }
-}
-
-fn set_process_group(pgid: &mut u32, pid: u32, set_foreground: bool) {
-    if *pgid == 0 {
-        *pgid = pid;
-        let _ = sys::setpgid(pid, pid);
-        if set_foreground {
-            let _ = sys::tcsetpgrp(0, pid);
-        }
-    } else {
-        let _ = sys::setpgid(pid, *pgid);
-    }
-}
-
-pub fn wait_for_interrupt(pid: u32) -> io::Result<()> {
-    loop {
-        let mut status = 0;
-        match sys::waitpid(pid as i32, &mut status, sys::WUNTRACED) {
-            Ok(_) => break Ok(()),
-            Err(sys::EINTR) => continue,
-            Err(errno) => break Err(io::Error::from_raw_os_error(errno)),
-        }
+        pid => Ok(pid),
     }
 }

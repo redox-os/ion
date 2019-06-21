@@ -3,7 +3,7 @@ use atty::Stream;
 use ion_shell::{BuiltinMap, IonError, PipelineError, Shell, Value};
 use liner::KeyBindings;
 use std::{
-    io::{self, stdin, BufReader},
+    io::{stdin, BufReader},
     process,
 };
 
@@ -31,13 +31,6 @@ impl FromStr for KeyBindingsWrapper {
             _ => Err("unknown key bindings".to_string()),
         }
     }
-}
-
-fn set_unique_pid() -> io::Result<()> {
-    // let pid = sys::getpid()?;
-    // sys::setpgid(0, pid)
-    // sys::tcsetpgrp(0, pid)
-    Ok(())
 }
 
 /// Ion is a commandline shell created to be a faster and easier to use alternative to the
@@ -147,14 +140,9 @@ fn main() {
     let stdin_is_a_tty = atty::is(Stream::Stdin);
     let mut shell = Shell::with_builtins(builtins, false);
 
-    if stdin_is_a_tty {
-        if let Err(why) = set_unique_pid() {
-            eprintln!("ion: could not assign a pid to the shell: {}", why);
-        }
-    }
-
     shell.opts_mut().print_comms = command_line_args.print_commands;
     shell.opts_mut().no_exec = command_line_args.no_execute;
+    shell.opts_mut().is_background_shell = !stdin_is_a_tty;
 
     let script_path = command_line_args.args.get(0).cloned();
     shell.variables_mut().set(

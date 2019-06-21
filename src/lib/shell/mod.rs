@@ -308,26 +308,35 @@ impl<'a> Shell<'a> {
 
         // Don't execute commands when the `-n` flag is passed.
         let exit_status = if self.opts.no_exec {
-            Status::SUCCESS
+            Ok(Status::SUCCESS)
         // Branch else if -> input == shell command i.e. echo
         } else if let Some(main) = self.builtins.get(pipeline.items[0].command()) {
             // Run the 'main' of the command and set exit_status
             if !pipeline.requires_piping() {
-                main(&pipeline.items[0].job.args, self)
+                Ok(main(&pipeline.items[0].job.args, self))
             } else {
-                self.execute_pipeline(pipeline)?
+                self.execute_pipeline(pipeline).map_err(Into::into)
             }
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(Value::Function(function)) =
             self.variables.get_ref(&pipeline.items[0].job.args[0]).cloned()
         {
             if !pipeline.requires_piping() {
-                function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)?
+                function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)
             } else {
-                self.execute_pipeline(pipeline)?
+                self.execute_pipeline(pipeline).map_err(Into::into)
             }
         } else {
-            self.execute_pipeline(pipeline)?
+            self.execute_pipeline(pipeline).map_err(Into::into)
+        };
+
+        let exit_status = match exit_status {
+            Ok(exit_status) => exit_status,
+            Err(IonError::PipelineExecutionError(PipelineError::CommandNotFound(command))) => {
+                self.command_not_found(&command);
+                Status::COULD_NOT_EXEC
+            }
+            Err(err) => return Err(err.into()),
         };
 
         if let Some(ref callback) = self.on_command {
