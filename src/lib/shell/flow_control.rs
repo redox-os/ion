@@ -7,36 +7,7 @@ use crate::{
 };
 use err_derive::Error;
 use smallvec::SmallVec;
-
-#[derive(Debug, Error, PartialEq, Eq, Hash)]
-pub enum BlockError {
-    #[error(display = "Case found outside of Match block")]
-    LoneCase,
-    #[error(display = "statement found outside of Case block in Match")]
-    StatementOutsideMatch,
-
-    #[error(display = "End found but no block to close")]
-    UnmatchedEnd,
-    #[error(display = "found ElseIf without If block")]
-    LoneElseIf,
-    #[error(display = "found Else without If block")]
-    LoneElse,
-    #[error(display = "Else block already exists")]
-    MultipleElse,
-    #[error(display = "ElseIf found after Else")]
-    ElseWrongOrder,
-
-    #[error(display = "found Break without loop body")]
-    UnmatchedBreak,
-    #[error(display = "found Continue without loop body")]
-    UnmatchedContinue,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct ElseIf<'a> {
-    pub expression: Block<'a>,
-    pub success:    Block<'a>,
-}
+use std::fmt;
 
 /// Represents a single branch in a match statement. For example, in the expression
 /// ```ignore
@@ -67,102 +38,171 @@ pub struct ElseIf<'a> {
 /// ```
 #[derive(Debug, PartialEq, Clone)]
 pub struct Case<'a> {
-    pub value:       Option<String>,
-    pub binding:     Option<String>,
+    /// The value to match with
+    pub value: Option<String>,
+    /// Set a variable with the exact result
+    pub binding: Option<String>,
+    /// An additional statement to test before matching the case statement
     pub conditional: Option<String>,
-    pub statements:  Block<'a>,
+    /// The block to execute on matching input
+    pub statements: Block<'a>,
 }
 
+/// An elseif case
+#[derive(Debug, PartialEq, Clone)]
+pub struct ElseIf<'a> {
+    /// The block to test
+    pub expression: Block<'a>,
+    /// The block to execute on success
+    pub success: Block<'a>,
+}
+
+/// The action to perform on assignment
 #[derive(Debug, PartialEq, Clone)]
 pub enum LocalAction {
+    /// List all the variables
     List,
+    /// Assign a value to a name
     Assign(String, Operator, String),
 }
 
+/// The action to perform on export
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExportAction {
+    /// List the environment variables
     List,
+    /// Export the value
     LocalExport(String),
+    /// Export and update
     Assign(String, Operator, String),
 }
 
+/// The mode for the next if block
 #[derive(Debug, PartialEq, Clone, Copy, Hash)]
 pub enum IfMode {
+    /// Standard if
     Success,
+    /// Else if
     ElseIf,
+    /// Else
     Else,
 }
 
+/// A single statement
+///
+/// Contains all the possible actions for the shell
 // TODO: Enable statements and expressions to contain &str values.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement<'a> {
+    /// Assignment
     Let(LocalAction),
+    /// A case
     Case(Case<'a>),
+    /// Export a variable
     Export(ExportAction),
+    /// An if block
     If {
+        /// The block to test
         expression: Block<'a>,
-        success:    Block<'a>,
-        else_if:    Vec<ElseIf<'a>>,
-        failure:    Block<'a>,
-        mode:       IfMode,
+        /// The block to execute on success
+        success: Block<'a>,
+        /// The list of associated else if blocks
+        else_if: Vec<ElseIf<'a>>,
+        /// The block to execute on failure
+        failure: Block<'a>,
+        /// The mode
+        mode: IfMode,
     },
+    /// else if
     ElseIf(ElseIf<'a>),
+    /// Create a function
     Function {
-        name:        types::Str,
+        /// the name of the function
+        name: types::Str,
+        /// the description of the function
         description: Option<types::Str>,
-        args:        Vec<KeyBuf>,
-        statements:  Block<'a>,
+        /// The required arguments of the function, with their types
+        args: Vec<KeyBuf>,
+        /// The statements in the function
+        statements: Block<'a>,
     },
+    /// for loop
     For {
-        variables:  SmallVec<[types::Str; 4]>,
-        values:     Vec<types::Str>,
+        /// The bounds
+        variables: SmallVec<[types::Str; 4]>,
+        /// The value to iterator for
+        values: Vec<types::Str>,
+        /// The block to execute repetitively
         statements: Block<'a>,
     },
+    /// while
     While {
+        /// The block to test
         expression: Block<'a>,
+        /// The block to execute repetitively
         statements: Block<'a>,
     },
+    /// Match
     Match {
+        /// The value to check
         expression: types::Str,
-        cases:      Vec<Case<'a>>,
+        /// A list of case to check for
+        cases: Vec<Case<'a>>,
     },
+    /// Else statement
     Else,
+    /// End of a block
     End,
+    /// Exit loop
     Break,
+    /// Next loop
     Continue,
+    /// Execute a pipeline
     Pipeline(Pipeline<'a>),
+    /// Time the statement
     Time(Box<Statement<'a>>),
+    /// Execute the statement if the previous command succeeded
     And(Box<Statement<'a>>),
+    /// Execute the statement if the previous command failed
     Or(Box<Statement<'a>>),
+    /// Succeed on failure of the inner statement
     Not(Box<Statement<'a>>),
+    /// An empty statement
     Default,
 }
 
-impl<'a> Statement<'a> {
-    pub fn short(&self) -> &'static str {
-        match *self {
-            Statement::Let { .. } => "Let { .. }",
-            Statement::Case(_) => "Case { .. }",
-            Statement::Export(_) => "Export { .. }",
-            Statement::If { .. } => "If { .. }",
-            Statement::ElseIf(_) => "ElseIf { .. }",
-            Statement::Function { .. } => "Function { .. }",
-            Statement::For { .. } => "For { .. }",
-            Statement::While { .. } => "While { .. }",
-            Statement::Match { .. } => "Match { .. }",
-            Statement::Else => "Else",
-            Statement::End => "End",
-            Statement::Break => "Break",
-            Statement::Continue => "Continue",
-            Statement::Pipeline(_) => "Pipeline { .. }",
-            Statement::Time(_) => "Time { .. }",
-            Statement::And(_) => "And { .. }",
-            Statement::Or(_) => "Or { .. }",
-            Statement::Not(_) => "Not { .. }",
-            Statement::Default => "Default",
-        }
+impl<'a> fmt::Display for Statement<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Statement::Let { .. } => "Let { .. }",
+                Statement::Case(_) => "Case { .. }",
+                Statement::Export(_) => "Export { .. }",
+                Statement::If { .. } => "If { .. }",
+                Statement::ElseIf(_) => "ElseIf { .. }",
+                Statement::Function { .. } => "Function { .. }",
+                Statement::For { .. } => "For { .. }",
+                Statement::While { .. } => "While { .. }",
+                Statement::Match { .. } => "Match { .. }",
+                Statement::Else => "Else",
+                Statement::End => "End",
+                Statement::Break => "Break",
+                Statement::Continue => "Continue",
+                Statement::Pipeline(_) => "Pipeline { .. }",
+                Statement::Time(_) => "Time { .. }",
+                Statement::And(_) => "And { .. }",
+                Statement::Or(_) => "Or { .. }",
+                Statement::Not(_) => "Not { .. }",
+                Statement::Default => "Default",
+            }
+        )
     }
+}
 
+impl<'a> Statement<'a> {
+    /// Check if the statement is a block-based statement
     pub fn is_block(&self) -> bool {
         match *self {
             Statement::Case(_)
@@ -178,182 +218,10 @@ impl<'a> Statement<'a> {
     }
 }
 
+/// A collection of statement in a block (delimited by braces in most languages)
 pub type Block<'a> = Vec<Statement<'a>>;
 
-pub fn insert_statement<'a>(
-    block: &mut Block<'a>,
-    statement: Statement<'a>,
-) -> Result<Option<Statement<'a>>, BlockError> {
-    match statement {
-        // Push new block to stack
-        Statement::For { .. }
-        | Statement::While { .. }
-        | Statement::Match { .. }
-        | Statement::If { .. }
-        | Statement::Function { .. } => {
-            block.push(statement);
-            Ok(None)
-        }
-        // Case is special as it should pop back previous Case
-        Statement::Case(_) => {
-            match block.last() {
-                Some(Statement::Case(_)) => {
-                    let case = block.pop().unwrap();
-                    let _ = insert_into_block(block, case);
-                }
-                Some(Statement::Match { .. }) => (),
-                _ => return Err(BlockError::LoneCase),
-            }
-
-            block.push(statement);
-            Ok(None)
-        }
-        Statement::End => {
-            match block.len() {
-                0 => Err(BlockError::UnmatchedEnd),
-                // Ready to return the complete block
-                1 => Ok(block.pop()),
-                // Merge back the top block into the previous one
-                _ => {
-                    let last_statement = block.pop().unwrap();
-                    if let Statement::Case(_) = last_statement {
-                        insert_into_block(block, last_statement)?;
-                        // Merge last Case back and pop off Match too
-                        let match_stm = block.pop().unwrap();
-                        if !block.is_empty() {
-                            insert_into_block(block, match_stm)?;
-
-                            Ok(None)
-                        } else {
-                            Ok(Some(match_stm))
-                        }
-                    } else {
-                        insert_into_block(block, last_statement)?;
-                        Ok(None)
-                    }
-                }
-            }
-        }
-        Statement::And(_) | Statement::Or(_) if !block.is_empty() => {
-            let pushed = match block.last_mut().unwrap() {
-                Statement::If {
-                    ref mut expression,
-                    ref mode,
-                    ref success,
-                    ref mut else_if,
-                    ..
-                } => match mode {
-                    IfMode::Success if success.is_empty() => {
-                        // Insert into If expression if there's no previous statement.
-                        expression.push(statement.clone());
-                        true
-                    }
-                    IfMode::ElseIf => {
-                        // Try to insert into last ElseIf expression if there's no previous
-                        // statement.
-                        let eif = else_if.last_mut().expect("Missmatch in 'If' mode!");
-                        if eif.success.is_empty() {
-                            eif.expression.push(statement.clone());
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                    _ => false,
-                },
-                Statement::While { ref mut expression, ref statements } => {
-                    if statements.is_empty() {
-                        expression.push(statement.clone());
-                        true
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            };
-            if !pushed {
-                insert_into_block(block, statement)?;
-            }
-
-            Ok(None)
-        }
-        Statement::Time(inner) => {
-            if inner.is_block() {
-                block.push(Statement::Time(inner));
-                Ok(None)
-            } else {
-                Ok(Some(Statement::Time(inner)))
-            }
-        }
-        _ => {
-            if !block.is_empty() {
-                insert_into_block(block, statement)?;
-                Ok(None)
-            } else {
-                // Filter out toplevel statements that should produce an error
-                // otherwise return the statement for immediat execution
-                match statement {
-                    Statement::ElseIf(_) => Err(BlockError::LoneElseIf),
-                    Statement::Else => Err(BlockError::LoneElse),
-                    Statement::Break => Err(BlockError::UnmatchedBreak),
-                    Statement::Continue => Err(BlockError::UnmatchedContinue),
-                    // Toplevel statement, return to execute immediately
-                    _ => Ok(Some(statement)),
-                }
-            }
-        }
-    }
-}
-
-fn insert_into_block<'a>(
-    block: &mut Block<'a>,
-    statement: Statement<'a>,
-) -> Result<(), BlockError> {
-    let block = match block.last_mut().expect("Should not insert statement if stack is empty!") {
-        Statement::Time(inner) => inner,
-        top_block => top_block,
-    };
-
-    match block {
-        Statement::Function { ref mut statements, .. } => statements.push(statement),
-        Statement::For { ref mut statements, .. } => statements.push(statement),
-        Statement::While { ref mut statements, .. } => statements.push(statement),
-        Statement::Match { ref mut cases, .. } => match statement {
-            Statement::Case(case) => cases.push(case),
-            _ => {
-                return Err(BlockError::StatementOutsideMatch);
-            }
-        },
-        Statement::Case(ref mut case) => case.statements.push(statement),
-        Statement::If {
-            ref mut success, ref mut else_if, ref mut failure, ref mut mode, ..
-        } => match statement {
-            Statement::ElseIf(eif) => {
-                if *mode == IfMode::Else {
-                    return Err(BlockError::ElseWrongOrder);
-                } else {
-                    *mode = IfMode::ElseIf;
-                    else_if.push(eif);
-                }
-            }
-            Statement::Else => {
-                if *mode == IfMode::Else {
-                    return Err(BlockError::MultipleElse);
-                } else {
-                    *mode = IfMode::Else;
-                }
-            }
-            _ => match mode {
-                IfMode::Success => success.push(statement),
-                IfMode::ElseIf => else_if.last_mut().unwrap().success.push(statement),
-                IfMode::Else => failure.push(statement),
-            },
-        },
-        _ => unreachable!("Not block-like statement pushed to stack!"),
-    }
-    Ok(())
-}
-
+/// A user-defined function
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Function<'a> {
     description: Option<types::Str>,
@@ -362,17 +230,19 @@ pub struct Function<'a> {
     statements:  Block<'a>,
 }
 
+/// Error during function execution
 #[derive(Debug, PartialEq, Clone, Error)]
 pub enum FunctionError {
+    /// The wrong number of arguments were supplied
     #[error(display = "invalid number of arguments supplied")]
     InvalidArgumentCount,
+    /// The argument had an invalid type
     #[error(display = "argument has invalid type: expected {}, found value '{}'", _0, _1)]
     InvalidArgumentType(Primitive, String),
 }
 
 impl<'a> Function<'a> {
-    pub fn is_empty(&self) -> bool { self.statements.is_empty() }
-
+    /// execute the function in the shell
     pub fn execute<S: AsRef<str>>(
         &self,
         shell: &mut Shell<'a>,
@@ -419,8 +289,10 @@ impl<'a> Function<'a> {
         res.map(|_| ())
     }
 
-    pub fn get_description(&self) -> Option<&types::Str> { self.description.as_ref() }
+    /// Get the function's description
+    pub fn description(&self) -> Option<&types::Str> { self.description.as_ref() }
 
+    /// Create a new function
     pub fn new(
         description: Option<types::Str>,
         name: types::Str,
@@ -428,107 +300,5 @@ impl<'a> Function<'a> {
         statements: Vec<Statement<'a>>,
     ) -> Self {
         Function { description, name, args, statements }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn new_match() -> Statement<'static> {
-        Statement::Match { expression: types::Str::from(""), cases: Vec::new() }
-    }
-    fn new_if() -> Statement<'static> {
-        Statement::If {
-            expression: vec![Statement::Default],
-            success:    Vec::new(),
-            else_if:    Vec::new(),
-            failure:    Vec::new(),
-            mode:       IfMode::Success,
-        }
-    }
-    fn new_case() -> Statement<'static> {
-        Statement::Case(Case {
-            value:       None,
-            binding:     None,
-            conditional: None,
-            statements:  Vec::new(),
-        })
-    }
-
-    #[test]
-    fn if_inside_match() {
-        let mut flow_control = Block::default();
-
-        let res = insert_statement(&mut flow_control, new_match());
-        assert_eq!(flow_control.len(), 1);
-        assert_eq!(res, Ok(None));
-
-        let res = insert_statement(&mut flow_control, new_case());
-        assert_eq!(flow_control.len(), 2);
-        assert_eq!(res, Ok(None));
-
-        // Pops back top case, len stays 2
-        let res = insert_statement(&mut flow_control, new_case());
-        assert_eq!(flow_control.len(), 2);
-        assert_eq!(res, Ok(None));
-
-        let res = insert_statement(&mut flow_control, new_if());
-        assert_eq!(flow_control.len(), 3);
-        assert_eq!(res, Ok(None));
-
-        let res = insert_statement(&mut flow_control, Statement::End);
-        assert_eq!(flow_control.len(), 2);
-        assert_eq!(res, Ok(None));
-
-        let res = insert_statement(&mut flow_control, Statement::End);
-        assert_eq!(flow_control.len(), 0);
-        if let Ok(Some(Statement::Match { ref cases, .. })) = res {
-            assert_eq!(cases.len(), 2);
-            assert_eq!(cases.last().unwrap().statements.len(), 1);
-        } else {
-            assert!(false);
-        }
-    }
-
-    #[test]
-    fn statement_outside_case() {
-        let mut flow_control = Block::default();
-
-        let res = insert_statement(&mut flow_control, new_match());
-        assert_eq!(flow_control.len(), 1);
-        assert_eq!(res, Ok(None));
-
-        let res = insert_statement(&mut flow_control, Statement::Default);
-        if res.is_err() {
-            flow_control.clear();
-            assert_eq!(flow_control.len(), 0);
-        } else {
-            assert!(false);
-        }
-    }
-
-    #[test]
-    fn return_toplevel() {
-        let mut flow_control = Block::default();
-        let oks = vec![
-            Statement::Time(Box::new(Statement::Default)),
-            Statement::And(Box::new(Statement::Default)),
-            Statement::Or(Box::new(Statement::Default)),
-            Statement::Not(Box::new(Statement::Default)),
-            Statement::Default,
-        ];
-        for ok in oks {
-            let res = insert_statement(&mut flow_control, ok.clone());
-            assert_eq!(Ok(Some(ok)), res);
-        }
-
-        let errs = vec![Statement::Else, Statement::End, Statement::Break, Statement::Continue];
-        for err in errs {
-            let res = insert_statement(&mut flow_control, err);
-            if res.is_ok() {
-                assert!(false);
-            }
-        }
     }
 }

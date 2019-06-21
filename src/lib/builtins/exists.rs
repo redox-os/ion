@@ -110,7 +110,7 @@ fn string_is_nonzero(string: &str) -> bool { !string.is_empty() }
 
 /// Returns true if the variable is an array and the array is not empty
 fn array_var_is_not_empty(arrayvar: &str, shell: &Shell<'_>) -> bool {
-    match shell.variables().get_ref(arrayvar) {
+    match shell.variables().get(arrayvar) {
         Some(Value::Array(array)) => !array.is_empty(),
         _ => false,
     }
@@ -126,7 +126,7 @@ fn string_var_is_not_empty(stringvar: &str, shell: &Shell<'_>) -> bool {
 
 /// Returns true if a function with the given name is defined
 fn function_is_defined(function: &str, shell: &Shell<'_>) -> bool {
-    if let Some(Value::Function(_)) = shell.variables().get_ref(function) {
+    if let Some(Value::Function(_)) = shell.variables().get(function) {
         true
     } else {
         false
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_arguments() {
-        let mut shell = Shell::library();
+        let mut shell = Shell::default();
 
         // assert_eq!(exists(&["ion".into(), ], &mut sink, &shell), Ok(false));
         // no parameters
@@ -168,7 +168,7 @@ mod tests {
         array.push("element".into());
         shell.variables_mut().set("array", array);
         assert_eq!(exists(&["ion".into(), "-a".into(), "array".into()], &shell), Ok(true));
-        shell.variables_mut().remove_variable("array");
+        shell.variables_mut().remove("array");
         assert_eq!(exists(&["ion".into(), "-a".into(), "array".into()], &shell), Ok(false));
 
         // check `exists -b`
@@ -225,12 +225,12 @@ mod tests {
         assert_eq!(exists(&["ion".into(), "-s".into(), "emptyvar".into()], &shell), Ok(false));
         shell.variables_mut().set("testvar", "foobar".to_string());
         assert_eq!(exists(&["ion".into(), "-s".into(), "testvar".into()], &shell), Ok(true));
-        shell.variables_mut().remove_variable("testvar");
+        shell.variables_mut().remove("testvar");
         assert_eq!(exists(&["ion".into(), "-s".into(), "testvar".into()], &shell), Ok(false));
         // also check that it doesn't trigger on arrays
         let mut array = types::Array::new();
         array.push("element".into());
-        shell.variables_mut().remove_variable("array");
+        shell.variables_mut().remove("array");
         shell.variables_mut().set("array", array);
         assert_eq!(exists(&["ion".into(), "-s".into(), "array".into()], &shell), Ok(false));
 
@@ -249,7 +249,7 @@ mod tests {
         );
 
         assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(true));
-        shell.variables_mut().remove_variable(name_str);
+        shell.variables_mut().remove(name_str);
         assert_eq!(exists(&["ion".into(), "--fn".into(), name_str.into()], &shell), Ok(false));
 
         // check invalid flags / parameters (should all be treated as strings and
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn test_match_flag_argument() {
-        let shell = Shell::library();
+        let shell = Shell::default();
 
         // we don't really care about the passed values, as long as both sited return
         // the same value
@@ -279,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_match_option_argument() {
-        let shell = Shell::library();
+        let shell = Shell::default();
 
         // we don't really care about the passed values, as long as both sited return
         // the same value
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_binary_is_in_path() {
-        let mut shell = Shell::library();
+        let mut shell = Shell::default();
 
         // TODO: We should probably also test with more complex PATH-variables:
         // TODO: multiple/:directories/
@@ -337,7 +337,7 @@ mod tests {
 
     #[test]
     fn test_array_var_is_not_empty() {
-        let mut shell = Shell::library();
+        let mut shell = Shell::default();
 
         shell.variables_mut().set("EMPTY_ARRAY", types::Array::new());
         assert_eq!(array_var_is_not_empty("EMPTY_ARRAY", &shell), false);
@@ -348,7 +348,7 @@ mod tests {
         assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), true);
 
         // test for array which does not even exist
-        shell.variables_mut().remove_variable("NOT_EMPTY_ARRAY");
+        shell.variables_mut().remove("NOT_EMPTY_ARRAY");
         assert_eq!(array_var_is_not_empty("NOT_EMPTY_ARRAY", &shell), false);
 
         // array_var_is_not_empty should NOT match for non-array variables with the
@@ -359,7 +359,7 @@ mod tests {
 
     #[test]
     fn test_string_var_is_not_empty() {
-        let mut shell = Shell::library();
+        let mut shell = Shell::default();
 
         shell.variables_mut().set("EMPTY", "");
         assert_eq!(string_var_is_not_empty("EMPTY", &shell), false);
@@ -374,13 +374,13 @@ mod tests {
         assert_eq!(string_var_is_not_empty("ARRAY_NOT_EMPTY", &shell), false);
 
         // test for a variable which does not even exist
-        shell.variables_mut().remove_variable("NOT_EMPTY");
+        shell.variables_mut().remove("NOT_EMPTY");
         assert_eq!(string_var_is_not_empty("NOT_EMPTY", &shell), false);
     }
 
     #[test]
     fn test_function_is_defined() {
-        let mut shell = Shell::library();
+        let mut shell = Shell::default();
 
         // create a simple dummy function
         let name_str = "test_function";
@@ -397,7 +397,7 @@ mod tests {
         );
 
         assert_eq!(function_is_defined(name_str, &shell), true);
-        shell.variables_mut().remove_variable(name_str);
+        shell.variables_mut().remove(name_str);
         assert_eq!(function_is_defined(name_str, &shell), false);
     }
 }

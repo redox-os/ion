@@ -2,6 +2,7 @@ mod assignments;
 mod colors;
 mod directory_stack;
 mod flow;
+/// The various blocks
 pub mod flow_control;
 mod fork;
 mod fork_function;
@@ -10,12 +11,14 @@ mod pipe_exec;
 mod shell_expand;
 mod signals;
 pub(crate) mod sys;
+/// Variables for the shell
 pub mod variables;
 
 pub(crate) use self::job::Job;
 use self::{
     directory_stack::DirectoryStack,
-    flow_control::{Block, BlockError, Function, FunctionError, Statement},
+    flow::BlockError,
+    flow_control::{Block, Function, FunctionError, Statement},
     foreground::ForegroundSignals,
     fork::{Fork, IonResult},
     pipe_exec::foreground,
@@ -46,32 +49,51 @@ use std::{
     time::SystemTime,
 };
 
+/// Errors from execution
 #[derive(Debug, Error)]
 pub enum IonError {
+    /// The fork failed
     #[error(display = "failed to fork: {}", _0)]
     Fork(#[error(cause)] io::Error),
+    /// Failed to setup capturing for function
     #[error(display = "error reading stdout of child: {}", _0)]
     CaptureFailed(#[error(cause)] io::Error),
+    /// The variable/function does not exist
     #[error(display = "element does not exist")]
     DoesNotExist,
+    /// The input is not properly terminated
     #[error(display = "input was not terminated")]
     Unterminated,
+    /// Function execution error
     #[error(display = "function error: {}", _0)]
     Function(#[error(cause)] FunctionError),
+
+    /// Unclosed block
     #[error(display = "unexpected end of script: expected end block for `{}`", _0)]
     UnclosedBlock(String),
+
+    /// Parsing failed
     #[error(display = "syntax error: {}", _0)]
     InvalidSyntax(#[error(cause)] ParseError),
+
+    /// Incorrect order of blocks
     #[error(display = "block error: {}", _0)]
     StatementFlowError(#[error(cause)] BlockError),
+
+    /// Unterminated statement
     #[error(display = "statement error: {}", _0)]
     UnterminatedStatementError(#[error(cause)] StatementError),
+
+    /// Found end without associated block
     #[error(display = "could not exit the current block since it does not exist!")]
     EmptyBlock,
+    /// Could not execute file
     #[error(display = "could not execute file '{}': {}", _0, _1)]
     FileExecutionError(String, #[error(cause)] io::Error),
+    /// Failed to run a pipeline
     #[error(display = "pipeline execution error: {}", _0)]
     PipelineExecutionError(#[error(cause)] PipelineError),
+    /// Could not properly expand to a pipeline
     #[error(display = "expansion error: {}", _0)]
     ExpansionError(#[error(cause)] ExpansionError<IonError>),
 }
@@ -104,6 +126,7 @@ impl From<ExpansionError<IonError>> for IonError {
     fn from(cause: ExpansionError<IonError>) -> Self { IonError::ExpansionError(cause) }
 }
 
+/// Options for the shell
 #[derive(Debug, Clone, Hash)]
 pub struct ShellOptions {
     /// Exit from the shell on the first error.
@@ -151,23 +174,27 @@ pub struct Shell<'a> {
     on_command: Option<Box<dyn Fn(&Shell<'_>, std::time::Duration) + 'a>>,
 }
 
+impl<'a> Default for Shell<'a> {
+    fn default() -> Self { Self::new() }
+}
+
 impl<'a> Shell<'a> {
     /// Install signal handlers necessary for the shell to work
     fn install_signal_handler() {
         extern "C" fn handler(signal: i32) {
             let signal = match signal {
-                sys::SIGINT => signals::SIGINT,
-                sys::SIGHUP => signals::SIGHUP,
-                sys::SIGTERM => signals::SIGTERM,
+                libc::SIGINT => signals::SIGINT,
+                libc::SIGHUP => signals::SIGHUP,
+                libc::SIGTERM => signals::SIGTERM,
                 _ => unreachable!(),
             };
 
             signals::PENDING.store(signal as usize, Ordering::SeqCst);
         }
 
-        let _ = sys::signal(sys::SIGHUP, handler);
-        let _ = sys::signal(sys::SIGINT, handler);
-        let _ = sys::signal(sys::SIGTERM, handler);
+        let _ = sys::signal(libc::SIGHUP, handler);
+        let _ = sys::signal(libc::SIGINT, handler);
+        let _ = sys::signal(libc::SIGTERM, handler);
 
         extern "C" fn sigpipe_handler(signal: i32) {
             let _ = io::stdout().flush();
@@ -175,19 +202,14 @@ impl<'a> Shell<'a> {
             sys::fork_exit(127 + signal);
         }
 
-        let _ = sys::signal(sys::SIGPIPE, sigpipe_handler);
+        let _ = sys::signal(libc::SIGPIPE, sigpipe_handler);
     }
 
-    pub fn binary() -> Self { Self::new(false) }
-
-    pub fn library() -> Self { Self::new(true) }
-
-    pub fn new(is_background_shell: bool) -> Self {
-        Self::with_builtins(BuiltinMap::default(), is_background_shell)
-    }
+    /// Create a new shell with default settings
+    pub fn new() -> Self { Self::with_builtins(BuiltinMap::default()) }
 
     /// Create a shell with custom builtins
-    pub fn with_builtins(builtins: BuiltinMap<'a>, is_background_shell: bool) -> Self {
+    pub fn with_builtins(builtins: BuiltinMap<'a>) -> Self {
         Self::install_signal_handler();
 
         // This will block SIGTSTP, SIGTTOU, SIGTTIN, and SIGCHLD, which is required
@@ -202,11 +224,11 @@ impl<'a> Shell<'a> {
             previous_job: !0,
             previous_status: Status::SUCCESS,
             opts: ShellOptions {
-                err_exit: false,
-                print_comms: false,
-                no_exec: false,
-                huponexit: false,
-                is_background_shell,
+                err_exit:            false,
+                print_comms:         false,
+                no_exec:             false,
+                huponexit:           false,
+                is_background_shell: true,
             },
             background: Arc::new(Mutex::new(Vec::new())),
             foreground_signals: Arc::new(ForegroundSignals::new()),
@@ -215,8 +237,10 @@ impl<'a> Shell<'a> {
         }
     }
 
+    /// Access the directory stack
     pub fn dir_stack(&self) -> &DirectoryStack { &self.directory_stack }
 
+    /// Mutable access to the directory stack
     pub fn dir_stack_mut(&mut self) -> &mut DirectoryStack { &mut self.directory_stack }
 
     /// Resets the flow control fields to their default values.
@@ -252,7 +276,7 @@ impl<'a> Shell<'a> {
         name: &str,
         args: &[S],
     ) -> Result<Status, IonError> {
-        if let Some(Value::Function(function)) = self.variables.get_ref(name).cloned() {
+        if let Some(Value::Function(function)) = self.variables.get(name).cloned() {
             function.execute(self, args)?;
             Ok(self.previous_status)
         } else {
@@ -288,7 +312,7 @@ impl<'a> Shell<'a> {
             self.on_command(&cmd)?;
         }
 
-        if let Some(block) = self.flow_control.last().map(Statement::short) {
+        if let Some(block) = self.flow_control.last().map(Statement::to_string) {
             self.previous_status = Status::from_exit_code(1);
             Err(IonError::UnclosedBlock(block.into()))
         } else {
@@ -319,7 +343,7 @@ impl<'a> Shell<'a> {
             }
         // Branch else if -> input == shell function and set the exit_status
         } else if let Some(Value::Function(function)) =
-            self.variables.get_ref(&pipeline.items[0].job.args[0]).cloned()
+            self.variables.get(&pipeline.items[0].job.args[0]).cloned()
         {
             if !pipeline.requires_piping() {
                 function.execute(self, &pipeline.items[0].job.args).map(|_| self.previous_status)
@@ -352,6 +376,7 @@ impl<'a> Shell<'a> {
         Ok(exit_status)
     }
 
+    /// Get the pid of the last executed job
     pub fn previous_job(&self) -> Option<usize> {
         if self.previous_job == !0 {
             None
@@ -411,12 +436,10 @@ impl<'a> Shell<'a> {
         self.background.lock().expect("Could not lock the mutex")
     }
 
-    pub fn suspend(&self) { signals::suspend(0); }
-
     /// Get the last command's return code and/or the code for the error
     pub fn previous_status(&self) -> Status { self.previous_status }
 
-    pub fn assign(&mut self, key: &Key<'_>, value: Value<Function<'a>>) -> Result<(), String> {
+    fn assign(&mut self, key: &Key<'_>, value: Value<Function<'a>>) -> Result<(), String> {
         match (&key.kind, &value) {
             (Primitive::Indexed(ref index_name, ref index_kind), Value::Str(_)) => {
                 let index = value_check(self, index_name, index_kind)

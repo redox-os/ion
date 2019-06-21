@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn filename_completion() {
-        let shell = Shell::library();
+        let shell = Shell::default();
         let mut completer = IonFileCompleter::new(None, &shell);
         assert_eq!(completer.completions("testing"), vec!["testing/"]);
         assert_eq!(completer.completions("testing/file"), vec!["testing/file_with_text"]);

@@ -85,7 +85,7 @@ pub fn drop_alias<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Status
         return Status::error("ion: you must specify an alias name".to_string());
     }
     for alias in args.iter().skip(1) {
-        if vars.remove_variable(alias.as_ref()).is_none() {
+        if vars.remove(alias.as_ref()).is_none() {
             return Status::error(format!("ion: undefined alias: {}", alias.as_ref()));
         }
     }
@@ -103,7 +103,7 @@ pub fn drop_array<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Status
     }
 
     for array in args.iter().skip(2) {
-        if vars.remove_variable(array.as_ref()).is_none() {
+        if vars.remove(array.as_ref()).is_none() {
             return Status::error(format!("ion: undefined array: {}", array.as_ref()));
         }
     }
@@ -117,7 +117,7 @@ pub fn drop_variable<S: AsRef<str>>(vars: &mut Variables<'_>, args: &[S]) -> Sta
     }
 
     for variable in args.iter().skip(1) {
-        if vars.remove_variable(variable.as_ref()).is_none() {
+        if vars.remove(variable.as_ref()).is_none() {
             return Status::error(format!("ion: undefined variable: {}", variable.as_ref()));
         }
     }

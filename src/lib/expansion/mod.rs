@@ -2,6 +2,7 @@
 mod braces;
 mod loops;
 mod methods;
+/// Expand pipelines
 pub mod pipelines;
 mod words;
 
@@ -27,47 +28,65 @@ use std::{
 };
 use unicode_segmentation::UnicodeSegmentation;
 
+/// Expansion errored
 #[derive(Debug, Error)]
 pub enum ExpansionError<T: fmt::Debug + error::Error + fmt::Display + 'static> {
+    /// Error during method expansion
     #[error(display = "{}", _0)]
     MethodError(#[error(cause)] MethodError),
+    /// Wrong type was given
     #[error(display = "{}", _0)]
     TypeError(#[error(cause)] TypeError),
+    /// Indexed out of the array bounds
     #[error(display = "invalid index")] // TODO: Add more info
     OutOfBound,
+    /// A string key was taken as index for an array
     #[error(display = "can't use key '{}' on array", _0)] // TODO: Add more info
     KeyOnArray(String),
 
+    /// Unsupported variable namespace
     #[error(display = "namespace '{}' is unsupported", _0)]
     UnsupportedNamespace(String),
+    /// Failed to parse a value as an hexadecimal value
     #[error(display = "could not parse '{}' as hexadecimal value: {}", _0, _1)]
     InvalidHex(String, #[error(cause)] std::num::ParseIntError),
+    /// Could not parse as a valid color
     #[error(display = "could not parse '{}' as a color", _0)]
     ColorError(String),
+    /// No properties given for color
     #[error(display = "no properties given to color")]
     EmptyColor,
+    /// The environment variable is not set
     #[error(display = "environment variable '{}' is not set", _0)]
     UnknownEnv(String),
+    /// Variable is not defined
     #[error(display = "Variable does not exist")]
     VarNotFound,
 
+    /// Failed to fetch the user home directory
     #[error(display = "Could not fetch the user home directory")]
     HomeNotFound,
+    /// Tilde expansion tried to access an index out of the directory stack size
     #[error(display = "Can't expand tilde: {} is out of bound for directory stack", _0)]
     OutOfStack(usize),
 
+    /// Subprocess error
     #[error(display = "Could not expand subprocess: {}", _0)]
     Subprocess(#[error(cause)] Box<T>),
 
+    /// Could not parse the index for array or map-like variable
     #[error(display = "Can't parse '{}' as a valid index for variable", _0)]
     IndexParsingError(String),
 
+    /// Tried to mix types between scalar and array-like variables
     #[error(display = "can't expand a scalar value '{}' as an array-like", _0)]
     ScalarAsArray(String),
 
+    /// A wrong index was given for indexing variable
     #[error(display = "index '{:?}' is not valid for {} variable '{}'", _0, _1, _2)]
     InvalidIndex(Select, &'static str, String),
 
+    /// Mixed types between maps and scalar/array value
     #[error(display = "variable '{}' is not a map-like value", _0)]
     NotAMap(String),
 }
@@ -80,6 +99,7 @@ impl<T: fmt::Display + fmt::Debug + error::Error> From<MethodError> for Expansio
     fn from(cause: MethodError) -> Self { ExpansionError::MethodError(cause) }
 }
 
+/// The result of expansion with a given expander
 pub type Result<T, E> = std::result::Result<T, ExpansionError<E>>;
 
 /// Determines whether an input string is expression-like as compared to a
@@ -97,6 +117,7 @@ pub fn is_expression(s: &str) -> bool {
 // TODO: Use Cow<'a, types::Str> for hashmap values.
 /// Trait representing different elements of string expansion.
 pub trait Expander: Sized {
+    /// The error returned when command expansion fails
     type Error: fmt::Display + fmt::Debug + error::Error + 'static;
 
     /// Expand a tilde form to the correct directory.

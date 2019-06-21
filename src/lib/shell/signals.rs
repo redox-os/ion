@@ -14,11 +14,8 @@ pub const SIGINT: u8 = 1;
 pub const SIGHUP: u8 = 2;
 pub const SIGTERM: u8 = 4;
 
-/// Suspends a given process by it's process ID.
-pub fn suspend(pid: u32) { let _ = sys::killpg(pid, sys::SIGSTOP); }
-
 /// Resumes a given process by it's process ID.
-pub fn resume(pid: u32) { let _ = sys::killpg(pid, sys::SIGCONT); }
+pub fn resume(pid: u32) { let _ = sys::killpg(pid, libc::SIGCONT); }
 
 /// The purpose of the signal handler is to ignore signals when it is active, and then continue
 /// listening to signals once the handler is dropped.
@@ -41,9 +38,9 @@ impl Iterator for SignalHandler {
     fn next(&mut self) -> Option<Self::Item> {
         match PENDING.swap(0, Ordering::SeqCst) as u8 {
             0 => None,
-            SIGINT => Some(sys::SIGINT),
-            SIGHUP => Some(sys::SIGHUP),
-            SIGTERM => Some(sys::SIGTERM),
+            SIGINT => Some(libc::SIGINT),
+            SIGHUP => Some(libc::SIGHUP),
+            SIGTERM => Some(libc::SIGTERM),
             _ => unreachable!(),
         }
     }

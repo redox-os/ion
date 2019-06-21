@@ -11,10 +11,10 @@ use ion_shell::{
     builtins::{man_pages, Status},
     expansion::Expander,
     parser::Terminator,
-    sys::SIGHUP,
     types, Shell,
 };
 use itertools::Itertools;
+use libc::SIGHUP;
 use liner::{Buffer, Context, KeyBindings};
 use std::{cell::RefCell, fs::OpenOptions, io, path::Path, rc::Rc};
 use xdg::BaseDirectories;

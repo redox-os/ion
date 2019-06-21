@@ -123,7 +123,7 @@ impl<'b> Shell<'b> {
                     .to_string());
             }
 
-            if operator == Operator::OptionalEqual && self.variables.get_ref(key.name).is_some() {
+            if operator == Operator::OptionalEqual && self.variables.get(key.name).is_some() {
                 continue;
             }
 
@@ -144,7 +144,7 @@ impl<'b> Shell<'b> {
                     backup.push((key, rhs))
                 }
                 _ => {
-                    let lhs = self.variables.get_ref(key.name).ok_or_else(|| {
+                    let lhs = self.variables.get(key.name).ok_or_else(|| {
                         format!("cannot update non existing variable `{}`", key.name)
                     })?;
                     let val = apply(operator, &lhs, rhs).map_err(|_| {

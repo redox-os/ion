@@ -8,8 +8,8 @@ use std::{
 pub fn wait_for_child(pid: u32) -> io::Result<u8> {
     loop {
         let mut status = 0;
-        if let Err(errno) = sys::waitpid(pid as i32, &mut status, sys::WUNTRACED) {
-            break if errno == sys::ECHILD {
+        if let Err(errno) = sys::waitpid(pid as i32, &mut status, libc::WUNTRACED) {
+            break if errno == libc::ECHILD {
                 Ok(sys::wexitstatus(status) as u8)
             } else {
                 Err(io::Error::from_raw_os_error(errno))
@@ -75,7 +75,7 @@ impl<'a, 'b> Fork<'a, 'b> {
 
         // If we are to capture stdout, create a pipe for capturing outputs.
         let outs = if self.capture as u8 & Capture::Stdout as u8 != 0 {
-            let fds = sys::pipe2(sys::O_CLOEXEC)?;
+            let fds = sys::pipe2(libc::O_CLOEXEC)?;
             Some(unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
         } else {
             None
@@ -83,7 +83,7 @@ impl<'a, 'b> Fork<'a, 'b> {
 
         // And if we are to capture stderr, create a pipe for that as well.
         let errs = if self.capture as u8 & Capture::Stderr as u8 != 0 {
-            let fds = sys::pipe2(sys::O_CLOEXEC)?;
+            let fds = sys::pipe2(libc::O_CLOEXEC)?;
             Some(unsafe { (File::from_raw_fd(fds.0), File::from_raw_fd(fds.1)) })
         } else {
             None
@@ -102,19 +102,19 @@ impl<'a, 'b> Fork<'a, 'b> {
                 // Redirect standard output to a pipe, or /dev/null, if needed.
                 if self.capture as u8 & Capture::IgnoreStdout as u8 != 0 {
                     if let Ok(null) = null_file.as_ref() {
-                        let _ = sys::dup2(null.as_raw_fd(), sys::STDOUT_FILENO);
+                        let _ = sys::dup2(null.as_raw_fd(), libc::STDOUT_FILENO);
                     }
                 } else if let Some((_, write)) = outs {
-                    let _ = sys::dup2(write.as_raw_fd(), sys::STDOUT_FILENO);
+                    let _ = sys::dup2(write.as_raw_fd(), libc::STDOUT_FILENO);
                 }
 
                 // Redirect standard error to a pipe, or /dev/null, if needed.
                 if self.capture as u8 & Capture::IgnoreStderr as u8 != 0 {
                     if let Ok(null) = null_file.as_ref() {
-                        let _ = sys::dup2(null.as_raw_fd(), sys::STDERR_FILENO);
+                        let _ = sys::dup2(null.as_raw_fd(), libc::STDERR_FILENO);
                     }
                 } else if let Some((_, write)) = errs {
-                    let _ = sys::dup2(write.as_raw_fd(), sys::STDERR_FILENO);
+                    let _ = sys::dup2(write.as_raw_fd(), libc::STDERR_FILENO);
                 }
 
                 // Drop all the file descriptors that we no longer need.

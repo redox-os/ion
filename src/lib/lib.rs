@@ -1,9 +1,9 @@
 //! # Ion - the pipe-oriented embedded language
 //!
 //! Ion is an embeddable shell for rust. This means your users can benefit from a fully-fledged
-//! programming language to configure your application, rather than predefined layouts like
-//! yaml. This also means the configuration can be completely responsive and react to events in
-//! any way the user sees fit.
+//! programming language to configure your application, rather than predefined layouts imposed by
+//! formats like yaml. This also means the configuration can be completely responsive and react to
+//! events in any way the user sees fit.
 //!
 //! ## Getting started
 //!
@@ -11,6 +11,9 @@
 //! [dependencies]
 //! ion_shell = "1.0"
 //! ```
+//!
+//! ## Documentation
+//!  - [Ion programming language manual](https://doc.redox-os.org/ion-manual/)
 //!
 //! ## Demo
 //!
@@ -38,13 +41,13 @@
 //!     };
 //!
 //!     // Create a shell
-//!     let mut shell = Shell::library();
+//!     let mut shell = Shell::new();
 //!
 //!     // Register the builtins
 //!     shell.builtins_mut().add("layout", set_layout, "Set the application layout");
 //!
 //!     // Read a file and execute it
-//!     shell.execute_file("./bob");
+//!     shell.execute_file("/home/user/.config/my-application/config.ion");
 //!
 //!     for _ in 0..255 {
 //!         i += 1;
@@ -55,28 +58,24 @@
 //!     }
 //! }
 //! ```
-//!
-//! ## Documentation
-//!  - [Ion programming language manual](https://doc.redox-os.org/ion-manual/)
 
 #![allow(unknown_lints)]
-
+// #![warn(missing_docs)]
 use ion_ranges as ranges;
 
+/// The various types used for storing values
 #[macro_use]
 pub mod types;
+/// Direct access to the parsers
 #[macro_use]
 pub mod parser;
 mod assignments;
+/// Access to the predefined builtins
 pub mod builtins;
+/// Expand the AST to create pipelines
 pub mod expansion;
 mod memory;
 mod shell;
-
-// Should be removed, hackish at best
-pub mod sys {
-    pub use super::shell::sys::{SIGHUP, SIGTERM};
-}
 
 pub(crate) use self::memory::IonPool;
 pub use crate::{

@@ -26,7 +26,7 @@ impl<'a, 'b> Expander for Shell<'b> {
             });
 
         // Ensure that the parent retains ownership of the terminal before exiting.
-        let _ = sys::tcsetpgrp(sys::STDIN_FILENO, process::id());
+        let _ = sys::tcsetpgrp(libc::STDIN_FILENO, process::id());
         output.map(Into::into).map_err(|err| ExpansionError::Subprocess(Box::new(err)))
     }
 
@@ -41,7 +41,7 @@ impl<'a, 'b> Expander for Shell<'b> {
 
     /// Expand an array variable with some selection
     fn array(&self, name: &str, selection: &Select) -> expansion::Result<types::Args, Self::Error> {
-        match self.variables.get_ref(name) {
+        match self.variables.get(name) {
             Some(Value::Array(array)) => match selection {
                 Select::All => {
                     Ok(types::Args::from_iter(array.iter().map(|x| format!("{}", x).into())))
@@ -156,7 +156,7 @@ impl<'a, 'b> Expander for Shell<'b> {
     }
 
     fn map_keys(&self, name: &str, sel: &Select) -> expansion::Result<types::Args, Self::Error> {
-        match self.variables.get_ref(name) {
+        match self.variables.get(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
                     .ok_or(ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into()))
@@ -171,7 +171,7 @@ impl<'a, 'b> Expander for Shell<'b> {
     }
 
     fn map_values(&self, name: &str, sel: &Select) -> expansion::Result<types::Args, Self::Error> {
-        match self.variables.get_ref(name) {
+        match self.variables.get(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())
                     .ok_or(ExpansionError::InvalidIndex(sel.clone(), "map-like", name.into()))

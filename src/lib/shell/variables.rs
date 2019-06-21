@@ -13,10 +13,13 @@ use types_rs::array;
 use unicode_segmentation::UnicodeSegmentation;
 use xdg::BaseDirectories;
 
+/// Contain a dynamically-typed variable value
 pub use types_rs::Value;
+/// A structure containing dynamically-typed values organised in scopes
 pub struct Variables<'a>(Scopes<types::Str, Value<Function<'a>>>);
 
 impl<'a> Variables<'a> {
+    /// Get all strings
     pub fn string_vars(&self) -> impl Iterator<Item = (&types::Str, &types::Str)> {
         self.0.scopes().flat_map(|map| {
             map.iter().filter_map(|(key, val)| {
@@ -29,6 +32,7 @@ impl<'a> Variables<'a> {
         })
     }
 
+    /// Get all aliases
     pub fn aliases(&self) -> impl Iterator<Item = (&types::Str, &types::Str)> {
         self.0.scopes().rev().flat_map(|map| {
             map.iter().filter_map(|(key, possible_alias)| {
@@ -41,6 +45,7 @@ impl<'a> Variables<'a> {
         })
     }
 
+    /// Get all the functions
     pub fn functions(&self) -> impl Iterator<Item = (&types::Str, &Function<'a>)> {
         self.0.scopes().rev().flat_map(|map| {
             map.iter().filter_map(|(key, val)| {
@@ -53,6 +58,7 @@ impl<'a> Variables<'a> {
         })
     }
 
+    /// Get all the array values
     pub fn arrays(&self) -> impl Iterator<Item = (&types::Str, &types::Array<Function<'a>>)> {
         self.0.scopes().rev().flat_map(|map| {
             map.iter().filter_map(|(key, val)| {
@@ -65,25 +71,31 @@ impl<'a> Variables<'a> {
         })
     }
 
+    /// Create a new scope. If namespace is true, variables won't be droppable across the scope
+    /// boundary
     pub fn new_scope(&mut self, namespace: bool) { self.0.new_scope(namespace) }
 
+    /// Exit the current scope
     pub fn pop_scope(&mut self) { self.0.pop_scope() }
 
-    pub fn pop_scopes<'b>(
+    pub(crate) fn pop_scopes<'b>(
         &'b mut self,
         index: usize,
     ) -> impl Iterator<Item = Scope<types::Str, Value<Function<'a>>>> + 'b {
         self.0.pop_scopes(index)
     }
 
-    pub fn append_scopes(&mut self, scopes: Vec<Scope<types::Str, Value<Function<'a>>>>) {
+    pub(crate) fn append_scopes(&mut self, scopes: Vec<Scope<types::Str, Value<Function<'a>>>>) {
         self.0.append_scopes(scopes)
     }
 
-    pub fn index_scope_for_var(&self, name: &str) -> Option<usize> {
+    pub(crate) fn index_scope_for_var(&self, name: &str) -> Option<usize> {
         self.0.index_scope_for_var(name)
     }
 
+    /// Set a variable to a value in the current scope. If a variable already exists in a writable
+    /// scope, it is updated, else a new variable is created in the current scope, possibly
+    /// shadowing other variables
     pub fn set<T: Into<Value<Function<'a>>>>(&mut self, name: &str, value: T) {
         let value = value.into();
         if let Some(val) = self.0.get_mut(name) {
@@ -134,15 +146,18 @@ impl<'a> Variables<'a> {
         env::var("PWD").unwrap().replace(&*home, "~").into()
     }
 
+    /// Indicates if the name is valid for a variable
     pub fn is_valid_variable_name(name: &str) -> bool {
         name.chars().all(Variables::is_valid_variable_character)
     }
 
-    pub fn is_valid_variable_character(c: char) -> bool {
+    fn is_valid_variable_character(c: char) -> bool {
         c.is_alphanumeric() || c == '_' || c == '?' || c == '.' || c == '-' || c == '+'
     }
 
-    pub fn remove_variable(&mut self, name: &str) -> Option<Value<Function<'a>>> {
+    /// Remove a variable from the current scope. If the value can't be removed (it is outside a
+    /// function or does not exist), returns None
+    pub fn remove(&mut self, name: &str) -> Option<Value<Function<'a>>> {
         if name.starts_with("super::") || name.starts_with("global::") {
             // Cannot mutate outer namespace
             return None;
@@ -150,14 +165,8 @@ impl<'a> Variables<'a> {
         self.0.remove_variable(name)
     }
 
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut Value<Function<'a>>> {
-        if name.starts_with("super::") || name.starts_with("global::") {
-            // Cannot mutate outer namespace
-            return None;
-        }
-        self.0.get_mut(name)
-    }
-
+    /// Get the string value associated with a name on the current scope. This includes fetching
+    /// env vars, colors & hexes and some extra values like MWD and SWD
     pub fn get_str(&self, name: &str) -> Result<types::Str, ExpansionError<IonError>> {
         match name {
             "MWD" => return Ok(self.get_minimal_directory()),
@@ -180,7 +189,7 @@ impl<'a> Variables<'a> {
                 .map_err(|_| ExpansionError::UnknownEnv(variable.into())),
             Some(("super", _)) | Some(("global", _)) | None => {
                 // Otherwise, it's just a simple variable name.
-                match self.get_ref(name) {
+                match self.get(name) {
                     Some(Value::Str(val)) => Ok(val.clone()),
                     _ => env::var(name).map(|s| s.into()).map_err(|_| ExpansionError::VarNotFound),
                 }
@@ -189,7 +198,8 @@ impl<'a> Variables<'a> {
         }
     }
 
-    pub fn get_ref(&self, mut name: &str) -> Option<&Value<Function<'a>>> {
+    /// Get a variable on the current scope
+    pub fn get(&self, mut name: &str) -> Option<&Value<Function<'a>>> {
         const GLOBAL_NS: &str = "global::";
         const SUPER_NS: &str = "super::";
 
@@ -208,7 +218,16 @@ impl<'a> Variables<'a> {
         } else {
             Namespace::Any
         };
-        self.0.get_ref(name, namespace)
+        self.0.get(name, namespace)
+    }
+
+    /// Get a mutable access to a variable on the current scope
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Value<Function<'a>>> {
+        if name.starts_with("super::") || name.starts_with("global::") {
+            // Cannot mutate outer namespace
+            return None;
+        }
+        self.0.get_mut(name)
     }
 }
 

@@ -1,9 +1,9 @@
 use ion_shell::{
     builtins::{man_pages::check_help, Status},
-    sys::SIGTERM,
     types::Str,
     Shell,
 };
+use libc::SIGTERM;
 use std::{error::Error, os::unix::process::CommandExt, process::Command};
 
 const MAN_EXEC: &str = r#"NAME

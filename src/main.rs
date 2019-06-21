@@ -138,7 +138,7 @@ fn main() {
     builtins.add("exit", &builtins::exit, "Exits the current session");
 
     let stdin_is_a_tty = atty::is(Stream::Stdin);
-    let mut shell = Shell::with_builtins(builtins, false);
+    let mut shell = Shell::with_builtins(builtins);
 
     shell.opts_mut().print_comms = command_line_args.print_commands;
     shell.opts_mut().no_exec = command_line_args.no_execute;

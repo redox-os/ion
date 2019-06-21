@@ -26,8 +26,7 @@ impl<'a> InteractiveBinary<'a> {
     /// Updates the history ignore patterns. Call this whenever HISTORY_IGNORE
     /// is changed.
     pub fn ignore_patterns(&self) -> IgnoreSetting {
-        if let Some(Value::Array(patterns)) =
-            self.shell.borrow().variables().get_ref("HISTORY_IGNORE")
+        if let Some(Value::Array(patterns)) = self.shell.borrow().variables().get("HISTORY_IGNORE")
         {
             let mut settings = IgnoreSetting::default();
             // for convenience and to avoid typos

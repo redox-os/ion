@@ -3,21 +3,6 @@ use std::{ffi::CStr, io, os::unix::io::RawFd};
 
 pub mod signals;
 
-pub const O_CLOEXEC: usize = libc::O_CLOEXEC as usize;
-pub const SIGHUP: i32 = libc::SIGHUP;
-pub const SIGINT: i32 = libc::SIGINT;
-pub const SIGTERM: i32 = libc::SIGTERM;
-pub const SIGCONT: i32 = libc::SIGCONT;
-pub const SIGSTOP: i32 = libc::SIGSTOP;
-pub const SIGTSTP: i32 = libc::SIGTSTP;
-pub const SIGPIPE: i32 = libc::SIGPIPE;
-
-pub const STDOUT_FILENO: i32 = libc::STDOUT_FILENO;
-pub const STDERR_FILENO: i32 = libc::STDERR_FILENO;
-pub const STDIN_FILENO: i32 = libc::STDIN_FILENO;
-
-pub use libc::{ECHILD, EINTR, WCONTINUED, WNOHANG, WUNTRACED};
-
 #[cfg(target_os = "redox")]
 pub const NULL_PATH: &str = "null:";
 #[cfg(unix)]
@@ -106,7 +91,7 @@ pub fn dup2(old: RawFd, new: RawFd) -> io::Result<RawFd> { cvt(unsafe { libc::du
 pub fn close(fd: RawFd) -> io::Result<()> { cvt(unsafe { libc::close(fd) }).and(Ok(())) }
 pub fn isatty(fd: RawFd) -> bool { unsafe { libc::isatty(fd) == 1 } }
 
-pub fn pipe2(flags: usize) -> io::Result<(RawFd, RawFd)> {
+pub fn pipe2(flags: i32) -> io::Result<(RawFd, RawFd)> {
     let mut fds = [0; 2];
 
     #[cfg(not(target_os = "macos"))]

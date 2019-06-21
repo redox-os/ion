@@ -57,7 +57,7 @@ pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match positionals {
         None => (),
         Some(kind) => {
-            if let Some(Value::Array(array)) = shell.variables().get_ref("args") {
+            if let Some(Value::Array(array)) = shell.variables().get("args") {
                 let command = array[0].clone();
                 // This used to take a `&[String]` but cloned them all, so although
                 // this is non-ideal and could probably be better done with `Rc`, it

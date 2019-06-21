@@ -99,7 +99,7 @@ impl<K: Hash + Eq, V: Clone> Scopes<K, V> {
         self.scopes[self.current].insert(name.into(), value.into())
     }
 
-    pub fn get_ref<Q: ?Sized>(&self, name: &Q, namespace: Namespace) -> Option<&V>
+    pub fn get<Q: ?Sized>(&self, name: &Q, namespace: Namespace) -> Option<&V>
     where
         K: Borrow<Q>,
         Q: Hash + Eq,
@@ -162,13 +162,5 @@ impl<K: Hash + Eq, V: Clone> Scopes<K, V> {
             }
         }
         None
-    }
-
-    pub fn get<T: From<V>, Q: ?Sized>(&self, name: &Q, namespace: Namespace) -> Option<T>
-    where
-        K: Borrow<Q>,
-        Q: Hash + Eq,
-    {
-        self.get_ref(name, namespace).cloned().map(Into::into)
     }
 }

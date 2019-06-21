@@ -24,7 +24,7 @@ impl<'a> Job<'a> {
         for arg in &self.args {
             args.extend(expand_arg(&arg, shell)?);
         }
-        match shell.variables.get_ref(&self.args[0]) {
+        match shell.variables.get(&self.args[0]) {
             Some(Value::Function(_)) => {}
             _ => self.args = args,
         }

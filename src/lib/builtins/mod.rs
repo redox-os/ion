@@ -96,7 +96,7 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
 ///
 /// // execute a builtin
 /// assert!(
-///     builtins.get("custom builtin").unwrap()(&["ion".into()], &mut Shell::new(false)).is_failure(),
+///     builtins.get("custom builtin").unwrap()(&["ion".into()], &mut Shell::new()).is_failure(),
 /// );
 /// // >> Hello world!
 pub struct BuiltinMap<'a> {
@@ -277,7 +277,7 @@ pub fn builtin_cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let err = match args.get(1) {
         Some(dir) => {
             let dir = dir.as_ref();
-            if let Some(Value::Array(cdpath)) = shell.variables().get_ref("CDPATH").cloned() {
+            if let Some(Value::Array(cdpath)) = shell.variables().get("CDPATH").cloned() {
                 if dir == "-" {
                     shell.dir_stack_mut().switch_to_previous_directory()
                 } else {
@@ -563,7 +563,7 @@ pub fn builtin_read(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
         return Status::SUCCESS;
     }
 
-    if sys::isatty(sys::STDIN_FILENO) {
+    if atty::is(atty::Stream::Stdin) {
         let mut con = Context::new();
         for arg in args.iter().skip(1) {
             match con.read_line(format!("{}=", arg.trim()), None, &mut EmptyCompleter) {
@@ -705,11 +705,11 @@ pub fn builtin_fg(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     job_control::fg(shell, &args[1..])
 }
 
-pub fn builtin_suspend(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+pub fn builtin_suspend(args: &[types::Str], _shell: &mut Shell<'_>) -> Status {
     if check_help(args, MAN_SUSPEND) {
         return Status::SUCCESS;
     }
-    shell.suspend();
+    let _ = unsafe { libc::kill(0, libc::SIGSTOP) };
     Status::SUCCESS
 }
 
