@@ -94,6 +94,12 @@ pub enum PipelineError {
 
     #[error(display = "command not found: {}", _0)]
     CommandNotFound(String),
+
+    #[error(display = "could not grab the terminal: {}", _0)]
+    TerminalGrabFailed(#[error(cause)] io::Error),
+
+    #[error(display = "could not start the processes: {}", _0)]
+    KillFailed(#[error(cause)] io::Error),
 }
 
 impl fmt::Display for OutputError {
@@ -521,11 +527,10 @@ impl<'b> Shell<'b> {
 
                 spawn_proc(self, parent, kind, &mut last_pid, &mut current_pid, &mut pgid)?;
                 if !self.opts.is_background_shell {
-                    let _ = sys::tcsetpgrp(libc::STDIN_FILENO, pgid); // TODO: Add more errors
+                    sys::tcsetpgrp(libc::STDIN_FILENO, pgid)
+                        .map_err(PipelineError::TerminalGrabFailed)?;
                 }
-                // When waking up functions, it may happen that no process is currently running.
-                // Since sigcont is sent in the function, it does not matter
-                sys::killpg(pgid, sys::SIGCONT).unwrap();
+                sys::killpg(pgid, sys::SIGCONT).map_err(PipelineError::KillFailed)?;
 
                 // Waits for all of the children of the assigned pgid to finish executing,
                 // returning the exit status of the last process in the queue.
