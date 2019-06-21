@@ -564,21 +564,9 @@ fn spawn_proc(
             let mut command = Command::new(&args[0].as_str());
             command.args(args[1..].iter().map(types::Str::as_str));
 
-            if let Some(stdin) = stdin {
-                command.stdin(stdin);
-            } else {
-                command.stdin(Stdio::inherit());
-            }
-            if let Some(stdout) = stdout {
-                command.stdout(stdout);
-            } else {
-                command.stdout(Stdio::inherit());
-            }
-            if let Some(stderr) = stderr {
-                command.stderr(stderr);
-            } else {
-                command.stderr(Stdio::inherit());
-            }
+            command.stdin(stdin.map(Into::into).unwrap_or_else(Stdio::inherit));
+            command.stdout(stdout.map(Into::into).unwrap_or_else(Stdio::inherit));
+            command.stderr(stderr.map(Into::into).unwrap_or_else(Stdio::inherit));
 
             let pgid_copy = *pgid;
             command.before_exec(move || sys::setpgid(0, pgid_copy));

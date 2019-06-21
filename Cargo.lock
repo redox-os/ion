@@ -375,7 +375,7 @@ dependencies = [
  "ion-ranges 0.1.0",
  "itertools 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "itoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "lexical 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lexical 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.58 (registry+https://github.com/rust-lang/crates.io-index)",
  "liner 0.5.0 (git+https://gitlab.redox-os.org/redox-os/liner)",
  "object-pool 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -415,19 +415,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "lexical"
-version = "2.1.0"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "lexical-core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lexical-core 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "lexical-core"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "ryu 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "stackvector 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "static_assertions 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1007,7 +1009,7 @@ version = "0.1.0"
 dependencies = [
  "hashbrown 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "lexical 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lexical 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "small 0.1.0 (git+https://gitlab.redox-os.org/redox-os/small)",
  "smallvec 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1154,8 +1156,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum itertools 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5b8467d9c1cebe26feb08c640139247fac215782d35371ade9a2136ed6085358"
 "checksum itoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "501266b7edd0174f8530248f87f99c88fbe60ca4ef3dd486835b8d8d53136f7f"
 "checksum lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc5729f27f159ddd61f4df6228e827e86643d4d3e7c32183cb30a1c08f604a14"
-"checksum lexical 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c106ed999697325a540c43d66a8d5175668cd96d7eb0bdba03a3bd98256cd698"
-"checksum lexical-core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3e82e023e062f1d25f807ad182008fba1b46538e999f908a08cc0c29e084462e"
+"checksum lexical 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "93de1b2ed9c7f01aac327bf84542a053b6cd15761defdcfaceb27e1d1b871e74"
+"checksum lexical-core 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "9d224b31f370c8dfc0dea1932d9e6bd451e65aef6f5f2318846664c04b42a796"
 "checksum libc 0.2.58 (registry+https://github.com/rust-lang/crates.io-index)" = "6281b86796ba5e4366000be6e9e18bf35580adf9e63fbe2294aadb587613a319"
 "checksum liner 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "e21c5e49e5d73f18124fd3c751a0823f754c5ae7193cb9e8aa467b03b161241c"
 "checksum liner 0.5.0 (git+https://gitlab.redox-os.org/redox-os/liner)" = "<none>"
