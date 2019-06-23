@@ -185,7 +185,10 @@ impl<'a, 'b> Completer for IonFileCompleter<'a, 'b> {
             // And then we will need to take those completions and remove the expanded form
             // of the tilde pattern and replace it with that pattern yet again.
             completions
-                .map(|completion| escape(&[tilde, &completion[e_index..]].concat()))
+                .map(|completion| {
+                    println!("'{}' : {}", completion, e_index);
+                    escape(&[tilde, &completion[e_index..]].concat())
+                })
                 .collect()
         } else {
             Vec::new()
@@ -233,7 +236,7 @@ fn filename_completion<'a>(start: &'a str, path: &'a PathBuf) -> impl Iterator<I
     .ok()
     .map(|completions| {
         completions.filter_map(Result::ok).filter_map(move |file| {
-            let out = file.to_str()?.trim_start_matches(&path.to_string_lossy().as_ref());
+            let out = file.to_str()?;
             let mut joined = String::with_capacity(out.len() + 3); // worst case senario
             if unescaped_start.starts_with("./") {
                 joined.push_str("./");
