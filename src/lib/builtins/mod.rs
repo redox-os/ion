@@ -29,21 +29,18 @@ use self::{
     variables::{alias, drop_alias, drop_array, drop_variable},
 };
 pub use self::{helpers::Status, man_pages::check_help};
-
+use crate::{
+    shell::{sys, Capture, Shell, Value},
+    types,
+};
+use hashbrown::HashMap;
+use itertools::Itertools;
+use liner::{Completer, Context};
 use std::{
     borrow::Cow,
     io::{self, BufRead},
     path::PathBuf,
 };
-
-use hashbrown::HashMap;
-use liner::{Completer, Context};
-
-use crate::{
-    shell::{sys, Capture, Shell, Value},
-    types,
-};
-use itertools::Itertools;
 
 const HELP_DESC: &str = "Display helpful information about a given command or list commands if \
                          none specified\n    help <command>";
@@ -55,15 +52,6 @@ const DISOWN_DESC: &str =
 
 /// The type for builtin functions. Builtins have direct access to the shell
 pub type BuiltinFunction<'a> = &'a dyn Fn(&[types::Str], &mut Shell<'_>) -> Status;
-
-macro_rules! map {
-    ($builtins:ident, $($name:expr => $func:ident: $help:expr),+) => {{
-        $(
-            $builtins.add($name, &$func, $help);
-        )+
-        $builtins
-    }};
-}
 
 // parses -N or +N patterns
 // required for popd, pushd, dirs
@@ -89,7 +77,8 @@ fn parse_numeric_arg(arg: &str) -> Option<(bool, usize)> {
 /// };
 ///
 /// // create a builtin map with some predefined builtins
-/// let mut builtins = BuiltinMap::new().with_basic().with_variables();
+/// let mut builtins = BuiltinMap::new();
+/// builtins.with_basic().with_variables();
 ///
 /// // add a builtin
 /// builtins.add("custom builtin", &mut custom, "Very helpful comment to display to the user");
@@ -106,12 +95,14 @@ pub struct BuiltinMap<'a> {
 
 impl<'a> Default for BuiltinMap<'a> {
     fn default() -> Self {
-        Self::with_capacity(64)
+        let mut builtins = Self::with_capacity(64);
+        builtins
             .with_basic()
             .with_variables()
             .with_process_control()
             .with_values_tests()
-            .with_files_and_directory()
+            .with_files_and_directory();
+        builtins
     }
 }
 
@@ -145,102 +136,110 @@ impl<'a> BuiltinMap<'a> {
     pub fn get(&self, func: &str) -> Option<BuiltinFunction<'a>> { self.fcts.get(func).cloned() }
 
     /// Add a new builtin
-    pub fn add(&mut self, name: &'static str, func: BuiltinFunction<'a>, help: &'static str) {
+    pub fn add(
+        &mut self,
+        name: &'static str,
+        func: BuiltinFunction<'a>,
+        help: &'static str,
+    ) -> &mut Self {
         self.fcts.insert(name, func);
         self.help.insert(name, help);
+        self
     }
 
     /// Create and control variables
     ///
     /// Contains `fn`, `alias`, `unalias`, `drop`, `read`
-    pub fn with_variables(mut self) -> Self {
-        map!(
-            self,
-            "fn" => builtin_fn : "Print list of functions",
-            "alias" => builtin_alias : "View, set or unset aliases",
-            "unalias" => builtin_unalias : "Delete an alias",
-            "drop" => builtin_drop : "Delete a variable",
-            "read" => builtin_read : "Read some variables\n    read <variable>"
-        )
+    pub fn with_variables(&mut self) -> &mut Self {
+        self.add("fn", &builtin_fn, "Print list of functions")
+            .add("alias", &builtin_alias, "View, set or unset aliases")
+            .add("unalias", &builtin_unalias, "Delete an alias")
+            .add("drop", &builtin_drop, "Delete a variable")
+            .add("read", &builtin_read, "Read some variables\n    read <variable>")
     }
 
     /// Control subrpocesses states
     ///
     /// Contains `disown`, `bg`, `fg`, `wait`, `isatty`, `jobs`
-    pub fn with_process_control(mut self) -> Self {
-        map!(
-            self,
-            "disown" => builtin_disown : DISOWN_DESC,
-            "bg" => builtin_bg : "Resumes a stopped background process",
-            "fg" => builtin_fg : "Resumes and sets a background process as the active process",
-            "wait" => builtin_wait : "Waits until all running background processes have completed",
-            "isatty" => builtin_isatty : "Returns 0 exit status if the supplied FD is a tty",
-            "jobs" => builtin_jobs : "Displays all jobs that are attached to the background"
-        )
+    pub fn with_process_control(&mut self) -> &mut Self {
+        self.add("disown", &builtin_disown, DISOWN_DESC)
+            .add("bg", &builtin_bg, "Resumes a stopped background process")
+            .add("fg", &builtin_fg, "Resumes and sets a background process as the active process")
+            .add(
+                "wait",
+                &builtin_wait,
+                "Waits until all running background processes have completed",
+            )
+            .add("isatty", &builtin_isatty, "Returns 0 exit status if the supplied FD is a tty")
+            .add("jobs", &builtin_jobs, "Displays all jobs that are attached to the background")
     }
 
     /// Utilities concerning the filesystem
     ///
     /// Contains `which`, `test`, `exists`, `popd`, `pushd`, `dirs`, `cd`
-    pub fn with_files_and_directory(mut self) -> Self {
-        map!(
-            self,
-            "which" => builtin_which : "Shows the full path of commands",
-            "test" => builtin_test : "Performs tests on files and text",
-            "exists" => builtin_exists : "Performs tests on files and text",
-            "popd" => builtin_popd : "Pop a directory from the stack",
-            "pushd" => builtin_pushd : "Push a directory to the stack",
-            "dirs" => builtin_dirs : "Display the current directory stack",
-            "cd" => builtin_cd : "Change the current directory\n    cd <path>",
-            "dir_depth" => builtin_dir_depth : "Set the maximum directory depth"
-        )
+    pub fn with_files_and_directory(&mut self) -> &mut Self {
+        self.add("which", &builtin_which, "Shows the full path of commands")
+            .add("test", &builtin_test, "Performs tests on files and text")
+            .add("exists", &builtin_exists, "Performs tests on files and text")
+            .add("popd", &builtin_popd, "Pop a directory from the stack")
+            .add("pushd", &builtin_pushd, "Push a directory to the stack")
+            .add("dirs", &builtin_dirs, "Display the current directory stack")
+            .add("cd", &builtin_cd, "Change the current directory\n    cd <path>")
+            .add("dir_depth", &builtin_dir_depth, "Set the maximum directory depth")
     }
 
     /// Utilities to test values
     ///
     /// Contains `bool`, `calc`, `eq`, `is`, `true`, `false`, `starts-with`, `ends-with`,
     /// `contains`, `matches`, `random`
-    pub fn with_values_tests(mut self) -> Self {
-        map!(
-            self,
-            "bool" => builtin_bool : "If the value is '1' or 'true', return 0 exit status",
-            "calc" => builtin_calc : "Calculate a mathematical expression",
-            "eq" => builtin_eq : "Simple alternative to == and !=",
-            "is" => builtin_is : "Simple alternative to == and !=",
-            "true" => builtin_true : "Do nothing, successfully",
-            "false" => builtin_false : "Do nothing, unsuccessfully",
-            "starts-with" => starts_with : "Evaluates if the supplied argument starts with a given string",
-            "ends-with" => ends_with : "Evaluates if the supplied argument ends with a given string",
-            "contains" => contains : "Evaluates if the supplied argument contains a given string",
-            "matches" => builtin_matches : "Checks if a string matches a given regex",
-            "random" => builtin_random : "Outputs a random u64"
-        )
+    pub fn with_values_tests(&mut self) -> &mut Self {
+        self.add("bool", &builtin_bool, "If the value is '1' or 'true', return 0 exit status")
+            .add("calc", &builtin_calc, "Calculate a mathematical expression")
+            .add("eq", &builtin_eq, "Simple alternative to == and !=")
+            .add("is", &builtin_is, "Simple alternative to == and !=")
+            .add("true", &builtin_true, "Do nothing, successfully")
+            .add("false", &builtin_false, "Do nothing, unsuccessfully")
+            .add(
+                "starts-with",
+                &starts_with,
+                "Evaluates if the supplied argument starts with a given string",
+            )
+            .add(
+                "ends-with",
+                &ends_with,
+                "Evaluates if the supplied argument ends with a given string",
+            )
+            .add(
+                "contains",
+                &contains,
+                "Evaluates if the supplied argument contains a given string",
+            )
+            .add("matches", &builtin_matches, "Checks if a string matches a given regex")
+            .add("random", &builtin_random, "Outputs a random u64")
     }
 
     /// Basic utilities for any ion embedded library
     ///
     /// Contains `help`, `source`, `status`, `echo`, `type`
-    pub fn with_basic(mut self) -> Self {
-        map!(
-            self,
-            "help" => builtin_help : HELP_DESC,
-            "source" => builtin_source : SOURCE_DESC,
-            "status" => builtin_status : "Evaluates the current runtime status",
-            "echo" => builtin_echo : "Display a line of text",
-            "type" => builtin_type : "indicates how a command would be interpreted"
-        )
+    pub fn with_basic(&mut self) -> &mut Self {
+        self.add("help", &builtin_help, HELP_DESC)
+            .add("source", &builtin_source, SOURCE_DESC)
+            .add("status", &builtin_status, "Evaluates the current runtime status")
+            .add("echo", &builtin_echo, "Display a line of text")
+            .add("type", &builtin_type, "indicates how a command would be interpreted")
     }
 
     /// Utilities specific for a shell, that should probably not be included in an embedded context
     ///
     /// Contains `eval`, `exec`, `exit`, `set`, `suspend`
-    pub fn with_shell_unsafe(mut self) -> Self {
-        map!(
-            self,
-            "eval" => builtin_eval : "Evaluates the evaluated expression",
-            "set" => builtin_set : "Set or unset values of shell options and positional parameters.",
-            "suspend" => builtin_suspend : "Suspends the shell with a SIGTSTOP signal"
-        )
+    pub fn with_shell_unsafe(&mut self) -> &mut Self {
+        self.add("eval", &builtin_eval, "Evaluates the evaluated expression")
+            .add(
+                "set",
+                &builtin_set,
+                "Set or unset values of shell options and positional parameters.",
+            )
+            .add("suspend", &builtin_suspend, "Suspends the shell with a SIGTSTOP signal")
     }
 }
 

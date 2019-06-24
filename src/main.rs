@@ -133,9 +133,11 @@ fn main() {
         return;
     }
 
-    let mut builtins = BuiltinMap::default().with_shell_unsafe();
-    builtins.add("exec", &builtins::exec, "Replace the shell with the given command.");
-    builtins.add("exit", &builtins::exit, "Exits the current session");
+    let mut builtins = BuiltinMap::default();
+    builtins
+        .with_shell_unsafe()
+        .add("exec", &builtins::exec, "Replace the shell with the given command.")
+        .add("exit", &builtins::exit, "Exits the current session");
 
     let stdin_is_a_tty = atty::is(Stream::Stdin);
     let mut shell = Shell::with_builtins(builtins);
