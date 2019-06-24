@@ -87,7 +87,7 @@ pub struct StringMethod<'a> {
     /// Pattern to use for certain methods
     pub pattern: &'a str,
     /// Selection to use to control the output of this method
-    pub selection: Select,
+    pub selection: Select<types::Str>,
 }
 
 impl<'a> StringMethod<'a> {

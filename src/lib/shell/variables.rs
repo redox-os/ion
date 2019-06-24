@@ -292,7 +292,11 @@ pub(crate) mod tests {
 
         fn string(&self, var: &str) -> Result<types::Str, IonError> { self.0.get_str(var) }
 
-        fn array(&self, _variable: &str, _selection: &Select) -> Result<types::Args, Self::Error> {
+        fn array(
+            &self,
+            _variable: &str,
+            _selection: &Select<types::Str>,
+        ) -> Result<types::Args, Self::Error> {
             Err(ExpansionError::VarNotFound)
         }
 
@@ -300,11 +304,19 @@ pub(crate) mod tests {
 
         fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 
-        fn map_keys(&self, _name: &str, _select: &Select) -> Result<types::Args, Self::Error> {
+        fn map_keys(
+            &self,
+            _name: &str,
+            _select: &Select<types::Str>,
+        ) -> Result<types::Args, Self::Error> {
             Err(ExpansionError::VarNotFound)
         }
 
-        fn map_values(&self, _name: &str, _select: &Select) -> Result<types::Args, Self::Error> {
+        fn map_values(
+            &self,
+            _name: &str,
+            _select: &Select<types::Str>,
+        ) -> Result<types::Args, Self::Error> {
             Err(ExpansionError::VarNotFound)
         }
     }

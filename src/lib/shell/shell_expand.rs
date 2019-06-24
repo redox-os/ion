@@ -40,7 +40,11 @@ impl<'a, 'b> Expander for Shell<'b> {
     }
 
     /// Expand an array variable with some selection
-    fn array(&self, name: &str, selection: &Select) -> expansion::Result<types::Args, Self::Error> {
+    fn array(
+        &self,
+        name: &str,
+        selection: &Select<types::Str>,
+    ) -> expansion::Result<types::Args, Self::Error> {
         match self.variables.get(name) {
             Some(Value::Array(array)) => match selection {
                 Select::All => {
@@ -155,7 +159,11 @@ impl<'a, 'b> Expander for Shell<'b> {
         }
     }
 
-    fn map_keys(&self, name: &str, sel: &Select) -> expansion::Result<types::Args, Self::Error> {
+    fn map_keys(
+        &self,
+        name: &str,
+        sel: &Select<types::Str>,
+    ) -> expansion::Result<types::Args, Self::Error> {
         match self.variables.get(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.keys().map(|x| format!("{}", x).into()), sel, map.len())
@@ -170,7 +178,11 @@ impl<'a, 'b> Expander for Shell<'b> {
         }
     }
 
-    fn map_values(&self, name: &str, sel: &Select) -> expansion::Result<types::Args, Self::Error> {
+    fn map_values(
+        &self,
+        name: &str,
+        sel: &Select<types::Str>,
+    ) -> expansion::Result<types::Args, Self::Error> {
         match self.variables.get(name) {
             Some(&Value::HashMap(ref map)) => {
                 Self::select(map.values().map(|x| format!("{}", x).into()), sel, map.len())

@@ -17,7 +17,7 @@ pub struct ArrayMethod<'a> {
     method:    &'a str,
     variable:  &'a str,
     pattern:   Pattern<'a>,
-    selection: Select,
+    selection: Select<types::Str>,
 }
 
 impl<'a> ArrayMethod<'a> {
@@ -25,7 +25,7 @@ impl<'a> ArrayMethod<'a> {
         method: &'a str,
         variable: &'a str,
         pattern: Pattern<'a>,
-        selection: Select,
+        selection: Select<types::Str>,
     ) -> Self {
         ArrayMethod { method, variable, pattern, selection }
     }

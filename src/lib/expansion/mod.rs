@@ -84,7 +84,7 @@ pub enum ExpansionError<T: fmt::Debug + error::Error + fmt::Display + 'static> {
 
     /// A wrong index was given for indexing variable
     #[error(display = "index '{:?}' is not valid for {} variable '{}'", _0, _1, _2)]
-    InvalidIndex(Select, &'static str, String),
+    InvalidIndex(Select<types::Str>, &'static str, String),
 
     /// Mixed types between maps and scalar/array value
     #[error(display = "variable '{}' is not a map-like value", _0)]
@@ -123,21 +123,25 @@ pub trait Expander: Sized {
     /// Expand a tilde form to the correct directory.
     fn tilde(&self, _input: &str) -> Result<types::Str, Self::Error>;
     /// Expand an array variable with some selection.
-    fn array(&self, _name: &str, _selection: &Select) -> Result<Args, Self::Error>;
+    fn array(&self, _name: &str, _selection: &Select<types::Str>) -> Result<Args, Self::Error>;
     /// Expand a string variable given if it's quoted / unquoted
     fn string(&self, _name: &str) -> Result<types::Str, Self::Error>;
     /// Expand a subshell expression.
     fn command(&self, _command: &str) -> Result<types::Str, Self::Error>;
     /// Iterating upon key-value maps.
-    fn map_keys(&self, _name: &str, _select: &Select) -> Result<Args, Self::Error>;
+    fn map_keys(&self, _name: &str, _select: &Select<types::Str>) -> Result<Args, Self::Error>;
     /// Iterating upon key-value maps.
-    fn map_values(&self, _name: &str, _select: &Select) -> Result<Args, Self::Error>;
+    fn map_values(&self, _name: &str, _select: &Select<types::Str>) -> Result<Args, Self::Error>;
     /// Get a string that exists in the shell.
     fn get_string(&self, value: &str) -> Result<types::Str, Self::Error> {
         Ok(self.expand_string(value)?.join(" ").into())
     }
     /// Select the proper values from an iterator
-    fn select<I: Iterator<Item = types::Str>>(vals: I, select: &Select, n: usize) -> Option<Args> {
+    fn select<I: Iterator<Item = types::Str>>(
+        vals: I,
+        select: &Select<types::Str>,
+        n: usize,
+    ) -> Option<Args> {
         match select {
             Select::All => Some(vals.collect()),
             Select::Range(range) => range
@@ -170,7 +174,7 @@ pub trait Expander: Sized {
                             token_buffer.reserve(2 * keys.size_hint().0);
                             for index in keys {
                                 let select = index
-                                    .parse::<Select>()
+                                    .parse::<Select<types::Str>>()
                                     .map_err(|_| ExpansionError::IndexParsingError(index.into()))?;
                                 token_buffer.push(WordToken::ArrayVariable(
                                     data,
@@ -213,7 +217,7 @@ trait ExpanderInternal: Expander {
         &self,
         current: &mut types::Str,
         command: &str,
-        selection: &Select,
+        selection: &Select<types::Str>,
     ) -> Result<(), Self::Error> {
         self.command(command)
             .map(|result| Self::slice(current, result.trim_end_matches('\n'), &selection))
@@ -249,7 +253,11 @@ trait ExpanderInternal: Expander {
         Ok(())
     }
 
-    fn array_expand(&self, elements: &[&str], selection: &Select) -> Result<Args, Self::Error> {
+    fn array_expand(
+        &self,
+        elements: &[&str],
+        selection: &Select<types::Str>,
+    ) -> Result<Args, Self::Error> {
         match selection {
             Select::All => {
                 let mut collected = Args::new();
@@ -302,7 +310,7 @@ trait ExpanderInternal: Expander {
         }
     }
 
-    fn slice<S: AsRef<str>>(output: &mut types::Str, expanded: S, selection: &Select) {
+    fn slice<S: AsRef<str>>(output: &mut types::Str, expanded: S, selection: &Select<types::Str>) {
         match selection {
             Select::All => output.push_str(expanded.as_ref()),
             Select::Index(Index::Forward(id)) => {
@@ -371,7 +379,7 @@ trait ExpanderInternal: Expander {
                             "{}",
                             output
                                 .split_whitespace()
-                                .select::<Vec<_>>(index, output.split_whitespace().count())
+                                .select::<Vec<_>, _>(index, output.split_whitespace().count())
                                 .into_iter()
                                 .format(" ")
                         )))
@@ -379,7 +387,7 @@ trait ExpanderInternal: Expander {
                         Ok(output
                             .split_whitespace()
                             .map(From::from)
-                            .select::<Args>(index, output.split_whitespace().count()))
+                            .select::<Args, _>(index, output.split_whitespace().count()))
                     }
                 })
             }
@@ -647,7 +655,11 @@ pub(crate) mod test {
             }
         }
 
-        fn array(&self, variable: &str, _selection: &Select) -> Result<types::Args, Self::Error> {
+        fn array(
+            &self,
+            variable: &str,
+            _selection: &Select<types::Str>,
+        ) -> Result<types::Args, Self::Error> {
             match variable {
                 "ARRAY" => Ok(args!["a", "b", "c"].to_owned()),
                 _ => Err(ExpansionError::VarNotFound),
@@ -658,11 +670,19 @@ pub(crate) mod test {
 
         fn tilde(&self, input: &str) -> Result<types::Str, Self::Error> { Ok(input.into()) }
 
-        fn map_keys<'a>(&'a self, _name: &str, _select: &Select) -> Result<Args, Self::Error> {
+        fn map_keys<'a>(
+            &'a self,
+            _name: &str,
+            _select: &Select<types::Str>,
+        ) -> Result<Args, Self::Error> {
             Err(ExpansionError::VarNotFound)
         }
 
-        fn map_values<'a>(&'a self, _name: &str, _select: &Select) -> Result<Args, Self::Error> {
+        fn map_values<'a>(
+            &'a self,
+            _name: &str,
+            _select: &Select<types::Str>,
+        ) -> Result<Args, Self::Error> {
             Err(ExpansionError::VarNotFound)
         }
     }

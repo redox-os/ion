@@ -355,9 +355,6 @@ dependencies = [
 [[package]]
 name = "ion-ranges"
 version = "0.1.0"
-dependencies = [
- "small 0.1.0 (git+https://gitlab.redox-os.org/redox-os/small)",
-]
 
 [[package]]
 name = "ion-shell"

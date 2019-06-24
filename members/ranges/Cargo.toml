@@ -2,6 +2,6 @@
 name = "ion-ranges"
 version = "0.1.0"
 authors = ["Michael Murphy <mmstickman@gmail.com>"]
+edition = "2018"
 
 [dependencies]
-small = { git = "https://gitlab.redox-os.org/redox-os/small", features = ["std"] }

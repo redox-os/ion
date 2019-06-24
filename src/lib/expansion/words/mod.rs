@@ -5,8 +5,8 @@ use super::{
     methods::{ArrayMethod, Pattern, StringMethod},
     Expander, ExpansionError, Result,
 };
-use crate::parser::lexers::ArgumentSplitter;
 pub use crate::ranges::{Select, SelectWithSize};
+use crate::{parser::lexers::ArgumentSplitter, types};
 use std::borrow::Cow;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -36,11 +36,11 @@ pub enum WordToken<'a> {
     Normal(Cow<'a, str>, bool, bool),
     Whitespace(&'a str),
     Brace(Vec<&'a str>),
-    Array(Vec<&'a str>, Select),
-    Variable(&'a str, Select),
-    ArrayVariable(&'a str, bool, Select),
-    ArrayProcess(&'a str, bool, Select),
-    Process(&'a str, Select),
+    Array(Vec<&'a str>, Select<types::Str>),
+    Variable(&'a str, Select<types::Str>),
+    ArrayVariable(&'a str, bool, Select<types::Str>),
+    ArrayProcess(&'a str, bool, Select<types::Str>),
+    Process(&'a str, Select<types::Str>),
     StringMethod(StringMethod<'a>),
     ArrayMethod(ArrayMethod<'a>, bool),
     Arithmetic(&'a str),
@@ -484,7 +484,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
         ))
     }
 
-    fn read_selection<I>(&mut self, iterator: &mut I) -> Result<Select, E::Error>
+    fn read_selection<I>(&mut self, iterator: &mut I) -> Result<Select<types::Str>, E::Error>
     where
         I: Iterator<Item = u8>,
     {
@@ -495,7 +495,7 @@ impl<'a, E: Expander + 'a> WordIterator<'a, E> {
                 let value = self.expanders.expand_string(&self.data[start..self.read])?.join(" ");
                 self.read += 1;
                 return value
-                    .parse::<Select>()
+                    .parse::<Select<types::Str>>()
                     .map_err(|_| ExpansionError::IndexParsingError(value.into()));
             }
             self.read += 1;

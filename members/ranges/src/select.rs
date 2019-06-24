@@ -1,5 +1,4 @@
 use super::{parse_index_range, Index, Range};
-use small;
 use std::{
     iter::{empty, FromIterator},
     str::FromStr,
@@ -7,7 +6,7 @@ use std::{
 
 /// Represents a filter on a vector-like object
 #[derive(Debug, PartialEq, Clone)]
-pub enum Select {
+pub enum Select<K> {
     /// Select all elements
     All,
     /// Select a single element based on its index
@@ -15,12 +14,12 @@ pub enum Select {
     /// Select a range of elements
     Range(Range),
     /// Select an element by mapped key
-    Key(small::String),
+    Key(K),
 }
 
 pub trait SelectWithSize {
     type Item;
-    fn select<O>(&mut self, &Select, usize) -> O
+    fn select<O, K>(&mut self, selection: &Select<K>, len: usize) -> O
     where
         O: FromIterator<Self::Item>;
 }
@@ -31,7 +30,7 @@ where
 {
     type Item = T;
 
-    fn select<O>(&mut self, s: &Select, size: usize) -> O
+    fn select<O, K>(&mut self, s: &Select<K>, size: usize) -> O
     where
         O: FromIterator<Self::Item>,
     {
@@ -48,10 +47,10 @@ where
     }
 }
 
-impl FromStr for Select {
+impl<K: FromStr> FromStr for Select<K> {
     type Err = ();
 
-    fn from_str(data: &str) -> Result<Select, ()> {
+    fn from_str(data: &str) -> Result<Self, ()> {
         if data == ".." {
             Ok(Select::All)
         } else if let Ok(index) = data.parse::<isize>() {
@@ -59,7 +58,7 @@ impl FromStr for Select {
         } else if let Some(range) = parse_index_range(data) {
             Ok(Select::Range(range))
         } else {
-            Ok(Select::Key(data.into()))
+            Ok(Select::Key(K::from_str(data).map_err(|_| ())?))
         }
     }
 }
