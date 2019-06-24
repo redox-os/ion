@@ -10,29 +10,38 @@ pub fn builtin(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = syn::parse_macro_input!(attr as syn::AttributeArgs);
     let syn::ItemFn { vis, decl, block, ident, .. } = &input;
     let syn::FnDecl { ref fn_token, ref inputs, ref output, .. } = **decl;
+    let mut help = None;
+    let mut short_description = None;
 
     let name = syn::Ident::new(&format!("builtin_{}", &ident), input.ident.span());
 
-    let help = attrs
-        .iter()
-        .filter_map(|meta| {
-            if let syn::NestedMeta::Meta(syn::Meta::NameValue(attr)) = meta {
-                if attr.ident == "man" {
-                    if let syn::Lit::Str(help) = &attr.lit {
-                        Some(help.value())
-                    } else {
-                        None
-                    }
+    for attr in attrs {
+        if let syn::NestedMeta::Meta(syn::Meta::NameValue(attr)) = attr {
+            if attr.ident == "man" {
+                if let syn::Lit::Str(h) = &attr.lit {
+                    help = Some(h.value());
                 } else {
-                    None
+                    panic!("`man` attribute should be a string variable");
+                }
+            } else if attr.ident == "desc" {
+                if let syn::Lit::Str(h) = &attr.lit {
+                    short_description = Some(h.value());
+                } else {
+                    panic!("`desc` attribute should be a string variable");
                 }
             } else {
-                None
+                panic!("Only the `man` and `desc` attributes are allowed");
             }
-        })
-        .next()
-        .expect("A man page is required! Please add a documentation comment");
-    let man = format!("NAME\n    {} - {}", ident, help.trim());
+        } else {
+            panic!("Only the `man` and `desc` attributes are allowed");
+        }
+    }
+    let help = help.expect("A man page is required! Please add an attribute with name `man`");
+    let help = help.trim();
+    let short_description = short_description
+        .expect("A short description is required! Please add an attribute with name `desc`");
+    let man = format!("NAME\n    {} - {}\n\n{}", ident, short_description, help);
+    let help = format!("{}\n\n```txt\n{}\n```", short_description, help);
 
     let result = quote! {
         #[doc = #help]

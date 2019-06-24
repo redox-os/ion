@@ -4,9 +4,9 @@ use crate::{shell::Shell, types};
 use builtins_proc::builtin;
 use std::env;
 
-#[builtin(man = "
-Evaluates the current runtime status
-
+#[builtin(
+    desc = "Evaluates the current runtime status",
+    man = "
 SYNOPSIS
     status [ -h | --help ] [-l] [-i]
 
@@ -20,7 +20,8 @@ OPTIONS
         returns true if the shell is interactive. Also --is-interactive.
     -f
         prints the filename of the currently running script or else stdio. Also --current-filename.
-")]
+"
+)]
 pub fn status(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let mut login_shell = false;
     let mut interactive = false;

@@ -259,16 +259,17 @@ pub fn builtin_dir_depth(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-#[builtin(man = "
-Change directory.
-
+#[builtin(
+    desc = "Change directory.",
+    man = "
 SYNOPSIS
     cd DIRECTORY
 
 DESCRIPTION
     Without arguments cd changes the working directory to your home directory.
     With arguments cd changes the working directory to the directory you provided.
-")]
+"
+)]
 pub fn cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let err = match args.get(1) {
         Some(dir) => {
@@ -304,15 +305,16 @@ pub fn cd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-#[builtin(man = "
-Returns true if the value given to it is equal to '1' or 'true'.
-
+#[builtin(
+    desc = "Returns true if the value given to it is equal to '1' or 'true'.",
+    man = "
 SYNOPSIS
     bool VALUE
 
 DESCRIPTION
     Returns true if the value given to it is equal to '1' or 'true'.
-")]
+"
+)]
 pub fn bool(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if args.len() != 2 {
         return Status::error("bool requires one argument");
@@ -332,15 +334,16 @@ pub fn bool(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-#[builtin(man = "
-prints the directory stack
-
+#[builtin(
+    desc = "prints the directory stack",
+    man = "
 SYNOPSIS
     dirs
 
 DESCRIPTION
     dirs prints the current directory stack.
-")]
+"
+)]
 pub fn dirs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     // converts pbuf to an absolute path if possible
     fn try_abs_path(pbuf: &PathBuf) -> Cow<'_, str> {
@@ -404,15 +407,16 @@ pub fn dirs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-#[builtin(man = "
-push a directory to the directory stack
-
+#[builtin(
+    desc = "push a directory to the directory stack",
+    man = "
 SYNOPSIS
     pushd DIRECTORY
 
 DESCRIPTION
     pushd pushes a directory to the directory stack.
-")]
+"
+)]
 pub fn pushd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     enum Action {
         Switch,          // <no arguments>
@@ -480,17 +484,18 @@ pub fn pushd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-#[builtin(man = "
-shift through the directory stack
-
+#[builtin(
+    desc = "shift through the directory stack",
+    man = "
 SYNOPSIS
     popd
 
 DESCRIPTION
     popd removes the top directory from the directory stack and changes the working directory to \
-                 the new top directory.
+           the new top directory.
     pushd adds directories to the stack.
-")]
+"
+)]
 pub fn popd(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let len = shell.dir_stack().dirs().len();
     if len <= 1 {
