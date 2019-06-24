@@ -47,3 +47,12 @@ impl<'a> From<Status> for Value<types::Function<'a>> {
 impl From<Status> for types::Str {
     fn from(status: Status) -> Self { types::Str::from(status.as_os_code().to_string()) }
 }
+
+impl From<std::io::Result<()>> for Status {
+    fn from(res: std::io::Result<()>) -> Self {
+        match res {
+            Ok(_) => Status::SUCCESS,
+            Err(err) => Status::error(format!("{}", err)),
+        }
+    }
+}

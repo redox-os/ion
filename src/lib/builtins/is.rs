@@ -1,6 +1,22 @@
 use super::Status;
+use crate as ion_shell;
 use crate::{shell::Shell, types};
+use builtins_proc::builtin;
 
+// TODO: Add support for multiple name in builtins man
+#[builtin(
+    desc = "checks if two arguments are the same",
+    man = "
+SYNOPSIS
+    is [ -h | --help ] [not]
+
+DESCRIPTION
+    Returns 0 if the two arguments are equal
+
+OPTIONS
+    not
+        returns 0 if the two arguments are not equal."
+)]
 pub fn is(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     match args.len() {
         4 => {
@@ -52,21 +68,21 @@ fn test_is() {
     shell.variables_mut().set("y", "0");
 
     // Four arguments
-    assert!(is(&vec_string(&["is", " ", " ", " "]), &mut shell).is_failure());
-    assert!(is(&vec_string(&["is", "not", " ", " "]), &mut shell).is_failure());
-    assert!(is(&vec_string(&["is", "not", "$x", "$x"]), &mut shell).is_failure());
-    assert!(is(&vec_string(&["is", "not", "2", "1"]), &mut shell).is_success());
-    assert!(is(&vec_string(&["is", "not", "$x", "$y"]), &mut shell).is_success());
+    assert!(builtin_is(&vec_string(&["is", " ", " ", " "]), &mut shell).is_failure());
+    assert!(builtin_is(&vec_string(&["is", "not", " ", " "]), &mut shell).is_failure());
+    assert!(builtin_is(&vec_string(&["is", "not", "$x", "$x"]), &mut shell).is_failure());
+    assert!(builtin_is(&vec_string(&["is", "not", "2", "1"]), &mut shell).is_success());
+    assert!(builtin_is(&vec_string(&["is", "not", "$x", "$y"]), &mut shell).is_success());
 
     // Three arguments
-    assert!(is(&vec_string(&["is", "1", "2"]), &mut shell).is_failure());
-    assert!(is(&vec_string(&["is", "$x", "$y"]), &mut shell).is_failure());
-    assert!(is(&vec_string(&["is", " ", " "]), &mut shell).is_success());
-    assert!(is(&vec_string(&["is", "$x", "$x"]), &mut shell).is_success());
+    assert!(builtin_is(&vec_string(&["is", "1", "2"]), &mut shell).is_failure());
+    assert!(builtin_is(&vec_string(&["is", "$x", "$y"]), &mut shell).is_failure());
+    assert!(builtin_is(&vec_string(&["is", " ", " "]), &mut shell).is_success());
+    assert!(builtin_is(&vec_string(&["is", "$x", "$x"]), &mut shell).is_success());
 
     // Two arguments
-    assert!(is(&vec_string(&["is", " "]), &mut shell).is_failure());
+    assert!(builtin_is(&vec_string(&["is", " "]), &mut shell).is_failure());
 
     // One argument
-    assert!(is(&vec_string(&["is"]), &mut shell).is_failure());
+    assert!(builtin_is(&vec_string(&["is"]), &mut shell).is_failure());
 }

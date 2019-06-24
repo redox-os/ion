@@ -1,8 +1,10 @@
 use super::Status;
+use crate as ion_shell;
 use crate::{
     shell::{variables::Value, Shell},
     types,
 };
+use builtins_proc::builtin;
 use std::iter;
 
 enum PositionalArgs {
@@ -12,6 +14,29 @@ enum PositionalArgs {
 
 use self::PositionalArgs::*;
 
+#[builtin(
+    desc = "Set or unset values of shell options and positional parameters.",
+    man = "
+SYNOPSIS
+    set [ --help ] [-e | +e] [-x | +x] [-o [vi | emacs]] [- | --] [STRING]...
+
+DESCRIPTION
+    Shell options may be set using the '-' character, and unset using the '+' character.
+
+OPTIONS
+    -e  Exit immediately if a command exits with a non-zero status.
+
+    -o  Specifies that an argument will follow that sets the key map.
+        The keymap argument may be either `vi` or `emacs`.
+
+    -x  Specifies that commands will be printed as they are executed.
+
+    --  Following arguments will be set as positional arguments in the shell.
+        If no argument are supplied, arguments will be unset.
+
+    -   Following arguments will be set as positional arguments in the shell.
+        If no arguments are suppled, arguments will not be unset."
+)]
 pub fn set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     let mut args_iter = args.iter();
     let mut positionals = None;

@@ -19,12 +19,13 @@ mod variables;
 use self::{
     command_info::{find_type, which},
     conditionals::{contains, ends_with, starts_with},
-    echo::echo,
+    echo::builtin_echo,
     exists::exists,
     functions::print_functions,
-    is::is,
+    is::builtin_is,
     man_pages::*,
-    source::source,
+    set::builtin_set,
+    source::builtin_source,
     status::builtin_status,
     test::test,
     variables::{alias, drop_alias, drop_array, drop_variable},
@@ -199,10 +200,10 @@ impl<'a> BuiltinMap<'a> {
     pub fn with_values_tests(&mut self) -> &mut Self {
         self.add("bool", &builtin_bool, "If the value is '1' or 'true', return 0 exit status")
             .add("calc", &builtin_calc, "Calculate a mathematical expression")
-            .add("eq", &builtin_eq, "Simple alternative to == and !=")
-            .add("is", &builtin_eq, "Simple alternative to == and !=")
-            .add("true", &builtin_true, "Do nothing, successfully")
-            .add("false", &builtin_false, "Do nothing, unsuccessfully")
+            .add("eq", &builtin_is, "Simple alternative to == and !=")
+            .add("is", &builtin_is, "Simple alternative to == and !=")
+            .add("true", &builtin_tru, "Do nothing, successfully")
+            .add("false", &builtin_fals, "Do nothing, unsuccessfully")
             .add(
                 "starts-with",
                 &starts_with,
@@ -575,11 +576,17 @@ impl Completer for EmptyCompleter {
     fn completions(&mut self, _start: &str) -> Vec<String> { Vec::new() }
 }
 
-pub fn builtin_read(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_READ) {
-        return Status::SUCCESS;
-    }
+#[builtin(
+    desc = "read a line of input into some variables",
+    man = "
+SYNOPSIS
+    read VARIABLES...
 
+DESCRIPTION
+    For each variable reads from standard input and stores the results in the variable.
+"
+)]
+pub fn read(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if atty::is(atty::Stream::Stdin) {
         let mut con = Context::new();
         for arg in args.iter().skip(1) {
@@ -603,10 +610,22 @@ pub fn builtin_read(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-pub fn builtin_drop(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_DROP) {
-        return Status::SUCCESS;
-    }
+#[builtin(
+    desc = "delete some variables or arrays",
+    man = "
+SYNOPSIS
+    drop [ -a ] VARIABLES...
+
+DESCRIPTION
+    Deletes the variables given to it as arguments. The variables name must be supplied.
+    Instead of '$x' use 'x'.
+
+OPTIONS
+    -a
+        Instead of deleting variables deletes arrays.
+"
+)]
+pub fn drop(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     if args.len() >= 2 && args[1] == "-a" {
         drop_array(shell.variables_mut(), args)
     } else {
@@ -614,46 +633,20 @@ pub fn builtin_drop(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_set(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_SET) {
-        return Status::SUCCESS;
-    }
-    set::set(args, shell)
-}
+#[builtin(
+    desc = "evaluates the specified commands",
+    man = "
+SYNOPSIS
+    eval COMMANDS...
 
-pub fn builtin_eq(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_EQ) {
-        return Status::SUCCESS;
-    }
-
-    is(args, shell)
-}
-
-pub fn builtin_eval(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_EVAL) {
-        Status::SUCCESS
-    } else {
-        shell.execute_command(args[1..].join(" ").as_bytes()).unwrap_or_else(|_| {
-            Status::error("ion: supplied eval expression was not terminated".to_string())
-        })
-    }
-}
-
-pub fn builtin_source(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_SOURCE) {
-        return Status::SUCCESS;
-    }
-    source(shell, args)
-}
-
-pub fn builtin_echo(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_ECHO) {
-        return Status::SUCCESS;
-    }
-    match echo(args) {
-        Ok(()) => Status::SUCCESS,
-        Err(why) => Status::error(why.to_string()),
-    }
+DESCRIPTION
+    eval evaluates the given arguments as a command. If more than one argument is given,
+    all arguments are joined using a space as a separator."
+)]
+pub fn eval(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
+    shell.execute_command(args[1..].join(" ").as_bytes()).unwrap_or_else(|_| {
+        Status::error("ion: supplied eval expression was not terminated".to_string())
+    })
 }
 
 pub fn builtin_test(args: &[types::Str], _: &mut Shell<'_>) -> Status {
@@ -684,15 +677,30 @@ pub fn builtin_random(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     }
 }
 
-pub fn builtin_true(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    check_help(args, MAN_TRUE);
+// TODO: Find a workaround
+#[builtin(
+    desc = "does nothing sucessfully",
+    man = "
+SYNOPSIS
+    true
+
+DESCRIPTION
+    Sets the exit status to 0."
+)]
+pub fn tru(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-pub fn builtin_false(args: &[types::Str], _: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_FALSE) {
-        return Status::SUCCESS;
-    }
+#[builtin(
+    desc = "does nothing unsuccessfully",
+    man = "
+SYNOPSIS
+    false
+
+DESCRIPTION
+    Sets the exit status to 1."
+)]
+pub fn fals(args: &[types::Str], _: &mut Shell<'_>) -> Status {
     Status::error("")
 }
 
@@ -702,16 +710,30 @@ pub fn builtin_wait(_: &[types::Str], shell: &mut Shell<'_>) -> Status {
     Status::SUCCESS
 }
 
-pub fn builtin_jobs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    check_help(args, MAN_JOBS);
+#[builtin(
+    desc = "list all jobs running in the background",
+    man = "
+SYNOPSIS
+    jobs
+
+DESCRIPTION
+    Prints a list of all jobs running in the background."
+)]
+pub fn jobs(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     job_control::jobs(shell);
     Status::SUCCESS
 }
 
-pub fn builtin_bg(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
-    if check_help(args, MAN_BG) {
-        return Status::SUCCESS;
-    }
+#[builtin(
+    desc = "sends jobs to background",
+    man = "
+SYNOPSIS
+    bg PID
+
+DESCRIPTION
+    bg sends the job to the background resuming it if it has stopped."
+)]
+pub fn bg(args: &[types::Str], shell: &mut Shell<'_>) -> Status {
     job_control::bg(shell, &args[1..])
 }
 
